@@ -84,7 +84,8 @@ def configure(source, fingerprint):
                "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
                f"-DCMAKE_BUILD_TYPE={os.environ['SDL_RDP_BUILD_TYPE']}"]
     command += [f"-DSDL_{option}=OFF" for option in disabled.split()]
-    command += ["-DSDL_UNIX_CONSOLE_BUILD=ON", "-DSDL_RDP=ON",
+    command += ["-DSDL_UNIX_CONSOLE_BUILD=ON", "-DSDL_RDP=ON", "-DSDL_RDPAUDIO=ON",
+                f"-DCMAKE_C_FLAGS=-I{ROOT / 'rdp'} -I{ROOT.parent}",
                 "-DSDL_RDP_DYNAMIC=libsdl-rdp-backend.so", "-DSDL_SHARED=ON",
                 "-DSDL_STATIC=OFF", "-DSDL_TEST_LIBRARY=OFF",
                 "-DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON"]

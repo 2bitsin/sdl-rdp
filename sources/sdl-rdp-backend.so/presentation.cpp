@@ -17,14 +17,26 @@ sdlrdp_rect State::Picture(unsigned w, unsigned h) const
     throw std::runtime_error("Aspect-corrected desktop exceeds RDP dimensions.");
   return {0, 0, int(units * n), int(units * d)};
 }
+void State::EnsurePicture()
+{
+  std::scoped_lock lock(frame_guard);
+  if (shadow) return;
+  shadow = std::make_shared<std::vector<BYTE>>(std::size_t(width) * height * 4);
+  frame_width = width; frame_height = height;
+  if (current) current->Post({0, 0, int(width), int(height)});
+}
 void State::Resize(unsigned w, unsigned h)
 {
   std::scoped_lock producer(producer_guard);
-  auto next = std::make_shared<std::vector<BYTE>>(std::size_t(w) * h * 4);
+  std::scoped_lock session(session_guard);
+  {
+    std::scoped_lock lock(frame_guard);
+    Picture(w, h);
+    shadow.reset();
+    width = w; height = h;
+  }
+  EnsurePicture();
   std::scoped_lock lock(peers_guard, frame_guard);
-  Picture(w, h);
-  shadow = std::move(next);
-  frame_width = width = w; frame_height = height = h;
   ++presented;
   for (auto const& peer : peers) if (peer->active) {
     peer->dirty.clear();

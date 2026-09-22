@@ -75,6 +75,7 @@ Peer::~Peer()
   thread.request_stop();
   SetEvent(wake.get());
   if (thread.joinable()) thread.join();
+  sound.reset();
   disp.reset();
   if (channels) WTSCloseServer(channels);
 }
@@ -115,6 +116,20 @@ bool Peer::Configure()
     && freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth, picture.w)
     && freerdp_settings_set_uint32(settings, FreeRDP_DesktopHeight, picture.h);
 }
+DWORD Peer::EventHandles(std::span<HANDLE> handles)
+{
+  static constexpr DWORD appended_handles = 3;
+  Expects(handles.size() > appended_handles, "event array has room for transport and peer handles");
+  auto count = client->GetEventHandles(client.get(), handles.data(), handles.size() - appended_handles);
+  if (!count) return 0;
+  auto transport_count = count;
+  Expects(count <= handles.size() - appended_handles, "transport respects event budget");
+  handles[count++] = wake.get();
+  handles[count++] = WTSVirtualChannelManagerGetEventHandle(channels);
+  if (sound) handles[count++] = sound->Event();
+  Ensures(count - transport_count <= appended_handles, "appended events fit reserved budget");
+  return count;
+}
 void Peer::Serve(std::stop_token quit)
 {
   Expects(client && wake, "peer owns transport and wake event");
@@ -125,17 +140,15 @@ void Peer::Serve(std::stop_token quit)
       DWORD count, timeout;
       {
         std::scoped_lock lock(owner.session_guard);
-        count = client->GetEventHandles(client.get(), handles.data(), 30);
+        count = EventHandles(handles);
         timeout = Timeout();
       }
       if (!count) break;
-      handles[count++] = wake.get();
-      handles[count++] = WTSVirtualChannelManagerGetEventHandle(channels);
       if (WaitForMultipleObjects(count, handles.data(), FALSE, timeout) == WAIT_FAILED
           || quit.stop_requested()) break;
       std::scoped_lock lock(owner.session_guard);
       if (quit.stop_requested()) break;
-      if (!client->CheckFileDescriptor(client.get()) || !Channels() || !Drain()) {
+      if (!client->CheckFileDescriptor(client.get()) || !Channels() || !SoundChannel() || !Drain()) {
         TransportEnded();
         break;
       }

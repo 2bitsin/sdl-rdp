@@ -1,6 +1,6 @@
 # sdl-rdp
 
-SDL3 with an opt-in `rdp` video driver. An unmodified SDL program on a
+SDL3 with opt-in `rdp` video and playback audio drivers. An unmodified SDL program on a
 headless machine, started with `SDL_VIDEO_DRIVER=rdp`, has its window served
 over RDP: a Windows or Mac RDP client is its display, keyboard and mouse.
 
@@ -75,6 +75,34 @@ EXPOSED + FOCUS_GAINED, leaving is OCCLUDED + FOCUS_LOST, the display mode
 reports the client's screen and measured refresh rate; details are properties (bound port on the
 display, client name on the window). A failed open is in `SDL_GetError()`,
 backend diagnostics go to `SDL_Log`.
+
+## Audio
+
+Select playback with `SDL_AUDIO_DRIVER=rdp`. The single playback device,
+"RDP client", starts at 48 kHz, 16-bit stereo PCM and switches to the
+client’s negotiated rate (48 kHz or 44.1 kHz). SDL converts application
+streams to the current device format. `SDL_RDP_AUDIO_LATENCY` is the unconfirmed audio
+limit in milliseconds (default 100). The driver maintains a real-time
+audio clock even when no client is attached, discarding those samples.
+The backend does no rate conversion: `sdlrdp_audio_open(handle)` opens playback,
+`sdlrdp_audio_rate(handle)` returns the negotiated rate (0 without a playing
+client), and `sdlrdp_audio_write` accepts stereo S16 frames at that rate.
+`SDLRDP_AUDIO {freq, 1}` announces audio negotiation; `{0, 0}` announces loss
+of audio. Connection events are never revised after they are queued.
+Playback uses FreeRDP’s `SendSamples2` to send PCM directly as Wave2, requiring
+rdpsnd version 8 or newer. FreeRDP’s DSP is not used and no wire correction is applied.
+The sample logs the device format again when SDL reports a format change.
+
+Audio works without initializing video. An audio-only application opens
+the same listener using the RDP hints above, with a black desktop at the
+configured width and height. Audio and video share a reference-counted
+backend handle when both are selected. There is no recording device.
+
+For mstsc, leave Remote audio playback set to **Play on this computer**
+(the default). Run the sample with `--tone` for a 440 Hz sine at -12 dBFS;
+add `--tight` to exercise audio alongside frame acknowledgement pacing:
+
+    SDL_VIDEO_DRIVER=rdp SDL_AUDIO_DRIVER=rdp sdl-rdp-sample --tone --tight
 
 ## Consuming
 

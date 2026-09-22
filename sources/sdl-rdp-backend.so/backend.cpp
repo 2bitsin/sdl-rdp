@@ -122,3 +122,40 @@ int sdlrdp_set_pointer(sdlrdp_handle* handle, unsigned w, unsigned h, unsigned x
     return 0;
   } catch (std::exception const& error) { last_error = error.what(); return -1; }
 }
+
+int sdlrdp_audio_open(sdlrdp_handle* handle)
+{
+  try {
+    if (!handle) throw std::runtime_error("Invalid audio handle.");
+    handle->state->OpenAudio();
+    return 0;
+  } catch (std::exception const& error) { last_error = error.what(); return -1; }
+}
+unsigned sdlrdp_audio_rate(sdlrdp_handle* handle)
+{
+  try {
+    if (!handle) throw std::runtime_error("Invalid audio handle.");
+    return handle->state->AudioRate();
+  } catch (std::exception const& error) { last_error = error.what(); return 0; }
+}
+int sdlrdp_audio_write(sdlrdp_handle* handle, const void* frames, unsigned count)
+{
+  try {
+    if (!handle || (!frames && count) || count > unsigned(INT_MAX))
+      throw std::runtime_error("Invalid audio handle, frames or count.");
+    return handle->state->WriteAudio(frames, count);
+  } catch (std::exception const& error) { last_error = error.what(); return -1; }
+}
+int sdlrdp_audio_wait(sdlrdp_handle* handle, int timeout)
+{
+  try {
+    if (!handle) throw std::runtime_error("Invalid audio handle.");
+    return handle->state->WaitAudio(timeout);
+  } catch (std::exception const& error) { last_error = error.what(); return -1; }
+}
+void sdlrdp_audio_close(sdlrdp_handle* handle)
+{
+  if (!handle) return;
+  try { handle->state->CloseAudio(); }
+  catch (std::exception const& error) { last_error = error.what(); }
+}

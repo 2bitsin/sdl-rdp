@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <ranges>
 #include <array>
+#include <cmath>
+#include <numbers>
 
 void Check(bool result)
 {
@@ -57,6 +59,13 @@ void PrintGeometry(const SDL_Event &event, SDL_Window *window)
     }
 }
 
+void PrintAudioFormat(SDL_AudioDeviceID device)
+{
+    SDL_AudioSpec actual;
+    Check(SDL_GetAudioDeviceFormat(device, &actual, nullptr));
+    SDL_Log("audio device=%s freq=%d", SDL_GetAudioDeviceName(device), actual.freq);
+}
+
 void PrintEvent(const SDL_Event &event, SDL_Window *window, unsigned frame)
 {
     auto line = std::format("event {} type={}", EventName(event.type), event.type);
@@ -69,6 +78,9 @@ void PrintEvent(const SDL_Event &event, SDL_Window *window, unsigned frame)
         break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN: case SDL_EVENT_MOUSE_BUTTON_UP:
         line += std::format(" button={} down={}", event.button.button, int(event.button.down));
+        break;
+    case SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED:
+        PrintAudioFormat(event.adevice.which);
         break;
     case SDL_EVENT_MOUSE_WHEEL:
         line += std::format(" x={} y={}", event.wheel.x, event.wheel.y);
@@ -148,9 +160,37 @@ void Run(SDL_Window *window, bool tight)
     }
 }
 
+void SDLCALL FeedTone(void *userdata, SDL_AudioStream *stream, int additional, int)
+{
+    auto &frame = *static_cast<Uint64 *>(userdata);
+    std::array<Sint16, 960> samples;
+    while (additional > 0) {
+        auto count = std::min(additional / int(2 * sizeof(Sint16)), 480);
+        if (!count) return;
+        for (int i = 0; i < count; ++i, ++frame) {
+            auto value = Sint16(std::lround(32767 * std::pow(10.0, -12.0 / 20.0) *
+                std::sin(2 * std::numbers::pi * 440 * double(frame) / 48000)));
+            samples[2 * i] = samples[2 * i + 1] = value;
+        }
+        Check(SDL_PutAudioStreamData(stream, samples.data(), count * 2 * sizeof(Sint16)));
+        additional -= count * 2 * sizeof(Sint16);
+    }
+}
+
+SDL_AudioStream *OpenTone(Uint64 &frame)
+{
+    const SDL_AudioSpec spec{SDL_AUDIO_S16, 2, 48000};
+    auto stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, FeedTone, &frame);
+    Check(stream != nullptr);
+    auto device = SDL_GetAudioStreamDevice(stream);
+    PrintAudioFormat(device);
+    Check(SDL_ResumeAudioStreamDevice(stream));
+    return stream;
+}
+
 struct Options {
     int width = 640, height = 480;
-    bool tight = false, fullscreen = false;
+    bool tight = false, fullscreen = false, tone = false;
 };
 
 Options ParseOptions(int argc, char **argv)
@@ -158,7 +198,8 @@ Options ParseOptions(int argc, char **argv)
     Options options;
     for (int i = 1; i < argc; ++i) {
         std::string_view arg(argv[i]);
-        if (arg == "--tight") options.tight = true;
+        if (arg == "--tone") options.tone = true;
+        else if (arg == "--tight") options.tight = true;
         else if (arg == "--fullscreen") options.fullscreen = true;
         else if (arg == "--aspect" && i + 1 < argc) Check(SDL_SetHint(SDL_HINT_RDP_ASPECT, argv[++i]));
         else if (arg == "--size" && i + 1 < argc) {
@@ -197,7 +238,7 @@ int main(int argc, char **argv)
         Check(SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SDL_RDP_CODEC"));
         Check(SDL_SetHint(SDL_HINT_RDP_CODEC, requested.c_str()));
     }
-    Check(SDL_Init(SDL_INIT_VIDEO));
+    Check(SDL_Init(SDL_INIT_VIDEO | (options.tone ? SDL_INIT_AUDIO : 0)));
     auto display = SDL_GetPrimaryDisplay();
     SDL_Log("port %lld", (long long)SDL_GetNumberProperty(SDL_GetDisplayProperties(display), SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0));
     {
@@ -205,6 +246,9 @@ int main(int argc, char **argv)
             SDL_CreateWindow("SDL RDP sample", options.width, options.height, options.fullscreen ? SDL_WINDOW_FULLSCREEN : 0), SDL_DestroyWindow);
         Check(window != nullptr);
         std::unique_ptr<SDL_Cursor, decltype(&SDL_DestroyCursor)> cursor(CreateCursor(), SDL_DestroyCursor);
+        Uint64 tone_frame = 0;
+        std::unique_ptr<SDL_AudioStream, decltype(&SDL_DestroyAudioStream)> tone(
+            options.tone ? OpenTone(tone_frame) : nullptr, SDL_DestroyAudioStream);
         Run(window.get(), options.tight);
     }
     SDL_Quit();

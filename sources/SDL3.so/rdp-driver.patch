@@ -1,15 +1,16 @@
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -374,6 +374,8 @@
+@@ -374,6 +374,9 @@
  set_option(SDL_OPENVR              "Use OpenVR video driver" OFF)
  dep_option(SDL_KMSDRM              "Use KMS DRM video driver" ${UNIX_SYS} "SDL_VIDEO" OFF)
  dep_option(SDL_KMSDRM_SHARED       "Dynamically load KMS DRM support" ON "SDL_KMSDRM;SDL_DEPS_SHARED" OFF)
++set_option(SDL_RDPAUDIO            "Use RDP audio driver" OFF)
 +set_option(SDL_RDP                 "Use RDP video driver" OFF)
 +set(SDL_RDP_DYNAMIC "libsdl-rdp-backend.so" CACHE STRING "RDP backend library")
  set_option(SDL_OFFSCREEN           "Use offscreen video driver" ON)
  dep_option(SDL_DUMMYCAMERA         "Support the dummy camera driver" ON SDL_CAMERA OFF)
  option_string(SDL_BACKGROUNDING_SIGNAL "number to use for magic backgrounding signal or 'OFF'" OFF)
-@@ -424,6 +426,7 @@
+@@ -424,6 +427,7 @@
    set(SDL_DUMMYAUDIO       OFF)
    set(SDL_DUMMYCAMERA      OFF)
    set(SDL_DUMMYVIDEO       OFF)
@@ -17,9 +18,21 @@
    set(SDL_OFFSCREEN        OFF)
    set(SDL_RENDER_GPU       OFF)
    set(SDL_TRAY             OFF)
-@@ -3501,6 +3504,12 @@
+@@ -1331,6 +1335,11 @@
+
+ # General SDL subsystem options, valid for all platforms
+ if(SDL_AUDIO)
++  if(SDL_RDPAUDIO)
++    set(SDL_AUDIO_DRIVER_RDP 1)
++    set(HAVE_SDL_AUDIO TRUE)
++    sdl_glob_sources("${SDL3_SOURCE_DIR}/src/audio/rdp/*.c")
++  endif()
+   # CheckDummyAudio/CheckDiskAudio - valid for all platforms
+   if(SDL_DUMMYAUDIO)
+     set(SDL_AUDIO_DRIVER_DUMMY 1)
+@@ -3501,6 +3510,12 @@
  # Platform-independent options
- 
+
  if(SDL_VIDEO)
 +  if(SDL_RDP)
 +    set(SDL_VIDEO_DRIVER_RDP 1)
@@ -32,96 +45,23 @@
      sdl_glob_sources(
 --- a/include/SDL3/SDL_hints.h
 +++ b/include/SDL3/SDL_hints.h
-@@ -3164,6 +3164,92 @@
+@@ -3164,6 +3164,19 @@
  #define SDL_HINT_QUIT_ON_LAST_WINDOW_CLOSE "SDL_QUIT_ON_LAST_WINDOW_CLOSE"
- 
- /**
-+ * A variable controlling the path to the RDP backend shared library.
-+ *
-+ * The default is the backend library selected when SDL was built.
-+ *
-+ * This hint should be set before initializing the video subsystem.
-+ *
-+ * \since This hint is available since SDL 3.4.8.
-+ */
+
++/* Listener settings are shared by audio and video; set before opening either. */
 +#define SDL_HINT_RDP_BACKEND "SDL_RDP_BACKEND"
-+
-+/**
-+ * A variable controlling the numeric IPv4 address for the RDP listener.
-+ *
-+ * The default is "0.0.0.0".
-+ *
-+ * This hint should be set before initializing the video subsystem.
-+ *
-+ * \since This hint is available since SDL 3.4.8.
-+ */
 +#define SDL_HINT_RDP_BIND "SDL_RDP_BIND"
-+
-+/**
-+ * A variable controlling the directory containing RDP TLS certificates.
-+ *
-+ * The default is the per-user data directory for sdl-rdp.
-+ *
-+ * This hint should be set before initializing the video subsystem.
-+ *
-+ * \since This hint is available since SDL 3.4.8.
-+ */
 +#define SDL_HINT_RDP_CERT_DIR "SDL_RDP_CERT_DIR"
-+
-+/**
-+ * RDP codec preference: auto (default), planar, remotefx, nscodec or raw.
-+ * May be changed while the video subsystem is running.
-+ */
 +#define SDL_HINT_RDP_CODEC "SDL_RDP_CODEC"
++#define SDL_HINT_RDP_AUDIO_LATENCY "SDL_RDP_AUDIO_LATENCY"
 +#define SDL_HINT_RDP_VSYNC "SDL_RDP_VSYNC"
 +#define SDL_HINT_RDP_ASPECT "SDL_RDP_ASPECT"
-+
-+
-+/**
-+ * A variable controlling the initial RDP display height in pixels.
-+ *
-+ * The default is "768".
-+ *
-+ * This hint should be set before initializing the video subsystem.
-+ *
-+ * \since This hint is available since SDL 3.4.8.
-+ */
 +#define SDL_HINT_RDP_HEIGHT "SDL_RDP_HEIGHT"
-+
-+/**
-+ * A variable controlling the RDP listener port.
-+ *
-+ * The default is "3389". A value of "0" selects an ephemeral port.
-+ *
-+ * This hint should be set before initializing the video subsystem.
-+ *
-+ * \since This hint is available since SDL 3.4.8.
-+ */
 +#define SDL_HINT_RDP_PORT "SDL_RDP_PORT"
-+
-+/**
-+ * A variable controlling whether RDP initialization waits for a client.
-+ *
-+ * The default is "0". Set to "1" to wait for client activation.
-+ *
-+ * This hint should be set before initializing the video subsystem.
-+ *
-+ * \since This hint is available since SDL 3.4.8.
-+ */
 +#define SDL_HINT_RDP_WAIT_FOR_CLIENT "SDL_RDP_WAIT_FOR_CLIENT"
-+
-+/**
-+ * A variable controlling the initial RDP display width in pixels.
-+ *
-+ * The default is "1024".
-+ *
-+ * This hint should be set before initializing the video subsystem.
-+ *
-+ * \since This hint is available since SDL 3.4.8.
-+ */
 +#define SDL_HINT_RDP_WIDTH "SDL_RDP_WIDTH"
 +
-+/**
+ /**
   * A variable controlling whether the Direct3D device is initialized for
   * thread-safe operations.
   *
@@ -130,7 +70,7 @@
 @@ -681,6 +681,7 @@
   */
  extern SDL_DECLSPEC SDL_PropertiesID SDLCALL SDL_GetDisplayProperties(SDL_DisplayID displayID);
- 
+
 +#define SDL_PROP_DISPLAY_RDP_PORT_NUMBER "SDL.display.rdp.port"
  #define SDL_PROP_DISPLAY_HDR_ENABLED_BOOLEAN             "SDL.display.HDR_enabled"
  #define SDL_PROP_DISPLAY_KMSDRM_PANEL_ORIENTATION_NUMBER "SDL.display.KMSDRM.panel_orientation"
@@ -138,7 +78,7 @@
 @@ -1627,6 +1628,9 @@
   */
  extern SDL_DECLSPEC SDL_PropertiesID SDLCALL SDL_GetWindowProperties(SDL_Window *window);
- 
+
 +#define SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING "SDL.window.rdp.client_name"
 +#define SDL_PROP_WINDOW_RDP_CODEC_STRING "SDL.window.rdp.codec"
 +#define SDL_PROP_WINDOW_RDP_ASPECT_STRING "SDL.window.rdp.aspect"
@@ -147,6 +87,15 @@
  #define SDL_PROP_WINDOW_SDR_WHITE_LEVEL_FLOAT                       "SDL.window.SDR_white_level"
 --- a/include/build_config/SDL_build_config.h.cmake
 +++ b/include/build_config/SDL_build_config.h.cmake
+@@ -272,6 +272,8 @@
+ #cmakedefine SDL_AUDIO_DRIVER_COREAUDIO 1
+ #cmakedefine SDL_AUDIO_DRIVER_DISK 1
+ #cmakedefine SDL_AUDIO_DRIVER_DSOUND 1
++#cmakedefine SDL_AUDIO_DRIVER_RDP 1
++#define SDL_RDP_DYNAMIC "@SDL_RDP_DYNAMIC@"
+ #cmakedefine SDL_AUDIO_DRIVER_DUMMY 1
+ #cmakedefine SDL_AUDIO_DRIVER_EMSCRIPTEN 1
+ #cmakedefine SDL_AUDIO_DRIVER_HAIKU 1
 @@ -406,6 +406,8 @@
  #cmakedefine SDL_VIDEO_DRIVER_KMSDRM_DYNAMIC_GBM @SDL_VIDEO_DRIVER_KMSDRM_DYNAMIC_GBM@
  #cmakedefine SDL_VIDEO_DRIVER_N3DS 1
@@ -197,11 +146,147 @@
              goto pre_driver_error;
          }
          SDL_SetError("No available video device");
---- a/src/video/SDL_video.c
-+++ b/src/video/SDL_video.c
-@@ -1451,4 +1451,4 @@
+@@ -1450,7 +1456,7 @@
+             (old_mode->format && old_mode->format != new_mode->format) ||
              (old_mode->w && old_mode->h && (old_mode->w != new_mode->w ||old_mode->h != new_mode->h)) ||
              (old_mode->pixel_density != 0.0f && old_mode->pixel_density != new_mode->pixel_density) ||
 -            (old_mode->refresh_rate != 0.0f && old_mode->refresh_rate != new_mode->refresh_rate));
 +            (old_mode->refresh_rate != new_mode->refresh_rate));
  }
+
+ void SDL_SetDesktopDisplayMode(SDL_VideoDisplay *display, const SDL_DisplayMode *mode)
+--- a/src/audio/SDL_sysaudio.h
++++ b/src/audio/SDL_sysaudio.h
+@@ -380,6 +380,7 @@
+ extern AudioBootStrap HAIKUAUDIO_bootstrap;
+ extern AudioBootStrap COREAUDIO_bootstrap;
+ extern AudioBootStrap DISKAUDIO_bootstrap;
++extern AudioBootStrap RDPAUDIO_bootstrap;
+ extern AudioBootStrap DUMMYAUDIO_bootstrap;
+ extern AudioBootStrap AAUDIO_bootstrap;
+ extern AudioBootStrap OPENSLES_bootstrap;
+--- a/src/audio/SDL_audio.c
++++ b/src/audio/SDL_audio.c
+@@ -95,6 +95,9 @@
+ #ifdef SDL_AUDIO_DRIVER_DISK
+     &DISKAUDIO_bootstrap,
+ #endif
++#ifdef SDL_AUDIO_DRIVER_RDP
++    &RDPAUDIO_bootstrap,
++#endif
+ #ifdef SDL_AUDIO_DRIVER_DUMMY
+     &DUMMYAUDIO_bootstrap,
+ #endif
+--- a/src/audio/rdp/SDL_rdpaudio.h
++++ b/src/audio/rdp/SDL_rdpaudio.h
+@@ -0,0 +1,12 @@
++#ifndef SDL_rdpaudio_h_
++#define SDL_rdpaudio_h_
++#include "../SDL_sysaudio.h"
++#include "SDL_rdpdyn.h"
++struct SDL_PrivateAudioData
++{
++    SDL_RDP_Backend backend;
++    sdlrdp_handle *handle;
++    Uint8 *mixbuf;
++    Uint64 next;
++};
++#endif
+--- a/src/audio/rdp/SDL_rdpaudio.c
++++ b/src/audio/rdp/SDL_rdpaudio.c
+@@ -0,0 +1,95 @@
++#include "SDL_internal.h"
++#include "SDL_rdpaudio.h"
++
++static void RDPAUDIO_DetectDevices(SDL_AudioDevice **playback, SDL_AudioDevice **recording)
++{
++    const SDL_AudioSpec spec = {SDL_AUDIO_S16, 2, 48000};
++    *playback = SDL_AddAudioDevice(false, "RDP client", &spec, NULL);
++}
++
++static bool RDPAUDIO_OpenDevice(SDL_AudioDevice *device)
++{
++    device->hidden = SDL_calloc(1, sizeof(*device->hidden));
++    if (!device->hidden) return false;
++    if (!SDL_RDP_AcquireBackend(&device->hidden->backend, &device->hidden->handle, NULL)) return false;
++    device->spec.format = SDL_AUDIO_S16;
++    device->spec.channels = 2;
++    device->spec.freq = 48000;
++    device->sample_frames = device->spec.freq / 100;
++    SDL_UpdatedAudioDeviceFormat(device);
++    if (device->hidden->backend.audio_open(device->hidden->handle) < 0) {
++        return SDL_SetError("%s", device->hidden->backend.last_error());
++    }
++    device->hidden->mixbuf = SDL_malloc(device->buffer_size);
++    device->hidden->next = SDL_GetTicksNS();
++    return device->hidden->mixbuf != NULL;
++}
++
++static bool RDPAUDIO_WaitDevice(SDL_AudioDevice *device)
++{
++    struct SDL_PrivateAudioData *data = device->hidden;
++    int result;
++    do {
++        result = data->backend.audio_wait(data->handle, 100);
++    } while (!result && !SDL_GetAtomicInt(&device->shutdown));
++    if (result < 0) return SDL_SetError("%s", data->backend.last_error());
++    const unsigned rate = data->backend.audio_rate(data->handle);
++    if (rate && device->spec.freq && rate != (unsigned)device->spec.freq) {
++        SDL_AudioSpec newspec = device->spec;
++        newspec.freq = (int)rate;
++        if (!SDL_AudioDeviceFormatChanged(device, &newspec, newspec.freq / 100)) return false;
++        Uint8 *mixbuf = SDL_realloc(data->mixbuf, device->buffer_size);
++        if (!mixbuf) return false;
++        data->mixbuf = mixbuf;
++    }
++    data->next += (Uint64)device->sample_frames * SDL_NS_PER_SECOND / device->spec.freq;
++    const Uint64 now = SDL_GetTicksNS();
++    if (data->next > now) SDL_DelayNS(data->next - now);
++    else data->next = now;
++    return true;
++}
++
++static bool RDPAUDIO_PlayDevice(SDL_AudioDevice *device, const Uint8 *buffer, int buflen)
++{
++    struct SDL_PrivateAudioData *data = device->hidden;
++    const unsigned frames = buflen / (2 * sizeof(Sint16));
++    const unsigned rate = data->backend.audio_rate(data->handle);
++    if (rate && rate != (unsigned)device->spec.freq) return true;
++    if (data->backend.audio_write(data->handle, buffer, frames) != (int)frames) {
++        return SDL_SetError("%s", data->backend.last_error());
++    }
++    return true;
++}
++
++static Uint8 *RDPAUDIO_GetDeviceBuf(SDL_AudioDevice *device, int *size)
++{
++    return device->hidden->mixbuf;
++}
++
++static void RDPAUDIO_CloseDevice(SDL_AudioDevice *device)
++{
++    if (device->hidden) {
++        if (device->hidden->handle) {
++            device->hidden->backend.audio_close(device->hidden->handle);
++            SDL_RDP_ReleaseBackend();
++        }
++        SDL_free(device->hidden->mixbuf);
++        SDL_free(device->hidden);
++        device->hidden = NULL;
++    }
++}
++
++static bool RDPAUDIO_Init(SDL_AudioDriverImpl *impl)
++{
++    impl->DetectDevices = RDPAUDIO_DetectDevices;
++    impl->OpenDevice = RDPAUDIO_OpenDevice;
++    impl->CloseDevice = RDPAUDIO_CloseDevice;
++    impl->WaitDevice = RDPAUDIO_WaitDevice;
++    impl->PlayDevice = RDPAUDIO_PlayDevice;
++    impl->GetDeviceBuf = RDPAUDIO_GetDeviceBuf;
++    return true;
++}
++
++AudioBootStrap RDPAUDIO_bootstrap = {
++    "rdp", "SDL RDP audio driver", RDPAUDIO_Init, true, false
++};
