@@ -1,3 +1,5 @@
+#include "_detail/check.hpp"
+#include "input.hpp"
 #include <SDL3/SDL.h>
 #include "clipboard.hpp"
 #include <format>
@@ -8,14 +10,6 @@
 #include <algorithm>
 #include <ranges>
 #include <array>
-
-void Check(bool result)
-{
-    if (!result) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s", SDL_GetError());
-        std::exit(1);
-    }
-}
 
 const char *EventName(Uint32 type)
 {
@@ -61,13 +55,14 @@ void PrintGeometry(const SDL_Event &event, SDL_Window *window)
 void PrintEvent(const SDL_Event &event, SDL_Window *window, unsigned frame)
 {
     if (PrintClipboardEvent(event)) return;
+    if (PrintInput(event, window)) return;
     auto line = std::format("event {} type={}", EventName(event.type), event.type);
     switch (event.type) {
     case SDL_EVENT_KEY_DOWN: case SDL_EVENT_KEY_UP:
         line += std::format(" scancode={} key={} down={}", int(event.key.scancode), event.key.key, int(event.key.down));
         break;
     case SDL_EVENT_MOUSE_MOTION:
-        line += std::format(" x={:.0f} y={:.0f} frame={}", event.motion.x, event.motion.y, frame);
+        line += std::format(" xrel={:g} yrel={:g} x={:.0f} y={:.0f} frame={}", event.motion.xrel, event.motion.yrel, event.motion.x, event.motion.y, frame);
         break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN: case SDL_EVENT_MOUSE_BUTTON_UP:
         line += std::format(" button={} down={}", event.button.button, int(event.button.down));
@@ -82,7 +77,8 @@ void PrintEvent(const SDL_Event &event, SDL_Window *window, unsigned frame)
         break;
     }
     case SDL_EVENT_WINDOW_EXPOSED:
-        line += std::format(" client_name={} codec={}", SDL_GetStringProperty(SDL_GetWindowProperties(window),
+        line += std::format(" keyboard_layout={} client_name={} codec={}",
+                    SDL_GetNumberProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_KEYBOARD_LAYOUT_NUMBER, 0), SDL_GetStringProperty(SDL_GetWindowProperties(window),
                     SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING, ""),
                     SDL_GetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_CODEC_STRING, ""));
         break;
@@ -133,6 +129,7 @@ void Run(SDL_Window *window, bool tight)
         SDL_Event event;
         if (SDL_WaitEventTimeout(&event, tight ? 0 : 10)) {
             PrintEvent(event, window, frame);
+            InputMode(event, window);
             if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F1)
                 CycleCodec();
             if (event.type == SDL_EVENT_QUIT ||
@@ -210,6 +207,7 @@ int main(int argc, char **argv)
             SDL_CreateWindow("SDL RDP sample", options.width, options.height, options.fullscreen ? SDL_WINDOW_FULLSCREEN : 0), SDL_DestroyWindow);
         Check(window != nullptr);
         std::unique_ptr<SDL_Cursor, decltype(&SDL_DestroyCursor)> cursor(CreateCursor(), SDL_DestroyCursor);
+        Check(SDL_StartTextInput(window.get()));
         Run(window.get(), options.tight);
     }
     SDL_Quit();

@@ -1,5 +1,8 @@
 #ifndef SDL_RDP_BACKEND_H
 #define SDL_RDP_BACKEND_H
+#ifndef __cplusplus
+#include <uchar.h>
+#endif
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -26,13 +29,15 @@ typedef struct {
 } sdlrdp_config;
 typedef enum {
   SDLRDP_CONNECTED, SDLRDP_DISCONNECTED, SDLRDP_RESIZE, SDLRDP_KEY,
-  SDLRDP_MOUSE_MOVE, SDLRDP_MOUSE_BUTTON, SDLRDP_MOUSE_WHEEL, SDLRDP_CODEC_CHANGED, SDLRDP_SCREEN, SDLRDP_REFRESH, SDLRDP_CLIPBOARD
+  SDLRDP_MOUSE_MOVE, SDLRDP_MOUSE_BUTTON, SDLRDP_MOUSE_WHEEL, SDLRDP_CODEC_CHANGED, SDLRDP_SCREEN, SDLRDP_REFRESH,
+  SDLRDP_CLIPBOARD, SDLRDP_TEXT, SDLRDP_MOUSE_RELATIVE, SDLRDP_TOUCH
 } sdlrdp_event_type;
+typedef enum { SDLRDP_TOUCH_DOWN, SDLRDP_TOUCH_MOVE, SDLRDP_TOUCH_UP, SDLRDP_TOUCH_CANCEL } sdlrdp_touch_phase;
 typedef struct {
   sdlrdp_event_type type;
   union {
     struct { unsigned width, height, bpp; char client_name[64]; sdlrdp_codec codec;
-      unsigned screen_width, screen_height, refresh_millihertz; } connected;
+      unsigned screen_width, screen_height, refresh_millihertz, keyboard_layout; } connected;
     struct { sdlrdp_codec codec; } codec_changed;
     struct { unsigned width, height; } resize;
     struct { unsigned width, height; } screen;
@@ -40,7 +45,10 @@ typedef struct {
     struct { unsigned scancode; int extended; int down; } key;
     struct { int x, y; } mouse_move;
     struct { unsigned button; int down; } mouse_button;
-    struct { int dx, dy; } mouse_wheel;
+    struct { float dx, dy; } mouse_wheel;
+    struct { char32_t codepoint; int down; } text;
+    struct { int dx, dy; } mouse_relative;
+    struct { unsigned id; float x, y, pressure; sdlrdp_touch_phase phase; } touch;
   };
 } sdlrdp_event;
 const char* sdlrdp_last_error(void);
@@ -56,6 +64,7 @@ unsigned sdlrdp_poll(sdlrdp_handle*, sdlrdp_event*, unsigned);
 /* Negative timeout waits indefinitely; wakeup without events returns 0. */
 int sdlrdp_wait(sdlrdp_handle*, int);
 void sdlrdp_wakeup(sdlrdp_handle*);
+int sdlrdp_set_relative_mouse(sdlrdp_handle*, int enabled);
 /* Unsupported preferences fall back to the best negotiated codec. */
 int sdlrdp_set_codec(sdlrdp_handle*, sdlrdp_codec);
 int sdlrdp_set_pointer(sdlrdp_handle*, unsigned w, unsigned h, unsigned hot_x, unsigned hot_y, const void* argb);

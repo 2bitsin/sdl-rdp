@@ -7,6 +7,7 @@
 #include "logging.hpp"
 #include "encoder.hpp"
 #include "clipboard.hpp"
+#include "input.hpp"
 #include <atomic>
 #include <condition_variable>
 #include <deque>
@@ -100,10 +101,11 @@ public:
   bool Marker(UINT16 action);
   bool Pacing();
   DWORD Timeout();
-  static constexpr DWORD AppendedHandleCount = 3;
+  static constexpr DWORD AppendedHandleCount = 3 + Input::MaxHandles;
   bool Channels();
   bool OpenStaticChannels();
   bool OpenDisplayControl();
+  static BOOL ChannelCreated(void*, UINT32, INT32);
   static UINT Layout(DispServerContext*, DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const*);
   static BOOL Activate(freerdp_peer* client);
   static BOOL Keyboard(rdpInput* input, UINT16 flags, UINT8 code);
@@ -132,6 +134,7 @@ public:
   HANDLE channels = nullptr;
   std::unique_ptr<DispServerContext, Releases<disp_server_context_free>> disp;
   std::unique_ptr<ClipboardChannel> clipboard;
+  UINT32 display_id = UINT32_MAX;
   bool disp_open = false, resizing = false, frame_started = false;
   sdlrdp_rect desktop{};
   bool activated = false;

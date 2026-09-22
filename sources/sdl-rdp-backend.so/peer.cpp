@@ -1,4 +1,5 @@
 #include "_detail/state.hpp"
+#include "_detail/input.hpp"
 #include <freerdp/crypto/certificate.h>
 #include <freerdp/crypto/privatekey.h>
 #include <freerdp/settings.h>
@@ -22,6 +23,7 @@ sdlrdp_event Connected(rdpSettings const* settings)
   sdlrdp_event event{.type = SDLRDP_CONNECTED};
   event.connected.width = freerdp_settings_get_uint32(settings, FreeRDP_DesktopWidth);
   event.connected.height = freerdp_settings_get_uint32(settings, FreeRDP_DesktopHeight);
+  event.connected.keyboard_layout = freerdp_settings_get_uint32(settings, FreeRDP_KeyboardLayout);
   event.connected.bpp = freerdp_settings_get_uint32(settings, FreeRDP_ColorDepth);
   auto name = freerdp_settings_get_string(settings, FreeRDP_ClientHostname);
   if (name) std::strncpy(event.connected.client_name, name, sizeof(event.connected.client_name) - 1);
@@ -55,7 +57,9 @@ Peer::Peer(PeerHandle accepted, State& state)
   auto raw = client.get();
   Expects(raw != nullptr, "accepted peer exists");
   if (!wake) throw std::runtime_error("peer event allocation failed");
-  raw->ContextSize = sizeof(rdpContext);
+  raw->ContextSize = sizeof(InputContext);
+  raw->ContextNew = Input::Create;
+  raw->ContextFree = Input::Free;
   raw->ContextExtra = this;
   raw->Activate = Activate;
   raw->Capabilities = Capabilities;
@@ -63,10 +67,12 @@ Peer::Peer(PeerHandle accepted, State& state)
   if (!freerdp_peer_context_new(raw)) throw std::runtime_error("peer context failed");
   channels = WTSOpenServerA(reinterpret_cast<char*>(raw->context));
   if (!channels || channels == INVALID_HANDLE_VALUE) throw std::runtime_error("Channel manager allocation failed.");
+  WTSVirtualChannelManagerSetDVCCreationCallback(channels, ChannelCreated, this);
   raw->context->update->SurfaceFrameAcknowledge = Acknowledge;
   raw->context->update->SuppressOutput = Suppress;
   auto input = raw->context->input;
   input->KeyboardEvent = Keyboard;
+  input->UnicodeKeyboardEvent = Input::Unicode;
   input->MouseEvent = Mouse;
   input->ExtendedMouseEvent = ExtendedMouse;
 }
@@ -75,6 +81,7 @@ Peer::~Peer()
   thread.request_stop();
   SetEvent(wake.get());
   if (thread.joinable()) thread.join();
+  Input::Held(*this).Close();
   clipboard.reset();
   disp.reset();
   if (channels) WTSCloseServer(channels);
@@ -128,6 +135,7 @@ void Peer::Serve(std::stop_token quit)
         std::scoped_lock lock(owner.session_guard);
         count = transport_count = client->GetEventHandles(client.get(), handles.data(),
           handles.size() - AppendedHandleCount);
+        if (count) count += Input::Held(*this).Handles(handles.data() + count);
         if (count && clipboard) handles[count++] = clipboard->Event();
         timeout = Timeout();
       }
@@ -157,7 +165,7 @@ bool Peer::Channels()
   Expects(client && client->context, "channel peer exists");
   if (!channels || !active) return true;
   return WTSVirtualChannelManagerCheckFileDescriptor(channels)
-    && OpenStaticChannels() && OpenDisplayControl();
+    && Input::Held(*this).Channels(*this) && OpenStaticChannels() && OpenDisplayControl();
 }
 void Peer::TransportEnded()
 {
@@ -207,6 +215,7 @@ bool Peer::Drain()
     ResetEvent(wake.get());
     return true;
   }
+  if (Input::Held(*this).center_pending && !Input::Center(*this)) return false;
   {
     std::scoped_lock lock(owner.frame_guard);
     ResetEvent(wake.get());

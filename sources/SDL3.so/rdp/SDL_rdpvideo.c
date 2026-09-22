@@ -49,6 +49,12 @@ static bool SDL_RDP_InitDisplay(SDL_VideoData *data, const sdlrdp_config *config
         SDL_PROP_DISPLAY_RDP_PORT_NUMBER, data->backend.port(data->handle));
 }
 
+static bool SDL_RDP_RelativeMouse(bool enabled)
+{
+    SDL_VideoData *data = SDL_GetVideoDevice()->internal;
+    return data->backend.set_relative_mouse(data->handle, enabled) == 0 || SDL_SetError("%s", data->backend.last_error());
+}
+
 static bool SDL_RDP_VideoInit(SDL_VideoDevice *_this)
 {
     SDL_VideoData *data = _this->internal;
@@ -80,6 +86,7 @@ static bool SDL_RDP_VideoInit(SDL_VideoDevice *_this)
     }
     SDL_AddKeyboard(SDL_DEFAULT_KEYBOARD_ID, NULL);
     SDL_AddMouse(SDL_DEFAULT_MOUSE_ID, NULL);
+    SDL_GetMouse()->SetRelativeMouseMode = SDL_RDP_RelativeMouse;
     SDL_RDP_InitMouse();
     return true;
 }

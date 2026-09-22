@@ -1,8 +1,28 @@
 #include "_detail/state.hpp"
+#include "_detail/input.hpp"
 #include <freerdp/channels/wtsvc.h>
 #include <freerdp/settings.h>
 
 namespace Backend {
+BOOL Peer::ChannelCreated(void* user, UINT32 id, INT32 status)
+{
+  Expects(user != nullptr, "channel creation has a peer");
+  auto& peer = *static_cast<Peer*>(user);
+  auto& input = Input::Held(peer);
+  if (status < 0) return TRUE;
+  if (id == input.advanced_id) {
+    input.advanced_ready = true;
+    return input.advanced->Poll(input.advanced.get()) == CHANNEL_RC_OK;
+  }
+  if (id == input.touch_id) {
+    input.touch_ready = true;
+    return rdpei_server_send_sc_ready(input.touch.get(), RDPINPUT_PROTOCOL_V10, 0) == CHANNEL_RC_OK;
+  }
+  if (id == peer.display_id)
+    return peer.disp->DisplayControlCaps(peer.disp.get()) == CHANNEL_RC_OK;
+  return TRUE;
+}
+
 bool Peer::OpenDisplayControl()
 {
   if (disp_open || !freerdp_settings_get_bool(client->context->settings, FreeRDP_SupportDisplayControl)
@@ -12,13 +32,12 @@ bool Peer::OpenDisplayControl()
   disp->custom = this;
   disp->rdpcontext = client->context;
   disp->DispMonitorLayout = Layout;
+  disp->ChannelIdAssigned = [](DispServerContext* context, UINT32 id) -> BOOL {
+    static_cast<Peer*>(context->custom)->display_id = id;
+    return TRUE;
+  };
   disp->MaxNumMonitors = 16;
   disp->MaxMonitorAreaFactorA = disp->MaxMonitorAreaFactorB = 8192;
-  WTSVirtualChannelManagerSetDVCCreationCallback(channels,
-    [](void* user, UINT32, INT32 status) -> BOOL {
-      auto& peer = *static_cast<Peer*>(user);
-      return status < 0 || peer.disp->DisplayControlCaps(peer.disp.get()) == CHANNEL_RC_OK;
-    }, this);
   disp_open = disp->Open(disp.get()) == CHANNEL_RC_OK;
   return disp_open;
 }
