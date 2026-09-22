@@ -269,7 +269,7 @@ TEST_P(Gate, FramesAndInput) {
   Client client(sdlrdp_port(backend.get()), GetParam());
   client.tolerance = GetParam().codec == SDLRDP_CODEC_REMOTEFX ? 40 : GetParam().codec == SDLRDP_CODEC_NSCODEC ? 3 : 0;
   ASSERT_TRUE(freerdp_connect(client.instance.get()));
-  auto events = Events(1);
+  auto events = Events(2);
   ASSERT_EQ(events.size(), 2u);
   ASSERT_EQ(events[0].type, SDLRDP_CONNECTED);
   EXPECT_EQ(events[0].connected.width, 320u);
@@ -394,7 +394,7 @@ TEST_P(Gate, BlockedSinglePresent) {
   Client client(sdlrdp_port(handle), GetParam(), 2048, 1536);
   client.tolerance = GetParam().codec == SDLRDP_CODEC_REMOTEFX ? 40 : GetParam().codec == SDLRDP_CODEC_NSCODEC ? 3 : 0;
   ASSERT_TRUE(freerdp_connect(client.instance.get()));
-  auto events = Events(1);
+  auto events = Events(2);
   ASSERT_EQ(events.size(), 2u);
   ASSERT_EQ(events.front().type, SDLRDP_CONNECTED);
   pixels.resize(2048 * 1536);
@@ -452,14 +452,16 @@ TEST_P(Gate, LiveCodecChange) {
       && (codec == SDLRDP_CODEC_REMOTEFX || codec == SDLRDP_CODEC_NSCODEC)) ? SDLRDP_CODEC_PLANAR
       : codec == SDLRDP_CODEC_AUTO ? (GetParam().surface ? SDLRDP_CODEC_REMOTEFX : SDLRDP_CODEC_PLANAR) : codec;
 
-    std::array<sdlrdp_event, 4> events{};
-    auto count = sdlrdp_poll(backend.get(), events.data(), events.size());
-    count = std::remove_if(events.begin(), events.begin() + count, [](auto e) { return e.type == SDLRDP_REFRESH; }) - events.begin();
-    ASSERT_EQ(count, expected == previous ? 0u : 1u);
-    if (count) {
-      ASSERT_EQ(count, 1u);
+    if (expected != previous) {
+      auto events = Events(1);
+      ASSERT_EQ(events.size(), 1u);
       EXPECT_EQ(events[0].type, SDLRDP_CODEC_CHANGED);
       EXPECT_EQ(events[0].codec_changed.codec, expected);
+    } else {
+      std::array<sdlrdp_event, 4> events{};
+      auto count = sdlrdp_poll(backend.get(), events.data(), events.size());
+      EXPECT_TRUE(std::ranges::all_of(std::span(events).first(count),
+        [](auto const& event) { return event.type == SDLRDP_REFRESH; }));
     }
     previous = expected;
   }
@@ -690,7 +692,12 @@ TEST_F(RoundFive, AspectAndMouse) {
   Open(640, 350, {4, 3});
   Client client(sdlrdp_port(backend.get()), true, 1024, 768);
   Connect(client, false);
-  auto events = Events();
+  std::vector<sdlrdp_event> events;
+  ASSERT_TRUE(client.Until([&] {
+    auto batch = Events();
+    events.insert(events.end(), batch.begin(), batch.end());
+    return events.size() >= 2;
+  }));
   ASSERT_EQ(events.size(), 2u);
   EXPECT_EQ(events[0].connected.screen_width, 1024u);
   EXPECT_EQ(events[1].type, SDLRDP_SCREEN);
@@ -783,7 +790,12 @@ TEST_F(RoundFive, WaitAndRefresh) {
   Open(320, 200);
   Client client(sdlrdp_port(backend.get()), true);
   Connect(client);
-  Events();
+  std::vector<sdlrdp_event> connected;
+  ASSERT_TRUE(client.Until([&] {
+    auto batch = Events();
+    connected.insert(connected.end(), batch.begin(), batch.end());
+    return connected.size() >= 2;
+  }));
   FrameObserver observer(client);
   std::vector<UINT32> pixels(320 * 200, 0x445566);
   auto started = Clock::now();
@@ -901,7 +913,12 @@ TEST_F(RoundFive, ClientScreenNeverResizesPicture) {
   Client client(sdlrdp_port(backend.get()), true, 1024, 768);
   DisplayClient display(client);
   Connect(client, false);
-  auto events = Events();
+  std::vector<sdlrdp_event> events;
+  ASSERT_TRUE(client.Until([&] {
+    auto batch = Events();
+    events.insert(events.end(), batch.begin(), batch.end());
+    return events.size() >= 2;
+  }));
   ASSERT_EQ(events.size(), 2u);
   EXPECT_EQ(events[1].screen.width, 1024u);
   EXPECT_EQ(events[1].screen.height, 768u);
@@ -946,9 +963,14 @@ TEST_F(RoundFive, AutoPrefersRemoteFX) {
   Open(320, 200, {}, SDLRDP_CODEC_AUTO);
   Client client(sdlrdp_port(backend.get()), true);
   ASSERT_TRUE(freerdp_connect(client.instance.get()));
-  auto events = Events();
-  ASSERT_GE(events.size(), 1u);
-  EXPECT_EQ(events[0].connected.codec, SDLRDP_CODEC_REMOTEFX);
+  std::vector<sdlrdp_event> events;
+  ASSERT_TRUE(client.Until([&] {
+    auto batch = Events();
+    events.insert(events.end(), batch.begin(), batch.end());
+    return std::ranges::any_of(events, [](auto const& event) { return event.type == SDLRDP_CONNECTED; });
+  }));
+  auto connected = std::ranges::find(events, SDLRDP_CONNECTED, &sdlrdp_event::type);
+  EXPECT_EQ(connected->connected.codec, SDLRDP_CODEC_REMOTEFX);
 }
 TEST_F(RoundFive, ExpectedDisconnectLogLevels) {
   Open();
