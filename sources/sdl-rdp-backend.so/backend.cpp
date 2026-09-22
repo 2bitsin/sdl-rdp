@@ -122,3 +122,36 @@ int sdlrdp_set_pointer(sdlrdp_handle* handle, unsigned w, unsigned h, unsigned x
     return 0;
   } catch (std::exception const& error) { last_error = error.what(); return -1; }
 }
+
+int sdlrdp_set_clipboard_text(sdlrdp_handle* handle, char const* text)
+{
+  try {
+    if (!handle || !text) throw std::runtime_error("Invalid clipboard handle or text.");
+    std::string copied(text);
+    auto unicode = Backend::ClipboardUnicode(copied);
+    auto& state = *handle->state;
+    std::scoped_lock lock(state.session_guard);
+    state.clipboard.text = std::move(copied);
+    state.clipboard.unicode = std::move(unicode);
+    ++state.clipboard.generation;
+    if (state.current) SetEvent(state.current->wake.get());
+    return 0;
+  } catch (std::exception const& error) { last_error = error.what(); return -1; }
+}
+const char* sdlrdp_get_clipboard_text(sdlrdp_handle* handle)
+{
+  try {
+    if (!handle) throw std::runtime_error("Invalid clipboard handle.");
+    auto& state = *handle->state;
+    std::scoped_lock lock(state.session_guard);
+    state.clipboard.exported = state.clipboard.text;
+    return state.clipboard.exported.c_str();
+  } catch (std::exception const& error) { last_error = error.what(); return nullptr; }
+}
+int sdlrdp_has_clipboard_text(sdlrdp_handle* handle)
+{
+  if (!handle) { last_error = "Invalid clipboard handle."; return -1; }
+  auto& state = *handle->state;
+  std::scoped_lock lock(state.session_guard);
+  return !state.clipboard.text.empty();
+}

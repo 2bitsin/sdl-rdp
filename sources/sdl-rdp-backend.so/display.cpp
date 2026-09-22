@@ -3,11 +3,8 @@
 #include <freerdp/settings.h>
 
 namespace Backend {
-bool Peer::Channels()
+bool Peer::OpenDisplayControl()
 {
-  Expects(client && client->context, "channel peer exists");
-  if (!channels || !active) return true;
-  if (!WTSVirtualChannelManagerCheckFileDescriptor(channels)) return false;
   if (disp_open || !freerdp_settings_get_bool(client->context->settings, FreeRDP_SupportDisplayControl)
       || WTSVirtualChannelManagerGetDrdynvcState(channels) != DRDYNVC_STATE_READY) return true;
   disp.reset(disp_server_context_new(channels));

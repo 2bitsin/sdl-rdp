@@ -1,4 +1,5 @@
 #include "SDL_rdpvideo.h"
+#include "SDL_rdpclipboard.h"
 #include "SDL_rdpwindow.h"
 #include "SDL_rdpframebuffer.h"
 #include "SDL_rdpevents.h"
@@ -133,6 +134,7 @@ static SDL_VideoDevice *SDL_RDP_CreateDevice(void)
     device->CreateWindowFramebuffer = SDL_RDP_CreateWindowFramebuffer;
     device->UpdateWindowFramebuffer = SDL_RDP_UpdateWindowFramebuffer;
     device->DestroyWindowFramebuffer = SDL_RDP_DestroyWindowFramebuffer;
+    SDL_RDP_InitClipboard(device);
     device->free = SDL_RDP_DeleteDevice;
     return device;
 }

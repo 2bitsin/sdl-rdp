@@ -1,4 +1,5 @@
 #include <sdl-rdp-backend.so/_detail/headless-client.hpp>
+#include <sdl-rdp-backend.so/_detail/headless-clipboard.hpp>
 #include <oxbox/platform/scratch-area.hpp>
 #include <gtest/gtest.h>
 #include <freerdp/input.h>
@@ -478,6 +479,55 @@ TEST_F(Sample, Soname) {
   }
   ASSERT_TRUE(found);
   ASSERT_TRUE(process->Exit());
+}
+
+TEST_F(Sample, ClipboardAscii) {
+  auto arguments = Arguments(certificates.Path(), false);
+  arguments.insert(arguments.end(), {"--clip", "hello"});
+  process = std::make_unique<Process>(arguments);
+  ASSERT_TRUE(Read("port "));
+  Client client(Number(std::string_view(line).substr(5)), true, 640, 480);
+  Headless::ClipboardClient clipboard(client);
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(client.Until([&] { return clipboard.Received({'h',0,'e',0,'l',0,'l',0,'o',0,0,0}); }));
+  SDL_Log("trace CLIPBOARD server formats=13,1 request=13 utf16le=680065006c006c006f000000 text=hello");
+  ASSERT_EQ(clipboard.RequestFormat(CF_TEXT), CHANNEL_RC_OK);
+  ASSERT_TRUE(client.Until([&] { return clipboard.Received({'h','e','l','l','o',0}); }));
+  SDL_Log("trace CLIPBOARD server request=1 bytes=68656c6c6f00 text=hello");
+  ASSERT_EQ(clipboard.Offer({'w',0,'o',0,'r',0,'l',0,'d',0,0,0}), CHANNEL_RC_OK);
+  ASSERT_TRUE(client.Until([&] { return clipboard.requests.load() == 1; }));
+  ASSERT_TRUE(Read("event CLIPBOARD text=world"));
+  SDL_Log("trace CLIPBOARD client formats=13 request=13 utf16le=77006f0072006c0064000000 text=world");
+  ASSERT_NO_FATAL_FAILURE(Escape(client));
+}
+
+TEST_F(Sample, ClipboardUnicode) {
+  auto arguments = Arguments(certificates.Path(), false);
+  arguments.insert(arguments.end(), {"--clip", "żółw"});
+  process = std::make_unique<Process>(arguments);
+  ASSERT_TRUE(Read("port "));
+  Client client(Number(std::string_view(line).substr(5)), true, 640, 480);
+  Headless::ClipboardClient clipboard(client);
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  std::vector<BYTE> bytes{0x7c,1,0xf3,0,0x42,1,0x77,0,0,0};
+  ASSERT_TRUE(client.Until([&] { return clipboard.Received(bytes); }));
+  SDL_Log("trace CLIPBOARD server formats=13,1 request=13 utf16le=7c01f300420177000000 text=żółw");
+  ASSERT_EQ(clipboard.RequestFormat(CF_TEXT), CHANNEL_RC_OK);
+  ASSERT_TRUE(client.Until([&] { return clipboard.Received({'?','?','?','w',0}); }));
+  SDL_Log("trace CLIPBOARD server request=1 bytes=3f3f3f7700 text=???w");
+  ASSERT_TRUE(Read("event CLIPBOARD text=żółw"));
+  ASSERT_EQ(clipboard.Offer({0,0}), CHANNEL_RC_OK);
+  ASSERT_TRUE(client.Until([&] { return clipboard.requests.load() == 1; }));
+  ASSERT_TRUE(Read("event CLIPBOARD text="));
+  ASSERT_EQ(clipboard.Offer(bytes), CHANNEL_RC_OK);
+  ASSERT_TRUE(client.Until([&] { return clipboard.requests.load() == 2; }));
+  ASSERT_TRUE(Read("event CLIPBOARD text=żółw"));
+  SDL_Log("trace CLIPBOARD client formats=13 request=13 utf16le=7c01f300420177000000 text=żółw");
+  ASSERT_EQ(clipboard.Offer({}, false), CHANNEL_RC_OK);
+  ASSERT_TRUE(client.Until([&] { return clipboard.accepted.load() == 4; }));
+  ASSERT_TRUE(Read("event CLIPBOARD text="));
+  SDL_Log("trace CLIPBOARD client formats=8 text-cleared=1");
+  ASSERT_NO_FATAL_FAILURE(Escape(client));
 }
 
 }

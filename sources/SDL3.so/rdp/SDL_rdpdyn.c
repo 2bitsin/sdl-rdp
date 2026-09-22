@@ -24,6 +24,9 @@ bool SDL_RDP_LoadBackend(SDL_RDP_Backend *backend)
     SDL_RDP_LOAD(resize);
     SDL_RDP_LOAD(set_aspect);
     SDL_RDP_LOAD(set_pointer);
+    SDL_RDP_LOAD(set_clipboard_text);
+    SDL_RDP_LOAD(get_clipboard_text);
+    SDL_RDP_LOAD(has_clipboard_text);
     if (backend->version() != SDLRDP_ABI_VERSION) {
         SDL_RDP_UnloadBackend(backend);
         return SDL_SetError("RDP backend ABI version mismatch (expected %u)", SDLRDP_ABI_VERSION);

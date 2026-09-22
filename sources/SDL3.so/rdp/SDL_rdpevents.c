@@ -1,4 +1,5 @@
 #include "SDL_rdpevents.h"
+#include "SDL_rdpclipboard.h"
 #include "SDL_rdpwindow.h"
 #include "src/events/SDL_keyboard_c.h"
 #include "src/events/SDL_mouse_c.h"
@@ -92,6 +93,10 @@ static void SDL_RDP_Input(SDL_Window *window, const sdlrdp_event *event)
 
 static void SDL_RDP_Dispatch(SDL_VideoData *data, const sdlrdp_event *event)
 {
+    if (event->type == SDLRDP_CLIPBOARD) {
+        SDL_RDP_ClipboardUpdate(data);
+        return;
+    }
     if (!data->window) {
         return;
     }

@@ -75,6 +75,7 @@ Peer::~Peer()
   thread.request_stop();
   SetEvent(wake.get());
   if (thread.joinable()) thread.join();
+  clipboard.reset();
   disp.reset();
   if (channels) WTSCloseServer(channels);
 }
@@ -119,18 +120,21 @@ void Peer::Serve(std::stop_token quit)
 {
   Expects(client && wake, "peer owns transport and wake event");
   // WinPR BIO signals readability only; retry blocked output every 5 ms for static frames.
-  std::array<HANDLE, 32> handles{};
+  std::array<HANDLE, MAXIMUM_WAIT_OBJECTS> handles{};
   if (Configure() && client->Initialize(client.get())) {
     while (!quit.stop_requested()) {
-      DWORD count, timeout;
+      DWORD count, transport_count, timeout;
       {
         std::scoped_lock lock(owner.session_guard);
-        count = client->GetEventHandles(client.get(), handles.data(), 30);
+        count = transport_count = client->GetEventHandles(client.get(), handles.data(),
+          handles.size() - AppendedHandleCount);
+        if (count && clipboard) handles[count++] = clipboard->Event();
         timeout = Timeout();
       }
       if (!count) break;
       handles[count++] = wake.get();
       handles[count++] = WTSVirtualChannelManagerGetEventHandle(channels);
+      Ensures(count - transport_count <= AppendedHandleCount, "appended handles fit reserved budget");
       if (WaitForMultipleObjects(count, handles.data(), FALSE, timeout) == WAIT_FAILED
           || quit.stop_requested()) break;
       std::scoped_lock lock(owner.session_guard);
@@ -147,6 +151,13 @@ void Peer::Serve(std::stop_token quit)
   owner.Depart(*this);
   finished = true;
   SetEvent(owner.reap.get());
+}
+bool Peer::Channels()
+{
+  Expects(client && client->context, "channel peer exists");
+  if (!channels || !active) return true;
+  return WTSVirtualChannelManagerCheckFileDescriptor(channels)
+    && OpenStaticChannels() && OpenDisplayControl();
 }
 void Peer::TransportEnded()
 {

@@ -1,4 +1,5 @@
 #include <SDL3/SDL.h>
+#include "clipboard.hpp"
 #include <format>
 #include <charconv>
 #include <string>
@@ -59,6 +60,7 @@ void PrintGeometry(const SDL_Event &event, SDL_Window *window)
 
 void PrintEvent(const SDL_Event &event, SDL_Window *window, unsigned frame)
 {
+    if (PrintClipboardEvent(event)) return;
     auto line = std::format("event {} type={}", EventName(event.type), event.type);
     switch (event.type) {
     case SDL_EVENT_KEY_DOWN: case SDL_EVENT_KEY_UP:
@@ -149,6 +151,7 @@ void Run(SDL_Window *window, bool tight)
 }
 
 struct Options {
+    const char *clip = nullptr;
     int width = 640, height = 480;
     bool tight = false, fullscreen = false;
 };
@@ -158,7 +161,8 @@ Options ParseOptions(int argc, char **argv)
     Options options;
     for (int i = 1; i < argc; ++i) {
         std::string_view arg(argv[i]);
-        if (arg == "--tight") options.tight = true;
+        if (arg == "--clip" && i + 1 < argc) options.clip = argv[++i];
+        else if (arg == "--tight") options.tight = true;
         else if (arg == "--fullscreen") options.fullscreen = true;
         else if (arg == "--aspect" && i + 1 < argc) Check(SDL_SetHint(SDL_HINT_RDP_ASPECT, argv[++i]));
         else if (arg == "--size" && i + 1 < argc) {
@@ -198,6 +202,7 @@ int main(int argc, char **argv)
         Check(SDL_SetHint(SDL_HINT_RDP_CODEC, requested.c_str()));
     }
     Check(SDL_Init(SDL_INIT_VIDEO));
+    if (options.clip) Check(SDL_SetClipboardText(options.clip));
     auto display = SDL_GetPrimaryDisplay();
     SDL_Log("port %lld", (long long)SDL_GetNumberProperty(SDL_GetDisplayProperties(display), SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0));
     {

@@ -6,6 +6,7 @@
 #include "rect.hpp"
 #include "logging.hpp"
 #include "encoder.hpp"
+#include "clipboard.hpp"
 #include <atomic>
 #include <condition_variable>
 #include <deque>
@@ -48,6 +49,7 @@ struct State {
   void Present(void const* pixels, int pitch, unsigned w, unsigned h,
                std::span<sdlrdp_rect const> damage);
   void SetPointer(unsigned w, unsigned h, unsigned x, unsigned y, void const* pixels);
+  Clipboard clipboard;
   Pointer pointer;
   uint64_t pointer_generation = 0;
   void Resize(unsigned w, unsigned h);
@@ -98,7 +100,10 @@ public:
   bool Marker(UINT16 action);
   bool Pacing();
   DWORD Timeout();
+  static constexpr DWORD AppendedHandleCount = 3;
   bool Channels();
+  bool OpenStaticChannels();
+  bool OpenDisplayControl();
   static UINT Layout(DispServerContext*, DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const*);
   static BOOL Activate(freerdp_peer* client);
   static BOOL Keyboard(rdpInput* input, UINT16 flags, UINT8 code);
@@ -126,6 +131,7 @@ public:
   bool ack_enabled = false, ack_seen = false, suppressed = false;
   HANDLE channels = nullptr;
   std::unique_ptr<DispServerContext, Releases<disp_server_context_free>> disp;
+  std::unique_ptr<ClipboardChannel> clipboard;
   bool disp_open = false, resizing = false, frame_started = false;
   sdlrdp_rect desktop{};
   bool activated = false;

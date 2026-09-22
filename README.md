@@ -76,6 +76,21 @@ reports the client's screen and measured refresh rate; details are properties (b
 display, client name on the window). A failed open is in `SDL_GetError()`,
 backend diagnostics go to `SDL_Log`.
 
+## Clipboard
+
+Clipboard text travels both ways through SDL's `SDL_SetClipboardText`,
+`SDL_GetClipboardText`, and `SDL_HasClipboardText`. Remote changes arrive as
+`SDL_EVENT_CLIPBOARD_UPDATE`. The sample accepts `--clip "hello"` and prints
+`event CLIPBOARD text=<text>` on updates. UTF-8 text is transferred as
+`CF_UNICODETEXT` (UTF-16LE); the server also announces `CF_TEXT`
+with ASCII fallback (`?` for non-ASCII characters).
+Clipboard redirection must be enabled in the RDP client (`/clipboard` in
+xfreerdp). Images and files are not supported yet.
+
+The backend ABI is version 4, adding `sdlrdp_set_clipboard_text`,
+`sdlrdp_get_clipboard_text`, and `sdlrdp_has_clipboard_text`. The getter's
+pointer belongs to the handle; copy it before another clipboard API call.
+
 ## Consuming
 
 `buildutil publish` pushes `sdl-rdp` to the site conan remote. A project takes

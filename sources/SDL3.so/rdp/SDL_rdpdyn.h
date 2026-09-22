@@ -18,6 +18,9 @@ typedef struct SDL_RDP_Backend
     int (*wait_frame)(sdlrdp_handle *, int);
     int (*resize)(sdlrdp_handle *, unsigned, unsigned);
     int (*set_aspect)(sdlrdp_handle *, sdlrdp_aspect);
+    int (*set_clipboard_text)(sdlrdp_handle *, const char *);
+    const char *(*get_clipboard_text)(sdlrdp_handle *);
+    int (*has_clipboard_text)(sdlrdp_handle *);
     void (*wakeup)(sdlrdp_handle *);
 } SDL_RDP_Backend;
 bool SDL_RDP_LoadBackend(SDL_RDP_Backend *backend);
