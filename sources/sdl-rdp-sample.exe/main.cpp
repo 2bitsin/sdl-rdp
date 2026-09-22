@@ -46,7 +46,7 @@ const char *EventName(Uint32 type)
     }
 }
 
-void PrintEvent(const SDL_Event &event, SDL_Window *window)
+void PrintEvent(const SDL_Event &event, SDL_Window *window, unsigned frame)
 {
     auto line = std::format("event {} type={}", EventName(event.type), event.type);
     switch (event.type) {
@@ -54,7 +54,7 @@ void PrintEvent(const SDL_Event &event, SDL_Window *window)
         line += std::format(" scancode={} key={} down={}", int(event.key.scancode), event.key.key, int(event.key.down));
         break;
     case SDL_EVENT_MOUSE_MOTION:
-        line += std::format(" x={:.0f} y={:.0f}", event.motion.x, event.motion.y);
+        line += std::format(" x={:.0f} y={:.0f} frame={}", event.motion.x, event.motion.y, frame);
         break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN: case SDL_EVENT_MOUSE_BUTTON_UP:
         line += std::format(" button={} down={}", event.button.button, int(event.button.down));
@@ -95,7 +95,7 @@ void Run(SDL_Window *window)
     for (;;) {
         SDL_Event event;
         if (SDL_WaitEventTimeout(&event, 10)) {
-            PrintEvent(event, window);
+            PrintEvent(event, window, frame);
             if (event.type == SDL_EVENT_QUIT ||
                 (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE)) return;
             if (event.type == SDL_EVENT_MOUSE_MOTION) {

@@ -1,2 +1,6 @@
 Init_submodule()
-Link_dependencies(SDL3)
+Link_dependencies(SDL3 TEST freerdp-client freerdp winpr oxbox::platform)
+if(TARGET sdl-rdp-sample-tests)
+  find_path(FREERDP_HEADERS freerdp/freerdp.h PATH_SUFFIXES freerdp3 REQUIRED)
+  target_include_directories(sdl-rdp-sample-tests PRIVATE ${FREERDP_HEADERS})
+endif()
