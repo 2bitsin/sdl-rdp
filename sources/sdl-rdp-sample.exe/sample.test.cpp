@@ -8,6 +8,8 @@
 #include <filesystem>
 #include <fstream>
 #include <ranges>
+#include <span>
+#include <print>
 #include <sstream>
 #include <spawn.h>
 #include <poll.h>
@@ -71,7 +73,11 @@ public:
     Expects(output >= 0, "stdout pipe open");
     for (;;) {
       if (auto end = pending.find('\n'); end != std::string::npos) {
-        line = pending.substr(0, end); pending.erase(0, end + 1); return true;
+        line = pending.substr(0, end);
+        pending.erase(0, end + 1);
+        EXPECT_TRUE(line.starts_with("SDL_GetVersion() ") || line.starts_with("drivers ") ||
+                    line.starts_with("port ") || line.starts_with("event ")) << "invalid sample stdout: " << line;
+        return true;
       }
       auto left = std::chrono::ceil<std::chrono::milliseconds>(deadline - Clock::now()).count();
       if (left <= 0) return false;
@@ -169,31 +175,48 @@ class NextFrame {
   Client& client;
   unsigned column;
   pSurfaceBits original;
+  pBitmapUpdate original_bitmap;
 public:
   bool received = false;
   testing::AssertionResult matches = testing::AssertionFailure() << "no complete frame";
-  explicit NextFrame(Client& value, unsigned frame) : client(value), column(frame % 640), original(value.instance->context->update->SurfaceBits) {
-    Expects(!active && original, "one frame observer with GDI installed");
+  explicit NextFrame(Client& value, unsigned frame) : client(value), column(frame % 640), original(value.instance->context->update->SurfaceBits),
+      original_bitmap(value.instance->context->update->BitmapUpdate) {
+    Expects(!active && original && original_bitmap, "one frame observer with GDI installed");
     active = this;
     client.instance->context->update->SurfaceBits = Receive;
+    client.instance->context->update->BitmapUpdate = ReceiveBitmap;
   }
-  ~NextFrame() { client.instance->context->update->SurfaceBits = original; active = nullptr; }
+  ~NextFrame() {
+    client.instance->context->update->SurfaceBits = original;
+    client.instance->context->update->BitmapUpdate = original_bitmap;
+    active = nullptr;
+  }
   static BOOL Receive(rdpContext* context, SURFACE_BITS_COMMAND const* command) {
     Expects(active && command, "frame observer and surface command exist");
-    auto& self = *active;
-    auto result = self.original(context, command);
-    // The sample presents full surfaces; the final band ends at desktop height.
+    auto result = active->original(context, command);
+    if (result && command->destBottom == 480) active->Observe(context);
+    return result;
+  }
+  static BOOL ReceiveBitmap(rdpContext* context, BITMAP_UPDATE const* command) {
+    Expects(active && command, "frame observer and bitmap command exist");
+    auto result = active->original_bitmap(context, command);
+    // Bitmap update corners are inclusive; surface command corners are exclusive.
+    if (result && std::ranges::any_of(std::span(command->rectangles, command->number),
+        [](auto const& rectangle) { return rectangle.destBottom == 479; })) active->Observe(context);
+    return result;
+  }
+  void Observe(rdpContext* context) {
+    Expects(context && context->gdi, "decoded framebuffer exists");
     auto gdi = context->gdi;
     UINT32 pixel = 0;
-    std::memcpy(&pixel, gdi->primary_buffer + 40 * gdi->stride + self.column * 4, 4);
+    std::memcpy(&pixel, gdi->primary_buffer + 40 * gdi->stride + column * 4, 4);
     UINT32 before = 0;
-    if (self.column) std::memcpy(&before, gdi->primary_buffer + 40 * gdi->stride + (self.column - 1) * 4, 4);
+    if (column) std::memcpy(&before, gdi->primary_buffer + 40 * gdi->stride + (column - 1) * 4, 4);
     bool origin = (pixel & 0xffffff) == 0x00ff00 && (before & 0xffffff) != 0x00ff00;
-    if (result && !self.received && command->destBottom == 480 && origin) {
-      self.matches = Pattern(self.client, true);
-      self.received = true;
+    if (!received && origin) {
+      matches = Pattern(client, true);
+      received = true;
     }
-    return result;
   }
 };
 
@@ -264,6 +287,64 @@ TEST_F(Sample, WholeSystem) {
   ASSERT_NO_FATAL_FAILURE(Exposed());
   ASSERT_NO_FATAL_FAILURE(Escape(second));
   ASSERT_LT(Clock::now() - started, 5s) << "whole-system case under five seconds";
+}
+
+TEST_F(Sample, RequestedSizeReturns) {
+  process = std::make_unique<Process>(Arguments(certificates.Path(), false));
+  ASSERT_TRUE(Read("port "));
+  auto port = Number(std::string_view(line).substr(5));
+  Client first(port, true, 320, 200);
+  ASSERT_TRUE(freerdp_connect(first.instance.get()));
+  ASSERT_TRUE(Read("event RESIZED "));
+  EXPECT_TRUE(line.ends_with("data1=320 data2=200")) << line;
+  ASSERT_TRUE(Read("event FOCUS_GAINED "));
+  ASSERT_TRUE(freerdp_disconnect(first.instance.get()));
+  ASSERT_TRUE(Read("event FOCUS_LOST "));
+  Client second(port, true, 800, 600);
+  ASSERT_TRUE(freerdp_connect(second.instance.get()));
+  ASSERT_TRUE(Read("event RESIZED "));
+  EXPECT_TRUE(line.ends_with("data1=640 data2=480")) << line;
+  ASSERT_TRUE(Read("event FOCUS_GAINED "));
+  std::print("{}", process->transcript);
+  ASSERT_NO_FATAL_FAILURE(Escape(second));
+}
+
+TEST_F(Sample, TakeoverFocus) {
+  process = std::make_unique<Process>(Arguments(certificates.Path(), false));
+  ASSERT_TRUE(Read("port "));
+  auto port = Number(std::string_view(line).substr(5));
+  Client first(port, true, 640, 480);
+  ASSERT_TRUE(freerdp_connect(first.instance.get()));
+  ASSERT_TRUE(Read("event FOCUS_GAINED "));
+  ASSERT_TRUE(Read("event MOUSE_ENTER "));
+  Client second(port, true, 640, 480);
+  ASSERT_TRUE(freerdp_connect(second.instance.get()));
+  for (auto expected : {"OCCLUDED", "FOCUS_LOST", "MOUSE_LEAVE", "EXPOSED", "FOCUS_GAINED", "MOUSE_ENTER"}) {
+    ASSERT_TRUE(process->Line(line, Clock::now() + 2s)) << process->transcript;
+    EXPECT_TRUE(line.starts_with("event " + std::string(expected) + " ")) << line;
+  }
+  std::print("{}", process->transcript);
+  ASSERT_NO_FATAL_FAILURE(Escape(second));
+}
+
+TEST_F(Sample, LiveCodec) {
+  auto arguments = Arguments(certificates.Path(), false);
+  arguments.insert(arguments.end() - 1, "SDL_RDP_CODEC=remotefx");
+  process = std::make_unique<Process>(arguments);
+  ASSERT_TRUE(Read("port "));
+  Client client(Number(std::string_view(line).substr(5)), true, 640, 480);
+  auto settings = client.instance->context->settings;
+  ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_RemoteFxCodec, TRUE));
+  ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_NSCodec, TRUE));
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(Read("event EXPOSED "));
+  ASSERT_TRUE(line.ends_with("codec=remotefx")) << line;
+  auto input = client.instance->context->input;
+  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x3b));
+  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x3b));
+  ASSERT_TRUE(Read("event CODEC_CHANGED codec=nscodec")) << process->transcript;
+  std::print("{}", process->transcript);
+  ASSERT_NO_FATAL_FAILURE(Escape(client));
 }
 
 TEST_F(Sample, WaitForClient) {

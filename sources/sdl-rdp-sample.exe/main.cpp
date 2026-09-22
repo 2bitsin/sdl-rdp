@@ -6,6 +6,7 @@
 #include <memory>
 #include <algorithm>
 #include <ranges>
+#include <array>
 
 void Check(bool result)
 {
@@ -63,8 +64,9 @@ void PrintEvent(const SDL_Event &event, SDL_Window *window, unsigned frame)
         line += std::format(" x={} y={}", event.wheel.x, event.wheel.y);
         break;
     case SDL_EVENT_WINDOW_EXPOSED:
-        line += std::format(" client_name={}", SDL_GetStringProperty(SDL_GetWindowProperties(window),
-                    SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING, ""));
+        line += std::format(" client_name={} codec={}", SDL_GetStringProperty(SDL_GetWindowProperties(window),
+                    SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING, ""),
+                    SDL_GetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_CODEC_STRING, ""));
         break;
     default:
         if (event.type >= SDL_EVENT_WINDOW_FIRST && event.type <= SDL_EVENT_WINDOW_LAST)
@@ -87,8 +89,28 @@ void Draw(SDL_Window *window, unsigned frame, const SDL_FPoint &pointer)
     Check(SDL_UpdateWindowSurface(window));
 }
 
+void CycleCodec()
+{
+    static constexpr std::array codecs{"auto", "planar", "remotefx", "nscodec", "raw"};
+    const char *hint = SDL_GetHint(SDL_HINT_RDP_CODEC);
+    auto current = std::ranges::find(codecs, std::string_view(hint ? hint : "auto"));
+    auto next = current == codecs.end() ? 0 : (current - codecs.begin() + 1) % codecs.size();
+    Check(SDL_SetHint(SDL_HINT_RDP_CODEC, codecs[next]));
+}
+
+void PrintCodecChange(SDL_Window *window, std::string &previous)
+{
+    std::string codec = SDL_GetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_CODEC_STRING, "");
+    if (codec != previous) {
+        std::println("event CODEC_CHANGED codec={}", codec);
+        std::fflush(stdout);
+        previous = std::move(codec);
+    }
+}
+
 void Run(SDL_Window *window)
 {
+    std::string codec;
     SDL_FPoint pointer{-8, -8};
     unsigned frame = 0;
     Uint64 next = 0;
@@ -96,6 +118,8 @@ void Run(SDL_Window *window)
         SDL_Event event;
         if (SDL_WaitEventTimeout(&event, 10)) {
             PrintEvent(event, window, frame);
+            if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F1)
+                CycleCodec();
             if (event.type == SDL_EVENT_QUIT ||
                 (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE)) return;
             if (event.type == SDL_EVENT_MOUSE_MOTION) {
@@ -103,6 +127,7 @@ void Run(SDL_Window *window)
                 Draw(window, frame, pointer);
             }
         }
+        PrintCodecChange(window, codec);
         if (SDL_GetTicks() >= next) {
             Draw(window, frame++, pointer);
             next = SDL_GetTicks() + 100;
@@ -117,6 +142,12 @@ int main()
     std::ranges::for_each(std::views::iota(0, SDL_GetNumVideoDrivers()),
         [&](int index) { drivers += std::format(" {}", SDL_GetVideoDriver(index)); });
     std::println("{}", drivers);
+    // Environment hints take priority over the live SDL_SetHint controls.
+    if (const char *codec = SDL_getenv("SDL_RDP_CODEC")) {
+        std::string requested(codec);
+        Check(SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SDL_RDP_CODEC"));
+        Check(SDL_SetHint(SDL_HINT_RDP_CODEC, requested.c_str()));
+    }
     Check(SDL_Init(SDL_INIT_VIDEO));
     auto display = SDL_GetPrimaryDisplay();
     std::println("port {}", SDL_GetNumberProperty(SDL_GetDisplayProperties(display),

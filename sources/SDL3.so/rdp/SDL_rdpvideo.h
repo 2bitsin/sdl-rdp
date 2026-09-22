@@ -9,4 +9,6 @@ struct SDL_VideoData
     SDL_DisplayID display;
     SDL_Window *window;
 };
+const char *SDL_RDP_CodecName(sdlrdp_codec codec);
+bool SDL_RDP_ParseCodec(const char *name, sdlrdp_codec *codec);
 #endif

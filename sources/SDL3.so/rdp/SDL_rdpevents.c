@@ -1,4 +1,5 @@
 #include "SDL_rdpevents.h"
+#include "SDL_rdpwindow.h"
 #include "src/events/SDL_keyboard_c.h"
 #include "src/events/SDL_mouse_c.h"
 #include "src/events/SDL_windowevents_c.h"
@@ -17,12 +18,7 @@ static void SDL_RDP_Resize(SDL_VideoData *data, unsigned width, unsigned height)
         SDL_SetDesktopDisplayMode(display, &mode);
         SDL_SetCurrentDisplayMode(display, &mode);
     }
-    if (data->window->w > (int)width || data->window->h > (int)height) {
-        int w = SDL_min(data->window->w, (int)width);
-        int h = SDL_min(data->window->h, (int)height);
-        SDL_SendWindowEvent(data->window, SDL_EVENT_WINDOW_RESIZED, w, h);
-        SDL_SendWindowEvent(data->window, SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED, w, h);
-    }
+    SDL_RDP_ApplyWindowSize(data);
 }
 
 static void SDL_RDP_Connected(SDL_VideoData *data, const sdlrdp_event *event)
@@ -31,6 +27,8 @@ static void SDL_RDP_Connected(SDL_VideoData *data, const sdlrdp_event *event)
     SDL_RDP_Resize(data, event->connected.width, event->connected.height);
     SDL_SetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING,
                           event->connected.client_name);
+    SDL_SetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_CODEC_STRING,
+                          SDL_RDP_CodecName(event->connected.codec));
     SDL_SendWindowEvent(window, SDL_EVENT_WINDOW_EXPOSED, 0, 0);
     SDL_SetKeyboardFocus(window);
     SDL_SetMouseFocus(window);
@@ -77,6 +75,10 @@ static void SDL_RDP_Dispatch(SDL_VideoData *data, const sdlrdp_event *event)
     switch (event->type) {
     case SDLRDP_CONNECTED: SDL_RDP_Connected(data, event); break;
     case SDLRDP_DISCONNECTED: SDL_RDP_Disconnected(data); break;
+    case SDLRDP_CODEC_CHANGED:
+        SDL_SetStringProperty(SDL_GetWindowProperties(data->window), SDL_PROP_WINDOW_RDP_CODEC_STRING,
+                              SDL_RDP_CodecName(event->codec_changed.codec));
+        break;
     case SDLRDP_RESIZE: SDL_RDP_Resize(data, event->resize.width, event->resize.height); break;
     default: SDL_RDP_Input(data->window, event); break;
     }

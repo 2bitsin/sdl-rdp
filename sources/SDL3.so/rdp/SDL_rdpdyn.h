@@ -13,6 +13,7 @@ typedef struct SDL_RDP_Backend
     int (*present)(sdlrdp_handle *, const void *, int, unsigned, unsigned, const sdlrdp_rect *, unsigned);
     unsigned (*poll)(sdlrdp_handle *, sdlrdp_event *, unsigned);
     int (*wait)(sdlrdp_handle *, int);
+    int (*set_codec)(sdlrdp_handle *, sdlrdp_codec);
     void (*wakeup)(sdlrdp_handle *);
 } SDL_RDP_Backend;
 bool SDL_RDP_LoadBackend(SDL_RDP_Backend *backend);

@@ -1,5 +1,6 @@
 #include "_detail/state.hpp"
 #include <winpr/ssl.h>
+#include <freerdp/settings.h>
 #include <winpr/synch.h>
 #include <arpa/inet.h>
 #include <unistd.h>
@@ -43,7 +44,7 @@ unsigned Bind(freerdp_listener* listener, sdlrdp_config const& config)
 }
 }
 State::State(sdlrdp_config const& config)
- : log(config.log), user(config.user), width(config.width), height(config.height),
+ : log_route(config), log(config.log), user(config.user), codec(config.codec), width(config.width), height(config.height),
    credentials(EnsureCertificate(config.cert_dir ? config.cert_dir : "_rdp")),
    listener(freerdp_listener_new()), stop(CreateEvent(nullptr, TRUE, FALSE, nullptr))
 {
@@ -64,6 +65,11 @@ State::~State()
   thread.request_stop();
   SetEvent(stop.get());
   if (thread.joinable()) thread.join();
+  for (auto const& peer : peers) {
+    peer->thread.request_stop();
+    SetEvent(peer->wake.get());
+  }
+  for (auto const& peer : peers) if (peer->thread.joinable()) peer->thread.join();
   peers.clear();
 }
 BOOL State::Accepted(freerdp_listener* listener, freerdp_peer* client)
@@ -98,6 +104,35 @@ void State::Listen(std::stop_token quit)
     std::scoped_lock lock(peers_guard);
     std::erase_if(peers, [](auto const& peer) { return peer->finished.load(); });
   }
+}
+void State::Takeover(Peer& peer, sdlrdp_event event)
+{
+  Expects(event.type == SDLRDP_CONNECTED, "activation carries session facts");
+  std::scoped_lock session(session_guard);
+  std::scoped_lock lock(peers_guard, frame_guard);
+  for (auto const& old : peers) {
+    if (old.get() == &peer || !old->active.exchange(false)) continue;
+    Push({.type = SDLRDP_DISCONNECTED});
+    old->client->Close(old->client.get());
+    old->thread.request_stop();
+    SetEvent(old->wake.get());
+  }
+  peer.active = peer.activated = true;
+  if (!shadow.empty()) peer.Post({0, 0, int(frame_width), int(frame_height)});
+  Push(event);
+  if (event.connected.width != width || event.connected.height != height)
+    Push({.type = SDLRDP_RESIZE, .resize = {event.connected.width, event.connected.height}});
+}
+void State::Depart(Peer& peer)
+{
+  Expects(peer.client != nullptr, "departing peer exists");
+  std::scoped_lock lock(session_guard);
+  if (peer.activated) {
+    auto name = freerdp_settings_get_string(peer.client->context->settings, FreeRDP_ClientHostname);
+    Log(SDLRDP_LOG_INFO, std::format("Client {} disconnected.", name ? name : peer.client->hostname));
+  }
+  if (peer.active.exchange(false)) Push({.type = SDLRDP_DISCONNECTED});
+  Ensures(!peer.active, "departed peer cannot inject input");
 }
 void State::Push(sdlrdp_event event)
 {

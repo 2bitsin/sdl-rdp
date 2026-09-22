@@ -19,6 +19,7 @@ bool SDL_RDP_LoadBackend(SDL_RDP_Backend *backend)
     SDL_RDP_LOAD(poll);
     SDL_RDP_LOAD(wait);
     SDL_RDP_LOAD(wakeup);
+    SDL_RDP_LOAD(set_codec);
     if (backend->version() != SDLRDP_ABI_VERSION) {
         SDL_RDP_UnloadBackend(backend);
         return SDL_SetError("RDP backend ABI version mismatch (expected %u)", SDLRDP_ABI_VERSION);

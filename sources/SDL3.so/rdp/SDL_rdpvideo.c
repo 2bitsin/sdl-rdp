@@ -26,10 +26,31 @@ static void SDL_RDP_Log(void *user, sdlrdp_log_level level, const char *text)
     SDL_LogMessage(SDL_LOG_CATEGORY_VIDEO, priorities[level], "%s", text);
 }
 
+static void SDLCALL SDL_RDP_CodecHintChanged(void *userdata, const char *name, const char *oldValue, const char *newValue)
+{
+    SDL_VideoData *data = userdata;
+    sdlrdp_codec codec;
+    if (data->handle && SDL_RDP_ParseCodec(newValue, &codec) &&
+        data->backend.set_codec(data->handle, codec) != 0) {
+        SDL_SetError("%s", data->backend.last_error());
+    }
+}
+
+static bool SDL_RDP_InitDisplay(SDL_VideoData *data, const sdlrdp_config *config)
+{
+    SDL_DisplayMode mode;
+    SDL_zero(mode);
+    mode.format = SDL_PIXELFORMAT_XRGB8888;
+    mode.w = (int)config->width;
+    mode.h = (int)config->height;
+    data->display = SDL_AddBasicVideoDisplay(&mode);
+    return data->display && SDL_SetNumberProperty(SDL_GetDisplayProperties(data->display),
+        SDL_PROP_DISPLAY_RDP_PORT_NUMBER, data->backend.port(data->handle));
+}
+
 static bool SDL_RDP_VideoInit(SDL_VideoDevice *_this)
 {
     SDL_VideoData *data = _this->internal;
-    SDL_DisplayMode mode;
     sdlrdp_config config;
     SDL_zero(config);
     config.log = SDL_RDP_Log;
@@ -44,16 +65,14 @@ static bool SDL_RDP_VideoInit(SDL_VideoDevice *_this)
         !config.height || config.height > SDL_MAX_SINT32) {
         return SDL_SetError("Invalid RDP port or dimensions");
     }
+    if (!SDL_RDP_ParseCodec(SDL_GetHint(SDL_HINT_RDP_CODEC), &config.codec)) {
+        return false;
+    }
     if (data->backend.open(&config, &data->handle) != 0) {
         return SDL_SetError("%s", data->backend.last_error());
     }
-    SDL_zero(mode);
-    mode.format = SDL_PIXELFORMAT_XRGB8888;
-    mode.w = (int)config.width;
-    mode.h = (int)config.height;
-    data->display = SDL_AddBasicVideoDisplay(&mode);
-    if (!data->display || !SDL_SetNumberProperty(SDL_GetDisplayProperties(data->display),
-            SDL_PROP_DISPLAY_RDP_PORT_NUMBER, data->backend.port(data->handle))) {
+    if (!SDL_RDP_InitDisplay(data, &config) ||
+        !SDL_AddHintCallback(SDL_HINT_RDP_CODEC, SDL_RDP_CodecHintChanged, data)) {
         return false;
     }
     SDL_AddKeyboard(SDL_DEFAULT_KEYBOARD_ID, NULL);
@@ -64,6 +83,7 @@ static bool SDL_RDP_VideoInit(SDL_VideoDevice *_this)
 static void SDL_RDP_VideoQuit(SDL_VideoDevice *_this)
 {
     SDL_VideoData *data = _this->internal;
+    SDL_RemoveHintCallback(SDL_HINT_RDP_CODEC, SDL_RDP_CodecHintChanged, data);
     if (data->handle) {
         data->backend.close(data->handle);
         data->handle = NULL;

@@ -92,8 +92,8 @@ bool Peer::Configure()
   return freerdp_settings_set_bool(settings, FreeRDP_NlaSecurity, FALSE)
     && freerdp_settings_set_bool(settings, FreeRDP_TlsSecurity, TRUE)
     && freerdp_settings_set_bool(settings, FreeRDP_RdpSecurity, TRUE)
-    && freerdp_settings_set_bool(settings, FreeRDP_RemoteFxCodec, FALSE)
-    && freerdp_settings_set_bool(settings, FreeRDP_NSCodec, FALSE)
+    && freerdp_settings_set_bool(settings, FreeRDP_RemoteFxCodec, TRUE)
+    && freerdp_settings_set_bool(settings, FreeRDP_NSCodec, TRUE)
     && freerdp_settings_set_bool(settings, FreeRDP_AutoReconnectionEnabled, TRUE)
     && freerdp_settings_set_bool(settings, FreeRDP_WaitForOutputBufferFlush, FALSE)
     && freerdp_settings_set_uint32(settings, FreeRDP_EncryptionLevel, ENCRYPTION_LEVEL_CLIENT_COMPATIBLE)
@@ -108,24 +108,44 @@ void Peer::Serve(std::stop_token quit)
   std::array<HANDLE, 32> handles{};
   if (Configure() && client->Initialize(client.get())) {
     while (!quit.stop_requested()) {
-      auto count = client->GetEventHandles(client.get(), handles.data(), 31);
+      DWORD count, timeout;
+      {
+        std::scoped_lock lock(owner.session_guard);
+        count = client->GetEventHandles(client.get(), handles.data(), 31);
+        timeout = client->IsWriteBlocked(client.get()) ? 5 : INFINITE;
+      }
       if (!count) break;
       handles[count++] = wake.get();
-      if (WaitForMultipleObjects(count, handles.data(), FALSE, client->IsWriteBlocked(client.get()) ? 5 : INFINITE) == WAIT_FAILED
+      if (WaitForMultipleObjects(count, handles.data(), FALSE, timeout) == WAIT_FAILED
           || quit.stop_requested()) break;
+      std::scoped_lock lock(owner.session_guard);
+      if (quit.stop_requested()) break;
       if (!client->CheckFileDescriptor(client.get()) || !Drain()) {
-        owner.Log(SDLRDP_LOG_ERROR, std::format("Peer transport failed: {}.",
-          freerdp_get_last_error_name(freerdp_get_last_error(client->context))));
+        TransportEnded();
         break;
       }
     }
+    std::scoped_lock lock(owner.session_guard);
     client->Disconnect(client.get());
   } else owner.Log(SDLRDP_LOG_ERROR, std::format("Peer initialization failed: {}.",
     freerdp_get_last_error_name(freerdp_get_last_error(client->context))));
-  owner.Log(SDLRDP_LOG_INFO, std::format("Peer disconnected: {}.", client->hostname));
-  if (active.exchange(false)) owner.Push({.type = SDLRDP_DISCONNECTED});
+  owner.Depart(*this);
   finished = true;
   SetEvent(owner.reap.get());
+}
+void Peer::TransportEnded()
+{
+  Expects(client && client->context, "transport context exists");
+  auto error = freerdp_get_last_error_name(freerdp_get_last_error(client->context));
+  bool pending;
+  {
+    std::scoped_lock lock(owner.frame_guard);
+    pending = dirty.has_value() || client->IsWriteBlocked(client.get());
+  }
+  if (active && pending)
+    owner.Log(SDLRDP_LOG_ERROR, std::format("Peer transport failed with pending data: {}.", error));
+  else if (!activated)
+    owner.Log(SDLRDP_LOG_INFO, std::format("Connection closed before activation. {}", error));
 }
 BOOL Peer::Activate(freerdp_peer* client)
 {
@@ -133,19 +153,11 @@ BOOL Peer::Activate(freerdp_peer* client)
   auto& self = Held(client);
   if (self.active.load()) return TRUE;
   if (!SendCookie(client->context)) return FALSE;
+  if (!self.encoder.Select(client->context->settings, self.owner.codec.load())) return FALSE;
   auto event = Connected(client->context->settings);
+  event.connected.codec = self.encoder.codec;
   self.desktop = {0, 0, int(event.connected.width), int(event.connected.height)};
-  {
-    std::scoped_lock lock(self.owner.frame_guard);
-    self.active = true;
-    if (!self.owner.shadow.empty()) self.Post({0, 0,
-      int(self.owner.frame_width), int(self.owner.frame_height)});
-  }
-  self.owner.Log(SDLRDP_LOG_INFO, std::format("Peer activated: {}x{}.", event.connected.width, event.connected.height));
-  self.owner.Push(event);
-  if (event.connected.width != self.owner.width || event.connected.height != self.owner.height)
-    self.owner.Push({.type = SDLRDP_RESIZE,
-      .resize = {event.connected.width, event.connected.height}});
+  self.owner.Takeover(self, event);
   return TRUE;
 }
 void Peer::Post(sdlrdp_rect area)
@@ -170,6 +182,9 @@ bool Peer::Drain()
     ResetEvent(wake.get());
   }
   if (region) region = Intersect(*region, desktop);
-  return !region || SendFrame(client->context, owner, *region);
+  if (!region || SendFrame(client->context, owner, *region)) return true;
+  std::scoped_lock lock(owner.frame_guard);
+  Post(*region);
+  return false;
 }
 }

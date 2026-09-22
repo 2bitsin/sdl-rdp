@@ -4,6 +4,8 @@
 #include "rdp-handles.hpp"
 #include "contract.hpp"
 #include "rect.hpp"
+#include "logging.hpp"
+#include "encoder.hpp"
 #include <atomic>
 #include <condition_variable>
 #include <deque>
@@ -26,6 +28,7 @@ struct State {
   explicit State(sdlrdp_config const& config);
   ~State();
   void Log(sdlrdp_log_level level, std::string const& text) const;
+  LogRoute log_route;
   void (*log)(void*, sdlrdp_log_level, const char*);
   void* user;
   void Listen(std::stop_token quit);
@@ -33,15 +36,19 @@ struct State {
   unsigned Poll(sdlrdp_event* out, unsigned max);
   int Wait(int timeout);
   void Wakeup();
+  void Takeover(Peer& peer, sdlrdp_event event);
+  void Depart(Peer& peer);
   void Present(void const* pixels, int pitch, unsigned w, unsigned h,
                std::span<sdlrdp_rect const> damage);
   static BOOL Accepted(freerdp_listener* listener, freerdp_peer* client);
+  std::atomic<sdlrdp_codec> codec;
   unsigned width, height, port = 0;
   Credentials credentials;
   ListenerHandle listener;
   EventHandle stop;
   EventHandle reap{CreateEvent(nullptr, TRUE, FALSE, nullptr)};
   // frame_guard protects the shadow and every peer's dirty region.
+  std::recursive_mutex session_guard;
   std::mutex peers_guard, events_guard, frame_guard;
   std::vector<BYTE> shadow;
   unsigned frame_width = 0, frame_height = 0;
@@ -59,7 +66,9 @@ public:
   void Post(sdlrdp_rect area);
   bool Configure();
   void Serve(std::stop_token quit);
+  Encoder encoder;
   bool Drain();
+  void TransportEnded();
   static Peer& Held(freerdp_peer* client);
   static BOOL Activate(freerdp_peer* client);
   static BOOL Keyboard(rdpInput* input, UINT16 flags, UINT8 code);
@@ -70,6 +79,7 @@ public:
   EventHandle wake;
   std::optional<sdlrdp_rect> dirty;
   sdlrdp_rect desktop{};
+  bool activated = false;
   std::atomic_bool active = false, finished = false;
   std::jthread thread;
 };

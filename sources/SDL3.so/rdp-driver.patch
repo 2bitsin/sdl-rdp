@@ -32,7 +32,7 @@
      sdl_glob_sources(
 --- a/include/SDL3/SDL_hints.h
 +++ b/include/SDL3/SDL_hints.h
-@@ -3164,6 +3164,83 @@
+@@ -3164,6 +3164,90 @@
  #define SDL_HINT_QUIT_ON_LAST_WINDOW_CLOSE "SDL_QUIT_ON_LAST_WINDOW_CLOSE"
  
  /**
@@ -67,6 +67,13 @@
 + * \since This hint is available since SDL 3.4.8.
 + */
 +#define SDL_HINT_RDP_CERT_DIR "SDL_RDP_CERT_DIR"
++
++/**
++ * RDP codec preference: auto (default), planar, remotefx, nscodec or raw.
++ * May be changed while the video subsystem is running.
++ */
++#define SDL_HINT_RDP_CODEC "SDL_RDP_CODEC"
++
 +
 +/**
 + * A variable controlling the initial RDP display height in pixels.
@@ -126,11 +133,12 @@
  #define SDL_PROP_DISPLAY_HDR_ENABLED_BOOLEAN             "SDL.display.HDR_enabled"
  #define SDL_PROP_DISPLAY_KMSDRM_PANEL_ORIENTATION_NUMBER "SDL.display.KMSDRM.panel_orientation"
  #define SDL_PROP_DISPLAY_WAYLAND_WL_OUTPUT_POINTER       "SDL.display.wayland.wl_output"
-@@ -1627,6 +1628,7 @@
+@@ -1627,6 +1628,8 @@
   */
  extern SDL_DECLSPEC SDL_PropertiesID SDLCALL SDL_GetWindowProperties(SDL_Window *window);
  
 +#define SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING "SDL.window.rdp.client_name"
++#define SDL_PROP_WINDOW_RDP_CODEC_STRING "SDL.window.rdp.codec"
  #define SDL_PROP_WINDOW_SHAPE_POINTER                               "SDL.window.shape"
  #define SDL_PROP_WINDOW_HDR_ENABLED_BOOLEAN                         "SDL.window.HDR_enabled"
  #define SDL_PROP_WINDOW_SDR_WHITE_LEVEL_FLOAT                       "SDL.window.SDR_white_level"
