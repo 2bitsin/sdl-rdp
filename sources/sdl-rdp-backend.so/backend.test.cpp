@@ -22,9 +22,9 @@
 #include <mutex>
 #include <cstring>
 #include <cerrno>
-#include <spawn.h>
-#include <sys/wait.h>
-extern char** environ;
+#include <openssl/ssl.h>
+#include <arpa/inet.h>
+#include "_detail/rect.hpp"
 #include "_detail/copy-rows.hpp"
 
 namespace {
@@ -137,31 +137,36 @@ TEST(Errors, WidthAndBind) {
   auto other = std::async(std::launch::async, [] { return std::string(sdlrdp_last_error()); });
   EXPECT_TRUE(other.get().empty());
 }
+struct Socket {
+  int descriptor = socket(AF_INET, SOCK_STREAM, 0);
+  ~Socket() { if (descriptor >= 0) close(descriptor); }
+};
 void InitializeTls(sdlrdp_config config)
 {
-  // FreeRDP 3.15 tls.c:571 initializes BIO_METHOD unsafely; prime it without a concurrent FreeRDP client.
+  // Issue 1: prime FreeRDP's lazy BIO method before the in-process client races it.
   config.log = nullptr;
   sdlrdp_handle* raw = nullptr;
   Expects(sdlrdp_open(&config, &raw) == 0, "TLS initialization listener opens");
   std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> backend(raw, sdlrdp_close);
-  auto port = std::to_string(sdlrdp_port(raw));
-  const char* script = R"(import socket, ssl, sys
-s = socket.create_connection(('127.0.0.1', int(sys.argv[1])), timeout=3)
-s.sendall(bytes.fromhex('030000130ee000000000000100080001000000'))
-reply = s.recv(19, socket.MSG_WAITALL)
-assert len(reply) == 19, reply
-context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-context.check_hostname = False
-context.verify_mode = ssl.CERT_NONE
-with context.wrap_socket(s, server_hostname='localhost'):
-    pass
-)";
-  std::array<char const*, 5> args{"python3", "-c", script, port.c_str(), nullptr};
-  pid_t child = 0;
-  Expects(posix_spawnp(&child, "python3", nullptr, nullptr,
-    const_cast<char**>(args.data()), environ) == 0, "TLS initialization client starts");
-  int status = 0;
-  Expects(waitpid(child, &status, 0) == child && status == 0, "TLS initialization handshake completes");
+  Socket socket;
+  sockaddr_in address{};
+  address.sin_family = AF_INET;
+  address.sin_port = htons(sdlrdp_port(raw));
+  address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  Expects(socket.descriptor >= 0 && connect(socket.descriptor,
+    reinterpret_cast<sockaddr*>(&address), sizeof(address)) == 0, "TLS socket connects");
+  std::array<unsigned char, 19> negotiation{3, 0, 0, 19, 14, 224, 0, 0, 0, 0, 0, 1, 0, 8, 0, 1, 0, 0, 0};
+  Expects(send(socket.descriptor, negotiation.data(), negotiation.size(), 0) == 19
+    && recv(socket.descriptor, negotiation.data(), negotiation.size(), MSG_WAITALL) == 19,
+    "RDP TLS negotiation completes");
+  std::unique_ptr<SSL_CTX, decltype(&SSL_CTX_free)> context(SSL_CTX_new(TLS_client_method()), SSL_CTX_free);
+  Expects(context != nullptr, "TLS context allocated");
+  std::unique_ptr<SSL, decltype(&SSL_free)> tls(SSL_new(context.get()), SSL_free);
+  Expects(tls != nullptr, "TLS session allocated");
+  SSL_set_verify(tls.get(), SSL_VERIFY_NONE, nullptr);
+  Expects(SSL_set_fd(tls.get(), socket.descriptor) == 1 && SSL_connect(tls.get()) == 1,
+          "TLS initialization handshake completes");
+  SSL_shutdown(tls.get());
 }
 class Gate : public testing::TestWithParam<bool> {
 protected:
@@ -296,6 +301,35 @@ TEST_P(Gate, LateClientAndBurst) {
             << " framebuffer=" << pixels.size() * 4 << " bytes\n";
   EXPECT_LE(after, before + pixels.size() * 4);
   ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); }));
+}
+TEST_P(Gate, ClipsToDesktop) {
+  backend.reset();
+  sdlrdp_config config{"127.0.0.1", 0, certificates.path.c_str(), 640, 480, 0, Logs::Collect, &logs};
+  sdlrdp_handle* handle = nullptr;
+  ASSERT_EQ(sdlrdp_open(&config, &handle), 0);
+  backend.reset(handle);
+  std::vector<UINT32> frame(640 * 480);
+  std::generate(frame.begin(), frame.end(), [index = 0u]() mutable {
+    return (index++ * 2654435761u) & 0x00ffffff; });
+  sdlrdp_rect area{0, 0, 640, 480};
+  ASSERT_EQ(sdlrdp_present(handle, frame.data(), 640 * 4, 640, 480, &area, 1), 0);
+  Backend::CopyRows({reinterpret_cast<BYTE const*>(frame.data()), frame.size() * 4}, 640 * 4,
+    {reinterpret_cast<BYTE*>(pixels.data()), pixels.size() * 4}, 320 * 4, 200, 320 * 4);
+  Client client(sdlrdp_port(handle), GetParam());
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); }));
+  EXPECT_EQ(client.instance->context->gdi->width, 320);
+  EXPECT_EQ(client.instance->context->gdi->height, 200);
+  EXPECT_FALSE(logs.Contains("failed"));
+  area = {400, 300, 40, 30};
+  std::ranges::fill(frame, 0x00010203u);
+  ASSERT_EQ(sdlrdp_present(handle, frame.data(), 640 * 4, 640, 480, &area, 1), 0);
+  auto deadline = Clock::now() + std::chrono::milliseconds(100);
+  do {
+    ASSERT_TRUE(client.Pump());
+    ASSERT_TRUE(client.Matches(pixels));
+  } while (Clock::now() < deadline);
+  EXPECT_FALSE(logs.Contains("failed"));
 }
 TEST_P(Gate, WaitForClient) {
   auto port = sdlrdp_port(backend.get());

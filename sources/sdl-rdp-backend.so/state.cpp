@@ -127,15 +127,6 @@ void State::Wakeup()
   { std::scoped_lock lock(events_guard); ++wake_generation; }
   changed.notify_all();
 }
-void Merge(std::optional<sdlrdp_rect>& region, sdlrdp_rect area)
-{
-  Expects(area.w > 0 && area.h > 0, "damage has positive extent");
-  if (!region) { region = area; return; }
-  auto x = std::min(region->x, area.x), y = std::min(region->y, area.y);
-  auto right = std::max(region->x + region->w, area.x + area.w);
-  auto bottom = std::max(region->y + region->h, area.y + area.h);
-  region = sdlrdp_rect{x, y, right - x, bottom - y};
-}
 void State::Present(void const* pixels, int pitch, unsigned w, unsigned h,
                     std::span<sdlrdp_rect const> damage)
 {

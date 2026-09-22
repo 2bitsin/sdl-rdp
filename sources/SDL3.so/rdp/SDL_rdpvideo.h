@@ -8,6 +8,5 @@ struct SDL_VideoData
     sdlrdp_handle *handle;
     SDL_DisplayID display;
     SDL_Window *window;
-    bool connected;
 };
 #endif

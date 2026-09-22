@@ -1,5 +1,7 @@
 #include <SDL3/SDL.h>
 #include <cstdio>
+#include <print>
+#include <string>
 #include <cstdlib>
 #include <memory>
 #include <algorithm>
@@ -8,7 +10,7 @@
 void Check(bool result)
 {
     if (!result) {
-        std::fprintf(stderr, "%s\n", SDL_GetError());
+        std::println(stderr, "{}", SDL_GetError());
         std::exit(1);
     }
 }
@@ -23,6 +25,7 @@ const char *EventName(Uint32 type)
     case SDL_EVENT_QUIT: return "QUIT";
     case SDL_EVENT_WINDOW_SHOWN: return "SHOWN";
     case SDL_EVENT_WINDOW_HIDDEN: return "HIDDEN";
+    case SDL_EVENT_WINDOW_OCCLUDED: return "OCCLUDED";
     case SDL_EVENT_WINDOW_EXPOSED: return "EXPOSED";
     case SDL_EVENT_WINDOW_RESIZED: return "RESIZED";
     case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: return "PIXEL_SIZE_CHANGED";
@@ -45,30 +48,30 @@ const char *EventName(Uint32 type)
 
 void PrintEvent(const SDL_Event &event, SDL_Window *window)
 {
-    std::printf("event %s type=%u", EventName(event.type), event.type);
+    auto line = std::format("event {} type={}", EventName(event.type), event.type);
     switch (event.type) {
     case SDL_EVENT_KEY_DOWN: case SDL_EVENT_KEY_UP:
-        std::printf(" scancode=%u key=%u down=%d", event.key.scancode, event.key.key, event.key.down);
+        line += std::format(" scancode={} key={} down={}", int(event.key.scancode), event.key.key, int(event.key.down));
         break;
     case SDL_EVENT_MOUSE_MOTION:
-        std::printf(" x=%.0f y=%.0f", event.motion.x, event.motion.y);
+        line += std::format(" x={:.0f} y={:.0f}", event.motion.x, event.motion.y);
         break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN: case SDL_EVENT_MOUSE_BUTTON_UP:
-        std::printf(" button=%u down=%d", event.button.button, event.button.down);
+        line += std::format(" button={} down={}", event.button.button, int(event.button.down));
         break;
     case SDL_EVENT_MOUSE_WHEEL:
-        std::printf(" x=%g y=%g", event.wheel.x, event.wheel.y);
+        line += std::format(" x={} y={}", event.wheel.x, event.wheel.y);
         break;
-    case SDL_EVENT_WINDOW_SHOWN:
-        std::printf(" client_name=%s", SDL_GetStringProperty(SDL_GetWindowProperties(window),
+    case SDL_EVENT_WINDOW_EXPOSED:
+        line += std::format(" client_name={}", SDL_GetStringProperty(SDL_GetWindowProperties(window),
                     SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING, ""));
         break;
     default:
         if (event.type >= SDL_EVENT_WINDOW_FIRST && event.type <= SDL_EVENT_WINDOW_LAST)
-            std::printf(" data1=%d data2=%d", event.window.data1, event.window.data2);
+            line += std::format(" data1={} data2={}", event.window.data1, event.window.data2);
         break;
     }
-    std::puts("");
+    std::println("{}", line);
     std::fflush(stdout);
 }
 
@@ -109,13 +112,14 @@ void Run(SDL_Window *window)
 
 int main()
 {
-    std::printf("drivers");
+    std::println("SDL_GetVersion() {}", SDL_GetVersion());
+    std::string drivers = "drivers";
     std::ranges::for_each(std::views::iota(0, SDL_GetNumVideoDrivers()),
-        [](int index) { std::printf(" %s", SDL_GetVideoDriver(index)); });
-    std::puts("");
+        [&](int index) { drivers += std::format(" {}", SDL_GetVideoDriver(index)); });
+    std::println("{}", drivers);
     Check(SDL_Init(SDL_INIT_VIDEO));
     auto display = SDL_GetPrimaryDisplay();
-    std::printf("port %lld\n", (long long)SDL_GetNumberProperty(SDL_GetDisplayProperties(display),
+    std::println("port {}", SDL_GetNumberProperty(SDL_GetDisplayProperties(display),
                 SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0));
     std::fflush(stdout);
     {

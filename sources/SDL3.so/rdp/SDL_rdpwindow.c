@@ -7,8 +7,9 @@ bool SDL_RDP_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_Proper
         return SDL_SetError("RDP supports one window");
     }
     _this->internal->window = window;
-    window->x = 0;
-    window->y = 0;
+    window->x = window->windowed.x = window->floating.x = 0;
+    window->y = window->windowed.y = window->floating.y = 0;
+    SDL_SendWindowEvent(window, SDL_EVENT_WINDOW_OCCLUDED, 0, 0);
     return true;
 }
 

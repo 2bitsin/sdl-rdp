@@ -32,6 +32,7 @@ typedef struct {
   };
 } sdlrdp_event;
 const char* sdlrdp_last_error(void);
+#define SDLRDP_ABI_VERSION 1
 unsigned sdlrdp_version(void);
 int sdlrdp_open(const sdlrdp_config*, sdlrdp_handle**);
 /* Close joins workers; callers must finish concurrent ABI calls first. */

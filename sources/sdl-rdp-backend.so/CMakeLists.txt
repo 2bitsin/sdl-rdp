@@ -1,7 +1,10 @@
 set(CMAKE_CXX_STANDARD 23)
 find_path(FREERDP_HEADERS freerdp/freerdp.h PATH_SUFFIXES freerdp3 REQUIRED)
+Require(OpenSSL VERSION ">=3" SYSTEM TEST)
+# FreeRDP uses host OpenSSL; oxbox's imported OpenSSL target belongs to Conan.
+find_library(SDLRDP_TEST_SSL NAMES ssl PATHS ${CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES} NO_DEFAULT_PATH REQUIRED)
 Init_submodule(PUBLISH_SYMBOLS)
-Link_dependencies(freerdp-server freerdp winpr oxbox::platform TEST freerdp-client)
+Link_dependencies(freerdp-server freerdp winpr oxbox::platform TEST freerdp-client ${SDLRDP_TEST_SSL})
 target_include_directories(sdl-rdp-backend PUBLIC ${FREERDP_HEADERS})
 target_link_options(sdl-rdp-backend PRIVATE "LINKER:--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
 set_property(TARGET sdl-rdp-backend APPEND PROPERTY LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/exports.map)

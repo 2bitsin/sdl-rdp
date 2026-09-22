@@ -17,12 +17,23 @@ static int SDL_RDP_GetInteger(const char *name, int fallback)
     return !*hint || *end || value < 0 || value > SDL_MAX_SINT32 ? -1 : (int)value;
 }
 
+static void SDL_RDP_Log(void *user, sdlrdp_log_level level, const char *text)
+{
+    static const SDL_LogPriority priorities[] = {
+        SDL_LOG_PRIORITY_ERROR, SDL_LOG_PRIORITY_WARN, SDL_LOG_PRIORITY_INFO
+    };
+    SDL_assert((unsigned)level < SDL_arraysize(priorities));
+    SDL_LogMessage(SDL_LOG_CATEGORY_VIDEO, priorities[level], "%s", text);
+}
+
 static bool SDL_RDP_VideoInit(SDL_VideoDevice *_this)
 {
     SDL_VideoData *data = _this->internal;
     SDL_DisplayMode mode;
     sdlrdp_config config;
     SDL_zero(config);
+    config.log = SDL_RDP_Log;
+    config.user = NULL;
     config.bind = SDL_GetHint(SDL_HINT_RDP_BIND);
     config.cert_dir = SDL_GetHint(SDL_HINT_RDP_CERT_DIR);
     config.port = SDL_RDP_GetInteger(SDL_HINT_RDP_PORT, 3389);
@@ -34,7 +45,7 @@ static bool SDL_RDP_VideoInit(SDL_VideoDevice *_this)
         return SDL_SetError("Invalid RDP port or dimensions");
     }
     if (data->backend.open(&config, &data->handle) != 0) {
-        return SDL_SetError("RDP backend could not open listener");
+        return SDL_SetError("%s", data->backend.last_error());
     }
     SDL_zero(mode);
     mode.format = SDL_PIXELFORMAT_XRGB8888;

@@ -6,14 +6,21 @@ import shlex
 import shutil
 import subprocess
 import tarfile
+import tomllib
+import sys
 import urllib.request
 
 import buildutil_configure as bc
 
-SDL_URL = "https://github.com/libsdl-org/SDL/releases/download/release-3.4.8/SDL3-3.4.8.tar.gz"
-SDL_SHA256 = "e9fff7467fb60f037e6708da18b25560649e4c63edc2a69bb871b960d9cbfbba"
 ROOT = bc.source_dir()
-SHARED = bc.output_dir(shared=True)
+SDL_VERSION = os.environ["SDL_RDP_VERSION"]
+VERSIONS = ROOT / "versions.toml"
+SDL_SHA256 = tomllib.loads(VERSIONS.read_text()).get(SDL_VERSION)
+if SDL_SHA256 is None:
+    sys.exit(f"SDL {SDL_VERSION} is unlisted; extend {VERSIONS}")
+SDL_URL = f"https://github.com/libsdl-org/SDL/releases/download/release-{SDL_VERSION}/SDL3-{SDL_VERSION}.tar.gz"
+SHARED = bc.output_dir(shared=True) / SDL_VERSION
+SHARED.mkdir(parents=True, exist_ok=True)
 
 
 def digest(path):
@@ -27,7 +34,7 @@ def run(command, **kwargs):
 
 
 def download():
-    archive = SHARED / "SDL3-3.4.8.tar.gz"
+    archive = SHARED / f"SDL3-{SDL_VERSION}.tar.gz"
     if archive.exists() and digest(archive) == SDL_SHA256:
         print("Download skipped: verified tarball", flush=True)
         return archive
@@ -43,7 +50,7 @@ def download():
 
 
 def extract(archive, fingerprint):
-    source = SHARED / "SDL3-3.4.8"
+    source = SHARED / f"SDL3-{SDL_VERSION}"
     stamp = SHARED / "extracted.sha256"
     if source.is_dir() and stamp.exists() and stamp.read_text() == fingerprint:
         print("Extraction skipped: matching source stamp", flush=True)
@@ -158,7 +165,8 @@ def settings(source, config):
 
 
 def main():
-    bc.depends(__file__, ROOT / 'rdp-driver.patch',
+    print(f'SDL version: {SDL_VERSION}', flush=True)
+    bc.depends(__file__, VERSIONS, ROOT / 'rdp-driver.patch',
                ROOT.parent / 'sdl-rdp-backend.so/sdl-rdp-backend.h')
     bc.inputs('*.c', '*.h', root=ROOT / 'rdp')
     source_hash = SDL_SHA256 + digest(ROOT / 'rdp-driver.patch')

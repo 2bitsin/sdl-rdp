@@ -3,6 +3,7 @@
 #include <freerdp/freerdp.h>
 #include "rdp-handles.hpp"
 #include "contract.hpp"
+#include "rect.hpp"
 #include <atomic>
 #include <condition_variable>
 #include <deque>
@@ -20,7 +21,6 @@ using utilities::Expects;
 using utilities::Ensures;
 struct Credentials { std::filesystem::path certificate, key; };
 Credentials EnsureCertificate(std::filesystem::path const& directory);
-void Merge(std::optional<sdlrdp_rect>& region, sdlrdp_rect area);
 class Peer;
 struct State {
   explicit State(sdlrdp_config const& config);
@@ -69,6 +69,7 @@ public:
   State& owner;
   EventHandle wake;
   std::optional<sdlrdp_rect> dirty;
+  sdlrdp_rect desktop{};
   std::atomic_bool active = false, finished = false;
   std::jthread thread;
 };

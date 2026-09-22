@@ -1,5 +1,4 @@
 #include "SDL_rdpdyn.h"
-#define SDL_RDP_ABI_VERSION 1
 #define SDL_RDP_LOAD(name) \
     backend->name = (void *)SDL_LoadFunction(backend->object, "sdlrdp_" #name); \
     if (!backend->name) { SDL_RDP_UnloadBackend(backend); return false; }
@@ -11,6 +10,7 @@ bool SDL_RDP_LoadBackend(SDL_RDP_Backend *backend)
     if (!backend->object) {
         return false;
     }
+    SDL_RDP_LOAD(last_error);
     SDL_RDP_LOAD(version);
     SDL_RDP_LOAD(open);
     SDL_RDP_LOAD(close);
@@ -19,9 +19,9 @@ bool SDL_RDP_LoadBackend(SDL_RDP_Backend *backend)
     SDL_RDP_LOAD(poll);
     SDL_RDP_LOAD(wait);
     SDL_RDP_LOAD(wakeup);
-    if (backend->version() != SDL_RDP_ABI_VERSION) {
+    if (backend->version() != SDLRDP_ABI_VERSION) {
         SDL_RDP_UnloadBackend(backend);
-        return SDL_SetError("RDP backend ABI version mismatch (expected %u)", SDL_RDP_ABI_VERSION);
+        return SDL_SetError("RDP backend ABI version mismatch (expected %u)", SDLRDP_ABI_VERSION);
     }
     SDL_ClearError();
     return true;

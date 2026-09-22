@@ -9,6 +9,12 @@ over RDP: a Windows or Mac RDP client is its display, keyboard and mouse.
 One buildutil project. `./buildutil build`, `./buildutil test`,
 `./buildutil publish` at the root.
 
+SDL defaults to `[options] sdl_version = "3.4.8"` in `buildutil.toml`.
+Select another pinned release with `./buildutil build --option sdl_version=3.4.16`.
+The hashes in `sources/SDL3.so/versions.toml` allow supported releases; each
+version keeps its archive, patched tree and configure cache under
+`_build/generated/SDL3/<version>/`.
+
 - `sources/SDL3.so/` builds `libSDL3.so`, the library applications link.
   `rdp/` is the driver, ordinary C in SDL's conventions with no FreeRDP
   dependency. `rdp-driver.patch` registers it in SDL's build and bootstrap

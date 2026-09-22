@@ -133,14 +133,14 @@ BOOL Peer::Activate(freerdp_peer* client)
   auto& self = Held(client);
   if (self.active.load()) return TRUE;
   if (!SendCookie(client->context)) return FALSE;
+  auto event = Connected(client->context->settings);
+  self.desktop = {0, 0, int(event.connected.width), int(event.connected.height)};
   {
     std::scoped_lock lock(self.owner.frame_guard);
     self.active = true;
     if (!self.owner.shadow.empty()) self.Post({0, 0,
       int(self.owner.frame_width), int(self.owner.frame_height)});
   }
-  auto settings = client->context->settings;
-  auto event = Connected(settings);
   self.owner.Log(SDLRDP_LOG_INFO, std::format("Peer activated: {}x{}.", event.connected.width, event.connected.height));
   self.owner.Push(event);
   if (event.connected.width != self.owner.width || event.connected.height != self.owner.height)
@@ -169,6 +169,7 @@ bool Peer::Drain()
     region = std::exchange(dirty, std::nullopt);
     ResetEvent(wake.get());
   }
+  if (region) region = Intersect(*region, desktop);
   return !region || SendFrame(client->context, owner, *region);
 }
 }

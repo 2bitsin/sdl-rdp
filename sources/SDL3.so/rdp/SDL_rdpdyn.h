@@ -5,6 +5,7 @@
 typedef struct SDL_RDP_Backend
 {
     SDL_SharedObject *object;
+    const char *(*last_error)(void);
     unsigned (*version)(void);
     int (*open)(const sdlrdp_config *, sdlrdp_handle **);
     void (*close)(sdlrdp_handle *);

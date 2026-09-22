@@ -32,13 +32,14 @@ bool SDL_RDP_UpdateWindowFramebuffer(SDL_VideoDevice *_this, SDL_Window *window,
     SDL_Surface *surface = SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_RDP_SURFACE, NULL);
     sdlrdp_rect *damage;
     int i, result;
+    bool isstack;
     if (!surface) {
         return SDL_SetError("Couldn't find RDP surface for window");
     }
-    if (!data->connected || numrects <= 0) {
+    if (numrects <= 0) {
         return true;
     }
-    damage = SDL_malloc((size_t)numrects * sizeof(*damage));
+    damage = SDL_small_alloc(sdlrdp_rect, (size_t)numrects, &isstack);
     if (!damage) {
         return false;
     }
@@ -47,8 +48,8 @@ bool SDL_RDP_UpdateWindowFramebuffer(SDL_VideoDevice *_this, SDL_Window *window,
     }
     result = data->backend.present(data->handle, surface->pixels, surface->pitch,
                                    surface->w, surface->h, damage, numrects);
-    SDL_free(damage);
-    return result == 0 || SDL_SetError("RDP backend rejected framebuffer");
+    SDL_small_free(damage, isstack);
+    return result == 0 || SDL_SetError("%s", data->backend.last_error());
 }
 
 void SDL_RDP_DestroyWindowFramebuffer(SDL_VideoDevice *_this, SDL_Window *window)

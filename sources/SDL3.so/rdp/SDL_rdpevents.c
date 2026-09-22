@@ -17,31 +17,30 @@ static void SDL_RDP_Resize(SDL_VideoData *data, unsigned width, unsigned height)
         SDL_SetDesktopDisplayMode(display, &mode);
         SDL_SetCurrentDisplayMode(display, &mode);
     }
-    SDL_SendWindowEvent(data->window, SDL_EVENT_WINDOW_RESIZED, (int)width, (int)height);
-    SDL_SendWindowEvent(data->window, SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED, (int)width, (int)height);
+    if (data->window->w > (int)width || data->window->h > (int)height) {
+        int w = SDL_min(data->window->w, (int)width);
+        int h = SDL_min(data->window->h, (int)height);
+        SDL_SendWindowEvent(data->window, SDL_EVENT_WINDOW_RESIZED, w, h);
+        SDL_SendWindowEvent(data->window, SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED, w, h);
+    }
 }
 
 static void SDL_RDP_Connected(SDL_VideoData *data, const sdlrdp_event *event)
 {
     SDL_Window *window = data->window;
-    data->connected = true;
     SDL_RDP_Resize(data, event->connected.width, event->connected.height);
     SDL_SetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING,
                           event->connected.client_name);
-    SDL_SendWindowEvent(window, SDL_EVENT_WINDOW_SHOWN, 0, 0);
     SDL_SendWindowEvent(window, SDL_EVENT_WINDOW_EXPOSED, 0, 0);
-    SDL_SendWindowEvent(window, SDL_EVENT_WINDOW_FOCUS_GAINED, 0, 0);
     SDL_SetKeyboardFocus(window);
     SDL_SetMouseFocus(window);
 }
 
 static void SDL_RDP_Disconnected(SDL_VideoData *data)
 {
-    data->connected = false;
+    SDL_SendWindowEvent(data->window, SDL_EVENT_WINDOW_OCCLUDED, 0, 0);
     SDL_SetKeyboardFocus(NULL);
     SDL_SetMouseFocus(NULL);
-    SDL_SendWindowEvent(data->window, SDL_EVENT_WINDOW_FOCUS_LOST, 0, 0);
-    SDL_SendWindowEvent(data->window, SDL_EVENT_WINDOW_HIDDEN, 0, 0);
 }
 
 static void SDL_RDP_Input(SDL_Window *window, const sdlrdp_event *event)
@@ -65,6 +64,7 @@ static void SDL_RDP_Input(SDL_Window *window, const sdlrdp_event *event)
                            (float)event->mouse_wheel.dy, SDL_MOUSEWHEEL_NORMAL);
         break;
     default:
+        SDL_assert(!"unhandled rdp event");
         break;
     }
 }
@@ -87,9 +87,6 @@ void SDL_RDP_PumpEvents(SDL_VideoDevice *_this)
     SDL_VideoData *data = _this->internal;
     sdlrdp_event events[64];
     unsigned count, i;
-    if (data->window && !data->connected) {
-        SDL_SendWindowEvent(data->window, SDL_EVENT_WINDOW_HIDDEN, 0, 0);
-    }
     while ((count = data->backend.poll(data->handle, events, SDL_arraysize(events))) != 0) {
         for (i = 0; i < count; ++i) {
             SDL_RDP_Dispatch(data, &events[i]);

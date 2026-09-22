@@ -17,7 +17,7 @@ void Dimensions(unsigned width, unsigned height)
 }
 const char* sdlrdp_last_error() { return last_error.c_str(); }
 
-unsigned sdlrdp_version() { return 1; }
+unsigned sdlrdp_version() { return SDLRDP_ABI_VERSION; }
 int sdlrdp_open(sdlrdp_config const* config, sdlrdp_handle** out)
 {
   try {
