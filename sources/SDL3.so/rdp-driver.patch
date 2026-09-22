@@ -32,7 +32,7 @@
      sdl_glob_sources(
 --- a/include/SDL3/SDL_hints.h
 +++ b/include/SDL3/SDL_hints.h
-@@ -3164,6 +3164,90 @@
+@@ -3164,6 +3164,92 @@
  #define SDL_HINT_QUIT_ON_LAST_WINDOW_CLOSE "SDL_QUIT_ON_LAST_WINDOW_CLOSE"
  
  /**
@@ -60,7 +60,7 @@
 +/**
 + * A variable controlling the directory containing RDP TLS certificates.
 + *
-+ * The default is "_rdp" in the current working directory.
++ * The default is the per-user data directory for sdl-rdp.
 + *
 + * This hint should be set before initializing the video subsystem.
 + *
@@ -73,6 +73,8 @@
 + * May be changed while the video subsystem is running.
 + */
 +#define SDL_HINT_RDP_CODEC "SDL_RDP_CODEC"
++#define SDL_HINT_RDP_VSYNC "SDL_RDP_VSYNC"
++#define SDL_HINT_RDP_ASPECT "SDL_RDP_ASPECT"
 +
 +
 +/**
@@ -133,12 +135,13 @@
  #define SDL_PROP_DISPLAY_HDR_ENABLED_BOOLEAN             "SDL.display.HDR_enabled"
  #define SDL_PROP_DISPLAY_KMSDRM_PANEL_ORIENTATION_NUMBER "SDL.display.KMSDRM.panel_orientation"
  #define SDL_PROP_DISPLAY_WAYLAND_WL_OUTPUT_POINTER       "SDL.display.wayland.wl_output"
-@@ -1627,6 +1628,8 @@
+@@ -1627,6 +1628,9 @@
   */
  extern SDL_DECLSPEC SDL_PropertiesID SDLCALL SDL_GetWindowProperties(SDL_Window *window);
  
 +#define SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING "SDL.window.rdp.client_name"
 +#define SDL_PROP_WINDOW_RDP_CODEC_STRING "SDL.window.rdp.codec"
++#define SDL_PROP_WINDOW_RDP_ASPECT_STRING "SDL.window.rdp.aspect"
  #define SDL_PROP_WINDOW_SHAPE_POINTER                               "SDL.window.shape"
  #define SDL_PROP_WINDOW_HDR_ENABLED_BOOLEAN                         "SDL.window.HDR_enabled"
  #define SDL_PROP_WINDOW_SDR_WHITE_LEVEL_FLOAT                       "SDL.window.SDR_white_level"
@@ -194,3 +197,11 @@
              goto pre_driver_error;
          }
          SDL_SetError("No available video device");
+--- a/src/video/SDL_video.c
++++ b/src/video/SDL_video.c
+@@ -1451,4 +1451,4 @@
+             (old_mode->w && old_mode->h && (old_mode->w != new_mode->w ||old_mode->h != new_mode->h)) ||
+             (old_mode->pixel_density != 0.0f && old_mode->pixel_density != new_mode->pixel_density) ||
+-            (old_mode->refresh_rate != 0.0f && old_mode->refresh_rate != new_mode->refresh_rate));
++            (old_mode->refresh_rate != new_mode->refresh_rate));
+ }

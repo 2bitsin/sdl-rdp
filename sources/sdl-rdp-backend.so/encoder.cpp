@@ -23,7 +23,8 @@ bool Available(rdpSettings const* settings, sdlrdp_codec codec)
 bool Encoder::Select(rdpSettings const* settings, sdlrdp_codec preference)
 {
   utilities::Expects(settings != nullptr, "negotiated settings exist");
-  constexpr std::array choices{SDLRDP_CODEC_PLANAR, SDLRDP_CODEC_REMOTEFX, SDLRDP_CODEC_NSCODEC, SDLRDP_CODEC_RAW};
+  if (freerdp_settings_get_uint32(settings, FreeRDP_ColorDepth) != 32) preference = SDLRDP_CODEC_RAW;
+  constexpr std::array choices{SDLRDP_CODEC_REMOTEFX, SDLRDP_CODEC_NSCODEC, SDLRDP_CODEC_PLANAR, SDLRDP_CODEC_RAW};
   codec = Available(settings, preference) ? preference
     : *std::ranges::find_if(choices, [=](auto choice) { return Available(settings, choice); });
   if (!stream) stream.reset(Stream_New(nullptr, 65536));

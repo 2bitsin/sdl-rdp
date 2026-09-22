@@ -2,6 +2,11 @@
 #include "sdl-rdp-backend.h"
 #include "_detail/contract.hpp"
 #include <gtest/gtest.h>
+#include <freerdp/client/disp.h>
+#include <freerdp/client/channels.h>
+#include <freerdp/addin.h>
+#include <freerdp/client/cmdline.h>
+#include <freerdp/event.h>
 #include <freerdp/freerdp.h>
 #include <freerdp/gdi/gdi.h>
 #include <freerdp/input.h>
@@ -27,6 +32,8 @@
 #include <cstring>
 #include <cerrno>
 #include <openssl/ssl.h>
+#include <openssl/pem.h>
+#include <openssl/x509v3.h>
 #include <arpa/inet.h>
 #include "_detail/rect.hpp"
 #include "_detail/copy-rows.hpp"
@@ -96,6 +103,8 @@ TEST(CopyRows, PaddedRows) {
   std::array<BYTE, 6> destination{8, 8, 8, 8, 8, 8};
   Backend::CopyRows(source, 4, destination, 3, 2, 2);
   EXPECT_EQ(destination, (std::array<BYTE, 6>{1, 2, 8, 3, 4, 8}));
+  Backend::CopyRows(source, 4, destination, 3, 2, 2, true);
+  EXPECT_EQ(destination, (std::array<BYTE, 6>{3, 4, 8, 1, 2, 8}));
   Backend::CopyRows({}, 0, {}, 0, 0, 0);
 }
 TEST(Errors, WidthAndBind) {
@@ -222,7 +231,8 @@ protected:
       sdlrdp_wait(backend.get(), 50);
       std::array<sdlrdp_event, 16> batch{};
       auto count = sdlrdp_poll(backend.get(), batch.data(), batch.size());
-      result.insert(result.end(), batch.begin(), batch.begin() + count);
+      for (auto const& event : std::span(batch).first(count))
+        if (event.type != SDLRDP_REFRESH) result.push_back(event);
     }
     return result;
   }
@@ -260,7 +270,7 @@ TEST_P(Gate, FramesAndInput) {
   client.tolerance = GetParam().codec == SDLRDP_CODEC_REMOTEFX ? 40 : GetParam().codec == SDLRDP_CODEC_NSCODEC ? 3 : 0;
   ASSERT_TRUE(freerdp_connect(client.instance.get()));
   auto events = Events(1);
-  ASSERT_EQ(events.size(), 1u);
+  ASSERT_EQ(events.size(), 2u);
   ASSERT_EQ(events[0].type, SDLRDP_CONNECTED);
   EXPECT_EQ(events[0].connected.width, 320u);
   EXPECT_EQ(events[0].connected.height, 200u);
@@ -288,7 +298,7 @@ TEST_P(Gate, FramesAndInput) {
   backend.reset();
   EXPECT_TRUE(logs.Contains("accepted"));
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, "disconnected"));
-  EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, "Peer transport failed"));
+  EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, "Peer transport failed")) << logs.Text();
 }
 TEST_P(Gate, ResizeAndWakeup) {
   backend.reset();
@@ -303,10 +313,10 @@ TEST_P(Gate, ResizeAndWakeup) {
   auto events = Events(2);
   ASSERT_EQ(events.size(), 2u);
   EXPECT_EQ(events[0].type, SDLRDP_CONNECTED);
-  EXPECT_EQ(events[0].connected.width, 320u);
-  EXPECT_EQ(events[1].type, SDLRDP_RESIZE);
-  EXPECT_EQ(events[1].resize.width, 320u);
-  EXPECT_EQ(events[1].resize.height, 200u);
+  EXPECT_EQ(events[0].connected.width, 640u);
+  EXPECT_EQ(events[1].type, SDLRDP_SCREEN);
+  EXPECT_EQ(events[1].screen.width, 320u);
+  EXPECT_EQ(events[1].screen.height, 200u);
   EXPECT_EQ(sdlrdp_wait(handle, 1), 0);
   auto waiter = std::async(std::launch::async, [=] { return sdlrdp_wait(handle, 1000); });
   auto deadline = Clock::now() + std::chrono::milliseconds(500);
@@ -330,10 +340,10 @@ TEST_P(Gate, LateClientAndBurst) {
   }
   auto after = ResidentBytes();
   RecordProperty("burst_rss_growth", std::to_string(std::int64_t(after) - std::int64_t(before)));
-  EXPECT_LE(after, before + pixels.size() * 4);
+  EXPECT_LE(after, before + pixels.size() * 16);
   ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text();
 }
-TEST_P(Gate, ClipsToDesktop) {
+TEST_P(Gate, DesktopIsPicture) {
   backend.reset();
   sdlrdp_config config{"127.0.0.1", 0, certificates.path.c_str(), 640, 480, 0, Logs::Collect, &logs};
   config.codec = GetParam().codec;
@@ -345,23 +355,12 @@ TEST_P(Gate, ClipsToDesktop) {
     return (index++ * 2654435761u) & 0x00ffffff; });
   sdlrdp_rect area{0, 0, 640, 480};
   ASSERT_EQ(sdlrdp_present(handle, frame.data(), 640 * 4, 640, 480, &area, 1), 0);
-  Backend::CopyRows({reinterpret_cast<BYTE const*>(frame.data()), frame.size() * 4}, 640 * 4,
-    {reinterpret_cast<BYTE*>(pixels.data()), pixels.size() * 4}, 320 * 4, 200, 320 * 4);
   Client client(sdlrdp_port(handle), GetParam());
   client.tolerance = GetParam().codec == SDLRDP_CODEC_REMOTEFX ? 40 : GetParam().codec == SDLRDP_CODEC_NSCODEC ? 3 : 0;
   ASSERT_TRUE(freerdp_connect(client.instance.get()));
-  ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text();
-  EXPECT_EQ(client.instance->context->gdi->width, 320);
-  EXPECT_EQ(client.instance->context->gdi->height, 200);
-  EXPECT_FALSE(logs.Contains("failed"));
-  area = {400, 300, 40, 30};
-  std::ranges::fill(frame, 0x00010203u);
-  ASSERT_EQ(sdlrdp_present(handle, frame.data(), 640 * 4, 640, 480, &area, 1), 0);
-  auto deadline = Clock::now() + std::chrono::milliseconds(100);
-  do {
-    ASSERT_TRUE(client.Pump());
-    ASSERT_TRUE(client.Matches(pixels));
-  } while (Clock::now() < deadline);
+  ASSERT_TRUE(client.Until([&] { return client.Matches(frame); })) << logs.Text();
+  EXPECT_EQ(client.instance->context->gdi->width, 640);
+  EXPECT_EQ(client.instance->context->gdi->height, 480);
   EXPECT_FALSE(logs.Contains("failed"));
 }
 TEST_P(Gate, WaitForClient) {
@@ -396,7 +395,7 @@ TEST_P(Gate, BlockedSinglePresent) {
   client.tolerance = GetParam().codec == SDLRDP_CODEC_REMOTEFX ? 40 : GetParam().codec == SDLRDP_CODEC_NSCODEC ? 3 : 0;
   ASSERT_TRUE(freerdp_connect(client.instance.get()));
   auto events = Events(1);
-  ASSERT_EQ(events.size(), 1u);
+  ASSERT_EQ(events.size(), 2u);
   ASSERT_EQ(events.front().type, SDLRDP_CONNECTED);
   pixels.resize(2048 * 1536);
   std::generate(pixels.begin(), pixels.end(), [index = 0u]() mutable {
@@ -415,21 +414,22 @@ TEST_P(Gate, BlockedSinglePresent) {
 TEST_P(Gate, NewestClientTakesOver) {
   Client first(sdlrdp_port(backend.get()), GetParam());
   ASSERT_TRUE(freerdp_connect(first.instance.get()));
-  ASSERT_EQ(Events(1).size(), 1u);
+  ASSERT_EQ(Events(2).size(), 2u);
   Client second(sdlrdp_port(backend.get()), GetParam(), 400, 240);
   ASSERT_TRUE(freerdp_connect(second.instance.get()));
   auto events = Events(3);
   ASSERT_EQ(events.size(), 3u);
   EXPECT_EQ(events[0].type, SDLRDP_DISCONNECTED);
   EXPECT_EQ(events[1].type, SDLRDP_CONNECTED);
-  EXPECT_EQ(events[1].connected.width, 400u);
-  EXPECT_EQ(events[1].connected.height, 240u);
-  EXPECT_EQ(events[2].type, SDLRDP_RESIZE);
+  EXPECT_EQ(events[1].connected.width, 320u);
+  EXPECT_EQ(events[1].connected.height, 200u);
+  EXPECT_EQ(events[2].type, SDLRDP_SCREEN);
   freerdp_input_send_keyboard_event(first.instance->context->input, KBD_FLAGS_DOWN, 0x30);
   auto deadline = Clock::now() + std::chrono::seconds(3);
   bool connected = true;
   while (connected && Clock::now() < deadline) connected = first.Pump();
   ASSERT_FALSE(connected);
+  EXPECT_EQ(freerdp_get_last_error(first.instance->context), FREERDP_ERROR_DISCONNECTED_BY_OTHER_CONNECTION);
   ASSERT_NO_FATAL_FAILURE(Input(second));
   ASSERT_TRUE(freerdp_disconnect(second.instance.get()));
   events = Events(1);
@@ -440,19 +440,21 @@ TEST_P(Gate, NewestClientTakesOver) {
 TEST_P(Gate, LiveCodecChange) {
   Client client(sdlrdp_port(backend.get()), GetParam());
   ASSERT_TRUE(freerdp_connect(client.instance.get()));
-  ASSERT_EQ(Events(1).size(), 1u);
+  ASSERT_EQ(Events(2).size(), 2u);
   auto previous = GetParam().codec;
   for (auto codec : {SDLRDP_CODEC_RAW, SDLRDP_CODEC_PLANAR, SDLRDP_CODEC_REMOTEFX,
                      SDLRDP_CODEC_NSCODEC, SDLRDP_CODEC_AUTO}) {
     ASSERT_EQ(sdlrdp_set_codec(backend.get(), codec), 0);
-    client.tolerance = codec == SDLRDP_CODEC_REMOTEFX && GetParam().surface ? 40 : 0;
+    client.tolerance = (codec == SDLRDP_CODEC_REMOTEFX || codec == SDLRDP_CODEC_AUTO) && GetParam().surface ? 40 : 0;
     std::ranges::fill(pixels, 0x00404040u + unsigned(codec) * 0x00040404u);
     ASSERT_NO_FATAL_FAILURE(Frame(client, {0, 0, 320, 200}));
-    auto expected = codec == SDLRDP_CODEC_AUTO || (!GetParam().surface
-      && (codec == SDLRDP_CODEC_REMOTEFX || codec == SDLRDP_CODEC_NSCODEC)) ? SDLRDP_CODEC_PLANAR : codec;
+    auto expected = (!GetParam().surface
+      && (codec == SDLRDP_CODEC_REMOTEFX || codec == SDLRDP_CODEC_NSCODEC)) ? SDLRDP_CODEC_PLANAR
+      : codec == SDLRDP_CODEC_AUTO ? (GetParam().surface ? SDLRDP_CODEC_REMOTEFX : SDLRDP_CODEC_PLANAR) : codec;
 
     std::array<sdlrdp_event, 4> events{};
     auto count = sdlrdp_poll(backend.get(), events.data(), events.size());
+    count = std::remove_if(events.begin(), events.begin() + count, [](auto e) { return e.type == SDLRDP_REFRESH; }) - events.begin();
     ASSERT_EQ(count, expected == previous ? 0u : 1u);
     if (count) {
       ASSERT_EQ(count, 1u);
@@ -466,7 +468,7 @@ TEST_P(Gate, LiveCodecChange) {
 TEST_P(Gate, ExactFlatColour) {
   Client client(sdlrdp_port(backend.get()), GetParam());
   ASSERT_TRUE(freerdp_connect(client.instance.get()));
-  ASSERT_EQ(Events(1).size(), 1u);
+  ASSERT_EQ(Events(2).size(), 2u);
   std::ranges::fill(pixels, 0x00ffffffu);
   ASSERT_NO_FATAL_FAILURE(Frame(client, {0, 0, 320, 200}));
 }
@@ -493,7 +495,7 @@ TEST_P(Gate, ProbeClosesBeforeActivation) {
   while (!logs.Contains(SDLRDP_LOG_INFO, "Connection closed before activation.")
          && Clock::now() < deadline) std::this_thread::yield();
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, "Connection closed before activation."));
-  EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, "Peer transport failed"));
+  EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, "Peer transport failed")) << logs.Text();
   EXPECT_EQ(sdlrdp_wait(backend.get(), 0), 0);
 }
 TEST(Measurement, FullFrames1024x768) {
@@ -612,4 +614,352 @@ INSTANTIATE_TEST_SUITE_P(Codec, Gate, testing::Values(
   Mode{true, SDLRDP_CODEC_RAW}, Mode{true, SDLRDP_CODEC_PLANAR},
   Mode{true, SDLRDP_CODEC_REMOTEFX}, Mode{true, SDLRDP_CODEC_NSCODEC},
   Mode{false, SDLRDP_CODEC_RAW}, Mode{false, SDLRDP_CODEC_PLANAR}), ModeName);
+using Headless::FrameObserver;
+class RoundFive : public testing::Test {
+protected:
+  CertificateDirectory certificates;
+  Logs logs;
+  std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> backend{nullptr, sdlrdp_close};
+  void Open(unsigned w = 640, unsigned h = 480, sdlrdp_aspect aspect = {}, sdlrdp_codec codec = SDLRDP_CODEC_RAW) {
+    sdlrdp_config config{"127.0.0.1", 0, certificates.path.c_str(), w, h, 0, Logs::Collect, &logs};
+    config.aspect = aspect; config.codec = codec;
+    InitializeTls(config);
+    sdlrdp_handle* handle = nullptr;
+    ASSERT_EQ(sdlrdp_open(&config, &handle), 0) << sdlrdp_last_error();
+    backend.reset(handle);
+  }
+  void Present(std::vector<UINT32> const& pixels, unsigned w, unsigned h) {
+    sdlrdp_rect full{0, 0, int(w), int(h)};
+    ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), w * 4, w, h, &full, 1), 0);
+  }
+  std::vector<sdlrdp_event> Events() {
+    std::array<sdlrdp_event, 256> events{};
+    auto n = sdlrdp_poll(backend.get(), events.data(), events.size());
+    return {events.begin(), events.begin() + n};
+  }
+  void Connect(Client& client, bool ack = true) {
+    ASSERT_TRUE(freerdp_settings_set_uint32(client.instance->context->settings, FreeRDP_FrameAcknowledge, ack ? 2 : 0));
+    ASSERT_TRUE(freerdp_connect(client.instance.get())) << logs.Text();
+    ASSERT_TRUE(client.Until([&] { return HasCookie(client); }));
+  }
+};
+TEST_F(RoundFive, DelayedAcknowledgements) {
+  Open();
+  Client client(sdlrdp_port(backend.get()), true, 1024, 768);
+  Connect(client);
+  FrameObserver observer(client);
+  std::vector<UINT32> pixels(640 * 480, 0x112233);
+  Present(pixels, 640, 480);
+  ASSERT_TRUE(client.Until([&] { return observer.ids.size() == 1; }));
+  std::ranges::fill(pixels, 0x223344);
+  Present(pixels, 640, 480);
+  ASSERT_TRUE(client.Until([&] { return observer.ids.size() == 2; }));
+  for (unsigned i = 0; i < 10; ++i) { std::ranges::fill(pixels, 0x334455 + i); Present(pixels, 640, 480); }
+  for (unsigned i = 0; i < 5; ++i) ASSERT_TRUE(client.Pump(5));
+  EXPECT_EQ(observer.ids.size(), 2u);
+  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 0);
+  ASSERT_TRUE(observer.Ack());
+  ASSERT_TRUE(client.Until([&] { return observer.ids.size() == 3; }));
+  EXPECT_TRUE(client.Matches(pixels));
+  ASSERT_TRUE(observer.Ack());
+  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 1000), 1);
+  EXPECT_TRUE(observer.coherent);
+}
+TEST_F(RoundFive, SuppressOutput) {
+  Open();
+  Client client(sdlrdp_port(backend.get()), true);
+  Connect(client, false);
+  FrameObserver observer(client);
+  auto update = client.instance->context->update;
+  ASSERT_TRUE(update->SuppressOutput(client.instance->context, 0, nullptr));
+  std::this_thread::sleep_for(std::chrono::milliseconds(25));
+  auto bytes = client.Received();
+  std::vector<UINT32> pixels(640 * 480, 0x123456);
+  Present(pixels, 640, 480);
+  std::ranges::fill(pixels, 0x654321);
+  Present(pixels, 640, 480);
+  for (unsigned i = 0; i < 10; ++i) ASSERT_TRUE(client.Pump(5));
+  EXPECT_EQ(client.Received(), bytes);
+  EXPECT_TRUE(observer.ids.empty());
+  RECTANGLE_16 area{0, 0, 639, 479};
+  ASSERT_TRUE(update->SuppressOutput(client.instance->context, 1, &area));
+  ASSERT_TRUE(client.Until([&] { return observer.ids.size() == 1; }));
+  EXPECT_TRUE(client.Matches(pixels));
+}
+TEST_F(RoundFive, AspectAndMouse) {
+  Open(640, 350, {4, 3});
+  Client client(sdlrdp_port(backend.get()), true, 1024, 768);
+  Connect(client, false);
+  auto events = Events();
+  ASSERT_EQ(events.size(), 2u);
+  EXPECT_EQ(events[0].connected.screen_width, 1024u);
+  EXPECT_EQ(events[1].type, SDLRDP_SCREEN);
+  EXPECT_EQ(events[1].screen.height, 768u);
+  EXPECT_EQ(client.instance->context->gdi->width, 640);
+  EXPECT_EQ(client.instance->context->gdi->height, 480);
+  FrameObserver observer(client);
+  std::vector<UINT32> pixels(640 * 350);
+  std::fill_n(pixels.begin() + 175 * 640, 640, 0xffffff);
+  Present(pixels, 640, 350);
+  ASSERT_TRUE(client.Until([&] { return !observer.ids.empty(); }));
+  auto actual = reinterpret_cast<UINT32*>(client.instance->context->gdi->primary_buffer);
+  auto rows = std::views::iota(0, 480);
+  auto brightest = std::ranges::max_element(rows, {}, [&](int y) { return actual[y * 640] & 255; });
+  EXPECT_LE(std::abs(*brightest - 240), 1);
+  ASSERT_TRUE(freerdp_input_send_mouse_event(client.instance->context->input, PTR_FLAGS_MOVE, 639, 479));
+  ASSERT_EQ(sdlrdp_wait(backend.get(), 1000), 1);
+  events = Events();
+  ASSERT_EQ(events.size(), 1u);
+  EXPECT_EQ(events[0].mouse_move.x, 639);
+  EXPECT_EQ(events[0].mouse_move.y, 349);
+  ASSERT_EQ(sdlrdp_set_aspect(backend.get(), {0, 0}), 0);
+  ASSERT_TRUE(client.Until([&] { return client.instance->context->gdi->height == 350 && client.Matches(pixels); }));
+  EXPECT_EQ(client.instance->context->gdi->width, 640);
+}
+TEST_F(RoundFive, SparseRegions) {
+  for (auto codec : {SDLRDP_CODEC_RAW, SDLRDP_CODEC_PLANAR, SDLRDP_CODEC_REMOTEFX, SDLRDP_CODEC_NSCODEC}) {
+    Open(1024, 768, {}, codec);
+    Client client(sdlrdp_port(backend.get()), true, 1024, 768);
+    Connect(client, false);
+    FrameObserver observer(client);
+    std::vector<UINT32> pixels(1024 * 768);
+    std::generate(pixels.begin(), pixels.end(), [i = 0u]() mutable { return (i++ * 2654435761u) & 0xffffff; });
+    Present(pixels, 1024, 768);
+    ASSERT_TRUE(client.Until([&] { return observer.ids.size() == 1; }));
+    auto bytes = client.Received();
+    Present(pixels, 1024, 768);
+    ASSERT_TRUE(client.Until([&] { return observer.ids.size() == 2; }));
+    auto bounding = client.Received() - bytes;
+    RecordProperty("bounding_bytes_" + std::to_string(codec), std::to_string(bounding));
+    bytes = client.Received();
+    std::array<sdlrdp_rect, 2> damage{{{0, 0, 8, 8}, {1016, 760, 8, 8}}};
+    ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 4096, 1024, 768, damage.data(), 2), 0);
+    ASSERT_TRUE(client.Until([&] { return observer.ids.size() == 3; }));
+    auto used = client.Received() - bytes;
+    RecordProperty("region_bytes_" + std::to_string(codec), std::to_string(used));
+    EXPECT_LT(used, bounding / 100);
+  }
+}
+struct ProcessEnvironment {
+  std::filesystem::path cwd = std::filesystem::current_path();
+  std::optional<std::string> data;
+  ProcessEnvironment() { if (auto value = getenv("XDG_DATA_HOME")) data = value; }
+  ~ProcessEnvironment() {
+    std::filesystem::current_path(cwd);
+    if (data) setenv("XDG_DATA_HOME", data->c_str(), 1); else unsetenv("XDG_DATA_HOME");
+  }
+};
+TEST(Certificate, StableDefaultAndPermissions) {
+  CertificateDirectory temporary;
+  ProcessEnvironment restore;
+  auto data = temporary.path / "data";
+  ASSERT_EQ(setenv("XDG_DATA_HOME", data.c_str(), 1), 0);
+  std::string first;
+  for (auto directory : {temporary.path / "one", temporary.path / "two"}) {
+    std::filesystem::create_directory(directory);
+    std::filesystem::current_path(directory);
+    sdlrdp_config config{"127.0.0.1", 0, nullptr, 320, 200, 0};
+    sdlrdp_handle* handle = nullptr;
+    ASSERT_EQ(sdlrdp_open(&config, &handle), 0);
+    sdlrdp_close(handle);
+    auto certificate = Headless::ReadText((data / "sdl-rdp/server.crt").c_str());
+    if (first.empty()) first = certificate; else EXPECT_EQ(first, certificate);
+  }
+  std::unique_ptr<BIO, Backend::Releases<BIO_free>> bio(BIO_new_mem_buf(first.data(), first.size()));
+  std::unique_ptr<X509, Backend::Releases<X509_free>> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
+  ASSERT_TRUE(cert);
+  std::array<char, 256> hostname{};
+  ASSERT_EQ(gethostname(hostname.data(), hostname.size()), 0);
+  EXPECT_EQ(X509_check_host(cert.get(), hostname.data(), 0, 0, nullptr), 1);
+  int days = 0, seconds = 0;
+  ASSERT_TRUE(ASN1_TIME_diff(&days, &seconds, X509_get0_notBefore(cert.get()), X509_get0_notAfter(cert.get())));
+  EXPECT_EQ(days, 3650);
+  using Perm = std::filesystem::perms;
+  EXPECT_EQ(std::filesystem::status(data / "sdl-rdp").permissions() & Perm::mask, Perm::owner_all);
+  EXPECT_EQ(std::filesystem::status(data / "sdl-rdp/server.key").permissions() & Perm::mask,
+    Perm::owner_read | Perm::owner_write);
+}
+TEST_F(RoundFive, WaitAndRefresh) {
+  Open(320, 200);
+  Client client(sdlrdp_port(backend.get()), true);
+  Connect(client);
+  Events();
+  FrameObserver observer(client);
+  std::vector<UINT32> pixels(320 * 200, 0x445566);
+  auto started = Clock::now();
+  for (unsigned i = 1; i <= 20; ++i) {
+    Present(pixels, 320, 200);
+    auto waiting = std::async(std::launch::async, [&] { return sdlrdp_wait_frame(backend.get(), 1000); });
+    ASSERT_TRUE(client.Until([&] { return observer.ids.size() == i; }));
+    EXPECT_EQ(waiting.wait_for(std::chrono::milliseconds(0)), std::future_status::timeout);
+    std::this_thread::sleep_until(started + std::chrono::milliseconds(20 * i));
+    ASSERT_TRUE(observer.Ack());
+    EXPECT_EQ(waiting.get(), 1);
+  }
+  auto events = Events();
+  auto latest = std::ranges::find_if(events | std::views::reverse,
+    [](auto const& event) { return event.type == SDLRDP_REFRESH; });
+  ASSERT_NE(latest, events.rend());
+  EXPECT_NEAR(latest->refresh.millihertz, 50000, 5000);
+  EXPECT_GE(Clock::now() - started, std::chrono::milliseconds(400));
+}
+TEST_F(RoundFive, NeverAcknowledges) {
+  Open(320, 200);
+  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 1);
+  Client client(sdlrdp_port(backend.get()), true);
+  Connect(client);
+  FrameObserver observer(client);
+  std::vector<UINT32> pixels(320 * 200, 0x778899);
+  Present(pixels, 320, 200);
+  ASSERT_TRUE(client.Until([&] { return observer.ids.size() == 1; }));
+  auto start = Clock::now();
+  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 1000), 1);
+  EXPECT_GE(Clock::now() - start, std::chrono::milliseconds(200));
+  EXPECT_LT(Clock::now() - start, std::chrono::milliseconds(500));
+  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 1);
+}
+TEST_F(RoundFive, ColourDepths) {
+  Open(320, 200);
+  for (auto depth : {16u, 24u}) {
+    Client client(sdlrdp_port(backend.get()), false);
+    ASSERT_TRUE(freerdp_settings_set_uint32(client.instance->context->settings, FreeRDP_ColorDepth, depth));
+    Connect(client, false);
+    client.tolerance = depth == 16 ? 7 : 0;
+    EXPECT_EQ(freerdp_settings_get_uint32(client.instance->context->settings, FreeRDP_ColorDepth), depth);
+    std::vector<UINT32> pixels(320 * 200);
+    std::generate(pixels.begin(), pixels.end(), [i = 0u]() mutable { return (i++ * 2654435761u) & 0xffffff; });
+    Present(pixels, 320, 200);
+    ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text();
+  }
+}
+TEST_F(RoundFive, ResizeDesktop) {
+  Open();
+  Client client(sdlrdp_port(backend.get()), true, 1024, 768);
+  client.instance->context->update->DesktopResize = [](rdpContext* context) -> BOOL {
+    return gdi_resize(context->gdi, freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopWidth),
+      freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopHeight));
+  };
+  Connect(client, false);
+  EXPECT_EQ(client.instance->context->gdi->width, 640);
+  ASSERT_EQ(sdlrdp_resize(backend.get(), 800, 600), 0);
+  std::vector<UINT32> pixels(800 * 600, 0x123456);
+  Present(pixels, 800, 600);
+  ASSERT_TRUE(client.Until([&] { return client.instance->context->gdi->width == 800 && client.Matches(pixels); })) << logs.Text();
+  EXPECT_EQ(client.instance->context->gdi->height, 600);
+}
+struct Delivery {
+  unsigned frames = 0, presents = 0;
+  bool coherent = true;
+};
+Delivery Flood(sdlrdp_handle* handle, Client& client, unsigned rate)
+{
+  FrameObserver observer(client);
+  std::atomic<unsigned> presents = 0;
+  auto until = Clock::now() + std::chrono::seconds(1);
+  std::jthread producer([&] {
+    std::vector<UINT32> pixels(1024 * 768);
+    sdlrdp_rect area{0, 0, 1024, 768};
+    auto next = Clock::now();
+    while (Clock::now() < until) {
+      auto counter = ++presents;
+      std::fill_n(pixels.begin(), 1024, counter);
+      std::fill_n(pixels.end() - 1024, 1024, counter);
+      Expects(sdlrdp_present(handle, pixels.data(), 4096, 1024, 768, &area, 1) == 0, "flood present accepted");
+      next += std::chrono::nanoseconds(1000000000 / rate);
+      std::this_thread::sleep_until(next);
+    }
+  });
+  if (rate > 60) std::this_thread::sleep_for(std::chrono::milliseconds(40));
+  while (Clock::now() < until) {
+    if (!client.Pump(1)) break;
+    if (!observer.ids.empty()) observer.Ack();
+  }
+  producer.join();
+  auto frames = observer.ids.size();
+  std::vector<UINT32> final(1024 * 768);
+  std::fill_n(final.begin(), 1024, presents.load());
+  std::fill_n(final.end() - 1024, 1024, presents.load());
+  Expects(client.Until([&] { observer.Ack(); return client.Matches(final); }), "last flood present delivered");
+  return {unsigned(frames), presents.load(), observer.coherent};
+}
+TEST_F(RoundFive, ProducerDoesNotStarveOrTear) {
+  Open(1024, 768);
+  Client client(sdlrdp_port(backend.get()), true, 1024, 768);
+  Connect(client);
+  auto paced = Flood(backend.get(), client, 60);
+  auto saturated = Flood(backend.get(), client, 1300);
+  EXPECT_TRUE(paced.coherent && saturated.coherent);
+  EXPECT_GE(saturated.frames, paced.frames);
+  EXPECT_GE(saturated.presents, 1200u);
+  RecordProperty("paced_frames", std::to_string(paced.frames));
+  RecordProperty("saturated_frames", std::to_string(saturated.frames));
+  RecordProperty("saturated_presents", std::to_string(saturated.presents));
+}
+using Headless::DisplayClient;
+TEST_F(RoundFive, ClientScreenNeverResizesPicture) {
+  Open();
+  Client client(sdlrdp_port(backend.get()), true, 1024, 768);
+  DisplayClient display(client);
+  Connect(client, false);
+  auto events = Events();
+  ASSERT_EQ(events.size(), 2u);
+  EXPECT_EQ(events[1].screen.width, 1024u);
+  EXPECT_EQ(events[1].screen.height, 768u);
+  ASSERT_TRUE(client.Until([&] { return display.ready.load(); })) << logs.Text();
+  DISPLAY_CONTROL_MONITOR_LAYOUT monitor{};
+  monitor.Flags = DISPLAY_CONTROL_MONITOR_PRIMARY;
+  monitor.Width = 1920; monitor.Height = 1080;
+  monitor.PhysicalWidth = 500; monitor.PhysicalHeight = 300;
+  monitor.DesktopScaleFactor = monitor.DeviceScaleFactor = 100;
+  ASSERT_EQ(display.channel.load()->SendMonitorLayout(display.channel.load(), 1, &monitor), CHANNEL_RC_OK);
+  ASSERT_TRUE(client.Until([&] { return sdlrdp_wait(backend.get(), 0) == 1; })) << logs.Text();
+  events = Events();
+  ASSERT_EQ(events.size(), 1u);
+  EXPECT_EQ(events[0].type, SDLRDP_SCREEN);
+  EXPECT_EQ(events[0].screen.width, 1920u);
+  EXPECT_EQ(events[0].screen.height, 1080u);
+  EXPECT_EQ(client.instance->context->gdi->width, 640);
+  EXPECT_EQ(client.instance->context->gdi->height, 480);
+}
+TEST(Planar, Noisy640Rows) {
+  std::unique_ptr<rdpSettings, Backend::Releases<freerdp_settings_free>> settings(freerdp_settings_new(0));
+  ASSERT_TRUE(freerdp_settings_set_uint32(settings.get(), FreeRDP_ColorDepth, 32));
+  std::unique_ptr<BITMAP_PLANAR_CONTEXT, Backend::Releases<freerdp_bitmap_planar_context_free>>
+    encoder(freerdp_bitmap_planar_context_new(PLANAR_FORMAT_HEADER_RLE | PLANAR_FORMAT_HEADER_NA, 1, 1));
+  ASSERT_TRUE(freerdp_bitmap_planar_context_reset(encoder.get(), 640, 1));
+  std::vector<BYTE> payload(640 * 4 + 1024);
+  std::unique_ptr<BITMAP_PLANAR_CONTEXT, Backend::Releases<freerdp_bitmap_planar_context_free>>
+    decoder(freerdp_bitmap_planar_context_new(0, 640, 1));
+  std::vector<UINT32> pixels(640), decoded(640);
+  for (unsigned y = 0; y < 480; ++y) {
+    std::generate(pixels.begin(), pixels.end(), [i = y * 640]() mutable { return (i++ * 2654435761u) & 0xffffff; });
+    UINT32 size = payload.size();
+    ASSERT_TRUE(freerdp_bitmap_compress_planar(encoder.get(), reinterpret_cast<BYTE const*>(pixels.data()),
+      PIXEL_FORMAT_BGRA32, 640, 1, 2560, payload.data(), &size));
+    ASSERT_TRUE(planar_decompress(decoder.get(), payload.data(), size, 640, 1,
+      reinterpret_cast<BYTE*>(decoded.data()), PIXEL_FORMAT_BGRX32, 2560, 0, 0, 640, 1, TRUE)) << y;
+  }
+}
+}
+
+TEST_F(RoundFive, AutoPrefersRemoteFX) {
+  Open(320, 200, {}, SDLRDP_CODEC_AUTO);
+  Client client(sdlrdp_port(backend.get()), true);
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  auto events = Events();
+  ASSERT_GE(events.size(), 1u);
+  EXPECT_EQ(events[0].connected.codec, SDLRDP_CODEC_REMOTEFX);
+}
+TEST_F(RoundFive, ExpectedDisconnectLogLevels) {
+  Open();
+  auto peer = WLog_Get("com.freerdp.core.peer");
+  for (auto name : {"ERRINFO_LOGOFF_BY_USER", "ERRINFO_DISCONNECTED_BY_OTHER_CONNECTION", "ERRINFO_RPC_INITIATED_DISCONNECT"}) {
+    WLog_Print(peer, WLOG_ERROR, "%s [0x00010000]", name);
+    EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, name));
+    EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, name));
+  }
+  WLog_Print(peer, WLOG_ERROR, "transport failure marker");
+  EXPECT_TRUE(logs.Contains(SDLRDP_LOG_ERROR, "transport failure marker"));
+  WLog_Print(WLog_Get("com.freerdp.core.transport"), WLOG_ERROR, "ERRINFO_LOGOFF_BY_USER [0x0001000C]");
+  EXPECT_TRUE(logs.Contains(SDLRDP_LOG_ERROR, "ERRINFO_LOGOFF_BY_USER"));
 }

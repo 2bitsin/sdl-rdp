@@ -5,6 +5,7 @@ extern "C" {
 #endif
 typedef struct sdlrdp_handle sdlrdp_handle;
 typedef struct { int x, y, w, h; } sdlrdp_rect;
+typedef struct { unsigned num, den; } sdlrdp_aspect;
 typedef enum { SDLRDP_LOG_ERROR, SDLRDP_LOG_WARN, SDLRDP_LOG_INFO } sdlrdp_log_level;
 /* Planar is lossless BitmapUpdate; RemoteFX and NSCodec use lossy SurfaceBits. */
 typedef enum {
@@ -14,24 +15,28 @@ typedef enum {
 typedef struct {
   const char* bind; /* NULL selects 0.0.0.0; numeric IPv4. */
   unsigned port; /* 0 selects an ephemeral port. */
-  const char* cert_dir; /* NULL selects _rdp under cwd. */
+  const char* cert_dir; /* NULL selects the per-user data directory. */
   unsigned width, height;
   int wait_for_client; /* Open waits for activation when nonzero. */
   /* Called on worker threads; user and callback must live until close returns. */
   void (*log)(void* user, sdlrdp_log_level level, const char* text);
   void* user;
   sdlrdp_codec codec;
+  sdlrdp_aspect aspect; /* Display aspect; either zero selects square pixels. */
 } sdlrdp_config;
 typedef enum {
   SDLRDP_CONNECTED, SDLRDP_DISCONNECTED, SDLRDP_RESIZE, SDLRDP_KEY,
-  SDLRDP_MOUSE_MOVE, SDLRDP_MOUSE_BUTTON, SDLRDP_MOUSE_WHEEL, SDLRDP_CODEC_CHANGED
+  SDLRDP_MOUSE_MOVE, SDLRDP_MOUSE_BUTTON, SDLRDP_MOUSE_WHEEL, SDLRDP_CODEC_CHANGED, SDLRDP_SCREEN, SDLRDP_REFRESH
 } sdlrdp_event_type;
 typedef struct {
   sdlrdp_event_type type;
   union {
-    struct { unsigned width, height, bpp; char client_name[64]; sdlrdp_codec codec; } connected;
+    struct { unsigned width, height, bpp; char client_name[64]; sdlrdp_codec codec;
+      unsigned screen_width, screen_height, refresh_millihertz; } connected;
     struct { sdlrdp_codec codec; } codec_changed;
     struct { unsigned width, height; } resize;
+    struct { unsigned width, height; } screen;
+    struct { unsigned millihertz; } refresh;
     struct { unsigned scancode; int extended; int down; } key;
     struct { int x, y; } mouse_move;
     struct { unsigned button; int down; } mouse_button;
@@ -39,7 +44,7 @@ typedef struct {
   };
 } sdlrdp_event;
 const char* sdlrdp_last_error(void);
-#define SDLRDP_ABI_VERSION 2
+#define SDLRDP_ABI_VERSION 3
 unsigned sdlrdp_version(void);
 int sdlrdp_open(const sdlrdp_config*, sdlrdp_handle**);
 /* Close joins workers; callers must finish concurrent ABI calls first. */
@@ -53,6 +58,11 @@ int sdlrdp_wait(sdlrdp_handle*, int);
 void sdlrdp_wakeup(sdlrdp_handle*);
 /* Unsupported preferences fall back to the best negotiated codec. */
 int sdlrdp_set_codec(sdlrdp_handle*, sdlrdp_codec);
+int sdlrdp_set_pointer(sdlrdp_handle*, unsigned w, unsigned h, unsigned hot_x, unsigned hot_y, const void* argb);
+int sdlrdp_resize(sdlrdp_handle*, unsigned, unsigned);
+int sdlrdp_set_aspect(sdlrdp_handle*, sdlrdp_aspect);
+/* 1 when acknowledged or no acknowledging peer; 0 on timeout, -1 on error. Negative waits indefinitely. */
+int sdlrdp_wait_frame(sdlrdp_handle*, int timeout_ms);
 #ifdef __cplusplus
 }
 #endif

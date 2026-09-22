@@ -12,6 +12,7 @@
 #include <cstring>
 #include <utility>
 #include <stdexcept>
+#include <freerdp/channels/wtsvc.h>
 
 namespace Backend {
 namespace {
@@ -57,8 +58,13 @@ Peer::Peer(PeerHandle accepted, State& state)
   raw->ContextSize = sizeof(rdpContext);
   raw->ContextExtra = this;
   raw->Activate = Activate;
+  raw->Capabilities = Capabilities;
   raw->PostConnect = [](freerdp_peer*) -> BOOL { return TRUE; };
   if (!freerdp_peer_context_new(raw)) throw std::runtime_error("peer context failed");
+  channels = WTSOpenServerA(reinterpret_cast<char*>(raw->context));
+  if (!channels || channels == INVALID_HANDLE_VALUE) throw std::runtime_error("Channel manager allocation failed.");
+  raw->context->update->SurfaceFrameAcknowledge = Acknowledge;
+  raw->context->update->SuppressOutput = Suppress;
   auto input = raw->context->input;
   input->KeyboardEvent = Keyboard;
   input->MouseEvent = Mouse;
@@ -69,6 +75,8 @@ Peer::~Peer()
   thread.request_stop();
   SetEvent(wake.get());
   if (thread.joinable()) thread.join();
+  disp.reset();
+  if (channels) WTSCloseServer(channels);
 }
 void Peer::Start()
 {
@@ -78,6 +86,8 @@ void Peer::Start()
 bool Peer::Configure()
 {
   Expects(client && client->context, "peer context exists");
+  sdlrdp_rect picture;
+  { std::scoped_lock lock(owner.frame_guard); picture = owner.Picture(); }
   auto settings = client->context->settings;
   std::unique_ptr<rdpPrivateKey, Releases<freerdp_key_free>> key(
     freerdp_key_new_from_file(owner.credentials.key.c_str()));
@@ -97,9 +107,13 @@ bool Peer::Configure()
     && freerdp_settings_set_bool(settings, FreeRDP_AutoReconnectionEnabled, TRUE)
     && freerdp_settings_set_bool(settings, FreeRDP_WaitForOutputBufferFlush, FALSE)
     && freerdp_settings_set_uint32(settings, FreeRDP_EncryptionLevel, ENCRYPTION_LEVEL_CLIENT_COMPATIBLE)
-    && freerdp_settings_set_uint32(settings, FreeRDP_ColorDepth, 32)
-    && freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth, owner.width)
-    && freerdp_settings_set_uint32(settings, FreeRDP_DesktopHeight, owner.height);
+    && freerdp_settings_set_bool(settings, FreeRDP_FrameMarkerCommandEnabled, TRUE)
+    && freerdp_settings_set_uint32(settings, FreeRDP_FrameAcknowledge, 2)
+    && freerdp_settings_set_bool(settings, FreeRDP_SupportDisplayControl, TRUE)
+    && freerdp_settings_set_bool(settings, FreeRDP_SuppressOutput, TRUE)
+    && freerdp_settings_set_uint32(settings, FreeRDP_LargePointerFlag, LARGE_POINTER_FLAG_96x96 | LARGE_POINTER_FLAG_384x384)
+    && freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth, picture.w)
+    && freerdp_settings_set_uint32(settings, FreeRDP_DesktopHeight, picture.h);
 }
 void Peer::Serve(std::stop_token quit)
 {
@@ -111,16 +125,17 @@ void Peer::Serve(std::stop_token quit)
       DWORD count, timeout;
       {
         std::scoped_lock lock(owner.session_guard);
-        count = client->GetEventHandles(client.get(), handles.data(), 31);
-        timeout = client->IsWriteBlocked(client.get()) ? 5 : INFINITE;
+        count = client->GetEventHandles(client.get(), handles.data(), 30);
+        timeout = Timeout();
       }
       if (!count) break;
       handles[count++] = wake.get();
+      handles[count++] = WTSVirtualChannelManagerGetEventHandle(channels);
       if (WaitForMultipleObjects(count, handles.data(), FALSE, timeout) == WAIT_FAILED
           || quit.stop_requested()) break;
       std::scoped_lock lock(owner.session_guard);
       if (quit.stop_requested()) break;
-      if (!client->CheckFileDescriptor(client.get()) || !Drain()) {
+      if (!client->CheckFileDescriptor(client.get()) || !Channels() || !Drain()) {
         TransportEnded();
         break;
       }
@@ -136,13 +151,15 @@ void Peer::Serve(std::stop_token quit)
 void Peer::TransportEnded()
 {
   Expects(client && client->context, "transport context exists");
-  auto error = freerdp_get_last_error_name(freerdp_get_last_error(client->context));
+  auto code = freerdp_get_last_error(client->context);
+  auto error = freerdp_get_last_error_name(code);
   bool pending;
   {
     std::scoped_lock lock(owner.frame_guard);
-    pending = dirty.has_value() || client->IsWriteBlocked(client.get());
+    pending = !dirty.empty() || snapshot != nullptr || client->IsWriteBlocked(client.get());
   }
-  if (active && pending)
+  if (ExpectedDisconnect(code)) owner.Log(SDLRDP_LOG_INFO, std::format("Peer disconnected: {}.", error));
+  else if (active && pending)
     owner.Log(SDLRDP_LOG_ERROR, std::format("Peer transport failed with pending data: {}.", error));
   else if (!activated)
     owner.Log(SDLRDP_LOG_INFO, std::format("Connection closed before activation. {}", error));
@@ -151,18 +168,22 @@ BOOL Peer::Activate(freerdp_peer* client)
 {
   Expects(client && client->context, "peer context exists");
   auto& self = Held(client);
-  if (self.active.load()) return TRUE;
+  if (self.active.load()) { self.resizing = false; SetEvent(self.wake.get()); return TRUE; }
   if (!SendCookie(client->context)) return FALSE;
   if (!self.encoder.Select(client->context->settings, self.owner.codec.load())) return FALSE;
   auto event = Connected(client->context->settings);
   event.connected.codec = self.encoder.codec;
+  event.connected.screen_width = self.screen_width;
+  event.connected.screen_height = self.screen_height;
+  event.connected.refresh_millihertz = self.refresh;
+  self.ack_enabled = freerdp_settings_get_uint32(client->context->settings, FreeRDP_FrameAcknowledge) != 0;
   self.desktop = {0, 0, int(event.connected.width), int(event.connected.height)};
   self.owner.Takeover(self, event);
   return TRUE;
 }
 void Peer::Post(sdlrdp_rect area)
 {
-  Merge(dirty, area);
+  dirty.Add(area);
   SetEvent(wake.get());
 }
 bool Peer::Drain()
@@ -175,16 +196,59 @@ bool Peer::Drain()
     ResetEvent(wake.get());
     return true;
   }
-  std::optional<sdlrdp_rect> region;
   {
     std::scoped_lock lock(owner.frame_guard);
-    region = std::exchange(dirty, std::nullopt);
     ResetEvent(wake.get());
+    if (suppressed || !Pacing()) return true;
   }
-  if (region) region = Intersect(*region, desktop);
-  if (!region || SendFrame(client->context, owner, *region)) return true;
-  std::scoped_lock lock(owner.frame_guard);
-  Post(*region);
-  return false;
+  if (!SendPointer()) return false;
+  if (!snapshot && !BeginFrame()) return false;
+  return !snapshot || resizing || SendFrame(*this);
+}
+BOOL Peer::Capabilities(freerdp_peer* client)
+{
+  auto& self = Held(client);
+  auto settings = client->context->settings;
+  std::scoped_lock lock(self.owner.frame_guard);
+  if (!self.activated) {
+    self.screen_width = freerdp_settings_get_uint32(settings, FreeRDP_DesktopWidth);
+    self.screen_height = freerdp_settings_get_uint32(settings, FreeRDP_DesktopHeight);
+  }
+  auto depth = freerdp_settings_get_uint32(settings, FreeRDP_ColorDepth);
+  if (depth != 16 && depth != 24 && depth != 32) {
+    self.owner.Log(SDLRDP_LOG_WARN, "Connection refused: colour depth must be 16, 24 or 32 bpp.");
+    return FALSE;
+  }
+  auto picture = self.resizing ? self.desktop : self.owner.Picture();
+  return freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth, picture.w)
+    && freerdp_settings_set_uint32(settings, FreeRDP_DesktopHeight, picture.h);
+}
+bool Peer::BeginFrame()
+{
+  sdlrdp_rect picture;
+  {
+    std::scoped_lock lock(owner.frame_guard);
+    if (dirty.empty() || !owner.shadow) return true;
+    picture = owner.Picture();
+    snapshot = owner.shadow;
+    snapshot_width = owner.frame_width; snapshot_height = owner.frame_height;
+    sequence = owner.presented;
+    sending = std::move(dirty);
+    dirty = {};
+    rect_index = row = 0;
+  }
+  if (picture.w != desktop.w || picture.h != desktop.h) {
+    desktop = picture;
+    resizing = true;
+    auto settings = client->context->settings;
+    if (!freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth, picture.w)
+        || !freerdp_settings_set_uint32(settings, FreeRDP_DesktopHeight, picture.h)
+        || !client->context->update->DesktopResize(client->context)) return false;
+    sending.clear();
+    sending.Add({0, 0, int(snapshot_width), int(snapshot_height)});
+  }
+  ++frame_id;
+  frame_started = false;
+  return true;
 }
 }

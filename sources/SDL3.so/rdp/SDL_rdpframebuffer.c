@@ -49,6 +49,9 @@ bool SDL_RDP_UpdateWindowFramebuffer(SDL_VideoDevice *_this, SDL_Window *window,
     result = data->backend.present(data->handle, surface->pixels, surface->pitch,
                                    surface->w, surface->h, damage, numrects);
     SDL_small_free(damage, isstack);
+    if (result == 0 && SDL_GetHintBoolean(SDL_HINT_RDP_VSYNC, true)) {
+        result = data->backend.wait_frame(data->handle, 100) < 0 ? -1 : 0;
+    }
     return result == 0 || SDL_SetError("%s", data->backend.last_error());
 }
 

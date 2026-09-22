@@ -1,6 +1,6 @@
 #include <SDL3/SDL.h>
-#include <cstdio>
-#include <print>
+#include <format>
+#include <charconv>
 #include <string>
 #include <cstdlib>
 #include <memory>
@@ -11,7 +11,7 @@
 void Check(bool result)
 {
     if (!result) {
-        std::println(stderr, "{}", SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s", SDL_GetError());
         std::exit(1);
     }
 }
@@ -47,6 +47,16 @@ const char *EventName(Uint32 type)
     }
 }
 
+void PrintGeometry(const SDL_Event &event, SDL_Window *window)
+{
+    if (event.type == SDL_EVENT_WINDOW_EXPOSED || event.type == SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED) {
+        auto mode = SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
+        int w, h;
+        Check(SDL_GetWindowSize(window, &w, &h));
+        SDL_Log("event GEOMETRY window=%dx%d desktop=%dx%d", w, h, mode->w, mode->h);
+    }
+}
+
 void PrintEvent(const SDL_Event &event, SDL_Window *window, unsigned frame)
 {
     auto line = std::format("event {} type={}", EventName(event.type), event.type);
@@ -63,6 +73,12 @@ void PrintEvent(const SDL_Event &event, SDL_Window *window, unsigned frame)
     case SDL_EVENT_MOUSE_WHEEL:
         line += std::format(" x={} y={}", event.wheel.x, event.wheel.y);
         break;
+    case SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED: {
+        auto mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
+        line += std::format(" refresh={} numerator={} denominator={}", mode->refresh_rate,
+                            mode->refresh_rate_numerator, mode->refresh_rate_denominator);
+        break;
+    }
     case SDL_EVENT_WINDOW_EXPOSED:
         line += std::format(" client_name={} codec={}", SDL_GetStringProperty(SDL_GetWindowProperties(window),
                     SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING, ""),
@@ -73,8 +89,8 @@ void PrintEvent(const SDL_Event &event, SDL_Window *window, unsigned frame)
             line += std::format(" data1={} data2={}", event.window.data1, event.window.data2);
         break;
     }
-    std::println("{}", line);
-    std::fflush(stdout);
+    SDL_Log("%s", line.c_str());
+    PrintGeometry(event, window);
 }
 
 void Draw(SDL_Window *window, unsigned frame, const SDL_FPoint &pointer)
@@ -84,8 +100,6 @@ void Draw(SDL_Window *window, unsigned frame, const SDL_FPoint &pointer)
     Check(SDL_FillSurfaceRect(surface, nullptr, 0x00010101));
     SDL_Rect block{int(frame % unsigned(surface->w)), 40, 32, 32};
     Check(SDL_FillSurfaceRect(surface, &block, 0x0000ff00));
-    SDL_Rect cursor{int(pointer.x), int(pointer.y), 8, 8};
-    Check(SDL_FillSurfaceRect(surface, &cursor, 0x00ff0000));
     Check(SDL_UpdateWindowSurface(window));
 }
 
@@ -102,13 +116,12 @@ void PrintCodecChange(SDL_Window *window, std::string &previous)
 {
     std::string codec = SDL_GetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_CODEC_STRING, "");
     if (codec != previous) {
-        std::println("event CODEC_CHANGED codec={}", codec);
-        std::fflush(stdout);
+        SDL_Log("event CODEC_CHANGED codec=%s", codec.c_str());
         previous = std::move(codec);
     }
 }
 
-void Run(SDL_Window *window)
+void Run(SDL_Window *window, bool tight)
 {
     std::string codec;
     SDL_FPoint pointer{-8, -8};
@@ -116,7 +129,7 @@ void Run(SDL_Window *window)
     Uint64 next = 0;
     for (;;) {
         SDL_Event event;
-        if (SDL_WaitEventTimeout(&event, 10)) {
+        if (SDL_WaitEventTimeout(&event, tight ? 0 : 10)) {
             PrintEvent(event, window, frame);
             if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F1)
                 CycleCodec();
@@ -130,19 +143,55 @@ void Run(SDL_Window *window)
         PrintCodecChange(window, codec);
         if (SDL_GetTicks() >= next) {
             Draw(window, frame++, pointer);
-            next = SDL_GetTicks() + 100;
+            next = SDL_GetTicks() + (tight ? 0 : 100);
         }
     }
 }
 
-int main()
+struct Options {
+    int width = 640, height = 480;
+    bool tight = false, fullscreen = false;
+};
+
+Options ParseOptions(int argc, char **argv)
 {
-    std::println("SDL_GetVersion() {}", SDL_GetVersion());
+    Options options;
+    for (int i = 1; i < argc; ++i) {
+        std::string_view arg(argv[i]);
+        if (arg == "--tight") options.tight = true;
+        else if (arg == "--fullscreen") options.fullscreen = true;
+        else if (arg == "--aspect" && i + 1 < argc) Check(SDL_SetHint(SDL_HINT_RDP_ASPECT, argv[++i]));
+        else if (arg == "--size" && i + 1 < argc) {
+            std::string_view size(argv[++i]);
+            auto first = std::from_chars(size.data(), size.data() + size.size(), options.width);
+            Check(first.ec == std::errc{} && first.ptr != size.data() + size.size() && *first.ptr == 'x');
+            auto second = std::from_chars(first.ptr + 1, size.data() + size.size(), options.height);
+            Check(second.ec == std::errc{} && second.ptr == size.data() + size.size() && options.width > 0 && options.height > 0);
+        } else { SDL_SetError("Unknown or incomplete option: %s", argv[i]); Check(false); }
+    }
+    return options;
+}
+
+SDL_Cursor *CreateCursor()
+{
+    auto surface = SDL_CreateSurface(8, 8, SDL_PIXELFORMAT_ARGB8888);
+    Check(surface != nullptr);
+    Check(SDL_FillSurfaceRect(surface, nullptr, 0xffff0000));
+    auto cursor = SDL_CreateColorCursor(surface, 0, 0);
+    SDL_DestroySurface(surface);
+    Check(cursor != nullptr);
+    Check(SDL_SetCursor(cursor));
+    return cursor;
+}
+
+int main(int argc, char **argv)
+{
+    auto options = ParseOptions(argc, argv);
+    SDL_Log("SDL_GetVersion() %d", SDL_GetVersion());
     std::string drivers = "drivers";
     std::ranges::for_each(std::views::iota(0, SDL_GetNumVideoDrivers()),
         [&](int index) { drivers += std::format(" {}", SDL_GetVideoDriver(index)); });
-    std::println("{}", drivers);
-    // Environment hints take priority over the live SDL_SetHint controls.
+    SDL_Log("%s", drivers.c_str());
     if (const char *codec = SDL_getenv("SDL_RDP_CODEC")) {
         std::string requested(codec);
         Check(SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SDL_RDP_CODEC"));
@@ -150,14 +199,13 @@ int main()
     }
     Check(SDL_Init(SDL_INIT_VIDEO));
     auto display = SDL_GetPrimaryDisplay();
-    std::println("port {}", SDL_GetNumberProperty(SDL_GetDisplayProperties(display),
-                SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0));
-    std::fflush(stdout);
+    SDL_Log("port %lld", (long long)SDL_GetNumberProperty(SDL_GetDisplayProperties(display), SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0));
     {
         std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)> window(
-            SDL_CreateWindow("SDL RDP sample", 640, 480, 0), SDL_DestroyWindow);
+            SDL_CreateWindow("SDL RDP sample", options.width, options.height, options.fullscreen ? SDL_WINDOW_FULLSCREEN : 0), SDL_DestroyWindow);
         Check(window != nullptr);
-        Run(window.get());
+        std::unique_ptr<SDL_Cursor, decltype(&SDL_DestroyCursor)> cursor(CreateCursor(), SDL_DestroyCursor);
+        Run(window.get(), options.tight);
     }
     SDL_Quit();
 }

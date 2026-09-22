@@ -1,1 +1,1 @@
-{ global: sdlrdp_last_error; sdlrdp_version; sdlrdp_open; sdlrdp_close; sdlrdp_port; sdlrdp_present; sdlrdp_poll; sdlrdp_wait; sdlrdp_wakeup; sdlrdp_set_codec; local: *; };
+{ global: sdlrdp_last_error; sdlrdp_version; sdlrdp_open; sdlrdp_close; sdlrdp_port; sdlrdp_present; sdlrdp_poll; sdlrdp_wait; sdlrdp_wakeup; sdlrdp_set_codec; sdlrdp_resize; sdlrdp_set_aspect; sdlrdp_wait_frame; sdlrdp_set_pointer; local: *; };

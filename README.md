@@ -25,7 +25,7 @@ version keeps its archive, patched tree and configure cache under
   those sources to buildutil, which compiles them and the driver into one
   library. Nothing SDL lands in the source tree.
 - `sources/sdl-rdp-backend.so/` builds `libsdl-rdp-backend.so`: the FreeRDP 3
-  server behind a nine-function C ABI (`sdl-rdp-backend.h`), with its gtest
+  server behind a versioned C ABI (`sdl-rdp-backend.h`), with its gtest
   gate (a headless FreeRDP client connects, frames and input round-trip). The
   driver dlopens it by name only when the `rdp` driver is selected, so SDL
   stays free of FreeRDP and a program runs without the backend installed.
@@ -44,11 +44,35 @@ Opt in only: probing never picks the driver and no listener opens unasked.
 
 Driver settings are hints with environment variables of the same name:
 `SDL_RDP_PORT` (3389, 0 for ephemeral), `SDL_RDP_BIND` (0.0.0.0),
-`SDL_RDP_CERT_DIR` (`_rdp`), `SDL_RDP_WIDTH`, `SDL_RDP_HEIGHT` (1024x768),
+`SDL_RDP_CERT_DIR` (`$XDG_DATA_HOME/sdl-rdp` or `~/.local/share/sdl-rdp`), `SDL_RDP_WIDTH`, `SDL_RDP_HEIGHT` (1024x768),
 `SDL_RDP_WAIT_FOR_CLIENT`, `SDL_RDP_BACKEND` (path of the backend library).
+`SDL_RDP_VSYNC` defaults to `1`: surface updates wait up to 100 ms for the
+client's frame acknowledgement. Set it to `0` to return immediately.
+`SDL_RDP_ASPECT` sets the picture's display aspect (for example `4:3`);
+empty means square pixels. It can change live, and
+`SDL_PROP_WINDOW_RDP_ASPECT_STRING` reports it on the window.
+The window keeps the app's requested size; the RDP desktop is that picture,
+with only pixel-aspect correction applied on the server. Client screen changes
+update SDL's desktop display mode. A fullscreen window follows that mode.
+Client-side smart sizing can stretch the picture to the client's screen.
+`SDL_RDP_CODEC` accepts `auto` (default), `remotefx`, `nscodec`, `planar`,
+and `raw`. Auto selects RemoteFX, then NSCodec, then planar, then raw among
+negotiated codecs. An unsupported explicit preference uses that same fallback.
+Planar is the explicit lossless choice; RemoteFX and NSCodec are lossy.
+The hint can change live; `SDL_PROP_WINDOW_RDP_CODEC_STRING` reports the
+negotiated codec on the window.
+
+Measured title-screen traffic at 1280x800 explains the auto preference:
+
+| Codec | Wire traffic |
+|---|---:|
+| RemoteFX | 3.5 MB/s |
+| Planar | 91.6 MB/s |
+| Raw | 253 MB/s |
+
 Session facts arrive as native SDL events: a client attaching is
 EXPOSED + FOCUS_GAINED, leaving is OCCLUDED + FOCUS_LOST, the display mode
-follows the client's desktop; details are properties (bound port on the
+reports the client's screen and measured refresh rate; details are properties (bound port on the
 display, client name on the window). A failed open is in `SDL_GetError()`,
 backend diagnostics go to `SDL_Log`.
 

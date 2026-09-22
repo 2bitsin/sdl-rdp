@@ -1,5 +1,7 @@
 #include "_detail/state.hpp"
 #include <winpr/ssl.h>
+#include <freerdp/channels/channels.h>
+#include <winpr/wtsapi.h>
 #include <freerdp/settings.h>
 #include <winpr/synch.h>
 #include <arpa/inet.h>
@@ -44,11 +46,14 @@ unsigned Bind(freerdp_listener* listener, sdlrdp_config const& config)
 }
 }
 State::State(sdlrdp_config const& config)
- : log_route(config), log(config.log), user(config.user), codec(config.codec), width(config.width), height(config.height),
-   credentials(EnsureCertificate(config.cert_dir ? config.cert_dir : "_rdp")),
+ : log_route(config), log(config.log), user(config.user), codec(config.codec), width(config.width), height(config.height), aspect(config.aspect),
+   credentials(EnsureCertificate(config.cert_dir ? std::filesystem::path(config.cert_dir) : DefaultCertificateDirectory())),
    listener(freerdp_listener_new()), stop(CreateEvent(nullptr, TRUE, FALSE, nullptr))
 {
   if (!listener || !stop || !reap) throw std::runtime_error("listener allocation failed");
+  static std::once_flag wts;
+  std::call_once(wts, [] { WTSRegisterWtsApiFunctionTable(FreeRDP_InitWtsApi()); });
+  Picture();
   winpr_InitializeSSL(WINPR_SSL_INIT_DEFAULT);
   listener->info = this;
   listener->PeerAccepted = Accepted;
@@ -113,15 +118,18 @@ void State::Takeover(Peer& peer, sdlrdp_event event)
   for (auto const& old : peers) {
     if (old.get() == &peer || !old->active.exchange(false)) continue;
     Push({.type = SDLRDP_DISCONNECTED});
+    freerdp_set_error_info(old->client->context->rdp, ERRINFO_DISCONNECTED_BY_OTHER_CONNECTION);
+    freerdp_send_error_info(old->client->context->rdp);
     old->client->Close(old->client.get());
     old->thread.request_stop();
     SetEvent(old->wake.get());
   }
+  current = &peer;
   peer.active = peer.activated = true;
-  if (!shadow.empty()) peer.Post({0, 0, int(frame_width), int(frame_height)});
+  if (shadow) peer.Post({0, 0, int(frame_width), int(frame_height)});
   Push(event);
-  if (event.connected.width != width || event.connected.height != height)
-    Push({.type = SDLRDP_RESIZE, .resize = {event.connected.width, event.connected.height}});
+  Push({.type = SDLRDP_SCREEN, .screen = {peer.screen_width, peer.screen_height}});
+  frame_changed.notify_all();
 }
 void State::Depart(Peer& peer)
 {
@@ -131,7 +139,12 @@ void State::Depart(Peer& peer)
     auto name = freerdp_settings_get_string(peer.client->context->settings, FreeRDP_ClientHostname);
     Log(SDLRDP_LOG_INFO, std::format("Client {} disconnected.", name ? name : peer.client->hostname));
   }
-  if (peer.active.exchange(false)) Push({.type = SDLRDP_DISCONNECTED});
+  {
+    std::scoped_lock frame(frame_guard);
+    if (current == &peer) current = nullptr;
+    if (peer.active.exchange(false)) Push({.type = SDLRDP_DISCONNECTED});
+  }
+  frame_changed.notify_all();
   Ensures(!peer.active, "departed peer cannot inject input");
 }
 void State::Push(sdlrdp_event event)
@@ -166,20 +179,36 @@ void State::Present(void const* pixels, int pitch, unsigned w, unsigned h,
                     std::span<sdlrdp_rect const> damage)
 {
   Expects(pixels && pitch >= int(w * 4), "source covers framebuffer rows");
-  std::scoped_lock lock(peers_guard, frame_guard);
-  std::optional<sdlrdp_rect> region;
-  if (frame_width != w || frame_height != h) {
-    shadow = std::vector<BYTE>(std::size_t(w) * h * 4);
-    frame_width = w; frame_height = h;
-    region = sdlrdp_rect{0, 0, int(w), int(h)};
-    for (auto const& peer : peers) peer->dirty.reset();
+  if (damage.empty()) return;
+  std::scoped_lock producer(producer_guard);
+  auto unused = std::ranges::find_if(buffers, [](auto const& buffer) { return buffer.use_count() == 1; });
+  if (unused == buffers.end()) { buffers.push_back(std::make_shared<std::vector<BYTE>>()); unused = buffers.end() - 1; }
+  auto next = *unused;
+  next->resize(std::size_t(w) * h * 4);
+  std::shared_ptr<std::vector<BYTE>> previous;
+  {
+    std::scoped_lock lock(frame_guard);
+    previous = shadow;
   }
-  for (auto area : damage) {
-    auto source = std::span(static_cast<BYTE const*>(pixels), std::size_t(pitch) * h);
+  bool full = damage.size() == 1 && damage[0].x == 0 && damage[0].y == 0
+    && damage[0].w == int(w) && damage[0].h == int(h);
+  if (!full) {
+    if (previous && previous->size() == next->size()) *next = *previous;
+    else std::ranges::fill(*next, 0);
+  }
+  auto source = std::span(static_cast<BYTE const*>(pixels), std::size_t(pitch) * h);
+  for (auto area : damage)
     CopyRows(source.subspan(std::size_t(area.y) * pitch + area.x * 4), pitch,
-      std::span(shadow).subspan((std::size_t(area.y) * w + area.x) * 4), w * 4, area.h, area.w * 4);
-    Merge(region, area);
+      std::span(*next).subspan((std::size_t(area.y) * w + area.x) * 4), w * 4, area.h, area.w * 4);
+  std::scoped_lock lock(peers_guard, frame_guard);
+  Picture(w, h);
+  auto resized = frame_width != w || frame_height != h;
+  shadow = std::move(next);
+  frame_width = width = w; frame_height = height = h;
+  ++presented;
+  for (auto const& peer : peers) if (peer->active) {
+    if (resized) { peer->dirty.clear(); peer->Post({0, 0, int(w), int(h)}); }
+    else for (auto area : damage) peer->Post(area);
   }
-  if (region) for (auto const& peer : peers) if (peer->active) peer->Post(*region);
 }
 }

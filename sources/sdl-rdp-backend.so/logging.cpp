@@ -5,12 +5,28 @@
 #include <mutex>
 #include <cstdlib>
 #include <stdexcept>
+#include <string_view>
+#include <freerdp/error.h>
 
 namespace Backend {
+bool ExpectedDisconnect(unsigned code)
+{
+  return code == FREERDP_ERROR_LOGOFF_BY_USER || code == FREERDP_ERROR_DISCONNECTED_BY_OTHER_CONNECTION
+    || code == FREERDP_ERROR_RPC_INITIATED_DISCONNECT;
+}
 namespace {
 // The newest open owns process-wide WLog routing; close waits for callbacks before clearing it.
 std::atomic<LogRoute*> route = nullptr;
 std::recursive_mutex routing_guard;
+bool ExpectedPeerMessage(wLogMessage const& message)
+{
+  if (!message.PrefixString || std::string_view(message.PrefixString) != "com.freerdp.core.peer"
+      || !message.TextString) return false;
+  auto text = std::string_view(message.TextString);
+  auto name = text.substr(0, text.find(' '));
+  return name == "ERRINFO_LOGOFF_BY_USER" || name == "ERRINFO_DISCONNECTED_BY_OTHER_CONNECTION"
+    || name == "ERRINFO_RPC_INITIATED_DISCONNECT";
+}
 BOOL Forward(wLogMessage const* message)
 {
   utilities::Expects(message != nullptr, "WLog message exists");
@@ -18,6 +34,7 @@ BOOL Forward(wLogMessage const* message)
   auto target = route.load();
   auto level = message->Level == WLOG_ERROR ? SDLRDP_LOG_ERROR
     : message->Level == WLOG_WARN ? SDLRDP_LOG_WARN : SDLRDP_LOG_INFO;
+  if (ExpectedPeerMessage(*message)) level = SDLRDP_LOG_INFO;
   if (target && target->callback && message->TextString)
     target->callback(target->user, level, message->TextString);
   return TRUE;
@@ -30,6 +47,7 @@ void Install()
   if (!WLog_SetLogAppenderType(root, WLOG_APPENDER_CALLBACK)
       || !WLog_ConfigureAppender(WLog_GetLogAppender(root), "callbacks", &callbacks))
     throw std::runtime_error("WLog callback installation failed.");
+  WLog_Layout_SetPrefixFormat(root, WLog_GetLogLayout(root), "%mn");
   if (auto level = std::getenv("WLOG_LEVEL")) WLog_SetStringLogLevel(root, level);
   else WLog_SetLogLevel(root, WLOG_WARN);
 }

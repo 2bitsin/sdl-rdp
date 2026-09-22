@@ -65,24 +65,28 @@ static bool SDL_RDP_VideoInit(SDL_VideoDevice *_this)
         !config.height || config.height > SDL_MAX_SINT32) {
         return SDL_SetError("Invalid RDP port or dimensions");
     }
-    if (!SDL_RDP_ParseCodec(SDL_GetHint(SDL_HINT_RDP_CODEC), &config.codec)) {
+    if (!SDL_RDP_ParseCodec(SDL_GetHint(SDL_HINT_RDP_CODEC), &config.codec) ||
+        !SDL_RDP_ParseAspect(SDL_GetHint(SDL_HINT_RDP_ASPECT), &config.aspect)) {
         return false;
     }
     if (data->backend.open(&config, &data->handle) != 0) {
         return SDL_SetError("%s", data->backend.last_error());
     }
     if (!SDL_RDP_InitDisplay(data, &config) ||
-        !SDL_AddHintCallback(SDL_HINT_RDP_CODEC, SDL_RDP_CodecHintChanged, data)) {
+        !SDL_AddHintCallback(SDL_HINT_RDP_CODEC, SDL_RDP_CodecHintChanged, data) ||
+        !SDL_AddHintCallback(SDL_HINT_RDP_ASPECT, SDL_RDP_AspectHintChanged, data)) {
         return false;
     }
     SDL_AddKeyboard(SDL_DEFAULT_KEYBOARD_ID, NULL);
     SDL_AddMouse(SDL_DEFAULT_MOUSE_ID, NULL);
+    SDL_RDP_InitMouse();
     return true;
 }
 
 static void SDL_RDP_VideoQuit(SDL_VideoDevice *_this)
 {
     SDL_VideoData *data = _this->internal;
+    SDL_RemoveHintCallback(SDL_HINT_RDP_ASPECT, SDL_RDP_AspectHintChanged, data);
     SDL_RemoveHintCallback(SDL_HINT_RDP_CODEC, SDL_RDP_CodecHintChanged, data);
     if (data->handle) {
         data->backend.close(data->handle);
@@ -123,6 +127,7 @@ static SDL_VideoDevice *SDL_RDP_CreateDevice(void)
     device->SendWakeupEvent = SDL_RDP_SendWakeupEvent;
     device->CreateSDLWindow = SDL_RDP_CreateWindow;
     device->DestroyWindow = SDL_RDP_DestroyWindow;
+    device->SetWindowFullscreen = SDL_RDP_SetWindowFullscreen;
     device->SetWindowSize = SDL_RDP_SetWindowSize;
     device->ShowWindow = SDL_RDP_ShowWindow;
     device->CreateWindowFramebuffer = SDL_RDP_CreateWindowFramebuffer;

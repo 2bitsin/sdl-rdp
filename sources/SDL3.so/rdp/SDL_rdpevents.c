@@ -5,6 +5,13 @@
 #include "src/events/SDL_windowevents_c.h"
 #include "src/events/scancodes_windows.h"
 
+static void SDL_RDP_CurrentMode(SDL_VideoData *data, const SDL_DisplayMode *mode)
+{
+    data->mode_index ^= 1;
+    data->modes[data->mode_index] = *mode;
+    SDL_SetCurrentDisplayMode(SDL_GetVideoDisplay(data->display), &data->modes[data->mode_index]);
+}
+
 static void SDL_RDP_Resize(SDL_VideoData *data, unsigned width, unsigned height)
 {
     SDL_VideoDisplay *display = SDL_GetVideoDisplay(data->display);
@@ -13,18 +20,34 @@ static void SDL_RDP_Resize(SDL_VideoData *data, unsigned width, unsigned height)
         return;
     }
     if (mode.w != (int)width || mode.h != (int)height) {
+        mode.refresh_rate = display->current_mode->refresh_rate;
+        mode.refresh_rate_numerator = display->current_mode->refresh_rate_numerator;
+        mode.refresh_rate_denominator = display->current_mode->refresh_rate_denominator;
         mode.w = (int)width;
         mode.h = (int)height;
         SDL_SetDesktopDisplayMode(display, &mode);
-        SDL_SetCurrentDisplayMode(display, &mode);
+        SDL_RDP_CurrentMode(data, &mode);
     }
-    SDL_RDP_ApplyWindowSize(data);
+    if (data->window->flags & SDL_WINDOW_FULLSCREEN) {
+        SDL_RDP_ApplyWindowSize(data, width, height);
+    }
+}
+
+static void SDL_RDP_Refresh(SDL_VideoData *data, unsigned millihertz)
+{
+    SDL_VideoDisplay *display = SDL_GetVideoDisplay(data->display);
+    SDL_DisplayMode mode = *display->current_mode;
+    mode.refresh_rate = millihertz / 1000.0f;
+    mode.refresh_rate_numerator = millihertz;
+    mode.refresh_rate_denominator = 1000;
+    SDL_RDP_CurrentMode(data, &mode);
 }
 
 static void SDL_RDP_Connected(SDL_VideoData *data, const sdlrdp_event *event)
 {
     SDL_Window *window = data->window;
-    SDL_RDP_Resize(data, event->connected.width, event->connected.height);
+    SDL_RDP_Resize(data, event->connected.screen_width, event->connected.screen_height);
+    SDL_RDP_Refresh(data, event->connected.refresh_millihertz);
     SDL_SetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING,
                           event->connected.client_name);
     SDL_SetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_CODEC_STRING,
@@ -79,8 +102,12 @@ static void SDL_RDP_Dispatch(SDL_VideoData *data, const sdlrdp_event *event)
         SDL_SetStringProperty(SDL_GetWindowProperties(data->window), SDL_PROP_WINDOW_RDP_CODEC_STRING,
                               SDL_RDP_CodecName(event->codec_changed.codec));
         break;
-    case SDLRDP_RESIZE: SDL_RDP_Resize(data, event->resize.width, event->resize.height); break;
-    default: SDL_RDP_Input(data->window, event); break;
+    case SDLRDP_RESIZE: break;
+    case SDLRDP_SCREEN: SDL_RDP_Resize(data, event->screen.width, event->screen.height); break;
+    case SDLRDP_REFRESH: SDL_RDP_Refresh(data, event->refresh.millihertz); break;
+    case SDLRDP_KEY: case SDLRDP_MOUSE_MOVE: case SDLRDP_MOUSE_BUTTON: case SDLRDP_MOUSE_WHEEL:
+        SDL_RDP_Input(data->window, event); break;
+    default: SDL_assert(!"unhandled rdp event"); break;
     }
 }
 

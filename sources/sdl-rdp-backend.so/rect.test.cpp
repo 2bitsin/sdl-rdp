@@ -22,3 +22,19 @@ TEST(Intersect, OverlapContainmentAndEmpty) {
   ASSERT_TRUE(edge);
   EXPECT_EQ(edge->w, 1);
 }
+TEST(Region, BridgeAndCap) {
+  Backend::Region region;
+  region.Add({0, 0, 8, 8});
+  region.Add({16, 0, 8, 8});
+  ASSERT_EQ(region.rects.size(), 2u);
+  region.Add({8, 0, 8, 8});
+  ASSERT_EQ(region.rects.size(), 1u);
+  EXPECT_EQ(region.rects[0].w, 24);
+  region.clear();
+  for (int i = 0; i < 16; ++i) region.Add({i * 20, i * 20, 8, 8});
+  ASSERT_EQ(region.rects.size(), 16u);
+  region.Add({320, 320, 8, 8});
+  ASSERT_EQ(region.rects.size(), 1u);
+  EXPECT_EQ(region.rects[0].w, 328);
+  EXPECT_EQ(region.rects[0].h, 328);
+}

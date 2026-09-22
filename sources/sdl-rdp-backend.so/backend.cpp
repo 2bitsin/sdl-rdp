@@ -88,3 +88,37 @@ int sdlrdp_set_codec(sdlrdp_handle* handle, sdlrdp_codec codec)
   handle->state->codec.store(codec);
   return 0;
 }
+int sdlrdp_resize(sdlrdp_handle* handle, unsigned width, unsigned height)
+{
+  try {
+    if (!handle) throw std::runtime_error("Invalid handle.");
+    Dimensions(width, height);
+    handle->state->Resize(width, height);
+    return 0;
+  } catch (std::exception const& error) { last_error = error.what(); return -1; }
+}
+int sdlrdp_set_aspect(sdlrdp_handle* handle, sdlrdp_aspect aspect)
+{
+  try {
+    if (!handle) throw std::runtime_error("Invalid handle.");
+    handle->state->SetAspect(aspect);
+    return 0;
+  } catch (std::exception const& error) { last_error = error.what(); return -1; }
+}
+int sdlrdp_wait_frame(sdlrdp_handle* handle, int timeout)
+{
+  try {
+    if (!handle) throw std::runtime_error("Invalid handle.");
+    return handle->state->WaitFrame(timeout);
+  } catch (std::exception const& error) { last_error = error.what(); return -1; }
+}
+
+int sdlrdp_set_pointer(sdlrdp_handle* handle, unsigned w, unsigned h, unsigned x, unsigned y, void const* argb)
+{
+  try {
+    if (!handle || w > 384 || h > 384 || ((w || h) && (!w || !h || !argb || x >= w || y >= h)))
+      throw std::runtime_error("Invalid pointer dimensions, hotspot, pixels or handle.");
+    handle->state->SetPointer(w, h, x, y, argb);
+    return 0;
+  } catch (std::exception const& error) { last_error = error.what(); return -1; }
+}
