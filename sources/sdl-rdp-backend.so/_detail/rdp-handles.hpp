@@ -3,6 +3,7 @@
 #include <freerdp/listener.h>
 #include <freerdp/peer.h>
 #include <winpr/handle.h>
+#include <winpr/stream.h>
 
 #include <memory>
 
@@ -14,6 +15,8 @@ namespace Backend
     template <typename VTy>
     auto operator()(VTy* what) const -> void { (void)RELEASE(what); }
   };
+
+  struct ReleaseStream { void operator()(wStream* stream) const { Stream_Free(stream, TRUE); } };
 
   struct ReleasesPeer
   {

@@ -53,6 +53,7 @@ State::State(sdlrdp_config const& config)
   if (!listener || !stop || !reap) throw std::runtime_error("listener allocation failed");
   static std::once_flag wts;
   std::call_once(wts, [] { WTSRegisterWtsApiFunctionTable(FreeRDP_InitWtsApi()); });
+  audio_latency = config.audio_latency_ms ? config.audio_latency_ms : 100;
   Picture();
   winpr_InitializeSSL(WINPR_SSL_INIT_DEFAULT);
   listener->info = this;
@@ -118,6 +119,7 @@ void State::Takeover(Peer& peer, sdlrdp_event event)
   for (auto const& old : peers) {
     if (old.get() == &peer || !old->active.exchange(false)) continue;
     Push({.type = SDLRDP_DISCONNECTED});
+    if (old->sound && old->sound->Rate()) Push({.type = SDLRDP_AUDIO, .audio = {0, 0}});
     freerdp_set_error_info(old->client->context->rdp, ERRINFO_DISCONNECTED_BY_OTHER_CONNECTION);
     freerdp_send_error_info(old->client->context->rdp);
     old->client->Close(old->client.get());
@@ -130,6 +132,7 @@ void State::Takeover(Peer& peer, sdlrdp_event event)
   Push(event);
   Push({.type = SDLRDP_SCREEN, .screen = {peer.screen_width, peer.screen_height}});
   frame_changed.notify_all();
+  audio_changed.notify_all();
 }
 void State::Depart(Peer& peer)
 {
@@ -142,9 +145,13 @@ void State::Depart(Peer& peer)
   {
     std::scoped_lock frame(frame_guard);
     if (current == &peer) current = nullptr;
-    if (peer.active.exchange(false)) Push({.type = SDLRDP_DISCONNECTED});
+    if (peer.active.exchange(false)) {
+      Push({.type = SDLRDP_DISCONNECTED});
+      if (peer.sound && peer.sound->Rate()) Push({.type = SDLRDP_AUDIO, .audio = {0, 0}});
+    }
   }
   frame_changed.notify_all();
+  audio_changed.notify_all();
   Ensures(!peer.active, "departed peer cannot inject input");
 }
 void State::Push(sdlrdp_event event)

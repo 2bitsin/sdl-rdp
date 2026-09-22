@@ -9,7 +9,6 @@
 #include <vector>
 
 namespace Backend {
-struct ReleaseStream { void operator()(wStream* stream) const { Stream_Free(stream, TRUE); } };
 struct Encoder {
   sdlrdp_codec codec = SDLRDP_CODEC_RAW;
   bool Select(rdpSettings const* settings, sdlrdp_codec preference);

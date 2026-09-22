@@ -1,4 +1,4 @@
-#include "SDL_rdpvideo.h"
+#include "SDL_rdpdyn.h"
 
 static const struct
 {

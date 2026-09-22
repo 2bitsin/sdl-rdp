@@ -127,8 +127,8 @@ inline pid_t ProcId() {
   return child;
 }
 
-inline unsigned ListeningPort() {
-  auto pid = ProcId();
+inline unsigned ListeningPort(pid_t pid = 0) {
+  if (!pid) pid = ProcId();
   std::vector<std::string> sockets;
   for (auto const& entry : fs::directory_iterator("/proc/" + std::to_string(pid) + "/fd")) {
     std::error_code error;

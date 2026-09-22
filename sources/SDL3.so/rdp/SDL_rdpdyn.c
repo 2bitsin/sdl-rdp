@@ -6,7 +6,7 @@
 bool SDL_RDP_LoadBackend(SDL_RDP_Backend *backend)
 {
     const char *path = SDL_GetHint(SDL_HINT_RDP_BACKEND);
-    backend->object = SDL_LoadObject(path && *path ? path : SDL_VIDEO_DRIVER_RDP_DYNAMIC);
+    backend->object = SDL_LoadObject(path && *path ? path : SDL_RDP_DYNAMIC);
     if (!backend->object) {
         return false;
     }
@@ -28,6 +28,11 @@ bool SDL_RDP_LoadBackend(SDL_RDP_Backend *backend)
     SDL_RDP_LOAD(set_clipboard_text);
     SDL_RDP_LOAD(get_clipboard_text);
     SDL_RDP_LOAD(has_clipboard_text);
+    SDL_RDP_LOAD(audio_open);
+    SDL_RDP_LOAD(audio_rate);
+    SDL_RDP_LOAD(audio_write);
+    SDL_RDP_LOAD(audio_wait);
+    SDL_RDP_LOAD(audio_close);
     if (backend->version() != SDLRDP_ABI_VERSION) {
         SDL_RDP_UnloadBackend(backend);
         return SDL_SetError("RDP backend ABI version mismatch (expected %u)", SDLRDP_ABI_VERSION);

@@ -83,6 +83,7 @@ Peer::~Peer()
   if (thread.joinable()) thread.join();
   Input::Held(*this).Close();
   clipboard.reset();
+  sound.reset();
   disp.reset();
   if (channels) WTSCloseServer(channels);
 }
@@ -123,6 +124,21 @@ bool Peer::Configure()
     && freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth, picture.w)
     && freerdp_settings_set_uint32(settings, FreeRDP_DesktopHeight, picture.h);
 }
+DWORD Peer::EventHandles(std::span<HANDLE> handles)
+{
+  Expects(handles.size() > AppendedHandleCount, "event array has room for transport and peer handles");
+  auto count = client->GetEventHandles(client.get(), handles.data(), handles.size() - AppendedHandleCount);
+  if (!count) return 0;
+  auto transport_count = count;
+  Expects(count <= handles.size() - AppendedHandleCount, "transport respects event budget");
+  count += Input::Held(*this).Handles(handles.data() + count);
+  if (clipboard) handles[count++] = clipboard->Event();
+  if (sound) handles[count++] = sound->Event();
+  handles[count++] = wake.get();
+  handles[count++] = WTSVirtualChannelManagerGetEventHandle(channels);
+  Ensures(count - transport_count <= AppendedHandleCount, "appended events fit reserved budget");
+  return count;
+}
 void Peer::Serve(std::stop_token quit)
 {
   Expects(client && wake, "peer owns transport and wake event");
@@ -133,21 +149,15 @@ void Peer::Serve(std::stop_token quit)
       DWORD count, transport_count, timeout;
       {
         std::scoped_lock lock(owner.session_guard);
-        count = transport_count = client->GetEventHandles(client.get(), handles.data(),
-          handles.size() - AppendedHandleCount);
-        if (count) count += Input::Held(*this).Handles(handles.data() + count);
-        if (count && clipboard) handles[count++] = clipboard->Event();
+        count = EventHandles(handles);
         timeout = Timeout();
       }
       if (!count) break;
-      handles[count++] = wake.get();
-      handles[count++] = WTSVirtualChannelManagerGetEventHandle(channels);
-      Ensures(count - transport_count <= AppendedHandleCount, "appended handles fit reserved budget");
       if (WaitForMultipleObjects(count, handles.data(), FALSE, timeout) == WAIT_FAILED
           || quit.stop_requested()) break;
       std::scoped_lock lock(owner.session_guard);
       if (quit.stop_requested()) break;
-      if (!client->CheckFileDescriptor(client.get()) || !Channels() || !Drain()) {
+      if (!client->CheckFileDescriptor(client.get()) || !Channels() || !SoundChannel() || !Drain()) {
         TransportEnded();
         break;
       }

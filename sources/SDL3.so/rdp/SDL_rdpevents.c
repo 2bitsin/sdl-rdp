@@ -139,7 +139,7 @@ static void SDL_RDP_Dispatch(SDL_VideoData *data, const sdlrdp_event *event)
         SDL_SetStringProperty(SDL_GetWindowProperties(data->window), SDL_PROP_WINDOW_RDP_CODEC_STRING,
                               SDL_RDP_CodecName(event->codec_changed.codec));
         break;
-    case SDLRDP_RESIZE: break;
+    case SDLRDP_AUDIO: case SDLRDP_RESIZE: break;
     case SDLRDP_SCREEN: SDL_RDP_Resize(data, event->screen.width, event->screen.height); break;
     case SDLRDP_REFRESH: SDL_RDP_Refresh(data, event->refresh.millihertz); break;
     case SDLRDP_TEXT: SDL_RDP_Text(data->window, event); break;

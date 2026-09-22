@@ -18,6 +18,7 @@
 #include <string_view>
 #include <freerdp/client/disp.h>
 #include <freerdp/client/channels.h>
+#include <freerdp/channels/channels.h>
 #include <freerdp/addin.h>
 #include <freerdp/client/cmdline.h>
 #include <freerdp/event.h>
@@ -152,7 +153,12 @@ struct DisplayClient {
     Expects(freerdp_settings_set_bool(context->settings, FreeRDP_SupportDisplayControl, TRUE), "display control enabled");
     PubSub_SubscribeChannelConnected(context->pubSub, Connected);
     client.instance->LoadChannels = [](freerdp* instance) -> BOOL {
-      return freerdp_client_load_addins(instance->context->channels, instance->context->settings);
+      char const* channel[] = {"disp"};
+      auto settings = instance->context->settings;
+      auto entry = reinterpret_cast<PVIRTUALCHANNELENTRYEX>(freerdp_load_channel_addin_entry(
+        "drdynvc", nullptr, nullptr, FREERDP_ADDIN_CHANNEL_STATIC | FREERDP_ADDIN_CHANNEL_ENTRYEX));
+      return entry && freerdp_client_add_dynamic_channel(settings, 1, channel)
+        && freerdp_channels_client_load_ex(instance->context->channels, settings, entry, settings) == 0;
     };
   }
 };

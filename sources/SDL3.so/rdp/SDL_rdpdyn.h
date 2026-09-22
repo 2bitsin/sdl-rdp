@@ -22,8 +22,17 @@ typedef struct SDL_RDP_Backend
     int (*set_clipboard_text)(sdlrdp_handle *, const char *);
     const char *(*get_clipboard_text)(sdlrdp_handle *);
     int (*has_clipboard_text)(sdlrdp_handle *);
+    int (*audio_open)(sdlrdp_handle *);
+    unsigned (*audio_rate)(sdlrdp_handle *);
+    int (*audio_write)(sdlrdp_handle *, const void *, unsigned);
+    int (*audio_wait)(sdlrdp_handle *, int);
+    void (*audio_close)(sdlrdp_handle *);
     void (*wakeup)(sdlrdp_handle *);
 } SDL_RDP_Backend;
 bool SDL_RDP_LoadBackend(SDL_RDP_Backend *backend);
 void SDL_RDP_UnloadBackend(SDL_RDP_Backend *backend);
+bool SDL_RDP_AcquireBackend(SDL_RDP_Backend *backend, sdlrdp_handle **handle, sdlrdp_config *config);
+void SDL_RDP_ReleaseBackend(void);
+bool SDL_RDP_ParseCodec(const char *name, sdlrdp_codec *codec);
+bool SDL_RDP_ParseAspect(const char *value, sdlrdp_aspect *aspect);
 #endif

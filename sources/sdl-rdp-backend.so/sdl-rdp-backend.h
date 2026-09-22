@@ -26,11 +26,12 @@ typedef struct {
   void* user;
   sdlrdp_codec codec;
   sdlrdp_aspect aspect; /* Display aspect; either zero selects square pixels. */
+  unsigned audio_latency_ms; /* 0 selects 100 ms. */
 } sdlrdp_config;
 typedef enum {
   SDLRDP_CONNECTED, SDLRDP_DISCONNECTED, SDLRDP_RESIZE, SDLRDP_KEY,
   SDLRDP_MOUSE_MOVE, SDLRDP_MOUSE_BUTTON, SDLRDP_MOUSE_WHEEL, SDLRDP_CODEC_CHANGED, SDLRDP_SCREEN, SDLRDP_REFRESH,
-  SDLRDP_CLIPBOARD, SDLRDP_TEXT, SDLRDP_MOUSE_RELATIVE, SDLRDP_TOUCH
+  SDLRDP_CLIPBOARD, SDLRDP_TEXT, SDLRDP_MOUSE_RELATIVE, SDLRDP_TOUCH, SDLRDP_AUDIO
 } sdlrdp_event_type;
 typedef enum { SDLRDP_TOUCH_DOWN, SDLRDP_TOUCH_MOVE, SDLRDP_TOUCH_UP, SDLRDP_TOUCH_CANCEL } sdlrdp_touch_phase;
 typedef struct {
@@ -38,6 +39,7 @@ typedef struct {
   union {
     struct { unsigned width, height, bpp; char client_name[64]; sdlrdp_codec codec;
       unsigned screen_width, screen_height, refresh_millihertz, keyboard_layout; } connected;
+    struct { unsigned freq; int connected; } audio;
     struct { sdlrdp_codec codec; } codec_changed;
     struct { unsigned width, height; } resize;
     struct { unsigned width, height; } screen;
@@ -52,7 +54,7 @@ typedef struct {
   };
 } sdlrdp_event;
 const char* sdlrdp_last_error(void);
-#define SDLRDP_ABI_VERSION 4
+#define SDLRDP_ABI_VERSION 5
 unsigned sdlrdp_version(void);
 int sdlrdp_open(const sdlrdp_config*, sdlrdp_handle**);
 /* Close joins workers; callers must finish concurrent ABI calls first. */
@@ -76,6 +78,11 @@ int sdlrdp_resize(sdlrdp_handle*, unsigned, unsigned);
 int sdlrdp_set_aspect(sdlrdp_handle*, sdlrdp_aspect);
 /* 1 when acknowledged or no acknowledging peer; 0 on timeout, -1 on error. Negative waits indefinitely. */
 int sdlrdp_wait_frame(sdlrdp_handle*, int timeout_ms);
+int sdlrdp_audio_open(sdlrdp_handle*);
+unsigned sdlrdp_audio_rate(sdlrdp_handle*);
+int sdlrdp_audio_write(sdlrdp_handle*, const void* frames, unsigned count);
+int sdlrdp_audio_wait(sdlrdp_handle*, int timeout_ms);
+void sdlrdp_audio_close(sdlrdp_handle*);
 #ifdef __cplusplus
 }
 #endif

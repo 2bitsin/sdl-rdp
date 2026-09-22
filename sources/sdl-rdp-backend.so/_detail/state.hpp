@@ -8,6 +8,7 @@
 #include "encoder.hpp"
 #include "clipboard.hpp"
 #include "input.hpp"
+#include "audio.hpp"
 #include <atomic>
 #include <condition_variable>
 #include <deque>
@@ -21,6 +22,7 @@
 #include <format>
 #include <freerdp/update.h>
 #include <freerdp/server/disp.h>
+#include <freerdp/server/rdpsnd.h>
 
 namespace Backend {
 using utilities::Expects;
@@ -56,6 +58,15 @@ struct State {
   void Resize(unsigned w, unsigned h);
   void SetAspect(sdlrdp_aspect value);
   int WaitFrame(int timeout);
+  void OpenAudio();
+  unsigned AudioRate();
+  void EnsurePicture();
+  int WriteAudio(void const* frames, unsigned count);
+  int WaitAudio(int timeout);
+  void CloseAudio();
+  unsigned audio_latency = 100;
+  bool audio_open = false;
+  std::condition_variable_any audio_changed;
   sdlrdp_rect Picture(unsigned w = 0, unsigned h = 0) const;
   static BOOL Accepted(freerdp_listener* listener, freerdp_peer* client);
   std::atomic<sdlrdp_codec> codec;
@@ -82,12 +93,14 @@ struct State {
 };
 class Peer {
 public:
+  using Clock = std::chrono::steady_clock;
   Peer(PeerHandle client, State& owner);
   ~Peer();
   void Start();
   void Post(sdlrdp_rect area);
   bool Configure();
   void Serve(std::stop_token quit);
+  DWORD EventHandles(std::span<HANDLE> handles);
   Encoder encoder;
   bool Drain();
   bool SendPointer();
@@ -101,11 +114,14 @@ public:
   bool Marker(UINT16 action);
   bool Pacing();
   DWORD Timeout();
-  static constexpr DWORD AppendedHandleCount = 3 + Input::MaxHandles;
+  static constexpr DWORD AppendedHandleCount = 4 + Input::MaxHandles;
   bool Channels();
   bool OpenStaticChannels();
   bool OpenDisplayControl();
   static BOOL ChannelCreated(void*, UINT32, INT32);
+  bool SoundChannel();
+  bool sound_attempted = false;
+  std::unique_ptr<AudioChannel> sound;
   static UINT Layout(DispServerContext*, DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const*);
   static BOOL Activate(freerdp_peer* client);
   static BOOL Keyboard(rdpInput* input, UINT16 flags, UINT8 code);
@@ -126,7 +142,7 @@ public:
   UINT32 frame_id = 0;
   struct Pending { UINT32 id; uint64_t sequence; };
   std::deque<Pending> pending;
-  using Clock = std::chrono::steady_clock;
+
   Clock::time_point first_sent{}, last_ack{};
   double ack_interval = 0;
   unsigned refresh = 0, screen_width = 0, screen_height = 0;

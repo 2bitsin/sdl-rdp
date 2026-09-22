@@ -1,5 +1,7 @@
 #include "_detail/sample-fixture.hpp"
 #include <sdl-rdp-backend.so/_detail/headless-clipboard.hpp>
+#include <sdl-rdp-backend.so/_detail/headless-audio.hpp>
+#include <cmath>
 
 namespace SampleGate {
 TEST_F(Sample, WholeSystem) {
@@ -254,6 +256,138 @@ TEST_F(Sample, ClipboardUnicode) {
   ASSERT_TRUE(Read("event CLIPBOARD text="));
   SDL_Log("trace CLIPBOARD client formats=8 text-cleared=1");
   ASSERT_NO_FATAL_FAILURE(Escape(client));
+}
+
+TEST_F(Sample, ToneAndVsync) {
+  for (bool tight : {false, true}) {
+    auto arguments = Arguments(certificates.Path(), false);
+    arguments.insert(arguments.begin() + 1, "SDL_AUDIO_DRIVER=rdp");
+    arguments.push_back("--tone");
+    if (tight) arguments.push_back("--tight");
+    process = std::make_unique<Process>(arguments);
+    ASSERT_TRUE(Read("port "));
+    auto port = Number(std::string_view(line).substr(5));
+    ASSERT_TRUE(Read("audio device=RDP client freq=48000"));
+    Client client(port, true, 640, 480);
+    Headless::SoundClient audio(client);
+    ASSERT_TRUE(freerdp_connect(client.instance.get()));
+    Headless::FrameObserver observer(client);
+    ASSERT_TRUE(client.Until([&] {
+      if (!observer.ids.empty()) observer.Ack();
+      return audio.samples.size() >= 48000 * 2;
+    }));
+    auto [frequency, db] = Headless::ToneMeasurements(audio.samples, 48000);
+    EXPECT_NEAR(frequency, 440, 8.8);
+    EXPECT_NEAR(db, -12, 0.3);
+    if (tight) EXPECT_GE(observer.ids.size(), 2u);
+    RecordProperty(tight ? "tight_tone_hz" : "tone_hz", std::to_string(frequency));
+    RecordProperty(tight ? "tight_tone_dbfs" : "tone_dbfs", std::to_string(db));
+    ASSERT_NO_FATAL_FAILURE(Escape(client));
+    process.reset();
+  }
+}
+
+
+TEST_F(Sample, ToneAtClientRate) {
+  auto arguments = Arguments(certificates.Path(), false);
+  arguments.insert(arguments.begin() + 1, "SDL_AUDIO_DRIVER=rdp");
+  arguments.push_back("--tone");
+  process = std::make_unique<Process>(arguments);
+  ASSERT_TRUE(Read("port "));
+  auto port = Number(std::string_view(line).substr(5));
+  ASSERT_TRUE(Read("audio device=RDP client freq=48000"));
+  Client client(port, true, 640, 480);
+  Headless::SoundClient audio(client);
+  audio.rate = 44100;
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  Headless::FrameObserver observer(client);
+  ASSERT_TRUE(client.Until([&] {
+    if (!observer.ids.empty()) observer.Ack();
+    return audio.samples.size() >= 44100 * 2;
+  }));
+  ASSERT_TRUE(Read("audio device=RDP client freq=44100"));
+  auto [frequency, db] = Headless::ToneMeasurements(audio.samples, audio.rate);
+  EXPECT_NEAR(frequency, 440, 8.8);
+  EXPECT_NEAR(db, -12, 0.3);
+  RecordProperty("device_format", line);
+  RecordProperty("tone_hz", std::to_string(frequency));
+  RecordProperty("tone_dbfs", std::to_string(db));
+  ASSERT_NO_FATAL_FAILURE(Escape(client));
+}
+
+class AudioDriver : public Sample {
+protected:
+  std::unique_ptr<SDL_AudioStream, decltype(&SDL_DestroyAudioStream)> stream{nullptr, SDL_DestroyAudioStream};
+  void SetUp() override {
+    ASSERT_TRUE(SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "rdp"));
+    ASSERT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));
+    ASSERT_TRUE(SDL_SetHint("SDL_RDP_PORT", "0"));
+    ASSERT_TRUE(SDL_SetHint("SDL_RDP_BIND", "127.0.0.1"));
+    ASSERT_TRUE(SDL_SetHint("SDL_RDP_CODEC", "planar"));
+    ASSERT_TRUE(SDL_SetHint("SDL_RDP_CERT_DIR", certificates.Path().c_str()));
+    auto library = BuildRoot() / "sources/sdl-rdp-backend.so/libsdl-rdp-backend.so";
+    ASSERT_TRUE(SDL_SetHint("SDL_RDP_BACKEND", library.c_str()));
+    ASSERT_TRUE(SDL_Init(SDL_INIT_AUDIO)) << SDL_GetError();
+    SDL_AudioSpec spec{SDL_AUDIO_S16, 2, 48000};
+    stream.reset(SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr));
+    ASSERT_TRUE(stream) << SDL_GetError();
+  }
+  void TearDown() override {
+    stream.reset();
+    SDL_Quit();
+    for (auto hint : {SDL_HINT_AUDIO_DRIVER, SDL_HINT_VIDEO_DRIVER, "SDL_RDP_PORT", "SDL_RDP_BIND",
+                      "SDL_RDP_CERT_DIR", "SDL_RDP_BACKEND", "SDL_RDP_CODEC"}) SDL_ResetHint(hint);
+  }
+};
+TEST_F(AudioDriver, NoClientTenSecondClock) {
+  EXPECT_EQ(SDL_WasInit(SDL_INIT_VIDEO), 0u);
+  EXPECT_STREQ(SDL_GetCurrentAudioDriver(), "rdp");
+  std::vector<Sint16> frames(480000 * 2, 1000);
+  ASSERT_TRUE(SDL_PutAudioStreamData(stream.get(), frames.data(), frames.size() * sizeof(Sint16)));
+  auto started = Clock::now();
+  ASSERT_TRUE(SDL_ResumeAudioStreamDevice(stream.get()));
+  auto deadline = started + 12s;
+  while (SDL_GetAudioStreamQueued(stream.get()) > 0 && Clock::now() < deadline) SDL_Delay(5);
+  auto elapsed = std::chrono::duration<double>(Clock::now() - started).count();
+  EXPECT_EQ(SDL_GetAudioStreamQueued(stream.get()), 0);
+  EXPECT_NEAR(elapsed, 10.0, 0.4);
+  RecordProperty("no_client_ten_seconds_elapsed", std::to_string(elapsed));
+}
+TEST_F(AudioDriver, AudioBeforeVideoSurvivesVideoQuit) {
+  ASSERT_TRUE(SDL_InitSubSystem(SDL_INIT_VIDEO)) << SDL_GetError();
+  auto port = SDL_GetNumberProperty(SDL_GetDisplayProperties(SDL_GetPrimaryDisplay()), "SDL.display.rdp.port", 0);
+  ASSERT_GT(port, 0);
+  SDL_QuitSubSystem(SDL_INIT_VIDEO);
+  EXPECT_EQ(SDL_WasInit(SDL_INIT_VIDEO), 0u);
+  Client client(port, true);
+  Headless::SoundClient audio(client);
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(client.Until([&] { return audio.ready; }));
+  std::vector<Sint16> pcm(4800 * 2, 1234);
+  ASSERT_TRUE(SDL_PutAudioStreamData(stream.get(), pcm.data(), pcm.size() * sizeof(Sint16)));
+  ASSERT_TRUE(SDL_ResumeAudioStreamDevice(stream.get()));
+  ASSERT_TRUE(client.Until([&] { return std::ranges::count(audio.samples, 1234) >= 960; }));
+  ASSERT_TRUE(SDL_InitSubSystem(SDL_INIT_VIDEO)) << SDL_GetError();
+  EXPECT_EQ(SDL_GetNumberProperty(SDL_GetDisplayProperties(SDL_GetPrimaryDisplay()), "SDL.display.rdp.port", 0), port);
+}
+
+TEST_F(AudioDriver, AudioOnlyPlaysBlackDesktop) {
+  EXPECT_EQ(SDL_WasInit(SDL_INIT_VIDEO), 0u);
+  auto pid = Number(fs::read_symlink("/proc/self").string());
+  auto port = ListeningPort(pid);
+  ASSERT_GT(port, 0u);
+  Client client(port, true);
+  Headless::SoundClient audio(client);
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(client.Until([&] { return audio.ready; }));
+  auto gdi = client.instance->context->gdi;
+  std::vector<UINT32> black(std::size_t(gdi->width) * gdi->height);
+  ASSERT_TRUE(client.Until([&] { return client.Matches(black); }));
+  std::vector<Sint16> pcm(4800 * 2, 1234);
+  ASSERT_TRUE(SDL_PutAudioStreamData(stream.get(), pcm.data(), pcm.size() * sizeof(Sint16)));
+  ASSERT_TRUE(SDL_ResumeAudioStreamDevice(stream.get()));
+  ASSERT_TRUE(client.Until([&] { return std::ranges::count(audio.samples, 1234) >= 960; }));
+  EXPECT_EQ(SDL_WasInit(SDL_INIT_VIDEO), 0u);
 }
 
 }
