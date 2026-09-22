@@ -99,6 +99,7 @@ public:
   bool Pacing();
   DWORD Timeout();
   bool Channels();
+  static BOOL ChannelCreated(void*, UINT32, INT32);
   static UINT Layout(DispServerContext*, DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const*);
   static BOOL Activate(freerdp_peer* client);
   static BOOL Keyboard(rdpInput* input, UINT16 flags, UINT8 code);
@@ -126,6 +127,7 @@ public:
   bool ack_enabled = false, ack_seen = false, suppressed = false;
   HANDLE channels = nullptr;
   std::unique_ptr<DispServerContext, Releases<disp_server_context_free>> disp;
+  UINT32 display_id = UINT32_MAX;
   bool disp_open = false, resizing = false, frame_started = false;
   sdlrdp_rect desktop{};
   bool activated = false;

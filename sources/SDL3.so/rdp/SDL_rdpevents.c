@@ -3,7 +3,10 @@
 #include "src/events/SDL_keyboard_c.h"
 #include "src/events/SDL_mouse_c.h"
 #include "src/events/SDL_windowevents_c.h"
+#include "src/events/SDL_touch_c.h"
 #include "src/events/scancodes_windows.h"
+
+static const SDL_TouchID SDL_RDP_TOUCH_ID = 1;
 
 static void SDL_RDP_CurrentMode(SDL_VideoData *data, const SDL_DisplayMode *mode)
 {
@@ -53,6 +56,8 @@ static void SDL_RDP_Connected(SDL_VideoData *data, const sdlrdp_event *event)
     SDL_SetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_CODEC_STRING,
                           SDL_RDP_CodecName(event->connected.codec));
     SDL_SendWindowEvent(window, SDL_EVENT_WINDOW_EXPOSED, 0, 0);
+    SDL_AddTouch(SDL_RDP_TOUCH_ID, SDL_TOUCH_DEVICE_DIRECT, "RDP touch");
+    SDL_SetNumberProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_KEYBOARD_LAYOUT_NUMBER, event->connected.keyboard_layout);
     SDL_SetKeyboardFocus(window);
     SDL_SetMouseFocus(window);
 }
@@ -62,6 +67,30 @@ static void SDL_RDP_Disconnected(SDL_VideoData *data)
     SDL_SendWindowEvent(data->window, SDL_EVENT_WINDOW_OCCLUDED, 0, 0);
     SDL_SetKeyboardFocus(NULL);
     SDL_SetMouseFocus(NULL);
+    SDL_DelTouch(SDL_RDP_TOUCH_ID);
+}
+
+static void SDL_RDP_Text(SDL_Window *window, const sdlrdp_event *event)
+{
+    char text[5];
+    if (event->text.down && SDL_TextInputActive(window)) {
+        *SDL_UCS4ToUTF8(event->text.codepoint, text) = '\0';
+        SDL_SendKeyboardText(text);
+    }
+}
+
+static void SDL_RDP_Touch(SDL_Window *window, const sdlrdp_event *event)
+{
+    SDL_EventType type;
+    if (event->touch.phase == SDLRDP_TOUCH_MOVE) {
+        SDL_SendTouchMotion(0, SDL_RDP_TOUCH_ID, event->touch.id + 1, window,
+                            event->touch.x, event->touch.y, event->touch.pressure);
+        return;
+    }
+    type = event->touch.phase == SDLRDP_TOUCH_DOWN ? SDL_EVENT_FINGER_DOWN :
+           event->touch.phase == SDLRDP_TOUCH_CANCEL ? SDL_EVENT_FINGER_CANCELED : SDL_EVENT_FINGER_UP;
+    SDL_SendTouch(0, SDL_RDP_TOUCH_ID, event->touch.id + 1, window, type,
+                  event->touch.x, event->touch.y, event->touch.pressure);
 }
 
 static void SDL_RDP_Input(SDL_Window *window, const sdlrdp_event *event)
@@ -71,6 +100,9 @@ static void SDL_RDP_Input(SDL_Window *window, const sdlrdp_event *event)
     case SDLRDP_KEY:
         SDL_SendKeyboardKey(0, SDL_DEFAULT_KEYBOARD_ID, event->key.scancode,
             windows_scancode_table[(event->key.scancode & 0xFF) | (event->key.extended ? 0x80 : 0)], event->key.down != 0);
+        break;
+    case SDLRDP_MOUSE_RELATIVE:
+        SDL_SendMouseMotion(0, window, SDL_DEFAULT_MOUSE_ID, true, (float)event->mouse_relative.dx, (float)event->mouse_relative.dy);
         break;
     case SDLRDP_MOUSE_MOVE:
         SDL_SendMouseMotion(0, window, SDL_DEFAULT_MOUSE_ID, false, (float)event->mouse_move.x, (float)event->mouse_move.y);
@@ -105,6 +137,9 @@ static void SDL_RDP_Dispatch(SDL_VideoData *data, const sdlrdp_event *event)
     case SDLRDP_RESIZE: break;
     case SDLRDP_SCREEN: SDL_RDP_Resize(data, event->screen.width, event->screen.height); break;
     case SDLRDP_REFRESH: SDL_RDP_Refresh(data, event->refresh.millihertz); break;
+    case SDLRDP_TEXT: SDL_RDP_Text(data->window, event); break;
+    case SDLRDP_TOUCH: SDL_RDP_Touch(data->window, event); break;
+    case SDLRDP_MOUSE_RELATIVE:
     case SDLRDP_KEY: case SDLRDP_MOUSE_MOVE: case SDLRDP_MOUSE_BUTTON: case SDLRDP_MOUSE_WHEEL:
         SDL_RDP_Input(data->window, event); break;
     default: SDL_assert(!"unhandled rdp event"); break;

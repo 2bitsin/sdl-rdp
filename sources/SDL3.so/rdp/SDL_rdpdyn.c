@@ -20,6 +20,7 @@ bool SDL_RDP_LoadBackend(SDL_RDP_Backend *backend)
     SDL_RDP_LOAD(wait);
     SDL_RDP_LOAD(wakeup);
     SDL_RDP_LOAD(set_codec);
+    SDL_RDP_LOAD(set_relative_mouse);
     SDL_RDP_LOAD(wait_frame);
     SDL_RDP_LOAD(resize);
     SDL_RDP_LOAD(set_aspect);

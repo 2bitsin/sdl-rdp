@@ -1,4 +1,5 @@
 #include "_detail/state.hpp"
+#include "_detail/input.hpp"
 #include <freerdp/input.h>
 #include <array>
 
@@ -20,12 +21,7 @@ BOOL Peer::Mouse(rdpInput* input, UINT16 flags, UINT16 x, UINT16 y)
   auto& owner = self.owner;
   std::scoped_lock lock(owner.session_guard);
   if (!self.active) return TRUE;
-  if (flags & PTR_FLAGS_MOVE) {
-    std::scoped_lock frame(owner.frame_guard);
-    int mx = std::min(owner.width - 1, unsigned(x) * owner.width / unsigned(self.desktop.w));
-    int my = std::min(owner.height - 1, unsigned(y) * owner.height / unsigned(self.desktop.h));
-    owner.Push({.type = SDLRDP_MOUSE_MOVE, .mouse_move = {mx, my}});
-  }
+  if ((flags & PTR_FLAGS_MOVE) && !Input::Motion(self, x, y)) return FALSE;
   constexpr std::array<unsigned, 3> buttons{PTR_FLAGS_BUTTON1, PTR_FLAGS_BUTTON3, PTR_FLAGS_BUTTON2};
   for (unsigned i = 0; i < buttons.size(); ++i)
     if (flags & buttons[i]) owner.Push({.type = SDLRDP_MOUSE_BUTTON,
@@ -33,7 +29,7 @@ BOOL Peer::Mouse(rdpInput* input, UINT16 flags, UINT16 x, UINT16 y)
   if (flags & (PTR_FLAGS_WHEEL | PTR_FLAGS_HWHEEL)) {
     int rotation = flags & WheelRotationMask;
     if (flags & PTR_FLAGS_WHEEL_NEGATIVE) rotation -= 0x200;
-    int notches = rotation / 120;
+    float notches = rotation / 120.0f;
     owner.Push({.type = SDLRDP_MOUSE_WHEEL,
       .mouse_wheel = {(flags & PTR_FLAGS_HWHEEL) ? notches : 0,
                       (flags & PTR_FLAGS_WHEEL) ? notches : 0}});
