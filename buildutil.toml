@@ -1,0 +1,17 @@
+[project]
+name = "sdl-rdp"
+cmake_option_prefix = "BACKEND"
+module_define_prefix = "BACKEND"
+
+[cmake]
+extensions = []
+
+[options]
+contracts = "stop"
+
+[run]
+default = "sdl-rdp-sample"
+
+[package]
+kind = "library"
+name = "sdl-rdp"

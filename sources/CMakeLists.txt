@@ -1,0 +1,8 @@
+enable_language(C)
+Require(FreeRDP-Server VERSION ">=3" SYSTEM)
+Require(FreeRDP VERSION ">=3" SYSTEM)
+Require(WinPR VERSION ">=3" SYSTEM)
+Require(FreeRDP-Client VERSION ">=3" SYSTEM TEST)
+Require(GTest VERSION ">=1.17.0" TEST CONAN gtest COMPONENTS gtest gtest_main)
+Require(oxbox VERSION "0.30.0.344" CONAN oxbox)
+Scan_subdirectories()

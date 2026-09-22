@@ -1,0 +1,7 @@
+set(CMAKE_CXX_STANDARD 23)
+find_path(FREERDP_HEADERS freerdp/freerdp.h PATH_SUFFIXES freerdp3 REQUIRED)
+Init_submodule(PUBLISH_SYMBOLS)
+Link_dependencies(freerdp-server freerdp winpr oxbox::platform TEST freerdp-client)
+target_include_directories(sdl-rdp-backend PUBLIC ${FREERDP_HEADERS})
+target_link_options(sdl-rdp-backend PRIVATE "LINKER:--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
+set_property(TARGET sdl-rdp-backend APPEND PROPERTY LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/exports.map)

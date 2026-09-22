@@ -1,49 +1,53 @@
 # sdl-rdp
 
-SDL3 with an `rdp` video driver. An unmodified SDL program on a headless
-machine runs with its window served over RDP, so a Windows or Mac RDP
-client is its display and its keyboard and mouse.
+SDL3 with an opt-in `rdp` video driver. An unmodified SDL program on a
+headless machine, started with `SDL_VIDEO_DRIVER=rdp`, has its window served
+over RDP: a Windows or Mac RDP client is its display, keyboard and mouse.
 
 ## Shape
 
-- `sdl/` — the driver, `src/video/rdp/`, as ordinary source files the
-  conan recipe copies into the upstream SDL tree at the pinned tag, plus
-  a short patch series that registers the driver in the bootstrap list
-  and the CMake build. Built with every desktop backend off (no X11,
-  Wayland, EGL, OpenGL, Vulkan, ALSA, PulseAudio, dbus, udev), which is
-  also the configuration that builds on a headless box.
-- `backend/` — `libsdl-rdp-backend`, a shared library with a five-function
-  C ABI (open, present, poll input, close, version) that wraps the FreeRDP 3
-  server: listener, peer lifecycle, TLS with a generated certificate,
-  frame push, input callbacks. FreeRDP is linked statically inside it.
-  The driver dlopens this library only when selected; a missing file
-  means the driver reports unavailable and SDL continues to the next one.
-- `test/` — the gate: an unmodified SDL sample built against this SDL,
-  started on the box, connected to by a headless FreeRDP client; the
-  received frame must equal what the sample drew, and injected input must
-  arrive as SDL events.
+One buildutil project. `./buildutil build`, `./buildutil test`,
+`./buildutil publish` at the root.
+
+- `sources/SDL3.so/` builds `libSDL3.so`, the library applications link.
+  `rdp/` is the driver, ordinary C in SDL's conventions with no FreeRDP
+  dependency. `rdp-driver.patch` registers it in SDL's build and bootstrap
+  list. `configure.py` is buildutil's per-module hook: it downloads the
+  selected SDL release into the generated folder once, applies the patch
+  there, runs SDL's own CMake configure (never its build) to learn the file
+  list, defines and `SDL_build_config.h` of a headless Linux build, and hands
+  those sources to buildutil, which compiles them and the driver into one
+  library. Nothing SDL lands in the source tree.
+- `sources/sdl-rdp-backend.so/` builds `libsdl-rdp-backend.so`: the FreeRDP 3
+  server behind a nine-function C ABI (`sdl-rdp-backend.h`), with its gtest
+  gate (a headless FreeRDP client connects, frames and input round-trip). The
+  driver dlopens it by name only when the `rdp` driver is selected, so SDL
+  stays free of FreeRDP and a program runs without the backend installed.
+- `sources/sdl-rdp-sample.exe/` is the sample: draws a pattern, prints every
+  SDL event as one line.
+- `test_package/` consumes the published package the way a downstream
+  project does: links the `SDL3` component, starts the `rdp` driver on an
+  ephemeral port, and proves the backend resolves from the package.
 
 ## Selecting it
 
-Opt in only; the driver sits after `dummy` in SDL's bootstrap list, so
-probing never picks it and no listener opens unasked.
+Opt in only: probing never picks the driver and no listener opens unasked.
 
     SDL_VIDEO_DRIVER=rdp        # from the shell, any SDL program
     SDL_HINT_VIDEO_DRIVER       # from code, before SDL_Init: an app's --rdp flag
 
 Driver settings are hints with environment variables of the same name:
-`SDL_RDP_PORT` (3389), `SDL_RDP_BIND` (0.0.0.0), `SDL_RDP_CERT_DIR`,
-`SDL_RDP_WAIT_FOR_CLIENT`.
+`SDL_RDP_PORT` (3389, 0 for ephemeral), `SDL_RDP_BIND` (0.0.0.0),
+`SDL_RDP_CERT_DIR` (`_rdp`), `SDL_RDP_WIDTH`, `SDL_RDP_HEIGHT` (1024x768),
+`SDL_RDP_WAIT_FOR_CLIENT`, `SDL_RDP_BACKEND` (path of the backend library).
+Session facts arrive as native SDL events: a client attaching is
+EXPOSED + FOCUS_GAINED, leaving is OCCLUDED + FOCUS_LOST, the display mode
+follows the client's desktop; details are properties (bound port on the
+display, client name on the window). A failed open is in `SDL_GetError()`,
+backend diagnostics go to `SDL_Log`.
 
-## Packages
+## Consuming
 
-Two conan packages on the project's conan remote: `sdl` under this project's channel,
-so a consumer switches by editing the version in its `Require` line, and
-`sdl-rdp-backend`. FreeRDP has no conan recipe anywhere; the backend
-recipe builds it from the upstream tag with servers on, clients off,
-codecs and channels trimmed.
-
-## Origin
-
-Design settled 2026-09-22 in the emuex20260731 session; the first
-FreeRDP server wrapper was written there and moves here as the backend.
+`buildutil publish` pushes `sdl-rdp` to the site conan remote. A project takes
+it with one `Require` line and links the `SDL3` component; the backend is never
+linked, only found next to it at runtime.

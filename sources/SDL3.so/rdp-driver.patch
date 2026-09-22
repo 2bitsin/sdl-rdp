@@ -1,0 +1,188 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -374,6 +374,8 @@
+ set_option(SDL_OPENVR              "Use OpenVR video driver" OFF)
+ dep_option(SDL_KMSDRM              "Use KMS DRM video driver" ${UNIX_SYS} "SDL_VIDEO" OFF)
+ dep_option(SDL_KMSDRM_SHARED       "Dynamically load KMS DRM support" ON "SDL_KMSDRM;SDL_DEPS_SHARED" OFF)
++set_option(SDL_RDP                 "Use RDP video driver" OFF)
++set(SDL_RDP_DYNAMIC "libsdl-rdp-backend.so" CACHE STRING "RDP backend library")
+ set_option(SDL_OFFSCREEN           "Use offscreen video driver" ON)
+ dep_option(SDL_DUMMYCAMERA         "Support the dummy camera driver" ON SDL_CAMERA OFF)
+ option_string(SDL_BACKGROUNDING_SIGNAL "number to use for magic backgrounding signal or 'OFF'" OFF)
+@@ -424,6 +426,7 @@
+   set(SDL_DUMMYAUDIO       OFF)
+   set(SDL_DUMMYCAMERA      OFF)
+   set(SDL_DUMMYVIDEO       OFF)
++  set(SDL_RDP              OFF)
+   set(SDL_OFFSCREEN        OFF)
+   set(SDL_RENDER_GPU       OFF)
+   set(SDL_TRAY             OFF)
+@@ -3501,6 +3504,12 @@
+ # Platform-independent options
+ 
+ if(SDL_VIDEO)
++  if(SDL_RDP)
++    set(SDL_VIDEO_DRIVER_RDP 1)
++    set(SDL_VIDEO_DRIVER_RDP_DYNAMIC "\"${SDL_RDP_DYNAMIC}\"")
++    set(HAVE_RDP TRUE)
++    set(HAVE_SDL_VIDEO TRUE)
++  endif()
+   if(SDL_OFFSCREEN)
+     set(SDL_VIDEO_DRIVER_OFFSCREEN 1)
+     sdl_glob_sources(
+--- a/include/SDL3/SDL_hints.h
++++ b/include/SDL3/SDL_hints.h
+@@ -3164,6 +3164,83 @@
+ #define SDL_HINT_QUIT_ON_LAST_WINDOW_CLOSE "SDL_QUIT_ON_LAST_WINDOW_CLOSE"
+ 
+ /**
++ * A variable controlling the path to the RDP backend shared library.
++ *
++ * The default is the backend library selected when SDL was built.
++ *
++ * This hint should be set before initializing the video subsystem.
++ *
++ * \since This hint is available since SDL 3.4.8.
++ */
++#define SDL_HINT_RDP_BACKEND "SDL_RDP_BACKEND"
++
++/**
++ * A variable controlling the numeric IPv4 address for the RDP listener.
++ *
++ * The default is "0.0.0.0".
++ *
++ * This hint should be set before initializing the video subsystem.
++ *
++ * \since This hint is available since SDL 3.4.8.
++ */
++#define SDL_HINT_RDP_BIND "SDL_RDP_BIND"
++
++/**
++ * A variable controlling the directory containing RDP TLS certificates.
++ *
++ * The default is "_rdp" in the current working directory.
++ *
++ * This hint should be set before initializing the video subsystem.
++ *
++ * \since This hint is available since SDL 3.4.8.
++ */
++#define SDL_HINT_RDP_CERT_DIR "SDL_RDP_CERT_DIR"
++
++/**
++ * A variable controlling the initial RDP display height in pixels.
++ *
++ * The default is "768".
++ *
++ * This hint should be set before initializing the video subsystem.
++ *
++ * \since This hint is available since SDL 3.4.8.
++ */
++#define SDL_HINT_RDP_HEIGHT "SDL_RDP_HEIGHT"
++
++/**
++ * A variable controlling the RDP listener port.
++ *
++ * The default is "3389". A value of "0" selects an ephemeral port.
++ *
++ * This hint should be set before initializing the video subsystem.
++ *
++ * \since This hint is available since SDL 3.4.8.
++ */
++#define SDL_HINT_RDP_PORT "SDL_RDP_PORT"
++
++/**
++ * A variable controlling whether RDP initialization waits for a client.
++ *
++ * The default is "0". Set to "1" to wait for client activation.
++ *
++ * This hint should be set before initializing the video subsystem.
++ *
++ * \since This hint is available since SDL 3.4.8.
++ */
++#define SDL_HINT_RDP_WAIT_FOR_CLIENT "SDL_RDP_WAIT_FOR_CLIENT"
++
++/**
++ * A variable controlling the initial RDP display width in pixels.
++ *
++ * The default is "1024".
++ *
++ * This hint should be set before initializing the video subsystem.
++ *
++ * \since This hint is available since SDL 3.4.8.
++ */
++#define SDL_HINT_RDP_WIDTH "SDL_RDP_WIDTH"
++
++/**
+  * A variable controlling whether the Direct3D device is initialized for
+  * thread-safe operations.
+  *
+--- a/include/SDL3/SDL_video.h
++++ b/include/SDL3/SDL_video.h
+@@ -681,6 +681,7 @@
+  */
+ extern SDL_DECLSPEC SDL_PropertiesID SDLCALL SDL_GetDisplayProperties(SDL_DisplayID displayID);
+ 
++#define SDL_PROP_DISPLAY_RDP_PORT_NUMBER "SDL.display.rdp.port"
+ #define SDL_PROP_DISPLAY_HDR_ENABLED_BOOLEAN             "SDL.display.HDR_enabled"
+ #define SDL_PROP_DISPLAY_KMSDRM_PANEL_ORIENTATION_NUMBER "SDL.display.KMSDRM.panel_orientation"
+ #define SDL_PROP_DISPLAY_WAYLAND_WL_OUTPUT_POINTER       "SDL.display.wayland.wl_output"
+@@ -1627,6 +1628,7 @@
+  */
+ extern SDL_DECLSPEC SDL_PropertiesID SDLCALL SDL_GetWindowProperties(SDL_Window *window);
+ 
++#define SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING "SDL.window.rdp.client_name"
+ #define SDL_PROP_WINDOW_SHAPE_POINTER                               "SDL.window.shape"
+ #define SDL_PROP_WINDOW_HDR_ENABLED_BOOLEAN                         "SDL.window.HDR_enabled"
+ #define SDL_PROP_WINDOW_SDR_WHITE_LEVEL_FLOAT                       "SDL.window.SDR_white_level"
+--- a/include/build_config/SDL_build_config.h.cmake
++++ b/include/build_config/SDL_build_config.h.cmake
+@@ -406,6 +406,8 @@
+ #cmakedefine SDL_VIDEO_DRIVER_KMSDRM_DYNAMIC_GBM @SDL_VIDEO_DRIVER_KMSDRM_DYNAMIC_GBM@
+ #cmakedefine SDL_VIDEO_DRIVER_N3DS 1
+ #cmakedefine SDL_VIDEO_DRIVER_NGAGE 1
++#cmakedefine SDL_VIDEO_DRIVER_RDP 1
++#cmakedefine SDL_VIDEO_DRIVER_RDP_DYNAMIC @SDL_VIDEO_DRIVER_RDP_DYNAMIC@
+ #cmakedefine SDL_VIDEO_DRIVER_OFFSCREEN 1
+ #cmakedefine SDL_VIDEO_DRIVER_PS2 1
+ #cmakedefine SDL_VIDEO_DRIVER_PSP 1
+--- a/src/video/SDL_sysvideo.h
++++ b/src/video/SDL_sysvideo.h
+@@ -543,6 +543,7 @@
+ extern VideoBootStrap Wayland_bootstrap;
+ extern VideoBootStrap VIVANTE_bootstrap;
+ extern VideoBootStrap Emscripten_bootstrap;
++extern VideoBootStrap RDP_bootstrap;
+ extern VideoBootStrap OFFSCREEN_bootstrap;
+ extern VideoBootStrap QNX_bootstrap;
+ extern VideoBootStrap OPENVR_bootstrap;
+--- a/src/video/SDL_video.c
++++ b/src/video/SDL_video.c
+@@ -145,6 +145,9 @@
+ #endif
+ #ifdef SDL_VIDEO_DRIVER_QNX
+     &QNX_bootstrap,
++#endif
++#ifdef SDL_VIDEO_DRIVER_RDP
++    &RDP_bootstrap,
+ #endif
+ #ifdef SDL_VIDEO_DRIVER_OFFSCREEN
+     &OFFSCREEN_bootstrap,
+@@ -669,6 +672,7 @@
+                 if (!bootstrap[i]->is_preferred &&
+                     (driver_attempt_len == SDL_strlen(bootstrap[i]->name)) &&
+                     (SDL_strncasecmp(bootstrap[i]->name, driver_attempt, driver_attempt_len) == 0)) {
++                    SDL_ClearError();
+                     video = bootstrap[i]->create();
+                     if (video) {
+                         break;
+@@ -690,7 +694,9 @@
+         SDL_DebugLogBackend("video", bootstrap[i]->name);
+     } else {
+         if (driver_name) {
+-            SDL_SetError("%s not available", driver_name);
++            if (!*SDL_GetError()) {
++                SDL_SetError("%s not available", driver_name);
++            }
+             goto pre_driver_error;
+         }
+         SDL_SetError("No available video device");
