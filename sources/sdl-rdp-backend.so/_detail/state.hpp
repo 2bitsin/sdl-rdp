@@ -120,6 +120,8 @@ public:
   static BOOL Suppress(rdpContext*, BYTE, RECTANGLE_16 const*);
   bool BeginFrame();
   bool Marker(UINT16 action);
+  void FrameSent(std::size_t bytes = 0);
+  void LogFrames();
   bool Pacing();
   void GraphicsDeadline();
   DWORD Timeout();
@@ -160,11 +162,13 @@ public:
   unsigned rect_index = 0, row = 0;
   uint64_t sequence = 0, acknowledged = 0;
   UINT32 frame_id = 0;
-  struct Pending { UINT32 id; uint64_t sequence; std::size_t bytes = 0; };
+  struct Pending { UINT32 id; uint64_t sequence; std::size_t bytes = 0; Clock::time_point sent{}; };
   std::deque<Pending> pending;
 
   Clock::time_point first_sent{}, last_ack{};
   double ack_interval = 0;
+  uint64_t frames_sent = 0, frames_coalesced = 0, dirty_presents = 0, ack_count = 0;
+  std::chrono::nanoseconds encoded_at_start{}, encode_total{}, encode_max{}, ack_total{}, ack_max{};
   unsigned refresh = 0, screen_width = 0, screen_height = 0;
   bool ack_enabled = false, ack_seen = false, suppressed = false;
   HANDLE channels = nullptr;

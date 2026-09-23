@@ -57,11 +57,32 @@ int State::WaitFrame(int timeout)
   std::unique_lock lock(frame_guard);
   auto target = presented;
   auto ready = [&] {
-    return !current || !current->ack_enabled || current->acknowledged >= target;
+    return !current || !current->ack_enabled || current->acknowledged + 1 >= target;
   };
   if (timeout < 0) frame_changed.wait(lock, ready);
   else frame_changed.wait_for(lock, std::chrono::milliseconds(timeout), ready);
   return ready();
+}
+void Peer::FrameSent(std::size_t bytes)
+{
+  Expects(snapshot != nullptr, "sent frame has a snapshot");
+  auto now = Clock::now();
+  if (ack_enabled) pending.push_back({frame_id, sequence, bytes, now});
+  if (first_sent == Clock::time_point{}) first_sent = now;
+  auto elapsed = encoder.encode_time - encoded_at_start;
+  encode_total += elapsed;
+  encode_max = std::max(encode_max, elapsed);
+  ++frames_sent;
+}
+void Peer::LogFrames()
+{
+  Expects(activated, "statistics belong to an activated connection");
+  using Milliseconds = std::chrono::duration<double, std::milli>;
+  owner.Log(SDLRDP_LOG_INFO, std::format(
+    "Frames: {} sent, {} coalesced; encode {:.1f} ms mean, {:.1f} ms max; acknowledgement {:.1f} ms mean, {:.1f} ms max.",
+    frames_sent, frames_coalesced, frames_sent ? Milliseconds(encode_total).count() / frames_sent : 0,
+    Milliseconds(encode_max).count(), ack_count ? Milliseconds(ack_total).count() / ack_count : 0,
+    Milliseconds(ack_max).count()));
 }
 bool Peer::Marker(UINT16 action)
 {
@@ -121,8 +142,14 @@ void Peer::AcceptAcknowledgement(UINT32 id)
   auto found = std::ranges::find(self.pending, id, &Pending::id);
   if (found == self.pending.end()) return;
   self.acknowledged = found->sequence;
-  self.pending.erase(self.pending.begin(), found + 1);
   auto now = Clock::now();
+  for (auto frame = self.pending.begin(); frame != found + 1; ++frame) {
+    auto elapsed = now - frame->sent;
+    self.ack_total += elapsed;
+    self.ack_max = std::max(self.ack_max, elapsed);
+    ++self.ack_count;
+  }
+  self.pending.erase(self.pending.begin(), found + 1);
   if (self.ack_seen) {
     auto ms = std::chrono::duration<double, std::milli>(now - self.last_ack).count();
     self.ack_interval = self.ack_interval ? self.ack_interval * 0.8 + ms * 0.2 : ms;

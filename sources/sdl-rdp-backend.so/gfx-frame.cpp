@@ -47,7 +47,7 @@ bool GfxChannel::Progressive()
 {
   Expects(confirmed && width && height, "confirmed surface exists");
   auto start = Peer::Clock::now();
-  if (!progressive) progressive.reset(progressive_context_new(TRUE));
+  if (!progressive) progressive.reset(progressive_context_new_ex(TRUE, THREADING_FLAGS_DISABLE_THREADS));
   if (!progressive) return false;
   REGION16 damage;
   region16_init(&damage);
@@ -135,7 +135,7 @@ bool GfxChannel::Send()
     if (!WriteCommand(packet.area, packet.data, packet.codec)) return false;
   if (!Check(context->EndFrame(context.get(), &end), "end frame")) return false;
   std::scoped_lock lock(peer.owner.frame_guard);
-  if (peer.ack_enabled) peer.pending.push_back({peer.frame_id, peer.sequence, frame_bytes});
+  peer.FrameSent(frame_bytes);
   last_bytes = frame_bytes;
   prepared.clear();
   peer.snapshot.reset();

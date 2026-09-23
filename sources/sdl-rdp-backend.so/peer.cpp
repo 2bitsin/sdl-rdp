@@ -330,6 +330,9 @@ bool Peer::BeginFrame()
     snapshot = owner.shadow;
     snapshot_width = owner.frame_width; snapshot_height = owner.frame_height;
     sequence = owner.presented;
+    frames_coalesced += dirty_presents ? dirty_presents - 1 : 0;
+    dirty_presents = 0;
+    encoded_at_start = encoder.encode_time;
     sending = std::move(dirty);
     dirty = {};
     rect_index = row = 0;
