@@ -53,7 +53,7 @@ diff -ruN a/CMakeLists.txt b/CMakeLists.txt
 diff -ruN a/include/SDL3/SDL_hints.h b/include/SDL3/SDL_hints.h
 --- a/include/SDL3/SDL_hints.h
 +++ b/include/SDL3/SDL_hints.h
-@@ -3163,6 +3163,29 @@
+@@ -3163,6 +3163,30 @@
   */
  #define SDL_HINT_QUIT_ON_LAST_WINDOW_CLOSE "SDL_QUIT_ON_LAST_WINDOW_CLOSE"
  
@@ -67,6 +67,7 @@ diff -ruN a/include/SDL3/SDL_hints.h b/include/SDL3/SDL_hints.h
 +#define SDL_HINT_RDP_CODEC "SDL_RDP_CODEC"
 +#define SDL_HINT_RDP_AVC_BITRATE "SDL_RDP_AVC_BITRATE"
 +#define SDL_HINT_RDP_AUDIO_LATENCY "SDL_RDP_AUDIO_LATENCY"
++#define SDL_HINT_RDP_AUDIO_LEAD "SDL_RDP_AUDIO_LEAD"
 +#define SDL_HINT_RDP_VSYNC "SDL_RDP_VSYNC"
 +#define SDL_HINT_RDP_ASPECT "SDL_RDP_ASPECT"
 +#define SDL_HINT_RDP_HEIGHT "SDL_RDP_HEIGHT"
@@ -217,7 +218,7 @@ diff -ruN a/src/audio/SDL_sysaudio.h b/src/audio/SDL_sysaudio.h
 diff -ruN a/src/audio/rdp/SDL_rdpaudio.c b/src/audio/rdp/SDL_rdpaudio.c
 --- a/src/audio/rdp/SDL_rdpaudio.c
 +++ b/src/audio/rdp/SDL_rdpaudio.c
-@@ -0,0 +1,95 @@
+@@ -0,0 +1,103 @@
 +#include "SDL_internal.h"
 +#include "SDL_rdpaudio.h"
 +
@@ -231,7 +232,13 @@ diff -ruN a/src/audio/rdp/SDL_rdpaudio.c b/src/audio/rdp/SDL_rdpaudio.c
 +{
 +    device->hidden = SDL_calloc(1, sizeof(*device->hidden));
 +    if (!device->hidden) return false;
-+    if (!SDL_RDP_AcquireBackend(&device->hidden->backend, &device->hidden->handle, NULL)) return false;
++    sdlrdp_config config;
++    if (!SDL_RDP_AcquireBackend(&device->hidden->backend, &device->hidden->handle, &config)) return false;
++    const int lead = SDL_RDP_GetInteger(SDL_HINT_RDP_AUDIO_LEAD, 150);
++    if (lead < 0) return SDL_SetError("Invalid RDP audio lead");
++    if ((unsigned)lead >= config.audio_latency_ms)
++        return SDL_SetError("RDP audio lead must be below the audio latency window");
++    device->hidden->lead = SDL_MS_TO_NS((Uint64)lead);
 +    device->spec.format = SDL_AUDIO_S16;
 +    device->spec.channels = 2;
 +    device->spec.freq = 48000;
@@ -262,10 +269,12 @@ diff -ruN a/src/audio/rdp/SDL_rdpaudio.c b/src/audio/rdp/SDL_rdpaudio.c
 +        if (!mixbuf) return false;
 +        data->mixbuf = mixbuf;
 +    }
-+    data->next += (Uint64)device->sample_frames * SDL_NS_PER_SECOND / device->spec.freq;
 +    const Uint64 now = SDL_GetTicksNS();
-+    if (data->next > now) SDL_DelayNS(data->next - now);
-+    else data->next = now;
++    if (rate && !data->rate) data->next = now;
++    data->rate = rate;
++    data->next += (Uint64)device->sample_frames * SDL_NS_PER_SECOND / device->spec.freq;
++    if (data->next > now + data->lead) SDL_DelayNS(data->next - now - data->lead);
++    else if (data->next < now) data->next = now;
 +    return true;
 +}
 +
@@ -316,7 +325,7 @@ diff -ruN a/src/audio/rdp/SDL_rdpaudio.c b/src/audio/rdp/SDL_rdpaudio.c
 diff -ruN a/src/audio/rdp/SDL_rdpaudio.h b/src/audio/rdp/SDL_rdpaudio.h
 --- a/src/audio/rdp/SDL_rdpaudio.h
 +++ b/src/audio/rdp/SDL_rdpaudio.h
-@@ -0,0 +1,12 @@
+@@ -0,0 +1,14 @@
 +#ifndef SDL_rdpaudio_h_
 +#define SDL_rdpaudio_h_
 +#include "../SDL_sysaudio.h"
@@ -327,6 +336,8 @@ diff -ruN a/src/audio/rdp/SDL_rdpaudio.h b/src/audio/rdp/SDL_rdpaudio.h
 +    sdlrdp_handle *handle;
 +    Uint8 *mixbuf;
 +    Uint64 next;
++    Uint64 lead;
++    unsigned rate;
 +};
 +#endif
 diff -ruN a/src/storage/SDL_storage.c b/src/storage/SDL_storage.c

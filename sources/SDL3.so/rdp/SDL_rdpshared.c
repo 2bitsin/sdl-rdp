@@ -8,7 +8,7 @@ static SDL_RDP_Backend shared_backend;
 static sdlrdp_handle *shared_handle;
 static sdlrdp_config shared_config;
 
-static int SDL_RDP_GetInteger(const char *name, int fallback)
+int SDL_RDP_GetInteger(const char *name, int fallback)
 {
     const char *hint = SDL_RDP_Setting(name);
     char *end;

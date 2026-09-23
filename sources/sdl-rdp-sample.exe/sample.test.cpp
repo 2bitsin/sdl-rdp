@@ -635,7 +635,7 @@ protected:
     SDL_Quit();
     SDL_SetLogOutputFunction(previous_log, previous_log_user);
     for (auto hint : {SDL_HINT_AUDIO_DRIVER, SDL_HINT_VIDEO_DRIVER, "SDL_RDP_PORT", "SDL_RDP_BIND",
-                      "SDL_RDP_CERT_DIR", "SDL_RDP_BACKEND", "SDL_RDP_CODEC"}) SDL_ResetHint(hint);
+                      "SDL_RDP_CERT_DIR", "SDL_RDP_BACKEND", "SDL_RDP_CODEC", SDL_HINT_RDP_AUDIO_LEAD}) SDL_ResetHint(hint);
   }
 };
 TEST_F(AudioDriver, NoClientTenSecondClock) {
@@ -649,13 +649,85 @@ TEST_F(AudioDriver, NoClientTenSecondClock) {
   while (SDL_GetAudioStreamQueued(stream.get()) > 0 && Clock::now() < deadline) SDL_Delay(5);
   auto elapsed = std::chrono::duration<double>(Clock::now() - started).count();
   EXPECT_EQ(SDL_GetAudioStreamQueued(stream.get()), 0);
-  // Consuming ten seconds of PCM must not run ahead of the device clock.
+  // Consuming ten seconds of PCM may run one lead ahead of real time.
   // SDL may dequeue one buffer ahead; scheduling delays only make this longer.
   int buffer_frames = 0;
   SDL_AudioSpec format{};
   ASSERT_TRUE(SDL_GetAudioDeviceFormat(SDL_GetAudioStreamDevice(stream.get()), &format, &buffer_frames));
-  EXPECT_GE(elapsed, 10.0 - double(buffer_frames) / format.freq);
+  EXPECT_GE(elapsed, 10.0 - 0.150 - double(buffer_frames) / format.freq);
   RecordProperty("no_client_ten_seconds_elapsed", std::to_string(elapsed));
+}
+TEST_F(AudioDriver, ClientReceivesOneLeadOnAttach) {
+  std::vector<Sint16> pcm(48000 * 5 * 2, 1234);
+  ASSERT_TRUE(SDL_PutAudioStreamData(stream.get(), pcm.data(), pcm.size() * sizeof(Sint16)));
+  ASSERT_TRUE(SDL_ResumeAudioStreamDevice(stream.get()));
+  SDL_Delay(200);
+  Client client(ListeningPort(Number(fs::read_symlink("/proc/self").string())), true);
+  Headless::SoundClient audio(client);
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
+  ASSERT_TRUE(client.Until([&] { return !audio.received.empty(); }));
+  auto deadline = audio.received.front() + 100ms;
+  while (audio.samples.size() / 2 < 7200 - 480 && Clock::now() < deadline) ASSERT_TRUE(client.Pump(1));
+  EXPECT_GE(audio.samples.size() / 2, 7200u - 480);
+  EXPECT_LE(audio.received.back(), deadline);
+  auto first = audio.received.size();
+  auto frames = audio.samples.size() / 2;
+  deadline = Clock::now() + 1s;
+  while (Clock::now() < deadline) ASSERT_TRUE(client.Pump(1));
+  ASSERT_GT(audio.received.size(), first);
+  double maximum_gap = 0;
+  for (auto i = first; i < audio.received.size(); ++i)
+    maximum_gap = std::max(maximum_gap, std::chrono::duration<double, std::milli>(audio.received[i] - audio.received[i - 1]).count());
+  auto block_ms = 1000.0 * (audio.samples.size() / 2 - frames) / (audio.received.size() - first) / audio.rate;
+  EXPECT_LE(maximum_gap, 2 * block_ms + 10);
+  auto elapsed = std::chrono::duration<double>(audio.received.back() - audio.received[first - 1]).count();
+  EXPECT_NEAR(double(audio.samples.size() / 2 - frames) / audio.rate, elapsed, 0.030);
+  RecordProperty("maximum_block_gap_ms", std::to_string(maximum_gap));
+}
+TEST_F(AudioDriver, StallRefillsTheLead) {
+  std::vector<Sint16> pcm(48000 * 5 * 2, 1234);
+  ASSERT_TRUE(SDL_PutAudioStreamData(stream.get(), pcm.data(), pcm.size() * sizeof(Sint16)));
+  ASSERT_TRUE(SDL_ResumeAudioStreamDevice(stream.get()));
+  Client client(ListeningPort(Number(fs::read_symlink("/proc/self").string())), true);
+  Headless::SoundClient audio(client);
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
+  ASSERT_TRUE(client.Until([&] { return audio.samples.size() / 2 >= 24000; }));
+  ASSERT_TRUE(SDL_LockAudioStream(stream.get()));
+  auto deadline = Clock::now() + 300ms;
+  bool pumped = true;
+  while (Clock::now() < deadline && pumped) pumped = client.Pump(1);
+  auto frames = audio.samples.size() / 2;
+  auto resumed = Clock::now();
+  SDL_UnlockAudioStream(stream.get());
+  ASSERT_TRUE(pumped);
+  while (audio.samples.size() / 2 - frames < 7200 && Clock::now() < resumed + 100ms)
+    ASSERT_TRUE(client.Pump(1));
+  EXPECT_GE(audio.samples.size() / 2 - frames, 7200u);
+  EXPECT_LE(audio.received.back(), resumed + 100ms);
+}
+TEST_F(AudioDriver, LeadAtOrAboveLatencyFailsOpen) {
+  stream.reset();
+  SDL_AudioSpec spec{SDL_AUDIO_S16, 2, 48000};
+  for (auto lead : {"500", "501"}) {
+    ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_AUDIO_LEAD, lead));
+    stream.reset(SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr));
+    EXPECT_FALSE(stream);
+    EXPECT_STREQ(SDL_GetError(), "RDP audio lead must be below the audio latency window");
+  }
+}
+TEST_F(AudioDriver, ZeroLeadKeepsRealtimeClock) {
+  stream.reset();
+  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_AUDIO_LEAD, "0"));
+  SDL_AudioSpec spec{SDL_AUDIO_S16, 2, 48000};
+  stream.reset(SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr));
+  ASSERT_TRUE(stream) << SDL_GetError();
+  std::vector<Sint16> pcm(48000 * 2, 1234);
+  ASSERT_TRUE(SDL_PutAudioStreamData(stream.get(), pcm.data(), pcm.size() * sizeof(Sint16)));
+  auto started = Clock::now();
+  ASSERT_TRUE(SDL_ResumeAudioStreamDevice(stream.get()));
+  while (SDL_GetAudioStreamQueued(stream.get()) > 0 && Clock::now() < started + 3s) SDL_Delay(1);
+  EXPECT_EQ(SDL_GetAudioStreamQueued(stream.get()), 0);
+  EXPECT_GE(Clock::now() - started, 990ms);
 }
 TEST_F(AudioDriver, AudioBeforeVideoSurvivesVideoQuit) {
   ASSERT_TRUE(SDL_InitSubSystem(SDL_INIT_VIDEO)) << SDL_GetError();

@@ -67,7 +67,8 @@ those before the RDP driver runs. Set them through hints or the environment.
 Settings include:
 `SDL_RDP_PORT` (3389, 0 for ephemeral), `SDL_RDP_BIND` (0.0.0.0),
 `SDL_RDP_CERT_DIR` (`$XDG_DATA_HOME/sdl-rdp` or `~/.local/share/sdl-rdp`), `SDL_RDP_WIDTH`, `SDL_RDP_HEIGHT` (1024x768),
-`SDL_RDP_WAIT_FOR_CLIENT`, `SDL_RDP_BACKEND` (path of the backend library).
+`SDL_RDP_WAIT_FOR_CLIENT`, `SDL_RDP_BACKEND` (path of the backend library),
+`SDL_RDP_AUDIO_LATENCY` (500 ms), `SDL_RDP_AUDIO_LEAD` (150 ms).
 `SDL_RDP_VSYNC` defaults to `1`: surface updates wait up to 100 ms for the
 client to acknowledge every frame except the latest present, allowing rendering
 to overlap the latest frame's encoding, delivery and decoding. At most two frames
@@ -262,6 +263,13 @@ Connection events are never revised after they are queued.
 Playback uses FreeRDP’s `SendSamples2` to send PCM directly as Wave2, requiring
 rdpsnd version 8 or newer. FreeRDP’s DSP is not used and no wire correction is applied.
 The sample logs the device format again when SDL reports a format change.
+
+`SDL_RDP_AUDIO_LEAD` (hint `SDL_HINT_RDP_AUDIO_LEAD`)
+sets how much audio the client keeps queued, in milliseconds (default 150).
+The driver runs its audio clock ahead by this amount, bursting on client attach
+and after a stall to refill the lead, then sending at real-time cadence.
+Audio lags the picture by the lead plus the round trip. The lead must be below
+the `SDL_RDP_AUDIO_LATENCY` window; zero restores pacing without a lead.
 
 Audio works without initializing video. An audio-only application opens
 the same listener using the RDP hints above, with a black desktop at the

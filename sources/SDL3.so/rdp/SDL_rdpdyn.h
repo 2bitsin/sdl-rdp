@@ -46,6 +46,7 @@ typedef struct SDL_RDP_Backend
 } SDL_RDP_Backend;
 const char *SDL_RDP_Setting(const char *name);
 const char *SDL_RDP_HintChangedValue(const char *name, const char *oldValue, const char *newValue);
+int SDL_RDP_GetInteger(const char *name, int fallback);
 bool SDL_RDP_SettingBoolean(const char *name, bool fallback);
 bool SDL_RDP_SettingsReady(void);
 bool SDL_RDP_LoadBackend(SDL_RDP_Backend *backend);
