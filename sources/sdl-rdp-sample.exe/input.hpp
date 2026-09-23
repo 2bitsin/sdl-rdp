@@ -27,6 +27,9 @@ inline void InputMode(const SDL_Event& event, SDL_Window* window)
 {
     if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat) return;
     switch (event.key.scancode) {
+    case SDL_SCANCODE_F6:
+        Check(SDL_SetWindowSize(window, 1920, 1080));
+        break;
     case SDL_SCANCODE_F2:
         Check(SDL_TextInputActive(window) ? SDL_StopTextInput(window) : SDL_StartTextInput(window));
         SDL_Log("event TEXT_MODE active=%d", SDL_TextInputActive(window));

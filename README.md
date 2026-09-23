@@ -77,10 +77,12 @@ are in flight. Set it to `0` to return immediately.
 empty means square pixels. It can change live, and
 `SDL_PROP_WINDOW_RDP_ASPECT_STRING` reports it on the window.
 The window keeps the app's requested size; the RDP desktop is that picture,
-with only pixel-aspect correction applied on the server. Client screen changes
-update SDL's desktop display mode. Borderless fullscreen follows that screen;
-exclusive fullscreen keeps its selected size. Leaving fullscreen restores the
-windowed size. Client-side smart sizing can stretch the picture to the client's screen.
+with only pixel-aspect correction applied on the server. SDL's desktop mode is
+the client's screen size after a client screen change and the picture size after
+the application's own resize, including the windowed size restored on leaving
+fullscreen. Borderless fullscreen fills the desktop mode; exclusive fullscreen
+keeps its selected size. Client-side smart sizing can
+stretch the picture to the client's screen.
 
 For exclusive fullscreen, select an advertised mode with
 `SDL_GetFullscreenDisplayModes`, pass it to
@@ -94,7 +96,7 @@ and these sizes at the client's refresh rate:
 
 Sample flags: `--fullscreen --mode 320x200` selects exclusive fullscreen,
 `--fullscreen` selects borderless, `--size 640x480` sets the windowed size,
-and `--aspect 4:3` declares the picture's display aspect. F4 toggles fullscreen.
+and `--aspect 4:3` declares the picture's display aspect. F4 toggles fullscreen; F6 resizes the window to 1920x1080.
 `--partial` submits only the animated strip between initial and exposed/resized full frames.
 
 `SDL_RDP_CODEC` accepts `auto` (default), `remotefx`, `nscodec`, `planar`,

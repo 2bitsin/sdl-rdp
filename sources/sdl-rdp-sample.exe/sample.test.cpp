@@ -228,6 +228,113 @@ TEST_F(Sample, FirstFrameObserverWithoutSuccessfulConnect) {
   }
 }
 
+TEST_F(Sample, WindowResizeMovesDesktopMode) {
+  auto arguments = Arguments(certificates.Path(), false);
+  arguments.insert(arguments.begin() + 1, {"SDL_RDP_WIDTH=1280", "SDL_RDP_HEIGHT=800"});
+  arguments.insert(arguments.end(), {"--size", "1280x800"});
+  process = std::make_unique<Process>(arguments);
+  ASSERT_TRUE(Read("port "));
+  Client client(Number(std::string_view(line).substr(5)), true, 1280, 800);
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
+  ASSERT_NO_FATAL_FAILURE(Exposed());
+  ASSERT_TRUE(freerdp_input_send_keyboard_event(client.instance->context->input, KBD_FLAGS_DOWN, 0x40));
+  ASSERT_TRUE(ReadInput(client, "event DISPLAY_DESKTOP_MODE_CHANGED type=" + std::to_string(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED) + " width=1920 height=1080"));
+  ASSERT_TRUE(Read("event GEOMETRY window=1920x1080 desktop=1920x1080"));
+  ASSERT_NO_FATAL_FAILURE(Escape(client));
+}
+
+TEST_F(Sample, FullscreenModeMovesDesktopMode) {
+  auto arguments = Arguments(certificates.Path(), false);
+  arguments.insert(arguments.begin() + 1, {"SDL_RDP_WIDTH=1280", "SDL_RDP_HEIGHT=800"});
+  arguments.insert(arguments.end(), {"--size", "1280x800", "--mode", "1920x1080"});
+  process = std::make_unique<Process>(arguments);
+  ASSERT_TRUE(Read("port "));
+  Client client(Number(std::string_view(line).substr(5)), true, 1280, 800);
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
+  ASSERT_NO_FATAL_FAILURE(Exposed());
+  auto input = client.instance->context->input;
+  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x3e));
+  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x3e));
+  ASSERT_TRUE(ReadInput(client, "event DISPLAY_DESKTOP_MODE_CHANGED type=" + std::to_string(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED) + " width=1920 height=1080"));
+  ASSERT_TRUE(Read("event GEOMETRY window=1920x1080 desktop=1920x1080"));
+  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x3e));
+  ASSERT_TRUE(ReadInput(client, "event DISPLAY_DESKTOP_MODE_CHANGED type=" + std::to_string(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED) + " width=1280 height=800"));
+  ASSERT_TRUE(Read("event GEOMETRY window=1280x800 desktop=1280x800"));
+  ASSERT_NO_FATAL_FAILURE(Escape(client));
+}
+
+class VideoDriver : public Sample {
+protected:
+  SDL_Window *window = nullptr;
+  void SetUp() override {
+    Sample::SetUp();
+    for (auto [name, value] : {std::pair{SDL_HINT_VIDEO_DRIVER, "rdp"}, {"SDL_RDP_PORT", "0"},
+         {"SDL_RDP_BIND", "127.0.0.1"}, {"SDL_RDP_CODEC", "planar"},
+         {"SDL_RDP_WIDTH", "1280"}, {"SDL_RDP_HEIGHT", "800"}}) ASSERT_TRUE(SDL_SetHint(name, value));
+    ASSERT_TRUE(SDL_SetHint("SDL_RDP_CERT_DIR", certificates.Path().c_str()));
+    auto library = BuildRoot() / "sources/sdl-rdp-backend.so/libsdl-rdp-backend.so";
+    ASSERT_TRUE(SDL_SetHint("SDL_RDP_BACKEND", library.c_str()));
+    ASSERT_TRUE(SDL_Init(SDL_INIT_VIDEO)) << SDL_GetError();
+    window = SDL_CreateWindow("desktop mode", 1280, 800, 0);
+    ASSERT_NE(window, nullptr) << SDL_GetError();
+    SDL_FlushEvents(SDL_EVENT_FIRST, SDL_EVENT_LAST);
+  }
+  void Desktop(int width, int height) {
+    auto mode = SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
+    ASSERT_NE(mode, nullptr);
+    EXPECT_EQ(mode->w, width);
+    EXPECT_EQ(mode->h, height);
+    SDL_Event event;
+    ASSERT_EQ(SDL_PeepEvents(&event, 1, SDL_GETEVENT, SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED,
+                            SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED), 1);
+    EXPECT_EQ(event.display.data1, width);
+    EXPECT_EQ(event.display.data2, height);
+    EXPECT_FALSE(SDL_HasEvent(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED));
+  }
+  void TearDown() override {
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+    for (auto hint : {SDL_HINT_VIDEO_DRIVER, "SDL_RDP_PORT", "SDL_RDP_BIND", "SDL_RDP_CODEC",
+         "SDL_RDP_WIDTH", "SDL_RDP_HEIGHT", "SDL_RDP_CERT_DIR", "SDL_RDP_BACKEND"}) SDL_ResetHint(hint);
+    Sample::TearDown();
+  }
+};
+
+TEST_F(VideoDriver, WindowResizeMovesDesktopMode) {
+  ASSERT_TRUE(SDL_SetWindowSize(window, 1920, 1080));
+  Desktop(1920, 1080);
+}
+
+TEST_F(VideoDriver, FullscreenModeMovesDesktopMode) {
+  auto mode = *SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
+  mode.w = 1920; mode.h = 1080;
+  ASSERT_TRUE(SDL_SetWindowFullscreenMode(window, &mode));
+  ASSERT_TRUE(SDL_SetWindowFullscreen(window, true));
+  Desktop(1920, 1080);
+  EXPECT_TRUE(SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN);
+  ASSERT_TRUE(SDL_SetWindowFullscreen(window, false));
+  Desktop(1280, 800);
+  ASSERT_TRUE(SDL_SetWindowFullscreen(window, true));
+  Desktop(1920, 1080);
+}
+
+TEST_F(VideoDriver, InitialWindowMovesDesktopMode) {
+  SDL_DestroyWindow(window);
+  window = SDL_CreateWindow("different size", 1920, 1080, 0);
+  ASSERT_NE(window, nullptr);
+  Desktop(1920, 1080);
+}
+
+TEST_F(VideoDriver, DesktopFullscreenKeepsDesktopMode) {
+  ASSERT_TRUE(SDL_SetWindowFullscreen(window, true));
+  auto mode = SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
+  ASSERT_NE(mode, nullptr);
+  EXPECT_EQ(mode->w, 1280);
+  EXPECT_EQ(mode->h, 800);
+  ASSERT_TRUE(SDL_SetWindowFullscreen(window, false));
+  EXPECT_FALSE(SDL_HasEvent(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED));
+}
+
 TEST_F(Sample, ExplicitFullscreenBeforeConnect) {
   auto arguments = Arguments(certificates.Path(), false);
   arguments.insert(arguments.end(), {"--fullscreen", "--mode", "320x200"});
@@ -258,7 +365,7 @@ TEST_F(Sample, ExplicitFullscreenRestoresWindow) {
   auto input = client.instance->context->input;
   ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x3e));
   ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x3e));
-  ASSERT_TRUE(Read("event GEOMETRY window=640x480 desktop=1280x800"));
+  ASSERT_TRUE(Read("event GEOMETRY window=640x480 desktop=640x480"));
   ASSERT_TRUE(client.Until([&] { auto gdi = client.instance->context->gdi; return gdi->width == 640 && gdi->height == 480; }));
   SDL_Log("trace leave gdi=640x480 screen=1280x800");
   ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x3e));
@@ -291,7 +398,7 @@ TEST_F(Sample, ExplicitFullscreenSurvivesScreenChange) {
   ASSERT_TRUE(client.Until([&] { auto gdi = client.instance->context->gdi; return gdi->width == 320 && gdi->height == 200; }));
   SDL_Log("trace screen=1920x1080 gdi=320x200");
   ASSERT_TRUE(freerdp_input_send_keyboard_event(client.instance->context->input, KBD_FLAGS_DOWN, 0x3e));
-  ASSERT_TRUE(Read("event GEOMETRY window=640x480 desktop=1920x1080"));
+  ASSERT_TRUE(Read("event GEOMETRY window=640x480 desktop=640x480"));
   ASSERT_TRUE(client.Until([&] { auto gdi = client.instance->context->gdi; return gdi->width == 640 && gdi->height == 480; }));
   SDL_Log("trace leave gdi=640x480 screen=1920x1080");
   ASSERT_NO_FATAL_FAILURE(Escape(client));
@@ -321,7 +428,7 @@ TEST_P(RefreshMode, EstimatesOnlyChangeCurrentMode) {
     return total;
   };
   auto desktop = count("event DISPLAY_DESKTOP_MODE_CHANGED ");
-  ASSERT_EQ(desktop, 1u) << process->transcript; // 640x480 startup -> 1024x768 client screen.
+  ASSERT_EQ(desktop, kind == "exclusive" ? 2u : 1u) << process->transcript;
   auto current = count("event DISPLAY_CURRENT_MODE_CHANGED ");
   unsigned estimates = 0, acknowledgements = 0;
   auto next_ack = Clock::now();

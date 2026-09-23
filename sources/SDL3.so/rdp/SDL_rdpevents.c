@@ -18,18 +18,28 @@ static void SDL_RDP_CopyRefresh(SDL_DisplayMode *target, const SDL_DisplayMode *
     target->refresh_rate_denominator = source->refresh_rate_denominator;
 }
 
-static void SDL_RDP_ScreenMode(SDL_VideoData *data, const SDL_DisplayMode *mode)
+void SDL_RDP_DesktopMode(SDL_VideoData *data, int w, int h)
 {
     SDL_VideoDisplay *display = SDL_GetVideoDisplay(data->display);
-    SDL_DisplayMode requested = data->window->requested_fullscreen_mode;
+    SDL_DisplayMode mode = display->desktop_mode;
+    SDL_RDP_CopyRefresh(&mode, display->current_mode);
+    mode.w = w;
+    mode.h = h;
     bool exclusive = display->fullscreen_active;
     // SDL_SetDesktopDisplayMode rejects the update while fullscreen_active.
     display->fullscreen_active = false;
-    SDL_SetDesktopDisplayMode(display, mode);
+    SDL_SetDesktopDisplayMode(display, &mode);
     display->fullscreen_active = exclusive;
+}
+
+static void SDL_RDP_ScreenMode(SDL_VideoData *data, int w, int h)
+{
+    SDL_VideoDisplay *display = SDL_GetVideoDisplay(data->display);
+    SDL_DisplayMode requested = data->window->requested_fullscreen_mode;
+    SDL_RDP_DesktopMode(data, w, h);
     SDL_ResetFullscreenDisplayModes(display);
     if (requested.w) {
-        SDL_RDP_CopyRefresh(&requested, mode);
+        SDL_RDP_CopyRefresh(&requested, &display->desktop_mode);
         bool accepted = SDL_SetWindowFullscreenMode(data->window, &requested);
         SDL_assert_always(accepted);
     }
@@ -38,15 +48,11 @@ static void SDL_RDP_ScreenMode(SDL_VideoData *data, const SDL_DisplayMode *mode)
 static void SDL_RDP_Resize(SDL_VideoData *data, unsigned width, unsigned height)
 {
     SDL_VideoDisplay *display = SDL_GetVideoDisplay(data->display);
-    SDL_DisplayMode mode = display->desktop_mode;
     if (!width || !height || width > SDL_MAX_SINT32 || height > SDL_MAX_SINT32) {
         return;
     }
-    if (mode.w != (int)width || mode.h != (int)height) {
-        SDL_RDP_CopyRefresh(&mode, display->current_mode);
-        mode.w = (int)width;
-        mode.h = (int)height;
-        SDL_RDP_ScreenMode(data, &mode);
+    if (display->desktop_mode.w != (int)width || display->desktop_mode.h != (int)height) {
+        SDL_RDP_ScreenMode(data, (int)width, (int)height);
     }
     if ((data->window->flags & SDL_WINDOW_FULLSCREEN) && !data->window->requested_fullscreen_mode.w) {
         if (SDL_RDP_ResizePicture(data, width, height)) {
@@ -61,7 +67,9 @@ static void SDL_RDP_Refresh(SDL_VideoData *data, unsigned millihertz)
     // Preserve the old record until SDL has compared it with the new one.
     SDL_DisplayMode *mode = display->current_mode == &data->refresh_modes[0] ?
         &data->refresh_modes[1] : &data->refresh_modes[0];
-    *mode = *display->current_mode;
+    *mode = display->desktop_mode;
+    mode->w = display->current_mode->w;
+    mode->h = display->current_mode->h;
     mode->refresh_rate = millihertz / 1000.0f;
     mode->refresh_rate_numerator = millihertz;
     mode->refresh_rate_denominator = 1000;
@@ -71,14 +79,8 @@ static void SDL_RDP_Refresh(SDL_VideoData *data, unsigned millihertz)
 static void SDL_RDP_Connected(SDL_VideoData *data, const sdlrdp_event *event)
 {
     SDL_Window *window = data->window;
-    SDL_VideoDisplay *display = SDL_GetVideoDisplay(data->display);
-    SDL_DisplayMode mode = display->desktop_mode;
-    mode.w = (int)event->connected.screen_width;
-    mode.h = (int)event->connected.screen_height;
-    mode.refresh_rate = event->connected.refresh_millihertz / 1000.0f;
-    mode.refresh_rate_numerator = event->connected.refresh_millihertz;
-    mode.refresh_rate_denominator = 1000;
-    SDL_RDP_ScreenMode(data, &mode);
+    SDL_RDP_Refresh(data, event->connected.refresh_millihertz);
+    SDL_RDP_ScreenMode(data, (int)event->connected.screen_width, (int)event->connected.screen_height);
     SDL_RDP_Resize(data, event->connected.screen_width, event->connected.screen_height);
     SDL_SetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING,
                           event->connected.client_name);

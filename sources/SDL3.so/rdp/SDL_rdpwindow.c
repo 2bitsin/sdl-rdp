@@ -1,4 +1,5 @@
 #include "SDL_rdpwindow.h"
+#include "SDL_rdpevents.h"
 #include "src/events/SDL_windowevents_c.h"
 
 bool SDL_RDP_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_PropertiesID props)
@@ -40,8 +41,14 @@ void SDL_RDP_ShowWindow(SDL_VideoDevice *_this, SDL_Window *window)
 
 bool SDL_RDP_ResizePicture(SDL_VideoData *data, int w, int h)
 {
-    return data->backend.resize(data->handle, w, h) == 0 ||
-        SDL_SetError("%s", data->backend.last_error());
+    SDL_VideoDisplay *display = SDL_GetVideoDisplay(data->display);
+    if (data->backend.resize(data->handle, w, h) != 0) {
+        return SDL_SetError("%s", data->backend.last_error());
+    }
+    if (display->desktop_mode.w != w || display->desktop_mode.h != h) {
+        SDL_RDP_DesktopMode(data, w, h);
+    }
+    return true;
 }
 
 SDL_FullscreenResult SDL_RDP_SetWindowFullscreen(SDL_VideoDevice *_this, SDL_Window *window, SDL_VideoDisplay *display, SDL_FullscreenOp fullscreen)
