@@ -1059,7 +1059,13 @@ TEST_F(AudioGate, AudioFormatMissKeepsSessionAndReconnects) {
     ASSERT_NE(event, events.end()) << logs.Text();
     EXPECT_EQ(event->audio.connected, 0u);
     EXPECT_EQ(sdlrdp_audio_rate(backend.get()), 0u);
-    EXPECT_TRUE(logs.Contains(SDLRDP_LOG_WARN, unmatched ? "rate=22050" : "client formats: none"));
+    {
+      std::scoped_lock lock(logs.guard);
+      EXPECT_EQ(std::ranges::count_if(logs.lines, [&](auto const& line) {
+        return line.first == SDLRDP_LOG_WARN
+          && line.second.contains(unmatched ? "rate=22050" : "client formats: none");
+      }), 1);
+    }
     EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, "client doesn't support any format"));
     FrameObserver observer(client);
     Present(std::vector<UINT32>(320 * 200, 0x123456), 320, 200);

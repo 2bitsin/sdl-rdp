@@ -60,6 +60,8 @@ bool AudioChannel::Pump()
 {
   Expects(sound != nullptr, "sound context exists");
   auto result = rdpsnd_server_handle_messages(sound.get());
+  if (result == ERROR_INTERNAL_ERROR && !ready && !rejected && !sound->num_client_formats)
+    RejectFormats();
   if (!rejected && (result == CHANNEL_RC_OK || result == ERROR_NO_DATA)) return true;
   sound->Close(sound.get());
   return false;

@@ -2,6 +2,7 @@
 #include "_detail/contract.hpp"
 #include <winpr/wlog.h>
 #include <atomic>
+#include <charconv>
 #include <mutex>
 #include <cstdlib>
 #include <stdexcept>
@@ -18,18 +19,24 @@ namespace {
 // The newest open owns process-wide WLog routing; close waits for callbacks before clearing it.
 std::atomic<LogRoute*> route = nullptr;
 std::recursive_mutex routing_guard;
-bool ExpectedPeerMessage(wLogMessage const& message)
+bool ExpectedLibraryMessage(wLogMessage const& message)
 {
   if (!message.PrefixString || !message.TextString) return false;
   auto prefix = std::string_view(message.PrefixString);
   auto text = std::string_view(message.TextString);
+  constexpr std::pair<std::string_view, std::string_view> known[] = {
+    {"com.freerdp.core.transport", "BIO_read retries exceeded"},
+    {"com.freerdp.channels.rdpsnd.server", "client doesn't support any format!"},
+  };
+  for (auto const& [source, message_text] : known)
+    if (prefix == source && text == message_text) return true;
   if (prefix == "com.freerdp.core.transport") {
-    if (text == "BIO_read retries exceeded") return true;
     constexpr std::string_view system_error = "BIO_read returned a system error ";
     if (!text.starts_with(system_error)) return false;
     text.remove_prefix(system_error.size());
-    auto end = text.find_first_not_of("0123456789");
-    return end > 0 && end != text.npos && text.substr(end).starts_with(": ");
+    unsigned error = 0;
+    auto [end, status] = std::from_chars(text.data(), text.data() + text.size(), error);
+    return status == std::errc{} && std::string_view(end, text.data() + text.size()).starts_with(": ");
   }
   auto name = text.substr(0, text.find(' '));
   if ((prefix == "com.freerdp.core" || prefix == "com.freerdp.core.peer")
@@ -44,14 +51,8 @@ BOOL Forward(wLogMessage const* message)
   auto target = route.load();
   auto level = message->Level == WLOG_ERROR ? SDLRDP_LOG_ERROR
     : message->Level == WLOG_WARN ? SDLRDP_LOG_WARN : SDLRDP_LOG_INFO;
-  if (ExpectedPeerMessage(*message)) level = SDLRDP_LOG_INFO;
+  if (ExpectedLibraryMessage(*message)) level = SDLRDP_LOG_INFO;
   auto text = message->TextString;
-  if (message->PrefixString && text
-      && std::string_view(message->PrefixString) == "com.freerdp.channels.rdpsnd.server"
-      && std::string_view(text) == "client doesn't support any format!") {
-    level = SDLRDP_LOG_WARN;
-    text = "Audio unavailable: client formats: none (no compatible formats advertised).";
-  }
   if (target && target->callback && text) target->callback(target->user, level, text);
   return TRUE;
 }
