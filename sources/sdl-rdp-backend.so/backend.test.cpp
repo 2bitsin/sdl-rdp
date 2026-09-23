@@ -955,18 +955,22 @@ TEST_F(RoundFive, ExpectedDisconnectLogLevels) {
     EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, name));
     EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, name));
   }
-  for (auto [category, message] : std::array<std::pair<const char*, const char*>, 4>{{
+  for (auto [category, message] : std::array<std::pair<const char*, const char*>, 6>{{
       {"com.freerdp.core.peer", "ERRCONNECT_CONNECT_TRANSPORT_FAILED [0x0002000D]"},
       {"com.freerdp.core.transport", "BIO_read retries exceeded"},
       {"com.freerdp.core.transport", "BIO_read returned a system error 104: Connection reset by peer"},
+      {"com.freerdp.core.transport", "BIO_read returned a system error 110: Connection timed out"},
+      {"com.freerdp.core.transport", "BIO_read returned a system error 5: Input/output error"},
       {"com.freerdp.core", "ERRCONNECT_CONNECT_TRANSPORT_FAILED [0x0002000D]"}}}) {
     WLog_Print(WLog_Get(category), WLOG_ERROR, "%s", message);
     EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, message));
     EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, message));
   }
-  auto failure = "BIO_read returned a system error 5: Input/output error";
+  auto failure = "BIO_write returned a system error 5: Input/output error";
   WLog_Print(WLog_Get("com.freerdp.core.transport"), WLOG_ERROR, "%s", failure);
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_ERROR, failure));
+  WLog_Print(peer, WLOG_ERROR, "%s", "BIO_read returned a system error 110: Connection timed out");
+  EXPECT_TRUE(logs.Contains(SDLRDP_LOG_ERROR, "BIO_read returned a system error 110"));
   WLog_Print(peer, WLOG_ERROR, "transport failure marker");
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_ERROR, "transport failure marker"));
   WLog_Print(WLog_Get("com.freerdp.core.transport"), WLOG_ERROR, "ERRINFO_LOGOFF_BY_USER [0x0001000C]");
@@ -1038,6 +1042,47 @@ TEST_F(AudioGate, AudioPcmAndReconnect) {
     EXPECT_EQ(audio.pending.size(), 0u);
   }
   RecordProperty("audio_diagnostics", logs.Text(true));
+}
+TEST_F(AudioGate, AudioFormatMissKeepsSessionAndReconnects) {
+  Open(320, 200);
+  ASSERT_EQ(sdlrdp_audio_open(backend.get()), 0);
+  for (bool unmatched : {false, true}) {
+    Client client(sdlrdp_port(backend.get()), true);
+    SoundClient audio(client);
+    audio.rate = 22050;
+    audio.advertise_unmatched = unmatched;
+    Connect(client);
+    auto events = EventsUntil([](auto const& events) {
+      return std::ranges::any_of(events, [](auto const& e) { return e.type == SDLRDP_AUDIO; });
+    }, true, &client);
+    auto event = std::ranges::find(events, SDLRDP_AUDIO, &sdlrdp_event::type);
+    ASSERT_NE(event, events.end()) << logs.Text();
+    EXPECT_EQ(event->audio.connected, 0u);
+    EXPECT_EQ(sdlrdp_audio_rate(backend.get()), 0u);
+    {
+      std::scoped_lock lock(logs.guard);
+      EXPECT_EQ(std::ranges::count_if(logs.lines, [&](auto const& line) {
+        return line.first == SDLRDP_LOG_WARN
+          && line.second.contains(unmatched ? "rate=22050" : "client formats: none");
+      }), 1);
+    }
+    EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, "client doesn't support any format"));
+    FrameObserver observer(client);
+    Present(std::vector<UINT32>(320 * 200, 0x123456), 320, 200);
+    ASSERT_TRUE(client.Until([&] { return !observer.ids.empty(); }));
+    ASSERT_TRUE(observer.Ack());
+    ASSERT_EQ(sdlrdp_wait_frame(backend.get(), 10000), 1);
+    ASSERT_TRUE(freerdp_input_send_keyboard_event(client.instance->context->input, KBD_FLAGS_DOWN, 0x1e));
+    events = EventsUntil([](auto const& events) {
+      return std::ranges::any_of(events, [](auto const& e) { return e.type == SDLRDP_KEY; });
+    }, true, &client);
+    EXPECT_NE(std::ranges::find(events, SDLRDP_KEY, &sdlrdp_event::type), events.end());
+    EXPECT_EQ(std::ranges::find(events, SDLRDP_DISCONNECTED, &sdlrdp_event::type), events.end());
+  }
+  Client client(sdlrdp_port(backend.get()), true);
+  SoundClient audio(client);
+  ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
+  EXPECT_EQ(sdlrdp_audio_rate(backend.get()), 48000u);
 }
 TEST_F(AudioGate, AudioInitialVolume) {
   Open(320, 200);

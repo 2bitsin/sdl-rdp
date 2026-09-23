@@ -103,7 +103,10 @@ The backend does no rate conversion: `sdlrdp_audio_open(handle)` opens playback,
 `sdlrdp_audio_rate(handle)` returns the negotiated rate (0 without a playing
 client), and `sdlrdp_audio_write` accepts stereo S16 frames at that rate.
 `SDLRDP_AUDIO {freq, 1}` announces audio negotiation; `{0, 0}` announces loss
-of audio. Connection events are never revised after they are queued.
+of audio. A client advertising no compatible formats receives no audio; the
+sound channel is released, `{0, 0}` is queued, and the audio rate stays zero.
+Video, input and clipboard continue on the same connection.
+Connection events are never revised after they are queued.
 Playback uses FreeRDP’s `SendSamples2` to send PCM directly as Wave2, requiring
 rdpsnd version 8 or newer. FreeRDP’s DSP is not used and no wire correction is applied.
 The sample logs the device format again when SDL reports a format change.
@@ -145,6 +148,14 @@ ships no portable Windows-layout-to-character table. FreeRDP 3.15 has no
 This driver uses the keymap SDL holds, falling back to SDL’s default US keymap.
 The negotiated layout ID alone does not install a character map. Unicode input
 provides layout-specific characters, including accented characters.
+
+Unicode input uses SDL’s `SDL_SendKeyboardUnicodeKey`, as UIKit and OpenVR do.
+SDL allocates a reserved scancode for characters absent from its keymap and
+sends a key down/up pair. With the default keycode options, `ä` produces
+scancode 400 with keycode 0, followed by text `ä`; `a` produces scancode 4,
+keycode 97 down/up and text `a`. Escape produces scancode 41, keycode 27
+down/up without text (the sample exits on key down). Reserved scancodes can
+vary with previously received characters.
 
 `SDL_SetWindowRelativeMouseMode` uses relative deltas from FreeRDP's `ainput`
 channel when the client supplies them. Otherwise each absolute motion is

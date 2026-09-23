@@ -2,6 +2,7 @@
 #include "_detail/contract.hpp"
 #include <winpr/wlog.h>
 #include <atomic>
+#include <charconv>
 #include <mutex>
 #include <cstdlib>
 #include <stdexcept>
@@ -18,14 +19,25 @@ namespace {
 // The newest open owns process-wide WLog routing; close waits for callbacks before clearing it.
 std::atomic<LogRoute*> route = nullptr;
 std::recursive_mutex routing_guard;
-bool ExpectedPeerMessage(wLogMessage const& message)
+bool ExpectedLibraryMessage(wLogMessage const& message)
 {
   if (!message.PrefixString || !message.TextString) return false;
   auto prefix = std::string_view(message.PrefixString);
   auto text = std::string_view(message.TextString);
-  if (prefix == "com.freerdp.core.transport")
-    return text == "BIO_read retries exceeded"
-      || text == "BIO_read returned a system error 104: Connection reset by peer";
+  constexpr std::pair<std::string_view, std::string_view> known[] = {
+    {"com.freerdp.core.transport", "BIO_read retries exceeded"},
+    {"com.freerdp.channels.rdpsnd.server", "client doesn't support any format!"},
+  };
+  for (auto const& [source, message_text] : known)
+    if (prefix == source && text == message_text) return true;
+  if (prefix == "com.freerdp.core.transport") {
+    constexpr std::string_view system_error = "BIO_read returned a system error ";
+    if (!text.starts_with(system_error)) return false;
+    text.remove_prefix(system_error.size());
+    unsigned error = 0;
+    auto [end, status] = std::from_chars(text.data(), text.data() + text.size(), error);
+    return status == std::errc{} && std::string_view(end, text.data() + text.size()).starts_with(": ");
+  }
   auto name = text.substr(0, text.find(' '));
   if ((prefix == "com.freerdp.core" || prefix == "com.freerdp.core.peer")
       && name == "ERRCONNECT_CONNECT_TRANSPORT_FAILED") return true;
@@ -39,9 +51,9 @@ BOOL Forward(wLogMessage const* message)
   auto target = route.load();
   auto level = message->Level == WLOG_ERROR ? SDLRDP_LOG_ERROR
     : message->Level == WLOG_WARN ? SDLRDP_LOG_WARN : SDLRDP_LOG_INFO;
-  if (ExpectedPeerMessage(*message)) level = SDLRDP_LOG_INFO;
-  if (target && target->callback && message->TextString)
-    target->callback(target->user, level, message->TextString);
+  if (ExpectedLibraryMessage(*message)) level = SDLRDP_LOG_INFO;
+  auto text = message->TextString;
+  if (target && target->callback && text) target->callback(target->user, level, text);
   return TRUE;
 }
 void Install()

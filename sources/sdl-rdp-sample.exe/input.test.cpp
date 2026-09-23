@@ -216,12 +216,19 @@ TEST_F(Sample, UnicodeKeysAndEscape) {
   ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(input, KBD_FLAGS_DOWN, 'a'));
   ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(input, KBD_FLAGS_RELEASE, 'a'));
   ASSERT_TRUE(Read("event KEY_DOWN "));
-  EXPECT_TRUE(line.contains(" key=97 down=1")) << line;
+  EXPECT_TRUE(line.contains("scancode=4 key=97 down=1")) << line;
+  ASSERT_TRUE(Read("event KEY_UP type=769 scancode=4 key=97 down=0"));
   ASSERT_TRUE(Read("event TEXT_INPUT text=a"));
+  ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(input, KBD_FLAGS_DOWN, 0xe4));
+  ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(input, KBD_FLAGS_RELEASE, 0xe4));
+  ASSERT_TRUE(Read("event KEY_DOWN type=768 scancode=400 key=0 down=1"));
+  ASSERT_TRUE(Read("event KEY_UP type=769 scancode=400 key=0 down=0"));
+  ASSERT_TRUE(Read("event TEXT_INPUT text=ä"));
   auto controls = process->transcript.size();
   for (auto code : {8, 9, 13, 127, 27}) {
     ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(input, KBD_FLAGS_DOWN, code));
     ASSERT_TRUE(Read("event KEY_DOWN "));
+    if (code == 27) EXPECT_TRUE(line.contains("scancode=41 key=27 down=1")) << line;
     EXPECT_TRUE(line.contains(" key=" + std::to_string(code) + " down=1")) << line;
   }
   EXPECT_TRUE(process->Exit());
