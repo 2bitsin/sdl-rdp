@@ -2,16 +2,78 @@
 #include <sdl-rdp-backend.so/_detail/headless-clipboard.hpp>
 #include <sdl-rdp-backend.so/_detail/headless-audio.hpp>
 #include <sdl-rdp-backend.so/_detail/headless-tls.hpp>
+#include <sdl-rdp-backend.so/_detail/headless-drive.hpp>
 #include <cmath>
 
 namespace SampleGate {
+TEST_F(Sample, DriveDisconnectDuringCat) {
+  oxbox::platform::ScratchArea share{"sample-disconnect", "sdl-rdp"};
+  auto path = share.Path() / "huge.bin";
+  { std::ofstream file(path); }
+  fs::resize_file(path, 400 * 1024 * 1024);
+  auto arguments = Arguments(certificates.Path(), false);
+  arguments.insert(arguments.end(), {"--cat", "share/huge.bin"});
+  process = std::make_unique<Process>(arguments);
+  ASSERT_TRUE(Read("port "));
+  auto port = Number(std::string_view(line).substr(5));
+  {
+    Client client(port, true, 640, 480);
+    Headless::ShareDrive(client, share.Path().c_str());
+    ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
+    Headless::DriveObserver observer(client);
+    ASSERT_TRUE(client.Until([&] {
+      return std::ranges::any_of(observer.io, [](auto packet) {
+        packet.Skip(12);
+        return packet.Get(4) == IRP_MJ_READ;
+      });
+    }));
+    ASSERT_TRUE(freerdp_disconnect(client.instance.get()));
+  }
+  ASSERT_TRUE(Read("cat failed: ")) << process->transcript;
+  SDL_Log("trace DRIVE disconnected after read request: %s", line.c_str());
+  Client second(port, true, 640, 480);
+  Headless::ShareDrive(second, share.Path().c_str());
+  ASSERT_TRUE(freerdp_connect(second.instance.get())) << ConnectLogs();
+  Headless::DriveObserver observer(second);
+  ASSERT_TRUE(second.Until([&] { return !observer.replies.empty() && Pattern(second, false); }));
+  ASSERT_NO_FATAL_FAILURE(Escape(second));
+  while (process->Line(line, Clock::now() + 1s)) {}
+  EXPECT_EQ(observer.requests, 0u);
+  auto failure = process->transcript.find("cat failed:");
+  EXPECT_EQ(process->transcript.find("cat failed:", failure + 1), std::string::npos);
+  EXPECT_EQ(process->transcript.find("cat bytes="), std::string::npos);
+  SDL_Log("trace DRIVE second client connected, frame received, cat not repeated, sample exited 0");
+}
+
+TEST_F(Sample, DriveMissingCatKeepsServing) {
+  oxbox::platform::ScratchArea share{"sample-missing", "sdl-rdp"};
+  auto arguments = Arguments(certificates.Path(), false);
+  arguments.insert(arguments.end(), {"--cat", "share/missing.bin"});
+  process = std::make_unique<Process>(arguments);
+  ASSERT_TRUE(Read("port "));
+  Client client(Number(std::string_view(line).substr(5)), true, 640, 480);
+  Headless::ShareDrive(client, share.Path().c_str());
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
+  ASSERT_TRUE(ReadInput(client, "cat failed: ")) << process->transcript;
+  EXPECT_NE(line.find("Drive 'missing.bin' failed: STATUS_NO_SUCH_FILE (0xc000000f)"), std::string::npos) << line;
+  // Observe a new frame after the failure, rather than inspecting an old framebuffer.
+  Headless::FrameObserver observer(client);
+  ASSERT_TRUE(client.Until([&] { return !observer.ids.empty() && Pattern(client, false); }));
+  ASSERT_NO_FATAL_FAILURE(Escape(client));
+  while (process->Line(line, Clock::now() + 1s)) {}
+  auto failure = process->transcript.find("cat failed:");
+  ASSERT_NE(failure, std::string::npos);
+  EXPECT_EQ(process->transcript.find("cat failed:", failure + 1), std::string::npos);
+  EXPECT_EQ(process->transcript.find("cat bytes="), std::string::npos);
+}
+
 TEST_F(Sample, WholeSystem) {
   process = std::make_unique<Process>(Arguments(certificates.Path(), false));
   ASSERT_TRUE(Read("port ")) << "port <n>: " << process->transcript;
   auto port = Number(std::string_view(line).substr(5));
   ASSERT_GT(port, 0u) << line;
   Client client(port, true, 640, 480);
-  ASSERT_TRUE(freerdp_connect(client.instance.get())) << "connect 640x480";
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs() << "connect 640x480";
   ASSERT_NO_FATAL_FAILURE(Exposed());
   ASSERT_TRUE(Read("event FOCUS_GAINED ")) << "FOCUS_GAINED: " << process->transcript;
   ASSERT_TRUE(client.Until([&] { return Pattern(client, false); })) << "0x010101 background and one green 32x32 block: " << Pattern(client, false).message();
@@ -20,7 +82,7 @@ TEST_F(Sample, WholeSystem) {
   ASSERT_TRUE(Read("event OCCLUDED ")) << "OCCLUDED: " << process->transcript;
   ASSERT_TRUE(Read("event FOCUS_LOST ")) << "FOCUS_LOST: " << process->transcript;
   Client second(port, true, 640, 480);
-  ASSERT_TRUE(freerdp_connect(second.instance.get())) << "second session connects";
+  ASSERT_TRUE(freerdp_connect(second.instance.get())) << ConnectLogs() << "second session connects";
   ASSERT_NO_FATAL_FAILURE(Exposed());
   ASSERT_NO_FATAL_FAILURE(Escape(second));
 }
@@ -30,13 +92,13 @@ TEST_F(Sample, RequestedSizeReturns) {
   ASSERT_TRUE(Read("port "));
   auto port = Number(std::string_view(line).substr(5));
   Client first(port, true, 320, 200);
-  ASSERT_TRUE(freerdp_connect(first.instance.get()));
+  ASSERT_TRUE(freerdp_connect(first.instance.get())) << ConnectLogs();
   ASSERT_TRUE(Read("event GEOMETRY window=640x480 desktop=320x200"));
   ASSERT_TRUE(first.Until([&] { return Pattern(first, false); }));
   ASSERT_TRUE(freerdp_disconnect(first.instance.get()));
   ASSERT_TRUE(Read("event FOCUS_LOST "));
   Client second(port, true, 800, 600);
-  ASSERT_TRUE(freerdp_connect(second.instance.get()));
+  ASSERT_TRUE(freerdp_connect(second.instance.get())) << ConnectLogs();
   ASSERT_TRUE(Read("event GEOMETRY window=640x480 desktop=800x600"));
   ASSERT_TRUE(second.Until([&] { return Pattern(second, false); }));
   SDL_Log("%s", process->transcript.c_str());
@@ -48,11 +110,11 @@ TEST_F(Sample, TakeoverFocus) {
   ASSERT_TRUE(Read("port "));
   auto port = Number(std::string_view(line).substr(5));
   Client first(port, true, 640, 480);
-  ASSERT_TRUE(freerdp_connect(first.instance.get()));
+  ASSERT_TRUE(freerdp_connect(first.instance.get())) << ConnectLogs();
   ASSERT_TRUE(Read("event FOCUS_GAINED "));
   ASSERT_TRUE(Read("event MOUSE_ENTER "));
   Client second(port, true, 640, 480);
-  ASSERT_TRUE(freerdp_connect(second.instance.get()));
+  ASSERT_TRUE(freerdp_connect(second.instance.get())) << ConnectLogs();
   for (auto expected : {"OCCLUDED", "FOCUS_LOST", "MOUSE_LEAVE", "EXPOSED", "FOCUS_GAINED", "MOUSE_ENTER"}) {
     do { ASSERT_TRUE(process->Line(line, Clock::now() + 10s)) << process->transcript; }
     while (!line.starts_with("event ") || line.starts_with("event GEOMETRY ") || line.starts_with("event CONNECTED "));
@@ -71,7 +133,7 @@ TEST_F(Sample, LiveCodec) {
   auto settings = client.instance->context->settings;
   ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_RemoteFxCodec, TRUE));
   ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_NSCodec, TRUE));
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
   ASSERT_TRUE(Read("event EXPOSED "));
   ASSERT_TRUE(line.ends_with("codec=remotefx")) << line;
   auto input = client.instance->context->input;
@@ -90,7 +152,7 @@ TEST_F(Sample, WaitForClient) {
   ASSERT_GT(port, 0u) << "sample's ephemeral listener: " << process->transcript;
   ASSERT_FALSE(Read("port ", 300ms)) << "no port line before client: " << process->transcript;
   Client client(port, true, 640, 480);
-  ASSERT_TRUE(freerdp_connect(client.instance.get())) << "connect to waiting sample";
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs() << "connect to waiting sample";
   ASSERT_TRUE(Read("port ")) << "port after connection: " << process->transcript;
   ASSERT_EQ(Number(std::string_view(line).substr(5)), port) << line;
   ASSERT_NO_FATAL_FAILURE(Exposed());
@@ -102,7 +164,7 @@ TEST_F(Sample, DesktopIsPicture) {
   process = std::make_unique<Process>(arguments);
   ASSERT_TRUE(Read("port "));
   Client client(Number(std::string_view(line).substr(5)), true, 1024, 768);
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
   ASSERT_TRUE(Read("event GEOMETRY window=640x480 desktop=1024x768"));
   ASSERT_TRUE(client.Until([&] { return Pattern(client, false); }));
   ASSERT_NO_FATAL_FAILURE(Escape(client));
@@ -116,7 +178,7 @@ TEST_F(Sample, FullscreenFollowsScreen) {
   ASSERT_TRUE(Read("port "));
   Client client(Number(std::string_view(line).substr(5)), true, 1024, 768);
   Headless::DisplayClient display(client);
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
   ASSERT_TRUE(Read("event RESIZED "));
   EXPECT_TRUE(line.ends_with("data1=1024 data2=768")) << line;
   ASSERT_TRUE(client.Until([&] { return display.ready.load(); }));
@@ -138,7 +200,7 @@ TEST_F(Sample, AspectMapsMouse) {
   process = std::make_unique<Process>(arguments);
   ASSERT_TRUE(Read("port "));
   Client client(Number(std::string_view(line).substr(5)), true, 1024, 768);
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
   ASSERT_TRUE(Read("event FOCUS_GAINED "));
   ASSERT_TRUE(client.Until([&] { auto gdi = client.instance->context->gdi; return gdi->width == 640 && gdi->height == 480; }));
   ASSERT_TRUE(freerdp_input_send_mouse_event(client.instance->context->input, PTR_FLAGS_MOVE, 639, 479));
@@ -162,7 +224,7 @@ TEST_F(Sample, VsyncAndRefresh) {
   ASSERT_TRUE(Read("port "));
   Client client(Number(std::string_view(line).substr(5)), true, 640, 480);
   ASSERT_TRUE(freerdp_settings_set_uint32(client.instance->context->settings, FreeRDP_FrameAcknowledge, 2));
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
   Headless::FrameObserver observer(client);
   auto window = freerdp_settings_get_uint32(client.instance->context->settings, FreeRDP_FrameAcknowledge);
   ASSERT_EQ(window, 2u);
@@ -204,7 +266,7 @@ TEST_F(Sample, CursorShape) {
   process = std::make_unique<Process>(Arguments(certificates.Path(), false));
   ASSERT_TRUE(Read("port "));
   Client client(Number(std::string_view(line).substr(5)), true, 640, 480);
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
   PointerObserver pointer(client);
   ASSERT_TRUE(freerdp_input_send_mouse_event(client.instance->context->input, PTR_FLAGS_MOVE, 100, 120));
   ASSERT_TRUE(client.Until([&] { return pointer.red && Pattern(client, false); }));
@@ -234,7 +296,7 @@ TEST_F(Sample, ClipboardAscii) {
   ASSERT_TRUE(Read("port "));
   Client client(Number(std::string_view(line).substr(5)), true, 640, 480);
   Headless::ClipboardClient clipboard(client);
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
   ASSERT_TRUE(client.Until([&] { return clipboard.Received({'h',0,'e',0,'l',0,'l',0,'o',0,0,0}); }));
   SDL_Log("trace CLIPBOARD server formats=13,1 request=13 utf16le=680065006c006c006f000000 text=hello");
   ASSERT_EQ(clipboard.RequestFormat(CF_TEXT), CHANNEL_RC_OK);
@@ -254,7 +316,7 @@ TEST_F(Sample, ClipboardUnicode) {
   ASSERT_TRUE(Read("port "));
   Client client(Number(std::string_view(line).substr(5)), true, 640, 480);
   Headless::ClipboardClient clipboard(client);
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
   std::vector<BYTE> bytes{0x7c,1,0xf3,0,0x42,1,0x77,0,0,0};
   ASSERT_TRUE(client.Until([&] { return clipboard.Received(bytes); }));
   SDL_Log("trace CLIPBOARD server formats=13,1 request=13 utf16le=7c01f300420177000000 text=żółw");
@@ -288,7 +350,7 @@ TEST_F(Sample, ToneAndVsync) {
     ASSERT_TRUE(Read("audio device=RDP client freq=48000"));
     Client client(port, true, 640, 480);
     Headless::SoundClient audio(client);
-    ASSERT_TRUE(freerdp_connect(client.instance.get()));
+    ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
     Headless::FrameObserver observer(client);
     ASSERT_TRUE(client.Until([&] {
       if (!observer.ids.empty()) observer.Ack();
@@ -317,7 +379,7 @@ TEST_F(Sample, ToneAtClientRate) {
   Client client(port, true, 640, 480);
   Headless::SoundClient audio(client);
   audio.rate = 44100;
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
   Headless::FrameObserver observer(client);
   ASSERT_TRUE(client.Until([&] {
     if (!observer.ids.empty()) observer.Ack();
@@ -335,8 +397,18 @@ TEST_F(Sample, ToneAtClientRate) {
 
 class AudioDriver : public Sample {
 protected:
+  SDL_LogOutputFunction previous_log = nullptr;
+  void* previous_log_user = nullptr;
   std::unique_ptr<SDL_AudioStream, decltype(&SDL_DestroyAudioStream)> stream{nullptr, SDL_DestroyAudioStream};
   void SetUp() override {
+    SDL_GetLogOutputFunction(&previous_log, &previous_log_user);
+    SDL_SetLogOutputFunction([](void* user, int category, SDL_LogPriority priority, char const* text) {
+      auto& self = *static_cast<AudioDriver*>(user);
+      auto level = priority >= SDL_LOG_PRIORITY_ERROR ? SDLRDP_LOG_ERROR
+        : priority == SDL_LOG_PRIORITY_WARN ? SDLRDP_LOG_WARN : SDLRDP_LOG_INFO;
+      Headless::Logs::Collect(&self.logs, level, text);
+      if (self.previous_log) self.previous_log(self.previous_log_user, category, priority, text);
+    }, this);
     ASSERT_TRUE(SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "rdp"));
     ASSERT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));
     ASSERT_TRUE(SDL_SetHint("SDL_RDP_PORT", "0"));
@@ -356,6 +428,7 @@ protected:
   void TearDown() override {
     stream.reset();
     SDL_Quit();
+    SDL_SetLogOutputFunction(previous_log, previous_log_user);
     for (auto hint : {SDL_HINT_AUDIO_DRIVER, SDL_HINT_VIDEO_DRIVER, "SDL_RDP_PORT", "SDL_RDP_BIND",
                       "SDL_RDP_CERT_DIR", "SDL_RDP_BACKEND", "SDL_RDP_CODEC"}) SDL_ResetHint(hint);
   }
@@ -387,7 +460,7 @@ TEST_F(AudioDriver, AudioBeforeVideoSurvivesVideoQuit) {
   EXPECT_EQ(SDL_WasInit(SDL_INIT_VIDEO), 0u);
   Client client(port, true);
   Headless::SoundClient audio(client);
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
   ASSERT_TRUE(client.Until([&] { return audio.ready; }));
   std::vector<Sint16> pcm(4800 * 2, 1234);
   ASSERT_TRUE(SDL_PutAudioStreamData(stream.get(), pcm.data(), pcm.size() * sizeof(Sint16)));
@@ -404,7 +477,7 @@ TEST_F(AudioDriver, AudioOnlyPlaysBlackDesktop) {
   ASSERT_GT(port, 0u);
   Client client(port, true);
   Headless::SoundClient audio(client);
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
   ASSERT_TRUE(client.Until([&] { return audio.ready; }));
   auto gdi = client.instance->context->gdi;
   std::vector<UINT32> black(std::size_t(gdi->width) * gdi->height);

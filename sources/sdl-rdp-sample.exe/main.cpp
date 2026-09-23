@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 #include "clipboard.hpp"
 #include "auth.hpp"
+#include "drives.hpp"
 #include <format>
 #include <charconv>
 #include <string>
@@ -70,6 +71,14 @@ std::string DisplayTiming()
                        mode->refresh_rate_numerator, mode->refresh_rate_denominator);
 }
 
+std::string ClientProperties(SDL_Window* window) {
+    auto properties = SDL_GetWindowProperties(window);
+    return std::format(" keyboard_layout={} client_name={} codec={}",
+        SDL_GetNumberProperty(properties, SDL_PROP_WINDOW_RDP_KEYBOARD_LAYOUT_NUMBER, 0),
+        SDL_GetStringProperty(properties, SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING, ""),
+        SDL_GetStringProperty(properties, SDL_PROP_WINDOW_RDP_CODEC_STRING, ""));
+}
+
 void PrintEvent(const SDL_Event &event, SDL_Window *window, unsigned frame)
 {
     if (PrintClipboardEvent(event)) return;
@@ -95,10 +104,7 @@ void PrintEvent(const SDL_Event &event, SDL_Window *window, unsigned frame)
         line += DisplayTiming();
         break;
     case SDL_EVENT_WINDOW_EXPOSED:
-        line += std::format(" keyboard_layout={} client_name={} codec={}",
-                    SDL_GetNumberProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_KEYBOARD_LAYOUT_NUMBER, 0), SDL_GetStringProperty(SDL_GetWindowProperties(window),
-                    SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING, ""),
-                    SDL_GetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_CODEC_STRING, ""));
+        line += ClientProperties(window);
         break;
     default:
         if (event.type >= SDL_EVENT_WINDOW_FIRST && event.type <= SDL_EVENT_WINDOW_LAST)
@@ -138,7 +144,7 @@ void PrintCodecChange(SDL_Window *window, std::string &previous)
     }
 }
 
-void Run(SDL_Window *window, bool tight)
+void Run(SDL_Window *window, bool tight, DriveOptions drives)
 {
     std::string codec;
     SDL_FPoint pointer{-8, -8};
@@ -158,6 +164,7 @@ void Run(SDL_Window *window, bool tight)
                 Draw(window, frame, pointer);
             }
         }
+        if (RunDrives(drives)) drives = {};
         PrintCodecChange(window, codec);
         if (SDL_GetTicks() >= next) {
             Draw(window, frame++, pointer);
@@ -195,6 +202,7 @@ SDL_AudioStream *OpenTone(Uint64 &frame)
 }
 
 struct Options {
+    DriveOptions drives;
     const char *clip = nullptr;
     int width = 640, height = 480;
     bool tight = false, fullscreen = false, tone = false;
@@ -207,6 +215,9 @@ Options ParseOptions(int argc, char **argv)
         std::string_view arg(argv[i]);
         if (AuthOption(arg, i, argc, argv)) continue;
         if (arg == "--clip" && i + 1 < argc) options.clip = argv[++i];
+        else if (arg == "--ls" && i + 1 < argc) options.drives.list = argv[++i];
+        else if (arg == "--cat" && i + 1 < argc) options.drives.cat = argv[++i];
+        else if (arg == "--write" && i + 1 < argc) options.drives.write = argv[++i];
         else if (arg == "--tone") options.tone = true;
         else if (arg == "--tight") options.tight = true;
         else if (arg == "--fullscreen") options.fullscreen = true;
@@ -262,7 +273,7 @@ int main(int argc, char **argv)
         Uint64 tone_frame = 0;
         std::unique_ptr<SDL_AudioStream, decltype(&SDL_DestroyAudioStream)> tone(
             options.tone ? OpenTone(tone_frame) : nullptr, SDL_DestroyAudioStream);
-        Run(window.get(), options.tight);
+        Run(window.get(), options.tight, options.drives);
     }
     SDL_Quit();
 }

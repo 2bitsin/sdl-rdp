@@ -84,7 +84,7 @@ def configure(source, fingerprint):
                "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
                f"-DCMAKE_BUILD_TYPE={os.environ['SDL_RDP_BUILD_TYPE']}"]
     command += [f"-DSDL_{option}=OFF" for option in disabled.split()]
-    command += ["-DSDL_UNIX_CONSOLE_BUILD=ON", "-DSDL_RDP=ON", "-DSDL_RDPAUDIO=ON",
+    command += ["-DSDL_UNIX_CONSOLE_BUILD=ON", "-DSDL_RDP=ON", "-DSDL_RDPAUDIO=ON", "-DSDL_RDPSTORAGE=ON",
                 f"-DCMAKE_C_FLAGS=-I{ROOT / 'rdp'} -I{ROOT.parent}",
                 "-DSDL_RDP_DYNAMIC=libsdl-rdp-backend.so", "-DSDL_SHARED=ON",
                 "-DSDL_STATIC=OFF", "-DSDL_TEST_LIBRARY=OFF",
@@ -104,8 +104,10 @@ def command_settings(entry):
     includes += [arg[len('-idirafter'):] for arg in arguments
                  if arg.startswith('-idirafter')]
     defines = [arg[2:] for arg in arguments if arg.startswith('-D')]
-    options = [arg for arg in arguments if arg.startswith('-m') or
+    options = [arg for arg in arguments if arg.startswith(('-m', '-W')) or
                arg in ('-pthread', '-fno-strict-aliasing', '-fno-strict-overflow')]
+    if Path(entry["file"]).name.startswith("SDL_rdp"):
+        options.append("-Wsign-compare")
     return includes, defines, options
 
 
@@ -115,6 +117,7 @@ def declare_sources(config):
     includes, defines, options = zip(*(command_settings(entry) for entry in entries))
     driver = next(entry for entry in entries if Path(entry["file"]).name == "SDL.c")
     _, driver_defines, driver_options = command_settings(driver)
+    driver_options.append("-Wsign-compare")
     common = set.intersection(*map(set, defines))
     lines = ['target_compile_definitions(SDL3 PRIVATE ' +
              ' '.join(map(quoted, sorted(common))) + ')']

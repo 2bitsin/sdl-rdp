@@ -116,6 +116,8 @@ Peer::~Peer()
   SetEvent(wake.get());
   if (thread.joinable()) thread.join();
   Input::Held(*this).Close();
+  if (drive) drive->Disconnect();
+  drive.reset();
   clipboard.reset();
   sound.reset();
   disp.reset();
@@ -169,6 +171,7 @@ DWORD Peer::EventHandles(std::span<HANDLE> handles)
   auto transport_count = count;
   Expects(count <= handles.size() - AppendedHandleCount, "transport respects event budget");
   count += Input::Held(*this).Handles(handles.data() + count);
+  if (drive && drive->Event()) handles[count++] = drive->Event();
   if (clipboard) handles[count++] = clipboard->Event();
   if (sound) handles[count++] = sound->Event();
   if (gfx) handles[count++] = gfx->Event();
@@ -211,6 +214,19 @@ void Peer::Serve(std::stop_token quit)
   finished = true;
   SetEvent(owner.reap.get());
   ResetAuthenticationLogging();
+}
+bool Peer::OpenStaticChannels()
+{
+  if (!clipboard && WTSVirtualChannelManagerIsChannelJoined(channels, CLIPRDR_SVC_CHANNEL_NAME)) {
+    clipboard = std::make_unique<ClipboardChannel>(*this);
+    if (!clipboard->Open()) return false;
+  }
+  if (!drive && WTSVirtualChannelManagerIsChannelJoined(channels, "rdpdr")) {
+    drive = std::make_shared<DriveChannel>(*this);
+    drive->Open();
+  }
+  if (drive) drive->Pump();
+  return !clipboard || clipboard->Pump();
 }
 bool Peer::Channels()
 {

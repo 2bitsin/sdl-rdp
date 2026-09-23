@@ -5,14 +5,6 @@
 #include <winpr/clipboard.h>
 
 namespace Backend {
-bool Peer::OpenStaticChannels()
-{
-  if (!clipboard && WTSVirtualChannelManagerIsChannelJoined(channels, CLIPRDR_SVC_CHANNEL_NAME)) {
-    clipboard = std::make_unique<ClipboardChannel>(*this);
-    if (!clipboard->Open()) return false;
-  }
-  return !clipboard || clipboard->Pump();
-}
 ClipboardChannel::ClipboardChannel(Peer& value) : peer(value) {}
 ClipboardChannel::~ClipboardChannel()
 {

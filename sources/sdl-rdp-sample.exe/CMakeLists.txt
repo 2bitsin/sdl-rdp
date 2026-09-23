@@ -1,6 +1,8 @@
 Init_submodule()
 Link_dependencies(SDL3 TEST freerdp-client freerdp winpr oxbox::platform)
+target_link_libraries(sdl-rdp-sample PRIVATE OpenSSL::Crypto)
 if(TARGET sdl-rdp-sample-tests)
+  target_link_libraries(sdl-rdp-sample-tests PRIVATE OpenSSL::Crypto)
   find_path(FREERDP_HEADERS freerdp/freerdp.h PATH_SUFFIXES freerdp3 REQUIRED)
   target_include_directories(sdl-rdp-sample-tests PRIVATE ${FREERDP_HEADERS})
   target_link_libraries(sdl-rdp-sample-tests PRIVATE ${SDLRDP_TEST_SSL})

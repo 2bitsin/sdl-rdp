@@ -15,6 +15,7 @@ void Dimensions(unsigned width, unsigned height)
   if (!height || height > MAX_HEIGHT) throw std::runtime_error("Desktop height must be 1..65535.");
 }
 }
+namespace Backend { void DriveError(std::string text) { last_error = std::move(text); } }
 const char* sdlrdp_last_error() { return last_error.c_str(); }
 
 unsigned sdlrdp_version() { return SDLRDP_ABI_VERSION; }

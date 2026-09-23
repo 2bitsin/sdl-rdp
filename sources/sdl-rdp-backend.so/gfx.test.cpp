@@ -25,7 +25,7 @@ TEST(GraphicsCapability, Version101ReservedLength) {
 TEST(GraphicsCapability, MasksFlagsAndDisablesAvc) {
   constexpr auto handled = RDPGFX_CAPS_FLAG_THINCLIENT | RDPGFX_CAPS_FLAG_SMALL_CACHE
     | RDPGFX_CAPS_FLAG_SCALEDMAP_DISABLE;
-  for (auto version : {RDPGFX_CAPVERSION_8, RDPGFX_CAPVERSION_81, RDPGFX_CAPVERSION_10,
+  for (UINT32 version : {RDPGFX_CAPVERSION_8, RDPGFX_CAPVERSION_81, RDPGFX_CAPVERSION_10,
       RDPGFX_CAPVERSION_102, RDPGFX_CAPVERSION_107}) {
     RDPGFX_CAPSET cap{version, 4, 0xffffffff};
     auto selected = Backend::SelectCapability({&cap, 1});

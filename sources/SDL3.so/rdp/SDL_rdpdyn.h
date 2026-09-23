@@ -29,6 +29,19 @@ typedef struct SDL_RDP_Backend
     int (*audio_write)(sdlrdp_handle *, const void *, unsigned);
     int (*audio_wait)(sdlrdp_handle *, int);
     void (*audio_close)(sdlrdp_handle *);
+    int (*drive_list)(sdlrdp_handle*, sdlrdp_drive*, unsigned max);
+    int (*drive_open)(sdlrdp_handle*, unsigned drive, const char* path, unsigned flags, sdlrdp_file**);
+    int (*drive_read)(sdlrdp_handle*, sdlrdp_file*, uint64_t offset, void*, size_t);
+    int (*drive_write)(sdlrdp_handle*, sdlrdp_file*, uint64_t offset, const void*, size_t);
+    int (*drive_stat)(sdlrdp_handle*, unsigned drive, const char* path, sdlrdp_stat*);
+    int (*drive_enumerate)(sdlrdp_handle*, unsigned drive, const char* path, unsigned offset,
+                          sdlrdp_dirent*, unsigned max);
+    int (*drive_mkdir)(sdlrdp_handle*, unsigned drive, const char* path);
+    int (*drive_remove)(sdlrdp_handle*, unsigned drive, const char* path);
+    int (*drive_rename)(sdlrdp_handle*, unsigned drive, const char* path, const char* destination);
+    int (*drive_fstat)(sdlrdp_handle*, sdlrdp_file*, sdlrdp_stat*);
+    int (*drive_flush)(sdlrdp_handle*, sdlrdp_file*);
+    int (*drive_close)(sdlrdp_handle*, sdlrdp_file*);
     void (*wakeup)(sdlrdp_handle *);
 } SDL_RDP_Backend;
 bool SDL_RDP_LoadBackend(SDL_RDP_Backend *backend);

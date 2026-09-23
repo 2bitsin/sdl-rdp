@@ -1,3 +1,4 @@
+#include "SDL_rdpdrive.h"
 #include "SDL_rdpevents.h"
 #include "SDL_rdpclipboard.h"
 #include "SDL_rdpwindow.h"
@@ -146,6 +147,10 @@ static void SDL_RDP_Input(SDL_Window *window, const sdlrdp_event *event)
 
 static void SDL_RDP_Dispatch(SDL_VideoData *data, const sdlrdp_event *event)
 {
+    if (event->type == SDLRDP_DRIVE) {
+        SDL_RDP_UpdateDrives(&data->backend, data->handle, SDL_GetDisplayProperties(data->display));
+        return;
+    }
     if (event->type == SDLRDP_CLIPBOARD) {
         SDL_RDP_ClipboardUpdate(data);
         return;

@@ -118,6 +118,7 @@ void State::Takeover(Peer& peer, sdlrdp_event event)
   std::scoped_lock lock(peers_guard, frame_guard);
   for (auto const& old : peers) {
     if (old.get() == &peer || !old->active.exchange(false)) continue;
+    if (old->drive) old->drive->Disconnect();
     Push({.type = SDLRDP_DISCONNECTED});
     if (old->sound && old->sound->Rate()) Push({.type = SDLRDP_AUDIO, .audio = {0, 0}});
     freerdp_set_error_info(old->client->context->rdp, ERRINFO_DISCONNECTED_BY_OTHER_CONNECTION);
@@ -143,6 +144,7 @@ void State::Depart(Peer& peer)
 {
   Expects(peer.client != nullptr, "departing peer exists");
   std::scoped_lock lock(session_guard);
+  if (peer.drive) peer.drive->Disconnect();
   if (peer.activated) {
     auto name = freerdp_settings_get_string(peer.client->context->settings, FreeRDP_ClientHostname);
     Log(SDLRDP_LOG_INFO, std::format("Client {} disconnected.", name ? name : peer.client->hostname));

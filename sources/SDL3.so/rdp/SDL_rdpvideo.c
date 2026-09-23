@@ -1,3 +1,4 @@
+#include "SDL_rdpdrive.h"
 #include "SDL_rdpvideo.h"
 #include "SDL_rdpauth.h"
 #include "SDL_rdpclipboard.h"
@@ -26,6 +27,7 @@ static bool SDL_RDP_InitDisplay(SDL_VideoData *data, const sdlrdp_config *config
     mode.h = (int)config->height;
     data->display = SDL_AddBasicVideoDisplay(&mode);
     if (data->display) SDL_RDP_AuthDisplay(SDL_GetDisplayProperties(data->display));
+    if (data->display) SDL_RDP_UpdateDrives(&data->backend, data->handle, SDL_GetDisplayProperties(data->display));
     return data->display && SDL_SetNumberProperty(SDL_GetDisplayProperties(data->display),
         SDL_PROP_DISPLAY_RDP_PORT_NUMBER, data->backend.port(data->handle));
 }
