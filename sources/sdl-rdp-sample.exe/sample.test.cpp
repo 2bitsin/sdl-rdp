@@ -742,16 +742,16 @@ TEST_F(Sample, ToneAndVsync) {
     process = std::make_unique<Process>(arguments);
     ASSERT_TRUE(Read("port "));
     auto port = Number(std::string_view(line).substr(5));
-    ASSERT_TRUE(Read("audio device=RDP client freq=48000"));
+    ASSERT_TRUE(Read("audio device=RDP client freq=44100"));
     Client client(port, true, 640, 480);
     Headless::SoundClient audio(client);
     ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
     Headless::FrameObserver observer(client);
     ASSERT_TRUE(client.Until([&] {
       if (!observer.ids.empty()) observer.Ack();
-      return audio.samples.size() >= 48000 * 2 && (!tight || observer.ids.size() >= 2);
+      return audio.samples.size() >= audio.rate * 2 && (!tight || observer.ids.size() >= 2);
     }));
-    auto [frequency, db] = Headless::ToneMeasurements(audio.samples, 48000);
+    auto [frequency, db] = Headless::ToneMeasurements(audio.samples, audio.rate);
     EXPECT_NEAR(frequency, 440, 8.8);
     EXPECT_NEAR(db, -12, 0.3);
     if (tight) EXPECT_GE(observer.ids.size(), 2u);
@@ -770,17 +770,17 @@ TEST_F(Sample, ToneAtClientRate) {
   process = std::make_unique<Process>(arguments);
   ASSERT_TRUE(Read("port "));
   auto port = Number(std::string_view(line).substr(5));
-  ASSERT_TRUE(Read("audio device=RDP client freq=48000"));
+  ASSERT_TRUE(Read("audio device=RDP client freq=44100"));
   Client client(port, true, 640, 480);
   Headless::SoundClient audio(client);
-  audio.rate = 44100;
+  audio.rate = 48000;
   ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
   Headless::FrameObserver observer(client);
   ASSERT_TRUE(client.Until([&] {
     if (!observer.ids.empty()) observer.Ack();
-    return audio.samples.size() >= 44100 * 2;
+    return audio.samples.size() >= audio.rate * 2;
   }));
-  ASSERT_TRUE(Read("audio device=RDP client freq=44100"));
+  ASSERT_TRUE(Read("audio device=RDP client freq=48000"));
   auto [frequency, db] = Headless::ToneMeasurements(audio.samples, audio.rate);
   EXPECT_NEAR(frequency, 440, 8.8);
   EXPECT_NEAR(db, -12, 0.3);
@@ -833,6 +833,7 @@ TEST_F(AudioDriver, NoClientTenSecondClock) {
   EXPECT_STREQ(SDL_GetCurrentAudioDriver(), "rdp");
   std::vector<Sint16> frames(480000 * 2, 1000);
   ASSERT_TRUE(SDL_PutAudioStreamData(stream.get(), frames.data(), frames.size() * sizeof(Sint16)));
+  ASSERT_TRUE(SDL_FlushAudioStream(stream.get()));
   auto started = Clock::now();
   ASSERT_TRUE(SDL_ResumeAudioStreamDevice(stream.get()));
   auto deadline = started + 30s;
@@ -857,8 +858,8 @@ TEST_F(AudioDriver, ClientReceivesOneLeadOnAttach) {
   ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
   ASSERT_TRUE(client.Until([&] { return !audio.received.empty(); }));
   auto deadline = audio.received.front() + 100ms;
-  while (audio.samples.size() / 2 < 7200 - 480 && Clock::now() < deadline) ASSERT_TRUE(client.Pump(1));
-  EXPECT_GE(audio.samples.size() / 2, 7200u - 480);
+  while (audio.samples.size() / 2 < audio.rate * 140 / 1000 && Clock::now() < deadline) ASSERT_TRUE(client.Pump(1));
+  EXPECT_GE(audio.samples.size() / 2, audio.rate * 140 / 1000);
   EXPECT_LE(audio.received.back(), deadline);
   auto first = audio.received.size();
   auto frames = audio.samples.size() / 2;
@@ -881,7 +882,7 @@ TEST_F(AudioDriver, StallRefillsTheLead) {
   Client client(ListeningPort(Number(fs::read_symlink("/proc/self").string())), true);
   Headless::SoundClient audio(client);
   ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
-  ASSERT_TRUE(client.Until([&] { return audio.samples.size() / 2 >= 24000; }));
+  ASSERT_TRUE(client.Until([&] { return audio.samples.size() / 2 >= audio.rate / 2; }));
   ASSERT_TRUE(SDL_LockAudioStream(stream.get()));
   auto deadline = Clock::now() + 300ms;
   bool pumped = true;
@@ -890,9 +891,9 @@ TEST_F(AudioDriver, StallRefillsTheLead) {
   auto resumed = Clock::now();
   SDL_UnlockAudioStream(stream.get());
   ASSERT_TRUE(pumped);
-  while (audio.samples.size() / 2 - frames < 7200 && Clock::now() < resumed + 100ms)
+  while (audio.samples.size() / 2 - frames < audio.rate * 150 / 1000 && Clock::now() < resumed + 100ms)
     ASSERT_TRUE(client.Pump(1));
-  EXPECT_GE(audio.samples.size() / 2 - frames, 7200u);
+  EXPECT_GE(audio.samples.size() / 2 - frames, audio.rate * 150 / 1000);
   EXPECT_LE(audio.received.back(), resumed + 100ms);
 }
 TEST_F(AudioDriver, LeadAtOrAboveLatencyFailsOpen) {
@@ -913,6 +914,7 @@ TEST_F(AudioDriver, ZeroLeadKeepsRealtimeClock) {
   ASSERT_TRUE(stream) << SDL_GetError();
   std::vector<Sint16> pcm(48000 * 2, 1234);
   ASSERT_TRUE(SDL_PutAudioStreamData(stream.get(), pcm.data(), pcm.size() * sizeof(Sint16)));
+  ASSERT_TRUE(SDL_FlushAudioStream(stream.get()));
   auto started = Clock::now();
   ASSERT_TRUE(SDL_ResumeAudioStreamDevice(stream.get()));
   while (SDL_GetAudioStreamQueued(stream.get()) > 0 && Clock::now() < started + 3s) SDL_Delay(1);

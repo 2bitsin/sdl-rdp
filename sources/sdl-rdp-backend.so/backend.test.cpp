@@ -1328,11 +1328,11 @@ TEST_F(AudioGate, AudioPcmAndReconnect) {
     SoundClient audio(client);
     ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
     ASSERT_EQ(audio.server_formats.size(), 2u);
-    EXPECT_EQ(audio.server_formats[0].nSamplesPerSec, 48000u);
-    EXPECT_EQ(audio.server_formats[1].nSamplesPerSec, 44100u);
-    std::array<INT16, 1920> pcm{};
+    EXPECT_EQ(audio.server_formats[0].nSamplesPerSec, 44100u);
+    EXPECT_EQ(audio.server_formats[1].nSamplesPerSec, 48000u);
+    std::array<INT16, 1764> pcm{};
     std::iota(pcm.begin(), pcm.end(), -480);
-    ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 960), 960);
+    ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 882), 882);
     ASSERT_TRUE(client.Until([&] { return audio.samples.size() >= pcm.size(); }));
     EXPECT_EQ(audio.samples.size(), pcm.size());
     EXPECT_EQ(audio.samples.front(), pcm.front());
@@ -1381,7 +1381,23 @@ TEST_F(AudioGate, AudioFormatMissKeepsSessionAndReconnects) {
   Client client(sdlrdp_port(backend.get()), true);
   SoundClient audio(client);
   ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
-  EXPECT_EQ(sdlrdp_audio_rate(backend.get()), 48000u);
+  EXPECT_EQ(sdlrdp_audio_rate(backend.get()), 44100u);
+}
+TEST_F(AudioGate, AudioBothRatesPrefer44100) {
+  Open(320, 200);
+  ASSERT_EQ(sdlrdp_audio_open(backend.get()), 0);
+  Client client(sdlrdp_port(backend.get()), true);
+  SoundClient audio(client);
+  audio.advertise_both_rates = true;
+  ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
+  ASSERT_EQ(audio.server_formats.size(), 2u);
+  EXPECT_EQ(audio.server_formats[0].nSamplesPerSec, 44100u);
+  EXPECT_EQ(audio.server_formats[1].nSamplesPerSec, 48000u);
+  EXPECT_EQ(sdlrdp_audio_rate(backend.get()), 44100u);
+  std::vector<INT16> pcm(882 * 2, 1234);
+  ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 882), 882);
+  ASSERT_TRUE(client.Until([&] { return audio.samples.size() == pcm.size(); }));
+  EXPECT_EQ(audio.samples, pcm);
 }
 TEST_F(AudioGate, AudioInitialVolume) {
   Open(320, 200);
@@ -1409,6 +1425,7 @@ TEST_F(AudioGate, AudioSlowConfirmsBoundTenSeconds) {
   ASSERT_EQ(sdlrdp_audio_open(backend.get()), 0);
   Client client(sdlrdp_port(backend.get()), true);
   SoundClient audio(client);
+  audio.rate = 48000;
   audio.auto_confirm = false;
   ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
   ASSERT_NO_FATAL_FAILURE(EstablishConfirmations(client, audio));
@@ -1435,6 +1452,7 @@ TEST_F(AudioGate, AudioPlaybackConfirmsKeepRealtimeStreamContinuous) {
   ASSERT_EQ(sdlrdp_audio_open(backend.get()), 0);
   Client client(sdlrdp_port(backend.get()), true);
   SoundClient audio(client);
+  audio.rate = 48000;
   audio.auto_confirm = false;
   ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
   RunRealtimeAudio(client, audio);
@@ -1449,6 +1467,7 @@ TEST_F(AudioGate, AudioContinuousUnderProgressiveLoad) {
   client.EnableGraphics();
   Headless::GraphicsObserver observer(client);
   SoundClient audio(client);
+  audio.rate = 48000;
   audio.auto_confirm = false;
   ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
   ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
@@ -1482,6 +1501,7 @@ TEST_F(AudioGate, AudioNeverConfirmsUsesServerClock) {
   ASSERT_EQ(sdlrdp_audio_open(backend.get()), 0);
   Client client(sdlrdp_port(backend.get()), true);
   SoundClient audio(client);
+  audio.rate = 48000;
   audio.auto_confirm = false;
   ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
   std::vector<INT16> pcm(48000 * 2, 1234);
@@ -1504,6 +1524,7 @@ TEST_F(AudioGate, AudioDisconnectDuringBlockedWrite) {
   for (bool reconnect : {false, true}) {
     Client client(sdlrdp_port(backend.get()), true);
     SoundClient audio(client);
+    audio.rate = 48000;
     audio.auto_confirm = reconnect;
     ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
     ASSERT_NO_FATAL_FAILURE(EstablishConfirmations(client, audio));
@@ -1525,6 +1546,7 @@ TEST_F(AudioGate, AudioOneMillisecondPartialBlock) {
   ASSERT_EQ(sdlrdp_audio_open(backend.get()), 0);
   Client client(sdlrdp_port(backend.get()), true);
   SoundClient audio(client);
+  audio.rate = 48000;
   ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
   std::array<INT16, 1920> pcm{};
   ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 48), 48);
@@ -1541,6 +1563,7 @@ TEST_F(AudioGate, AudioFallbackIdleDoesNotAccumulateCredit) {
   ASSERT_EQ(sdlrdp_audio_open(backend.get()), 0);
   Client client(sdlrdp_port(backend.get()), true);
   SoundClient audio(client);
+  audio.rate = 48000;
   audio.auto_confirm = false;
   ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
   std::vector<INT16> pcm(48000 * 2, 1234);
@@ -1563,6 +1586,7 @@ TEST_F(AudioGate, AudioReorderedConfirmsCreditOnlyTheirBlock) {
   ASSERT_EQ(sdlrdp_audio_open(backend.get()), 0);
   Client client(sdlrdp_port(backend.get()), true);
   SoundClient audio(client);
+  audio.rate = 48000;
   audio.auto_confirm = false;
   ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
   ASSERT_NO_FATAL_FAILURE(EstablishConfirmations(client, audio));

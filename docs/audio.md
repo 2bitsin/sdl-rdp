@@ -1,8 +1,10 @@
 # Audio
 
 Select playback with `SDL_AUDIO_DRIVER=rdp`. The single playback device,
-"RDP client", starts at 48 kHz, 16-bit stereo PCM and switches to the
-client’s negotiated rate (48 kHz or 44.1 kHz). SDL converts application
+"RDP client", starts at 44.1 kHz, 16-bit stereo PCM and switches to the
+client’s negotiated rate (44.1 kHz or 48 kHz). Measurements on 2026-09-23 showed that mstsc plays
+48 kHz PCM at its 44.1 kHz device rate, making audio fall behind by 8.8 percent
+of playing time, so the server offers 44.1 kHz first. SDL converts application
 streams to the current device format. `SDL_RDP_AUDIO_LATENCY` controls how far
 the server may run ahead of the client’s confirmed playback before it waits, in milliseconds (default 500).
 This window guards against a stalled client; the SDL driver paces the stream.

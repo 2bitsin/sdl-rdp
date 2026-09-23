@@ -54,8 +54,9 @@ AudioChannel::AudioChannel(State& state, HANDLE channels, rdpContext* context, H
   sound->server_formats = audio_formats_new(2);
   if (!sound->server_formats) throw std::runtime_error("Audio format allocation failed.");
   sound->num_server_formats = 2;
-  sound->server_formats[0] = {WAVE_FORMAT_PCM, 2, 48000, 192000, 4, 16, 0, nullptr};
-  sound->server_formats[1] = {WAVE_FORMAT_PCM, 2, 44100, 176400, 4, 16, 0, nullptr};
+  // mstsc plays 48 kHz at its 44.1 kHz device rate (measured 2026-09-23).
+  sound->server_formats[0] = {WAVE_FORMAT_PCM, 2, 44100, 176400, 4, 16, 0, nullptr};
+  sound->server_formats[1] = {WAVE_FORMAT_PCM, 2, 48000, 192000, 4, 16, 0, nullptr};
   sound->src_format = &sound->server_formats[0];
   sound->data = this;
   sound->rdpcontext = context;

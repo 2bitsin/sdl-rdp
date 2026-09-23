@@ -46,9 +46,9 @@ public:
   std::vector<Clock::time_point> received;
   std::vector<AUDIO_FORMAT> server_formats;
   std::deque<Confirmation> pending;
-  unsigned rate = 48000, version = 8, volume = 0xffffffffu;
+  unsigned rate = 44100, version = 8, volume = 0xffffffffu;
   std::size_t confirmed_frames = 0, maximum_pending_frames = 0;
-  bool advertise_unmatched = false;
+  bool advertise_unmatched = false, advertise_both_rates = false;
   bool ready = false, auto_confirm = true, opened = false;
   explicit SoundClient(Client& target) : client(target) {
     Expects(freerdp_settings_set_bool(client.instance->context->settings, FreeRDP_AudioPlayback, TRUE), "sound playback enabled");
@@ -115,7 +115,7 @@ public:
     AUDIO_FORMAT own{WAVE_FORMAT_PCM, 2, rate, rate * 4, 4, 16, 0, nullptr};
     std::vector<AUDIO_FORMAT> supported;
     for (auto const& format : server_formats)
-      if (audio_format_compatible(&own, &format)) supported.push_back(format);
+      if (advertise_both_rates || audio_format_compatible(&own, &format)) supported.push_back(format);
     if (supported.empty() && advertise_unmatched) supported.push_back(own);
     std::vector<BYTE> bytes(24 + supported.size() * 18);
     wStream output{};

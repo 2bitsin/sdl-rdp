@@ -224,7 +224,7 @@ diff -ruN a/src/audio/rdp/SDL_rdpaudio.c b/src/audio/rdp/SDL_rdpaudio.c
 +
 +static void RDPAUDIO_DetectDevices(SDL_AudioDevice **playback, SDL_AudioDevice **recording)
 +{
-+    const SDL_AudioSpec spec = {SDL_AUDIO_S16, 2, 48000};
++    const SDL_AudioSpec spec = {SDL_AUDIO_S16, 2, 44100};
 +    *playback = SDL_AddAudioDevice(false, "RDP client", &spec, NULL);
 +}
 +
@@ -241,7 +241,7 @@ diff -ruN a/src/audio/rdp/SDL_rdpaudio.c b/src/audio/rdp/SDL_rdpaudio.c
 +    device->hidden->lead = SDL_MS_TO_NS((Uint64)lead);
 +    device->spec.format = SDL_AUDIO_S16;
 +    device->spec.channels = 2;
-+    device->spec.freq = 48000;
++    device->spec.freq = 44100;
 +    device->sample_frames = device->spec.freq / 100;
 +    SDL_UpdatedAudioDeviceFormat(device);
 +    if (device->hidden->backend.audio_open(device->hidden->handle) < 0) {
