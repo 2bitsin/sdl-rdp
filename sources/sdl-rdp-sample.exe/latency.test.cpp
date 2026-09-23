@@ -1,85 +1,123 @@
 #include "_detail/sample-fixture.hpp"
-#include <sdl-rdp-backend.so/_detail/headless-clipboard.hpp>
+
 #include <sdl-rdp-backend.so/_detail/headless-audio.hpp>
+#include <sdl-rdp-backend.so/_detail/headless-clipboard.hpp>
 
 namespace SampleGate {
 namespace {
+void RecordSample(std::string const& line, std::size_t offset, std::span<int64_t const> sent,
+                  std::vector<int64_t>& latency) {
+  ASSERT_LT(latency.size(), sent.size());
+  auto elapsed = std::stoll(line.substr(offset)) - sent[latency.size()];
+  EXPECT_GE(elapsed, 0);
+  latency.push_back(elapsed);
+}
 int64_t SendTime(Client const& client) {
-  Expects(client.instance != nullptr, "latency client exists");
-  return std::chrono::duration_cast<std::chrono::milliseconds>(
-    std::chrono::system_clock::now().time_since_epoch()).count();
+  Expects(client.Instance() != nullptr, "latency client exists");
+  return WallMilliseconds();
 }
 
+void ReportLatency(std::vector<int64_t>& latency, std::string_view event) {
+  std::ranges::sort(latency);
+  auto p95 = latency[((latency.size() * 95 + 99) / 100) - 1];
+  testing::Test::RecordProperty(std::string(event) + "_p95_ms", p95);
+  SDL_Log("latency %.*s count=%zu p95=%lld ms", int(event.size()), event.data(), latency.size(),
+          static_cast<long long>(p95));
+  EXPECT_LT(p95, 40) << event;
+}
 void CheckLatency(std::string const& trace, std::string_view event, std::span<int64_t const> sent) {
   Expects(!event.empty(), "trace event is named");
   Expects(!sent.empty(), "client sent measured events");
   auto prefix = std::format("trace {} t=", event);
   std::vector<int64_t> latency;
   std::istringstream lines(trace);
-  for (std::string line; std::getline(lines, line); ) {
+  for (std::string line; std::getline(lines, line);) {
     auto at = line.find(prefix);
     if (at == std::string::npos) continue;
     if (event == "key" && !line.contains(" code=30 ")) continue;
-    ASSERT_LT(latency.size(), sent.size());
-    auto elapsed = std::stoll(line.substr(at + prefix.size())) - sent[latency.size()];
-    EXPECT_GE(elapsed, 0);
-    latency.push_back(elapsed);
+    RecordSample(line, at + prefix.size(), sent, latency);
+    if (::testing::Test::HasFatalFailure()) return;
   }
   ASSERT_EQ(latency.size(), sent.size()) << event;
-  std::ranges::sort(latency);
-  auto p95 = latency[(latency.size() * 95 + 99) / 100 - 1];
-  testing::Test::RecordProperty(std::string(event) + "_p95_ms", p95);
-  SDL_Log("latency %.*s count=%zu p95=%lld ms", int(event.size()), event.data(), latency.size(), static_cast<long long>(p95));
-  EXPECT_LT(p95, 40) << event;
+  ReportLatency(latency, event);
 }
 }
 
-TEST_F(Sample, InputAndClipboardUnderTightVideo) {
-  Expects(process == nullptr, "sample has not started");
-  auto arguments = Arguments(certificates.Path(), false);
-  arguments.insert(arguments.begin() + 1, {"SDL_AUDIO_DRIVER=rdp", "SDL_RDP_TRACE=1", "SDL_LOGGING=video=info"});
-  arguments.insert(arguments.end(), {"--tone", "--tight"});
-  process = std::make_unique<Process>(arguments);
-  ASSERT_TRUE(Read("port "));
-  auto port = Number(std::string_view(line).substr(5));
-  ASSERT_TRUE(Read("audio device=RDP client freq=44100"));
-  std::jthread drain([&](std::stop_token stop) {
-    Expects(process != nullptr, "trace source is running");
-    std::string output;
-    while (!stop.stop_requested()) process->Line(output, Clock::now() + 10ms);
-  });
-  Client client(port, true, 640, 480);
-  Headless::ClipboardClient clipboard(client);
-  Headless::SoundClient audio(client);
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
-  Headless::FrameObserver frames(client);
-  ASSERT_TRUE(client.Until([&] {
-    if (!frames.ids.empty()) frames.Ack();
-    return !audio.received.empty() && clipboard.accepted.load() > 0;
-  }));
-  std::vector<int64_t> keys, clips;
-  auto start = Clock::now();
-  auto before = frames.ids.size();
-  for (unsigned i = 0; i < 60; ++i) {
-    while (Clock::now() < start + i * 50ms) {
-      ASSERT_TRUE(client.Pump(1));
-      if (!frames.ids.empty()) ASSERT_TRUE(frames.Ack());
-    }
-    keys.push_back(SendTime(client));
-    ASSERT_TRUE(freerdp_input_send_keyboard_event(client.instance->context->input,
-      i % 2 ? KBD_FLAGS_RELEASE : KBD_FLAGS_DOWN, 0x1e));
-    clips.push_back(SendTime(client));
-    ASSERT_EQ(clipboard.Offer({BYTE('A' + i), 0, 0, 0}), CHANNEL_RC_OK);
-  }
-  while (Clock::now() < start + 3s) {
+namespace {
+void PumpUntil(Client& client, Headless::FrameObserver& frames, Clock::time_point deadline) {
+  while (Clock::now() < deadline) {
     ASSERT_TRUE(client.Pump(1));
-    if (!frames.ids.empty()) ASSERT_TRUE(frames.Ack());
+    if (!frames.Frames().empty()) ASSERT_TRUE(frames.Ack());
   }
-  EXPECT_GE(frames.ids.size() - before, 60u);
-  ASSERT_NO_FATAL_FAILURE(Escape(client));
+}
+void SampleLatency(Client& client, Headless::FrameObserver& frames, Headless::ClipboardClient& clipboard,
+                   std::vector<int64_t>& keys, std::vector<int64_t>& clips, Clock::time_point start) {
+  for (unsigned i = 0; i < 60; ++i) {
+    PumpUntil(client, frames, start + i * 50ms);
+    if (::testing::Test::HasFatalFailure()) return;
+    keys.push_back(SendTime(client));
+    ASSERT_TRUE(freerdp_input_send_keyboard_event(client.Instance()->context->input,
+                                                  i % 2 ? KBD_FLAGS_RELEASE : KBD_FLAGS_DOWN, 0x1e));
+    clips.push_back(SendTime(client));
+    ASSERT_EQ(clipboard.Offer({ BYTE('A' + i), 0, 0, 0 }), CHANNEL_RC_OK);
+  }
+  PumpUntil(client, frames, start + 3s);
+}
+}
+namespace {
+std::vector<std::string> TightAudioArguments(fs::path const& certificates) {
+  auto arguments = Arguments(certificates, false);
+  arguments.insert(arguments.begin() + 1, { "SDL_AUDIO_DRIVER=rdp", "SDL_RDP_TRACE=1", "SDL_LOGGING=video=info" });
+  arguments.insert(arguments.end(), { "--tone", "--tight" });
+  return arguments;
+}
+}
+namespace {
+void DrainTrace(Process& process, std::stop_token const& stop) {
+  std::string output;
+  while (!stop.stop_requested())
+    process.Line(output, Clock::now() + 10ms);
+}
+}
+namespace {
+void ThenMediaReady(Client& client, Headless::FrameObserver& frames, Headless::SoundClient& audio,
+                    Headless::ClipboardClient& clipboard) {
+  ASSERT_TRUE(client.Until([&] {
+    if (!frames.Frames().empty()) frames.Ack();
+    return !audio.CaptureState().received.empty() && clipboard.Observed().accepted.load() > 0;
+  }));
+}
+}
+namespace {
+void FinishLatency(std::jthread& drain, Process const& process, std::span<int64_t const> keys,
+                   std::span<int64_t const> clips) {
   drain.request_stop();
   drain.join();
-  CheckLatency(process->transcript, "key", keys);
-  CheckLatency(process->transcript, "clipboard", clips);
+  CheckLatency(process.Transcript(), "key", keys);
+  CheckLatency(process.Transcript(), "clipboard", clips);
+}
+}
+TEST_F(Sample, InputAndClipboardUnderTightVideo) {
+  Expects(process == nullptr, "sample has not started");
+  GivenAudioProcess(TightAudioArguments(certificates.Path()));
+  if (::testing::Test::HasFatalFailure()) return;
+  std::jthread drain([&](std::stop_token const& stop) { DrainTrace(*process, stop); });
+  Client client(audio_port, true, 640, 480);
+  Headless::ClipboardClient clipboard(client);
+  Headless::SoundClient audio(client);
+  ASSERT_TRUE(freerdp_connect(client.Instance().get()));
+  Headless::FrameObserver frames(client);
+  ThenMediaReady(client, frames, audio, clipboard);
+  if (::testing::Test::HasFatalFailure()) return;
+  std::vector<int64_t> keys;
+  std::vector<int64_t> clips;
+  auto start  = Clock::now();
+  auto before = frames.Frames().size();
+  SampleLatency(client, frames, clipboard, keys, clips, start);
+  if (::testing::Test::HasFatalFailure()) return;
+  EXPECT_GE(frames.Frames().size() - before, 60u);
+  Escape(client);
+  if (::testing::Test::HasFatalFailure()) return;
+  FinishLatency(drain, *process, keys, clips);
 }
 }

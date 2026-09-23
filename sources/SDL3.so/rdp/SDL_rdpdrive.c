@@ -8,8 +8,14 @@ typedef struct RDP_File {
   bool            append;
 } RDP_File;
 
-static sdlrdp_drive* RDP_DriveList(SDL_RDP_Backend* backend, sdlrdp_handle* handle, int* count)
-{
+static bool RDP_DriveListValid(SDL_RDP_Backend* backend, int count, unsigned capacity) {
+  if (count < 0) return SDL_SetError("%s", backend->last_error());
+  if ((unsigned)count < capacity) return true;
+  if (capacity > SDL_MAX_SINT32 / 2 / sizeof(sdlrdp_drive)) return SDL_SetError("Too many RDP drives");
+  return true;
+}
+
+static sdlrdp_drive* RDP_DriveList(SDL_RDP_Backend* backend, sdlrdp_handle* handle, int* count) {
   unsigned      capacity = 16;
   sdlrdp_drive* drives   = NULL;
   for (;;) {
@@ -20,24 +26,17 @@ static sdlrdp_drive* RDP_DriveList(SDL_RDP_Backend* backend, sdlrdp_handle* hand
     }
     drives = grown;
     *count = backend->drive_list(handle, drives, capacity);
-    if (*count < 0) {
-      SDL_SetError("%s", backend->last_error());
+    if (!RDP_DriveListValid(backend, *count, capacity)) {
       SDL_free(drives);
       return NULL;
     }
     if ((unsigned)*count < capacity) return drives;
-    if (capacity > SDL_MAX_SINT32 / 2 / sizeof(*drives)) {
-      SDL_free(drives);
-      SDL_SetError("Too many RDP drives");
-      return NULL;
-    }
     capacity *= 2;
   }
 }
 
-bool SDL_RDP_FindDrive(SDL_RDP_Backend* backend, sdlrdp_handle* handle, const char* name, unsigned* id)
-{
-  int           count  = 0;
+bool SDL_RDP_FindDrive(SDL_RDP_Backend* backend, sdlrdp_handle* handle, char const* name, unsigned* id) {
+  int count = 0;
   sdlrdp_drive* drives = RDP_DriveList(backend, handle, &count);
   if (!drives) return false;
   for (int i = 0; i < count; ++i) {
@@ -51,9 +50,8 @@ bool SDL_RDP_FindDrive(SDL_RDP_Backend* backend, sdlrdp_handle* handle, const ch
   return SDL_SetError("RDP drive unavailable: %s", name ? name : "");
 }
 
-static Sint64 SDLCALL RDP_FileSize(void* userdata)
-{
-  RDP_File*   file = userdata;
+static Sint64 SDLCALL RDP_FileSize(void* userdata) {
+  RDP_File* file = userdata;
   sdlrdp_stat info;
   if (file->backend.drive_fstat(file->handle, file->file, &info) < 0) {
     SDL_SetError("%s", file->backend.last_error());
@@ -66,13 +64,15 @@ static Sint64 SDLCALL RDP_FileSize(void* userdata)
   return (Sint64)info.size;
 }
 
-static Sint64 SDLCALL RDP_FileSeek(void* userdata, Sint64 offset, SDL_IOWhence whence)
-{
+static Sint64 SDLCALL RDP_FileSeek(void* userdata, Sint64 offset, SDL_IOWhence whence) {
   RDP_File* file = userdata;
   Sint64    base = 0;
-  if (whence == SDL_IO_SEEK_CUR) base = file->position;
-  else if (whence == SDL_IO_SEEK_END) base = RDP_FileSize(file);
-  else if (whence != SDL_IO_SEEK_SET) base = -1;
+  if (whence == SDL_IO_SEEK_CUR)
+    base = file->position;
+  else if (whence == SDL_IO_SEEK_END)
+    base = RDP_FileSize(file);
+  else if (whence != SDL_IO_SEEK_SET)
+    base = -1;
   if (base < 0 || offset < -base || offset > SDL_MAX_SINT64 - base) {
     SDL_SetError("Invalid RDP file seek");
     return -1;
@@ -81,8 +81,7 @@ static Sint64 SDLCALL RDP_FileSeek(void* userdata, Sint64 offset, SDL_IOWhence w
   return file->position;
 }
 
-static size_t RDP_FileResult(RDP_File* file, int count, size_t size, SDL_IOStatus* status, SDL_IOStatus short_status)
-{
+static size_t RDP_FileResult(RDP_File* file, int count, size_t size, SDL_IOStatus* status, SDL_IOStatus short_status) {
   if (count < 0) {
     *status = SDL_IO_STATUS_ERROR;
     SDL_SetError("%s", file->backend.last_error());
@@ -93,34 +92,31 @@ static size_t RDP_FileResult(RDP_File* file, int count, size_t size, SDL_IOStatu
   return count;
 }
 
-static size_t SDLCALL RDP_FileRead(void* userdata, void* buffer, size_t size, SDL_IOStatus* status)
-{
-  RDP_File* file  = userdata;
-  int       count = file->backend.drive_read(file->handle, file->file, file->position, buffer, SDL_min(size, SDL_MAX_SINT32));
+static size_t SDLCALL RDP_FileRead(void* userdata, void* buffer, size_t size, SDL_IOStatus* status) {
+  RDP_File* file = userdata;
+  int count = file->backend.drive_read(file->handle, file->file, file->position, buffer, SDL_min(size, SDL_MAX_SINT32));
   return RDP_FileResult(file, count, size, status, SDL_IO_STATUS_EOF);
 }
 
-static size_t SDLCALL RDP_FileWrite(void* userdata, const void* buffer, size_t size, SDL_IOStatus* status)
-{
+static size_t SDLCALL RDP_FileWrite(void* userdata, void const* buffer, size_t size, SDL_IOStatus* status) {
   RDP_File* file = userdata;
   if (file->append && RDP_FileSeek(file, 0, SDL_IO_SEEK_END) < 0) {
     *status = SDL_IO_STATUS_ERROR;
     return 0;
   }
-  int count = file->backend.drive_write(file->handle, file->file, file->position, buffer, SDL_min(size, SDL_MAX_SINT32));
+  int count =
+      file->backend.drive_write(file->handle, file->file, file->position, buffer, SDL_min(size, SDL_MAX_SINT32));
   return RDP_FileResult(file, count, size, status, SDL_IO_STATUS_ERROR);
 }
 
-static bool SDLCALL RDP_FileFlush(void* userdata, SDL_IOStatus* status)
-{
+static bool SDLCALL RDP_FileFlush(void* userdata, SDL_IOStatus* status) {
   RDP_File* file = userdata;
   if (file->backend.drive_flush(file->handle, file->file) >= 0) return true;
   *status = SDL_IO_STATUS_ERROR;
   return SDL_SetError("%s", file->backend.last_error());
 }
 
-static bool SDLCALL RDP_FileClose(void* userdata)
-{
+static bool SDLCALL RDP_FileClose(void* userdata) {
   RDP_File* file = userdata;
   bool      ok   = true;
   if (file->file && file->backend.drive_close(file->handle, file->file) < 0)
@@ -130,23 +126,27 @@ static bool SDLCALL RDP_FileClose(void* userdata)
   return ok;
 }
 
-static unsigned RDP_FileMode(const char* mode)
-{
+static unsigned RDP_FileMode(char const* mode) {
   unsigned flags = 0;
   if (!mode || !*mode) return 0;
-  if (*mode == 'r') flags = SDLRDP_FILE_READ;
-  else if (*mode == 'w') flags = SDLRDP_FILE_WRITE | SDLRDP_FILE_CREATE | SDLRDP_FILE_TRUNCATE;
-  else if (*mode == 'a') flags = SDLRDP_FILE_WRITE | SDLRDP_FILE_CREATE;
-  else return 0;
-  for (const char* p = mode + 1; *p; ++p) {
-    if (*p == '+') flags |= SDLRDP_FILE_READ | SDLRDP_FILE_WRITE;
-    else if (*p != 'b') return 0;
+  if (*mode == 'r')
+    flags = SDLRDP_FILE_READ;
+  else if (*mode == 'w')
+    flags = SDLRDP_FILE_WRITE | SDLRDP_FILE_CREATE | SDLRDP_FILE_TRUNCATE;
+  else if (*mode == 'a')
+    flags = SDLRDP_FILE_WRITE | SDLRDP_FILE_CREATE;
+  else
+    return 0;
+  for (char const* p = mode + 1; *p; ++p) {
+    if (*p == '+')
+      flags |= SDLRDP_FILE_READ | SDLRDP_FILE_WRITE;
+    else if (*p != 'b')
+      return 0;
   }
   return flags;
 }
 
-SDL_IOStream* SDLCALL SDL_RDP_OpenFile(const char* drive, const char* path, const char* mode)
-{
+SDL_IOStream* SDLCALL SDL_RDP_OpenFile(char const* drive, char const* path, char const* mode) {
   unsigned              id     = 0;
   unsigned              flags  = RDP_FileMode(mode);
   SDL_IOStreamInterface iface  = { 0 };
@@ -180,13 +180,13 @@ SDL_IOStream* SDLCALL SDL_RDP_OpenFile(const char* drive, const char* path, cons
   return stream;
 }
 
-void SDL_RDP_UpdateDrives(SDL_RDP_Backend* backend, sdlrdp_handle* handle, SDL_PropertiesID props)
-{
-  int           count  = 0;
+void SDL_RDP_UpdateDrives(SDL_RDP_Backend* backend, sdlrdp_handle* handle, SDL_PropertiesID props) {
+  int count = 0;
   sdlrdp_drive* drives = RDP_DriveList(backend, handle, &count);
   if (!drives) return;
   size_t capacity = 1;
-  for (int i = 0; i < count; ++i) capacity += SDL_strlen(drives[i].name) + 1;
+  for (int i = 0; i < count; ++i)
+    capacity += SDL_strlen(drives[i].name) + 1;
   char* names = SDL_calloc(1, capacity);
   if (!names) {
     SDL_free(drives);

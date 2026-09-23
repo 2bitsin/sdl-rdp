@@ -1,26 +1,27 @@
 #pragma once
 #include "rdp-handles.hpp"
+
 #include <freerdp/server/cliprdr.h>
+#include <span>
 #include <string>
 #include <string_view>
-#include <span>
 #include <vector>
 
 namespace Backend {
 class Peer;
 struct Clipboard {
   std::string text, exported;
-  std::vector<BYTE> unicode{0, 0};
+  std::vector<BYTE> unicode{ 0, 0 };
   uint64_t generation = 0;
 };
 class ClipboardChannel {
 public:
-  ClipboardChannel(ClipboardChannel const &) = delete;
-  ClipboardChannel &operator=(ClipboardChannel const &) = delete;
-  ClipboardChannel(ClipboardChannel &&) = delete;
-  ClipboardChannel &operator=(ClipboardChannel &&) = delete;
-  explicit ClipboardChannel(Peer &value);
+  ClipboardChannel(ClipboardChannel const&) = delete;
+  ClipboardChannel(ClipboardChannel&&)      = delete;
+  explicit ClipboardChannel(Peer& value);
   ~ClipboardChannel();
+  ClipboardChannel& operator = (ClipboardChannel const&) = delete;
+  ClipboardChannel& operator = (ClipboardChannel&&)      = delete;
   bool Open();
   bool Pump(std::span<HANDLE const> signaled);
   HANDLE Event() const;
@@ -30,12 +31,12 @@ private:
   UINT Request();
   UINT RespondToList();
   bool FirstOfferWhileAppHoldsText() const;
-  UINT RequestOfferedText(CLIPRDR_FORMAT_LIST const & /*list*/);
+  UINT RequestOfferedText(CLIPRDR_FORMAT_LIST const& /*list*/);
   void Changed(std::string text);
-  static UINT Formats(CliprdrServerContext * /*context*/, CLIPRDR_FORMAT_LIST const * /*list*/);
-  static UINT DataRequest(CliprdrServerContext * /*context*/, CLIPRDR_FORMAT_DATA_REQUEST const * /*request*/);
-  static UINT DataResponse(CliprdrServerContext * /*context*/, CLIPRDR_FORMAT_DATA_RESPONSE const * /*response*/);
-  Peer &peer;
+  static UINT Formats(CliprdrServerContext* /*context*/, CLIPRDR_FORMAT_LIST const* /*list*/);
+  static UINT DataRequest(CliprdrServerContext* /*context*/, CLIPRDR_FORMAT_DATA_REQUEST const* /*request*/);
+  static UINT DataResponse(CliprdrServerContext* /*context*/, CLIPRDR_FORMAT_DATA_RESPONSE const* /*response*/);
+  Peer& peer;
   std::unique_ptr<CliprdrServerContext, Releases<cliprdr_server_context_free>> context;
   uint64_t announced = 0, requested = 0, offered = 0, requested_generation = 0, offered_generation = 0;
   bool ready = false, opened = false, pending = false, has_unicode = false;

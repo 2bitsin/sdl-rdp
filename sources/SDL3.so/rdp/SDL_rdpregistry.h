@@ -14,7 +14,7 @@ struct SDL_RDP_Registry {
   SDL_RDP_Backend* auth_backend;
   sdlrdp_config*   auth_config;
   SDL_InitState    ini_init;
-  const char*      ini_values[SDL_RDP_SETTING_COUNT];
+  char const* ini_values[SDL_RDP_SETTING_COUNT];
   char* ini_text;
   bool  ini_failed;
   char* ini_failed_path;

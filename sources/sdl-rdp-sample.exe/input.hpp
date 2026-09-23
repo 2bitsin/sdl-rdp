@@ -1,31 +1,37 @@
 #pragma once
 #include "_detail/check.hpp"
 
-inline bool PrintInput(const SDL_Event& event, SDL_Window* window)
-{
+inline char const* TouchName(Uint32 type) {
+  switch (type) {
+  case SDL_EVENT_FINGER_DOWN:
+    return "FINGER_DOWN";
+  case SDL_EVENT_FINGER_MOTION:
+    return "FINGER_MOTION";
+  case SDL_EVENT_FINGER_UP:
+    return "FINGER_UP";
+  case SDL_EVENT_FINGER_CANCELED:
+    return "FINGER_CANCELED";
+  default:
+    return nullptr;
+  }
+}
+inline bool PrintInput(SDL_Event const& event, SDL_Window* window) {
   if (event.type == SDL_EVENT_TEXT_INPUT) {
     SDL_Log("event TEXT_INPUT text=%s", event.text.text);
     return true;
   }
-  const char* name = nullptr;
-  switch (event.type) {
-  case SDL_EVENT_FINGER_DOWN: name = "FINGER_DOWN"; break;
-  case SDL_EVENT_FINGER_MOTION: name = "FINGER_MOTION"; break;
-  case SDL_EVENT_FINGER_UP: name = "FINGER_UP"; break;
-  case SDL_EVENT_FINGER_CANCELED: name = "FINGER_CANCELED"; break;
-  default: return false;
-  }
-  int width;
-  int height;
+  char const* name = TouchName(event.type);
+  if (!name) return false;
+  int width  = 0;
+  int height = 0;
   Check(SDL_GetWindowSize(window, &width, &height));
-  SDL_Log("event %s id=%llu x=%.3f y=%.3f pressure=%.3f window_x=%.0f window_y=%.0f",
-          name, (unsigned long long)event.tfinger.fingerID, event.tfinger.x, event.tfinger.y,
-          event.tfinger.pressure, event.tfinger.x * width, event.tfinger.y * height);
+  SDL_Log("event %s id=%llu x=%.3f y=%.3f pressure=%.3f window_x=%.0f window_y=%.0f", name,
+          (unsigned long long)event.tfinger.fingerID, event.tfinger.x, event.tfinger.y, event.tfinger.pressure,
+          event.tfinger.x * float(width), event.tfinger.y * float(height));
   return true;
 }
 
-inline void InputMode(const SDL_Event& event, SDL_Window* window)
-{
+inline void InputMode(SDL_Event const& event, SDL_Window* window) {
   if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat) return;
   switch (event.key.scancode) {
   case SDL_SCANCODE_F6:
@@ -39,6 +45,7 @@ inline void InputMode(const SDL_Event& event, SDL_Window* window)
     Check(SDL_SetWindowRelativeMouseMode(window, !SDL_GetWindowRelativeMouseMode(window)));
     SDL_Log("event RELATIVE_MODE active=%d", SDL_GetWindowRelativeMouseMode(window));
     break;
-  default: break;
+  default:
+    break;
   }
 }

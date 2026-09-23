@@ -1,14 +1,12 @@
 #include "SDL_rdpini.h"
+
 #include <SDL3/SDL_stdinc.h>
 
 #define SDL_RDP_SETTING_STRING(name) "SDL_RDP_" #name,
-const char* const SDL_RDP_SettingNames[SDL_RDP_SETTING_COUNT] = {
-  SDL_RDP_SETTING_NAMES(SDL_RDP_SETTING_STRING)
-};
+char const* const SDL_RDP_SettingNames[SDL_RDP_SETTING_COUNT] = { SDL_RDP_SETTING_NAMES(SDL_RDP_SETTING_STRING) };
 #undef SDL_RDP_SETTING_STRING
 
-int SDL_RDP_IniIndex(const char* name)
-{
+int SDL_RDP_IniIndex(char const* name) {
   int i = 0;
   for (i = 0; i < SDL_RDP_SETTING_COUNT; ++i) {
     if (SDL_strcmp(name, SDL_RDP_SettingNames[i]) == 0) return i;
@@ -16,16 +14,25 @@ int SDL_RDP_IniIndex(const char* name)
   return -1;
 }
 
-static char* SDL_RDP_IniTrim(char* start, char* end)
-{
-  while (start < end && SDL_isspace((unsigned char)*start)) ++start;
-  while (end > start && SDL_isspace((unsigned char)end[-1])) --end;
+static char* SDL_RDP_IniTrim(char* start, char* end) {
+  while (start < end && SDL_isspace((unsigned char)*start))
+    ++start;
+  while (end > start && SDL_isspace((unsigned char)end[-1]))
+    --end;
   *end = '\0';
   return start;
 }
 
-static void SDL_RDP_IniLine(char* start, char* end, unsigned line, SDL_RDP_IniCallback callback, void* user)
-{
+static char* SDL_RDP_IniUnquote(char* value) {
+  char* end = value + SDL_strlen(value);
+  if (end - value >= 2 && *value == '"' && end[-1] == '"') {
+    ++value;
+    end[-1] = '\0';
+  }
+  return value;
+}
+
+static void SDL_RDP_IniLine(char* start, char* end, unsigned line, SDL_RDP_IniCallback callback, void* user) {
   char* key    = SDL_RDP_IniTrim(start, end);
   char* value  = NULL;
   char* equals = NULL;
@@ -39,16 +46,11 @@ static void SDL_RDP_IniLine(char* start, char* end, unsigned line, SDL_RDP_IniCa
   }
   value = SDL_RDP_IniTrim(equals + 1, end);
   key   = SDL_RDP_IniTrim(key, equals);
-  end   = value + SDL_strlen(value);
-  if (end - value >= 2 && *value == '"' && end[-1] == '"') {
-    ++value;
-    end[-1] = '\0';
-  }
+  value = SDL_RDP_IniUnquote(value);
   callback(user, SDL_RDP_IniIndex(key), key, value, line);
 }
 
-void SDL_RDP_IniParse(char* text, SDL_RDP_IniCallback callback, void* user)
-{
+void SDL_RDP_IniParse(char* text, SDL_RDP_IniCallback callback, void* user) {
   unsigned line = 1;
   while (*text) {
     char* end  = SDL_strchr(text, '\n');

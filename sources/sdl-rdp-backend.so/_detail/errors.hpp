@@ -10,8 +10,7 @@ namespace Backend {
 class ErrorStore {
 public:
   static char const* Last() { return CallingThread().text->c_str(); }
-  static void        Publish(ErrorStore* owner, std::string text)
-  {
+  static void Publish(ErrorStore* owner, std::string text) {
     auto& caller = CallingThread();
     if (owner) {
       std::scoped_lock const lock(owner->guard);
@@ -28,13 +27,12 @@ private:
   struct Cursor {
     std::shared_ptr<std::string> text{ std::make_shared<std::string>() };
   };
-  static Cursor& CallingThread()
-  {
+  static Cursor& CallingThread() {
     // The handle-free C ABI needs a per-thread cursor, also after a failed open or close.
     static thread_local Cursor caller;
     return caller;
   }
-  std::mutex                                              guard;
+  std::mutex guard;
   std::map<std::thread::id, std::shared_ptr<std::string>> errors;
 };
 }

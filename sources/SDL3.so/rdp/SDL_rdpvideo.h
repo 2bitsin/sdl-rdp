@@ -1,18 +1,17 @@
 #ifndef SDL_rdpvideo_h_
 #define SDL_rdpvideo_h_
-#include "src/video/SDL_sysvideo.h"
 #include "SDL_rdpdyn.h"
-struct SDL_VideoData
-{
-    SDL_RDP_Backend backend;
-    sdlrdp_handle *handle;
-    SDL_DisplayID display;
-    SDL_Window *window;
-    int picture_width, picture_height;
-    unsigned audio_rate;
-    SDL_DisplayMode refresh_modes[2];
+#include "src/video/SDL_sysvideo.h"
+struct SDL_VideoData {
+  SDL_RDP_Backend backend;
+  sdlrdp_handle*  handle;
+  SDL_DisplayID   display;
+  SDL_Window*     window;
+  int picture_width, picture_height;
+  unsigned audio_rate;
+  SDL_DisplayMode refresh_modes[2];
 };
 void SDL_RDP_InitMouse(void);
-void SDLCALL SDL_RDP_AspectHintChanged(void *userdata, const char *name, const char *oldValue, const char *newValue);
-const char *SDL_RDP_CodecName(sdlrdp_codec codec);
+void SDLCALL SDL_RDP_AspectHintChanged(void* userdata, char const* name, char const* oldValue, char const* newValue);
+char const* SDL_RDP_CodecName(sdlrdp_codec codec);
 #endif

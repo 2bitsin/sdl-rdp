@@ -1,287 +1,283 @@
 #pragma once
-#include "sample-process.hpp"
+#include "sample-checks.hpp"
 
 namespace SampleGate {
-inline testing::AssertionResult Pattern(Client &client, bool /*pointer*/) {
-  auto *gdi = client.instance->context->gdi;
-  if (!gdi || gdi->width != 640 || gdi->height != 480)
-    return testing::AssertionFailure() << "framebuffer is not 640x480";
-  auto pixel = [&](int index) {
-    UINT32 value = 0;
-    std::memcpy(&value, gdi->primary_buffer + (static_cast<std::size_t>((index / 640)) * gdi->stride) + ((static_cast<std::ptrdiff_t>(index % 640)) * 4), 4);
-    return value & 0xffffff;
-  };
-  auto columns = std::views::iota(0, 640);
-  auto first = std::ranges::find_if(columns, [&](int x) { return pixel((40 * 640) + x) == 0x00ff00; });
-  if (first == columns.end() || *first > 608)
-    return testing::AssertionFailure() << "no complete green block on row 40";
-  auto expected = [&](int index) {
-    int x = index % 640;
-    int y = index / 640;
-    auto expected = x >= *first && x < *first + 32 && y >= 40 && y < 72 ? 0x00ff00u : 0x010101u;
-    return expected;
-  };
-  auto indices = std::views::iota(0, 640 * 480);
-  auto mismatch = std::ranges::find_if(indices, [&](int i) { return pixel(i) != expected(i); });
-  if (mismatch == indices.end())
-    return testing::AssertionSuccess();
-  return testing::AssertionFailure() << "pixel (" << *mismatch % 640 << "," << *mismatch / 640
-                                     << ") actual=" << std::hex << pixel(*mismatch) << " expected=" << expected(*mismatch);
+inline void ConnectDrive(Client& client, fs::path const& share) {
+  Headless::ShareDrive(client, share.c_str());
+  ASSERT_TRUE(freerdp_connect(client.Instance().get()));
 }
 
-class FullDesktopFrames {
-public:
-  FullDesktopFrames(FullDesktopFrames const &) = delete;
-  FullDesktopFrames &operator=(FullDesktopFrames const &) = delete;
-  FullDesktopFrames(FullDesktopFrames &&) = delete;
-  FullDesktopFrames &operator=(FullDesktopFrames &&) = delete;
-  explicit FullDesktopFrames(Client &client) : update(client.instance->context->update),
-                                               surface(update->SurfaceBits), bitmap(update->BitmapUpdate) {
-    Expects(!active && surface && bitmap, "one desktop observer with GDI installed");
-    active = this;
-    update->SurfaceBits = ReceiveSurface;
-    update->BitmapUpdate = ReceiveBitmap;
-  }
-  ~FullDesktopFrames() {
-    update->SurfaceBits = surface;
-    update->BitmapUpdate = bitmap;
-    active = nullptr;
-  }
-  void Observe(rdpContext *context, unsigned left, unsigned top, unsigned right, unsigned bottom) {
-    auto *gdi = context->gdi;
-    ++deliveries;
-    rows.resize(gdi->height);
-    if (left || right != unsigned(gdi->width) || top >= bottom || bottom > rows.size())
-      return;
-    std::fill(rows.begin() + top, rows.begin() + bottom, true);
-    if (std::ranges::all_of(rows, [](bool covered) { return covered; })) {
-      ++full;
-      std::ranges::fill(rows, false);
-    }
-  }
-  static BOOL ReceiveSurface(rdpContext *context, SURFACE_BITS_COMMAND const *command) {
-    Expects(active && command, "desktop observer and surface command exist");
-    auto result = active->surface(context, command);
-    if (result)
-      active->Observe(context, command->destLeft, command->destTop, command->destRight, command->destBottom);
-    return result;
-  }
-  static BOOL ReceiveBitmap(rdpContext *context, BITMAP_UPDATE const *command) {
-    Expects(active && command, "desktop observer and bitmap command exist");
-    auto result = active->bitmap(context, command);
-    if (result)
-      for (auto const &rectangle : std::span(command->rectangles, command->number))
-        active->Observe(context, rectangle.destLeft, rectangle.destTop, rectangle.destRight + 1, rectangle.destBottom + 1);
-    return result;
-  }
-  unsigned full = 0, deliveries = 0;
-
-private:
-  inline static thread_local FullDesktopFrames *active = nullptr;
-  rdpUpdate *update;
-  pSurfaceBits surface;
-  pBitmapUpdate bitmap;
-  std::vector<bool> rows;
-};
-
-class NextFrame {
-public:
-  NextFrame(NextFrame const &) = delete;
-  NextFrame &operator=(NextFrame const &) = delete;
-  NextFrame(NextFrame &&) = delete;
-  NextFrame &operator=(NextFrame &&) = delete;
-  explicit NextFrame(Client &value, unsigned frame) : client(value), column(frame % 640), original(value.instance->context->update->SurfaceBits),
-                                                      original_bitmap(value.instance->context->update->BitmapUpdate) {
-    Expects(!active && original && original_bitmap, "one frame observer with GDI installed");
-    active = this;
-    client.instance->context->update->SurfaceBits = Receive;
-    client.instance->context->update->BitmapUpdate = ReceiveBitmap;
-  }
-  ~NextFrame() {
-    client.instance->context->update->SurfaceBits = original;
-    client.instance->context->update->BitmapUpdate = original_bitmap;
-    active = nullptr;
-  }
-  static BOOL Receive(rdpContext *context, SURFACE_BITS_COMMAND const *command) {
-    Expects(active && command, "frame observer and surface command exist");
-    auto result = active->original(context, command);
-    if (result && command->destBottom == 480)
-      active->Observe(context);
-    return result;
-  }
-  static BOOL ReceiveBitmap(rdpContext *context, BITMAP_UPDATE const *command) {
-    Expects(active && command, "frame observer and bitmap command exist");
-    auto result = active->original_bitmap(context, command);
-    // Bitmap update corners are inclusive; surface command corners are exclusive.
-    if (result && std::ranges::any_of(std::span(command->rectangles, command->number),
-                                      [](auto const &rectangle) { return rectangle.destBottom == 479; }))
-      active->Observe(context);
-    return result;
-  }
-  void Observe(rdpContext *context) {
-    Expects(context && context->gdi, "decoded framebuffer exists");
-    auto *gdi = context->gdi;
-    UINT32 pixel = 0;
-    std::memcpy(&pixel, gdi->primary_buffer + (40uz * gdi->stride) + (static_cast<std::size_t>(column) * 4), 4);
-    UINT32 before = 0;
-    if (column)
-      std::memcpy(&before, gdi->primary_buffer + (40uz * gdi->stride) + ((static_cast<std::size_t>(column - 1)) * 4), 4);
-    bool const origin = (pixel & 0xffffff) == 0x00ff00 && (before & 0xffffff) != 0x00ff00;
-    if (!received && origin) {
-      matches = Pattern(client, true);
-      received = true;
-    }
-  }
-  bool received = false;
-  testing::AssertionResult matches = testing::AssertionFailure() << "no complete frame";
-
-private:
-  inline static thread_local NextFrame *active = nullptr;
-  Client &client;
-  unsigned column;
-  pSurfaceBits original;
-  pBitmapUpdate original_bitmap;
-};
-
-class Sample : public testing::Test {
+class SampleSession : public SampleChecks {
 protected:
-  void GivenProcess(std::vector<std::string> arguments = {}) {
-    if (arguments.empty())
-      arguments = Arguments(certificates.Path(), false);
-    process = std::make_unique<Process>(arguments);
-    ASSERT_TRUE(Read("port "));
+  void GivenDesktopProcess(std::vector<std::string> const& arguments) {
+    GivenProcess(arguments);
+    if (::testing::Test::HasFatalFailure()) return;
+    session = std::make_unique<Client>(Number(std::string_view(line).substr(5)), true, 1280, 800);
+    ConnectExposed(*session);
   }
-  void GivenFocus(Client &client) {
-    ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  void GivenDriveProcess(std::vector<std::string> const& arguments, fs::path const& share) {
+    GivenProcess(arguments);
+    if (::testing::Test::HasFatalFailure()) return;
+    session = std::make_unique<Client>(Number(std::string_view(line).substr(5)), true, 640, 480);
+    ConnectDrive(*session, share);
+  }
+
+  void ConnectExposed(Client& client) {
+    ASSERT_TRUE(freerdp_connect(client.Instance().get()));
+    Exposed();
+  }
+
+  void GivenInputSession(bool advanced = false) {
+    GivenProcess();
+    if (::testing::Test::HasFatalFailure()) return;
+    session = std::make_unique<Client>(Number(std::string_view(line).substr(5)), true, 640, 480);
+    if (advanced) channels = std::make_unique<InputClient>(*session);
+    GivenFocus(*session);
+  }
+  Client& SessionClient() { return *session; }
+  void GivenPositionSession() {
+    GivenProcess();
+    if (::testing::Test::HasFatalFailure()) return;
+    session = std::make_unique<Client>(Number(std::string_view(line).substr(5)), true, 640, 480);
+    ASSERT_TRUE(freerdp_connect(session->Instance().get()));
+    position = std::make_unique<PositionObserver>(*session);
     ASSERT_TRUE(Read("event FOCUS_GAINED "));
   }
-  void WhenTextStops(rdpInput *input) {
-    ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x3c));
-    ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x3c));
-    ASSERT_TRUE(Read("event TEXT_MODE active=0"));
+  PositionObserver& Position() { return *position; }
+  void GivenFullscreen() {
+    auto arguments = Arguments(certificates.Path(), false);
+    arguments.insert(arguments.end(), { "--fullscreen", "--mode", "320x200" });
+    GivenProcess(arguments);
   }
-  static void ThenAdvanced(Client &client, InputClient &channels) {
-    ASSERT_TRUE(client.Until([&] { return channels.advanced.load() && channels.touch.load() && channels.touch.load()->GetVersion(channels.touch.load()) == RDPINPUT_PROTOCOL_V10; }));
+  void GivenAspect() {
+    auto arguments = Arguments(certificates.Path(), false);
+    arguments.insert(arguments.end(), { "--size", "640x350", "--aspect", "4:3" });
+    GivenProcess(arguments);
   }
-  void WhenRelative(rdpInput *input) {
-    ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x3d));
-    ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x3d));
-    ASSERT_TRUE(Read("event RELATIVE_MODE active=1"));
+  void ThenExplicitGeometry(Client& client, unsigned height = 200) {
+    ASSERT_TRUE(Read("event GEOMETRY window=320x200 desktop=320x200"));
+    ASSERT_TRUE(client.Until([&] {
+      auto* gdi = client.Instance()->context->gdi;
+      return gdi->width == 320 && std::cmp_equal(gdi->height, height);
+    }));
   }
-  void SetUp() override {
-    std::scoped_lock const lock(log_guard);
-    client_logs = &logs;
-    auto *root = WLog_GetRoot();
-    ASSERT_NE(root, nullptr);
-    wLogCallbacks callbacks{CollectClientLog, CollectClientLog, CollectClientLog, CollectClientLog};
-    ASSERT_TRUE(WLog_SetLogAppenderType(root, WLOG_APPENDER_CALLBACK));
-    ASSERT_TRUE(WLog_ConfigureAppender(WLog_GetLogAppender(root), "callbacks", &callbacks));
+  void GivenAudioProcess(std::vector<std::string> const& arguments) {
+    process = std::make_unique<Process>(arguments);
+    ASSERT_TRUE(Read("port "));
+    audio_port = Number(std::string_view(line).substr(5));
+    ASSERT_TRUE(Read("audio device=RDP client freq=44100"));
   }
-  std::string ConnectLogs() {
-    // Drain the child pipe too: connect can fail before another Read consumes its diagnostics.
-    std::string ignored;
-    auto deadline = Clock::now() + 10ms;
-    if (process)
-      while (process->Line(ignored, deadline)) {
-      }
-    return "\nclient:\n" + logs.Text(true) + "\nsample:\n" + (process ? process->transcript : "");
+  void ThenIniConnects(std::vector<std::string> const& args, unsigned port) {
+    GivenIniProcess(args, port);
+    if (::testing::Test::HasFatalFailure()) return;
+    Client const client(port, true, 640, 480);
+    ASSERT_TRUE(freerdp_connect(client.Instance().get())) << ConnectLogs();
+    Escape(client);
   }
-  bool Read(std::string_view expected, std::chrono::milliseconds timeout = 10s) {
-    Expects(process && !expected.empty() && timeout > 0ms, "running sample, expected line and deadline supplied");
-    auto deadline = Clock::now() + timeout;
-    while (process->Line(line, deadline))
-      if (line.starts_with(expected))
-        return true;
-    return false;
+  Headless::ClipboardClient& ClipboardSession() { return *clipboard; }
+  void GivenClipboard(std::string const& text) {
+    auto arguments = Arguments(certificates.Path(), false);
+    arguments.insert(arguments.end(), { "--clip", text });
+    GivenProcess(arguments);
+    if (::testing::Test::HasFatalFailure()) return;
+    session   = std::make_unique<Client>(Number(std::string_view(line).substr(5)), true, 640, 480);
+    clipboard = std::make_unique<Headless::ClipboardClient>(*session);
+    ASSERT_TRUE(freerdp_connect(session->Instance().get())) << ConnectLogs();
   }
-  bool ReadInput(Client &client, std::string_view expected) {
-    Expects(!expected.empty(), "expected input event supplied");
-    bool received = false;
-    return client.Until([&] { return received || (received = Read(expected, 1ms)); });
+  void GivenIniProcess(std::vector<std::string> const& args, unsigned port) {
+    process = std::make_unique<Process>(args);
+    ASSERT_TRUE(Read("port ")) << process->Transcript();
+    EXPECT_EQ(Number(std::string_view(line).substr(5)), port);
   }
-  void DelayAcknowledgement(Client &client, Headless::FrameObserver &frames) {
-    Expects(frames.ack_times.size() >= 2, "two previous acknowledgements define the delay");
-    ASSERT_TRUE(freerdp_input_send_keyboard_event(client.instance->context->input, KBD_FLAGS_DOWN, 0x1e));
-    ASSERT_TRUE(ReadInput(client, "event KEY_DOWN "));
-    auto interval = frames.ack_times.back() - frames.ack_times[frames.ack_times.size() - 2];
-    std::this_thread::sleep_until(frames.ack_times.back() + interval * 3);
-  }
-  void IncrementalFrames(Client &client, Headless::FrameObserver &frames, FullDesktopFrames &desktop, std::string_view change) {
-    Expects(!change.empty(), "frame trigger is named");
-    auto baseline = desktop.full;
-    auto before = frames.ids.size();
-    auto deliveries = desktop.deliveries;
-    if (change == "delayed ack")
-      ASSERT_NO_FATAL_FAILURE(DelayAcknowledgement(client, frames));
-    ASSERT_TRUE(frames.Ack());
-    ASSERT_TRUE(client.Until([&] { return frames.ids.size() >= before + 2; }));
-    EXPECT_EQ(desktop.full, baseline);
-    EXPECT_GT(desktop.deliveries, deliveries);
-    EXPECT_EQ(client.instance->context->gdi->width, 320);
-    EXPECT_EQ(client.instance->context->gdi->height, 200);
-    SDL_Log("trace exclusive %.*s gdi=%dx%d new_full_desktop=%u frames=%zu", int(change.size()), change.data(),
-            client.instance->context->gdi->width, client.instance->context->gdi->height,
-            desktop.full - baseline, frames.ids.size() - before);
-  }
-  void Exposed() {
-    ASSERT_TRUE(Read("event EXPOSED ")) << "EXPOSED missing: " << process->transcript;
-    auto name = line.find(" client_name=");
-    ASSERT_NE(name, std::string::npos) << line;
-    ASSERT_LT(name + 13, line.size()) << "non-empty client_name required: " << line;
-  }
-  void Input(Client &client) {
-    auto *input = client.instance->context->input;
-    unsigned motion_frame = 0;
-    ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x1e)) << "send A down";
-    ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x1e)) << "send A up";
-    ASSERT_TRUE(freerdp_input_send_mouse_event(input, PTR_FLAGS_MOVE, 100, 120)) << "send motion";
-    ASSERT_TRUE(freerdp_input_send_mouse_event(input, PTR_FLAGS_BUTTON1 | PTR_FLAGS_DOWN, 100, 120)) << "send left down";
-    ASSERT_TRUE(freerdp_input_send_mouse_event(input, PTR_FLAGS_BUTTON1, 100, 120)) << "send left up";
-    ASSERT_TRUE(freerdp_input_send_mouse_event(input, PTR_FLAGS_WHEEL | 120, 0, 0)) << "send wheel";
-    for (auto [event, text] : std::array<std::pair<std::string_view, std::string_view>, 6>{
-             {{"KEY_DOWN", " scancode=4 "}, {"KEY_UP", " scancode=4 "}, {"MOUSE_MOTION", " x=100 y=120"}, {"MOUSE_BUTTON_DOWN", " button=1 "}, {"MOUSE_BUTTON_UP", " button=1 "}, {"MOUSE_WHEEL", " y=1"}}}) {
-      ASSERT_TRUE(Read("event " + std::string(event) + " ")) << event << text << ": " << process->transcript;
-      ASSERT_TRUE(line.contains(text)) << "expected " << event << text << ", actual: " << line;
-      if (event == "MOUSE_MOTION") {
-        auto field = line.find(" frame=");
-        ASSERT_NE(field, std::string::npos) << "motion frame identifier: " << line;
-        motion_frame = Number(std::string_view(line).substr(field + 7));
-      }
-    }
-    NextFrame frame(client, motion_frame);
-    ASSERT_TRUE(client.Until([&] { return frame.received; })) << "next complete frame after motion";
-    ASSERT_TRUE(frame.matches) << "frame excludes pointer: " << frame.matches.message();
-  }
-  void TearDown() override {
-    {
-      std::scoped_lock const lock(log_guard);
-      client_logs = nullptr;
-    }
-    if (process)
-      SDL_Log("%s", process->transcript.c_str());
-  }
-  void Escape(Client &client) {
-    ASSERT_TRUE(freerdp_input_send_keyboard_event(client.instance->context->input, KBD_FLAGS_DOWN, 1)) << "send Escape";
-    ASSERT_TRUE(process->Exit()) << "sample exit 0 within ten seconds: " << process->transcript;
-  }
-  Headless::Logs logs;
-  oxbox::platform::ScratchArea certificates{"certificates", "sdl-rdp"};
-  std::unique_ptr<Process> process;
-  std::string line;
+  unsigned audio_port = 0;
 
 private:
-  static BOOL CollectClientLog(wLogMessage const *message) {
-    std::scoped_lock const lock(log_guard);
-    if (client_logs && message->TextString) {
-      auto level = message->Level == WLOG_ERROR  ? SDLRDP_LOG_ERROR
-                   : message->Level == WLOG_WARN ? SDLRDP_LOG_WARN
-                                                 : SDLRDP_LOG_INFO;
-      Headless::Logs::Collect(client_logs, level, message->TextString);
-    }
-    return TRUE;
+  std::unique_ptr<Client>                    session;
+  std::unique_ptr<Headless::ClipboardClient> clipboard;
+  std::unique_ptr<InputClient>               channels;
+  std::unique_ptr<PositionObserver>          position;
+};
+class SampleDesktopSteps : public SampleSession {
+protected:
+  void GivenAdvancedSession() {
+    GivenInputSession(true);
+    if (::testing::Test::HasFatalFailure()) return;
+    ThenAdvanced(SessionClient());
   }
-  inline static std::mutex log_guard;
-  inline static Headless::Logs *client_logs = nullptr;
+  static void PressFullscreenKey(Client& client) {
+    auto* input = client.Instance()->context->input;
+    ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x3e));
+    ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x3e));
+  }
+
+  void WhenUnicodeClipboardOffered(Client& client, std::vector<BYTE> const& bytes) {
+    ASSERT_EQ(ClipboardSession().Offer(bytes), CHANNEL_RC_OK);
+    ASSERT_TRUE(client.Until([&] { return ClipboardSession().Observed().requests.load() == 2; }));
+    ASSERT_TRUE(Read("event CLIPBOARD text=żółw"));
+    SDL_Log("trace CLIPBOARD client formats=13 request=13 utf16le=7c01f300420177000000 text=żółw");
+  }
+  void WhenClipboardEmptied(Client& client) {
+    ASSERT_EQ(ClipboardSession().Offer({ 0, 0 }), CHANNEL_RC_OK);
+    ASSERT_TRUE(client.Until([&] { return ClipboardSession().Observed().requests.load() == 1; }));
+    ASSERT_TRUE(Read("event CLIPBOARD text="));
+  }
+  void WhenAsciiClipboardOffered(Client& client) {
+    ASSERT_EQ(ClipboardSession().Offer({ 'w', 0, 'o', 0, 'r', 0, 'l', 0, 'd', 0, 0, 0 }), CHANNEL_RC_OK);
+    ASSERT_TRUE(client.Until([&] { return ClipboardSession().Observed().requests.load() == 1; }));
+    ASSERT_TRUE(Read("event CLIPBOARD text=world"));
+    SDL_Log("trace CLIPBOARD client formats=13 request=13 utf16le=77006f0072006c0064000000 text=world");
+  }
+  void ThenSizeEvents(std::string const& dimensions) {
+    ASSERT_TRUE(Read("event RESIZED "));
+    EXPECT_TRUE(line.ends_with(dimensions)) << line;
+    ASSERT_TRUE(Read("event PIXEL_SIZE_CHANGED "));
+    EXPECT_TRUE(line.ends_with(dimensions)) << line;
+  }
+  void ThenDesktopMode(Client& client, unsigned w, unsigned h) {
+    ASSERT_TRUE(ReadInput(
+        client, "event DISPLAY_DESKTOP_MODE_CHANGED type=" + std::to_string(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED) +
+                    std::format(" width={} height={}", w, h)));
+    ASSERT_TRUE(Read(std::format("event GEOMETRY window={}x{} desktop={}x{}", w, h, w, h)));
+    ASSERT_TRUE(client.Until([&] {
+      auto* gdi = client.Instance()->context->gdi;
+      return std::cmp_equal(gdi->width, w) && std::cmp_equal(gdi->height, h);
+    }));
+  }
+  void ThenWaitingPort(unsigned port) {
+    ASSERT_TRUE(Read("port ")) << "port after connection: " << process->Transcript();
+    ASSERT_EQ(Number(std::string_view(line).substr(5)), port) << line;
+  }
+  void WhenCodecKeyChanges(Client const& client) {
+    auto* input = client.Instance()->context->input;
+    ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x3b));
+    ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x3b));
+    ASSERT_TRUE(Read("event CODEC_CHANGED codec=nscodec")) << process->Transcript();
+    SDL_Log("%s", process->Transcript().c_str());
+  }
+  void GivenSwitchableCodec(Client const& client) {
+    auto* settings = client.Instance()->context->settings;
+    ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_RemoteFxCodec, TRUE));
+    ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_NSCodec, TRUE));
+    ASSERT_TRUE(freerdp_connect(client.Instance().get())) << ConnectLogs();
+  }
+  void ThenTakeoverEvent(char const* expected) {
+    do {
+      ASSERT_TRUE(process->Line(line, Clock::now() + 10s)) << process->Transcript();
+    } while (!line.starts_with("event ") || line.starts_with("event GEOMETRY ") ||
+             line.starts_with("event CONNECTED "));
+    EXPECT_TRUE(line.starts_with("event " + std::string(expected) + " ")) << line;
+  }
+  void WhenSmallerDesktop(Client& first) {
+    ASSERT_TRUE(freerdp_connect(first.Instance().get())) << ConnectLogs();
+    ASSERT_TRUE(Read("event GEOMETRY window=640x480 desktop=320x200"));
+    ASSERT_TRUE(first.Until([&] { return Pattern(first, false); }));
+    ASSERT_TRUE(freerdp_disconnect(first.Instance().get()));
+    ASSERT_TRUE(Read("event FOCUS_LOST "));
+  }
+  void WhenWholeSampleReconnects(Client const& client, unsigned port) {
+    ASSERT_TRUE(freerdp_disconnect(client.Instance().get())) << "disconnect";
+    ASSERT_TRUE(Read("event OCCLUDED ")) << "OCCLUDED: " << process->Transcript();
+    ASSERT_TRUE(Read("event FOCUS_LOST ")) << "FOCUS_LOST: " << process->Transcript();
+    Client const second(port, true, 640, 480);
+    ASSERT_TRUE(freerdp_connect(second.Instance().get())) << ConnectLogs() << "second session connects";
+    Exposed();
+    if (::testing::Test::HasFatalFailure()) return;
+    Escape(second);
+  }
+  void GivenWholeSample() {
+    process = std::make_unique<Process>(Arguments(certificates.Path(), false));
+    ASSERT_TRUE(Read("port ")) << "port <n>: " << process->Transcript();
+  }
+};
+class Sample : public SampleDesktopSteps {
+protected:
+  void ThenTouchEvent(Client& client, std::string_view event, std::string_view detail) {
+    ASSERT_TRUE(ReadInput(client, event));
+    EXPECT_TRUE(line.contains(detail)) << line;
+  }
+  void ThenIgnoredWarpMotion(Client& client, rdpInput* input, UINT16 x, UINT16 y, char const* delta) {
+    ASSERT_TRUE(freerdp_input_send_mouse_event(input, PTR_FLAGS_MOVE, x, y));
+    ASSERT_TRUE(Read("event MOUSE_MOTION "));
+    EXPECT_TRUE(line.contains(delta)) << line;
+    if (x == 630) ASSERT_TRUE(client.Until([&] { return Position().Count() > 0; }));
+  }
+  void GivenRelativeOrigin(rdpInput* input) {
+    ASSERT_TRUE(freerdp_input_send_mouse_event(input, PTR_FLAGS_MOVE, 200, 150));
+    ASSERT_TRUE(Read("event MOUSE_MOTION "));
+    ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x3d));
+    ASSERT_TRUE(Read("event RELATIVE_MODE active=1"));
+  }
+  void WhenUnicodeControl(rdpInput* input, int code) {
+    ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(input, KBD_FLAGS_DOWN, code));
+    ASSERT_TRUE(Read("event KEY_DOWN "));
+    if (code == 27) EXPECT_TRUE(line.contains("scancode=41 key=27 down=1")) << line;
+    EXPECT_TRUE(line.contains(" key=" + std::to_string(code) + " down=1")) << line;
+  }
+  void ThenStoppedScancodeText(std::size_t stopped) {
+    EXPECT_EQ(process->Transcript().find("event TEXT_INPUT", stopped), std::string::npos);
+    auto lines = std::string_view(process->Transcript()) | std::views::split('\n');
+    EXPECT_EQ(
+        std::ranges::count_if(lines, [](auto text) { return std::string_view(text).contains("event TEXT_INPUT"); }), 2);
+    SDL_Log("gate SCANCODE_TEXT a=1 A=1 stopped_text=0");
+  }
+  void WhenReverseWheel(Client& client, auto* advanced) {
+    ASSERT_EQ(advanced->AInputSendInputEvent(advanced, AINPUT_FLAGS_WHEEL, -120 * 65536, 120 * 65536), CHANNEL_RC_OK);
+    ASSERT_TRUE(ReadInput(client, "event MOUSE_WHEEL "));
+    EXPECT_TRUE(line.ends_with(" x=-1 y=1")) << line;
+  }
+  void WhenAspectRelative(Client& client) {
+    ASSERT_TRUE(freerdp_input_send_keyboard_event(client.Instance()->context->input, KBD_FLAGS_DOWN, 0x3d));
+    ASSERT_TRUE(Read("event RELATIVE_MODE active=1"));
+    auto* advanced = SampleGate::InputClient::Advanced().load();
+    ASSERT_EQ(advanced->AInputSendInputEvent(advanced, AINPUT_FLAGS_MOVE | AINPUT_FLAGS_REL, -10, 48), CHANNEL_RC_OK);
+    ASSERT_TRUE(ReadInput(client, "event MOUSE_MOTION "));
+    EXPECT_TRUE(line.contains(" xrel=-10 yrel=35 ")) << line;
+  }
+  void WhenAdvancedMotion(Client& client, rdpInput* input) {
+    ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x3d));
+    ASSERT_TRUE(Read("event RELATIVE_MODE active=1"));
+    auto* advanced = SampleGate::InputClient::Advanced().load();
+    ASSERT_EQ(advanced->AInputSendInputEvent(advanced, AINPUT_FLAGS_MOVE | AINPUT_FLAGS_REL, 17, -9), CHANNEL_RC_OK);
+    ASSERT_TRUE(ReadInput(client, "event MOUSE_MOTION "));
+    EXPECT_TRUE(line.contains(" xrel=17 yrel=-9 ")) << line;
+  }
+  void ThenWarpEchoIgnored(rdpInput* input) {
+    auto initial = Position().Count();
+    ASSERT_TRUE(freerdp_input_send_mouse_event(input, PTR_FLAGS_MOVE, 320, 240));
+    ASSERT_TRUE(freerdp_input_send_mouse_event(input, PTR_FLAGS_MOVE, 330, 235));
+    ASSERT_TRUE(Read("event MOUSE_MOTION "));
+    EXPECT_TRUE(line.contains(" xrel=10 yrel=-5 ")) << line;
+    EXPECT_EQ(Position().Count(), initial);
+  }
+  void WhenRelativeWarp(Client& client, rdpInput* input) {
+    ASSERT_TRUE(freerdp_input_send_mouse_event(input, PTR_FLAGS_MOVE, 630, 240));
+    ASSERT_TRUE(Read("event MOUSE_MOTION "));
+    ASSERT_TRUE(client.Until([&] { return Position().Count() > 0; }));
+    EXPECT_EQ(Position().X(), 320u);
+    EXPECT_EQ(Position().Y(), 240u);
+    SDL_Log("gate POINTER_POSITION x=%u y=%u", Position().X(), Position().Y());
+  }
+  void WhenPreciseWheel(rdpInput* input, UINT16 flags, char const* expected) {
+    ASSERT_TRUE(freerdp_input_send_mouse_event(input, flags, 0, 0));
+    ASSERT_TRUE(Read("event MOUSE_WHEEL "));
+    EXPECT_TRUE(line.ends_with(expected)) << line;
+  }
+  void ThenStoppedUnicode(rdpInput* input) {
+    auto stopped = process->Transcript().size();
+    ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(input, KBD_FLAGS_DOWN, 0xe9));
+    ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x1e));
+    ASSERT_TRUE(Read("event KEY_DOWN type=768 scancode=4 key=97 down=1"));
+    EXPECT_TRUE(line.contains(" scancode=4 key=97 down=1")) << line;
+    EXPECT_EQ(process->Transcript().find("event TEXT_INPUT", stopped), std::string::npos);
+    SDL_Log("gate TEXT_STOPPED no_TEXT_INPUT=1 scancode_key=97 layout=0x040c");
+  }
+  void GivenFrenchKeyboard(Client const& client) {
+    ASSERT_TRUE(freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_KeyboardLayout, 0x40c));
+    ASSERT_TRUE(freerdp_connect(client.Instance().get()));
+    ASSERT_TRUE(Read("event EXPOSED "));
+    EXPECT_TRUE(line.contains(" keyboard_layout=1036 ")) << line;
+    ASSERT_TRUE(Read("event FOCUS_GAINED "));
+  }
 };
 
-} // namespace SampleGate
+}

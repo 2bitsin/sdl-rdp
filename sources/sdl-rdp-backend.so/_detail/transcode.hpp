@@ -1,14 +1,13 @@
 #pragma once
-#include <oxbox/utilities/transcode.hpp>
 #include <functional>
+#include <oxbox/utilities/transcode.hpp>
 #include <stdexcept>
 #include <vector>
 
 namespace Backend {
-template<class Output, class Map = std::identity>
+template <class Output, class Map = std::identity>
 Output TranscodeRange(std::span<std::byte const> input, oxbox::utilities::TextFormat source,
-                      oxbox::utilities::TextFormat target, Map map = {})
-{
+                      oxbox::utilities::TextFormat target, Map map = {}) {
   using namespace oxbox::utilities;
   static_assert(sizeof(typename Output::value_type) == sizeof(std::byte));
   std::vector<std::byte> encoded;

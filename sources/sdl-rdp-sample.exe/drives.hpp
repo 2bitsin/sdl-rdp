@@ -1,8 +1,8 @@
 #pragma once
 
 struct DriveOptions {
-  const char* list  = nullptr;
-  const char* cat   = nullptr;
-  const char* write = nullptr;
+  char const* list  = nullptr;
+  char const* cat   = nullptr;
+  char const* write = nullptr;
 };
 bool RunDrives(DriveOptions const& /*options*/);

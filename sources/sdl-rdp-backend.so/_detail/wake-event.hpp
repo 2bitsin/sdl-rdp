@@ -1,5 +1,6 @@
 #pragma once
 #include "rdp-handles.hpp"
+
 #include <atomic>
 
 namespace Backend {
@@ -11,8 +12,9 @@ public:
   HANDLE get() const;
   explicit operator bool() const;
   void Transition(Phase next);
+
 private:
-  EventHandle        handle;
-  std::atomic<Phase> phase  { Phase::Idle };
+  EventHandle handle;
+  std::atomic<Phase> phase{ Phase::Idle };
 };
 }

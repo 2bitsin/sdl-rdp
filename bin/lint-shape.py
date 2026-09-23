@@ -65,7 +65,7 @@ def classes(tokens, pairs):
         inherited = False
         while cursor < len(tokens):
             word = tokens[cursor][0]
-            if word in ('{', ';') or (word in ('>', ',') and not inherited):
+            if word in ('{', ';') or (word in ('>', ',', '*', '&', ')', '(', '=') and not inherited):
                 break
             inherited |= word == ':'
             cursor += 1
@@ -198,7 +198,8 @@ def check_file(path, fixtures=frozenset()):
 def check_allow(findings, allow):
     allowed = set()
     if allow:
-        allowed = {line.strip() for line in allow.read_text().splitlines() if line.strip()}
+        allowed = {entry for line in allow.read_text().splitlines()
+                   if (entry := line.partition('#')[0].strip())}
     current = {text for text, _ in findings}
     failed = False
     for text, line in findings:
@@ -214,9 +215,12 @@ def check_allow(findings, allow):
 
 def fixture_classes(paths):
     bases = {}
+    helpers = set()
     for path in paths:
         tokens, _ = scan(path.read_text())
         for _, name, line, start, _ in classes(tokens, matching(tokens)):
+            if path.name.startswith('test-') or path.name.endswith('.test.cpp'):
+                helpers.add(name)
             prefix = []
             cursor = start - 1
             while cursor >= 0 and tokens[cursor][0] not in ('class', 'struct'):
@@ -225,7 +229,12 @@ def fixture_classes(paths):
             if ':' in prefix:
                 bases.setdefault(name, set()).update(prefix[:prefix.index(':')])
     fixtures = {'Test', 'TestWithParam'}
-    while additional := {name for name, parents in bases.items() if parents & fixtures} - fixtures:
+    while True:
+        derived = {name for name, parents in bases.items() if parents & fixtures}
+        mixins = {parent for name in fixtures for parent in bases.get(name, ()) if parent in helpers}
+        additional = (derived | mixins) - fixtures
+        if not additional:
+            break
         fixtures.update(additional)
     return fixtures
 

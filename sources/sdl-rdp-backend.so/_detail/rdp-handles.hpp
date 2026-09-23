@@ -2,17 +2,14 @@
 
 #include <freerdp/listener.h>
 #include <freerdp/peer.h>
+#include <memory>
 #include <winpr/handle.h>
 #include <winpr/stream.h>
 
-#include <memory>
-
 namespace Backend {
-template <auto RELEASE>
-struct Releases {
+template <auto RELEASE> struct Releases {
 public:
-  template <typename VTy>
-  auto operator()(VTy* what) const -> void { (void)RELEASE(what); }
+  template <typename VTy> auto operator()(VTy* what) const -> void { (void)RELEASE(what); }
 };
 
 struct ReleaseStream {
@@ -22,8 +19,7 @@ public:
 
 struct ReleasesPeer {
 public:
-  auto operator()(freerdp_peer* what) const -> void
-  {
+  auto operator()(freerdp_peer* what) const -> void {
     freerdp_peer_context_free(what);
     freerdp_peer_free(what);
   }
@@ -31,8 +27,7 @@ public:
 
 struct ReleasesListener {
 public:
-  void operator()(freerdp_listener* listener) const
-  {
+  void operator()(freerdp_listener* listener) const {
     listener->Close(listener);
     freerdp_listener_free(listener);
   }

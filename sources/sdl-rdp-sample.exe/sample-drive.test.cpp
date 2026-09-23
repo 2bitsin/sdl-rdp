@@ -1,68 +1,83 @@
-#include <cstddef>
 #include "_detail/sample-fixture.hpp"
+
+#include <cstddef>
 #include <sdl-rdp-backend.so/_detail/headless-drive.hpp>
 
 namespace SampleGate {
-TEST_F(Sample, DriveDisconnectDuringCat)
-{
-  oxbox::platform::ScratchArea const share{ "sample-disconnect", "sdl-rdp" };
-  auto                               path  = share.Path() / "huge.bin";
+namespace {
+class DriveSample : public SampleGate::Sample {
+protected:
+  void ThenMissingCat(Client& client) {
+    ASSERT_TRUE(ReadInput(client, "cat failed: ")) << process->Transcript();
+    EXPECT_NE(line.find("Drive 'missing.bin' failed: STATUS_NO_SUCH_FILE (0xc000000f)"), std::string::npos) << line;
+  }
+};
+namespace {
+void ThenCatFailure(Process const& process) {
+  auto failure = process.Transcript().find("cat failed:");
+  EXPECT_EQ(process.Transcript().find("cat failed:", failure + 1), std::string::npos);
+  EXPECT_EQ(process.Transcript().find("cat bytes="), std::string::npos);
+}
+}
+namespace {
+void CreateHugeFile(fs::path const& share) {
+  auto path = share / "huge.bin";
   {
     std::ofstream const file(path);
   }
   fs::resize_file(path, static_cast<std::ptrdiff_t>(400 * 1024) * 1024);
+}
+}
+namespace {
+void ThenCatNotRepeated(Process const& process, Headless::DriveObserver const& observer) {
+  EXPECT_EQ(observer.Observed().requests, 0u);
+  ThenCatFailure(process);
+  SDL_Log("trace DRIVE second client connected, frame received, cat not repeated, sample exited 0");
+}
+}
+TEST_F(DriveSample, DriveDisconnectDuringCat) {
+  oxbox::platform::ScratchArea const share{ "sample-disconnect", "sdl-rdp" };
+  CreateHugeFile(share.Path());
   auto arguments = Arguments(certificates.Path(), false);
   arguments.insert(arguments.end(), { "--cat", "share/huge.bin" });
-  ASSERT_NO_FATAL_FAILURE(GivenProcess(arguments));
+  GivenProcess(arguments);
+  if (::testing::Test::HasFatalFailure()) return;
   auto port = Number(std::string_view(line).substr(5));
-  {
-    Client client(port, true, 640, 480);
-    Headless::ShareDrive(client, share.Path().c_str());
-    ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
-    Headless::DriveObserver observer(client);
-    ASSERT_TRUE(client.Until([&] {
-      return std::ranges::any_of(observer.io, [](auto packet) {
-        packet.Skip(12);
-        return packet.Get(4) == IRP_MJ_READ;
-      });
-    }));
-    ASSERT_TRUE(freerdp_disconnect(client.instance.get()));
-  }
-  ASSERT_TRUE(Read("cat failed: ")) << process->transcript;
+  DisconnectReading(port, share.Path());
+  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_TRUE(Read("cat failed: ")) << process->Transcript();
   SDL_Log("trace DRIVE disconnected after read request: %s", line.c_str());
   Client second(port, true, 640, 480);
   Headless::ShareDrive(second, share.Path().c_str());
-  ASSERT_TRUE(freerdp_connect(second.instance.get())) << ConnectLogs();
+  ASSERT_TRUE(freerdp_connect(second.Instance().get())) << ConnectLogs();
   Headless::DriveObserver observer(second);
-  ASSERT_TRUE(second.Until([&] { return !observer.replies.empty() && Pattern(second, false); }));
-  ASSERT_NO_FATAL_FAILURE(Escape(second));
-  while (process->Line(line, Clock::now() + 1s)) {}
-  EXPECT_EQ(observer.requests, 0u);
-  auto failure = process->transcript.find("cat failed:");
-  EXPECT_EQ(process->transcript.find("cat failed:", failure + 1), std::string::npos);
-  EXPECT_EQ(process->transcript.find("cat bytes="), std::string::npos);
-  SDL_Log("trace DRIVE second client connected, frame received, cat not repeated, sample exited 0");
+  ASSERT_TRUE(second.Until([&] { return !observer.Observed().replies.empty() && Pattern(second, false); }));
+  Escape(second);
+  if (::testing::Test::HasFatalFailure()) return;
+  while (process->Line(line, Clock::now() + 1s)) {
+  }
+  ThenCatNotRepeated(*process, observer);
 }
 
-TEST_F(Sample, DriveMissingCatKeepsServing)
-{
-  oxbox::platform::ScratchArea const share    { "sample-missing", "sdl-rdp" };
-  auto                               arguments = Arguments(certificates.Path(), false);
+TEST_F(DriveSample, DriveMissingCatKeepsServing) {
+  oxbox::platform::ScratchArea const share{ "sample-missing", "sdl-rdp" };
+  auto arguments = Arguments(certificates.Path(), false);
   arguments.insert(arguments.end(), { "--cat", "share/missing.bin" });
-  ASSERT_NO_FATAL_FAILURE(GivenProcess(arguments));
-  Client client(Number(std::string_view(line).substr(5)), true, 640, 480);
-  Headless::ShareDrive(client, share.Path().c_str());
-  ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
-  ASSERT_TRUE(ReadInput(client, "cat failed: ")) << process->transcript;
-  EXPECT_NE(line.find("Drive 'missing.bin' failed: STATUS_NO_SUCH_FILE (0xc000000f)"), std::string::npos) << line;
+  GivenDriveProcess(arguments, share.Path());
+  if (::testing::Test::HasFatalFailure()) return;
+  auto& client = SessionClient();
+  ThenMissingCat(client);
+  if (::testing::Test::HasFatalFailure()) return;
   // Observe a new frame after the failure, rather than inspecting an old framebuffer.
   Headless::FrameObserver observer(client);
-  ASSERT_TRUE(client.Until([&] { return !observer.ids.empty() && Pattern(client, false); }));
-  ASSERT_NO_FATAL_FAILURE(Escape(client));
-  while (process->Line(line, Clock::now() + 1s)) {}
-  auto failure = process->transcript.find("cat failed:");
+  ASSERT_TRUE(client.Until([&] { return !observer.Frames().empty() && Pattern(client, false); }));
+  Escape(client);
+  if (::testing::Test::HasFatalFailure()) return;
+  while (process->Line(line, Clock::now() + 1s)) {
+  }
+  auto failure = process->Transcript().find("cat failed:");
   ASSERT_NE(failure, std::string::npos);
-  EXPECT_EQ(process->transcript.find("cat failed:", failure + 1), std::string::npos);
-  EXPECT_EQ(process->transcript.find("cat bytes="), std::string::npos);
+  ThenCatFailure(*process);
+}
 }
 }
