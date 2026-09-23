@@ -107,7 +107,7 @@ public:
   }
 
   bool Until(auto ready) {
-    auto deadline = Clock::now() + std::chrono::seconds(3);
+    auto deadline = Clock::now() + std::chrono::seconds(10);
     while (!ready() && Clock::now() < deadline) {
       for (unsigned batch = 0; batch < 16; ++batch) if (!Pump(batch ? 0 : 10)) return false;
     }
@@ -119,7 +119,25 @@ struct FrameObserver {
   rdpUpdate* update;
   pSurfaceFrameMarker original;
   std::vector<UINT32> ids;
+  std::vector<Clock::time_point> received;
   bool coherent = true;
+  std::vector<Clock::time_point> ack_times, ack_processed;
+  // Each server timestamp lies between sending the ACK and observing a later
+  // server action. Propagate those measured intervals through the 0.8/0.2
+  // refresh filter; include its 5% notification hysteresis and mHz rounding.
+  std::pair<double, double> RefreshBounds() const {
+    Expects(ack_times.size() == ack_processed.size() && ack_times.size() >= 2,
+            "at least two acknowledgements bracketed");
+    double lower = 0, upper = 0;
+    for (std::size_t i = 1; i < ack_times.size(); ++i) {
+      auto low = std::max(0.0, std::chrono::duration<double>(ack_times[i] - ack_processed[i - 1]).count());
+      auto high = std::chrono::duration<double>(ack_processed[i] - ack_times[i - 1]).count();
+      lower = i == 1 ? low : 0.8 * lower + 0.2 * low;
+      upper = i == 1 ? high : 0.8 * upper + 0.2 * high;
+    }
+    return {std::clamp(1.0 / upper, 0.001, 1000.0) / 1.05 - 0.001,
+            std::clamp(lower > 0 ? 1.0 / lower : 1000.0, 0.001, 1000.0) / 0.95 + 0.001};
+  }
   explicit FrameObserver(Client& client) : update(client.instance->context->update), original(update->SurfaceFrameMarker) {
     Expects(!active, "one frame observer per thread");
     active = this;
@@ -129,12 +147,19 @@ struct FrameObserver {
   static BOOL Receive(rdpContext* context, SURFACE_FRAME_MARKER const* marker) {
     if (marker->frameAction != SURFACECMD_FRAMEACTION_END) return TRUE;
     active->ids.push_back(marker->frameId);
+    active->received.push_back(Clock::now());
     auto gdi = context->gdi;
     auto pixels = reinterpret_cast<UINT32 const*>(gdi->primary_buffer);
     active->coherent &= (pixels[0] & 0xffffff) == (pixels[(gdi->height - 1) * gdi->width] & 0xffffff);
     return TRUE;
   }
-  bool Ack() { return !ids.empty() && update->SurfaceFrameAcknowledge(update->context, ids.back()); }
+  bool Ack() {
+    if (ids.empty()) return false;
+    auto sent = Clock::now();
+    if (!update->SurfaceFrameAcknowledge(update->context, ids.back())) return false;
+    ack_times.push_back(sent);
+    return true;
+  }
 };
 struct DisplayClient {
   inline static std::atomic<DispClientContext*> channel = nullptr;

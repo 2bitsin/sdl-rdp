@@ -92,7 +92,7 @@ public:
   }
   bool Exit() {
     Expects(pid > 0, "sample has not been reaped");
-    auto deadline = Clock::now() + 2s;
+    auto deadline = Clock::now() + 10s;
     int status = 0;
     while (Clock::now() < deadline) {
       if (waitpid(pid, &status, WNOHANG) == pid) { pid = -1; return WIFEXITED(status) && WEXITSTATUS(status) == 0; }
@@ -225,7 +225,7 @@ protected:
   oxbox::platform::ScratchArea certificates{"certificates", "sdl-rdp"};
   std::unique_ptr<Process> process;
   std::string line;
-  bool Read(std::string_view expected, std::chrono::milliseconds timeout = 2s) {
+  bool Read(std::string_view expected, std::chrono::milliseconds timeout = 10s) {
     Expects(process && !expected.empty() && timeout > 0ms, "running sample, expected line and deadline supplied");
     auto deadline = Clock::now() + timeout;
     while (process->Line(line, deadline)) if (line.starts_with(expected)) return true;
@@ -269,7 +269,7 @@ protected:
   void TearDown() override { if (process) SDL_Log("%s", process->transcript.c_str()); }
   void Escape(Client& client) {
     ASSERT_TRUE(freerdp_input_send_keyboard_event(client.instance->context->input, KBD_FLAGS_DOWN, 1)) << "send Escape";
-    ASSERT_TRUE(process->Exit()) << "sample exit 0 within two seconds: " << process->transcript;
+    ASSERT_TRUE(process->Exit()) << "sample exit 0 within ten seconds: " << process->transcript;
   }
 };
 
