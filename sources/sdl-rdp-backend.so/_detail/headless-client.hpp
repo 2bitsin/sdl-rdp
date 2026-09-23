@@ -98,6 +98,16 @@ public:
         && freerdp_channels_client_load_ex(instance->context->channels, settings, entry, settings) == 0;
     };
   }
+  void Credentials(char const* user, char const* password, char const* domain, bool nla = false) {
+    auto settings = instance->context->settings;
+    Expects(freerdp_settings_set_string(settings, FreeRDP_Username, user)
+      && freerdp_settings_set_string(settings, FreeRDP_Password, password)
+      && freerdp_settings_set_string(settings, FreeRDP_Domain, domain)
+      && freerdp_settings_set_bool(settings, FreeRDP_NlaSecurity, nla)
+      && freerdp_settings_set_bool(settings, FreeRDP_TlsSecurity, !nla)
+      && freerdp_settings_set_bool(settings, FreeRDP_RdpSecurity, FALSE)
+      && freerdp_settings_set_string(settings, FreeRDP_AuthenticationPackageList, "!kerberos"), "client credentials configured");
+  }
   bool Pump(unsigned timeout = 10) {
     std::array<HANDLE, 64> handles{};
     auto count = freerdp_get_event_handles(instance->context, handles.data(), handles.size());

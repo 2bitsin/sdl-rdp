@@ -10,6 +10,7 @@
 #include "input.hpp"
 #include "audio.hpp"
 #include "gfx.hpp"
+#include "auth.hpp"
 #include <atomic>
 #include <condition_variable>
 #include <deque>
@@ -41,6 +42,7 @@ struct State {
   ~State();
   void Log(sdlrdp_log_level level, std::string const& text) const;
   LogRoute log_route;
+  Authentication authentication;
   void (*log)(void*, sdlrdp_log_level, const char*);
   void* user;
   void Listen(std::stop_token quit);
@@ -100,6 +102,8 @@ public:
   void Start();
   void Post(sdlrdp_rect area);
   bool Configure();
+  void AuthenticationEnded();
+  AuthenticationState authentication;
   void Serve(std::stop_token quit);
   DWORD EventHandles(std::span<HANDLE> handles);
   Encoder encoder;

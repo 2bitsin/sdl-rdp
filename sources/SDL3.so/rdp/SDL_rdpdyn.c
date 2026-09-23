@@ -3,6 +3,17 @@
     backend->name = (void *)SDL_LoadFunction(backend->object, "sdlrdp_" #name); \
     if (!backend->name) { SDL_RDP_UnloadBackend(backend); return false; }
 
+static bool SDL_RDP_LoadAuthentication(SDL_RDP_Backend *backend)
+{
+    if (backend->version() != SDLRDP_ABI_VERSION) {
+        SDL_RDP_UnloadBackend(backend);
+        return SDL_SetError("RDP backend ABI version mismatch (expected %u)", SDLRDP_ABI_VERSION);
+    }
+    SDL_RDP_LOAD(verify_pair);
+    SDL_RDP_LOAD(lookup_pair);
+    return true;
+}
+
 bool SDL_RDP_LoadBackend(SDL_RDP_Backend *backend)
 {
     const char *path = SDL_GetHint(SDL_HINT_RDP_BACKEND);
@@ -12,6 +23,7 @@ bool SDL_RDP_LoadBackend(SDL_RDP_Backend *backend)
     }
     SDL_RDP_LOAD(last_error);
     SDL_RDP_LOAD(version);
+    if (!SDL_RDP_LoadAuthentication(backend)) return false;
     SDL_RDP_LOAD(open);
     SDL_RDP_LOAD(close);
     SDL_RDP_LOAD(port);
@@ -33,10 +45,6 @@ bool SDL_RDP_LoadBackend(SDL_RDP_Backend *backend)
     SDL_RDP_LOAD(audio_write);
     SDL_RDP_LOAD(audio_wait);
     SDL_RDP_LOAD(audio_close);
-    if (backend->version() != SDLRDP_ABI_VERSION) {
-        SDL_RDP_UnloadBackend(backend);
-        return SDL_SetError("RDP backend ABI version mismatch (expected %u)", SDLRDP_ABI_VERSION);
-    }
     SDL_ClearError();
     return true;
 }

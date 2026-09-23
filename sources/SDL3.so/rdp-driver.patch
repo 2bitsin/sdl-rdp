@@ -45,7 +45,7 @@
      sdl_glob_sources(
 --- a/include/SDL3/SDL_hints.h
 +++ b/include/SDL3/SDL_hints.h
-@@ -3164,6 +3164,19 @@
+@@ -3164,6 +3164,25 @@
  #define SDL_HINT_QUIT_ON_LAST_WINDOW_CLOSE "SDL_QUIT_ON_LAST_WINDOW_CLOSE"
 
 +/* Listener settings are shared by audio and video; set before opening either. */
@@ -60,6 +60,12 @@
 +#define SDL_HINT_RDP_PORT "SDL_RDP_PORT"
 +#define SDL_HINT_RDP_WAIT_FOR_CLIENT "SDL_RDP_WAIT_FOR_CLIENT"
 +#define SDL_HINT_RDP_WIDTH "SDL_RDP_WIDTH"
++/* UTF-8 fixed credentials; unset domain accepts any domain. Set before init. */
++#define SDL_HINT_RDP_USER "SDL_RDP_USER"
++#define SDL_HINT_RDP_PASSWORD "SDL_RDP_PASSWORD"
++#define SDL_HINT_RDP_DOMAIN "SDL_RDP_DOMAIN"
++/* none, tls, nla; defaults to nla with a password hint, otherwise none. */
++#define SDL_HINT_RDP_AUTH "SDL_RDP_AUTH"
 +
  /**
   * A variable controlling whether the Direct3D device is initialized for
@@ -67,18 +73,29 @@
   *
 --- a/include/SDL3/SDL_video.h
 +++ b/include/SDL3/SDL_video.h
-@@ -681,6 +681,7 @@
+@@ -681,6 +681,14 @@
   */
  extern SDL_DECLSPEC SDL_PropertiesID SDLCALL SDL_GetDisplayProperties(SDL_DisplayID displayID);
 
 +#define SDL_PROP_DISPLAY_RDP_PORT_NUMBER "SDL.display.rdp.port"
++/* Worker-thread callbacks, read at call time. Keep callbacks/userdata alive until quit.
++   bool (SDLCALL *)(void *userdata, const char *domain, const char *user, const char *password)
++   bool (SDLCALL *)(void *userdata, const char *domain, const char *user, Uint8 nt_hash[16])
++   Set after SDL_Init; absent callbacks fall back to the fixed hint pair. */
++#define SDL_PROP_DISPLAY_RDP_VERIFY_POINTER "SDL.display.rdp.verify"
++#define SDL_PROP_DISPLAY_RDP_LOOKUP_POINTER "SDL.display.rdp.lookup"
++#define SDL_PROP_DISPLAY_RDP_AUTH_USERDATA_POINTER "SDL.display.rdp.auth_userdata"
  #define SDL_PROP_DISPLAY_HDR_ENABLED_BOOLEAN             "SDL.display.HDR_enabled"
  #define SDL_PROP_DISPLAY_KMSDRM_PANEL_ORIENTATION_NUMBER "SDL.display.KMSDRM.panel_orientation"
  #define SDL_PROP_DISPLAY_WAYLAND_WL_OUTPUT_POINTER       "SDL.display.wayland.wl_output"
-@@ -1627,6 +1628,15 @@
+@@ -1627,6 +1628,19 @@
   */
  extern SDL_DECLSPEC SDL_PropertiesID SDLCALL SDL_GetWindowProperties(SDL_Window *window);
 
++/* Read-only UTF-8 identity and authentication result of the connected client. */
++#define SDL_PROP_WINDOW_RDP_USER_STRING "SDL.window.rdp.user"
++#define SDL_PROP_WINDOW_RDP_DOMAIN_STRING "SDL.window.rdp.domain"
++#define SDL_PROP_WINDOW_RDP_AUTHENTICATED_BOOLEAN "SDL.window.rdp.authenticated"
 +#define SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING "SDL.window.rdp.client_name"
 +#define SDL_PROP_WINDOW_RDP_CODEC_STRING "SDL.window.rdp.codec"
 +/**

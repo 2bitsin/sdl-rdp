@@ -1,4 +1,5 @@
 #include "SDL_rdpvideo.h"
+#include "SDL_rdpauth.h"
 #include "SDL_rdpclipboard.h"
 #include "SDL_rdpwindow.h"
 #include "SDL_rdpframebuffer.h"
@@ -24,6 +25,7 @@ static bool SDL_RDP_InitDisplay(SDL_VideoData *data, const sdlrdp_config *config
     mode.w = (int)config->width;
     mode.h = (int)config->height;
     data->display = SDL_AddBasicVideoDisplay(&mode);
+    if (data->display) SDL_RDP_AuthDisplay(SDL_GetDisplayProperties(data->display));
     return data->display && SDL_SetNumberProperty(SDL_GetDisplayProperties(data->display),
         SDL_PROP_DISPLAY_RDP_PORT_NUMBER, data->backend.port(data->handle));
 }
@@ -56,6 +58,7 @@ static bool SDL_RDP_VideoInit(SDL_VideoDevice *_this)
 static void SDL_RDP_VideoQuit(SDL_VideoDevice *_this)
 {
     SDL_VideoData *data = _this->internal;
+    SDL_RDP_AuthDisplay(0);
     SDL_RemoveHintCallback(SDL_HINT_RDP_ASPECT, SDL_RDP_AspectHintChanged, data);
     SDL_RemoveHintCallback(SDL_HINT_RDP_CODEC, SDL_RDP_CodecHintChanged, data);
     if (data->handle) {

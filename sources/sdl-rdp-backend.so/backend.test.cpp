@@ -496,9 +496,15 @@ TEST_P(Gate, ProbeClosesBeforeActivation) {
     ASSERT_EQ(connect(socket.descriptor, reinterpret_cast<sockaddr*>(&address), sizeof(address)), 0);
   }
   auto deadline = Clock::now() + std::chrono::seconds(10);
-  while (!logs.Contains(SDLRDP_LOG_INFO, "Connection closed before activation.")
+  while (!logs.Contains(SDLRDP_LOG_INFO, "Connection closed before activation")
          && Clock::now() < deadline) std::this_thread::yield();
-  EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, "Connection closed before activation."));
+  {
+    std::scoped_lock lock(logs.guard);
+    EXPECT_TRUE(std::ranges::any_of(logs.lines, [](auto const& line) {
+      return line.first == SDLRDP_LOG_INFO
+        && line.second == "Connection closed before activation: ERRCONNECT_CONNECT_TRANSPORT_FAILED.";
+    }));
+  }
   EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, "Peer transport failed")) << logs.Text();
   EXPECT_EQ(sdlrdp_wait(backend.get(), 0), 0);
 }
@@ -573,7 +579,7 @@ TEST(Logging, NewestHandleRoutesAndClears) {
   sdlrdp_handle* raw = nullptr;
   ASSERT_EQ(sdlrdp_open(&config, &raw), 0);
   std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> a(raw, sdlrdp_close);
-  config.user = &second;
+  config.log_user = &second;
   ASSERT_EQ(sdlrdp_open(&config, &raw), 0);
   std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> b(raw, sdlrdp_close);
   WLog_Print(WLog_GetRoot(), WLOG_WARN, "latest handle marker");
