@@ -839,6 +839,131 @@ TEST_F(RoundFive, ColourDepths) {
     ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text();
   }
 }
+struct ResizeProbe {
+  inline static ResizeProbe* active = nullptr;
+  Backend::State& state;
+  Backend::Peer& peer;
+  pDesktopResize original;
+  unsigned calls = 0;
+  explicit ResizeProbe(Backend::State& state) : state(state), peer(*state.current) {
+    std::scoped_lock lock(state.session_guard);
+    Expects(!active, "one resize probe exists");
+    active = this;
+    original = peer.client->context->update->DesktopResize;
+    peer.client->context->update->DesktopResize = [](rdpContext* context) -> BOOL {
+      EXPECT_TRUE(freerdp_is_active_state(context));
+      ++active->calls;
+      return active->original(context);
+    };
+  }
+  ~ResizeProbe() {
+    std::scoped_lock lock(state.session_guard);
+    peer.client->context->update->DesktopResize = original;
+    active = nullptr;
+  }
+  bool Finalizing() {
+    std::scoped_lock lock(state.session_guard);
+    auto current = freerdp_get_state(peer.client->context);
+    return current >= CONNECTION_STATE_FINALIZATION_SYNC && current <= CONNECTION_STATE_FINALIZATION_FONT_LIST;
+  }
+  void MatchingLayout() {
+    std::scoped_lock lock(state.session_guard);
+    Expects(peer.resizing && peer.disp, "display layout targets the in-flight resize");
+    DISPLAY_CONTROL_MONITOR_LAYOUT monitor{};
+    monitor.Flags = DISPLAY_CONTROL_MONITOR_PRIMARY;
+    monitor.Width = peer.desktop.w; monitor.Height = peer.desktop.h;
+    DISPLAY_CONTROL_MONITOR_LAYOUT_PDU layout{sizeof(monitor), 1, &monitor};
+    EXPECT_EQ(peer.disp->DispMonitorLayout(peer.disp.get(), &layout), CHANNEL_RC_OK);
+  }
+  void ConfirmActiveCallback() {
+    std::scoped_lock lock(state.session_guard);
+    ASSERT_FALSE(freerdp_is_active_state(peer.client->context));
+    ASSERT_TRUE(peer.client->Activate(peer.client.get()));
+    EXPECT_TRUE(peer.resizing);
+  }
+  unsigned Calls() {
+    std::scoped_lock lock(state.session_guard);
+    return calls;
+  }
+};
+class ResizeStorm : public RoundFive {
+protected:
+  Clock::time_point started;
+  unsigned intervening = 0;
+  void DuringFinalization(ResizeProbe& probe, unsigned last_width, unsigned last_height) {
+    auto deadline = Clock::now() + std::chrono::seconds(2);
+    while (!probe.Finalizing() && Clock::now() < deadline) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    ASSERT_TRUE(probe.Finalizing());
+    probe.ConfirmActiveCallback();
+    for (auto [w, h] : {std::pair{1600u, 900u}, {1920u, 1080u}, {last_width, last_height}}) {
+      ASSERT_EQ(sdlrdp_resize(backend.get(), w, h), 0);
+      ++intervening;
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      EXPECT_EQ(probe.Calls(), 1u);
+      EXPECT_TRUE(probe.Finalizing());
+    }
+    probe.MatchingLayout();
+    EXPECT_LT(Clock::now() - started, std::chrono::milliseconds(200));
+  }
+  void Run(unsigned last_width, unsigned last_height, unsigned expected) {
+    Open(640, 480, {}, SDLRDP_CODEC_PLANAR);
+    Client client(sdlrdp_port(backend.get()), true, 640, 480);
+    Headless::DisplayClient display(client);
+    display.echo_resize = expected == 1;
+    display.finalization_delay = std::chrono::milliseconds(20);
+    Connect(client, false);
+    ASSERT_TRUE(client.Until([&] { return display.ready.load(); }));
+    Events();
+    ResizeProbe probe(*backend->state);
+    display.finalizing = [&] { if (display.desktops == 1) DuringFinalization(probe, last_width, last_height); };
+    started = Clock::now();
+    ASSERT_EQ(sdlrdp_resize(backend.get(), 1280, 800), 0);
+    std::vector<UINT32> pixels(last_width * last_height, 0);
+    ASSERT_TRUE(client.Until([&] { return display.desktops && client.Matches(pixels); }))
+      << "server calls=" << probe.Calls() << " client calls=" << display.desktops
+      << " GDI=" << client.instance->context->gdi->width << "x" << client.instance->context->gdi->height << "\n" << logs.Text(true);
+    for (unsigned i = 0; i < 20; ++i) ASSERT_TRUE(client.Pump(5));
+    EXPECT_EQ(client.instance->context->gdi->width, int(last_width));
+    EXPECT_EQ(client.instance->context->gdi->height, int(last_height));
+    EXPECT_FALSE(freerdp_shall_disconnect_context(client.instance->context));
+    EXPECT_EQ(intervening, 3u);
+    EXPECT_EQ(probe.Calls(), expected);
+    EXPECT_EQ(display.desktops, expected);
+    EXPECT_EQ(display.echoes, display.echo_resize ? expected : 0u);
+    EXPECT_FALSE(logs.Contains("Unexpected client message")) << logs.Text(true);
+    EXPECT_FALSE(std::ranges::any_of(Events(), [](auto event) { return event.type == SDLRDP_SCREEN; }));
+    RecordProperty("DesktopResize_calls", probe.Calls());
+    RecordProperty("SDLRDP_SCREEN_events", 0);
+  }
+};
+TEST_F(ResizeStorm, CoalescesThreeSizesDuringFinalization) {
+  Run(1024, 768, 2);
+}
+TEST_F(ResizeStorm, AlternatingAppSizesWithLayoutEcho) {
+  Run(1280, 800, 1);
+}
+TEST_F(ResizeStorm, EqualLayoutDoesNotChangePicture) {
+  Open();
+  Client client(sdlrdp_port(backend.get()), true, 640, 480);
+  Headless::DisplayClient display(client);
+  Connect(client, false);
+  ASSERT_TRUE(client.Until([&] { return display.ready.load(); }));
+  Events();
+  uint64_t presented;
+  { std::scoped_lock lock(backend->state->frame_guard); presented = backend->state->presented; }
+  ASSERT_TRUE(display.Layout(640, 480));
+  ASSERT_TRUE(display.Layout(800, 600));
+  auto events = EventsUntil([](auto const& events) {
+    return std::ranges::any_of(events, [](auto event) { return event.type == SDLRDP_SCREEN; });
+  }, false, &client);
+  auto screens = events | std::views::filter([](auto event) { return event.type == SDLRDP_SCREEN; });
+  ASSERT_EQ(std::ranges::distance(screens), 1);
+  EXPECT_EQ(screens.front().screen.width, 800u);
+  EXPECT_EQ(screens.front().screen.height, 600u);
+  { std::scoped_lock lock(backend->state->frame_guard); EXPECT_EQ(backend->state->presented, presented); }
+  RecordProperty("equal_layout_screen_events", 0);
+  RecordProperty("equal_layout_picture_resizes", 0);
+}
 TEST_F(RoundFive, ResizeDesktop) {
   Open();
   Client client(sdlrdp_port(backend.get()), true, 1024, 768);

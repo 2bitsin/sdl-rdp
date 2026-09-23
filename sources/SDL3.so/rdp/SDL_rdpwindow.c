@@ -42,9 +42,14 @@ void SDL_RDP_ShowWindow(SDL_VideoDevice *_this, SDL_Window *window)
 bool SDL_RDP_ResizePicture(SDL_VideoData *data, int w, int h)
 {
     SDL_VideoDisplay *display = SDL_GetVideoDisplay(data->display);
+    if (data->picture_width == w && data->picture_height == h) {
+        return true;
+    }
     if (data->backend.resize(data->handle, w, h) != 0) {
         return SDL_SetError("%s", data->backend.last_error());
     }
+    data->picture_width = w;
+    data->picture_height = h;
     if (display->desktop_mode.w != w || display->desktop_mode.h != h) {
         SDL_RDP_DesktopMode(data, w, h);
     }

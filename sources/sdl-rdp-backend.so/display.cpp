@@ -61,6 +61,7 @@ UINT Peer::Layout(DispServerContext* context, DISPLAY_CONTROL_MONITOR_LAYOUT_PDU
     right = std::max(right, int64_t(monitor.Left) + monitor.Width);
     bottom = std::max(bottom, int64_t(monitor.Top) + monitor.Height);
   }
+  if (right - left == self.desktop.w && bottom - top == self.desktop.h) return CHANNEL_RC_OK;
   self.owner.Push({.type = SDLRDP_SCREEN, .screen = {unsigned(right - left), unsigned(bottom - top)}});
   return CHANNEL_RC_OK;
 }

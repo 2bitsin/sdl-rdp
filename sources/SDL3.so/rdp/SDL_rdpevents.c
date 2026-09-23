@@ -54,7 +54,8 @@ static void SDL_RDP_Resize(SDL_VideoData *data, unsigned width, unsigned height)
     if (display->desktop_mode.w != (int)width || display->desktop_mode.h != (int)height) {
         SDL_RDP_ScreenMode(data, (int)width, (int)height);
     }
-    if ((data->window->flags & SDL_WINDOW_FULLSCREEN) && !data->window->requested_fullscreen_mode.w) {
+    if ((data->window->flags & SDL_WINDOW_FULLSCREEN) && !data->window->requested_fullscreen_mode.w &&
+        (data->picture_width != (int)width || data->picture_height != (int)height)) {
         if (SDL_RDP_ResizePicture(data, width, height)) {
             SDL_SendWindowEvent(data->window, SDL_EVENT_WINDOW_RESIZED, width, height);
         }

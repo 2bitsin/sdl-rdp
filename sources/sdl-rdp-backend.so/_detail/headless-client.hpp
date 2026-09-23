@@ -17,6 +17,8 @@
 #include <cstdlib>
 #include <numeric>
 #include <atomic>
+#include <functional>
+#include <thread>
 #include <string_view>
 #include <freerdp/client/disp.h>
 #include <freerdp/client/channels.h>
@@ -204,6 +206,40 @@ struct FrameObserver {
   }
 };
 struct DisplayClient {
+  inline static thread_local DisplayClient* active = nullptr;
+  Client& client;
+  pDesktopResize desktop_resize;
+  bool echo_resize = false;
+  std::chrono::milliseconds finalization_delay{};
+  std::function<void()> finalizing;
+  unsigned desktops = 0, echoes = 0;
+  static bool Layout(unsigned width, unsigned height) {
+    Expects(active && ready && channel, "display channel is ready");
+    DISPLAY_CONTROL_MONITOR_LAYOUT monitor{};
+    monitor.Flags = DISPLAY_CONTROL_MONITOR_PRIMARY;
+    monitor.Width = width; monitor.Height = height;
+    monitor.PhysicalWidth = 400; monitor.PhysicalHeight = 300;
+    monitor.DesktopScaleFactor = monitor.DeviceScaleFactor = 100;
+    return channel.load()->SendMonitorLayout(channel.load(), 1, &monitor) == CHANNEL_RC_OK;
+  }
+  static BOOL Resize(rdpContext* context) {
+    Expects(active != nullptr, "display observer exists");
+    ++active->desktops;
+    if (!active->desktop_resize(context)) return FALSE;
+    if (active->echo_resize && ready) {
+      ++active->echoes;
+      if (!Layout(context->gdi->width, context->gdi->height)) return FALSE;
+    }
+    if (active->finalizing) active->finalizing();
+    std::this_thread::sleep_for(active->finalization_delay);
+    return TRUE;
+  }
+  ~DisplayClient() {
+    freerdp_disconnect(client.instance.get());
+    client.instance->context->update->DesktopResize = desktop_resize;
+    PubSub_UnsubscribeChannelConnected(client.instance->context->pubSub, Connected);
+    active = nullptr; channel = nullptr; ready = false;
+  }
   inline static std::atomic<DispClientContext*> channel = nullptr;
   inline static std::atomic_bool ready = false;
   static void Connected(void*, ChannelConnectedEventArgs const* event) {
@@ -213,11 +249,15 @@ struct DisplayClient {
       ready = true; return CHANNEL_RC_OK;
     };
   }
-  explicit DisplayClient(Client& client) {
+  explicit DisplayClient(Client& client) : client(client), desktop_resize(client.instance->context->update->DesktopResize) {
+    Expects(!active, "one display observer per thread");
+    active = this;
+    client.instance->context->update->DesktopResize = Resize;
     channel = nullptr; ready = false;
     freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
     auto context = client.instance->context;
-    Expects(freerdp_settings_set_bool(context->settings, FreeRDP_SupportDisplayControl, TRUE), "display control enabled");
+    Expects(freerdp_settings_set_bool(context->settings, FreeRDP_SupportDisplayControl, TRUE)
+      && freerdp_settings_set_bool(context->settings, FreeRDP_SynchronousDynamicChannels, TRUE), "display control enabled");
     PubSub_SubscribeChannelConnected(context->pubSub, Connected);
     client.instance->LoadChannels = [](freerdp* instance) -> BOOL {
       char const* channel[] = {"disp"};

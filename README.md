@@ -91,7 +91,8 @@ the client's screen size after a client screen change and the picture size after
 the application's own resize, including the windowed size restored on leaving
 fullscreen. Borderless fullscreen fills the desktop mode; exclusive fullscreen
 keeps its selected size. Client-side smart sizing can
-stretch the picture to the client's screen.
+stretch the picture to the client's screen. Resizes during client reactivation
+are coalesced and applied when the client is active again.
 
 For exclusive fullscreen, select an advertised mode with
 `SDL_GetFullscreenDisplayModes`, pass it to
