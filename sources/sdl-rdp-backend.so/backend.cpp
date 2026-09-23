@@ -28,7 +28,8 @@ int sdlrdp_open(sdlrdp_config const* config, sdlrdp_handle** out)
     if (config->auth < SDLRDP_AUTH_NONE || config->auth > SDLRDP_AUTH_NLA)
       throw std::runtime_error("Invalid authentication mode.");
     Dimensions(config->width, config->height);
-    if (config->codec < SDLRDP_CODEC_AUTO || config->codec > SDLRDP_CODEC_PROGRESSIVE)
+    if (config->avc_bitrate_kbps > UINT32_MAX / 1000) throw std::runtime_error("AVC bitrate exceeds NVENC range");
+    if (config->codec < SDLRDP_CODEC_AUTO || config->codec > SDLRDP_CODEC_AVC420)
       throw std::runtime_error("Invalid codec preference.");
     if (config->port > 65535) throw std::runtime_error("Open failed: port exceeds 65535.");
     auto handle = std::make_unique<sdlrdp_handle>();
@@ -84,7 +85,7 @@ void sdlrdp_wakeup(sdlrdp_handle* handle)
 
 int sdlrdp_set_codec(sdlrdp_handle* handle, sdlrdp_codec codec)
 {
-  if (!handle || codec < SDLRDP_CODEC_AUTO || codec > SDLRDP_CODEC_PROGRESSIVE) {
+  if (!handle || codec < SDLRDP_CODEC_AUTO || codec > SDLRDP_CODEC_AVC420) {
     last_error = "Invalid handle or codec preference.";
     return -1;
   }

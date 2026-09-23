@@ -15,7 +15,7 @@ typedef enum { SDLRDP_LOG_ERROR, SDLRDP_LOG_WARN, SDLRDP_LOG_INFO } sdlrdp_log_l
 /* Planar is lossless BitmapUpdate; RemoteFX and NSCodec use lossy SurfaceBits. */
 typedef enum {
   SDLRDP_CODEC_AUTO, SDLRDP_CODEC_PLANAR, SDLRDP_CODEC_REMOTEFX,
-  SDLRDP_CODEC_NSCODEC, SDLRDP_CODEC_RAW, SDLRDP_CODEC_PROGRESSIVE
+  SDLRDP_CODEC_NSCODEC, SDLRDP_CODEC_RAW, SDLRDP_CODEC_PROGRESSIVE, SDLRDP_CODEC_AVC420
 } sdlrdp_codec;
 typedef enum { SDLRDP_AUTH_NONE, SDLRDP_AUTH_TLS, SDLRDP_AUTH_NLA } sdlrdp_auth;
 typedef struct {
@@ -37,6 +37,7 @@ typedef struct {
   int (*lookup)(void* auth_user, const char* domain, const char* user, unsigned char nt_hash[16]);
   void* auth_user;
   const char *user, *password, *domain; /* UTF-8, copied by open; NULL means unset. */
+  unsigned avc_bitrate_kbps; /* 0 selects a pixel-count-scaled default. */
 } sdlrdp_config;
 typedef enum {
   SDLRDP_CONNECTED, SDLRDP_DISCONNECTED, SDLRDP_RESIZE, SDLRDP_KEY,
@@ -69,7 +70,7 @@ typedef struct {
 int sdlrdp_verify_pair(const sdlrdp_config*, const char* domain, const char* user, const char* password);
 int sdlrdp_lookup_pair(const sdlrdp_config*, const char* domain, const char* user, unsigned char nt_hash[16]);
 const char* sdlrdp_last_error(void);
-#define SDLRDP_ABI_VERSION 6
+#define SDLRDP_ABI_VERSION 7
 unsigned sdlrdp_version(void);
 int sdlrdp_open(const sdlrdp_config*, sdlrdp_handle**);
 /* Close joins workers; callers must finish concurrent ABI calls first. */

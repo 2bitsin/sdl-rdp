@@ -97,7 +97,7 @@ and `--aspect 4:3` declares the picture's display aspect. F4 toggles fullscreen.
 `--partial` submits only the animated strip between initial and exposed/resized full frames.
 
 `SDL_RDP_CODEC` accepts `auto` (default), `remotefx`, `nscodec`, `planar`,
-`raw`, and `progressive`. On legacy connections, auto selects RemoteFX, then NSCodec, then planar, then raw among
+`raw`, `progressive`, and `avc420`. On legacy connections, auto selects RemoteFX, then NSCodec, then planar, then raw among
 negotiated codecs. An unsupported explicit preference uses that same fallback.
 Planar is the explicit lossless choice; RemoteFX and NSCodec are lossy.
 The hint can change live; `SDL_PROP_WINDOW_RDP_CODEC_STRING` reports the
@@ -126,7 +126,7 @@ Clients that negotiate MS-RDPEGFX use `progressive` by default. `planar` and
 select progressive on the pipeline. RemoteFX and NSCodec remain legacy choices.
 Clients without GFX, with a rejected channel, or without confirmation within
 three seconds of activation use legacy codec selection. The connected event and `SDL_PROP_WINDOW_RDP_CODEC_STRING`
-report the negotiated codec; both sides need ABI 6.
+report the negotiated codec; both sides need ABI 7.
 
 Progressive encodes damaged tiles with FreeRDP's single-pass RemoteFX encoder,
 without refinement passes. SYNC/CONTEXT headers are sent once per surface.
@@ -140,14 +140,38 @@ reports. The suspend value clears outstanding frames and disables waiting until
 another acknowledgement arrives. Capabilities are logged at INFO once per peer;
 `SDL_LOGGING=video=info` shows them in SDL applications.
 
-| Client | Progressive | AVC420 (round two) | AVC444 |
+| Client | Progressive | AVC420 | AVC444 |
 |---|---|---|---|
 | Windows 10/11 mstsc | Yes | Yes | Yes, including v2 |
 | macOS Windows App / Microsoft Remote Desktop | Yes | Yes | Unverified |
 | iOS / Android Windows App | Assumed; unverified | Unsupported in xrdp tests | Unsupported in xrdp tests |
 | FreeRDP 3.15 | Yes | Yes | Yes |
 
-Round two will add AVC420 through NVENC with capability-based selection.
+`SDL_RDP_CODEC=avc420` explicitly selects H.264 AVC420 over RDPGFX, including
+in the sample. The server needs an NVIDIA GPU and a driver providing NVENC
+(SDK 13 headers require driver 570 or newer). CUDA and NVENC are loaded at runtime;
+no NVIDIA library is linked. Missing libraries, unavailable hardware, a surface
+below NVENC's minimum picture size, or client capabilities without AVC420 cause
+a fallback to progressive, with one INFO diagnostic per connection.
+
+`SDL_RDP_AVC_BITRATE` sets the bitrate in kbit/s. Zero (the default) means
+16000 kbit/s at 1920x1080, scaled by the real surface pixel count with a
+2000 kbit/s floor. An explicit nonzero bitrate is used as given. The server
+encodes one access unit per frame, with no B frames or reorder delay. CPU conversion
+uses BT.709 full-range I420. Pictures are padded to multiples of 16 by repeating
+the last column and row; only the real damage is drawn. Padding does not scale
+the picture. Resize and switching into AVC420 force an IDR with SPS/PPS.
+`auto` continues to select progressive.
+
+| RDPGFX codec | Selection | Encoder |
+|---|---|---|
+| Progressive | Default / `progressive` | FreeRDP RemoteFX |
+| AVC420 | Explicit `avc420` | NVIDIA NVENC H.264, lossy 4:2:0 |
+| Planar | Explicit `planar` | Lossless RGB |
+| Raw | Explicit `raw` | Uncompressed RGB |
+
+ABI 7 appends `SDLRDP_CODEC_AVC420` and `sdlrdp_config.avc_bitrate_kbps`.
+Rebuild both the backend and driver together; the driver checks the version.
 
 ## Authentication
 
@@ -213,7 +237,7 @@ with ASCII fallback (`?` for non-ASCII characters).
 Clipboard redirection must be enabled in the RDP client (`/clipboard` in
 xfreerdp). Images and files are not supported yet.
 
-The backend ABI is version 6; graphics adds `SDLRDP_CODEC_PROGRESSIVE`. Clipboard provides `sdlrdp_set_clipboard_text`,
+The backend ABI is version 7; graphics supports `SDLRDP_CODEC_PROGRESSIVE` and `SDLRDP_CODEC_AVC420`. Clipboard provides `sdlrdp_set_clipboard_text`,
 `sdlrdp_get_clipboard_text`, and `sdlrdp_has_clipboard_text`. The getter's
 pointer belongs to the handle; copy it before another clipboard API call.
 

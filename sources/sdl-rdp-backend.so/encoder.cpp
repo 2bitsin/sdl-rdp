@@ -16,6 +16,7 @@ bool Available(rdpSettings const* settings, sdlrdp_codec codec)
     case SDLRDP_CODEC_REMOTEFX: return surface && freerdp_settings_get_bool(settings, FreeRDP_RemoteFxCodec);
     case SDLRDP_CODEC_NSCODEC: return surface && freerdp_settings_get_bool(settings, FreeRDP_NSCodec);
     case SDLRDP_CODEC_RAW: return true;
+    case SDLRDP_CODEC_AVC420:
     case SDLRDP_CODEC_PROGRESSIVE:
     case SDLRDP_CODEC_AUTO: return false;
     default: utilities::Unreachable(codec);

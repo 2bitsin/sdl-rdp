@@ -53,7 +53,7 @@ diff -ruN a/CMakeLists.txt b/CMakeLists.txt
 diff -ruN a/include/SDL3/SDL_hints.h b/include/SDL3/SDL_hints.h
 --- a/include/SDL3/SDL_hints.h
 +++ b/include/SDL3/SDL_hints.h
-@@ -3163,6 +3163,28 @@
+@@ -3163,6 +3163,29 @@
   */
  #define SDL_HINT_QUIT_ON_LAST_WINDOW_CLOSE "SDL_QUIT_ON_LAST_WINDOW_CLOSE"
  
@@ -65,6 +65,7 @@ diff -ruN a/include/SDL3/SDL_hints.h b/include/SDL3/SDL_hints.h
 +#define SDL_HINT_RDP_BIND "SDL_RDP_BIND"
 +#define SDL_HINT_RDP_CERT_DIR "SDL_RDP_CERT_DIR"
 +#define SDL_HINT_RDP_CODEC "SDL_RDP_CODEC"
++#define SDL_HINT_RDP_AVC_BITRATE "SDL_RDP_AVC_BITRATE"
 +#define SDL_HINT_RDP_AUDIO_LATENCY "SDL_RDP_AUDIO_LATENCY"
 +#define SDL_HINT_RDP_VSYNC "SDL_RDP_VSYNC"
 +#define SDL_HINT_RDP_ASPECT "SDL_RDP_ASPECT"

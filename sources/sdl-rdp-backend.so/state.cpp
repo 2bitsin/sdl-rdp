@@ -50,6 +50,7 @@ State::State(sdlrdp_config const& config)
    credentials(EnsureCertificate(config.cert_dir ? std::filesystem::path(config.cert_dir) : DefaultCertificateDirectory())),
    listener(freerdp_listener_new()), stop(CreateEvent(nullptr, TRUE, FALSE, nullptr))
 {
+  avc_bitrate_kbps = config.avc_bitrate_kbps;
   if (!listener || !stop || !reap) throw std::runtime_error("listener allocation failed");
   static std::once_flag wts;
   std::call_once(wts, [] { WTSRegisterWtsApiFunctionTable(FreeRDP_InitWtsApi()); });

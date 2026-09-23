@@ -17,6 +17,9 @@ public:
   std::vector<RDPGFX_FRAME_ACKNOWLEDGE_PDU> frames;
   bool automatic = true, advertise = true;
   std::vector<RDPGFX_CREATE_SURFACE_PDU> surfaces;
+  std::vector<unsigned> avc_nals;
+  std::vector<RECTANGLE_16> avc_rects;
+  std::vector<RDPGFX_H264_QUANT_QUALITY> avc_quality;
   struct Reset { UINT32 width, height; std::vector<MONITOR_DEF> monitors; std::size_t desktops, frames; };
   std::vector<Reset> resets;
   std::vector<std::pair<UINT32, UINT32>> desktops;
@@ -54,12 +57,24 @@ public:
     active->surface = active->channel->SurfaceCommand;
     active->channel->SurfaceCommand = [](RdpgfxClientContext* channel, RDPGFX_SURFACE_COMMAND const* command) -> UINT {
       ++active->commands;
+      if (command->codecId == RDPGFX_CODECID_AVC420) active->ObserveAvc(*command);
       if (command->codecId == RDPGFX_CODECID_CAPROGRESSIVE && command->length >= 2
           && command->data[0] == 0xc0 && command->data[1] == 0xcc) ++active->progressive_headers;
       return active->surface(channel, command);
     };
     active->ObserveResets();
     active->ObserveFrames();
+  }
+  void ObserveAvc(RDPGFX_SURFACE_COMMAND const& command) {
+    Expects(command.extra, "AVC command has a parsed bitmap stream");
+    auto const& stream = *static_cast<RDPGFX_AVC420_BITMAP_STREAM const*>(command.extra);
+    avc_rects.assign(stream.meta.regionRects, stream.meta.regionRects + stream.meta.numRegionRects);
+    avc_quality.assign(stream.meta.quantQualityVals, stream.meta.quantQualityVals + stream.meta.numRegionRects);
+    unsigned types = 0;
+    for (std::size_t i = 0; i + 3 < stream.length; ++i)
+      if (!stream.data[i] && !stream.data[i + 1] && stream.data[i + 2] == 1)
+        types |= 1u << (stream.data[i + 3] & 31);
+    avc_nals.push_back(types);
   }
   void ObserveResets() {
     Expects(channel != nullptr, "graphics channel connected");

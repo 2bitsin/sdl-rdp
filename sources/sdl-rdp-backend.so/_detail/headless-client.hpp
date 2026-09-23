@@ -72,9 +72,11 @@ public:
     if (!surface) Expects(freerdp_settings_set_uint32(settings, FreeRDP_SurfaceCommandsSupported, 0),
                          "surface commands disabled");
   }
-  void EnableGraphics() {
+  void EnableGraphics(bool h264 = false) {
     auto context = instance->context;
-    Expects(freerdp_settings_set_bool(context->settings, FreeRDP_SupportGraphicsPipeline, TRUE)
+    Expects(freerdp_settings_set_bool(context->settings, FreeRDP_GfxH264, h264)
+      && freerdp_settings_set_bool(context->settings, FreeRDP_GfxAVC444, FALSE)
+      && freerdp_settings_set_bool(context->settings, FreeRDP_SupportGraphicsPipeline, TRUE)
       && freerdp_settings_set_bool(context->settings, FreeRDP_SynchronousDynamicChannels, TRUE),
       "graphics pipeline enabled on the client pump thread");
     freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
@@ -128,10 +130,12 @@ public:
     });
   }
 
-  unsigned MaxError(std::vector<UINT32> const& pixels) const {
+  unsigned MaxError(std::vector<UINT32> const& pixels, std::vector<UINT32> const* reference = nullptr) const {
     Expects(instance->context->gdi != nullptr, "decoded framebuffer exists");
     auto actual = reinterpret_cast<UINT32 const*>(instance->context->gdi->primary_buffer);
-    return std::transform_reduce(pixels.begin(), pixels.end(), actual, 0u,
+    auto const& expected = reference ? *reference : pixels;
+    Expects(expected.size() == pixels.size(), "reference matches source dimensions");
+    return std::transform_reduce(expected.begin(), expected.end(), actual, 0u,
       [](auto a, auto b) { return std::max(a, b); }, [](auto a, auto b) {
         return unsigned(std::max({std::abs(int(a & 255) - int(b & 255)),
           std::abs(int((a >> 8) & 255) - int((b >> 8) & 255)),
