@@ -31,7 +31,10 @@ measurement or a removed violation makes its entry stale; remove or reduce the
 entry in the same change. Never raise a limit; the allow list only shrinks.
 Run `python3 bin/lint-shape.py --allow bin/lint-shape.allow` directly to inspect
 shape failures. Run `bin/lint-clones.sh` for the clone gate (40 tokens, 5 lines).
-Both run under CTest when tests are built. Missing `npx` explicitly skips the
+Test fixtures retain protected data members so derived test bodies can use them.
+The C driver is checked by `bin/lint-tidy-c.sh` using the GCC debug database.
+It skips with code 77 and a reason if the database or clang-tidy is absent.
+All three lint gates run under CTest when tests are built. Missing `npx` explicitly skips the
 clone gate with exit code 77; it never passes silently.
 
 The driver C files in `rdp/` are compiled directly, not copied into the SDL patch.

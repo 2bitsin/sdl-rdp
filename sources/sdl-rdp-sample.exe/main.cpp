@@ -1,3 +1,4 @@
+#include <cstddef>
 #include "_detail/check.hpp"
 #include "input.hpp"
 #include <SDL3/SDL.h>
@@ -15,294 +16,303 @@
 #include <cmath>
 #include <numbers>
 
-const char *EventName(Uint32 type)
+namespace {
+const char* EventName(Uint32 type)
 {
-    switch (type) {
-    case SDL_EVENT_KEYBOARD_ADDED: return "KEYBOARD_ADDED";
-    case SDL_EVENT_MOUSE_ADDED: return "MOUSE_ADDED";
-    case SDL_EVENT_WINDOW_MOVED: return "MOVED";
-    case SDL_EVENT_WINDOW_SAFE_AREA_CHANGED: return "SAFE_AREA_CHANGED";
-    case SDL_EVENT_QUIT: return "QUIT";
-    case SDL_EVENT_WINDOW_SHOWN: return "SHOWN";
-    case SDL_EVENT_WINDOW_HIDDEN: return "HIDDEN";
-    case SDL_EVENT_WINDOW_OCCLUDED: return "OCCLUDED";
-    case SDL_EVENT_WINDOW_EXPOSED: return "EXPOSED";
-    case SDL_EVENT_WINDOW_RESIZED: return "RESIZED";
-    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: return "PIXEL_SIZE_CHANGED";
-    case SDL_EVENT_WINDOW_FOCUS_GAINED: return "FOCUS_GAINED";
-    case SDL_EVENT_WINDOW_FOCUS_LOST: return "FOCUS_LOST";
-    case SDL_EVENT_WINDOW_MOUSE_ENTER: return "MOUSE_ENTER";
-    case SDL_EVENT_WINDOW_MOUSE_LEAVE: return "MOUSE_LEAVE";
-    case SDL_EVENT_DISPLAY_ADDED: return "DISPLAY_ADDED";
-    case SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED: return "DISPLAY_CURRENT_MODE_CHANGED";
-    case SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED: return "DISPLAY_DESKTOP_MODE_CHANGED";
-    case SDL_EVENT_KEY_DOWN: return "KEY_DOWN";
-    case SDL_EVENT_KEY_UP: return "KEY_UP";
-    case SDL_EVENT_MOUSE_MOTION: return "MOUSE_MOTION";
-    case SDL_EVENT_MOUSE_BUTTON_DOWN: return "MOUSE_BUTTON_DOWN";
-    case SDL_EVENT_MOUSE_BUTTON_UP: return "MOUSE_BUTTON_UP";
-    case SDL_EVENT_MOUSE_WHEEL: return "MOUSE_WHEEL";
-    default: return "OTHER";
-    }
+  switch (type) {
+  case SDL_EVENT_KEYBOARD_ADDED: return "KEYBOARD_ADDED";
+  case SDL_EVENT_MOUSE_ADDED: return "MOUSE_ADDED";
+  case SDL_EVENT_WINDOW_MOVED: return "MOVED";
+  case SDL_EVENT_WINDOW_SAFE_AREA_CHANGED: return "SAFE_AREA_CHANGED";
+  case SDL_EVENT_QUIT: return "QUIT";
+  case SDL_EVENT_WINDOW_SHOWN: return "SHOWN";
+  case SDL_EVENT_WINDOW_HIDDEN: return "HIDDEN";
+  case SDL_EVENT_WINDOW_OCCLUDED: return "OCCLUDED";
+  case SDL_EVENT_WINDOW_EXPOSED: return "EXPOSED";
+  case SDL_EVENT_WINDOW_RESIZED: return "RESIZED";
+  case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: return "PIXEL_SIZE_CHANGED";
+  case SDL_EVENT_WINDOW_FOCUS_GAINED: return "FOCUS_GAINED";
+  case SDL_EVENT_WINDOW_FOCUS_LOST: return "FOCUS_LOST";
+  case SDL_EVENT_WINDOW_MOUSE_ENTER: return "MOUSE_ENTER";
+  case SDL_EVENT_WINDOW_MOUSE_LEAVE: return "MOUSE_LEAVE";
+  case SDL_EVENT_DISPLAY_ADDED: return "DISPLAY_ADDED";
+  case SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED: return "DISPLAY_CURRENT_MODE_CHANGED";
+  case SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED: return "DISPLAY_DESKTOP_MODE_CHANGED";
+  case SDL_EVENT_KEY_DOWN: return "KEY_DOWN";
+  case SDL_EVENT_KEY_UP: return "KEY_UP";
+  case SDL_EVENT_MOUSE_MOTION: return "MOUSE_MOTION";
+  case SDL_EVENT_MOUSE_BUTTON_DOWN: return "MOUSE_BUTTON_DOWN";
+  case SDL_EVENT_MOUSE_BUTTON_UP: return "MOUSE_BUTTON_UP";
+  case SDL_EVENT_MOUSE_WHEEL: return "MOUSE_WHEEL";
+  default: return "OTHER";
+  }
 }
 
-void PrintGeometry(const SDL_Event &event, SDL_Window *window)
+void PrintGeometry(const SDL_Event& event, SDL_Window* window)
 {
-    if (event.type == SDL_EVENT_WINDOW_EXPOSED || event.type == SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED ||
-        event.type == SDL_EVENT_WINDOW_RESIZED) {
-        auto mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
-        int w, h;
-        Check(SDL_GetWindowSize(window, &w, &h));
-        SDL_Log("event GEOMETRY window=%dx%d desktop=%dx%d", w, h, mode->w, mode->h);
-    }
+  if (event.type == SDL_EVENT_WINDOW_EXPOSED || event.type == SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED ||
+      event.type == SDL_EVENT_WINDOW_RESIZED) {
+    const auto* mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
+    int         w;
+    int         h;
+    Check(SDL_GetWindowSize(window, &w, &h));
+    SDL_Log("event GEOMETRY window=%dx%d desktop=%dx%d", w, h, mode->w, mode->h);
+  }
 }
 
 void PrintAudioFormat(SDL_AudioDeviceID device)
 {
-    SDL_AudioSpec actual;
-    Check(SDL_GetAudioDeviceFormat(device, &actual, nullptr));
-    SDL_Log("audio device=%s freq=%d", SDL_GetAudioDeviceName(device), actual.freq);
+  SDL_AudioSpec actual;
+  Check(SDL_GetAudioDeviceFormat(device, &actual, nullptr));
+  SDL_Log("audio device=%s freq=%d", SDL_GetAudioDeviceName(device), actual.freq);
 }
 
 std::string DisplayTiming()
 {
-    auto mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
-    Check(mode != nullptr);
-    return std::format(" refresh={} numerator={} denominator={}", mode->refresh_rate,
-                       mode->refresh_rate_numerator, mode->refresh_rate_denominator);
+  const auto* mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
+  Check(mode != nullptr);
+  return std::format(" refresh={} numerator={} denominator={}", mode->refresh_rate,
+                     mode->refresh_rate_numerator, mode->refresh_rate_denominator);
 }
 
-std::string ClientProperties(SDL_Window* window) {
-    auto properties = SDL_GetWindowProperties(window);
-    return std::format(" keyboard_layout={} client_name={} codec={}",
-        SDL_GetNumberProperty(properties, SDL_PROP_WINDOW_RDP_KEYBOARD_LAYOUT_NUMBER, 0),
-        SDL_GetStringProperty(properties, SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING, ""),
-        SDL_GetStringProperty(properties, SDL_PROP_WINDOW_RDP_CODEC_STRING, ""));
-}
-
-void PrintEvent(const SDL_Event &event, SDL_Window *window, unsigned frame)
+std::string ClientProperties(SDL_Window* window)
 {
-    if (PrintClipboardEvent(event)) return;
-    if (PrintInput(event, window)) return;
-    auto line = std::format("event {} type={}", EventName(event.type), event.type);
-    switch (event.type) {
-    case SDL_EVENT_KEY_DOWN: case SDL_EVENT_KEY_UP:
-        line += std::format(" scancode={} key={} down={}", int(event.key.scancode), event.key.key, int(event.key.down));
-        break;
-    case SDL_EVENT_MOUSE_MOTION:
-        line += std::format(" xrel={:g} yrel={:g} x={:.0f} y={:.0f} frame={}", event.motion.xrel, event.motion.yrel, event.motion.x, event.motion.y, frame);
-        break;
-    case SDL_EVENT_MOUSE_BUTTON_DOWN: case SDL_EVENT_MOUSE_BUTTON_UP:
-        line += std::format(" button={} down={}", event.button.button, int(event.button.down));
-        break;
-    case SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED:
-        PrintAudioFormat(event.adevice.which);
-        break;
-    case SDL_EVENT_MOUSE_WHEEL:
-        line += std::format(" x={} y={}", event.wheel.x, event.wheel.y);
-        break;
-    case SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED: line += std::format(" width={} height={}", event.display.data1, event.display.data2); break;
-    case SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED: {
-        auto mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
-        line += DisplayTiming();
-        line += std::format(" width={} height={}", mode->w, mode->h);
-        break;
-    }
-    case SDL_EVENT_WINDOW_EXPOSED:
-        line += ClientProperties(window);
-        break;
-    default:
-        if (event.type >= SDL_EVENT_WINDOW_FIRST && event.type <= SDL_EVENT_WINDOW_LAST)
-            line += std::format(" data1={} data2={}", event.window.data1, event.window.data2);
-        break;
-    }
-    SDL_Log("%s", line.c_str());
-    PrintGeometry(event, window);
-    if (event.type == SDL_EVENT_WINDOW_EXPOSED) PrintAuthentication(window);
+  auto properties = SDL_GetWindowProperties(window);
+  return std::format(" keyboard_layout={} client_name={} codec={}",
+                     SDL_GetNumberProperty(properties, SDL_PROP_WINDOW_RDP_KEYBOARD_LAYOUT_NUMBER, 0),
+                     SDL_GetStringProperty(properties, SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING, ""),
+                     SDL_GetStringProperty(properties, SDL_PROP_WINDOW_RDP_CODEC_STRING, ""));
 }
 
-void Draw(SDL_Window *window, unsigned frame, bool full)
+void PrintEvent(const SDL_Event& event, SDL_Window* window, unsigned frame)
 {
-    auto surface = SDL_GetWindowSurface(window);
-    Check(surface != nullptr);
-    Check(SDL_FillSurfaceRect(surface, nullptr, 0x00010101));
-    SDL_Rect block{int(frame % unsigned(surface->w)), 40, 32, 32};
-    Check(SDL_FillSurfaceRect(surface, &block, 0x0000ff00));
-    SDL_Rect damage{0, 40, surface->w, std::min(32, std::max(0, surface->h - 40))};
-    Check(full ? SDL_UpdateWindowSurface(window) : SDL_UpdateWindowSurfaceRects(window, &damage, 1));
+  if (PrintClipboardEvent(event)) return;
+  if (PrintInput(event, window)) return;
+  auto line = std::format("event {} type={}", EventName(event.type), event.type);
+  switch (event.type) {
+  case SDL_EVENT_KEY_DOWN:
+  case SDL_EVENT_KEY_UP:
+    line += std::format(" scancode={} key={} down={}", int(event.key.scancode), event.key.key, int(event.key.down));
+    break;
+  case SDL_EVENT_MOUSE_MOTION:
+    line += std::format(" xrel={:g} yrel={:g} x={:.0f} y={:.0f} frame={}", event.motion.xrel, event.motion.yrel, event.motion.x, event.motion.y, frame);
+    break;
+  case SDL_EVENT_MOUSE_BUTTON_DOWN:
+  case SDL_EVENT_MOUSE_BUTTON_UP:
+    line += std::format(" button={} down={}", event.button.button, int(event.button.down));
+    break;
+  case SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED:
+    PrintAudioFormat(event.adevice.which);
+    break;
+  case SDL_EVENT_MOUSE_WHEEL:
+    line += std::format(" x={} y={}", event.wheel.x, event.wheel.y);
+    break;
+  case SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED: line += std::format(" width={} height={}", event.display.data1, event.display.data2); break;
+  case SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED: {
+    const auto* mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
+    line += DisplayTiming();
+    line += std::format(" width={} height={}", mode->w, mode->h);
+    break;
+  }
+  case SDL_EVENT_WINDOW_EXPOSED:
+    line += ClientProperties(window);
+    break;
+  default:
+    if (event.type >= SDL_EVENT_WINDOW_FIRST && event.type <= SDL_EVENT_WINDOW_LAST)
+      line += std::format(" data1={} data2={}", event.window.data1, event.window.data2);
+    break;
+  }
+  SDL_Log("%s", line.c_str());
+  PrintGeometry(event, window);
+  if (event.type == SDL_EVENT_WINDOW_EXPOSED) PrintAuthentication(window);
+}
+
+void Draw(SDL_Window* window, unsigned frame, bool full)
+{
+  auto* surface = SDL_GetWindowSurface(window);
+  Check(surface != nullptr);
+  Check(SDL_FillSurfaceRect(surface, nullptr, 0x00010101));
+  SDL_Rect const block{ int(frame % unsigned(surface->w)), 40, 32, 32 };
+  Check(SDL_FillSurfaceRect(surface, &block, 0x0000ff00));
+  SDL_Rect const damage{ 0, 40, surface->w, std::min(32, std::max(0, surface->h - 40)) };
+  Check(full ? SDL_UpdateWindowSurface(window) : SDL_UpdateWindowSurfaceRects(window, &damage, 1));
 }
 
 void CycleCodec()
 {
-    static constexpr std::array codecs{"auto", "planar", "remotefx", "nscodec", "raw", "progressive"};
-    const char *hint = SDL_GetHint(SDL_HINT_RDP_CODEC);
-    auto current = std::ranges::find(codecs, std::string_view(hint ? hint : "auto"));
-    auto next = current == codecs.end() ? 0 : (current - codecs.begin() + 1) % codecs.size();
-    Check(SDL_SetHint(SDL_HINT_RDP_CODEC, codecs[next]));
+  static constexpr std::array codecs { "auto", "planar", "remotefx", "nscodec", "raw", "progressive" };
+  const char*                 hint    = SDL_GetHint(SDL_HINT_RDP_CODEC);
+  const auto*                 current = std::ranges::find(codecs, std::string_view(hint ? hint : "auto"));
+  auto                        next    = current == codecs.end() ? 0 : (current - codecs.begin() + 1) % codecs.size();
+  Check(SDL_SetHint(SDL_HINT_RDP_CODEC, codecs[next]));
 }
 
-void PrintCodecChange(SDL_Window *window, std::string &previous)
+void PrintCodecChange(SDL_Window* window, std::string& previous)
 {
-    std::string codec = SDL_GetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_CODEC_STRING, "");
-    if (codec != previous) {
-        SDL_Log("event CODEC_CHANGED codec=%s", codec.c_str());
-        previous = std::move(codec);
+  std::string codec = SDL_GetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_CODEC_STRING, "");
+  if (codec != previous) {
+    SDL_Log("event CODEC_CHANGED codec=%s", codec.c_str());
+    previous = std::move(codec);
+  }
+}
+
+void Run(SDL_Window* window, bool tight, bool partial, DriveOptions drives)
+{
+  std::string codec;
+  bool        full  = true;
+  unsigned    frame = 0;
+  Uint64      next  = 0;
+  for (;;) {
+    SDL_Event event;
+    if (SDL_WaitEventTimeout(&event, tight ? 0 : 10)) {
+      PrintEvent(event, window, frame);
+      InputMode(event, window);
+      if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED || event.type == SDL_EVENT_WINDOW_EXPOSED) full = true;
+      if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F4)
+        Check(SDL_SetWindowFullscreen(window, !(SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN)));
+      if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F1)
+        CycleCodec();
+      if (event.type == SDL_EVENT_QUIT ||
+          (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE)) return;
+      if (event.type == SDL_EVENT_MOUSE_MOTION) {
+        Draw(window, frame, full || !partial);
+        full = false;
+      }
     }
-}
-
-void Run(SDL_Window *window, bool tight, bool partial, DriveOptions drives)
-{
-    std::string codec;
-    bool full = true;
-    unsigned frame = 0;
-    Uint64 next = 0;
-    for (;;) {
-        SDL_Event event;
-        if (SDL_WaitEventTimeout(&event, tight ? 0 : 10)) {
-            PrintEvent(event, window, frame);
-            InputMode(event, window);
-            if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED || event.type == SDL_EVENT_WINDOW_EXPOSED) full = true;
-            if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F4)
-                Check(SDL_SetWindowFullscreen(window, !(SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN)));
-            if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F1)
-                CycleCodec();
-            if (event.type == SDL_EVENT_QUIT ||
-                (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE)) return;
-            if (event.type == SDL_EVENT_MOUSE_MOTION) {
-                Draw(window, frame, full || !partial);
-                full = false;
-            }
-        }
-        if (RunDrives(drives)) drives = {};
-        PrintCodecChange(window, codec);
-        if (SDL_GetTicks() >= next) {
-            Draw(window, frame++, full || !partial);
-            full = false;
-            next = SDL_GetTicks() + (tight ? 0 : 100);
-        }
+    if (RunDrives(drives)) drives = {};
+    PrintCodecChange(window, codec);
+    if (SDL_GetTicks() >= next) {
+      Draw(window, frame++, full || !partial);
+      full = false;
+      next = SDL_GetTicks() + (tight ? 0 : 100);
     }
+  }
 }
 
-void SDLCALL FeedTone(void *userdata, SDL_AudioStream *stream, int additional, int)
+void SDLCALL FeedTone(void* userdata, SDL_AudioStream* stream, int additional, int /*unused*/)
 {
-    auto &frame = *static_cast<Uint64 *>(userdata);
-    std::array<Sint16, 960> samples;
-    while (additional > 0) {
-        auto count = std::min(additional / int(2 * sizeof(Sint16)), 480);
-        if (!count) return;
-        for (int i = 0; i < count; ++i, ++frame) {
-            auto value = Sint16(std::lround(32767 * std::pow(10.0, -12.0 / 20.0) *
-                std::sin(2 * std::numbers::pi * 440 * double(frame) / 48000)));
-            samples[2 * i] = samples[2 * i + 1] = value;
-        }
-        Check(SDL_PutAudioStreamData(stream, samples.data(), count * 2 * sizeof(Sint16)));
-        additional -= count * 2 * sizeof(Sint16);
+  auto&                   frame   = *static_cast<Uint64*>(userdata);
+  std::array<Sint16, 960> samples{ };
+  while (additional > 0) {
+    auto count = std::min(additional / int(2 * sizeof(Sint16)), 480);
+    if (!count) return;
+    for (int i = 0; i < count; ++i, ++frame) {
+      auto value       = Sint16(std::lround(32767 * std::pow(10.0, -12.0 / 20.0) *
+                                            std::sin(2 * std::numbers::pi * 440 * double(frame) / 48000)));
+      samples[2uz * i] = samples[(2uz * i) + 1] = value;
     }
+    Check(SDL_PutAudioStreamData(stream, samples.data(), static_cast<std::ptrdiff_t>(count) * 2 * sizeof(Sint16)));
+    additional -= static_cast<std::ptrdiff_t>(count) * 2 * sizeof(Sint16);
+  }
 }
 
-SDL_AudioStream *OpenTone(Uint64 &frame)
+SDL_AudioStream* OpenTone(Uint64& frame)
 {
-    const SDL_AudioSpec spec{SDL_AUDIO_S16, 2, 48000};
-    auto stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, FeedTone, &frame);
-    Check(stream != nullptr);
-    auto device = SDL_GetAudioStreamDevice(stream);
-    PrintAudioFormat(device);
-    Check(SDL_ResumeAudioStreamDevice(stream));
-    return stream;
+  const SDL_AudioSpec spec  { SDL_AUDIO_S16, 2, 48000 };
+  auto*               stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, FeedTone, &frame);
+  Check(stream != nullptr);
+  auto device = SDL_GetAudioStreamDevice(stream);
+  PrintAudioFormat(device);
+  Check(SDL_ResumeAudioStreamDevice(stream));
+  return stream;
 }
 
 struct Options {
-    DriveOptions drives;
-    const char *clip = nullptr;
-    int width = 640, height = 480;
-    int mode_width = 0, mode_height = 0;
-    bool tight = false, fullscreen = false, tone = false, partial = false;
+  DriveOptions drives;
+  const char*  clip       = nullptr;
+  int          width      = 640, height = 480;
+  int          mode_width = 0, mode_height = 0;
+  bool         tight      = false, fullscreen = false, tone = false, partial = false;
 };
 
-void ParseSize(std::string_view size, int &width, int &height)
+void ParseSize(std::string_view size, int& width, int& height)
 {
-    auto first = std::from_chars(size.data(), size.data() + size.size(), width);
-    Check(first.ec == std::errc{} && first.ptr != size.data() + size.size() && *first.ptr == 'x');
-    auto second = std::from_chars(first.ptr + 1, size.data() + size.size(), height);
-    Check(second.ec == std::errc{} && second.ptr == size.data() + size.size() && width > 0 && height > 0);
+  auto first = std::from_chars(size.data(), size.data() + size.size(), width);
+  Check(first.ec == std::errc{} && first.ptr != size.data() + size.size() && *first.ptr == 'x');
+  auto second = std::from_chars(first.ptr + 1, size.data() + size.size(), height);
+  Check(second.ec == std::errc{} && second.ptr == size.data() + size.size() && width > 0 && height > 0);
 }
 
-void Fullscreen(SDL_Window *window, const Options &options)
+void Fullscreen(SDL_Window* window, const Options& options)
 {
-    if (options.mode_width) {
-        auto mode = *SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
-        mode.w = options.mode_width;
-        mode.h = options.mode_height;
-        Check(SDL_SetWindowFullscreenMode(window, &mode));
-    }
-    if (options.fullscreen) Check(SDL_SetWindowFullscreen(window, true));
+  if (options.mode_width) {
+    auto mode = *SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
+    mode.w    = options.mode_width;
+    mode.h    = options.mode_height;
+    Check(SDL_SetWindowFullscreenMode(window, &mode));
+  }
+  if (options.fullscreen) Check(SDL_SetWindowFullscreen(window, true));
 }
 
-Options ParseOptions(int argc, char **argv, Authenticator& authentication)
+Options ParseOptions(int argc, char** argv, Authenticator& authentication)
 {
-    Options options;
-    for (int i = 1; i < argc; ++i) {
-        std::string_view arg(argv[i]);
-        if (authentication.Option(arg, i, argc, argv)) continue;
-        if (arg == "--clip" && i + 1 < argc) options.clip = argv[++i];
-        else if (arg == "--ls" && i + 1 < argc) options.drives.list = argv[++i];
-        else if (arg == "--cat" && i + 1 < argc) options.drives.cat = argv[++i];
-        else if (arg == "--write" && i + 1 < argc) options.drives.write = argv[++i];
-        else if (arg == "--tone") options.tone = true;
-        else if (arg == "--tight") options.tight = true;
-        else if (arg == "--partial") options.partial = true;
-        else if (arg == "--fullscreen") options.fullscreen = true;
-        else if (arg == "--aspect" && i + 1 < argc) Check(SDL_SetHint(SDL_HINT_RDP_ASPECT, argv[++i]));
-        else if (arg == "--size" && i + 1 < argc) ParseSize(argv[++i], options.width, options.height);
-        else if (arg == "--mode" && i + 1 < argc) ParseSize(argv[++i], options.mode_width, options.mode_height);
-        else { SDL_SetError("Unknown or incomplete option: %s", argv[i]); Check(false); }
+  Options options;
+  for (int i = 1; i < argc; ++i) {
+    std::string_view const arg(argv[i]);
+    if (authentication.Option(arg, i, argc, argv)) continue;
+    if (arg == "--clip" && i + 1 < argc) options.clip = argv[++i];
+    else if (arg == "--ls" && i + 1 < argc) options.drives.list = argv[++i];
+    else if (arg == "--cat" && i + 1 < argc) options.drives.cat = argv[++i];
+    else if (arg == "--write" && i + 1 < argc) options.drives.write = argv[++i];
+    else if (arg == "--tone") options.tone = true;
+    else if (arg == "--tight") options.tight = true;
+    else if (arg == "--partial") options.partial = true;
+    else if (arg == "--fullscreen") options.fullscreen = true;
+    else if (arg == "--aspect" && i + 1 < argc) Check(SDL_SetHint(SDL_HINT_RDP_ASPECT, argv[++i]));
+    else if (arg == "--size" && i + 1 < argc) ParseSize(argv[++i], options.width, options.height);
+    else if (arg == "--mode" && i + 1 < argc) ParseSize(argv[++i], options.mode_width, options.mode_height);
+    else {
+      SDL_SetError("Unknown or incomplete option: %s", argv[i]);
+      Check(false);
     }
-    return options;
+  }
+  return options;
 }
 
-SDL_Cursor *CreateCursor()
+SDL_Cursor* CreateCursor()
 {
-    auto surface = SDL_CreateSurface(8, 8, SDL_PIXELFORMAT_ARGB8888);
-    Check(surface != nullptr);
-    Check(SDL_FillSurfaceRect(surface, nullptr, 0xffff0000));
-    auto cursor = SDL_CreateColorCursor(surface, 0, 0);
-    SDL_DestroySurface(surface);
-    Check(cursor != nullptr);
-    Check(SDL_SetCursor(cursor));
-    return cursor;
+  auto* surface = SDL_CreateSurface(8, 8, SDL_PIXELFORMAT_ARGB8888);
+  Check(surface != nullptr);
+  Check(SDL_FillSurfaceRect(surface, nullptr, 0xffff0000));
+  auto* cursor = SDL_CreateColorCursor(surface, 0, 0);
+  SDL_DestroySurface(surface);
+  Check(cursor != nullptr);
+  Check(SDL_SetCursor(cursor));
+  return cursor;
 }
 
-int main(int argc, char **argv)
+}
+int main(int argc, char** argv)
 {
-    Authenticator authentication;
-    auto options = ParseOptions(argc, argv, authentication);
-    authentication.Defaults();
-    SDL_Log("SDL_GetVersion() %d", SDL_GetVersion());
-    std::string drivers = "drivers";
-    std::ranges::for_each(std::views::iota(0, SDL_GetNumVideoDrivers()),
-        [&](int index) { drivers += std::format(" {}", SDL_GetVideoDriver(index)); });
-    SDL_Log("%s", drivers.c_str());
-    if (const char *codec = SDL_getenv("SDL_RDP_CODEC")) {
-        std::string requested(codec);
-        Check(SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SDL_RDP_CODEC"));
-        Check(SDL_SetHint(SDL_HINT_RDP_CODEC, requested.c_str()));
-    }
-    Check(SDL_Init(SDL_INIT_VIDEO | (options.tone ? SDL_INIT_AUDIO : 0)));
-    authentication.Install();
-    if (options.clip) Check(SDL_SetClipboardText(options.clip));
-    auto display = SDL_GetPrimaryDisplay();
-    SDL_Log("port %lld", (long long)SDL_GetNumberProperty(SDL_GetDisplayProperties(display), SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0));
-    {
-        std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)> window(
-            SDL_CreateWindow("SDL RDP sample", options.width, options.height, 0), SDL_DestroyWindow);
-        Check(window != nullptr);
-        Fullscreen(window.get(), options);
-        std::unique_ptr<SDL_Cursor, decltype(&SDL_DestroyCursor)> cursor(CreateCursor(), SDL_DestroyCursor);
-        Check(SDL_StartTextInput(window.get()));
-        Uint64 tone_frame = 0;
-        std::unique_ptr<SDL_AudioStream, decltype(&SDL_DestroyAudioStream)> tone(
-            options.tone ? OpenTone(tone_frame) : nullptr, SDL_DestroyAudioStream);
-        Run(window.get(), options.tight, options.partial, options.drives);
-    }
-    SDL_Quit();
+  Authenticator authentication;
+  auto          options        = ParseOptions(argc, argv, authentication);
+  authentication.Defaults();
+  SDL_Log("SDL_GetVersion() %d", SDL_GetVersion());
+  std::string drivers = "drivers";
+  std::ranges::for_each(std::views::iota(0, SDL_GetNumVideoDrivers()),
+                        [&](int index) { drivers += std::format(" {}", SDL_GetVideoDriver(index)); });
+  SDL_Log("%s", drivers.c_str());
+  if (const char* codec = SDL_getenv("SDL_RDP_CODEC")) {
+    std::string const requested(codec);
+    Check(SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SDL_RDP_CODEC"));
+    Check(SDL_SetHint(SDL_HINT_RDP_CODEC, requested.c_str()));
+  }
+  Check(SDL_Init(SDL_INIT_VIDEO | (options.tone ? SDL_INIT_AUDIO : 0)));
+  authentication.Install();
+  if (options.clip) Check(SDL_SetClipboardText(options.clip));
+  auto display = SDL_GetPrimaryDisplay();
+  SDL_Log("port %lld", (long long)SDL_GetNumberProperty(SDL_GetDisplayProperties(display), SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0));
+  {
+    std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)> const window(
+        SDL_CreateWindow("SDL RDP sample", options.width, options.height, 0), SDL_DestroyWindow);
+    Check(window != nullptr);
+    Fullscreen(window.get(), options);
+    std::unique_ptr<SDL_Cursor, decltype(&SDL_DestroyCursor)> const cursor(CreateCursor(), SDL_DestroyCursor);
+    Check(SDL_StartTextInput(window.get()));
+    Uint64 tone_frame = 0;
+    std::unique_ptr<SDL_AudioStream, decltype(&SDL_DestroyAudioStream)> const tone(
+        options.tone ? OpenTone(tone_frame) : nullptr, SDL_DestroyAudioStream);
+    Run(window.get(), options.tight, options.partial, options.drives);
+  }
+  SDL_Quit();
 }

@@ -62,7 +62,12 @@ def classes(tokens, pairs):
             continue
         name = tokens[index + 1][0]
         cursor = index + 2
-        while cursor < len(tokens) and tokens[cursor][0] not in ('{', ';', '>', ','):
+        inherited = False
+        while cursor < len(tokens):
+            word = tokens[cursor][0]
+            if word in ('{', ';') or (word in ('>', ',') and not inherited):
+                break
+            inherited |= word == ':'
             cursor += 1
         if cursor in pairs and tokens[cursor][0] == '{':
             yield kind, name, line, cursor, pairs[cursor]
@@ -131,7 +136,7 @@ def data_count(words):
     return count
 
 
-def class_measurements(tokens, pairs, item, public_data=False):
+def class_measurements(tokens, pairs, item, public_data=False, fixture=False):
     kind, name, line, start, end = item
     access = 'private' if kind == 'class' else 'public'
     highest = -1
@@ -155,7 +160,7 @@ def class_measurements(tokens, pairs, item, public_data=False):
         elif (count := data_count(words)):
             highest = max(highest, ranks[access])
             data += count
-            exposed_data += access != 'private'
+            exposed_data += access != 'private' and not (fixture and access == 'protected')
             section_data[access] = True
     active = any(function != name for function in functions)
     if active and not public_data:
@@ -164,7 +169,7 @@ def class_measurements(tokens, pairs, item, public_data=False):
     return name, line, size, data, len(functions), layout, active
 
 
-def check_file(path):
+def check_file(path, fixtures=frozenset()):
     source = path.read_text()
     tokens, comments = scan(source)
     nonblank = sum(bool(line.strip()) for line in source.splitlines())
@@ -177,7 +182,7 @@ def check_file(path):
     pairs = matching(tokens)
     for item in classes(tokens, pairs):
         public_data = path.as_posix() == 'sources/sdl-rdp-backend.so/_detail/state.hpp' and item[1] in ('Peer', 'State')
-        name, line, size, data, functions, layout, active = class_measurements(tokens, pairs, item, public_data)
+        name, line, size, data, functions, layout, active = class_measurements(tokens, pairs, item, public_data, item[1] in fixtures)
         if not active:
             continue
         for label, value, limit in (('lines', size, CLASS_LINES),
@@ -207,14 +212,34 @@ def check_allow(findings, allow):
     return int(failed)
 
 
+def fixture_classes(paths):
+    bases = {}
+    for path in paths:
+        tokens, _ = scan(path.read_text())
+        for _, name, line, start, _ in classes(tokens, matching(tokens)):
+            prefix = []
+            cursor = start - 1
+            while cursor >= 0 and tokens[cursor][0] not in ('class', 'struct'):
+                prefix.append(tokens[cursor][0])
+                cursor -= 1
+            if ':' in prefix:
+                bases.setdefault(name, set()).update(prefix[:prefix.index(':')])
+    fixtures = {'Test', 'TestWithParam'}
+    while additional := {name for name, parents in bases.items() if parents & fixtures} - fixtures:
+        fixtures.update(additional)
+    return fixtures
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--allow', type=pathlib.Path)
     args = parser.parse_args()
     findings = []
-    for path in sorted(pathlib.Path('sources').rglob('*')):
-        if path.suffix in EXTENSIONS and path.is_file():
-            findings.extend(check_file(path))
+    paths = [path for path in sorted(pathlib.Path('sources').rglob('*'))
+             if path.suffix in EXTENSIONS and path.is_file()]
+    fixtures = fixture_classes(paths)
+    for path in paths:
+        findings.extend(check_file(path, fixtures))
     return check_allow(findings, args.allow)
 
 

@@ -1,28 +1,49 @@
 #pragma once
+#include <cstddef>
 #include "test-backend.hpp"
 #include "headless-audio.hpp"
 namespace BackendGate {
 using Headless::SoundClient;
 class AudioGate : public RoundFive {
 protected:
-  void ConnectAudio(Client& client, SoundClient& audio) {
+  void GivenAudioServer()
+  {
+    Open(320, 200);
+    ASSERT_EQ(sdlrdp_audio_open(backend.get()), 0);
+  }
+  static void ThenAudioFormats(SoundClient const& audio)
+  {
+    ASSERT_EQ(audio.server_formats.size(), 2u);
+    EXPECT_EQ(audio.server_formats[0].nSamplesPerSec, 44100u);
+    EXPECT_EQ(audio.server_formats[1].nSamplesPerSec, 48000u);
+  }
+  void GivenUnconfirmedAudio(Client& client, SoundClient& audio)
+  {
+    audio.rate         = 48000;
+    audio.auto_confirm = false;
+    ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
+  }
+  void ConnectAudio(Client& client, SoundClient& audio)
+  {
     Connect(client);
     ASSERT_TRUE(client.Until([&] { return audio.opened; }));
     auto events = EventsUntil([](auto const& events) {
       return std::ranges::any_of(events, [](auto const& event) {
         return event.type == SDLRDP_AUDIO && event.audio.connected;
       });
-    }, true, &client);
+    },
+                              true, &client);
     ASSERT_TRUE(std::ranges::any_of(events, [](auto const& event) {
       return event.type == SDLRDP_AUDIO && event.audio.connected;
     })) << logs.Text();
   }
-  void RunRealtimeAudio(Client& client, SoundClient& audio) {
+  void RunRealtimeAudio(Client& client, SoundClient& audio)
+  {
     Expects(backend && audio.opened, "audio connection exists");
-    auto writing = std::async(std::launch::async, [&] {
-      std::array<INT16, 480 * 2> pcm{};
-      auto start = Clock::now();
-      int written = 0;
+    auto writing  = std::async(std::launch::async, [&] {
+      std::array<INT16, 480uz * 2> pcm    { };
+      auto                         start   = Clock::now();
+      int                          written = 0;
       for (unsigned tick = 1; tick <= 200; ++tick) {
         std::this_thread::sleep_until(start + std::chrono::milliseconds(tick * 10));
         auto count = sdlrdp_audio_write(backend.get(), pcm.data(), 480);
@@ -51,24 +72,26 @@ protected:
     EXPECT_FALSE(logs.Contains("Audio confirmation gate waiting"));
     EXPECT_EQ(audio.confirmed_frames, 96000u);
   }
-  void CheckAudioStatistics(SoundClient const& audio) {
+  void CheckAudioStatistics(SoundClient const& audio)
+  {
     Expects(!backend, "connection statistics have been flushed");
-    auto text = logs.Text(true);
+    auto        text  = logs.Text(true);
     std::smatch match;
-    ASSERT_TRUE(std::regex_search(text, match, std::regex(
-      R"(Audio: ([0-9]+) blocks sent; gap ([0-9.]+) ms mean, ([0-9.]+) ms max; ([0-9]+) gaps over 40 ms\.)"))) << text;
+    ASSERT_TRUE(std::regex_search(text, match, std::regex(R"(Audio: ([0-9]+) blocks sent; gap ([0-9.]+) ms mean, ([0-9.]+) ms max; ([0-9]+) gaps over 40 ms\.)"))) << text;
     EXPECT_EQ(std::stoull(match[1]), audio.received.size());
     EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "Audio:"), 1u);
     EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "Frames:"), 1u);
     EXPECT_TRUE(std::regex_search(text, std::regex(
-      R"(acknowledgement [0-9.]+ ms mean, [0-9.]+ ms max, [0-9]+ over 100 ms\.)"))) << text;
+                                            R"(acknowledgement [0-9.]+ ms mean, [0-9.]+ ms max, [0-9]+ over 100 ms\.)")))
+        << text;
   }
-  void EstablishConfirmations(Client& client, SoundClient& audio) {
+  void EstablishConfirmations(Client& client, SoundClient& audio)
+  {
     // Fill one latency window, then return its credit. This distinguishes a
     // slow confirming client from the deliberate no-confirmation fallback.
-    std::vector<INT16> pcm(24000 * 2);
+    std::vector<INT16> pcm(24000uz * 2);
     auto automatic = audio.auto_confirm;
-    audio.auto_confirm = true;
+    audio.auto_confirm           = true;
     ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 24000), 24000);
     ASSERT_TRUE(client.Until([&] { return audio.confirmed_frames == 24000; }));
     ASSERT_EQ(sdlrdp_audio_wait(backend.get(), 10000), 1);
@@ -76,6 +99,5 @@ protected:
     audio.samples.clear();
     audio.confirmed_frames = audio.maximum_pending_frames = 0;
   }
-
 };
 }

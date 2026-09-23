@@ -1,10 +1,11 @@
 #ifndef SDL_rdpini_h_
 #define SDL_rdpini_h_
 
-#define SDL_RDP_SETTING_NAMES(X) \
-    X(INI) X(BACKEND) X(BIND) X(CERT_DIR) X(CODEC) X(AUDIO_LATENCY) X(AUDIO_LEAD) \
-    X(VSYNC) X(ASPECT) X(HEIGHT) X(PORT) X(WAIT_FOR_CLIENT) X(WIDTH) X(REFRESH) \
-    X(USER) X(PASSWORD) X(DOMAIN) X(AUTH)
+#define SDL_RDP_SETTING_NAMES(X)                                                  \
+  X(INI)                                                                          \
+  X(BACKEND) X(BIND) X(CERT_DIR) X(CODEC) X(AUDIO_LATENCY) X(AUDIO_LEAD)          \
+      X(VSYNC) X(ASPECT) X(HEIGHT) X(PORT) X(WAIT_FOR_CLIENT) X(WIDTH) X(REFRESH) \
+          X(USER) X(PASSWORD) X(DOMAIN) X(AUTH)
 
 #define SDL_RDP_SETTING_ENUM(name) SDL_RDP_SETTING_##name,
 enum { SDL_RDP_SETTING_NAMES(SDL_RDP_SETTING_ENUM) SDL_RDP_SETTING_COUNT };

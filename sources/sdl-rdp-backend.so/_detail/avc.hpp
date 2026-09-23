@@ -9,38 +9,44 @@
 #include <vector>
 
 namespace Backend::Avc {
-struct IntraRefresh { unsigned period, count; };
+struct IntraRefresh {
+  unsigned period, count;
+};
 IntraRefresh IntraRefreshFor(unsigned fps);
 unsigned Bitrate(unsigned width, unsigned height, unsigned kbps = 0);
 unsigned Aligned(unsigned dimension);
 void ReplicateEdges(std::span<BYTE> pixels, unsigned width, unsigned height);
 struct Regions {
-  std::vector<RECTANGLE_16>              rects   {  };
-  std::vector<RDPGFX_H264_QUANT_QUALITY> quality {  };
-  sdlrdp_rect                            bounds  {  };
+public:
   void Add(sdlrdp_rect area);
   std::size_t Bytes() const {
     utilities::Expects(rects.size() == quality.size(), "every region has quantization metadata");
-    return 4 + 10 * rects.size();
+    return 4 + (10 * rects.size());
   }
+  std::vector<RECTANGLE_16> rects;
+  std::vector<RDPGFX_H264_QUANT_QUALITY> quality;
+  sdlrdp_rect bounds{};
 };
 class Encoder {
 public:
-  std::chrono::nanoseconds convert_time{}, upload_time{}, encode_time{};
   Encoder();
   ~Encoder();
-  Encoder(Encoder const&) = delete;
-  Encoder& operator=(Encoder const&) = delete;
+  Encoder(Encoder const &) = delete;
+  Encoder &operator=(Encoder const &) = delete;
+  Encoder(Encoder &&) = delete;
+  Encoder &operator=(Encoder &&) = delete;
   static bool Available();
   static std::string UnavailableReason();
   bool Open(unsigned width, unsigned height, unsigned bitrate, unsigned fps);
-  std::span<BYTE const> Encode(std::span<BYTE const> bgrx, unsigned stride, bool force_idr, std::vector<BYTE>& encoded);
+  std::span<BYTE const> Encode(std::span<BYTE const> bgrx, unsigned stride, bool force_idr, std::vector<BYTE> &encoded);
   void Close();
   bool IsOpen() const;
   bool TooSmall() const;
-  std::string const& Error() const;
+  std::string const &Error() const;
+  std::chrono::nanoseconds convert_time{}, upload_time{}, encode_time{};
+
 private:
   struct Impl;
   std::unique_ptr<Impl> impl;
 };
-}
+} // namespace Backend::Avc

@@ -2,43 +2,40 @@
 
 static const struct
 {
-    const char *name;
-    sdlrdp_codec codec;
+  const char *name;
+  sdlrdp_codec codec;
 } SDL_RDP_codecs[] = {
-    { "auto", SDLRDP_CODEC_AUTO },
-    { "planar", SDLRDP_CODEC_PLANAR },
-    { "remotefx", SDLRDP_CODEC_REMOTEFX },
-    { "nscodec", SDLRDP_CODEC_NSCODEC },
-    { "raw", SDLRDP_CODEC_RAW },
-    { "progressive", SDLRDP_CODEC_PROGRESSIVE },
-    { "avc420", SDLRDP_CODEC_AVC420 }
-};
+    {"auto", SDLRDP_CODEC_AUTO},
+    {"planar", SDLRDP_CODEC_PLANAR},
+    {"remotefx", SDLRDP_CODEC_REMOTEFX},
+    {"nscodec", SDLRDP_CODEC_NSCODEC},
+    {"raw", SDLRDP_CODEC_RAW},
+    {"progressive", SDLRDP_CODEC_PROGRESSIVE},
+    {"avc420", SDLRDP_CODEC_AVC420}};
 
-bool SDL_RDP_ParseCodec(const char *name, sdlrdp_codec *codec)
-{
-    unsigned i;
-    if (!name) {
-        name = "auto";
+bool SDL_RDP_ParseCodec(const char *name, sdlrdp_codec *codec) {
+  unsigned i = 0;
+  if (!name) {
+    name = "auto";
+  }
+  for (i = 0; i < SDL_arraysize(SDL_RDP_codecs); ++i) {
+    if (SDL_strcmp(name, SDL_RDP_codecs[i].name) == 0) {
+      *codec = SDL_RDP_codecs[i].codec;
+      return true;
     }
-    for (i = 0; i < SDL_arraysize(SDL_RDP_codecs); ++i) {
-        if (SDL_strcmp(name, SDL_RDP_codecs[i].name) == 0) {
-            *codec = SDL_RDP_codecs[i].codec;
-            return true;
-        }
-    }
-    SDL_SetError("Invalid SDL_RDP_CODEC '%s'; valid names: auto, planar, remotefx, nscodec, raw, progressive, avc420", name);
-    SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "%s", SDL_GetError());
-    return false;
+  }
+  SDL_SetError("Invalid SDL_RDP_CODEC '%s'; valid names: auto, planar, remotefx, nscodec, raw, progressive, avc420", name);
+  SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "%s", SDL_GetError());
+  return false;
 }
 
-const char *SDL_RDP_CodecName(sdlrdp_codec codec)
-{
-    unsigned i;
-    for (i = 0; i < SDL_arraysize(SDL_RDP_codecs); ++i) {
-        if (SDL_RDP_codecs[i].codec == codec) {
-            return SDL_RDP_codecs[i].name;
-        }
+const char *SDL_RDP_CodecName(sdlrdp_codec codec) {
+  unsigned i = 0;
+  for (i = 0; i < SDL_arraysize(SDL_RDP_codecs); ++i) {
+    if (SDL_RDP_codecs[i].codec == codec) {
+      return SDL_RDP_codecs[i].name;
     }
-    SDL_assert(!"invalid RDP codec");
-    return "unknown";
+  }
+  SDL_assert(!"invalid RDP codec"); // NOLINT(readability-else-after-return): SDL assertion macro owns the diagnosed control flow.
+  return "unknown";
 }

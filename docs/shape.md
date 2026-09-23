@@ -28,3 +28,13 @@ version keeps its archive, patched tree and configure cache under
 - `test_package/` consumes the published package the way a downstream
   project does: links the `SDL3` component, starts the `rdp` driver on an
   ephemeral port, and proves the backend resolves from the package.
+
+`sdlrdp_last_error()` reports the calling thread's most recent error; successful
+calls do not clear it. Each handle owns its per-thread error slots. A thread-local
+cursor retains the most recently published slot after handle close. Failed opens
+and null-handle calls publish a cursor-owned error instead.
+
+WLog has no callback user pointer. `LogRoute` owns the process-lifetime routing
+object, its callback lock, installation flag, and per-thread peer filters. The
+newest handle supplies the callback; closing it clears routing without restoring
+an older handle. Route changes and callback delivery share the same lock.

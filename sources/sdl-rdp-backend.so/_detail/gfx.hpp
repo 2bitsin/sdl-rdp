@@ -14,7 +14,11 @@ inline constexpr UINT32 GraphicsContextId = 1;
 class Peer;
 class GfxChannel {
 public:
-  explicit GfxChannel(Peer& peer);
+  GfxChannel(GfxChannel const &) = delete;
+  GfxChannel &operator=(GfxChannel const &) = delete;
+  GfxChannel(GfxChannel &&) = delete;
+  GfxChannel &operator=(GfxChannel &&) = delete;
+  explicit GfxChannel(Peer &value);
   ~GfxChannel();
   bool Open();
   bool Pump();
@@ -24,6 +28,7 @@ public:
   bool Send();
   unsigned FrameWindow() const;
   bool confirmed = false;
+
 private:
   void AccountAvcFrame();
   bool Surface();
@@ -33,17 +38,17 @@ private:
   std::span<BYTE const> Picture();
   bool SelectAvc();
   void ResetAvc();
-  void ConfirmedCapability(RDPGFX_CAPSET const& cap);
+  void ConfirmedCapability(RDPGFX_CAPSET const &cap);
   bool ProgressivePayload(std::span<BYTE> data);
   bool Raw();
   bool Planar();
-  bool WriteCommand(sdlrdp_rect area, std::span<BYTE> data, UINT32 codec, Avc::Regions& regions);
+  bool WriteCommand(sdlrdp_rect area, std::span<BYTE> data, UINT32 codec, Avc::Regions &regions);
   bool Command(sdlrdp_rect area, std::span<BYTE const> data, UINT32 codec);
-  bool Check(UINT result, char const* operation);
-  static UINT Caps(RdpgfxServerContext*, RDPGFX_CAPS_ADVERTISE_PDU const*);
-  static UINT Ack(RdpgfxServerContext*, RDPGFX_FRAME_ACKNOWLEDGE_PDU const*);
-  static UINT Qoe(RdpgfxServerContext*, RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU const*);
-  Peer& peer;
+  bool Check(UINT result, char const *operation) const;
+  static UINT Caps(RdpgfxServerContext *, RDPGFX_CAPS_ADVERTISE_PDU const *);
+  static UINT Ack(RdpgfxServerContext *, RDPGFX_FRAME_ACKNOWLEDGE_PDU const *);
+  static UINT Qoe(RdpgfxServerContext *, RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU const *);
+  Peer &peer;
   std::unique_ptr<RdpgfxServerContext, Releases<rdpgfx_server_context_free>> context;
   std::unique_ptr<PROGRESSIVE_CONTEXT, Releases<progressive_context_free>> progressive;
   Avc::Encoder avc;
@@ -54,14 +59,14 @@ private:
   UINT32 queue_depth = 0;
   std::size_t frame_bytes = 0, last_bytes = 0;
   struct Packet {
-    sdlrdp_rect area   {};
-    std::size_t offset {};
-    std::size_t length {};
-    UINT32      codec  {};
+    sdlrdp_rect area{};
+    std::size_t offset{};
+    std::size_t length{};
+    UINT32 codec{};
   };
-  Avc::Regions      regions;
+  Avc::Regions regions;
   std::vector<BYTE> payload;
   std::vector<Packet> prepared;
   std::vector<BYTE> pixels, band;
 };
-}
+} // namespace Backend

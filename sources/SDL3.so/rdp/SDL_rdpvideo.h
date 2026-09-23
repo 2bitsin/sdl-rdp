@@ -13,8 +13,6 @@ struct SDL_VideoData
     SDL_DisplayMode refresh_modes[2];
 };
 void SDL_RDP_InitMouse(void);
-bool SDL_RDP_ParseAspect(const char *value, sdlrdp_aspect *aspect);
 void SDLCALL SDL_RDP_AspectHintChanged(void *userdata, const char *name, const char *oldValue, const char *newValue);
 const char *SDL_RDP_CodecName(sdlrdp_codec codec);
-bool SDL_RDP_ParseCodec(const char *name, sdlrdp_codec *codec);
 #endif

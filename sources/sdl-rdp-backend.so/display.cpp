@@ -7,7 +7,7 @@ namespace Backend {
 BOOL Peer::ChannelCreated(void* user, UINT32 id, INT32 status)
 {
   Expects(user != nullptr, "channel creation has a peer");
-  auto& peer = *static_cast<Peer*>(user);
+  auto& peer  = *static_cast<Peer*>(user);
   auto& input = Input::Held(peer);
   peer.handle_count = 0;
   if (status < 0) {
@@ -33,20 +33,19 @@ BOOL Peer::ChannelCreated(void* user, UINT32 id, INT32 status)
 
 bool Peer::OpenDisplayControl()
 {
-  if (disp_open || !freerdp_settings_get_bool(client->context->settings, FreeRDP_SupportDisplayControl)
-      || WTSVirtualChannelManagerGetDrdynvcState(channels) != DRDYNVC_STATE_READY) return true;
+  if (disp_open || !freerdp_settings_get_bool(client->context->settings, FreeRDP_SupportDisplayControl) || WTSVirtualChannelManagerGetDrdynvcState(channels) != DRDYNVC_STATE_READY) return true;
   disp.reset(disp_server_context_new(channels));
   if (!disp) return false;
-  disp->custom = this;
-  disp->rdpcontext = client->context;
+  disp->custom            = this;
+  disp->rdpcontext        = client->context;
   disp->DispMonitorLayout = Layout;
   disp->ChannelIdAssigned = [](DispServerContext* context, UINT32 id) -> BOOL {
     static_cast<Peer*>(context->custom)->display_id = id;
     return TRUE;
   };
-  disp->MaxNumMonitors = 16;
+  disp->MaxNumMonitors        = 16;
   disp->MaxMonitorAreaFactorA = disp->MaxMonitorAreaFactorB = 8192;
-  disp_open = disp->Open(disp.get()) == CHANNEL_RC_OK;
+  disp_open                                                 = disp->Open(disp.get()) == CHANNEL_RC_OK;
   return disp_open;
 }
 UINT Peer::Layout(DispServerContext* context, DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const* pdu)
@@ -54,16 +53,21 @@ UINT Peer::Layout(DispServerContext* context, DISPLAY_CONTROL_MONITOR_LAYOUT_PDU
   Expects(context && pdu, "display layout exists");
   auto& self = *static_cast<Peer*>(context->custom);
   if (!pdu->NumMonitors || !self.active) return CHANNEL_RC_OK;
-  int64_t left = 0, top = 0, right = 0, bottom = 0;
+  int64_t left   = 0;
+  int64_t top    = 0;
+  int64_t right  = 0;
+  int64_t bottom = 0;
   for (unsigned i = 0; i < pdu->NumMonitors; ++i) {
     auto const& monitor = pdu->Monitors[i];
-    left = std::min(left, int64_t(monitor.Left));
-    top = std::min(top, int64_t(monitor.Top));
-    right = std::max(right, int64_t(monitor.Left) + monitor.Width);
-    bottom = std::max(bottom, int64_t(monitor.Top) + monitor.Height);
+    left                = std::min(left, int64_t(monitor.Left));
+    top                 = std::min(top, int64_t(monitor.Top));
+    right               = std::max(right, int64_t(monitor.Left) + monitor.Width);
+    bottom              = std::max(bottom, int64_t(monitor.Top) + monitor.Height);
   }
   if (right - left == self.desktop.w && bottom - top == self.desktop.h) return CHANNEL_RC_OK;
-  self.owner.Push({.type = SDLRDP_SCREEN, .screen = {unsigned(right - left), unsigned(bottom - top)}});
+  self.owner.Push({
+      .type = SDLRDP_SCREEN, .screen = { .width = unsigned(right - left), .height = unsigned(bottom - top) }
+  });
   return CHANNEL_RC_OK;
 }
 }

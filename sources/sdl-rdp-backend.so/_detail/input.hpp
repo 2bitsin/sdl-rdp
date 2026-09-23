@@ -10,29 +10,32 @@
 namespace Backend {
 class Peer;
 struct Input {
+public:
+  static Input &Held(Peer & /*peer*/);
+  static BOOL Create(freerdp_peer * /*unused*/, rdpContext * /*context*/);
+  static void Free(freerdp_peer * /*unused*/, rdpContext * /*context*/);
+  bool Channels(Peer &peer, std::span<HANDLE const> ready);
+  bool Open(Peer &peer);
+  unsigned Handles(HANDLE *handles) const;
+  void Close();
+  static BOOL Unicode(rdpInput * /*input*/, UINT16 flags, UINT16 code);
+  static UINT Advanced(ainput_server_context * /*context*/, UINT64 /*unused*/, UINT64 flags, INT32 x, INT32 y);
+  static UINT Touch(RdpeiServerContext * /*context*/, const RDPINPUT_TOUCH_EVENT * /*event*/);
+  static void Relative(Peer & /*peer*/, int dx, int dy);
+  static bool Motion(Peer & /*peer*/, int x, int y);
+  static bool Center(Peer & /*peer*/);
   static constexpr unsigned MaxHandles = 2;
   std::array<oxbox::utilities::UtfDecodeState, 2> unicode{};
   std::unique_ptr<ainput_server_context, Releases<ainput_server_context_free>> advanced;
   std::unique_ptr<RdpeiServerContext, Releases<rdpei_server_context_free>> touch;
-  HANDLE advanced_event{ nullptr };
+  HANDLE advanced_event{nullptr};
   bool opened = false, have_relative = false, relative = false;
   UINT32 advanced_id = UINT32_MAX, touch_id = UINT32_MAX;
   bool advanced_ready = false, touch_ready = false;
   bool warp_requested = false;
   int last_x = 0, last_y = 0;
-  static Input& Held(Peer&);
-  static BOOL Create(freerdp_peer*, rdpContext*);
-  static void Free(freerdp_peer*, rdpContext*);
-  bool Channels(Peer& peer, std::span<HANDLE const> ready);
-  bool Open(Peer& peer);
-  unsigned Handles(HANDLE* handles);
-  void Close();
-  static BOOL Unicode(rdpInput*, UINT16 flags, UINT16 code);
-  static UINT Advanced(ainput_server_context*, UINT64, UINT64 flags, INT32 x, INT32 y);
-  static UINT Touch(RdpeiServerContext*, const RDPINPUT_TOUCH_EVENT*);
-  static void Relative(Peer&, int dx, int dy);
-  static bool Motion(Peer&, int x, int y);
-  static bool Center(Peer&);
 };
-struct InputContext : rdpContext { Input* state; };
-}
+struct InputContext : rdpContext {
+  Input *state;
+};
+} // namespace Backend

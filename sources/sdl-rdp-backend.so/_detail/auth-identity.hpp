@@ -1,4 +1,5 @@
 #pragma once
+#include <cstddef>
 #include "transcode.hpp"
 #include "contract.hpp"
 #include <winpr/sspi.h>
@@ -16,7 +17,7 @@ inline std::string IdentityText(UINT16 const* text, ULONG length, ULONG flags)
   using oxbox::utilities::Encoding;
   // FreeRDP on Linux fills ANSI identities from UTF-8 settings (3.15 winpr/libwinpr/sspi/sspi_winpr.c).
   auto unicode = (flags & SEC_WINNT_AUTH_IDENTITY_UNICODE) != 0;
-  auto bytes = std::span(reinterpret_cast<std::byte const*>(text), length * (unicode ? 2 : 1));
-  return TranscodeRange<std::string>(bytes, {unicode ? Encoding::UTF16 : Encoding::UTF8, std::endian::native}, {});
+  auto bytes   = std::span(reinterpret_cast<std::byte const*>(text), static_cast<std::size_t>(length) * (unicode ? 2 : 1));
+  return TranscodeRange<std::string>(bytes, { .encoding = unicode ? Encoding::UTF16 : Encoding::UTF8, .order = std::endian::native }, {});
 }
 }

@@ -1,21 +1,19 @@
-#include <sdl-rdp-backend.so/_detail/avc.hpp>
+#include <cstddef>
 #include "_detail/sample-fixture.hpp"
-#include <sdl-rdp-backend.so/_detail/headless-clipboard.hpp>
-#include <sdl-rdp-backend.so/_detail/headless-audio.hpp>
-#include <sdl-rdp-backend.so/_detail/headless-tls.hpp>
 #include <sdl-rdp-backend.so/_detail/headless-drive.hpp>
-#include <cmath>
 
 namespace SampleGate {
-TEST_F(Sample, DriveDisconnectDuringCat) {
-  oxbox::platform::ScratchArea share{"sample-disconnect", "sdl-rdp"};
-  auto path = share.Path() / "huge.bin";
-  { std::ofstream file(path); }
-  fs::resize_file(path, 400 * 1024 * 1024);
+TEST_F(Sample, DriveDisconnectDuringCat)
+{
+  oxbox::platform::ScratchArea const share{ "sample-disconnect", "sdl-rdp" };
+  auto                               path  = share.Path() / "huge.bin";
+  {
+    std::ofstream const file(path);
+  }
+  fs::resize_file(path, static_cast<std::ptrdiff_t>(400 * 1024) * 1024);
   auto arguments = Arguments(certificates.Path(), false);
-  arguments.insert(arguments.end(), {"--cat", "share/huge.bin"});
-  process = std::make_unique<Process>(arguments);
-  ASSERT_TRUE(Read("port "));
+  arguments.insert(arguments.end(), { "--cat", "share/huge.bin" });
+  ASSERT_NO_FATAL_FAILURE(GivenProcess(arguments));
   auto port = Number(std::string_view(line).substr(5));
   {
     Client client(port, true, 640, 480);
@@ -46,12 +44,12 @@ TEST_F(Sample, DriveDisconnectDuringCat) {
   SDL_Log("trace DRIVE second client connected, frame received, cat not repeated, sample exited 0");
 }
 
-TEST_F(Sample, DriveMissingCatKeepsServing) {
-  oxbox::platform::ScratchArea share{"sample-missing", "sdl-rdp"};
-  auto arguments = Arguments(certificates.Path(), false);
-  arguments.insert(arguments.end(), {"--cat", "share/missing.bin"});
-  process = std::make_unique<Process>(arguments);
-  ASSERT_TRUE(Read("port "));
+TEST_F(Sample, DriveMissingCatKeepsServing)
+{
+  oxbox::platform::ScratchArea const share    { "sample-missing", "sdl-rdp" };
+  auto                               arguments = Arguments(certificates.Path(), false);
+  arguments.insert(arguments.end(), { "--cat", "share/missing.bin" });
+  ASSERT_NO_FATAL_FAILURE(GivenProcess(arguments));
   Client client(Number(std::string_view(line).substr(5)), true, 640, 480);
   Headless::ShareDrive(client, share.Path().c_str());
   ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();

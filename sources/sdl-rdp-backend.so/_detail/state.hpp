@@ -51,7 +51,7 @@ struct State {
   Authentication authentication;
   void (*log)(void*, sdlrdp_log_level, const char*);
   void* user;
-  void Listen(std::stop_token quit);
+  void Listen(const std::stop_token &quit);
   void Push(sdlrdp_event event);
   unsigned Poll(sdlrdp_event* out, unsigned max);
   int Wait(int timeout);
