@@ -30,9 +30,11 @@ inline void ScaleColumns(Peer& peer, sdlrdp_rect area)
     peer.scale_columns[x] = {first * 4, std::min(first + 1, peer.snapshot_width - 1) * 4, float(position - first)};
   }
 }
-inline void ScaleBand(Peer& peer, sdlrdp_rect area, std::span<BYTE> buffer, bool flip)
+inline void ScaleBand(Peer& peer, sdlrdp_rect area, std::span<BYTE> buffer, bool flip, std::size_t pitch = 0)
 {
-  Expects(peer.snapshot && buffer.size() >= std::size_t(area.w) * area.h * 4, "band storage exists");
+  if (!pitch) pitch = std::size_t(area.w) * 4;
+  Expects(peer.snapshot && area.h > 0 && pitch >= std::size_t(area.w) * 4
+    && buffer.size() >= (area.h - 1) * pitch + area.w * 4, "band storage exists");
   ScaleColumns(peer, area);
   auto ratio = double(peer.snapshot_height) / peer.desktop.h;
   for (int y = 0; y < area.h; ++y) {
@@ -41,7 +43,7 @@ inline void ScaleBand(Peer& peer, sdlrdp_rect area, std::span<BYTE> buffer, bool
     auto weight = float(position - first);
     auto top = peer.snapshot->data() + std::size_t(first) * peer.snapshot_width * 4;
     auto bottom = peer.snapshot->data() + std::size_t(second) * peer.snapshot_width * 4;
-    auto out = buffer.data() + std::size_t(flip ? area.h - y - 1 : y) * area.w * 4;
+    auto out = buffer.data() + std::size_t(flip ? area.h - y - 1 : y) * pitch;
     for (auto column : peer.scale_columns) {
       for (unsigned c = 0; c < 4; ++c) {
         float a = top[column.first + c], b = bottom[column.first + c];

@@ -9,7 +9,14 @@ BOOL Peer::ChannelCreated(void* user, UINT32 id, INT32 status)
   Expects(user != nullptr, "channel creation has a peer");
   auto& peer = *static_cast<Peer*>(user);
   auto& input = Input::Held(peer);
-  if (status < 0) return TRUE;
+  if (status < 0) {
+    if (id == peer.gfx_id) {
+      peer.gfx.reset();
+      peer.owner.Log(SDLRDP_LOG_WARN, "GFX channel rejected; using legacy surface bits.");
+      peer.AnnounceConnection(peer.encoder.codec);
+    }
+    return TRUE;
+  }
   if (id == input.advanced_id) {
     input.advanced_ready = true;
     return input.advanced->Poll(input.advanced.get()) == CHANNEL_RC_OK;

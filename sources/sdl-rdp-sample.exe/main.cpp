@@ -115,7 +115,7 @@ void Draw(SDL_Window *window, unsigned frame, const SDL_FPoint &pointer)
 
 void CycleCodec()
 {
-    static constexpr std::array codecs{"auto", "planar", "remotefx", "nscodec", "raw"};
+    static constexpr std::array codecs{"auto", "planar", "remotefx", "nscodec", "raw", "progressive"};
     const char *hint = SDL_GetHint(SDL_HINT_RDP_CODEC);
     auto current = std::ranges::find(codecs, std::string_view(hint ? hint : "auto"));
     auto next = current == codecs.end() ? 0 : (current - codecs.begin() + 1) % codecs.size();

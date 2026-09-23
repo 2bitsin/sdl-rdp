@@ -128,9 +128,14 @@ void State::Takeover(Peer& peer, sdlrdp_event event)
   }
   current = &peer;
   peer.active = peer.activated = true;
+  peer.activated_at = Peer::Clock::now();
   if (shadow) peer.Post({0, 0, int(frame_width), int(frame_height)});
-  Push(event);
-  Push({.type = SDLRDP_SCREEN, .screen = {peer.screen_width, peer.screen_height}});
+  if (freerdp_settings_get_bool(peer.client->context->settings, FreeRDP_SupportGraphicsPipeline))
+    peer.connection = event;
+  else {
+    Push(event);
+    Push({.type = SDLRDP_SCREEN, .screen = {peer.screen_width, peer.screen_height}});
+  }
   frame_changed.notify_all();
   audio_changed.notify_all();
 }

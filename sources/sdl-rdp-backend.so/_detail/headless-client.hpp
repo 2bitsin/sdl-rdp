@@ -2,6 +2,8 @@
 #include "contract.hpp"
 #include <freerdp/freerdp.h>
 #include <freerdp/gdi/gdi.h>
+#include <freerdp/gdi/gfx.h>
+#include <freerdp/client/rdpgfx.h>
 #include <freerdp/codecs.h>
 #include <freerdp/settings.h>
 #include <winpr/synch.h>
@@ -69,6 +71,32 @@ public:
       && freerdp_settings_set_bool(settings, FreeRDP_SupportGraphicsPipeline, FALSE), "client configured");
     if (!surface) Expects(freerdp_settings_set_uint32(settings, FreeRDP_SurfaceCommandsSupported, 0),
                          "surface commands disabled");
+  }
+  void EnableGraphics() {
+    auto context = instance->context;
+    Expects(freerdp_settings_set_bool(context->settings, FreeRDP_SupportGraphicsPipeline, TRUE)
+      && freerdp_settings_set_bool(context->settings, FreeRDP_SynchronousDynamicChannels, TRUE),
+      "graphics pipeline enabled on the client pump thread");
+    freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
+    PubSub_SubscribeChannelConnected(context->pubSub, [](void* raw, ChannelConnectedEventArgs const* event) {
+      if (std::string_view(event->name) != RDPGFX_DVC_CHANNEL_NAME) return;
+      auto context = static_cast<rdpContext*>(raw);
+      Expects(gdi_graphics_pipeline_init(context->gdi, static_cast<RdpgfxClientContext*>(event->pInterface)),
+        "graphics decoder initialized");
+    });
+    PubSub_SubscribeChannelDisconnected(context->pubSub, [](void* raw, ChannelDisconnectedEventArgs const* event) {
+      if (std::string_view(event->name) != RDPGFX_DVC_CHANNEL_NAME) return;
+      auto context = static_cast<rdpContext*>(raw);
+      gdi_graphics_pipeline_uninit(context->gdi, static_cast<RdpgfxClientContext*>(event->pInterface));
+    });
+    instance->LoadChannels = [](freerdp* instance) -> BOOL {
+      char const* channel[] = {"rdpgfx"};
+      auto settings = instance->context->settings;
+      auto entry = reinterpret_cast<PVIRTUALCHANNELENTRYEX>(freerdp_load_channel_addin_entry(
+        "drdynvc", nullptr, nullptr, FREERDP_ADDIN_CHANNEL_STATIC | FREERDP_ADDIN_CHANNEL_ENTRYEX));
+      return entry && freerdp_client_add_dynamic_channel(settings, 1, channel)
+        && freerdp_channels_client_load_ex(instance->context->channels, settings, entry, settings) == 0;
+    };
   }
   bool Pump(unsigned timeout = 10) {
     std::array<HANDLE, 64> handles{};

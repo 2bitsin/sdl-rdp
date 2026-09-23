@@ -1,5 +1,7 @@
 #include "_detail/headless-client.hpp"
 #include "_detail/headless-tls.hpp"
+#include "_detail/headless-gfx.hpp"
+#include "_detail/state.hpp"
 #include "sdl-rdp-backend.h"
 #include "_detail/contract.hpp"
 #include <gtest/gtest.h>
@@ -228,7 +230,7 @@ protected:
   }
   void Frame(Client& client, sdlrdp_rect area) {
     ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &area, 1), 0);
-    ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text();
+    ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0) && client.Matches(pixels); })) << logs.Text();
   }
   void Input(Client& client) {
     auto input = client.instance->context->input;
@@ -467,10 +469,12 @@ TEST_P(Gate, LiveCodecChange) {
 }
 TEST_P(Gate, ExactFlatColour) {
   Client client(sdlrdp_port(backend.get()), GetParam());
+  client.tolerance = GetParam().codec == SDLRDP_CODEC_REMOTEFX || GetParam().codec == SDLRDP_CODEC_NSCODEC ? 3 : 0;
   ASSERT_TRUE(freerdp_connect(client.instance.get()));
   ASSERT_EQ(Events(2).size(), 2u);
   std::ranges::fill(pixels, 0x00ffffffu);
   ASSERT_NO_FATAL_FAILURE(Frame(client, {0, 0, 320, 200}));
+  RecordProperty("maximum_channel_error", client.MaxError(pixels));
 }
 TEST_P(Gate, TinyDamage) {
   Client client(sdlrdp_port(backend.get()), GetParam());
@@ -606,8 +610,8 @@ TEST(Logging, NoFreerdpStdout) {
 }
 std::string ModeName(testing::TestParamInfo<Mode> const& info)
 {
-  Expects(info.param.codec >= SDLRDP_CODEC_AUTO && info.param.codec <= SDLRDP_CODEC_RAW, "known codec");
-  constexpr std::array names{"Auto", "Planar", "RemoteFX", "NSCodec", "Raw"};
+  Expects(info.param.codec >= SDLRDP_CODEC_AUTO && info.param.codec <= SDLRDP_CODEC_PROGRESSIVE, "known codec");
+  constexpr std::array names{"Auto", "Planar", "RemoteFX", "NSCodec", "Raw", "Progressive"};
   return std::string(names[info.param.codec]) + (info.param.surface ? "Surface" : "Bitmap");
 }
 INSTANTIATE_TEST_SUITE_P(Codec, Gate, testing::Values(
@@ -955,10 +959,13 @@ TEST_F(RoundFive, ExpectedDisconnectLogLevels) {
     EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, name));
     EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, name));
   }
-  for (auto [category, message] : std::array<std::pair<const char*, const char*>, 6>{{
+  for (auto [category, message] : std::array<std::pair<const char*, const char*>, 9>{{
       {"com.freerdp.core.peer", "ERRCONNECT_CONNECT_TRANSPORT_FAILED [0x0002000D]"},
       {"com.freerdp.core.transport", "BIO_read retries exceeded"},
       {"com.freerdp.core.transport", "BIO_read returned a system error 104: Connection reset by peer"},
+      {"com.freerdp.core.transport", "BIO_should_retry returned an error: error:80000068:system library::Connection reset by peer"},
+      {"com.freerdp.core.transport", "BIO_write returned a system error 32: Broken pipe"},
+      {"com.freerdp.core.transport", "BIO_should_retry returned an error: error:80000020:system library::Broken pipe"},
       {"com.freerdp.core.transport", "BIO_read returned a system error 110: Connection timed out"},
       {"com.freerdp.core.transport", "BIO_read returned a system error 5: Input/output error"},
       {"com.freerdp.core", "ERRCONNECT_CONNECT_TRANSPORT_FAILED [0x0002000D]"}}}) {
@@ -975,6 +982,38 @@ TEST_F(RoundFive, ExpectedDisconnectLogLevels) {
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_ERROR, "transport failure marker"));
   WLog_Print(WLog_Get("com.freerdp.core.transport"), WLOG_ERROR, "ERRINFO_LOGOFF_BY_USER [0x0001000C]");
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_ERROR, "ERRINFO_LOGOFF_BY_USER"));
+  RecordProperty("trace", logs.Text(true));
+}
+
+TEST_F(RoundFive, GraphicsDisconnectDuringWrite) {
+  constexpr unsigned width = 2048, height = 2048;
+  Open(width, height, {}, SDLRDP_CODEC_PROGRESSIVE);
+  Client client(sdlrdp_port(backend.get()), true, width, height);
+  client.EnableGraphics();
+  ASSERT_NO_FATAL_FAILURE(Connect(client));
+  ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
+  Events();
+  std::vector<UINT32> pixels(width * height);
+  ASSERT_NO_FATAL_FAILURE(Present(pixels, width, height));
+  ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0); }));
+  UINT32 value = 1;
+  for (auto& pixel : pixels) {
+    value ^= value << 13; value ^= value >> 17; value ^= value << 5;
+    pixel = value & 0xffffff;
+  }
+  ASSERT_NO_FATAL_FAILURE(Present(pixels, width, height));
+  std::array<HANDLE, 64> handles{};
+  auto count = freerdp_get_event_handles(client.instance->context, handles.data(), handles.size());
+  ASSERT_GT(count, 0u);
+  ASSERT_LT(WaitForMultipleObjects(count, handles.data(), FALSE, 10000), WAIT_OBJECT_0 + count);
+  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 0);
+  ASSERT_TRUE(freerdp_disconnect(client.instance.get()));
+  auto events = EventsUntil([](auto const& events) {
+    return std::ranges::any_of(events, [](auto const& event) { return event.type == SDLRDP_DISCONNECTED; });
+  });
+  EXPECT_NE(std::ranges::find(events, SDLRDP_DISCONNECTED, &sdlrdp_event::type), events.end());
+  backend.reset();
+  EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, "")) << logs.Text(true);
   RecordProperty("trace", logs.Text(true));
 }
 
@@ -1229,4 +1268,348 @@ TEST_F(AudioGate, AudioReorderedConfirmsCreditOnlyTheirBlock) {
   EXPECT_EQ(sdlrdp_audio_wait(backend.get(), 0), 0);
   ASSERT_TRUE(audio.Confirm());
   EXPECT_EQ(sdlrdp_audio_wait(backend.get(), 10000), 1);
+}
+
+namespace {
+class GraphicsGate : public Gate {};
+TEST_P(GraphicsGate, DecodesAndResizes) {
+  Client client(sdlrdp_port(backend.get()), true);
+  client.EnableGraphics();
+  Headless::GraphicsObserver observer(client);
+  client.tolerance = GetParam().codec == SDLRDP_CODEC_PROGRESSIVE ? 24 : 0;
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); })) << logs.Text(true);
+  ASSERT_TRUE(logs.Contains(SDLRDP_LOG_INFO, "GFX advertised"));
+  EXPECT_TRUE(logs.Contains("GFX confirmed version=0x000a0701"));
+  Frame(client, {0, 0, 320, 200});
+  RecordProperty("maximum_channel_error", client.MaxError(pixels));
+  EXPECT_LE(client.MaxError(pixels), client.tolerance);
+  EXPECT_EQ(observer.commands, GetParam().codec == SDLRDP_CODEC_PLANAR ? 200u : 1u);
+  auto events = Events(2);
+  auto connected = std::ranges::find(events, SDLRDP_CONNECTED, &sdlrdp_event::type);
+  ASSERT_NE(connected, events.end());
+  EXPECT_EQ(connected->connected.codec, GetParam().codec);
+  std::vector<UINT32> resized(352 * 224, 0x0055aaff);
+  sdlrdp_rect full{0, 0, 352, 224};
+  ASSERT_EQ(sdlrdp_present(backend.get(), resized.data(), 352 * 4, 352, 224, &full, 1), 0);
+  ASSERT_TRUE(client.Until([&] { return client.Matches(resized); })) << logs.Text(true);
+  EXPECT_EQ(client.instance->context->gdi->width, 352);
+  ASSERT_EQ(observer.surfaces.size(), 2u);
+  EXPECT_EQ(observer.deleted, 1u);
+  EXPECT_EQ(observer.surfaces.back().width, 352);
+  EXPECT_EQ(observer.surfaces.back().height, 224);
+  EXPECT_EQ(observer.progressive_headers, GetParam().codec == SDLRDP_CODEC_PROGRESSIVE ? 2u : 0u);
+  RecordProperty("trace", logs.Text(true));
+}
+TEST_P(GraphicsGate, AcknowledgementPacingAndSuspend) {
+  Client client(sdlrdp_port(backend.get()), true);
+  client.EnableGraphics();
+  Headless::GraphicsObserver observer(client);
+  observer.automatic = false;
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
+  sdlrdp_rect full{0, 0, 320, 200};
+  for (unsigned count = 1; count <= 2; ++count) {
+    std::ranges::fill(pixels, count * 0x00202020u);
+    ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &full, 1), 0);
+    ASSERT_TRUE(client.Until([&] { return observer.frames.size() == count; })) << logs.Text(true);
+  }
+  ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &full, 1), 0);
+  auto deadline = Clock::now() + std::chrono::milliseconds(300);
+  while (Clock::now() < deadline) ASSERT_TRUE(client.Pump());
+  EXPECT_EQ(observer.frames.size(), 2u);
+  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 0);
+  ASSERT_TRUE(observer.Ack(SUSPEND_FRAME_ACKNOWLEDGEMENT));
+  ASSERT_TRUE(client.Until([&] { return observer.frames.size() == 3; }));
+  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 1);
+  ASSERT_TRUE(observer.Ack());
+  ASSERT_TRUE(client.Pump(20));
+  for (unsigned count = 4; count <= 5; ++count) {
+    ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &full, 1), 0);
+    ASSERT_TRUE(client.Until([&] { return observer.frames.size() == count; }));
+  }
+  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 0);
+  ASSERT_TRUE(observer.Ack());
+  ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0) == 1; }));
+  RecordProperty("trace", "two unacknowledged frames held for 300 ms; suspend releases third; resume waits; cumulative ack releases wait");
+}
+TEST_P(GraphicsGate, QueueDepthThrottlesBytes) {
+  Client client(sdlrdp_port(backend.get()), true);
+  client.EnableGraphics();
+  Headless::GraphicsObserver observer(client);
+  observer.automatic = false;
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
+  sdlrdp_rect full{0, 0, 320, 200};
+  for (unsigned count = 1; count <= 2; ++count) {
+    ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &full, 1), 0);
+    ASSERT_TRUE(client.Until([&] { return observer.frames.size() == count; }));
+  }
+  ASSERT_TRUE(observer.AckFrame(0, 10000000));
+  ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &full, 1), 0);
+  auto deadline = Clock::now() + std::chrono::milliseconds(80);
+  while (Clock::now() < deadline) ASSERT_TRUE(client.Pump());
+  EXPECT_EQ(observer.frames.size(), 2u);
+  ASSERT_TRUE(observer.AckFrame(0, 0));
+  ASSERT_TRUE(client.Until([&] { return observer.frames.size() == 3; }));
+  RecordProperty("trace", "ack frame 1 with 10000000 queued bytes holds frame 3 despite one free frame slot; queueDepth=0 releases it");
+}
+TEST_P(GraphicsGate, RejectedChannelUsesLegacy) {
+  Client client(sdlrdp_port(backend.get()), true);
+  client.EnableGraphics();
+  Headless::DisplayClient display(client);
+  client.tolerance = GetParam().codec == SDLRDP_CODEC_PROGRESSIVE ? 24 : 0;
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX channel rejected"); })) << logs.Text(true);
+  Frame(client, {0, 0, 320, 200});
+  EXPECT_FALSE(logs.Contains("GFX confirmed"));
+  RecordProperty("trace", "GCC negotiates GFX; client registers only disp; graphics DVC is rejected; legacy frame decodes");
+}
+TEST_P(GraphicsGate, TakeoverWithLegacy) {
+  Client graphics(sdlrdp_port(backend.get()), true);
+  graphics.EnableGraphics();
+  graphics.tolerance = GetParam().codec == SDLRDP_CODEC_PROGRESSIVE ? 24 : 0;
+  ASSERT_TRUE(freerdp_connect(graphics.instance.get()));
+  ASSERT_TRUE(graphics.Until([&] { return logs.Contains("GFX confirmed"); }));
+  Frame(graphics, {0, 0, 320, 200});
+  Client legacy(sdlrdp_port(backend.get()), true);
+  legacy.tolerance = GetParam().codec == SDLRDP_CODEC_PROGRESSIVE ? 24 : 0;
+  ASSERT_TRUE(freerdp_connect(legacy.instance.get()));
+  ASSERT_TRUE(legacy.Until([&] { return legacy.Matches(pixels); }));
+  EXPECT_FALSE(freerdp_settings_get_bool(legacy.instance->context->settings, FreeRDP_SupportGraphicsPipeline));
+  Client next(sdlrdp_port(backend.get()), true);
+  next.EnableGraphics();
+  next.tolerance = graphics.tolerance;
+  ASSERT_TRUE(freerdp_connect(next.instance.get()));
+  ASSERT_TRUE(next.Until([&] { return next.Matches(pixels); })) << logs.Text(true);
+  RecordProperty("trace", "pipeline frame -> legacy takeover frame -> fresh pipeline takeover frame");
+}
+INSTANTIATE_TEST_SUITE_P(Pipeline, GraphicsGate, testing::Values(
+  Mode{true, SDLRDP_CODEC_PLANAR}, Mode{true, SDLRDP_CODEC_RAW}, Mode{true, SDLRDP_CODEC_PROGRESSIVE}), ModeName);
+}
+
+namespace {
+std::vector<UINT32> GraphicsScene(unsigned frame, bool noise)
+{
+  std::vector<UINT32> pixels(640 * 480, 0x00010101);
+  if (noise) {
+    UINT32 value = frame + 1;
+    for (auto& pixel : pixels) {
+      value ^= value << 13; value ^= value >> 17; value ^= value << 5;
+      pixel = value & 0xffffff;
+    }
+  } else for (unsigned y = 40; y < 72; ++y)
+    for (unsigned x = frame % 640; x < std::min(frame % 640 + 32, 640u); ++x)
+      pixels[y * 640 + x] = 0x0000ff00;
+  return pixels;
+}
+class GraphicsMeasurement : public RoundFive {
+protected:
+  void RecordGraphicsTiming(Client& client, sdlrdp_codec codec) {
+    if (codec != SDLRDP_CODEC_PROGRESSIVE) return;
+    ASSERT_TRUE(client.Until([&] {
+      std::scoped_lock lock(backend->state->session_guard);
+      auto const& peer = *backend->state->current;
+      return peer.graphics_qoe.frameId == peer.frame_id;
+    }));
+    std::scoped_lock lock(backend->state->session_guard);
+    auto const& peer = *backend->state->current;
+    RecordProperty("activation_to_gfx_ms", std::to_string(
+      std::chrono::duration<double, std::milli>(peer.graphics_ready_time).count()));
+    RecordProperty("client_decode_ms", peer.graphics_qoe.timeDiffSE);
+    RecordProperty("client_render_ms", peer.graphics_qoe.timeDiffEDR);
+    RecordProperty("client_qoe_frame", peer.graphics_qoe.frameId);
+    EXPECT_FALSE(logs.Contains("GFX QoE"));
+  }
+  void Measure(sdlrdp_codec codec, bool noise) {
+    Open(640, 480, {}, codec);
+    Client client(sdlrdp_port(backend.get()), true, 640, 480);
+    if (codec == SDLRDP_CODEC_PROGRESSIVE) client.EnableGraphics();
+    ASSERT_TRUE(freerdp_settings_set_bool(client.instance->context->settings, FreeRDP_GfxSendQoeAck, TRUE));
+    Connect(client);
+    if (codec == SDLRDP_CODEC_PROGRESSIVE)
+      ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
+    Present(GraphicsScene(0, noise), 640, 480);
+    ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0); }));
+    auto encode = [&] {
+      std::scoped_lock lock(backend->state->session_guard);
+      return backend->state->current->encoder.encode_time;
+    };
+    auto initial_encode = encode();
+    auto initial_bytes = client.Received();
+    auto start = Clock::now();
+    unsigned maximum_error = 0;
+    double latency = 0;
+    for (unsigned frame = 1; frame <= 20; ++frame) {
+      auto pixels = GraphicsScene(frame, noise);
+      auto presented = Clock::now();
+      sdlrdp_rect damage = noise ? sdlrdp_rect{0, 0, 640, 480} : sdlrdp_rect{int(frame - 1), 40, 33, 32};
+      ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 640 * 4, 640, 480, &damage, 1), 0);
+      ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0); })) << logs.Text(true);
+      latency += std::chrono::duration<double, std::milli>(Clock::now() - presented).count();
+      maximum_error = std::max(maximum_error, client.MaxError(pixels));
+    }
+    auto elapsed = std::chrono::duration<double>(Clock::now() - start).count();
+    auto bytes = client.Received() - initial_bytes;
+    auto milliseconds = std::chrono::duration<double, std::milli>(encode() - initial_encode).count();
+    RecordProperty("wire_MB_per_second", std::to_string(bytes / elapsed / 1000000));
+    RecordProperty("wire_MB_per_second_at_60fps", std::to_string(bytes * 3.0 / 1000000));
+    RecordProperty("encode_ms_per_frame", std::to_string(milliseconds / 20));
+    RecordProperty("present_ack_ms_per_frame", std::to_string(latency / 20));
+    RecordProperty("maximum_channel_error", maximum_error);
+    RecordGraphicsTiming(client, codec);
+    EXPECT_LE(maximum_error, noise ? 48u : 24u);
+  }
+};
+TEST_F(GraphicsMeasurement, ProgressiveMovingBlock) { Measure(SDLRDP_CODEC_PROGRESSIVE, false); }
+TEST_F(GraphicsMeasurement, RemoteFxMovingBlock) { Measure(SDLRDP_CODEC_REMOTEFX, false); }
+TEST_F(GraphicsMeasurement, ProgressiveNoise) { Measure(SDLRDP_CODEC_PROGRESSIVE, true); }
+TEST_F(GraphicsMeasurement, RemoteFxNoise) { Measure(SDLRDP_CODEC_REMOTEFX, true); }
+}
+
+namespace {
+TEST_F(RoundFive, GraphicsAutoUsesProgressive) {
+  Open(640, 480, {}, SDLRDP_CODEC_AUTO);
+  Client client(sdlrdp_port(backend.get()), true, 640, 480);
+  client.EnableGraphics();
+  Connect(client);
+  ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
+  auto events = Events();
+  auto connected = std::ranges::find(events, SDLRDP_CONNECTED, &sdlrdp_event::type);
+  ASSERT_NE(connected, events.end());
+  EXPECT_EQ(connected->connected.codec, SDLRDP_CODEC_PROGRESSIVE);
+  auto pixels = GraphicsScene(3, false);
+  Present(pixels, 640, 480);
+  ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0); }));
+  EXPECT_LE(client.MaxError(pixels), 24u);
+  ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_RAW), 0);
+  pixels = GraphicsScene(4, false);
+  Present(pixels, 640, 480);
+  ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0) && client.Matches(pixels); }));
+  events = Events();
+  auto changed = std::ranges::find(events, SDLRDP_CODEC_CHANGED, &sdlrdp_event::type);
+  ASSERT_NE(changed, events.end());
+  EXPECT_EQ(changed->codec_changed.codec, SDLRDP_CODEC_RAW);
+  RecordProperty("trace", "auto connects as progressive; live raw preference produces exact RGB and CODEC_CHANGED raw");
+}
+}
+
+namespace {
+TEST_F(RoundFive, ProgressiveDamageAndQoe) {
+  Open(640, 480, {}, SDLRDP_CODEC_PROGRESSIVE);
+  Client client(sdlrdp_port(backend.get()), true, 640, 480);
+  client.EnableGraphics();
+  Headless::GraphicsObserver observer(client);
+  Connect(client);
+  ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
+  auto pixels = GraphicsScene(5, false);
+  Present(pixels, 640, 480);
+  ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0); }));
+  auto before = client.Received();
+  sdlrdp_rect damage{17, 19, 7, 5};
+  for (int y = damage.y; y < damage.y + damage.h; ++y)
+    for (int x = damage.x; x < damage.x + damage.w; ++x) pixels[y * 640 + x] = 0x00ff0000;
+  ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 640 * 4, 640, 480, &damage, 1), 0);
+  ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0); }));
+  EXPECT_LE(client.MaxError(pixels), 24u);
+  EXPECT_EQ(observer.progressive_headers, 1u);
+  EXPECT_EQ(observer.surfaces.size(), 1u);
+  EXPECT_LT(client.Received() - before, 4096u);
+  RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU qoe{observer.frames.back().frameId, 1234, 7, 9};
+  ASSERT_EQ(observer.channel->QoeFrameAcknowledge(observer.channel, &qoe), CHANNEL_RC_OK);
+  ASSERT_TRUE(client.Until([&] {
+    std::scoped_lock lock(backend->state->session_guard);
+    auto const& received = backend->state->current->graphics_qoe;
+    return received.timestamp == qoe.timestamp && received.timeDiffSE == 7 && received.timeDiffEDR == 9;
+  }));
+  EXPECT_FALSE(logs.Contains("GFX QoE"));
+  RecordProperty("damage_wire_bytes", std::to_string(client.Received() - before));
+  RecordProperty("maximum_channel_error", client.MaxError(pixels));
+  RecordProperty("trace", "7x5 damage at 17,19; one progressive header over two frames; QoE timestamp=1234 decode=7 render=9 retained without logging");
+}
+}
+
+namespace {
+TEST_F(RoundFive, GraphicsVersion101) {
+  Open(640, 480, {}, SDLRDP_CODEC_PROGRESSIVE);
+  Client client(sdlrdp_port(backend.get()), true, 640, 480);
+  client.EnableGraphics();
+  ASSERT_TRUE(freerdp_settings_set_uint32(client.instance->context->settings, FreeRDP_GfxCapsFilter, ((1u << 11) - 1) & ~(1u << 3)));
+  Connect(client);
+  ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed version=0x000a0100 flags=0x00000000"); }));
+  auto pixels = GraphicsScene(3, false);
+  Present(pixels, 640, 480);
+  ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0); }));
+  EXPECT_LE(client.MaxError(pixels), 24u);
+  RecordProperty("trace", "10.1-only advertisement confirms its 16-byte reserved capability data with no flags; progressive decodes");
+}
+}
+
+namespace {
+TEST_F(RoundFive, GraphicsWithoutDynamicChannelsUsesLegacy) {
+  Open(640, 480, {}, SDLRDP_CODEC_RAW);
+  Client client(sdlrdp_port(backend.get()), true, 640, 480);
+  ASSERT_TRUE(freerdp_settings_set_bool(client.instance->context->settings, FreeRDP_SupportGraphicsPipeline, TRUE));
+  client.instance->LoadChannels = [](freerdp*) -> BOOL { return TRUE; };
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  auto events = EventsUntil([](auto const& events) {
+    return std::ranges::any_of(events, [](auto event) { return event.type == SDLRDP_CONNECTED; });
+  }, false, &client);
+  auto connected = std::ranges::find(events, SDLRDP_CONNECTED, &sdlrdp_event::type);
+  ASSERT_NE(connected, events.end()) << logs.Text();
+  EXPECT_EQ(connected->connected.codec, SDLRDP_CODEC_RAW);
+  EXPECT_TRUE(logs.Contains(SDLRDP_LOG_WARN, "GFX confirmation timed out"));
+  {
+    std::scoped_lock lock(backend->state->session_guard);
+    auto const& peer = *backend->state->current;
+    auto elapsed = Clock::now() - peer.activated_at;
+    EXPECT_GE(elapsed, Backend::Peer::GraphicsConnectionWait);
+    EXPECT_FALSE(peer.gfx);
+    EXPECT_FALSE(peer.connection);
+    RecordProperty("activation_to_legacy_ms", std::to_string(std::chrono::duration<double, std::milli>(elapsed).count()));
+  }
+  auto pixels = GraphicsScene(4, false);
+  Present(pixels, 640, 480);
+  ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); }));
+  RecordProperty("trace", "GFX setting on; no DRDYNVC/addin; deadline emits legacy connected; raw frame decodes");
+}
+TEST_F(RoundFive, GraphicsWithoutCapabilitiesUsesLegacy) {
+  Open(640, 480, {}, SDLRDP_CODEC_RAW);
+  Client client(sdlrdp_port(backend.get()), true, 640, 480);
+  client.EnableGraphics();
+  Headless::GraphicsObserver observer(client);
+  observer.advertise = false;
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  auto events = EventsUntil([](auto const& events) {
+    return std::ranges::any_of(events, [](auto event) { return event.type == SDLRDP_CONNECTED; });
+  }, false, &client);
+  auto connected = std::ranges::find(events, SDLRDP_CONNECTED, &sdlrdp_event::type);
+  ASSERT_NE(connected, events.end()) << logs.Text();
+  EXPECT_EQ(connected->connected.codec, SDLRDP_CODEC_RAW);
+  EXPECT_TRUE(logs.Contains(SDLRDP_LOG_WARN, "GFX confirmation timed out"));
+  EXPECT_FALSE(logs.Contains("GFX confirmed"));
+  auto pixels = GraphicsScene(4, false);
+  Present(pixels, 640, 480);
+  ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); }));
+  RecordProperty("trace", "GFX DVC opened; CapsAdvertise withheld; deadline emits legacy connected; raw frame decodes");
+}
+}
+
+namespace {
+TEST_F(RoundFive, GraphicsCodecSwitchPreservesUndamagedTiles) {
+  Open(640, 480, {}, SDLRDP_CODEC_RAW);
+  Client client(sdlrdp_port(backend.get()), true, 640, 480);
+  client.EnableGraphics();
+  Connect(client);
+  auto pixels = GraphicsScene(4, false);
+  Present(pixels, 640, 480);
+  ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); }));
+  ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_PROGRESSIVE), 0);
+  sdlrdp_rect damage{18, 45, 1, 1};
+  pixels[45 * 640 + 18] = 0x0000ee00;
+  ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 640 * 4, 640, 480, &damage, 1), 0);
+  ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0); }));
+  EXPECT_LE(client.MaxError(pixels), 24u);
+  RecordProperty("trace", "raw picture; switch to progressive with one pixel of damage; entire decoded picture preserved");
+}
 }

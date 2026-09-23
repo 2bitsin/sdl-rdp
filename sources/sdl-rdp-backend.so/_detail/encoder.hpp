@@ -6,16 +6,20 @@
 #include <freerdp/codec/rfx.h>
 #include <freerdp/codec/nsc.h>
 #include <span>
+#include <chrono>
 #include <vector>
 
 namespace Backend {
 struct Encoder {
   sdlrdp_codec codec = SDLRDP_CODEC_RAW;
+  bool SetupPlanar(rdpSettings const* settings, bool xrgb = false);
   bool Select(rdpSettings const* settings, sdlrdp_codec preference);
   unsigned planar_width = 0, rfx_width = 0, rfx_height = 0;
   bool skip_alpha = false, dynamic_color = false;
   bool EncodePlanar(std::span<BYTE const> pixels, unsigned width);
   bool Encode(std::span<BYTE const> pixels, unsigned width, unsigned height);
+  bool EncodePayload(std::span<BYTE const> pixels, unsigned width, unsigned height);
+  std::chrono::nanoseconds encode_time{};
   unsigned Id(rdpSettings const* settings) const;
   std::span<BYTE> payload;
   std::unique_ptr<BITMAP_PLANAR_CONTEXT, Releases<freerdp_bitmap_planar_context_free>> planar, plain;
