@@ -66,17 +66,21 @@ UINT GfxChannel::Caps(RdpgfxServerContext* context, RDPGFX_CAPS_ADVERTISE_PDU co
       sets += std::format(" version=0x{:08x} flags=0x{:08x};", cap.version, cap.flags);
     self.peer.owner.Log(SDLRDP_LOG_INFO, "GFX advertised sets:" + sets);
   }
-  auto selected = SelectCapability(advertised);
+  bool wanted = self.peer.owner.codec.load() == SDLRDP_CODEC_AVC420;
+  auto selected = SelectCapability(advertised, true);
+  bool offered = selected.version == RDPGFX_CAPVERSION_81
+    ? (selected.flags & RDPGFX_CAPS_FLAG_AVC420_ENABLED) != 0
+    : selected.version >= RDPGFX_CAPVERSION_10 && !(selected.flags & RDPGFX_CAPS_FLAG_AVC_DISABLED);
+  if (offered && !Avc::Encoder::Available()) selected = SelectCapability(advertised);
   if (!selected.version) return ERROR_NOT_SUPPORTED;
   RDPGFX_CAPS_CONFIRM_PDU confirm{&selected};
   if (!self.Check(context->CapsConfirm(context, &confirm), "confirm")) return ERROR_INTERNAL_ERROR;
-  self.confirmed = true;
-  self.peer.graphics_ready_time = Peer::Clock::now() - self.peer.activated_at;
-  self.width = self.height = 0;
-  self.headers = false;
-  self.prepared.clear();
+  self.ConfirmedCapability(selected);
   if (!self.Select()) return ERROR_INTERNAL_ERROR;
+  bool announcing = bool(self.peer.connection);
   self.peer.AnnounceConnection(self.peer.encoder.codec);
+  if (announcing && wanted && self.peer.encoder.codec != SDLRDP_CODEC_AVC420)
+    self.peer.owner.Push({.type = SDLRDP_CODEC_CHANGED, .codec_changed = {self.peer.encoder.codec}});
   std::scoped_lock lock(self.peer.owner.frame_guard);
   self.peer.pending.clear();
   self.peer.ack_enabled = true;
@@ -85,6 +89,24 @@ UINT GfxChannel::Caps(RdpgfxServerContext* context, RDPGFX_CAPS_ADVERTISE_PDU co
     selected.version, selected.flags));
   self.logged = true;
   return CHANNEL_RC_OK;
+}
+void GfxChannel::ResetAvc()
+{
+  avc.Close(); force_idr = true; avc_rejected = false;
+}
+void GfxChannel::ConfirmedCapability(RDPGFX_CAPSET const& cap)
+{
+  Expects(cap.version, "supported capabilities confirmed");
+  avc_allowed = cap.version == RDPGFX_CAPVERSION_81
+    ? (cap.flags & RDPGFX_CAPS_FLAG_AVC420_ENABLED) != 0
+    : cap.version >= RDPGFX_CAPVERSION_10 && !(cap.flags & RDPGFX_CAPS_FLAG_AVC_DISABLED)
+      && Avc::Encoder::Available();
+  ResetAvc();
+  confirmed = true;
+  peer.graphics_ready_time = Peer::Clock::now() - peer.activated_at;
+  width = height = 0;
+  headers = false;
+  prepared.clear();
 }
 UINT GfxChannel::Ack(RdpgfxServerContext* context, RDPGFX_FRAME_ACKNOWLEDGE_PDU const* ack)
 {
@@ -142,6 +164,7 @@ bool GfxChannel::Surface()
   pixels.resize(std::size_t(width) * height * 4);
   headers = false;
   progressive.reset();
+  ResetAvc();
   peer.sending.clear();
   peer.sending.Add({0, 0, int(peer.snapshot_width), int(peer.snapshot_height)});
   Ensures(width == unsigned(peer.desktop.w) && height == unsigned(peer.desktop.h), "surface matches desktop");

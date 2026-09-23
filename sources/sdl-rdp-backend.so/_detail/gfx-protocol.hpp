@@ -7,7 +7,7 @@
 #include <span>
 
 namespace Backend {
-inline RDPGFX_CAPSET SelectCapability(std::span<RDPGFX_CAPSET const> caps)
+inline RDPGFX_CAPSET SelectCapability(std::span<RDPGFX_CAPSET const> caps, bool avc_available = false)
 {
   constexpr std::array versions{RDPGFX_CAPVERSION_8, RDPGFX_CAPVERSION_81, RDPGFX_CAPVERSION_10,
     RDPGFX_CAPVERSION_101, RDPGFX_CAPVERSION_102, RDPGFX_CAPVERSION_103, RDPGFX_CAPVERSION_104,
@@ -21,10 +21,14 @@ inline RDPGFX_CAPSET SelectCapability(std::span<RDPGFX_CAPSET const> caps)
   }
   if (!selected.version) return selected;
   selected.length = selected.version == RDPGFX_CAPVERSION_101 ? Version101DataLength : FlagsDataLength;
+  bool avc = avc_available && (selected.version == RDPGFX_CAPVERSION_81
+    ? (selected.flags & RDPGFX_CAPS_FLAG_AVC420_ENABLED) != 0
+    : selected.version >= RDPGFX_CAPVERSION_10 && !(selected.flags & RDPGFX_CAPS_FLAG_AVC_DISABLED));
   selected.flags &= RDPGFX_CAPS_FLAG_THINCLIENT | RDPGFX_CAPS_FLAG_SMALL_CACHE
     | RDPGFX_CAPS_FLAG_SCALEDMAP_DISABLE;
   if (selected.version == RDPGFX_CAPVERSION_101) selected.flags = 0;
-  else if (selected.version >= RDPGFX_CAPVERSION_10) selected.flags |= RDPGFX_CAPS_FLAG_AVC_DISABLED;
+  else if (selected.version >= RDPGFX_CAPVERSION_10 && !avc) selected.flags |= RDPGFX_CAPS_FLAG_AVC_DISABLED;
+  if (avc && selected.version == RDPGFX_CAPVERSION_81) selected.flags |= RDPGFX_CAPS_FLAG_AVC420_ENABLED;
   return selected;
 }
 inline UINT32 FrameTimestamp(SYSTEMTIME const& time)

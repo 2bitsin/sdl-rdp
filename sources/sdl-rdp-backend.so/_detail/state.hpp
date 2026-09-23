@@ -69,6 +69,7 @@ struct State {
   int WriteAudio(void const* frames, unsigned count);
   int WaitAudio(int timeout);
   void CloseAudio();
+  unsigned avc_bitrate_kbps = 0;
   unsigned audio_latency = 100;
   bool audio_open = false;
   std::condition_variable_any audio_changed;

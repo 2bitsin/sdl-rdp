@@ -6,27 +6,69 @@
 namespace Backend {
 bool GfxChannel::Select()
 {
-  auto choice = peer.owner.codec.load();
-  if (choice != SDLRDP_CODEC_RAW && choice != SDLRDP_CODEC_PLANAR) choice = SDLRDP_CODEC_PROGRESSIVE;
+  Expects(confirmed, "codec follows capability confirmation");
+  auto preference = peer.owner.codec.load();
+  auto choice = preference;
+  if (choice == SDLRDP_CODEC_AVC420 && !SelectAvc()) choice = SDLRDP_CODEC_PROGRESSIVE;
+  if (choice != SDLRDP_CODEC_AVC420 && choice != SDLRDP_CODEC_RAW && choice != SDLRDP_CODEC_PLANAR) choice = SDLRDP_CODEC_PROGRESSIVE;
   auto previous = peer.encoder.codec;
   if (choice == SDLRDP_CODEC_PLANAR
       && !peer.encoder.SetupPlanar(peer.client->context->settings, true)) return false;
   // Raw and planar do not populate the persistent progressive surface.
-  if (previous != choice && choice == SDLRDP_CODEC_PROGRESSIVE && peer.snapshot)
+  if (previous != choice && (choice == SDLRDP_CODEC_PROGRESSIVE || choice == SDLRDP_CODEC_AVC420) && peer.snapshot)
     peer.sending.Add({0, 0, int(peer.snapshot_width), int(peer.snapshot_height)});
+  if (previous != choice) force_idr = true;
   peer.encoder.codec = choice;
-  if (previous != choice && !peer.connection) peer.owner.Push({.type = SDLRDP_CODEC_CHANGED, .codec_changed = {choice}});
+  bool fell_back = preference == SDLRDP_CODEC_AVC420 && requested != preference && choice != preference;
+  bool changed = previous != choice || fell_back;
+  requested = preference;
+  if (changed && !peer.connection) peer.owner.Push({.type = SDLRDP_CODEC_CHANGED, .codec_changed = {choice}});
   return true;
 }
-bool GfxChannel::Command(sdlrdp_rect area, std::span<BYTE> data, UINT32 codec)
+bool GfxChannel::SelectAvc()
+{
+  Expects(confirmed, "codec follows capability confirmation");
+  if (avc_rejected) return false;
+  std::string reason;
+  if (!Avc::Encoder::Available()) reason = Avc::Encoder::UnavailableReason();
+  else if (!avc_allowed) reason = "confirmed capabilities do not allow AVC420";
+  else if (!avc.IsOpen()) {
+    auto w = unsigned(peer.desktop.w), h = unsigned(peer.desktop.h);
+    if (!avc.Open(w, h, Avc::Bitrate(w, h, peer.owner.avc_bitrate_kbps), std::max(1u, peer.refresh ? peer.refresh / 1000 : 60)))
+      reason = avc.Error();
+  }
+  if (reason.empty()) return true;
+  if (!avc_logged) peer.owner.Log(SDLRDP_LOG_INFO, "AVC420 falls back to progressive: " + reason + ".");
+  avc_logged = avc_rejected = true;
+  return false;
+}
+bool GfxChannel::Avc420()
+{
+  Expects(confirmed && width && height && avc.IsOpen(), "confirmed AVC surface exists");
+  auto start = Peer::Clock::now();
+  Avc::Regions regions;
+  for (auto rect : peer.sending.rects) {
+    auto area = ScaleDamage(rect, peer);
+    ScaleBand(peer, area, std::span(pixels).subspan((std::size_t(area.y) * width + area.x) * 4), false, width * 4);
+    regions.Add(area);
+  }
+  auto data = avc.Encode(pixels, width * 4, force_idr);
+  peer.encoder.encode_time += Peer::Clock::now() - start;
+  if (data.empty()) return false;
+  force_idr = false;
+  auto bounds = regions.bounds;
+  return Command(bounds, data, RDPGFX_CODECID_AVC420, std::move(regions));
+}
+bool GfxChannel::Command(sdlrdp_rect area, std::span<BYTE const> data, UINT32 codec, Avc::Regions regions)
 {
   Expects(!data.empty(), "encoded graphics payload exists");
   constexpr std::size_t WireToSurfaceHeaderBytes = 25;
   frame_bytes += data.size() + WireToSurfaceHeaderBytes;
-  prepared.push_back({area, {data.begin(), data.end()}, codec});
+  if (codec == RDPGFX_CODECID_AVC420) frame_bytes += regions.Bytes();
+  prepared.push_back({area, {data.begin(), data.end()}, codec, std::move(regions)});
   return true;
 }
-bool GfxChannel::WriteCommand(sdlrdp_rect area, std::span<BYTE> data, UINT32 codec)
+bool GfxChannel::WriteCommand(sdlrdp_rect area, std::span<BYTE> data, UINT32 codec, Avc::Regions& regions)
 {
   Expects(confirmed && !data.empty(), "confirmed graphics payload exists");
   Expects(area.x >= 0 && area.y >= 0 && area.w > 0 && area.h > 0
@@ -41,6 +83,9 @@ bool GfxChannel::WriteCommand(sdlrdp_rect area, std::span<BYTE> data, UINT32 cod
   command.right = area.x + area.w; command.bottom = area.y + area.h;
   command.width = area.w; command.height = area.h;
   command.length = data.size(); command.data = data.data();
+  RDPGFX_AVC420_BITMAP_STREAM stream{{UINT32(regions.rects.size()), regions.rects.data(), regions.quality.data()},
+    UINT32(data.size()), data.data()};
+  if (codec == RDPGFX_CODECID_AVC420) command.extra = &stream;
   return Check(context->SurfaceCommand(context.get(), &command), "surface command");
 }
 bool GfxChannel::Progressive()
@@ -118,6 +163,7 @@ bool GfxChannel::Prepare()
   if (!Surface() || !Select()) return false;
   constexpr std::size_t StartFrameBytes = 16, EndFrameBytes = 12;
   frame_bytes = StartFrameBytes + EndFrameBytes;
+  if (peer.encoder.codec == SDLRDP_CODEC_AVC420) return Avc420();
   if (peer.encoder.codec == SDLRDP_CODEC_PROGRESSIVE) return Progressive();
   return peer.encoder.codec == SDLRDP_CODEC_PLANAR ? Planar() : Raw();
 }
@@ -132,7 +178,7 @@ bool GfxChannel::Send()
   RDPGFX_END_FRAME_PDU end{peer.frame_id};
   if (!Check(context->StartFrame(context.get(), &start), "start frame")) return false;
   for (auto& packet : prepared)
-    if (!WriteCommand(packet.area, packet.data, packet.codec)) return false;
+    if (!WriteCommand(packet.area, packet.data, packet.codec, packet.regions)) return false;
   if (!Check(context->EndFrame(context.get(), &end), "end frame")) return false;
   std::scoped_lock lock(peer.owner.frame_guard);
   peer.FrameSent(frame_bytes);

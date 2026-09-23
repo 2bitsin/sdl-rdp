@@ -59,6 +59,9 @@ static bool SDL_RDP_Config(sdlrdp_config *config)
     config->width = SDL_RDP_GetInteger(SDL_HINT_RDP_WIDTH, 1024);
     config->height = SDL_RDP_GetInteger(SDL_HINT_RDP_HEIGHT, 768);
     config->audio_latency_ms = SDL_RDP_GetInteger(SDL_HINT_RDP_AUDIO_LATENCY, 500);
+    config->avc_bitrate_kbps = SDL_RDP_GetInteger(SDL_HINT_RDP_AVC_BITRATE, 0);
+    if (config->avc_bitrate_kbps > SDL_MAX_UINT32 / 1000)
+        return SDL_SetError("Invalid RDP AVC bitrate");
     config->wait_for_client = SDL_RDP_SettingBoolean(SDL_HINT_RDP_WAIT_FOR_CLIENT, false);
     if (config->audio_latency_ms > SDL_MAX_SINT32 || config->port > 65535 || !config->width || config->width > SDL_MAX_SINT32 ||
         !config->height || config->height > SDL_MAX_SINT32) {

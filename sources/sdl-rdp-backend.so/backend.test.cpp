@@ -599,8 +599,8 @@ TEST(Logging, NoFreerdpStdout) {
 }
 std::string ModeName(testing::TestParamInfo<Mode> const& info)
 {
-  Expects(info.param.codec >= SDLRDP_CODEC_AUTO && info.param.codec <= SDLRDP_CODEC_PROGRESSIVE, "known codec");
-  constexpr std::array names{"Auto", "Planar", "RemoteFX", "NSCodec", "Raw", "Progressive"};
+  Expects(info.param.codec >= SDLRDP_CODEC_AUTO && info.param.codec <= SDLRDP_CODEC_AVC420, "known codec");
+  constexpr std::array names{"Auto", "Planar", "RemoteFX", "NSCodec", "Raw", "Progressive", "Avc420"};
   return std::string(names[info.param.codec]) + (info.param.surface ? "Surface" : "Bitmap");
 }
 INSTANTIATE_TEST_SUITE_P(Codec, Gate, testing::Values(
