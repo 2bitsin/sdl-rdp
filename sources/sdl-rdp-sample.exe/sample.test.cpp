@@ -240,6 +240,7 @@ TEST_F(Sample, WindowResizeMovesDesktopMode) {
   ASSERT_TRUE(freerdp_input_send_keyboard_event(client.instance->context->input, KBD_FLAGS_DOWN, 0x40));
   ASSERT_TRUE(ReadInput(client, "event DISPLAY_DESKTOP_MODE_CHANGED type=" + std::to_string(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED) + " width=1920 height=1080"));
   ASSERT_TRUE(Read("event GEOMETRY window=1920x1080 desktop=1920x1080"));
+  ASSERT_TRUE(client.Until([&] { auto gdi = client.instance->context->gdi; return gdi->width == 1920 && gdi->height == 1080; }));
   ASSERT_NO_FATAL_FAILURE(Escape(client));
 }
 
@@ -257,9 +258,11 @@ TEST_F(Sample, FullscreenModeMovesDesktopMode) {
   ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x3e));
   ASSERT_TRUE(ReadInput(client, "event DISPLAY_DESKTOP_MODE_CHANGED type=" + std::to_string(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED) + " width=1920 height=1080"));
   ASSERT_TRUE(Read("event GEOMETRY window=1920x1080 desktop=1920x1080"));
+  ASSERT_TRUE(client.Until([&] { auto gdi = client.instance->context->gdi; return gdi->width == 1920 && gdi->height == 1080; }));
   ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x3e));
   ASSERT_TRUE(ReadInput(client, "event DISPLAY_DESKTOP_MODE_CHANGED type=" + std::to_string(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED) + " width=1280 height=800"));
   ASSERT_TRUE(Read("event GEOMETRY window=1280x800 desktop=1280x800"));
+  ASSERT_TRUE(client.Until([&] { auto gdi = client.instance->context->gdi; return gdi->width == 1280 && gdi->height == 800; }));
   ASSERT_NO_FATAL_FAILURE(Escape(client));
 }
 
