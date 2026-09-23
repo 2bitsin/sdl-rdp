@@ -23,9 +23,14 @@ bool ExpectedPeerMessage(wLogMessage const& message)
   if (!message.PrefixString || !message.TextString) return false;
   auto prefix = std::string_view(message.PrefixString);
   auto text = std::string_view(message.TextString);
-  if (prefix == "com.freerdp.core.transport")
-    return text == "BIO_read retries exceeded"
-      || text == "BIO_read returned a system error 104: Connection reset by peer";
+  if (prefix == "com.freerdp.core.transport") {
+    if (text == "BIO_read retries exceeded") return true;
+    constexpr std::string_view system_error = "BIO_read returned a system error ";
+    if (!text.starts_with(system_error)) return false;
+    text.remove_prefix(system_error.size());
+    auto end = text.find_first_not_of("0123456789");
+    return end > 0 && end != text.npos && text.substr(end).starts_with(": ");
+  }
   auto name = text.substr(0, text.find(' '));
   if ((prefix == "com.freerdp.core" || prefix == "com.freerdp.core.peer")
       && name == "ERRCONNECT_CONNECT_TRANSPORT_FAILED") return true;
@@ -40,8 +45,14 @@ BOOL Forward(wLogMessage const* message)
   auto level = message->Level == WLOG_ERROR ? SDLRDP_LOG_ERROR
     : message->Level == WLOG_WARN ? SDLRDP_LOG_WARN : SDLRDP_LOG_INFO;
   if (ExpectedPeerMessage(*message)) level = SDLRDP_LOG_INFO;
-  if (target && target->callback && message->TextString)
-    target->callback(target->user, level, message->TextString);
+  auto text = message->TextString;
+  if (message->PrefixString && text
+      && std::string_view(message->PrefixString) == "com.freerdp.channels.rdpsnd.server"
+      && std::string_view(text) == "client doesn't support any format!") {
+    level = SDLRDP_LOG_WARN;
+    text = "Audio unavailable: client formats: none (no compatible formats advertised).";
+  }
+  if (target && target->callback && text) target->callback(target->user, level, text);
   return TRUE;
 }
 void Install()

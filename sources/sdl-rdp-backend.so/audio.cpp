@@ -19,13 +19,19 @@ bool Peer::SoundChannel()
 {
   Expects(channels != nullptr, "channel manager exists");
   if (!active) return true;
+  bool healthy = true;
   if (!sound_attempted) {
     sound_attempted = true;
     if (!WTSVirtualChannelManagerIsChannelJoined(channels, RDPSND_CHANNEL_NAME)) return true;
     sound = std::make_unique<AudioChannel>(owner, channels, client->context, wake.get());
-    if (!sound->Initialize()) return false;
+    healthy = sound->Initialize();
   }
-  return !sound || sound->Pump();
+  if (sound && (!healthy || !sound->Pump())) {
+    sound.reset();
+    owner.Push({.type = SDLRDP_AUDIO, .audio = {0, 0}});
+    owner.audio_changed.notify_all();
+  }
+  return true;
 }
 AudioChannel::AudioChannel(State& state, HANDLE channels, rdpContext* context, HANDLE event)
  : owner(state), wake(event), sound(rdpsnd_server_context_new(channels))
@@ -54,7 +60,9 @@ bool AudioChannel::Pump()
 {
   Expects(sound != nullptr, "sound context exists");
   auto result = rdpsnd_server_handle_messages(sound.get());
-  return result == CHANNEL_RC_OK || result == ERROR_NO_DATA;
+  if (!rejected && (result == CHANNEL_RC_OK || result == ERROR_NO_DATA)) return true;
+  sound->Close(sound.get());
+  return false;
 }
 HANDLE AudioChannel::Event() const
 {
@@ -90,16 +98,32 @@ void AudioChannel::Activated(RdpsndServerContext* context)
   auto& self = *static_cast<AudioChannel*>(context->data);
   static constexpr unsigned wave2_version = 8;
   if (context->clientVersion < wave2_version) {
-    self.owner.Log(SDLRDP_LOG_WARN, "Audio requires rdpsnd Wave2 support (version 8).");
+    self.RejectFormats();
     return;
   }
-  if (!context->num_client_formats) return;
+  if (!context->num_client_formats) { self.RejectFormats(); return; }
   auto const& selected = context->client_formats[0];
   if (selected.wFormatTag != WAVE_FORMAT_PCM || selected.nChannels != 2 || selected.wBitsPerSample != 16
-      || (selected.nSamplesPerSec != 48000 && selected.nSamplesPerSec != 44100)) return;
+      || (selected.nSamplesPerSec != 48000 && selected.nSamplesPerSec != 44100)) {
+    self.RejectFormats();
+    return;
+  }
   self.Select(0);
   self.owner.Log(SDLRDP_LOG_INFO, std::format("Audio selected: stereo S16 at {} Hz.", selected.nSamplesPerSec));
   self.owner.Push({.type = SDLRDP_AUDIO, .audio = {selected.nSamplesPerSec, 1}});
+}
+void AudioChannel::RejectFormats()
+{
+  Expects(sound != nullptr, "sound context exists");
+  rejected = true;
+  std::string formats;
+  for (unsigned i = 0; i < sound->num_client_formats; ++i) {
+    auto const& format = sound->client_formats[i];
+    formats += std::format("{}tag={} channels={} rate={} bits={}", i ? "; " : "",
+      format.wFormatTag, format.nChannels, format.nSamplesPerSec, format.wBitsPerSample);
+  }
+  owner.Log(SDLRDP_LOG_WARN, std::format("Audio unavailable: client version={}; client formats: {}.",
+    sound->clientVersion, formats.empty() ? "none" : formats));
 }
 void AudioChannel::AdoptServerClock()
 {
