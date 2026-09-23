@@ -1,5 +1,5 @@
 #ifndef _GNU_SOURCE
-#define _GNU_SOURCE // NOLINT(bugprone-reserved-identifier,cert-dcl37-c,cert-dcl51-cpp): glibc dladdr.
+#define _GNU_SOURCE
 #endif
 #include "SDL_rdpdyn.h"
 #include "SDL_rdpini.h"

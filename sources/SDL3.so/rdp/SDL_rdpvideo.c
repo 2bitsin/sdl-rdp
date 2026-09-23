@@ -171,6 +171,6 @@ static SDL_VideoDevice* SDL_RDP_CreateDevice(void) {
   return device;
 }
 
-VideoBootStrap RDP_bootstrap = { // NOLINT(cppcoreguidelines-avoid-non-const-global-variables): SDL bootstrap state.
+VideoBootStrap RDP_bootstrap = {
   "rdp", "SDL RDP video driver", SDL_RDP_CreateDevice, NULL, false
 };

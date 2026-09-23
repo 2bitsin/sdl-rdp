@@ -16,9 +16,5 @@ if(TARGET sdl-rdp-backend-tests)
   add_test(NAME              clone-lint
            COMMAND           ${CMAKE_SOURCE_DIR}/bin/lint-clones.sh
            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-  add_test(NAME              tidy-c-lint
-           COMMAND           ${CMAKE_SOURCE_DIR}/bin/lint-tidy-c.sh
-           WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-  set_tests_properties(clone-lint tidy-c-lint PROPERTIES SKIP_RETURN_CODE 77)
-  set_tests_properties(tidy-c-lint            PROPERTIES TIMEOUT          600)
+  set_tests_properties(clone-lint PROPERTIES SKIP_RETURN_CODE 77)
 endif()

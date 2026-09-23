@@ -3,7 +3,7 @@
 #include "SDL_rdpregistry.h"
 
 static struct SDL_RDP_Registry
-    registry; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables): SDL bootstrap state.
+    registry;
 
 struct SDL_RDP_Registry* SDL_RDP_Registry(void) {
   return &registry;
