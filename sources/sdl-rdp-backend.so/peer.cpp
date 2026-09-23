@@ -225,7 +225,6 @@ bool Peer::Drain()
     ResetEvent(wake.get());
     return true;
   }
-  if (Input::Held(*this).center_pending && !Input::Center(*this)) return false;
   {
     std::scoped_lock lock(owner.frame_guard);
     ResetEvent(wake.get());

@@ -16,23 +16,24 @@ bool Input::Center(Peer& peer)
 {
   Expects(peer.active, "active peer has a desktop");
   auto& input = Held(peer);
-  input.center_pending = false;
   POINTER_POSITION_UPDATE position{UINT32(peer.desktop.w / 2), UINT32(peer.desktop.h / 2)};
   auto context = peer.client->context;
-  return context->update->pointer->PointerPosition(context, &position);
+  input.warp_requested = context->update->pointer->PointerPosition(context, &position);
+  return input.warp_requested;
 }
 bool Input::Motion(Peer& peer, int x, int y)
 {
   Expects(peer.desktop.w > 0 && peer.desktop.h > 0, "desktop dimensions are positive");
   auto& input = Held(peer);
+  int dx = x - input.last_x, dy = y - input.last_y;
   input.last_x = x; input.last_y = y;
   if (input.relative) {
     if (input.have_relative) return true;
-    int dx = x - peer.desktop.w / 2, dy = y - peer.desktop.h / 2;
-    if (dx || dy) {
-      Relative(peer, dx, dy);
-      return Center(peer);
-    }
+    bool warped = input.warp_requested && x == peer.desktop.w / 2 && y == peer.desktop.h / 2;
+    input.warp_requested = false;
+    if (!warped && (dx || dy)) Relative(peer, dx, dy);
+    if (x < peer.desktop.w / 8 || x >= peer.desktop.w * 7 / 8
+        || y < peer.desktop.h / 8 || y >= peer.desktop.h * 7 / 8) return Center(peer);
     return true;
   }
   std::scoped_lock frame(peer.owner.frame_guard);
@@ -49,7 +50,7 @@ UINT Input::Advanced(ainput_server_context* context, UINT64, UINT64 flags, INT32
   if (!peer.active) return CHANNEL_RC_OK;
   auto& input = Held(peer);
   if (flags & AINPUT_FLAGS_MOVE) input.have_relative = (flags & (AINPUT_FLAGS_REL | AINPUT_FLAGS_HAVE_REL)) != 0;
-  if (input.have_relative) input.center_pending = false;
+  if (input.have_relative) input.warp_requested = false;
   if ((flags & AINPUT_FLAGS_MOVE) && (flags & AINPUT_FLAGS_REL)) {
     if (input.relative) Relative(peer, x, y);
   } else if ((flags & AINPUT_FLAGS_MOVE) && !Motion(peer, x, y)) return ERROR_INTERNAL_ERROR;
@@ -71,7 +72,7 @@ int sdlrdp_set_relative_mouse(sdlrdp_handle* handle, int enabled)
   if (owner.current) {
     auto& input = Backend::Input::Held(*owner.current);
     input.relative = enabled != 0;
-    input.center_pending = input.relative && !input.have_relative;
+    input.warp_requested = false;
     SetEvent(owner.current->wake.get());
   }
   return 0;

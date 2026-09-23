@@ -146,6 +146,8 @@ TEST_F(Sample, AspectMapsMouse) {
   ASSERT_TRUE(Read("event MOUSE_MOTION "));
   EXPECT_TRUE(line.contains(" x=639 y=349 ")) << line;
   auto input = client.instance->context->input;
+  ASSERT_TRUE(freerdp_input_send_mouse_event(input, PTR_FLAGS_MOVE, 320, 240));
+  ASSERT_TRUE(Read("event MOUSE_MOTION "));
   ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x3d));
   ASSERT_TRUE(Read("event RELATIVE_MODE active=1"));
   ASSERT_TRUE(freerdp_input_send_mouse_event(input, PTR_FLAGS_MOVE, 330, 192));
