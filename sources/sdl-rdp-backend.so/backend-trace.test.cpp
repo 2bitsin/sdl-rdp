@@ -36,7 +36,7 @@ protected:
   }
   void Exercise() {
     ASSERT_EQ(sdlrdp_audio_open(backend.get()), 0);
-    Client client(sdlrdp_port(backend.get()), true);
+    Client      client(sdlrdp_port(backend.get()), true);
     SoundClient audio(client);
     ConnectAudio(client, audio);
     if (::testing::Test::HasFatalFailure()) return;

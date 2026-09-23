@@ -3,7 +3,7 @@
 using namespace std::chrono_literals;
 namespace Backend {
 TEST(RefreshEstimator, ClientLatencyIgnoresPresentSpacing) {
-  Refresh value { RefreshMode::Client };
+  Refresh value{ RefreshMode::Client };
   value.Restart();
   auto now = Refresh::Clock::now();
   for (int frame = 0; frame < 10; ++frame)
@@ -14,7 +14,7 @@ TEST(RefreshEstimator, ClientLatencyIgnoresPresentSpacing) {
   EXPECT_EQ(value.Rate(), 60u);
 }
 TEST(RefreshEstimator, AverageHeldAcknowledgementRespectsFloor) {
-  Refresh value { RefreshMode::Average };
+  Refresh value{ RefreshMode::Average };
   value.Restart();
   auto now = Refresh::Clock::now();
   value.Acknowledge(now, 1ms);
@@ -26,7 +26,7 @@ TEST(RefreshEstimator, AverageHeldAcknowledgementRespectsFloor) {
   }
 }
 TEST(RefreshEstimator, SenderUsesQueueAndSegments) {
-  Refresh value { RefreshMode::Sender };
+  Refresh value{ RefreshMode::Sender };
   value.Restart();
   WireSample wire{
     .available = true, .outq = 10001, .notsent = 500, .unacked = 10, .rtt = 100, .mss = 1000, .delivery_rate = 100000
@@ -58,7 +58,7 @@ void ThenBlockedIntervals(Refresh& value, Refresh::Clock::time_point now) {
 }
 }
 TEST(RefreshEstimator, BlockedSenderStepsOncePerCurrentInterval) {
-  Refresh value { RefreshMode::Sender };
+  Refresh value{ RefreshMode::Sender };
   value.Restart();
   auto now = Refresh::Clock::now();
   ThenBlockedIntervals(value, now);
@@ -74,7 +74,7 @@ TEST(RefreshEstimator, BlockedSenderStepsOncePerCurrentInterval) {
 }
 TEST(RefreshEstimator, BlockedTransportDoesNotChangeOtherModes) {
   for (auto mode : { RefreshMode::Fixed, RefreshMode::Client, RefreshMode::Average }) {
-    Refresh value { mode };
+    Refresh value{ mode };
     value.Restart();
     auto now = Refresh::Clock::now();
     for (auto elapsed = 0ms; elapsed <= 1s; elapsed += 5ms)
@@ -83,13 +83,13 @@ TEST(RefreshEstimator, BlockedTransportDoesNotChangeOtherModes) {
   }
 }
 TEST(RefreshEstimator, EmptyQueueRecoversOnlyOncePerCompletedFrame) {
-  Refresh value { RefreshMode::Sender };
+  Refresh value{ RefreshMode::Sender };
   value.Restart();
   value.Blocked(Refresh::Clock::now());
   value.Written({ .available = true, .outq = 36 }, 10000);
   value.Drained({ .available = true, .outq = 36 });
   EXPECT_EQ(value.Rate(), 50u);
-  value.Drained({});
+  value.Drained({ });
   EXPECT_EQ(value.Rate(), 50u);
   value.Drained({ .available = true });
   EXPECT_EQ(value.Rate(), 60u);
@@ -106,9 +106,9 @@ TEST(RefreshEstimator, EmptyQueueRecoversOnlyOncePerCompletedFrame) {
   value.Drained({ .available = true });
   EXPECT_EQ(value.Rate(), 50u);
 }
-class RefreshReset : public testing::TestWithParam<RefreshMode> {};
+class RefreshReset : public testing::TestWithParam<RefreshMode> { };
 TEST_P(RefreshReset, RestartDropsHistory) {
-  Refresh value { GetParam() };
+  Refresh value{ GetParam() };
   value.Restart();
   auto now = Refresh::Clock::now();
   for (int frame = 0; frame < 10; ++frame) {

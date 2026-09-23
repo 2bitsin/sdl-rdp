@@ -95,7 +95,7 @@ void Peer::LogFrames() {
                                                 Milliseconds(avc_convert).count() / double(avc_frames),
                                                 Milliseconds(avc_upload).count() / double(avc_frames),
                                                 Milliseconds(avc_encode).count() / double(avc_frames))
-                                  : std::string{};
+                                  : std::string{ };
   owner.Log(SDLRDP_LOG_INFO,
             std::format(
                 "Frames: {} sent, {} coalesced; encode {:.1f} ms mean, {:.1f} ms max{}; acknowledgement {:.1f} ms "
@@ -110,7 +110,7 @@ bool Peer::Marker(UINT16 action) {
   Expects(client != nullptr, "client transport exists");
   Expects(client->context, "client context exists");
   if (!freerdp_settings_get_bool(client->context->settings, FreeRDP_FrameMarkerCommandEnabled)) return true;
-  SURFACE_FRAME_MARKER const marker { action, frame_id };
+  SURFACE_FRAME_MARKER const marker{ action, frame_id };
   return client->context->update->SurfaceFrameMarker(client->context, &marker);
 }
 bool Peer::Pacing() {

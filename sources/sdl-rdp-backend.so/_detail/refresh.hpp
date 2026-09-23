@@ -26,14 +26,14 @@ struct Refresh {
   unsigned Rate() const { return rate; }
   RefreshMode Mode() const { return mode; }
   bool AwaitingEmpty() const { return awaiting_empty != 0; }
-  void Restart();
-  void Step(Direction direction);
-  Direction FromLatency(Clock::duration latency) const;
+  void             Restart();
+  void             Step(Direction direction);
+  Direction        FromLatency(Clock::duration latency) const;
   static Direction FromWire(WireSample const& wire, std::size_t bytes);
-  void Blocked(Clock::time_point now);
-  void Acknowledge(Clock::time_point now, Clock::duration latency);
-  void Written(WireSample const& wire, std::size_t bytes);
-  void Drained(WireSample const& wire);
+  void             Blocked(Clock::time_point now);
+  void             Acknowledge(Clock::time_point now, Clock::duration latency);
+  void             Written(WireSample const& wire, std::size_t bytes);
+  void             Drained(WireSample const& wire);
 
 private:
   RefreshMode       mode           = RefreshMode::Fixed;

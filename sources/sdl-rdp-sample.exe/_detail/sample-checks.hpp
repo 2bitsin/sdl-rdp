@@ -69,7 +69,7 @@ protected:
     WhenNonAsciiKey(input);
   }
   void ThenDriveOutput(fs::path const& share, std::string const& original) {
-    std::array<unsigned char, EVP_MAX_MD_SIZE> digest {   };
+    std::array<unsigned char, EVP_MAX_MD_SIZE> digest{ };
     unsigned                                   length = 0;
     ASSERT_EQ(EVP_Digest(original.data(), original.size(), digest.data(), &length, EVP_sha256(), nullptr), 1);
     auto hex = oxbox::utilities::ToHex(std::as_bytes(std::span(digest).first(length)));
@@ -121,7 +121,7 @@ protected:
     }
   }
   void ThenClipboardCleared(Client& client, Headless::ClipboardClient& clipboard) {
-    ASSERT_EQ(clipboard.Offer({}, false), CHANNEL_RC_OK);
+    ASSERT_EQ(clipboard.Offer({ }, false), CHANNEL_RC_OK);
     ASSERT_TRUE(client.Until([&] { return clipboard.Observed().accepted.load() == 4; }));
     ASSERT_TRUE(Read("event CLIPBOARD text="));
     SDL_Log("trace CLIPBOARD client formats=8 text-cleared=1");

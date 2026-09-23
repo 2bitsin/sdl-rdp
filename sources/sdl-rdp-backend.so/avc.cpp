@@ -23,7 +23,7 @@ IntraRefresh IntraRefreshFor(unsigned fps) {
   Expects(fps, "refresh rate is positive");
   Expects(fps <= UINT32_MAX / 2, "doubled refresh rate fits NVENC");
   // Recovery target: refresh every two seconds, spreading each sweep over half a second.
-  IntraRefresh refresh { .period = 2 * fps, .count = std::max(1u, fps / 2) };
+  IntraRefresh refresh{ .period = 2 * fps, .count = std::max(1u, fps / 2) };
   Ensures(refresh.count <= refresh.period, "refresh sweep fits its period");
   return refresh;
 }
@@ -78,22 +78,22 @@ void Regions::Add(sdlrdp_rect area) {
 }
 struct Encoder::Impl {
 public:
-  bool Check(int status, char const* operation);
-  bool Load();
-  bool Session();
-  bool Initialize(unsigned bitrate, unsigned fps);
+  bool                     Check(int status, char const* operation);
+  bool                     Load();
+  bool                     Session();
+  bool                     Initialize(unsigned bitrate, unsigned fps);
   NV_ENC_INITIALIZE_PARAMS Parameters(unsigned fps, NV_ENC_CONFIG* config) const;
-  bool Buffers();
-  bool MinimumSize();
-  NV_ENC_PIC_PARAMS Picture(bool force_idr) const;
-  bool Fill(std::span<BYTE const> bgrx, unsigned stride, Encoder& timing);
-  void Close();
+  bool                     Buffers();
+  bool                     MinimumSize();
+  NV_ENC_PIC_PARAMS        Picture(bool force_idr) const;
+  bool                     Fill(std::span<BYTE const> bgrx, unsigned stride, Encoder& timing);
+  void                     Close();
 
 private:
   friend class                Encoder;
   CudaFunctions*              cuda    = nullptr;
   NvencFunctions*             loader  = nullptr;
-  NV_ENCODE_API_FUNCTION_LIST api     {         };
+  NV_ENCODE_API_FUNCTION_LIST api    { };
   CUdevice                    device  = 0;
   CUcontext                   context = nullptr;
   void*                       session = nullptr;
@@ -129,7 +129,7 @@ bool Encoder::Impl::Session() {
       !Check(cuda->cuDeviceGet(&device, 0), "cuDeviceGet") ||
       !Check(cuda->cuDevicePrimaryCtxRetain(&context, device), "retain CUDA context"))
     return false;
-  NV_ENC_OPEN_ENCODE_SESSION_EX_PARAMS open { };
+  NV_ENC_OPEN_ENCODE_SESSION_EX_PARAMS open{ };
   open.version    = NV_ENC_OPEN_ENCODE_SESSION_EX_PARAMS_VER;
   open.deviceType = NV_ENC_DEVICE_TYPE_CUDA;
   open.device     = context;
@@ -174,7 +174,7 @@ void ConfigurePreset(NV_ENC_CONFIG& config, unsigned bitrate, unsigned fps) {
 }
 }
 NV_ENC_INITIALIZE_PARAMS Encoder::Impl::Parameters(unsigned fps, NV_ENC_CONFIG* config) const {
-  NV_ENC_INITIALIZE_PARAMS init { };
+  NV_ENC_INITIALIZE_PARAMS init{ };
   init.version           = NV_ENC_INITIALIZE_PARAMS_VER;
   init.encodeGUID        = NV_ENC_CODEC_H264_GUID;
   init.presetGUID        = NV_ENC_PRESET_P4_GUID;
@@ -194,7 +194,7 @@ bool Encoder::Impl::Initialize(unsigned bitrate, unsigned fps) {
   Expects(session != nullptr, "encoder session exists");
   Expects(bitrate > 0, "encoder bitrate is positive");
   Expects(fps > 0, "encoder frame rate is positive");
-  NV_ENC_PRESET_CONFIG preset { };
+  NV_ENC_PRESET_CONFIG preset{ };
   preset.version           = NV_ENC_PRESET_CONFIG_VER;
   preset.presetCfg.version = NV_ENC_CONFIG_VER;
   if (!Check(api.nvEncGetEncodePresetConfigEx(session, NV_ENC_CODEC_H264_GUID, NV_ENC_PRESET_P4_GUID,
@@ -210,14 +210,14 @@ bool Encoder::Impl::Buffers() {
   Expects(session != nullptr, "encoder session exists");
   Expects(w % 16 == 0, "encoder width is aligned");
   Expects(h % 16 == 0, "encoder height is aligned");
-  NV_ENC_CREATE_INPUT_BUFFER in { };
+  NV_ENC_CREATE_INPUT_BUFFER in{ };
   in.version   = NV_ENC_CREATE_INPUT_BUFFER_VER;
   in.width     = w;
   in.height    = h;
   in.bufferFmt = NV_ENC_BUFFER_FORMAT_IYUV;
   if (!Check(api.nvEncCreateInputBuffer(session, &in), "create input buffer")) return false;
   input = in.inputBuffer;
-  NV_ENC_CREATE_BITSTREAM_BUFFER out { };
+  NV_ENC_CREATE_BITSTREAM_BUFFER out{ };
   out.version = NV_ENC_CREATE_BITSTREAM_BUFFER_VER;
   if (!Check(api.nvEncCreateBitstreamBuffer(session, &out), "create bitstream buffer")) return false;
   output = out.bitstreamBuffer;
@@ -228,10 +228,10 @@ int ConvertInput(NV_ENC_LOCK_INPUT_BUFFER const& lock, prim_size_t const& size, 
                  unsigned stride) {
   Expects(lock.pitch >= size.width, "I420 pitch covers aligned width");
   Expects(lock.pitch % 2 == 0, "I420 pitch is even");
-  auto* y { static_cast<BYTE*>(lock.bufferDataPtr) };
+  auto* y{ static_cast<BYTE*>(lock.bufferDataPtr) };
   std::array<BYTE*, 3> planes{ y, y + (std::size_t(lock.pitch) * size.height),
                                y + (std::size_t(lock.pitch) * size.height * 5 / 4) };
-  std::array<UINT32, 3> pitches { lock.pitch, lock.pitch / 2, lock.pitch / 2 };
+  std::array<UINT32, 3> pitches{ lock.pitch, lock.pitch / 2, lock.pitch / 2 };
   return primitives_get()->RGBToYUV420_8u_P3AC4R(bgrx.data(), PIXEL_FORMAT_BGRX32, stride, planes.data(),
                                                  pitches.data(), &size);
 }
@@ -241,7 +241,7 @@ bool Encoder::Impl::Fill(std::span<BYTE const> bgrx, unsigned stride, Encoder& t
   Expects(input != nullptr, "encoder input buffer exists");
   using Clock = std::chrono::steady_clock;
   auto                     start = Clock::now();
-  NV_ENC_LOCK_INPUT_BUFFER lock  {              };
+  NV_ENC_LOCK_INPUT_BUFFER lock { };
   lock.version     = NV_ENC_LOCK_INPUT_BUFFER_VER;
   lock.inputBuffer = input;
   if (!Check(api.nvEncLockInputBuffer(session, &lock), "lock input")) return false;
@@ -267,7 +267,7 @@ void Encoder::Impl::Close() {
   cuda_free_functions(&cuda);
   first = true;
 }
-Encoder::Encoder() : impl(std::make_unique<Impl>()) {}
+Encoder::Encoder() : impl(std::make_unique<Impl>()) { }
 Encoder::~Encoder() {
   Close();
 }
@@ -289,7 +289,7 @@ std::string Encoder::UnavailableReason() {
     auto available = probe.Load();
     auto error     = probe.error;
     probe.Close();
-    return available ? std::string{} : error;
+    return available ? std::string{ } : error;
   }();
   return reason;
 }
@@ -297,7 +297,7 @@ bool Encoder::Available() {
   return UnavailableReason().empty();
 }
 bool Encoder::Impl::MinimumSize() {
-  NV_ENC_CAPS_PARAM caps { };
+  NV_ENC_CAPS_PARAM caps{ };
   caps.version = NV_ENC_CAPS_PARAM_VER;
   int min_width  = 0;
   int min_height = 0;
@@ -329,7 +329,7 @@ bool Encoder::Open(unsigned width, unsigned height, unsigned bitrate, unsigned f
   return true;
 }
 NV_ENC_PIC_PARAMS Encoder::Impl::Picture(bool force_idr) const {
-  NV_ENC_PIC_PARAMS pic { };
+  NV_ENC_PIC_PARAMS pic{ };
   pic.version         = NV_ENC_PIC_PARAMS_VER;
   pic.inputBuffer     = input;
   pic.outputBitstream = output;
@@ -345,17 +345,17 @@ std::span<BYTE const> Encoder::Encode(std::span<BYTE const> bgrx, unsigned strid
   Expects(IsOpen(), "encoder is open");
   Expects(stride >= impl->w * 4, "source stride covers aligned width");
   Expects(bgrx.size() >= std::size_t(impl->h - 1) * stride + std::size_t(impl->w) * 4, "source covers aligned height");
-  times.convert = times.upload = times.encode = {};
-  if (!impl->Fill(bgrx, stride, *this)) return {};
+  times.convert = times.upload = times.encode = { };
+  if (!impl->Fill(bgrx, stride, *this)) return { };
   auto pic   = impl->Picture(force_idr);
   auto start = std::chrono::steady_clock::now();
-  if (!impl->Check(impl->api.nvEncEncodePicture(impl->session, &pic), "encode picture")) return {};
-  NV_ENC_LOCK_BITSTREAM lock { .version = NV_ENC_LOCK_BITSTREAM_VER, .outputBitstream = impl->output };
-  if (!impl->Check(impl->api.nvEncLockBitstream(impl->session, &lock), "lock bitstream")) return {};
+  if (!impl->Check(impl->api.nvEncEncodePicture(impl->session, &pic), "encode picture")) return { };
+  NV_ENC_LOCK_BITSTREAM lock{ .version = NV_ENC_LOCK_BITSTREAM_VER, .outputBitstream = impl->output };
+  if (!impl->Check(impl->api.nvEncLockBitstream(impl->session, &lock), "lock bitstream")) return { };
   times.encode = std::chrono::steady_clock::now() - start;
   auto const* data = static_cast<BYTE const*>(lock.bitstreamBufferPtr);
   encoded.assign(data, data + lock.bitstreamSizeInBytes);
-  if (!impl->Check(impl->api.nvEncUnlockBitstream(impl->session, impl->output), "unlock bitstream")) return {};
+  if (!impl->Check(impl->api.nvEncUnlockBitstream(impl->session, impl->output), "unlock bitstream")) return { };
   impl->first = false;
   Ensures(!encoded.empty(), "one access unit produced synchronously");
   return encoded;

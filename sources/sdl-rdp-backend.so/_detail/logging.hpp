@@ -19,17 +19,17 @@ void ResetAuthenticationLogging();
 class LogRoute {
 public:
   struct Filter {
-    bool               authentication_failed { false   };
-    rdpSettings const* peer_settings         { nullptr };
-    bool               negotiation_failed    { false   };
-    bool               handshake_failed      { false   };
+    bool               authentication_failed{ false   };
+    rdpSettings const* peer_settings        { nullptr };
+    bool               negotiation_failed   { false   };
+    bool               handshake_failed     { false   };
   };
   explicit LogRoute(sdlrdp_config const& config);
   LogRoute(LogRoute const&) = delete;
   LogRoute(LogRoute&&)      = delete;
   ~LogRoute();
-  LogRoute& operator = (LogRoute const&) = delete;
-  LogRoute& operator = (LogRoute&&)      = delete;
+  LogRoute& operator =(LogRoute const&) = delete;
+  LogRoute& operator =(LogRoute&&) = delete;
   static auto WithFilter(auto operation) {
     auto& routing = Shared();
     std::scoped_lock const lock(routing.guard);
@@ -40,13 +40,13 @@ private:
   struct Routing {
     std::recursive_mutex              guard;
     std::once_flag                    installed;
-    LogRoute*                         active    { nullptr };
+    LogRoute*                         active   { nullptr };
     std::map<std::thread::id, Filter> filters;
   };
   static Routing& Shared();
-  static BOOL Forward(wLogMessage const* message);
-  static void Install();
-  void (*callback)(void*, sdlrdp_log_level, char const*);
+  static BOOL     Forward(wLogMessage const* message);
+  static void     Install();
+  void  (*callback)(void*, sdlrdp_log_level, char const*);
   void* user;
 };
 }

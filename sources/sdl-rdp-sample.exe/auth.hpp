@@ -8,11 +8,11 @@ public:
   Authenticator(Authenticator const&) = delete;
   Authenticator(Authenticator&&)      = delete;
   ~Authenticator();
-  Authenticator& operator = (Authenticator const&) = delete;
-  Authenticator& operator = (Authenticator&&)      = delete;
-  bool Option(std::string_view option, int& index, int argc, char** argv);
-  void Defaults() const;
-  void Install();
+  Authenticator& operator =(Authenticator const&) = delete;
+  Authenticator& operator =(Authenticator&&) = delete;
+  bool           Option(std::string_view option, int& index, int argc, char** argv);
+  void           Defaults() const;
+  void           Install();
 
 private:
   static bool SDLCALL Deny(void* /*unused*/, char const* /*unused*/, char const* /*unused*/, char const* /*unused*/);

@@ -16,26 +16,26 @@ public:
   NtHash(NtHash&&)      = delete;
   NtHash()              = default;
   ~NtHash() { OPENSSL_cleanse(bytes.data(), bytes.size()); }
-  NtHash& operator = (NtHash const&) = delete;
-  NtHash& operator = (NtHash&&)      = delete;
+  NtHash& operator =(NtHash const&) = delete;
+  NtHash& operator =(NtHash&&) = delete;
   BYTE* Data() { return bytes.data(); }
 
 private:
-  std::array<BYTE, 16> bytes { };
+  std::array<BYTE, 16> bytes{ };
 };
 struct SettingsPassword {
 public:
   SettingsPassword(SettingsPassword const&) = delete;
   SettingsPassword(SettingsPassword&&)      = delete;
-  explicit SettingsPassword(rdpSettings* value) : settings{ value } {}
+  explicit SettingsPassword(rdpSettings* value) : settings{ value } { }
   ~SettingsPassword() {
     auto* password = freerdp_settings_get_string_writable(settings, FreeRDP_Password);
     if (password) OPENSSL_cleanse(password, std::strlen(password));
     // FreeRDP 3.15 include/freerdp/settings.h: set_string copies input; NULL removes the old entry.
     Ensures(freerdp_settings_set_string(settings, FreeRDP_Password, nullptr), "password cleared");
   }
-  SettingsPassword& operator = (SettingsPassword const&) = delete;
-  SettingsPassword& operator = (SettingsPassword&&)      = delete;
+  SettingsPassword& operator =(SettingsPassword const&) = delete;
+  SettingsPassword& operator =(SettingsPassword&&) = delete;
 
 private:
   rdpSettings* settings;
@@ -44,10 +44,10 @@ struct PlainPassword {
 public:
   PlainPassword(PlainPassword const&) = delete;
   PlainPassword(PlainPassword&&)      = delete;
-  explicit PlainPassword(char const* text) : value{ text } {}
+  explicit PlainPassword(char const* text) : value{ text } { }
   ~PlainPassword() { OPENSSL_cleanse(value.data(), value.size()); }
-  PlainPassword& operator = (PlainPassword const&) = delete;
-  PlainPassword& operator = (PlainPassword&&)      = delete;
+  PlainPassword& operator =(PlainPassword const&) = delete;
+  PlainPassword& operator =(PlainPassword&&) = delete;
   char const* Text() const { return value.c_str(); }
 
 private:
@@ -63,7 +63,7 @@ void Reject(Peer& peer) {
                                               peer.client->hostname));
 }
 bool Verify(Peer& peer, char const* domain, char const* user, char const* password) {
-  SettingsPassword const clear  { peer.client->context->settings     };
+  SettingsPassword const clear { peer.client->context->settings };
   auto const&            config = peer.owner.authentication.Config();
   peer.authentication.user   = user;
   peer.authentication.domain = domain;
@@ -72,7 +72,7 @@ bool Verify(Peer& peer, char const* domain, char const* user, char const* passwo
     Reject(peer);
     return false;
   }
-  PlainPassword const plain { password };
+  PlainPassword const plain{ password };
   bool const accepted = config.verify ? config.verify(config.auth_user, domain, user, plain.Text()) != 0
                                       : sdlrdp_verify_pair(&config, domain, user, plain.Text()) != 0;
   if (!accepted) Reject(peer);
@@ -107,7 +107,7 @@ BOOL Authenticate(freerdp_peer* client, SEC_WINNT_AUTH_IDENTITY const*, BOOL aut
 }
 bool AuthenticateSettings(freerdp_peer* client) {
   auto&                  peer  = Peer::Held(client);
-  SettingsPassword const clear { client->context->settings };
+  SettingsPassword const clear{ client->context->settings };
   if (peer.authentication.checked) return peer.authentication.rejected ? Denied(client) : true;
   peer.authentication.checked = true;
   try {
@@ -136,10 +136,10 @@ namespace {
 bool NtlmResponseKey(AuthenticationState const& identity, BYTE* nt_hash_v1, BYTE* response) {
   // FreeRDP 3.15's NTLM callback consumes a response key and treats nonzero as success.
   auto user = TranscodeRange<std::vector<BYTE>>(
-      std::as_bytes(std::span(identity.user)), {},
+      std::as_bytes(std::span(identity.user)), { },
       { .encoding = oxbox::utilities::Encoding::UTF16, .order = std::endian::little });
   auto domain = TranscodeRange<std::vector<BYTE>>(
-      std::as_bytes(std::span(identity.domain)), {},
+      std::as_bytes(std::span(identity.domain)), { },
       { .encoding = oxbox::utilities::Encoding::UTF16, .order = std::endian::little });
   auto user_length   = user.size();
   auto domain_length = domain.size();

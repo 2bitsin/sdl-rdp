@@ -30,7 +30,7 @@ protected:
   }
   void SetUp() override {
     auto          path   = scratch.Path().string();
-    sdlrdp_config config {                         };
+    sdlrdp_config config{ };
     config.bind     = "127.0.0.1";
     config.cert_dir = path.c_str();
     config.width    = 320;
@@ -49,7 +49,7 @@ protected:
     if (second) Headless::ShareDrive(*client, path.c_str(), "second");
     ASSERT_TRUE(freerdp_connect(client->Instance().get())) << logs.Text(true);
     ASSERT_TRUE(client->Until([&] {
-      sdlrdp_drive value { };
+      sdlrdp_drive value{ };
       if (sdlrdp_drive_list(handle.get(), &value, 1) != 1) return false;
       EXPECT_STREQ(value.name, name);
       drive = value.id;
@@ -74,7 +74,7 @@ protected:
   }
   void ThenVideoMatches() {
     std::vector<UINT32> pixels(320uz * 200uz, 0x00446688);
-    sdlrdp_rect const damage { 0, 0, 320, 200 };
+    sdlrdp_rect const damage{ 0, 0, 320, 200 };
     ASSERT_EQ(sdlrdp_present(handle.get(), pixels.data(), 1280, 320, 200, &damage, 1), 0);
     ASSERT_TRUE(client->Until([&] { return client->Matches(pixels); }));
   }
@@ -104,14 +104,14 @@ protected:
     return file;
   }
   void ThenRemovedDrive() {
-    std::array<sdlrdp_event, 32> events {                                              };
+    std::array<sdlrdp_event, 32> events{ };
     auto                         count  = sdlrdp_poll(handle.get(), events.data(), 32);
     EXPECT_TRUE(std::ranges::any_of(std::span(events.data(), count), [&](auto const& event) {
       return event.type == SDLRDP_DRIVE && !event.drive.added && event.drive.id == drive;
     }));
   }
   void ThenDriveFailure(sdlrdp_file* file, unsigned warnings) {
-    sdlrdp_drive value { };
+    sdlrdp_drive value{ };
     EXPECT_EQ(sdlrdp_drive_list(handle.get(), &value, 1), 0);
     EXPECT_EQ(sdlrdp_drive_close(handle.get(), file), -1);
     EXPECT_EQ(Logged(SDLRDP_LOG_WARN, "") - warnings, 1u);
@@ -126,14 +126,14 @@ protected:
     }
     return expected;
   }
-  sdlrdp_file*                 held_file = nullptr;
-  Headless::Logs               logs;
-  oxbox::platform::ScratchArea scratch   { "drive", "sdl-rdp" };
-  std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> handle{ nullptr, sdlrdp_close };
-  std::unique_ptr<Headless::Client>        client;
-  std::unique_ptr<Headless::DriveObserver> observer;
-  std::jthread                             pump;
-  unsigned                                 drive    = 0;
+  sdlrdp_file*                                            held_file = nullptr;
+  Headless::Logs                                          logs;
+  oxbox::platform::ScratchArea                            scratch  { "drive", "sdl-rdp"    };
+  std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> handle   { nullptr, sdlrdp_close };
+  std::unique_ptr<Headless::Client>                       client;
+  std::unique_ptr<Headless::DriveObserver>                observer;
+  std::jthread                                            pump;
+  unsigned                                                drive     = 0;
 };
 class DriveChecks : public DriveSession {
 protected:

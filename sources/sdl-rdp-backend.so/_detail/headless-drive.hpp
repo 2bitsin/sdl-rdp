@@ -10,7 +10,7 @@ inline void ShareDrive(Client& client, char const* path, char const* name = "sha
   freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
   Expects(freerdp_settings_set_bool(client.Instance()->context->settings, FreeRDP_AudioPlayback, FALSE),
           "drive-only client has no audio device");
-  std::array<char const*, 3> arguments { "drive", name, path };
+  std::array<char const*, 3> arguments{ "drive", name, path };
   Expects(freerdp_client_add_device_channel(client.Instance()->context->settings, 3, arguments.data()),
           "drive device configured");
   client.Instance()->LoadChannels = [](freerdp* instance) -> BOOL {
@@ -56,8 +56,8 @@ public:
     instance->ReceiveChannelData = original;
     active                       = nullptr;
   }
-  DriveObserver& operator = (DriveObserver const&) = delete;
-  DriveObserver& operator = (DriveObserver&&)      = delete;
+  DriveObserver& operator =(DriveObserver const&) = delete;
+  DriveObserver& operator =(DriveObserver&&) = delete;
   bool Send(Backend::DrivePacket const& packet) const {
     auto id = freerdp_channels_get_id_by_name(instance, RDPDR_CHANNEL_NAME);
     return id && instance->SendChannelData(instance, id, packet.Bytes().data(), packet.Bytes().size());

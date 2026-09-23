@@ -19,7 +19,7 @@ TEST_F(AudioGate, AudioPcmAndReconnect) {
   GivenAudioServer();
   if (::testing::Test::HasFatalFailure()) return;
   for (unsigned connection = 0; connection < 2; ++connection) {
-    Client client(sdlrdp_port(backend.get()), true);
+    Client      client(sdlrdp_port(backend.get()), true);
     SoundClient audio(client);
     ConnectAudioFormats(client, audio);
     if (::testing::Test::HasFatalFailure()) return;
@@ -37,7 +37,7 @@ TEST_F(AudioGate, AudioFormatMissKeepsSessionAndReconnects) {
   GivenAudioServer();
   if (::testing::Test::HasFatalFailure()) return;
   for (bool const unmatched : { false, true }) {
-    Client client(sdlrdp_port(backend.get()), true);
+    Client      client(sdlrdp_port(backend.get()), true);
     SoundClient audio(client);
     audio.CaptureState().rate                = 22050;
     audio.CaptureState().advertise_unmatched = unmatched;
@@ -45,7 +45,7 @@ TEST_F(AudioGate, AudioFormatMissKeepsSessionAndReconnects) {
     ThenUnavailableAudio(client, unmatched);
     ThenLiveVideoAndInput(client);
   }
-  Client client(sdlrdp_port(backend.get()), true);
+  Client      client(sdlrdp_port(backend.get()), true);
   SoundClient audio(client);
   ConnectAudio(client, audio);
   if (::testing::Test::HasFatalFailure()) return;
@@ -54,7 +54,7 @@ TEST_F(AudioGate, AudioFormatMissKeepsSessionAndReconnects) {
 TEST_F(AudioGate, AudioBothRatesPrefer44100) {
   GivenAudioServer();
   if (::testing::Test::HasFatalFailure()) return;
-  Client client(sdlrdp_port(backend.get()), true);
+  Client      client(sdlrdp_port(backend.get()), true);
   SoundClient audio(client);
   audio.CaptureState().advertise_both_rates = true;
   ConnectAudioFormats(client, audio);
@@ -70,7 +70,7 @@ TEST_F(AudioGate, AudioInitialVolume) {
   GivenAudioServer();
   if (::testing::Test::HasFatalFailure()) return;
   EXPECT_EQ(sdlrdp_audio_rate(backend.get()), 0u);
-  Client client(sdlrdp_port(backend.get()), true);
+  Client      client(sdlrdp_port(backend.get()), true);
   SoundClient audio(client);
   audio.CaptureState().rate   = 44100;
   audio.CaptureState().volume = 0x8000ffffu;
@@ -110,7 +110,7 @@ UINT ObserveProgressivePayload(RdpgfxClientContext* channel, RDPGFX_SURFACE_COMM
 }
 unsigned ProduceProgressiveFrames(sdlrdp_handle* backend) {
   std::vector<UINT32> pixels(1280uz * 800);
-  sdlrdp_rect const full      { 0, 0, 1280, 800                        };
+  sdlrdp_rect const full     { 0, 0, 1280, 800 };
   auto              deadline  = Clock::now() + std::chrono::seconds(2);
   unsigned          presented = 0;
   while (Clock::now() < deadline) {
@@ -123,12 +123,12 @@ unsigned ProduceProgressiveFrames(sdlrdp_handle* backend) {
 }
 }
 TEST_F(AudioGate, AudioContinuousUnderProgressiveLoad) {
-  Open(1280, 800, {}, SDLRDP_CODEC_PROGRESSIVE);
+  Open(1280, 800, { }, SDLRDP_CODEC_PROGRESSIVE);
   ASSERT_EQ(sdlrdp_audio_open(backend.get()), 0);
   Client client(sdlrdp_port(backend.get()), true, 1280, 800);
   client.EnableGraphics();
   Headless::GraphicsObserver const observer(client);
-  SoundClient audio(client);
+  SoundClient                      audio(client);
   GivenUnconfirmedAudio(client, audio);
   if (::testing::Test::HasFatalFailure()) return;
   ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
@@ -161,7 +161,7 @@ TEST_F(AudioGate, AudioDisconnectDuringBlockedWrite) {
   GivenAudioServer();
   if (::testing::Test::HasFatalFailure()) return;
   for (bool const reconnect : { false, true }) {
-    Client client(sdlrdp_port(backend.get()), true);
+    Client      client(sdlrdp_port(backend.get()), true);
     SoundClient audio(client);
     audio.CaptureState().rate         = 48000;
     audio.CaptureState().auto_confirm = reconnect;
@@ -178,14 +178,14 @@ TEST_F(AudioGate, AudioDisconnectDuringBlockedWrite) {
   }
 }
 TEST_F(AudioGate, AudioOneMillisecondPartialBlock) {
-  Open(320, 200, {}, SDLRDP_CODEC_RAW, 1);
+  Open(320, 200, { }, SDLRDP_CODEC_RAW, 1);
   ASSERT_EQ(sdlrdp_audio_open(backend.get()), 0);
-  Client client(sdlrdp_port(backend.get()), true);
+  Client      client(sdlrdp_port(backend.get()), true);
   SoundClient audio(client);
   audio.CaptureState().rate = 48000;
   ConnectAudio(client, audio);
   if (::testing::Test::HasFatalFailure()) return;
-  std::array<INT16, 1920> pcm { };
+  std::array<INT16, 1920> pcm{ };
   ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 48), 48);
   auto writing =
       std::async(std::launch::async, [&] { return sdlrdp_audio_write(backend.get(), pcm.data() + 96, 912); });

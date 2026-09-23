@@ -39,12 +39,12 @@ inline fs::path BuildRoot() {
     if (fs::is_regular_file(directory / "sdl-rdp-sample")) return directory.parent_path();
   }
   Expects(false, "built sample exists on ctest PATH");
-  return {};
+  return { };
 }
 
 inline pid_t Spawn(std::vector<std::string> arguments, int& output) {
   Expects(!arguments.empty(), "child arguments supplied");
-  std::array<int, 2> descriptors { };
+  std::array<int, 2> descriptors{ };
   Expects(pipe2(descriptors.data(), O_CLOEXEC) == 0, "stdout pipe created");
   output = descriptors[0];
   pid_t                      pid     = -1;
@@ -64,7 +64,7 @@ inline pid_t Spawn(std::vector<std::string> arguments, int& output) {
 
 class Process {
 public:
-  explicit Process(std::vector<std::string> arguments) : pid(Spawn(std::move(arguments), output)) {}
+  explicit Process(std::vector<std::string> arguments) : pid(Spawn(std::move(arguments), output)) { }
   Process(Process const&) = delete;
   Process(Process&&)      = delete;
   ~Process() {
@@ -75,8 +75,8 @@ public:
     }
     close(output);
   }
-  Process& operator = (Process const&) = delete;
-  Process& operator = (Process&&)      = delete;
+  Process& operator =(Process const&) = delete;
+  Process& operator =(Process&&) = delete;
   bool Line(std::string& line, Clock::time_point deadline) {
     Expects(output >= 0, "stdout pipe open");
     for (;;) {
@@ -88,9 +88,9 @@ public:
       }
       auto left = std::chrono::ceil<std::chrono::milliseconds>(deadline - Clock::now()).count();
       if (left <= 0) return false;
-      pollfd descriptor { .fd = output, .events = POLLIN, .revents = 0 };
+      pollfd descriptor{ .fd = output, .events = POLLIN, .revents = 0 };
       if (poll(&descriptor, 1, int(left)) <= 0) return false;
-      std::array<char, 4096> buffer {                                            };
+      std::array<char, 4096> buffer{ };
       auto                   count  = read(output, buffer.data(), buffer.size());
       if (count <= 0) return false;
       pending.append(buffer.data(), count);
@@ -140,7 +140,7 @@ inline unsigned Number(std::string_view text, int base = 10) {
   Expects(base <= 36, "integer base fits the supported digit alphabet");
   unsigned value = 0;
   auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value, base);
-  return error == std::errc{} && end == text.data() + text.size() ? value : 0;
+  return error == std::errc{ } && end == text.data() + text.size() ? value : 0;
 }
 
 inline pid_t ProcId() {

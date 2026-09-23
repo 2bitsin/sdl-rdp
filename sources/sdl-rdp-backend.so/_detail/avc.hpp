@@ -15,9 +15,9 @@ struct IntraRefresh {
   unsigned count;
 };
 IntraRefresh IntraRefreshFor(unsigned fps);
-unsigned Bitrate(unsigned width, unsigned height, unsigned kbps = 0);
-unsigned Aligned(unsigned dimension);
-void ReplicateEdges(std::span<BYTE> pixels, unsigned width, unsigned height);
+unsigned     Bitrate(unsigned width, unsigned height, unsigned kbps = 0);
+unsigned     Aligned(unsigned dimension);
+void         ReplicateEdges(std::span<BYTE> pixels, unsigned width, unsigned height);
 struct Regions {
 public:
   void Add(sdlrdp_rect area);
@@ -36,12 +36,12 @@ public:
 private:
   std::vector<RECTANGLE_16>              rects;
   std::vector<RDPGFX_H264_QUANT_QUALITY> quality;
-  sdlrdp_rect                            bounds  { };
+  sdlrdp_rect                            bounds { };
 };
 struct EncodingTimes {
-  std::chrono::nanoseconds convert { };
-  std::chrono::nanoseconds upload  { };
-  std::chrono::nanoseconds encode  { };
+  std::chrono::nanoseconds convert{ };
+  std::chrono::nanoseconds upload { };
+  std::chrono::nanoseconds encode { };
 };
 class Encoder {
 public:
@@ -49,20 +49,20 @@ public:
   Encoder(Encoder const&) = delete;
   Encoder(Encoder&&)      = delete;
   ~Encoder();
-  Encoder& operator = (Encoder const&) = delete;
-  Encoder& operator = (Encoder&&)      = delete;
-  static bool Available();
-  static std::string UnavailableReason();
-  bool Open(unsigned width, unsigned height, unsigned bitrate, unsigned fps);
+  Encoder&              operator =(Encoder const&) = delete;
+  Encoder&              operator =(Encoder&&) = delete;
+  static bool           Available();
+  static std::string    UnavailableReason();
+  bool                  Open(unsigned width, unsigned height, unsigned bitrate, unsigned fps);
   std::span<BYTE const> Encode(std::span<BYTE const> bgrx, unsigned stride, bool force_idr, std::vector<BYTE>& encoded);
-  void Close();
-  bool IsOpen() const;
-  bool TooSmall() const;
-  std::string const& Error() const;
+  void                  Close();
+  bool                  IsOpen() const;
+  bool                  TooSmall() const;
+  std::string const&    Error() const;
   EncodingTimes const& Timing() const { return times; }
 
 private:
-  EncodingTimes         times;
+  EncodingTimes times;
   struct                Impl;
   std::unique_ptr<Impl> impl;
 };

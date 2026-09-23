@@ -19,6 +19,6 @@ inline std::string IdentityText(UINT16 const* text, ULONG length, ULONG flags) {
   auto bytes =
       std::span(reinterpret_cast<std::byte const*>(text), static_cast<std::size_t>(length) * (unicode ? 2 : 1));
   return TranscodeRange<std::string>(
-      bytes, { .encoding = unicode ? Encoding::UTF16 : Encoding::UTF8, .order = std::endian::native }, {});
+      bytes, { .encoding = unicode ? Encoding::UTF16 : Encoding::UTF8, .order = std::endian::native }, { });
 }
 }

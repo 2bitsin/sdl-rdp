@@ -16,7 +16,7 @@ void Input::Relative(Peer& peer, int dx, int dy) {
 bool Input::Center(Peer& peer) {
   Expects(peer.active, "active peer has a desktop");
   auto&                         input    = Held(peer);
-  POINTER_POSITION_UPDATE const position { UINT32(peer.desktop.w / 2), UINT32(peer.desktop.h / 2) };
+  POINTER_POSITION_UPDATE const position{ UINT32(peer.desktop.w / 2), UINT32(peer.desktop.h / 2) };
   auto*                         context  = peer.client->context;
   input.warp_requested = context->update->pointer->PointerPosition(context, &position);
   return input.warp_requested;

@@ -51,7 +51,7 @@ protected:
     RecordProperty("maximum_channel_error", maximum_error);
   }
   void Measure(sdlrdp_codec codec, bool noise) {
-    Open(640, 480, {}, codec);
+    Open(640, 480, { }, codec);
     Client client(sdlrdp_port(backend.get()), true, 640, 480);
     PrepareMeasurement(client, codec, noise);
     if (::testing::Test::HasFatalFailure()) return;

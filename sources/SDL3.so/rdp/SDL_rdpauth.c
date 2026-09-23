@@ -13,7 +13,7 @@ void SDL_RDP_AuthDisplay(SDL_PropertiesID properties) {
 static int SDL_RDP_VerifyCredentials(void* unused, char const* domain, char const* user, char const* password) {
   (void)unused;
   struct SDL_RDP_Registry* const state      = SDL_RDP_Registry();
-  SDL_PropertiesID               properties = (SDL_PropertiesID)SDL_GetAtomicInt(&state->auth_properties);
+  SDL_PropertiesID properties = (SDL_PropertiesID)SDL_GetAtomicInt(&state->auth_properties);
   SDL_RDP_Verify verify =
       properties ? (SDL_RDP_Verify)SDL_GetPointerProperty(properties, SDL_PROP_DISPLAY_RDP_VERIFY_POINTER, NULL) : NULL;
   if (verify) {
@@ -26,7 +26,7 @@ static int SDL_RDP_VerifyCredentials(void* unused, char const* domain, char cons
 static int SDL_RDP_LookupCredentials(void* unused, char const* domain, char const* user, unsigned char hash[16]) {
   (void)unused;
   struct SDL_RDP_Registry* const state      = SDL_RDP_Registry();
-  SDL_PropertiesID               properties = (SDL_PropertiesID)SDL_GetAtomicInt(&state->auth_properties);
+  SDL_PropertiesID properties = (SDL_PropertiesID)SDL_GetAtomicInt(&state->auth_properties);
   SDL_RDP_Lookup lookup =
       properties ? (SDL_RDP_Lookup)SDL_GetPointerProperty(properties, SDL_PROP_DISPLAY_RDP_LOOKUP_POINTER, NULL) : NULL;
   if (lookup) {
@@ -78,7 +78,7 @@ static bool SDL_RDP_AuthMode(sdlrdp_config* config, char const* mode) {
 
 bool SDL_RDP_AuthConfig(sdlrdp_config* config, SDL_RDP_Backend* backend) {
   struct SDL_RDP_Registry* const state = SDL_RDP_Registry();
-  char const*                    mode  = SDL_RDP_Setting(SDL_HINT_RDP_AUTH);
+  char const* mode = SDL_RDP_Setting(SDL_HINT_RDP_AUTH);
   config->user     = SDL_RDP_Setting(SDL_HINT_RDP_USER);
   config->password = SDL_RDP_Setting(SDL_HINT_RDP_PASSWORD);
   config->domain   = SDL_RDP_Setting(SDL_HINT_RDP_DOMAIN);

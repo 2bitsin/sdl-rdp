@@ -46,8 +46,8 @@ public:
     client.Instance()->context->update->DesktopResize = desktop_resize;
     active                                            = nullptr;
   }
-  GraphicsObserver& operator = (GraphicsObserver const&) = delete;
-  GraphicsObserver& operator = (GraphicsObserver&&)      = delete;
+  GraphicsObserver& operator =(GraphicsObserver const&) = delete;
+  GraphicsObserver& operator =(GraphicsObserver&&) = delete;
   bool Ack(UINT32 depth = 0) {
     Expects(channel, "channel is installed");
     Expects(!observed.frames.empty(), "observer has received a frame");
@@ -126,7 +126,7 @@ private:
     channel->EndFrame = [](RdpgfxClientContext* channel, RDPGFX_END_FRAME_PDU const* frame) -> UINT {
       auto result = active->end(channel, frame);
       if (result != CHANNEL_RC_OK) return result;
-      RDPGFX_FRAME_ACKNOWLEDGE_PDU const ack { 0, frame->frameId, UINT32(active->observed.frames.size() + 1) };
+      RDPGFX_FRAME_ACKNOWLEDGE_PDU const ack{ 0, frame->frameId, UINT32(active->observed.frames.size() + 1) };
       active->observed.frames.push_back(ack);
       return active->observed.automatic ? active->original(channel, &ack) : CHANNEL_RC_OK;
     };

@@ -35,7 +35,7 @@ void SDL_RDP_SetWindowSize(SDL_VideoDevice* _this, SDL_Window* window) {
   window->last_size_pending = false;
 }
 
-void SDL_RDP_ShowWindow(SDL_VideoDevice* _this, SDL_Window* window) {}
+void SDL_RDP_ShowWindow(SDL_VideoDevice* _this, SDL_Window* window) { }
 
 bool SDL_RDP_ResizePicture(SDL_VideoData* data, int w, int h) {
   SDL_RDP_CheckPicture(data, w, h);

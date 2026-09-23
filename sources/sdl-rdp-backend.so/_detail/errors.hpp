@@ -25,7 +25,7 @@ public:
 
 private:
   struct Cursor {
-    std::shared_ptr<std::string> text { std::make_shared<std::string>() };
+    std::shared_ptr<std::string> text{ std::make_shared<std::string>() };
   };
   static Cursor& CallingThread() {
     // The handle-free C ABI needs a per-thread cursor, also after a failed open or close.

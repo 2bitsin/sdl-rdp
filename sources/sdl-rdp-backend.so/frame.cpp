@@ -16,7 +16,7 @@ auto SendSurfaceBits(rdpUpdate* update, Frame const& what, unsigned codec) -> bo
   Expects(update != nullptr, "update exists");
   Expects(update->SurfaceBits != nullptr, "surface callback exists");
   auto payload = what.pixels;
-  auto command = SURFACE_BITS_COMMAND{};
+  auto command = SURFACE_BITS_COMMAND{ };
   command.cmdType              = CMDTYPE_SET_SURFACE_BITS;
   command.skipCompression      = TRUE;
   command.destLeft             = what.area.x;
@@ -35,7 +35,7 @@ auto SendSurfaceBits(rdpUpdate* update, Frame const& what, unsigned codec) -> bo
 auto BitmapRectangle(Frame const& band, bool compressed) -> BITMAP_DATA {
   Expects(!band.pixels.empty(), "bitmap payload exists");
   auto payload   = band.pixels;
-  auto rectangle = BITMAP_DATA{};
+  auto rectangle = BITMAP_DATA{ };
   rectangle.destLeft           = band.area.x;
   rectangle.destTop            = band.area.y;
   // Bitmap update corners are inclusive, unlike a surface command's.
@@ -56,7 +56,7 @@ bool SendBitmapBand(rdpUpdate* update, std::span<BITMAP_DATA> rectangles) {
   Expects(update != nullptr, "update exists");
   Expects(update->BitmapUpdate != nullptr, "bitmap callback exists");
   Expects(!rectangles.empty(), "bitmap batch exists");
-  auto batch = BITMAP_UPDATE{};
+  auto batch = BITMAP_UPDATE{ };
   batch.number          = rectangles.size();
   batch.rectangles      = rectangles.data();
   batch.skipCompression = TRUE;
@@ -79,7 +79,7 @@ auto Convert(Frame band, unsigned depth) -> std::vector<BYTE> {
   std::vector<BYTE> converted(std::size_t(stride) * band.area.h);
   if (!freerdp_image_copy(converted.data(), format, stride, 0, 0, band.area.w, band.area.h, band.pixels.data(),
                           PIXEL_FORMAT_BGRX32, band.area.w * 4, 0, 0, nullptr, FREERDP_FLIP_NONE))
-    return {};
+    return { };
   return converted;
 }
 } // namespace
@@ -90,7 +90,7 @@ bool LegacyFrame::Prepare(Peer& peer) {
   if (!SelectEncoder(peer)) return false;
   auto* settings = peer.client->context->settings;
   depth = freerdp_settings_get_uint32(settings, FreeRDP_ColorDepth);
-  wire           = depth != 32                                                           ? Wire::Bitmap
+  wire = depth != 32                                                           ? Wire::Bitmap
                    : peer.encoder.Codec() == SDLRDP_CODEC_PLANAR                         ? Wire::Planar
                    : freerdp_settings_get_bool(settings, FreeRDP_SurfaceCommandsEnabled) ? Wire::Surface
                                                                                          : Wire::Bitmap;
@@ -102,7 +102,7 @@ void LegacyFrame::AppendPlanar(Packet& packet, std::size_t& wire_size, sdlrdp_re
   auto size = payload.size();
   if (wire_size + 26 + size > BITMAP_RECTANGLE_LIMIT && !packet.bands.empty()) {
     packets.push_back(std::move(packet));
-    packet    = {};
+    packet    = { };
     wire_size = 4;
   }
   packet.bands.push_back({ area, { payload.begin(), payload.end() } });
@@ -127,14 +127,14 @@ bool LegacyFrame::AppendBand(Encoder& encoder, Frame band) {
   if (depth != 32) {
     auto converted = Convert(band, depth);
     if (converted.empty()) return false;
-    packets.push_back({ { Band{ .area = band.area, .pixels = std::move(converted) } }, {} });
+    packets.push_back({ { Band{ .area = band.area, .pixels = std::move(converted) } }, { } });
     return true;
   }
   if (encoder.codec != SDLRDP_CODEC_RAW) {
     if (!encoder.Encode(band.pixels, band.area.w, band.area.h)) return false;
     band.pixels = encoder.payload;
   }
-  packets.push_back({ { Band{ .area = band.area, .pixels = { band.pixels.begin(), band.pixels.end() } } }, {} });
+  packets.push_back({ { Band{ .area = band.area, .pixels = { band.pixels.begin(), band.pixels.end() } } }, { } });
   return true;
 }
 bool LegacyFrame::Bands(Peer& peer, sdlrdp_rect area) {

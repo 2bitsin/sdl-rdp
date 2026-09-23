@@ -30,7 +30,7 @@ void ProducePending(Backend::WakeEvent& wake, std::atomic<unsigned>& published, 
 }
 }
 TEST(WakeEvent, SignalledManualResetEvent) {
-  Backend::EventHandle const event { CreateEvent(nullptr, TRUE, FALSE, nullptr) };
+  Backend::EventHandle const event{ CreateEvent(nullptr, TRUE, FALSE, nullptr) };
   utilities::Expects(bool(event), "manual reset event exists");
   EXPECT_FALSE(Backend::Signalled(event.get()));
   ASSERT_TRUE(SetEvent(event.get()));
@@ -42,9 +42,9 @@ TEST(WakeEvent, SignalledManualResetEvent) {
 
 TEST(WakeEvent, ConcurrentPendingAndIdle) {
   using Phase = Backend::WakeEvent::Phase;
-  Backend::WakeEvent    wake      { CreateEvent(nullptr, TRUE, FALSE, nullptr) };
-  std::atomic<unsigned> published { 0                                          };
-  std::atomic<unsigned> consumed  { 0                                          };
+  Backend::WakeEvent    wake     { CreateEvent(nullptr, TRUE, FALSE, nullptr) };
+  std::atomic<unsigned> published{ 0                                          };
+  std::atomic<unsigned> consumed { 0                                          };
   ASSERT_TRUE(wake);
   std::jthread producer([&](std::stop_token const& stop) { ProducePending(wake, published, consumed, stop); });
   ConsumePublished(wake, published, consumed);

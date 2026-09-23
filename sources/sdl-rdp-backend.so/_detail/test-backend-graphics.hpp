@@ -16,9 +16,9 @@ protected:
     RecordProperty("trace", logs.Text(true));
   }
 
-  void Open(unsigned w = 640, unsigned h = 480, sdlrdp_aspect aspect = {}, sdlrdp_codec codec = SDLRDP_CODEC_RAW,
+  void Open(unsigned w = 640, unsigned h = 480, sdlrdp_aspect aspect = { }, sdlrdp_codec codec = SDLRDP_CODEC_RAW,
             unsigned audio_latency = 0) {
-    sdlrdp_config config { "127.0.0.1", 0, certificates.Path().c_str(), w, h, 0, Logs::Collect, &logs };
+    sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), w, h, 0, Logs::Collect, &logs };
     config.aspect           = aspect;
     config.codec            = codec;
     config.audio_latency_ms = audio_latency;
@@ -46,13 +46,13 @@ protected:
     EXPECT_LE(client.MaxError(pixels), 24u);
   }
   void GivenGraphicsClient(sdlrdp_codec codec) {
-    Open(640, 480, {}, codec);
+    Open(640, 480, { }, codec);
     if (::testing::Test::HasFatalFailure()) return;
     graphics_client = std::make_unique<Client>(sdlrdp_port(backend.get()), true, 640, 480);
     graphics_client->EnableGraphics();
   }
   void GivenPipelinedGraphics() {
-    Open(320, 200, {}, SDLRDP_CODEC_PROGRESSIVE);
+    Open(320, 200, { }, SDLRDP_CODEC_PROGRESSIVE);
     if (::testing::Test::HasFatalFailure()) return;
     graphics_client = std::make_unique<Client>(sdlrdp_port(backend.get()), true);
     graphics_client->EnableGraphics();

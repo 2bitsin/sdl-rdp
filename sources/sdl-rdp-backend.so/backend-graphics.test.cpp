@@ -77,7 +77,7 @@ protected:
     ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
   }
   void PresentFrames(Client& client, Headless::GraphicsObserver& observer, unsigned first, unsigned last) {
-    sdlrdp_rect const full { 0, 0, 320, 200 };
+    sdlrdp_rect const full{ 0, 0, 320, 200 };
     std::ranges::for_each(std::views::iota(first, last + 1), [&](unsigned count) {
       ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &full, 1), 0);
       ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() == count; }));
@@ -85,7 +85,7 @@ protected:
   }
   void ThenResized(Client& client, Headless::GraphicsObserver& observer) {
     std::vector<UINT32> resized(352uz * 224, 0x0055aaff);
-    sdlrdp_rect const full { 0, 0, 352, 224 };
+    sdlrdp_rect const full{ 0, 0, 352, 224 };
     ASSERT_EQ(sdlrdp_present(backend.get(), resized.data(), 352 * 4, 352, 224, &full, 1), 0);
     ASSERT_TRUE(client.Until([&] { return client.Matches(resized); })) << logs.Text(true);
     EXPECT_EQ(client.Instance()->context->gdi->width, 352);
@@ -132,7 +132,7 @@ TEST_P(GraphicsGate, AcknowledgementPacingAndSuspend) {
   if (::testing::Test::HasFatalFailure()) return;
   auto&             client   = *graphics_client;
   auto&             observer = *graphics_observer;
-  sdlrdp_rect const full     { 0, 0, 320, 200     };
+  sdlrdp_rect const full    { 0, 0, 320, 200 };
   FillGraphicsWindow(client, observer, full);
   if (::testing::Test::HasFatalFailure()) return;
   ThenFullGraphicsWindow(observer, full);
@@ -185,7 +185,7 @@ INSTANTIATE_TEST_SUITE_P(Pipeline, GraphicsGate,
                          ModeName);
 
 TEST_F(RoundFive, GraphicsAutoUsesProgressive) {
-  Open(640, 480, {}, SDLRDP_CODEC_AUTO);
+  Open(640, 480, { }, SDLRDP_CODEC_AUTO);
   Client client(sdlrdp_port(backend.get()), true, 640, 480);
   ConnectPipeline(client);
   if (::testing::Test::HasFatalFailure()) return;
@@ -210,7 +210,7 @@ TEST_F(RoundFive, ProgressiveDamageAndQoe) {
   Present(pixels, 640, 480);
   ASSERT_TRUE(client.Until([&] { return Acknowledged(); }));
   auto              before = client.Received();
-  sdlrdp_rect const damage { 17, 19, 7, 5      };
+  sdlrdp_rect const damage{ 17, 19, 7, 5 };
   std::ranges::for_each(std::views::iota(damage.y, damage.y + damage.h), [&](int y) {
     std::ranges::fill(std::span(pixels).subspan((y * 640) + damage.x, damage.w), 0x00ff0000u);
   });
@@ -237,7 +237,7 @@ TEST_F(RoundFive, GraphicsVersion101) {
 }
 
 TEST_F(RoundFive, GraphicsWithoutDynamicChannelsUsesLegacy) {
-  Open(640, 480, {}, SDLRDP_CODEC_RAW);
+  Open(640, 480, { }, SDLRDP_CODEC_RAW);
   Client client(sdlrdp_port(backend.get()), true, 640, 480);
   ASSERT_TRUE(freerdp_settings_set_bool(client.Instance()->context->settings, FreeRDP_SupportGraphicsPipeline, TRUE));
   client.Instance()->LoadChannels = [](freerdp*) -> BOOL { return TRUE; };
@@ -282,7 +282,7 @@ TEST_F(RoundFive, GraphicsCodecSwitchPreservesUndamagedTiles) {
   PresentMatching(client, pixels);
   if (::testing::Test::HasFatalFailure()) return;
   ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_PROGRESSIVE), 0);
-  sdlrdp_rect const damage { 18, 45, 1, 1 };
+  sdlrdp_rect const damage{ 18, 45, 1, 1 };
   pixels[(45 * 640) + 18] = 0x0000ee00;
   PresentProgressiveDamage(client, pixels, damage);
   if (::testing::Test::HasFatalFailure()) return;

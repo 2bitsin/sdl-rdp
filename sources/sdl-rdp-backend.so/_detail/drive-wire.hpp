@@ -14,7 +14,7 @@ class DriveChannel;
 struct MalformedResponse : std::runtime_error {
 public:
   MalformedResponse(std::string const& cause, std::weak_ptr<DriveChannel> channel)
-      : std::runtime_error(cause), origin(std::move(channel)) {}
+      : std::runtime_error(cause), origin(std::move(channel)) { }
   std::weak_ptr<DriveChannel> origin;
 };
 struct DrivePacket {
@@ -47,7 +47,7 @@ public:
     try {
       auto result = TranscodeRange<std::string>(
           std::as_bytes(std::span(bytes).subspan(position, count)),
-          { .encoding = oxbox::utilities::Encoding::UTF16, .order = std::endian::little }, {});
+          { .encoding = oxbox::utilities::Encoding::UTF16, .order = std::endian::little }, { });
       position += count;
       return result;
     } catch (std::exception const& error) {
@@ -73,7 +73,7 @@ inline std::vector<uint8_t> DrivePath(char const* path) {
   std::string text(path);
   if (text.empty() || text.front() != '/') text.insert(text.begin(), '/');
   auto encoded = TranscodeRange<std::vector<uint8_t>>(
-      std::as_bytes(std::span(text)), {},
+      std::as_bytes(std::span(text)), { },
       { .encoding = oxbox::utilities::Encoding::UTF16, .order = std::endian::little },
       [](char32_t point) { return point == U'/' ? U'\\' : point; });
   encoded.resize(encoded.size() + 2);

@@ -63,7 +63,7 @@ void DelayAcknowledgements(Client& client, Headless::FrameObserver& frames) {
 
 int BoundReceiveBuffer(Client& client) {
   Expects(client.Instance() != nullptr, "client exists");
-  std::array<HANDLE, 64> handles { };
+  std::array<HANDLE, 64> handles{ };
   auto count = freerdp_get_event_handles(client.Instance()->context, handles.data(), handles.size());
   Expects(count > 0, "connected client has transport events");
   unsigned sockets  = 0;
@@ -94,7 +94,7 @@ struct Observation {
 
 std::vector<Observation> Exercise(unsigned port, int scenario, std::string_view mode) {
   Expects(port > 0, "sample listener is open");
-  Client client(port, true, 1280, 800);
+  Client                  client(port, true, 1280, 800);
   Headless::DisplayClient display(client);
   Expects(freerdp_connect(client.Instance().get()), "headless client connects");
   auto receiver = mode == "auto-sender" && scenario >= 3 ? BoundReceiveBuffer(client) : -1;
@@ -104,7 +104,7 @@ std::vector<Observation> Exercise(unsigned port, int scenario, std::string_view 
   std::vector<Observation> observations;
   auto                     last         = scenario == 0 ? 1 : scenario;
   for (; scenario <= last; ++scenario) {
-    Observation observed { .scenario = scenario, .started = WallTime() };
+    Observation observed{ .scenario = scenario, .started = WallTime() };
     if (scenario < 2)
       InterruptAcknowledgements(client, frames, display, scenario == 1);
     else if (scenario == 2 || (scenario == 4 && mode != "auto-sender"))
@@ -307,7 +307,7 @@ TEST_P(VsyncRecovery, HeldAcknowledgementAndDisplayChannelResize) {
     Recovery(trace, observed.resumed, observed.scenario == 0 ? "held_" : "resize_");
   }
 }
-class ClientRecovery : public VsyncRecovery {};
+class ClientRecovery : public VsyncRecovery { };
 TEST_P(ClientRecovery, DelayedAcknowledgementsDropAndRecover) {
   Expects(renderer != nullptr, "fixture created a renderer");
   Run(2);
@@ -321,7 +321,7 @@ TEST_P(ClientRecovery, DelayedAcknowledgementsDropAndRecover) {
   EXPECT_GE(count(resumed), 30);
   Recovery(logs.Text(true), resumed, "prompt_");
 }
-class SenderRecovery : public VsyncRecovery {};
+class SenderRecovery : public VsyncRecovery { };
 TEST_P(SenderRecovery, SocketPauseDropAndRecover) {
   Expects(renderer != nullptr, "fixture created a renderer");
   Run(3);
@@ -337,7 +337,7 @@ TEST_P(SenderRecovery, SocketPauseDropAndRecover) {
   EXPECT_NE(TraceDuring(trace, observed.started, observed.resumed).find("hz=10"), std::string::npos);
   Recovery(trace, observed.resumed, "drained_");
 }
-class AdaptiveRecovery : public VsyncRecovery {};
+class AdaptiveRecovery : public VsyncRecovery { };
 TEST_P(AdaptiveRecovery, ResizeRestartsAtCeiling) {
   Expects(renderer != nullptr, "fixture created a renderer");
   Run(4);

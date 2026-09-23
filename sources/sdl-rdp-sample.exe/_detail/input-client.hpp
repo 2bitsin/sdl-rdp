@@ -13,8 +13,8 @@ public:
     touch    = nullptr;
     freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
     auto*                      context = client.Instance()->context;
-    std::array<char const*, 1> ainput  { AINPUT_CHANNEL_NAME        };
-    std::array<char const*, 1> rdpei   { RDPEI_CHANNEL_NAME         };
+    std::array<char const*, 1> ainput { AINPUT_CHANNEL_NAME };
+    std::array<char const*, 1> rdpei  { RDPEI_CHANNEL_NAME  };
     Expects(freerdp_client_add_dynamic_channel(context->settings, 1, ainput.data()), "ainput enabled");
     Expects(freerdp_client_add_dynamic_channel(context->settings, 1, rdpei.data()), "rdpei enabled");
     PubSub_SubscribeChannelConnected(context->pubSub, Connected);
@@ -47,8 +47,8 @@ public:
     client.Instance()->context->update->pointer->PointerPosition = Receive;
   }
   ~PositionObserver() { active = nullptr; }
-  PositionObserver& operator = (PositionObserver const&) = delete;
-  PositionObserver& operator = (PositionObserver&&)      = delete;
+  PositionObserver& operator =(PositionObserver const&) = delete;
+  PositionObserver& operator =(PositionObserver&&) = delete;
   unsigned Count() const { return count; }
   unsigned X() const { return x; }
   unsigned Y() const { return y; }
@@ -101,8 +101,8 @@ public:
     if (paint_installed) client.Instance()->context->update->EndPaint = original_paint;
     active = nullptr;
   }
-  FirstFrameSize& operator = (FirstFrameSize const&) = delete;
-  FirstFrameSize& operator = (FirstFrameSize&&)      = delete;
+  FirstFrameSize& operator =(FirstFrameSize const&) = delete;
+  FirstFrameSize& operator =(FirstFrameSize&&) = delete;
   bool Received() const { return received; }
   int Width() const { return width; }
   int Height() const { return height; }
@@ -132,10 +132,10 @@ private:
   int  width    = 0;
   int  height   = 0;
 
-  inline static thread_local FirstFrameSize* active = nullptr;
+  inline static thread_local FirstFrameSize* active           = nullptr;
   Client&                                    client;
-  decltype(freerdp::PostConnect) original_connect;
-  pEndPaint original_paint  = nullptr;
-  bool      paint_installed = false;
+  decltype(freerdp::PostConnect)             original_connect;
+  pEndPaint                                  original_paint   = nullptr;
+  bool                                       paint_installed  = false;
 };
 }

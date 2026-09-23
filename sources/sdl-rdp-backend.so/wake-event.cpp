@@ -14,7 +14,7 @@ bool Signalled(HANDLE event) {
   return result == WAIT_OBJECT_0;
 }
 
-WakeEvent::WakeEvent(HANDLE value) : handle(value) {}
+WakeEvent::WakeEvent(HANDLE value) : handle(value) { }
 HANDLE WakeEvent::get() const {
   return handle.get();
 }

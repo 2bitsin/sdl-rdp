@@ -130,7 +130,7 @@ TEST_F(DesktopSample, FullscreenFollowsScreen) {
   arguments.emplace_back("--fullscreen");
   GivenProcess(arguments);
   if (::testing::Test::HasFatalFailure()) return;
-  Client client(Number(std::string_view(line).substr(5)), true, 1024, 768);
+  Client                        client(Number(std::string_view(line).substr(5)), true, 1024, 768);
   Headless::DisplayClient const display(client);
   ASSERT_TRUE(freerdp_connect(client.Instance().get())) << ConnectLogs();
   ThenSizeEvents("data1=1024 data2=768");
@@ -238,7 +238,7 @@ TEST_F(DesktopSample, ClipboardUnicode) {
   GivenClipboard("żółw");
   if (::testing::Test::HasFatalFailure()) return;
   auto&             client = SessionClient();
-  std::vector<BYTE> bytes  { 0x7c, 1, 0xf3, 0, 0x42, 1, 0x77, 0, 0, 0 };
+  std::vector<BYTE> bytes { 0x7c, 1, 0xf3, 0, 0x42, 1, 0x77, 0, 0, 0 };
   ASSERT_TRUE(client.Until([&] { return ClipboardSession().Received(bytes); }));
   SDL_Log("trace CLIPBOARD server formats=13,1 request=13 utf16le=7c01f300420177000000 text=żółw");
   ThenLegacyClipboard(client);

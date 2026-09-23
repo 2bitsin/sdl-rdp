@@ -24,14 +24,14 @@ void Draw(SDL_Window* window, unsigned frame, bool full) {
   auto* surface = SDL_GetWindowSurface(window);
   Check(surface != nullptr);
   Check(SDL_FillSurfaceRect(surface, nullptr, 0x00010101));
-  SDL_Rect const block { int(frame % unsigned(surface->w)), 40, 32, 32 };
+  SDL_Rect const block{ int(frame % unsigned(surface->w)), 40, 32, 32 };
   Check(SDL_FillSurfaceRect(surface, &block, 0x0000ff00));
-  SDL_Rect const damage { 0, 40, surface->w, std::min(32, std::max(0, surface->h - 40)) };
+  SDL_Rect const damage{ 0, 40, surface->w, std::min(32, std::max(0, surface->h - 40)) };
   Check(full ? SDL_UpdateWindowSurface(window) : SDL_UpdateWindowSurfaceRects(window, &damage, 1));
 }
 
 void CycleCodec() {
-  static constexpr std::array codecs  { "auto", "planar", "remotefx", "nscodec", "raw", "progressive"                };
+  static constexpr std::array codecs { "auto", "planar", "remotefx", "nscodec", "raw", "progressive" };
   char const*                 hint    = SDL_GetHint(SDL_HINT_RDP_CODEC);
   auto const*                 current = std::ranges::find(codecs, std::string_view(hint ? hint : "auto"));
   auto                        next    = current == codecs.end() ? 0 : (current - codecs.begin() + 1) % codecs.size();
@@ -79,7 +79,7 @@ void Run(SDL_Window* window, bool tight, bool partial, DriveOptions drives) {
   for (;;) {
     SDL_Event event;
     if (SDL_WaitEventTimeout(&event, tight ? 0 : 10) && !ProcessEvent(event, window, frame, full, partial)) return;
-    if (RunDrives(drives)) drives = {};
+    if (RunDrives(drives)) drives = { };
     PrintCodecChange(window, codec);
     DrawScheduled(window, frame, full, next, tight, partial);
   }
@@ -87,7 +87,7 @@ void Run(SDL_Window* window, bool tight, bool partial, DriveOptions drives) {
 
 void SDLCALL FeedTone(void* userdata, SDL_AudioStream* stream, int additional, int /*unused*/) {
   auto&                   frame   = *static_cast<Uint64*>(userdata);
-  std::array<Sint16, 960> samples {                                 };
+  std::array<Sint16, 960> samples{ };
   while (additional > 0) {
     auto count = std::min(additional / int(2 * sizeof(Sint16)), 480);
     if (!count) return;
@@ -102,7 +102,7 @@ void SDLCALL FeedTone(void* userdata, SDL_AudioStream* stream, int additional, i
 }
 
 SDL_AudioStream* OpenTone(Uint64& frame) {
-  SDL_AudioSpec const spec   { SDL_AUDIO_S16, 2, 48000                                                               };
+  SDL_AudioSpec const spec  { SDL_AUDIO_S16, 2, 48000 };
   auto*               stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, FeedTone, &frame);
   Check(stream != nullptr);
   auto device = SDL_GetAudioStreamDevice(stream);
@@ -126,9 +126,9 @@ struct Options {
 
 void ParseSize(std::string_view size, int& width, int& height) {
   auto first = std::from_chars(size.data(), size.data() + size.size(), width);
-  Check(first.ec == std::errc{} && first.ptr != size.data() + size.size() && *first.ptr == 'x');
+  Check(first.ec == std::errc{ } && first.ptr != size.data() + size.size() && *first.ptr == 'x');
   auto second = std::from_chars(first.ptr + 1, size.data() + size.size(), height);
-  Check(second.ec == std::errc{} && second.ptr == size.data() + size.size() && width > 0 && height > 0);
+  Check(second.ec == std::errc{ } && second.ptr == size.data() + size.size() && width > 0 && height > 0);
 }
 
 void Fullscreen(SDL_Window* window, Options const& options) {

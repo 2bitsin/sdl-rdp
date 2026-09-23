@@ -68,7 +68,7 @@ bool Encoder::InitializeCodec(rdpSettings const* settings) {
 bool Encoder::Select(rdpSettings const* settings, sdlrdp_codec preference) {
   utilities::Expects(settings != nullptr, "negotiated settings exist");
   if (freerdp_settings_get_uint32(settings, FreeRDP_ColorDepth) != 32) preference = SDLRDP_CODEC_RAW;
-  constexpr std::array choices { SDLRDP_CODEC_REMOTEFX, SDLRDP_CODEC_NSCODEC, SDLRDP_CODEC_PLANAR, SDLRDP_CODEC_RAW };
+  constexpr std::array choices{ SDLRDP_CODEC_REMOTEFX, SDLRDP_CODEC_NSCODEC, SDLRDP_CODEC_PLANAR, SDLRDP_CODEC_RAW };
   codec = Available(settings, preference)
               ? preference
               : *std::ranges::find_if(choices, [=](auto choice) { return Available(settings, choice); });
@@ -92,7 +92,7 @@ bool Encoder::ResetRemoteFx(unsigned width, unsigned height) {
 }
 bool Encoder::EncodeRemoteFx(std::span<BYTE const> pixels, unsigned width, unsigned height) {
   if (!ResetRemoteFx(width, height)) return false;
-  RFX_RECT const rect { 0, 0, UINT16(width), UINT16(height) };
+  RFX_RECT const rect{ 0, 0, UINT16(width), UINT16(height) };
   return rfx_compose_message(rfx.get(), stream.get(), &rect, 1, pixels.data(), width, height, width * 4);
 }
 bool Encoder::EncodePayload(std::span<BYTE const> pixels, unsigned width, unsigned height) {

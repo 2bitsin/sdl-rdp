@@ -86,7 +86,7 @@ std::string PointerDetails(SDL_Event const& event, unsigned frame) {
   case SDL_EVENT_MOUSE_WHEEL:
     return std::format(" x={} y={}", event.wheel.x, event.wheel.y);
   default:
-    return {};
+    return { };
   }
 }
 std::string WindowDetails(SDL_Event const& event, SDL_Window* window) {
@@ -99,7 +99,7 @@ std::string WindowDetails(SDL_Event const& event, SDL_Window* window) {
   if (event.type == SDL_EVENT_WINDOW_EXPOSED) return ClientProperties(window);
   if (event.type >= SDL_EVENT_WINDOW_FIRST && event.type <= SDL_EVENT_WINDOW_LAST)
     return std::format(" data1={} data2={}", event.window.data1, event.window.data2);
-  return {};
+  return { };
 }
 std::string EventDetails(SDL_Event const& event, SDL_Window* window, unsigned frame) {
   if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP)

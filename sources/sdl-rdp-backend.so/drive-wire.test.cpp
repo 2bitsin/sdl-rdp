@@ -6,7 +6,7 @@ namespace {
 void SendMalformedDrivePacket(Headless::Client& client) {
   auto*               instance  = client.Instance().get();
   auto                channel   = freerdp_channels_get_id_by_name(instance, RDPDR_CHANNEL_NAME);
-  std::array<BYTE, 4> malformed { 0x72, 0x44, 0x41, 0x44                                        };
+  std::array<BYTE, 4> malformed{ 0x72, 0x44, 0x41, 0x44 };
   ASSERT_TRUE(instance->SendChannelData(instance, channel, malformed.data(), malformed.size()));
 }
 Backend::DrivePacket EmptyBasicInformation(Headless::DriveObserver& observer) {
@@ -31,7 +31,7 @@ void CompleteRead(Headless::DriveObserver& observer, size_t index) {
 void AnnounceDriveNames(Headless::DriveObserver& observer) {
   std::string_view const label = "żółw";
   auto wide                    = Backend::TranscodeRange<std::vector<uint8_t>>(
-      std::as_bytes(std::span(label)), {},
+      std::as_bytes(std::span(label)), { },
       { .encoding = oxbox::utilities::Encoding::UTF16, .order = std::endian::little });
   wide.resize(wide.size() + 2);
   ASSERT_TRUE(observer.Send(DeviceAnnouncement(RDPDR_DTYP_FILESYSTEM, 100, wide)));
@@ -39,7 +39,7 @@ void AnnounceDriveNames(Headless::DriveObserver& observer) {
   long_name.push_back(0);
   ASSERT_TRUE(observer.Send(DeviceAnnouncement(RDPDR_DTYP_FILESYSTEM, 101, long_name)));
   ASSERT_TRUE(observer.Send(DeviceAnnouncement(RDPDR_DTYP_FILESYSTEM, 102, std::array<uint8_t, 2>{ 0xff, 0 })));
-  ASSERT_TRUE(observer.Send(DeviceAnnouncement(RDPDR_DTYP_PRINT, 103, {})));
+  ASSERT_TRUE(observer.Send(DeviceAnnouncement(RDPDR_DTYP_PRINT, 103, { })));
 }
 }
 
@@ -61,7 +61,7 @@ protected:
     EXPECT_EQ(Logged(SDLRDP_LOG_INFO, "extended PDU"), 1u);
   }
   void ThenDriveNames() {
-    std::array<sdlrdp_drive, 8> drives { };
+    std::array<sdlrdp_drive, 8> drives{ };
     ASSERT_EQ(sdlrdp_drive_list(handle.get(), drives.data(), 8), 4);
     EXPECT_STREQ(drives[1].name, "żółw");
     EXPECT_EQ(std::string(drives[2].name), std::string(511, 'x'));
@@ -106,7 +106,7 @@ TEST_F(DriveWire, MalformedChannelKeepsVideoSession) {
   SendMalformedDrivePacket(*client);
   if (::testing::Test::HasFatalFailure()) return;
   ASSERT_TRUE(client->Until([&] {
-    sdlrdp_drive value { };
+    sdlrdp_drive value{ };
     return sdlrdp_drive_list(handle.get(), &value, 1) == 0;
   }));
   ThenAbortedRead(read, file);
@@ -121,7 +121,7 @@ TEST_F(DriveWire, MalformedInformationKeepsVideoSession) {
   auto* file     = held_file;
   auto& observer = *this->observer;
   auto stat      = std::async(std::launch::async, [&] {
-    sdlrdp_stat info   {                                               };
+    sdlrdp_stat info  { };
     auto        result = sdlrdp_drive_fstat(handle.get(), file, &info);
     return std::pair(result, std::string(sdlrdp_last_error()));
   });
@@ -180,7 +180,7 @@ TEST_F(DriveWire, UnknownCompletionIsIgnored) {
   packet.Put(STATUS_SUCCESS);
   ASSERT_TRUE(observer.Send(packet));
   ASSERT_TRUE(client->Until([&] { return Logged(SDLRDP_LOG_WARN, "Unknown drive completion id") == 1; }));
-  sdlrdp_drive value { };
+  sdlrdp_drive value{ };
   EXPECT_EQ(sdlrdp_drive_list(handle.get(), &value, 1), 1);
   ThenVideoMatches();
 }

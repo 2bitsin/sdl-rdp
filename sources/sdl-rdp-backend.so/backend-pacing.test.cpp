@@ -18,7 +18,7 @@ TEST_F(RoundFive, DelayedAcknowledgements) {
   Open();
   Client client(sdlrdp_port(backend.get()), true, 1024, 768);
   Connect(client);
-  FrameObserver observer(client);
+  FrameObserver       observer(client);
   std::vector<UINT32> pixels(640uz * 480, 0x112233);
   Present(pixels, 640, 480);
   ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == 1; }));
@@ -49,7 +49,7 @@ TEST_F(RoundFive, SuppressOutput) {
   Present(pixels, 640, 480);
   ThenSuppressed(client, observer, bytes);
   if (::testing::Test::HasFatalFailure()) return;
-  RECTANGLE_16 const area { 0, 0, 639, 479 };
+  RECTANGLE_16 const area{ 0, 0, 639, 479 };
   ASSERT_TRUE(update->SuppressOutput(client.Instance()->context, 1, &area));
   ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == 1; }));
   EXPECT_TRUE(client.Matches(pixels));
@@ -60,7 +60,7 @@ TEST_F(RoundFive, AspectAndMouse) {
   Connect(client, false);
   ThenAspectGeometry(client);
   if (::testing::Test::HasFatalFailure()) return;
-  FrameObserver observer(client);
+  FrameObserver       observer(client);
   std::vector<UINT32> pixels(640uz * 350);
   std::fill_n(pixels.begin() + 175uz * 640, 640, 0xffffff);
   Present(pixels, 640, 350);
@@ -74,10 +74,10 @@ TEST_F(RoundFive, AspectAndMouse) {
 }
 TEST_F(RoundFive, SparseRegions) {
   for (auto codec : { SDLRDP_CODEC_RAW, SDLRDP_CODEC_PLANAR, SDLRDP_CODEC_REMOTEFX, SDLRDP_CODEC_NSCODEC }) {
-    Open(1024, 768, {}, codec);
+    Open(1024, 768, { }, codec);
     Client client(sdlrdp_port(backend.get()), true, 1024, 768);
     Connect(client, false);
-    FrameObserver observer(client);
+    FrameObserver       observer(client);
     std::vector<UINT32> pixels(1024uz * 768);
     std::ranges::generate(pixels, [i = 0u]() mutable { return (i++ * 2654435761u) & 0xffffff; });
     Present(pixels, 1024, 768);
@@ -106,7 +106,7 @@ TEST_F(RoundFive, WaitWithoutRefreshFeedback) {
   Client client(sdlrdp_port(backend.get()), true);
   Connect(client);
   ASSERT_EQ(Events(2).size(), 2u);
-  FrameObserver observer(client);
+  FrameObserver             observer(client);
   std::vector<UINT32> const pixels(320uz * 200, 0x445566);
   for (unsigned i = 1; i <= 20; ++i) {
     WhenAcknowledgedFrame(client, observer, pixels, i, WaitForAcknowledgement);
@@ -118,7 +118,7 @@ TEST_F(RoundFive, NeverAcknowledges) {
   EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 1);
   Client client(sdlrdp_port(backend.get()), true);
   Connect(client);
-  FrameObserver observer(client);
+  FrameObserver             observer(client);
   std::vector<UINT32> const pixels(320uz * 200, 0x778899);
   auto start = Clock::now();
   Present(pixels, 320, 200);
@@ -140,7 +140,7 @@ TEST_F(RoundFive, ColourDepths) {
 namespace {
 void ProduceFrames(sdlrdp_handle* backend, std::atomic<unsigned>& presents, std::stop_token const& stop) {
   std::vector<UINT32> pixels(1024uz * 768);
-  sdlrdp_rect const area { 0, 0, 1024, 768 };
+  sdlrdp_rect const area{ 0, 0, 1024, 768 };
   while (!stop.stop_requested()) {
     auto sequence = presents.load() + 1;
     std::fill_n(pixels.begin(), 1024, sequence);
@@ -171,7 +171,7 @@ TEST_F(RoundFive, ProducerDoesNotStarveOrTear) {
 }
 
 TEST_F(RoundFive, AutoPrefersRemoteFX) {
-  Open(320, 200, {}, SDLRDP_CODEC_AUTO);
+  Open(320, 200, { }, SDLRDP_CODEC_AUTO);
   Client const client(sdlrdp_port(backend.get()), true);
   ASSERT_TRUE(freerdp_connect(client.Instance().get())) << logs.Text(true);
   auto events    = EventsUntil([](auto const& events) {
@@ -235,7 +235,7 @@ TEST_F(RoundFive, ExpectedDisconnectLogLevels) {
 
 TEST_F(RoundFive, GraphicsDisconnectDuringWrite) {
   constexpr unsigned side = 2048;
-  Open(side, side, {}, SDLRDP_CODEC_PROGRESSIVE);
+  Open(side, side, { }, SDLRDP_CODEC_PROGRESSIVE);
   Client client(sdlrdp_port(backend.get()), true, side, side);
   ConnectPipeline(client);
   if (::testing::Test::HasFatalFailure()) return;

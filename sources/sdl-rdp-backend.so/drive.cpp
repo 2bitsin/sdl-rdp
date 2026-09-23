@@ -62,14 +62,14 @@ void GeneralCapability(DrivePacket& packet) {
   Capability(packet, CAP_GENERAL_TYPE, GENERAL_CAPABILITY_VERSION_02, body);
 }
 void DriveCapability(DrivePacket& packet) {
-  Capability(packet, CAP_DRIVE_TYPE, DRIVE_CAPABILITY_VERSION_02, {});
+  Capability(packet, CAP_DRIVE_TYPE, DRIVE_CAPABILITY_VERSION_02, { });
 }
 } // namespace
 void DriveChannel::Abort(std::string const& cause) {
   std::scoped_lock const lock(mutex);
   Fail(cause);
 }
-DriveChannel::DriveChannel(Peer& value) : peer(value) {}
+DriveChannel::DriveChannel(Peer& value) : peer(value) { }
 DriveChannel::~DriveChannel() {
   Disconnect();
 }
@@ -121,7 +121,7 @@ void DriveChannel::Announce(DrivePacket& packet) {
   while (count--) {
     auto                type = packet.Get(4);
     auto                wire = packet.Get(4);
-    std::array<char, 9> name {               };
+    std::array<char, 9> name{ };
     for (unsigned i = 0; i < 8; ++i)
       name[i] = char(packet.Get(1));
     auto length = packet.Get(4);
@@ -169,7 +169,7 @@ void DriveChannel::Remove(unsigned wire) {
       ++it;
       continue;
     }
-    sdlrdp_event removed { .type = SDLRDP_DRIVE, .drive = { .added = 0, .id = it->first, .name = {} } };
+    sdlrdp_event removed{ .type = SDLRDP_DRIVE, .drive = { .added = 0, .id = it->first, .name = { } } };
     std::strncpy(removed.drive.name, it->second.drive.name, sizeof(removed.drive.name) - 1);
     peer.owner.Push(removed);
     for (auto const& [id, request] : pending) {
@@ -250,10 +250,10 @@ std::shared_ptr<DriveRequest> DriveChannel::Send(unsigned drive, unsigned file, 
 }
 void DriveChannel::AnnounceDevice(unsigned wire, std::string const& label) {
   auto        id    = peer.owner.next_drive.fetch_add(1);
-  DeviceEntry entry { .wire = wire, .drive = { id, {} }  };
+  DeviceEntry entry{ .wire = wire, .drive = { id, { } } };
   std::strncpy(entry.drive.name, label.c_str(), sizeof(entry.drive.name) - 1);
   devices.emplace(id, entry);
-  sdlrdp_event added { .type = SDLRDP_DRIVE, .drive = { .added = 1, .id = id, .name = {} } };
+  sdlrdp_event added{ .type = SDLRDP_DRIVE, .drive = { .added = 1, .id = id, .name = { } } };
   std::strncpy(added.drive.name, label.c_str(), sizeof(added.drive.name) - 1);
   peer.owner.Push(added);
 }

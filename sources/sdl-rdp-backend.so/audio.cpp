@@ -85,9 +85,9 @@ AudioChannel::AudioChannel(Peer& peer)
 }
 AudioChannel::~AudioChannel() {
   sound.reset();
-  int major    { 0 };
-  int minor    { 0 };
-  int revision { 0 };
+  int major   { 0 };
+  int minor   { 0 };
+  int revision{ 0 };
   freerdp_get_version(&major, &minor, &revision);
   if (major != 3 || minor != 15 || revision != 0) return;
   // FreeRDP 3.15.0 returns the existing static-channel handle from Open.
@@ -121,7 +121,7 @@ unsigned AudioChannel::Remaining() const {
 }
 void AudioChannel::Reset() {
   sent         = confirmed = clock_frames = 0;
-  first        = clock_start = {};
+  first        = clock_start = { };
   server_clock = has_confirmation = false;
   pending.clear();
   buffer.clear();
@@ -130,7 +130,7 @@ void AudioChannel::Reset() {
 void AudioChannel::AdoptServerClock() {
   Expects(ready, "audio has a selected format");
   auto now = Clock::now();
-  if (server_clock || has_confirmation || first == Clock::time_point{} || now - first < std::chrono::milliseconds(500))
+  if (server_clock || has_confirmation || first == Clock::time_point{ } || now - first < std::chrono::milliseconds(500))
     return;
   server_clock = true;
   clock_start  = now;

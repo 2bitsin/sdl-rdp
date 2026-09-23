@@ -81,7 +81,7 @@ int sdlrdp_present(sdlrdp_handle* handle, void const* pixels, int pitch, unsigne
     Dimensions(width, height);
     if (!handle || !pixels || (!rects && count) || std::cmp_less(pitch, width * 4))
       throw std::runtime_error("Present failed: invalid handle, pixels, rectangles or pitch.");
-    std::span const damage { rects, count };
+    std::span const damage{ rects, count };
     ValidateDamage(damage, width, height);
     handle->state->trace.Line("present", [&] { return std::format("dirty={}", count); });
     handle->state->Present(pixels, pitch, width, height, damage);

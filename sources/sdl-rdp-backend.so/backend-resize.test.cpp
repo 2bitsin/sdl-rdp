@@ -24,8 +24,8 @@ public:
     peer.client->context->update->DesktopResize = original;
     active                                      = nullptr;
   }
-  ResizeProbe& operator = (ResizeProbe const&) = delete;
-  ResizeProbe& operator = (ResizeProbe&&)      = delete;
+  ResizeProbe& operator =(ResizeProbe const&) = delete;
+  ResizeProbe& operator =(ResizeProbe&&) = delete;
   bool Finalizing() {
     std::scoped_lock const lock(state.session_guard);
     auto current = freerdp_get_state(peer.client->context);
@@ -35,11 +35,11 @@ public:
     std::scoped_lock const lock(state.session_guard);
     Expects(peer.resizing, "peer has an in-flight resize");
     Expects(peer.disp != nullptr, "peer has a display channel");
-    DISPLAY_CONTROL_MONITOR_LAYOUT monitor { };
+    DISPLAY_CONTROL_MONITOR_LAYOUT monitor{ };
     monitor.Flags  = DISPLAY_CONTROL_MONITOR_PRIMARY;
     monitor.Width  = peer.desktop.w;
     monitor.Height = peer.desktop.h;
-    DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const layout { sizeof(monitor), 1, &monitor };
+    DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const layout{ sizeof(monitor), 1, &monitor };
     EXPECT_EQ(peer.disp->DispMonitorLayout(peer.disp.get(), &layout), CHANNEL_RC_OK);
   }
   void ConfirmActiveCallback() {
@@ -115,8 +115,8 @@ protected:
     ThenQuietResize(probe);
   }
   void Run(unsigned last_width, unsigned last_height, unsigned expected) {
-    Open(640, 480, {}, SDLRDP_CODEC_PLANAR);
-    Client client(sdlrdp_port(backend.get()), true, 640, 480);
+    Open(640, 480, { }, SDLRDP_CODEC_PLANAR);
+    Client                  client(sdlrdp_port(backend.get()), true, 640, 480);
     Headless::DisplayClient display(client);
     display.Observed().echo_resize        = expected == 1;
     display.Observed().finalization_delay = std::chrono::milliseconds(20);
@@ -148,7 +148,7 @@ TEST_F(ResizeStorm, AlternatingAppSizesWithLayoutEcho) {
 }
 TEST_F(ResizeStorm, EqualLayoutDoesNotChangePicture) {
   Open();
-  Client client(sdlrdp_port(backend.get()), true, 640, 480);
+  Client                        client(sdlrdp_port(backend.get()), true, 640, 480);
   Headless::DisplayClient const display(client);
   Connect(client, false);
   ASSERT_TRUE(client.Until([&] { return Headless::DisplayClient::Ready(); }));
@@ -204,7 +204,7 @@ TEST_F(RoundFive, PictureSizeReactivatesDesktop) {
 
 TEST_F(RoundFive, ClientScreenNeverResizesPicture) {
   Open();
-  Client client(sdlrdp_port(backend.get()), true, 1024, 768);
+  Client              client(sdlrdp_port(backend.get()), true, 1024, 768);
   DisplayClient const display(client);
   Connect(client, false);
   auto events = Events(2);

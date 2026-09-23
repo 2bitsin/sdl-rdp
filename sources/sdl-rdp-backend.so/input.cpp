@@ -21,7 +21,7 @@ BOOL Peer::Keyboard(rdpInput* input, UINT16 flags, UINT8 code) {
 }
 namespace {
 void PushMouseButtons(State& owner, UINT16 flags) {
-  constexpr std::array<unsigned, 3> buttons { PTR_FLAGS_BUTTON1, PTR_FLAGS_BUTTON3, PTR_FLAGS_BUTTON2 };
+  constexpr std::array<unsigned, 3> buttons{ PTR_FLAGS_BUTTON1, PTR_FLAGS_BUTTON3, PTR_FLAGS_BUTTON2 };
   for (unsigned i = 0; i < buttons.size(); ++i)
     if (flags & buttons[i])
       owner.Push(
@@ -52,7 +52,7 @@ BOOL Peer::Mouse(rdpInput* input, UINT16 flags, UINT16 x, UINT16 y) {
 BOOL Peer::ExtendedMouse(rdpInput* input, UINT16 flags, UINT16 /*unused*/, UINT16 /*unused*/) {
   return DispatchInput(input, [&](Peer& self) {
     auto&                             owner   = self.owner;
-    constexpr std::array<unsigned, 2> buttons { PTR_XFLAGS_BUTTON1, PTR_XFLAGS_BUTTON2 };
+    constexpr std::array<unsigned, 2> buttons{ PTR_XFLAGS_BUTTON1, PTR_XFLAGS_BUTTON2 };
     for (unsigned i = 0; i < buttons.size(); ++i)
       if (flags & buttons[i])
         owner.Push(

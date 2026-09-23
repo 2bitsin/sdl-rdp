@@ -79,8 +79,8 @@ public:
     SDL_Quit();
     SDL_ResetHints();
   }
-  Quit& operator = (Quit const&) = delete;
-  Quit& operator = (Quit&&)      = delete;
+  Quit& operator =(Quit const&) = delete;
+  Quit& operator =(Quit&&) = delete;
 };
 void GivenAuthenticationHints(fs::path const& certificates) {
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));
@@ -111,7 +111,7 @@ void ConnectPropertyCredentials(unsigned port) {
 }
 }
 TEST(DriverAuthentication, PropertiesReadAtCallTime) {
-  oxbox::platform::ScratchArea const certificates { "driver-auth", "sdl-rdp" };
+  oxbox::platform::ScratchArea const certificates{ "driver-auth", "sdl-rdp" };
   GivenAuthenticationHints(certificates.Path());
   if (::testing::Test::HasFatalFailure()) return;
   PropertyCredentials credentials;

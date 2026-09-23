@@ -31,14 +31,14 @@ public:
     }
   }
   ~DirectoryLock() { close(fd); }
-  DirectoryLock& operator = (DirectoryLock const&) = delete;
-  DirectoryLock& operator = (DirectoryLock&&)      = delete;
+  DirectoryLock& operator =(DirectoryLock const&) = delete;
+  DirectoryLock& operator =(DirectoryLock&&) = delete;
 
 private:
   int fd;
 };
 std::string Hostname() {
-  std::array<char, 256> name { };
+  std::array<char, 256> name{ };
   if (gethostname(name.data(), name.size() - 1)) throw std::runtime_error("Hostname unavailable.");
   return name.data();
 }
@@ -81,8 +81,8 @@ void Generate(Credentials const& paths) {
 std::filesystem::path DefaultCertificateDirectory() {
   if (auto* data = std::getenv("XDG_DATA_HOME"); data && *data) return std::filesystem::path(data) / "sdl-rdp";
   if (auto* home = std::getenv("HOME"); home && *home) return std::filesystem::path(home) / ".local/share/sdl-rdp";
-  std::array<char, 16384> buffer {         };
-  passwd                  entry  {         };
+  std::array<char, 16384> buffer{ };
+  passwd                  entry { };
   passwd*                 found  = nullptr;
   if (getpwuid_r(getuid(), &entry, buffer.data(), buffer.size(), &found) || !found)
     throw std::runtime_error("User home directory unavailable.");
@@ -97,7 +97,7 @@ Credentials EnsureCertificate(std::filesystem::path const& directory) {
     throw std::runtime_error("Certificate directory creation failed.");
   DirectoryLock const process_lock(directory);
   std::filesystem::permissions(directory, std::filesystem::perms::owner_all);
-  Credentials result { .certificate = directory / "server.crt", .key = directory / "server.key" };
+  Credentials result{ .certificate = directory / "server.crt", .key = directory / "server.key" };
   if (!exists(result.certificate) || !exists(result.key)) Generate(result);
   std::filesystem::permissions(result.key, std::filesystem::perms::owner_read | std::filesystem::perms::owner_write);
   Ensures(exists(result.certificate), "credentials exist");

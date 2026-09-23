@@ -36,7 +36,7 @@ void ThenCatNotRepeated(Process const& process, Headless::DriveObserver const& o
 }
 }
 TEST_F(DriveSample, DriveDisconnectDuringCat) {
-  oxbox::platform::ScratchArea const share { "sample-disconnect", "sdl-rdp" };
+  oxbox::platform::ScratchArea const share{ "sample-disconnect", "sdl-rdp" };
   CreateHugeFile(share.Path());
   auto arguments = Arguments(certificates.Path(), false);
   arguments.insert(arguments.end(), { "--cat", "share/huge.bin" });
@@ -60,7 +60,7 @@ TEST_F(DriveSample, DriveDisconnectDuringCat) {
 }
 
 TEST_F(DriveSample, DriveMissingCatKeepsServing) {
-  oxbox::platform::ScratchArea const share     { "sample-missing", "sdl-rdp"           };
+  oxbox::platform::ScratchArea const share    { "sample-missing", "sdl-rdp" };
   auto                               arguments = Arguments(certificates.Path(), false);
   arguments.insert(arguments.end(), { "--cat", "share/missing.bin" });
   GivenDriveProcess(arguments, share.Path());

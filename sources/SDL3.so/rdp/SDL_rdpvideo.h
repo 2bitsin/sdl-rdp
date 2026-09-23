@@ -12,7 +12,7 @@ struct SDL_VideoData {
   unsigned        audio_rate;
   SDL_DisplayMode refresh_modes[2];
 };
-void SDL_RDP_InitMouse(void);
+void         SDL_RDP_InitMouse(void);
 void SDLCALL SDL_RDP_AspectHintChanged(void* userdata, char const* name, char const* oldValue, char const* newValue);
-char const* SDL_RDP_CodecName(sdlrdp_codec codec);
+char const*  SDL_RDP_CodecName(sdlrdp_codec codec);
 #endif

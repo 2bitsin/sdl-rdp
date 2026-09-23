@@ -87,8 +87,8 @@ public:
     client.Instance()->LoadChannels = previous_load;
     active                          = nullptr;
   }
-  SoundClient& operator = (SoundClient const&) = delete;
-  SoundClient& operator = (SoundClient&&)      = delete;
+  SoundClient& operator =(SoundClient const&) = delete;
+  SoundClient& operator =(SoundClient&&) = delete;
 
   bool Send(std::span<BYTE const> bytes) const {
     Expects(!bytes.empty(), "sound PDU is nonempty");
@@ -126,18 +126,18 @@ public:
 private:
   friend struct                           SoundProtocol;
   SoundCapture                            capture;
-  inline static thread_local SoundClient* active        = nullptr;
+  inline static thread_local SoundClient* active         = nullptr;
   Client&                                 client;
-  decltype(freerdp::LoadChannels) previous_load = nullptr;
-  CHANNEL_ENTRY_POINTS_EX entry          {         };
-  void*                   init           = nullptr;
-  DWORD                   channel        = 0;
-  std::vector<BYTE>       incoming;
-  std::array<BYTE, 4>     first          {         };
-  unsigned                wave_bytes     = 0;
-  UINT16                  timestamp      = 0;
-  BYTE                    block          = 0;
-  bool                    expecting_wave = false;
+  decltype(freerdp::LoadChannels)         previous_load  = nullptr;
+  CHANNEL_ENTRY_POINTS_EX                 entry         { };
+  void*                                   init           = nullptr;
+  DWORD                                   channel        = 0;
+  std::vector<BYTE>                       incoming;
+  std::array<BYTE, 4>                     first         { };
+  unsigned                                wave_bytes     = 0;
+  UINT16                                  timestamp      = 0;
+  BYTE                                    block          = 0;
+  bool                                    expecting_wave = false;
 };
 }
 
@@ -148,7 +148,7 @@ inline BOOL SoundProtocol::Register(CHANNEL_ENTRY_POINTS_EX* points, void* handl
   Expects(self != nullptr, "capture context supplied");
   self->entry = *points;
   self->init  = handle;
-  CHANNEL_DEF definition { };
+  CHANNEL_DEF definition{ };
   std::memcpy(definition.name, "rdpsnd", 7);
   definition.options = CHANNEL_OPTION_INITIALIZED | CHANNEL_OPTION_ENCRYPT_RDP;
   return points->pVirtualChannelInitEx(self, nullptr, handle, &definition, 1, VIRTUAL_CHANNEL_VERSION_WIN2000,
@@ -190,7 +190,7 @@ inline void ReadSoundFormats(wStream* stream, SoundCapture& capture) {
   });
 }
 inline std::vector<AUDIO_FORMAT> SupportedSoundFormats(SoundCapture const& capture) {
-  AUDIO_FORMAT const        own       { WAVE_FORMAT_PCM, 2, capture.rate, capture.rate * 4, 4, 16, 0, nullptr };
+  AUDIO_FORMAT const        own      { WAVE_FORMAT_PCM, 2, capture.rate, capture.rate * 4, 4, 16, 0, nullptr };
   std::vector<AUDIO_FORMAT> supported;
   std::ranges::copy_if(capture.server_formats, std::back_inserter(supported), [&](auto const& format) {
     return capture.advertise_both_rates || audio_format_compatible(&own, &format);
@@ -220,7 +220,7 @@ inline void WriteSoundFormatHeader(wStream* out, SoundCapture const& capture, st
 inline std::vector<BYTE> SoundFormatReply(SoundCapture const& capture) {
   auto supported = SupportedSoundFormats(capture);
   std::vector<BYTE> bytes(24 + (supported.size() * 18));
-  wStream output {                                                        };
+  wStream output{ };
   auto*   out    = Stream_StaticInit(&output, bytes.data(), bytes.size());
   WriteSoundFormatHeader(out, capture, supported.size(), bytes.size());
   std::ranges::for_each(supported, [&](auto const& format) {
@@ -260,7 +260,7 @@ inline void SoundProtocol::Receive(SoundClient& self) {
     return;
   }
   Expects(self.incoming.size() >= 4, "sound PDU header complete");
-  wStream storage {                                                                         };
+  wStream storage{ };
   auto*   stream  = Stream_StaticInit(&storage, self.incoming.data(), self.incoming.size());
   BYTE    type    = 0;
   UINT16  size    = 0;

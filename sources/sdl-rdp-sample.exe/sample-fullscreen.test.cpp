@@ -45,7 +45,7 @@ TEST_F(FullscreenSample, ExplicitFullscreenBeforeConnect) {
   if (::testing::Test::HasFatalFailure()) return;
   auto port = Number(std::string_view(line).substr(5));
   ASSERT_TRUE(Read("event GEOMETRY window=320x200 desktop=320x200"));
-  Client client(port, true, 1280, 800);
+  Client         client(port, true, 1280, 800);
   FirstFrameSize frame(client);
   ASSERT_TRUE(freerdp_connect(client.Instance().get()));
   ASSERT_TRUE(client.Until([&] { return frame.Received(); }));
@@ -79,7 +79,7 @@ TEST_F(FullscreenSample, ExplicitFullscreenRestoresWindow) {
 TEST_F(FullscreenSample, ExplicitFullscreenSurvivesScreenChange) {
   GivenFullscreen();
   if (::testing::Test::HasFatalFailure()) return;
-  Client client(Number(std::string_view(line).substr(5)), true, 1280, 800);
+  Client                        client(Number(std::string_view(line).substr(5)), true, 1280, 800);
   Headless::DisplayClient const display(client);
   ConnectExposed(client);
   if (::testing::Test::HasFatalFailure()) return;
@@ -252,11 +252,11 @@ TEST_P(ExclusiveFullscreen, DoesNotRepaintOnModeChanges) {
   Expects(process == nullptr, "sample has not started");
   Start();
   if (::testing::Test::HasFatalFailure()) return;
-  Client client(Number(std::string_view(line).substr(5)), true, 1280, 800);
+  Client                  client(Number(std::string_view(line).substr(5)), true, 1280, 800);
   Headless::DisplayClient display(client);
   ASSERT_TRUE(freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_FrameAcknowledge, 2));
   ASSERT_TRUE(freerdp_connect(client.Instance().get()));
-  FullDesktopFrames desktop(client);
+  FullDesktopFrames       desktop(client);
   Headless::FrameObserver frames(client);
   InitialFrames(client, display, frames);
   if (::testing::Test::HasFatalFailure()) return;

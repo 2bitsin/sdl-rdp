@@ -31,5 +31,5 @@ typedef void (*SDL_RDP_IniCallback)(
     unsigned line); // NOLINT(modernize-use-using): This callback declaration must also compile as C.
 /* Splits text in place; callback strings live in text. -1: unknown key, -2: malformed. */
 void SDL_RDP_IniParse(char* text, SDL_RDP_IniCallback callback, void* user);
-int SDL_RDP_IniIndex(char const* name);
+int  SDL_RDP_IniIndex(char const* name);
 #endif

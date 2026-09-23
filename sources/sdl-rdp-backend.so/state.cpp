@@ -29,8 +29,8 @@ public:
   ~Socket() {
     if (descriptor >= 0) ::close(descriptor);
   }
-  Socket& operator = (Socket const&) = delete;
-  Socket& operator = (Socket&&)      = delete;
+  Socket& operator =(Socket const&) = delete;
+  Socket& operator =(Socket&&) = delete;
   int Get() const { return descriptor; }
   void Release() { descriptor = -1; }
 
@@ -56,7 +56,7 @@ void LogDeparture(Peer& peer) {
 unsigned Bind(freerdp_listener* listener, sdlrdp_config const& config) {
   Expects(listener != nullptr, "listener exists");
   Socket      socket;
-  sockaddr_in address { };
+  sockaddr_in address{ };
   address.sin_family = AF_INET;
   address.sin_port   = htons(config.port);
   PrepareListenerSocket(socket.Get());
@@ -75,14 +75,14 @@ unsigned Bind(freerdp_listener* listener, sdlrdp_config const& config) {
 }
 void ComposeRow(std::span<BYTE const> source, std::span<BYTE const> former, std::span<BYTE> target, auto damage) {
   for (int x = 0; std::cmp_less(x, target.size() / 4);) {
-    auto covered { std::ranges::find_if(damage, [x](auto rect) { return rect.x <= x && x < rect.x + rect.w; }) };
-    auto ahead   { damage | std::views::filter([x](auto rect) { return rect.x > x; })                          };
-    auto nearest { std::ranges::min_element(ahead, {}, &sdlrdp_rect::x)                                        };
+    auto covered{ std::ranges::find_if(damage, [x](auto rect) { return rect.x <= x && x < rect.x + rect.w; }) };
+    auto ahead  { damage | std::views::filter([x](auto rect) { return rect.x > x; })                          };
+    auto nearest{ std::ranges::min_element(ahead, { }, &sdlrdp_rect::x)                                       };
     auto end{ covered != damage.end()  ? covered->x + covered->w
               : nearest != ahead.end() ? nearest->x
                                        : int(target.size() / 4) };
-    auto output { target.subspan(x * 4, (end - x) * 4)      };
-    auto input  { covered != damage.end() ? source : former };
+    auto output{ target.subspan(x * 4, (end - x) * 4)      };
+    auto input { covered != damage.end() ? source : former };
     if (input.empty())
       std::ranges::fill(output, 0);
     else
@@ -179,7 +179,7 @@ BOOL State::Accepted(freerdp_listener* listener, freerdp_peer* client) {
 void State::Listen(std::stop_token const& quit) {
   Expects(listener != nullptr, "listener exists");
   Expects(stop != nullptr, "listener owns its stop event");
-  std::array<HANDLE, 32> handles { };
+  std::array<HANDLE, 32> handles{ };
   while (!quit.stop_requested()) {
     auto count = listener->GetEventHandles(listener.get(), handles.data(), 30);
     if (!count) break;
@@ -293,7 +293,7 @@ void State::Present(void const* pixels, int pitch, unsigned w, unsigned h, std::
     if (frame_width == w && frame_height == h) previous = shadow;
   }
   ComposePicture({ static_cast<BYTE const*>(pixels), std::size_t(pitch) * h }, pitch,
-                 previous ? std::span<BYTE const>(*previous) : std::span<BYTE const>{}, *next, w, h, damage);
+                 previous ? std::span<BYTE const>(*previous) : std::span<BYTE const>{ }, *next, w, h, damage);
   Avc::ReplicateEdges(*next, w, h);
   Publish(std::move(next), w, h, damage);
 }

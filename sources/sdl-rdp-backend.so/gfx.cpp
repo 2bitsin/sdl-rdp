@@ -7,7 +7,7 @@
 #include <utility>
 
 namespace Backend {
-GfxChannel::GfxChannel(Peer& value) : peer(value), context(rdpgfx_server_context_new(peer.channels)) {}
+GfxChannel::GfxChannel(Peer& value) : peer(value), context(rdpgfx_server_context_new(peer.channels)) { }
 GfxChannel::~GfxChannel() = default;
 bool GfxChannel::Open() {
   Expects(peer.channels, "peer owns its channel manager");
@@ -85,18 +85,18 @@ UINT GfxChannel::ActivateCapabilities(RDPGFX_CAPSET const& selected, bool wanted
   return CHANNEL_RC_OK;
 }
 bool GfxChannel::ResetSurface() {
-  RDPGFX_DELETE_ENCODING_CONTEXT_PDU const encoding { GraphicsSurfaceId, GraphicsContextId };
+  RDPGFX_DELETE_ENCODING_CONTEXT_PDU const encoding{ GraphicsSurfaceId, GraphicsContextId };
   if (headers && !Check(context->DeleteEncodingContext(context.get(), &encoding), "delete encoding context"))
     return false;
-  RDPGFX_DELETE_SURFACE_PDU const remove { GraphicsSurfaceId };
+  RDPGFX_DELETE_SURFACE_PDU const remove{ GraphicsSurfaceId };
   if (width && !Check(context->DeleteSurface(context.get(), &remove), "delete surface")) return false;
   constexpr UINT32 PrimaryMonitor = 1;
   constexpr UINT32 MonitorCount   = 1;
-  MONITOR_DEF      monitor        { 0, 0, peer.desktop.w - 1, peer.desktop.h - 1, PrimaryMonitor };
+  MONITOR_DEF      monitor       { 0, 0, peer.desktop.w - 1, peer.desktop.h - 1, PrimaryMonitor };
   RDPGFX_RESET_GRAPHICS_PDU const reset{ unsigned(peer.desktop.w), unsigned(peer.desktop.h), MonitorCount, &monitor };
   RDPGFX_CREATE_SURFACE_PDU const create{ GraphicsSurfaceId, UINT16(peer.desktop.w), UINT16(peer.desktop.h),
                                           GFX_PIXEL_FORMAT_XRGB_8888 };
-  RDPGFX_MAP_SURFACE_TO_OUTPUT_PDU const map { GraphicsSurfaceId, 0, 0, 0 };
+  RDPGFX_MAP_SURFACE_TO_OUTPUT_PDU const map{ GraphicsSurfaceId, 0, 0, 0 };
   return Check(context->ResetGraphics(context.get(), &reset), "reset graphics") &&
          Check(context->CreateSurface(context.get(), &create), "create surface") &&
          Check(context->MapSurfaceToOutput(context.get(), &map), "map surface");
@@ -111,7 +111,7 @@ UINT GfxChannel::Caps(RdpgfxServerContext* context, RDPGFX_CAPS_ADVERTISE_PDU co
   auto       selected = SelectCapability(advertised, true);
   if (AllowsAvc(selected) && !Avc::Encoder::Available()) selected = SelectCapability(advertised);
   if (!selected.version) return ERROR_NOT_SUPPORTED;
-  RDPGFX_CAPS_CONFIRM_PDU const confirm { &selected };
+  RDPGFX_CAPS_CONFIRM_PDU const confirm{ &selected };
   if (!self.Check(context->CapsConfirm(context, &confirm), "confirm")) return ERROR_INTERNAL_ERROR;
   self.ConfirmedCapability(selected);
   if (!self.Select()) return ERROR_INTERNAL_ERROR;

@@ -22,7 +22,7 @@ protected:
     auto path = std::to_array("/tmp/sdlrdp-gfx-resize-XXXXXX");
     ASSERT_NE(mkdtemp(path.data()), nullptr);
     certificates = path.data();
-    sdlrdp_config config { "127.0.0.1", 0, certificates.c_str(), 640, 480, 0, Headless::Logs::Collect, &logs };
+    sdlrdp_config config{ "127.0.0.1", 0, certificates.c_str(), 640, 480, 0, Headless::Logs::Collect, &logs };
     config.codec = SDLRDP_CODEC_PROGRESSIVE;
     sdlrdp_handle* handle = nullptr;
     ASSERT_EQ(sdlrdp_open(&config, &handle), 0);
@@ -43,9 +43,9 @@ protected:
     EXPECT_LE(client.MaxError(pixels), client.Tolerance());
     EXPECT_EQ(observer.Observed().progressive_headers, generations);
   }
-  std::filesystem::path certificates;
-  Headless::Logs        logs;
-  std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> backend{ nullptr, sdlrdp_close };
+  std::filesystem::path                                   certificates;
+  Headless::Logs                                          logs;
+  std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> backend     { nullptr, sdlrdp_close };
 };
 void ThenBilinearPixels(rdpGdi const* gdi, std::vector<UINT32> const& pixels) {
   for (int y = 0; y < 240; ++y) {
@@ -75,7 +75,7 @@ void ThenProgressiveGeneration(Headless::GraphicsObserver const& observer, unsig
   EXPECT_EQ(observer.Observed().surfaces.back().width, w);
   EXPECT_EQ(observer.Observed().surfaces.back().height, h);
 }
-constexpr std::array ResizeSequence { std::pair{ 640u, 480u }, std::pair{ 320u, 200u }, std::pair{ 640u, 480u } };
+constexpr std::array ResizeSequence{ std::pair{ 640u, 480u }, std::pair{ 320u, 200u }, std::pair{ 640u, 480u } };
 void MatchCostStatistics(std::string const& text, std::smatch& match, char const* expression) {
   ASSERT_TRUE(std::regex_search(text, match, std::regex(expression))) << text;
 }
@@ -111,9 +111,9 @@ TEST_F(GraphicsResize, RawAspectMatchesBilinear) {
   Headless::GraphicsObserver observer(client);
   ASSERT_TRUE(freerdp_connect(client.Instance().get()));
   std::vector<UINT32> pixels(320uz * 200);
-  std::mt19937 random(17); // NOLINT(cert-msc32-c, cert-msc51-cpp): Reproducible codec input.
+  std::mt19937        random(17);           // NOLINT(cert-msc32-c, cert-msc51-cpp): Reproducible codec input.
   std::ranges::generate(pixels, [&] { return random() & 0x00ffffff; });
-  sdlrdp_rect const full { 0, 0, 320, 200 };
+  sdlrdp_rect const full{ 0, 0, 320, 200 };
   ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &full, 1), 0);
   ASSERT_TRUE(client.Until([&] { return !observer.Observed().frames.empty(); })) << logs.Text(true);
   auto* gdi = client.Instance()->context->gdi;
@@ -132,7 +132,7 @@ TEST_F(GraphicsResize, ProgressiveContextAndFullDamage) {
   for (auto [w, h] : ResizeSequence) {
     std::vector<UINT32> pixels(static_cast<std::size_t>(w) * h, 0x335577 + (generations * 0x221100));
     SCOPED_TRACE(std::to_string(w) + "x" + std::to_string(h));
-    sdlrdp_rect const damage { 0, 0, int(w), int(h) };
+    sdlrdp_rect const damage{ 0, 0, int(w), int(h) };
     ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), w * 4, w, h, &damage, 1), 0);
     ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text(true);
     ++generations;
@@ -175,9 +175,9 @@ TEST_F(GraphicsCost, FullRandomFrame) {
   EXPECT_EQ(client.Instance()->context->codecs->ThreadingFlags, THREADING_FLAGS_DISABLE_THREADS);
   ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
   std::vector<UINT32> pixels(1280uz * 800);
-  std::mt19937 random(17); // NOLINT(cert-msc32-c, cert-msc51-cpp): Reproducible codec input.
+  std::mt19937        random(17);            // NOLINT(cert-msc32-c, cert-msc51-cpp): Reproducible codec input.
   std::ranges::generate(pixels, [&] { return random() & 0x00ffffff; });
-  sdlrdp_rect const full { 0, 0, 1280, 800 };
+  sdlrdp_rect const full{ 0, 0, 1280, 800 };
   ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 5120, 1280, 800, &full, 1), 0);
   AwaitAcknowledgement(client, 1);
   if (::testing::Test::HasFatalFailure()) return;
@@ -207,7 +207,7 @@ TEST_F(GraphicsCost, AvcFullFrame) {
   ConnectGraphics(client);
   if (::testing::Test::HasFatalFailure()) return;
   std::vector<UINT32> pixels(1920uz * 1080);
-  sdlrdp_rect const full { 0, 0, 1920, 1080 };
+  sdlrdp_rect const full{ 0, 0, 1920, 1080 };
   for (unsigned frame = 0; frame < 10; ++frame) {
     Headless::MovingTilePattern(pixels, 1920, 1080, frame);
     ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 7680, 1920, 1080, &full, 1), 0);
@@ -239,8 +239,8 @@ TEST_F(GraphicsCost, PlanarPartialMatchesFull) {
   if (::testing::Test::HasFatalFailure()) return;
   std::vector<UINT32> pixels(354uz * 226);
   Headless::MovingTilePattern(pixels, 354, 226, 0);
-  sdlrdp_rect const full     { 0, 0, 354, 226   };
-  sdlrdp_rect const part     { 17, 19, 177, 113 };
+  sdlrdp_rect const full    { 0, 0, 354, 226   };
+  sdlrdp_rect const part    { 17, 19, 177, 113 };
   auto              expected = pixels;
   PresentPlanar(backend.get(), client, observer, pixels, expected, full);
   ApplyPlanarDamage(pixels, expected, part);

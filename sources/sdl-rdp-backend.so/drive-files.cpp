@@ -122,7 +122,7 @@ sdlrdp_dirent Entry(DrivePacket& packet) {
   constexpr unsigned end_of_file_offset         = 40;
   constexpr unsigned allocation_size_field_size = 8;
   packet.Skip(end_of_file_offset);
-  sdlrdp_dirent entry { };
+  sdlrdp_dirent entry{ };
   entry.size = packet.Get(8);
   packet.Skip(allocation_size_field_size);
   entry.directory = bool(packet.Get(4) & FILE_ATTRIBUTE_DIRECTORY);

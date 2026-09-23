@@ -5,7 +5,7 @@ TEST_F(RoundFive, PipelinedLegacyPresent) {
   Open(320, 200);
   Client client(sdlrdp_port(backend.get()), true);
   Connect(client);
-  FrameObserver const observer(client);
+  FrameObserver const       observer(client);
   std::vector<UINT32> const pixels(320uz * 200, 0x123456);
   Present(pixels, 320, 200);
   EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 1);

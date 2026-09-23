@@ -65,8 +65,8 @@ public:
     update->BitmapUpdate = bitmap;
     active               = nullptr;
   }
-  FullDesktopFrames& operator = (FullDesktopFrames const&) = delete;
-  FullDesktopFrames& operator = (FullDesktopFrames&&)      = delete;
+  FullDesktopFrames& operator =(FullDesktopFrames const&) = delete;
+  FullDesktopFrames& operator =(FullDesktopFrames&&) = delete;
   unsigned Full() const { return full; }
   unsigned Deliveries() const { return deliveries; }
 
@@ -127,8 +127,8 @@ public:
     client.Instance()->context->update->BitmapUpdate = original_bitmap;
     active                                           = nullptr;
   }
-  NextFrame& operator = (NextFrame const&) = delete;
-  NextFrame& operator = (NextFrame&&)      = delete;
+  NextFrame& operator =(NextFrame const&) = delete;
+  NextFrame& operator =(NextFrame&&) = delete;
   bool Received() const { return received; }
   auto const& Matches() const { return matches; }
 
@@ -192,7 +192,7 @@ protected:
       motion_frame = Number(std::string_view(line).substr(field + 7));
     }
   }
-  void GivenProcess(std::vector<std::string> arguments = {}) {
+  void GivenProcess(std::vector<std::string> arguments = { }) {
     if (arguments.empty()) arguments = Arguments(certificates.Path(), false);
     process = std::make_unique<Process>(arguments);
     ASSERT_TRUE(Read("port "));
@@ -217,7 +217,7 @@ protected:
     client_logs = &logs;
     auto* root = WLog_GetRoot();
     ASSERT_NE(root, nullptr);
-    wLogCallbacks callbacks { CollectClientLog, CollectClientLog, CollectClientLog, CollectClientLog };
+    wLogCallbacks callbacks{ CollectClientLog, CollectClientLog, CollectClientLog, CollectClientLog };
     ASSERT_TRUE(WLog_SetLogAppenderType(root, WLOG_APPENDER_CALLBACK));
     ASSERT_TRUE(WLog_ConfigureAppender(WLog_GetLogAppender(root), "callbacks", &callbacks));
   }
@@ -282,7 +282,7 @@ protected:
     ASSERT_TRUE(process->Exit()) << "sample exit 0 within ten seconds: " << process->Transcript();
   }
   Headless::Logs               logs;
-  oxbox::platform::ScratchArea certificates { "certificates", "sdl-rdp" };
+  oxbox::platform::ScratchArea certificates{ "certificates", "sdl-rdp" };
   std::unique_ptr<Process>     process;
   std::string                  line;
 

@@ -101,10 +101,10 @@ TEST_F(Sample, InputAndClipboardUnderTightVideo) {
   Expects(process == nullptr, "sample has not started");
   GivenAudioProcess(TightAudioArguments(certificates.Path()));
   if (::testing::Test::HasFatalFailure()) return;
-  std::jthread drain([&](std::stop_token const& stop) { DrainTrace(*process, stop); });
-  Client client(audio_port, true, 640, 480);
+  std::jthread              drain([&](std::stop_token const& stop) { DrainTrace(*process, stop); });
+  Client                    client(audio_port, true, 640, 480);
   Headless::ClipboardClient clipboard(client);
-  Headless::SoundClient audio(client);
+  Headless::SoundClient     audio(client);
   ASSERT_TRUE(freerdp_connect(client.Instance().get()));
   Headless::FrameObserver frames(client);
   ThenMediaReady(client, frames, audio, clipboard);

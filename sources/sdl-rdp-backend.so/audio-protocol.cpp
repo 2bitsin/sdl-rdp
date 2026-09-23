@@ -108,7 +108,7 @@ void AudioProtocol::RecordBlock(AudioChannel& self, AudioChannel::Clock::time_po
     if (gap > std::chrono::milliseconds(40)) ++self.gaps_over_40ms;
   }
   self.last_send = now;
-  if (self.first == AudioChannel::Clock::time_point{}) self.first = now;
+  if (self.first == AudioChannel::Clock::time_point{ }) self.first = now;
   if (!self.server_clock) self.pending.push_back({ block, self.buffer.size() / 2, now });
 }
 void AudioProtocol::TransportEnded(AudioChannel& self) {

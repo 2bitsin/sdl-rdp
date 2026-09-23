@@ -76,7 +76,7 @@ protected:
     GivenAudioProcess(arguments);
     if (::testing::Test::HasFatalFailure()) return;
     auto port = audio_port;
-    Client client(port, true, 640, 480);
+    Client                client(port, true, 640, 480);
     Headless::SoundClient audio(client);
     ASSERT_TRUE(freerdp_connect(client.Instance().get())) << ConnectLogs();
     Headless::FrameObserver observer(client);
@@ -107,7 +107,7 @@ TEST_F(AudioSample, ToneAtClientRate) {
   if (::testing::Test::HasFatalFailure()) return;
   auto port = Number(std::string_view(line).substr(5));
   ASSERT_TRUE(Read("audio device=RDP client freq=44100"));
-  Client client(port, true, 640, 480);
+  Client                client(port, true, 640, 480);
   Headless::SoundClient audio(client);
   audio.CaptureState().rate = 48000;
   ASSERT_TRUE(freerdp_connect(client.Instance().get())) << ConnectLogs();
@@ -195,7 +195,7 @@ protected:
     GivenAudioHints();
     if (::testing::Test::HasFatalFailure()) return;
     ASSERT_TRUE(SDL_Init(SDL_INIT_AUDIO)) << SDL_GetError();
-    SDL_AudioSpec const spec { SDL_AUDIO_S16, 2, 48000 };
+    SDL_AudioSpec const spec{ SDL_AUDIO_S16, 2, 48000 };
     stream.reset(SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr));
     ASSERT_TRUE(stream) << SDL_GetError();
     auto port = ListeningPort(pid_t(Number(fs::read_symlink("/proc/self").string())));
@@ -234,7 +234,7 @@ TEST_F(AudioDriver, NoClientTenSecondClock) {
   // Consuming ten seconds of PCM may run one lead ahead of real time.
   // SDL may dequeue one buffer ahead; scheduling delays only make this longer.
   int           buffer_frames = 0;
-  SDL_AudioSpec format        {   };
+  SDL_AudioSpec format       { };
   ASSERT_TRUE(SDL_GetAudioDeviceFormat(SDL_GetAudioStreamDevice(stream.get()), &format, &buffer_frames));
   EXPECT_GE(elapsed, 10.0 - 0.150 - (double(buffer_frames) / format.freq));
   RecordProperty("no_client_ten_seconds_elapsed", std::to_string(elapsed));
@@ -277,7 +277,7 @@ TEST_F(AudioDriver, StallRefillsTheLead) {
 }
 TEST_F(AudioDriver, LeadAtOrAboveLatencyFailsOpen) {
   stream.reset();
-  SDL_AudioSpec const spec { SDL_AUDIO_S16, 2, 48000 };
+  SDL_AudioSpec const spec{ SDL_AUDIO_S16, 2, 48000 };
   for (auto const* lead : { "500", "501" }) {
     ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_AUDIO_LEAD, lead));
     stream.reset(SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr));
@@ -288,7 +288,7 @@ TEST_F(AudioDriver, LeadAtOrAboveLatencyFailsOpen) {
 TEST_F(AudioDriver, ZeroLeadKeepsRealtimeClock) {
   stream.reset();
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_AUDIO_LEAD, "0"));
-  SDL_AudioSpec const spec { SDL_AUDIO_S16, 2, 48000 };
+  SDL_AudioSpec const spec{ SDL_AUDIO_S16, 2, 48000 };
   stream.reset(SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr));
   ASSERT_TRUE(stream) << SDL_GetError();
   std::vector<Sint16> pcm(48000uz * 2, 1234);
@@ -307,7 +307,7 @@ TEST_F(AudioDriver, AudioBeforeVideoSurvivesVideoQuit) {
   ASSERT_GT(port, 0);
   SDL_QuitSubSystem(SDL_INIT_VIDEO);
   EXPECT_EQ(SDL_WasInit(SDL_INIT_VIDEO), 0u);
-  Client client(port, true);
+  Client                client(port, true);
   Headless::SoundClient audio(client);
   ThenAudioSurvivesVideoQuit(client, audio);
   if (::testing::Test::HasFatalFailure()) return;
@@ -320,7 +320,7 @@ TEST_F(AudioDriver, AudioOnlyPlaysBlackDesktop) {
   auto pid  = Number(fs::read_symlink("/proc/self").string());
   auto port = ListeningPort(pid_t(pid));
   ASSERT_GT(port, 0u);
-  Client client(port, true);
+  Client                client(port, true);
   Headless::SoundClient audio(client);
   ConnectAudio(client, audio);
   if (::testing::Test::HasFatalFailure()) return;

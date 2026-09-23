@@ -19,7 +19,7 @@ void ThenDriveStorage(SDL_PropertiesID properties) {
 }
 }
 TEST_F(Sample, DriveCommands) {
-  oxbox::platform::ScratchArea const share    { "sample-drive", "sdl-rdp" };
+  oxbox::platform::ScratchArea const share   { "sample-drive", "sdl-rdp" };
   std::string                        original = "client disk contents\n";
   oxbox::platform::WriteBinaryFile(share.Path() / "source", std::as_bytes(std::span(original)));
   auto arguments = Arguments(certificates.Path(), false);
@@ -54,7 +54,7 @@ void ThenStorageEntries(SDL_Storage* storage) {
 }
 void ThenStorageContents(SDL_Storage* storage) {
   ASSERT_TRUE(SDL_WriteStorageFile(storage, "whole", "contents", 8)) << SDL_GetError();
-  std::array<char, 8> buffer { };
+  std::array<char, 8> buffer{ };
   ASSERT_TRUE(SDL_ReadStorageFile(storage, "whole", buffer.data(), sizeof(buffer)));
   EXPECT_EQ(std::string(buffer.data(), 8), "contents");
 }
@@ -70,7 +70,7 @@ void VerifyStorage() {
   EXPECT_TRUE(SDL_CloseStorage(storage));
 }
 void ThenStreamRead(SDL_IOStream* stream) {
-  std::array<char, 8> buffer { };
+  std::array<char, 8> buffer{ };
   EXPECT_EQ(SDL_GetIOSize(stream), 8);
   EXPECT_EQ(SDL_SeekIO(stream, 2, SDL_IO_SEEK_SET), 2);
   EXPECT_EQ(SDL_ReadIO(stream, buffer.data(), 3), 3u);
@@ -107,7 +107,7 @@ TEST_F(Sample, DriveStorageAndStream) {
   auto quit       = std::unique_ptr<void, void (*)(void*)>(reinterpret_cast<void*>(1), [](void*) { SDL_Quit(); });
   auto properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
   Client client(SDL_GetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0), false);
-  oxbox::platform::ScratchArea const share { "storage-drive", "sdl-rdp" };
+  oxbox::platform::ScratchArea const share{ "storage-drive", "sdl-rdp" };
   ConnectDrive(client, share.Path());
   if (::testing::Test::HasFatalFailure()) return;
   std::jthread const pump([&](std::stop_token const& stop) {

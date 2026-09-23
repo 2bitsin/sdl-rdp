@@ -31,40 +31,40 @@ public:
   DriveChannel(DriveChannel&&)      = delete;
   explicit DriveChannel(Peer& /*value*/);
   ~DriveChannel();
-  DriveChannel& operator = (DriveChannel const&) = delete;
-  DriveChannel& operator = (DriveChannel&&)      = delete;
-  bool Open();
-  bool Pump(std::span<HANDLE const> signaled);
+  DriveChannel& operator =(DriveChannel const&) = delete;
+  DriveChannel& operator =(DriveChannel&&) = delete;
+  bool          Open();
+  bool          Pump(std::span<HANDLE const> signaled);
   HANDLE Event() const { return event; }
-  void Disconnect();
-  void Abort(std::string const& /*cause*/);
-  int List(sdlrdp_drive* /*out*/, unsigned /*max*/);
+  void     Disconnect();
+  void     Abort(std::string const& /*cause*/);
+  int      List(sdlrdp_drive* /*out*/, unsigned /*max*/);
   unsigned Device(unsigned id);
   std::shared_ptr<DriveRequest> Send(unsigned drive, unsigned file, unsigned major, DrivePacket const& body,
                                      unsigned minor = 0);
   DrivePacket Wait(std::shared_ptr<DriveRequest> const& /*request*/, std::string const& path, bool end = false);
-  size_t WaitAny(std::span<Slot const> /*slots*/);
-  void Warn(std::string const& /*cause*/) const;
+  size_t      WaitAny(std::span<Slot const> /*slots*/);
+  void        Warn(std::string const& /*cause*/) const;
 
 private:
   struct DeviceEntry {
     unsigned     wire;
     sdlrdp_drive drive;
   };
-  void AnnounceDevice(unsigned wire, std::string const& label);
+  void        AnnounceDevice(unsigned wire, std::string const& label);
   void GeneralClientCapability(DrivePacket& packet, std::size_t start, std::size_t length, unsigned version) const;
-  bool PumpAvailable();
-  void Write(DrivePacket& packet);
-  void Receive(DrivePacket& /*packet*/);
-  void Capabilities();
-  void ClientCapabilities(DrivePacket& /*packet*/);
+  bool        PumpAvailable();
+  void        Write(DrivePacket& packet);
+  void        Receive(DrivePacket& /*packet*/);
+  void        Capabilities();
+  void        ClientCapabilities(DrivePacket& /*packet*/);
   std::string Name(std::span<uint8_t const> /*bytes*/, char const* /*dos*/) const;
-  void Shutdown();
-  void CloseTransport();
-  void Fail(std::string const& /*cause*/);
-  void Announce(DrivePacket& /*packet*/);
-  void Remove(unsigned /*wire*/);
-  void Complete(DrivePacket& /*packet*/);
+  void        Shutdown();
+  void        CloseTransport();
+  void        Fail(std::string const& /*cause*/);
+  void        Announce(DrivePacket& /*packet*/);
+  void        Remove(unsigned /*wire*/);
+  void        Complete(DrivePacket& /*packet*/);
   std::mutex                                        mutex;
   Peer&                                             peer;
   HANDLE                                            channel       = nullptr;
@@ -83,11 +83,11 @@ public:
   sdlrdp_file(sdlrdp_file const&) = delete;
   sdlrdp_file(sdlrdp_file&&)      = delete;
   sdlrdp_file(std::shared_ptr<Backend::DriveChannel> source, unsigned device, unsigned file, std::string name)
-      : channel { std::move(source) }, drive{ device }, wire{ file }, path{ std::move(name) } { }
+      : channel{ std::move(source) }, drive{ device }, wire{ file }, path{ std::move(name) } { }
   ~sdlrdp_file();
-  sdlrdp_file& operator = (sdlrdp_file const&) = delete;
-  sdlrdp_file& operator = (sdlrdp_file&&)      = delete;
-  void Close();
+  sdlrdp_file& operator =(sdlrdp_file const&) = delete;
+  sdlrdp_file& operator =(sdlrdp_file&&) = delete;
+  void         Close();
   auto const& Channel() const { return channel; }
   unsigned Drive() const { return drive; }
   unsigned Id() const { return wire; }

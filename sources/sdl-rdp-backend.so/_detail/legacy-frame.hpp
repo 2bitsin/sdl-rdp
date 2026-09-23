@@ -18,7 +18,7 @@ public:
 
 private:
   struct Band {
-    sdlrdp_rect       area   { };
+    sdlrdp_rect       area  { };
     std::vector<BYTE> pixels;
   };
   struct Packet {
@@ -35,8 +35,8 @@ private:
   enum class                 Wire    { Bitmap, Planar, Surface };
   std::vector<Packet>        packets;
   std::optional<std::size_t> next;
-  unsigned                   depth   { 32                      };
-  unsigned                   codec   { 0                       };
-  Wire                       wire    { Wire::Bitmap            };
+  unsigned                   depth  { 32           };
+  unsigned                   codec  { 0            };
+  Wire                       wire   { Wire::Bitmap };
 };
 }

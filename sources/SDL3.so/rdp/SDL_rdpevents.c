@@ -123,7 +123,7 @@ static void SDL_RDP_Text(SDL_Window* window, sdlrdp_event const* event) {
   if (event->text.down) {
     SDL_SendKeyboardUnicodeKey(0, event->text.codepoint);
     if (SDL_TextInputActive(window)) {
-      *SDL_UCS4ToUTF8(event->text.codepoint, text) = '\0';
+      * SDL_UCS4ToUTF8(event->text.codepoint, text) = '\0';
       SDL_SendKeyboardText(text);
     }
   }
@@ -139,7 +139,7 @@ static void SDL_RDP_Key(SDL_Window* window, sdlrdp_event const* event) {
   }
   key = SDL_GetKeyFromScancode(scancode, SDL_GetModState(), false);
   if (key >= 0x20 && key != 0x7f && key <= 0x10ffff) {
-    *SDL_UCS4ToUTF8(key, text) = '\0';
+    * SDL_UCS4ToUTF8(key, text) = '\0';
     SDL_SendKeyboardText(text);
   }
 }

@@ -123,12 +123,12 @@ void ThenEqualLayout(Client& client, Headless::DisplayClient& display) {
 }
 namespace {
 void ThenAudioDeviceChanges(Client& client, SDL_AudioStream* stream) {
-  SDL_AudioSpec before { };
+  SDL_AudioSpec before{ };
   ASSERT_TRUE(SDL_GetAudioDeviceFormat(SDL_GetAudioStreamDevice(stream), &before, nullptr));
   EXPECT_EQ(before.freq, 44100);
   ASSERT_TRUE(client.Until([&] {
     SDL_PumpEvents();
-    SDL_AudioSpec actual { };
+    SDL_AudioSpec actual{ };
     return SDL_GetAudioDeviceFormat(SDL_GetAudioStreamDevice(stream), &actual, nullptr) && actual.freq == 48000;
   }));
 }
@@ -247,13 +247,13 @@ TEST_F(VideoDriver, DefaultPresentDoesNotWaitForAcknowledgements) {
 TEST_F(VideoDriver, AudioEventChangesOpenDeviceFormat) {
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "rdp"));
   ASSERT_TRUE(SDL_Init(SDL_INIT_AUDIO));
-  SDL_AudioSpec const spec { SDL_AUDIO_S16, 2, 44100 };
+  SDL_AudioSpec const spec{ SDL_AUDIO_S16, 2, 44100 };
   std::unique_ptr<SDL_AudioStream, decltype(&SDL_DestroyAudioStream)> const stream{
     SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr), SDL_DestroyAudioStream
   };
   ASSERT_TRUE(stream) << SDL_GetError();
   auto properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
-  Client client(SDL_GetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0), true, 1280, 800);
+  Client                client(SDL_GetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0), true, 1280, 800);
   Headless::SoundClient audio(client);
   audio.CaptureState().rate = 48000;
   ASSERT_TRUE(freerdp_connect(client.Instance().get()));

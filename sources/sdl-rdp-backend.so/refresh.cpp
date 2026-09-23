@@ -8,8 +8,8 @@ void Refresh::Restart() {
   utilities::Expects(ceiling > 0, "declared refresh is positive");
   rate           = ceiling;
   average        = 1.0 / ceiling;
-  last_ack       = {};
-  last_blocked   = {};
+  last_ack       = { };
+  last_blocked   = { };
   awaiting_empty = 0;
 }
 void Refresh::Step(Direction direction) {
@@ -45,7 +45,7 @@ void Refresh::Blocked(Clock::time_point now) {
   utilities::Expects(rate > 0, "effective refresh is positive");
   if (mode != RefreshMode::Sender) return;
   awaiting_empty = 0;
-  if (last_blocked != Clock::time_point{} && now - last_blocked < std::chrono::duration<double>(1.0 / rate)) return;
+  if (last_blocked != Clock::time_point{ } && now - last_blocked < std::chrono::duration<double>(1.0 / rate)) return;
   last_blocked = now;
   Step(Direction::Down);
 }
@@ -54,7 +54,7 @@ void Refresh::Acknowledge(Clock::time_point now, Clock::duration latency) {
   if (mode == RefreshMode::Client) {
     Step(FromLatency(latency));
   } else if (mode == RefreshMode::Average) {
-    if (last_ack != Clock::time_point{}) {
+    if (last_ack != Clock::time_point{ }) {
       average = 0.8 * average + 0.2 * std::chrono::duration<double>(now - last_ack).count();
       auto estimate = unsigned(std::clamp(std::round(1.0 / average), 10.0, double(ceiling)));
       if (std::abs(double(estimate) - rate) > rate * 0.05) rate = estimate;

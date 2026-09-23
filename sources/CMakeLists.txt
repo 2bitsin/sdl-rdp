@@ -20,8 +20,9 @@ if(TARGET sdl-rdp-backend-tests)
            COMMAND           ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/bin/align-columns.py --check sources
            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
   add_test(NAME              align-columns-test
-           COMMAND           ${Python3_EXECUTABLE} -m pytest -q ${CMAKE_SOURCE_DIR}/bin/test_align_columns.py
+           COMMAND           ${CMAKE_SOURCE_DIR}/bin/test-align-columns.sh ${Python3_EXECUTABLE}
            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+  set_tests_properties(align-columns-test PROPERTIES SKIP_RETURN_CODE 77)
   add_test(NAME              clone-lint
            COMMAND           ${CMAKE_SOURCE_DIR}/bin/lint-clones.sh
            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

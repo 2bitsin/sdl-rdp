@@ -16,8 +16,8 @@ public:
   ~TlsSocket() {
     if (descriptor >= 0) close(descriptor);
   }
-  TlsSocket& operator = (TlsSocket const&) = delete;
-  TlsSocket& operator = (TlsSocket&&)      = delete;
+  TlsSocket& operator =(TlsSocket const&) = delete;
+  TlsSocket& operator =(TlsSocket&&) = delete;
   int Get() const { return descriptor; }
   void Release() { descriptor = -1; }
 
@@ -27,7 +27,7 @@ private:
 
 inline void NegotiateTls(int descriptor, unsigned port) {
   using utilities::Expects;
-  sockaddr_in address { };
+  sockaddr_in address{ };
   address.sin_family      = AF_INET;
   address.sin_port        = htons(port);
   address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
@@ -35,7 +35,7 @@ inline void NegotiateTls(int descriptor, unsigned port) {
   if (descriptor < 0) throw std::runtime_error("TLS socket could not be opened");
   Expects(connect(descriptor, reinterpret_cast<sockaddr*>(&address), sizeof(address)) == 0,
           "TLS socket connects to the listener");
-  std::array<unsigned char, 19> negotiation { 3, 0, 0, 19, 14, 224, 0, 0, 0, 0, 0, 1, 0, 8, 0, 1, 0, 0, 0 };
+  std::array<unsigned char, 19> negotiation{ 3, 0, 0, 19, 14, 224, 0, 0, 0, 0, 0, 1, 0, 8, 0, 1, 0, 0, 0 };
   Expects(send(descriptor, negotiation.data(), negotiation.size(), 0) == 19, "RDP negotiation request is sent");
   Expects(recv(descriptor, negotiation.data(), negotiation.size(), MSG_WAITALL) == 19,
           "RDP negotiation response is complete");

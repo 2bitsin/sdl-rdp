@@ -37,7 +37,7 @@ int sdlrdp_lookup_pair(sdlrdp_config const* config, char const* domain, char con
   if (!config || !domain || !user || !hash || !PairName(*config, domain, user)) return 0;
   try {
     auto bytes = Backend::TranscodeRange<std::vector<BYTE>>(
-        std::as_bytes(std::span(config->password, std::strlen(config->password))), {},
+        std::as_bytes(std::span(config->password, std::strlen(config->password))), { },
         { .encoding = oxbox::utilities::Encoding::UTF16, .order = std::endian::little });
     auto length = bytes.size();
     bytes.resize(length + sizeof(WCHAR));

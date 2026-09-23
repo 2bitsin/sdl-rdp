@@ -15,7 +15,7 @@
 namespace {
 std::vector<BYTE> PadReference(std::vector<UINT32> const& pixels, unsigned width, unsigned height, unsigned w,
                                unsigned h) {
-  auto padded { std::vector<BYTE>(std::size_t(w) * h * 4) };
+  auto padded{ std::vector<BYTE>(std::size_t(w) * h * 4) };
   std::ranges::for_each(std::views::iota(0u, h), [&](unsigned y) {
     std::ranges::for_each(std::views::iota(0u, w), [&](unsigned x) {
       auto pixel = pixels[(std::min(y, height - 1) * width) + std::min(x, width - 1)];
@@ -25,20 +25,20 @@ std::vector<BYTE> PadReference(std::vector<UINT32> const& pixels, unsigned width
   return padded;
 }
 std::vector<UINT32> Yuv420Reference(std::vector<UINT32> const& pixels, unsigned width, unsigned height) {
-  auto w      { Backend::Avc::Aligned(width)                  };
-  auto h      { Backend::Avc::Aligned(height)                 };
+  auto w     { Backend::Avc::Aligned(width)                  };
+  auto h     { Backend::Avc::Aligned(height)                 };
   auto padded = PadReference(pixels, width, height, w, h);
-  auto yuv    { std::vector<BYTE>(std::size_t(w) * h * 3 / 2) };
+  auto yuv   { std::vector<BYTE>(std::size_t(w) * h * 3 / 2) };
   std::array<BYTE*, 3> planes{ yuv.data(), yuv.data() + (std::size_t(w) * h),
                                yuv.data() + (std::size_t(w) * h * 5 / 4) };
-  std::array<UINT32, 3> strides { w, w / 2, w / 2 };
-  prim_size_t const     size    { w, h            };
+  std::array<UINT32, 3> strides{ w, w / 2, w / 2 };
+  prim_size_t const     size   { w, h            };
   EXPECT_EQ(primitives_get()->RGBToYUV420_8u_P3AC4R(padded.data(), PIXEL_FORMAT_BGRX32, w * 4, planes.data(),
                                                     strides.data(), &size),
             0);
-  std::array<BYTE const*, 3> source  { planes[0], planes[1], planes[2]         };
-  auto                       decoded { std::vector<UINT32>(std::size_t(w) * h) };
-  auto                       cropped { std::vector<UINT32>(pixels.size())      };
+  std::array<BYTE const*, 3> source { planes[0], planes[1], planes[2]         };
+  auto                       decoded{ std::vector<UINT32>(std::size_t(w) * h) };
+  auto                       cropped{ std::vector<UINT32>(pixels.size())      };
   EXPECT_EQ(primitives_get()->YUV420ToRGB_8u_P3AC4R(source.data(), strides.data(),
                                                     reinterpret_cast<BYTE*>(decoded.data()), w * 4, PIXEL_FORMAT_BGRX32,
                                                     &size),
@@ -97,7 +97,7 @@ protected:
   void ThenReported(Headless::Client& client, sdlrdp_codec codec) {
     bool reported = false;
     ASSERT_TRUE(client.Until([&] {
-      std::array<sdlrdp_event, 32> events {                                                          };
+      std::array<sdlrdp_event, 32> events{ };
       auto                         count  = sdlrdp_poll(backend.get(), events.data(), events.size());
       reported |= std::ranges::any_of(std::span(events).first(count), [=](auto const& event) {
         return (event.type == SDLRDP_CONNECTED && event.connected.codec == codec) ||
@@ -118,8 +118,8 @@ protected:
 
   void Frame(Headless::Client& client, Headless::GraphicsObserver& observer, std::vector<UINT32> const& pixels,
              unsigned width, unsigned height, sdlrdp_rect damage) {
-    auto before     { observer.Observed().frames.size()   };
-    auto avc_before { observer.Observed().avc_nals.size() };
+    auto before    { observer.Observed().frames.size()   };
+    auto avc_before{ observer.Observed().avc_nals.size() };
     ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), width * 4, width, height, &damage, 1), 0);
     ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() > before; })) << logs.Text(true);
     auto reference = observer.Observed().avc_nals.size() > avc_before ? Yuv420Reference(pixels, width, height) : pixels;
@@ -136,7 +136,7 @@ protected:
   }
 
   void ThenCodecChanged() {
-    std::array<sdlrdp_event, 32> events  {       };
+    std::array<sdlrdp_event, 32> events { };
     bool                         changed = false;
     ASSERT_TRUE(ClientSession().Until([&] {
       auto count = sdlrdp_poll(backend.get(), events.data(), events.size());
@@ -174,7 +174,7 @@ protected:
     EXPECT_EQ(ObserverSession().Observed().avc_rects.back().bottom, 200);
   }
   void WhenSmallAvcRequested(std::vector<UINT32> const& pixels) {
-    std::array<sdlrdp_event, 32> events { };
+    std::array<sdlrdp_event, 32> events{ };
     while (sdlrdp_poll(backend.get(), events.data(), events.size())) {
     }
     ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_AVC420), 0);
@@ -225,8 +225,8 @@ protected:
                      std::vector<UINT32> const& pixels) {
     ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_RAW), 0);
     ASSERT_EQ(sdlrdp_set_aspect(backend.get(), { 3, 2 }), 0);
-    auto              before { observer.Observed().frames.size() };
-    sdlrdp_rect const full   { 0, 0, 320, 200                    };
+    auto              before{ observer.Observed().frames.size() };
+    sdlrdp_rect const full  { 0, 0, 320, 200                    };
     ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &full, 1), 0);
     ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() > before; }));
     std::vector<UINT32> scaled(321uz * 214);
@@ -269,12 +269,12 @@ TEST_F(AvcGraphics, DecodesPFrameAndResize) {
   GivenAvc();
   if (::testing::Test::IsSkipped() || ::testing::Test::HasFatalFailure()) return;
   std::vector<UINT32> pixels(320uz * 200);
-  constexpr std::array<UINT32, 4> colors { 0xff0000, 0x00ff00, 0x0000ff, 0x55aaff };
+  constexpr std::array<UINT32, 4> colors{ 0xff0000, 0x00ff00, 0x0000ff, 0x55aaff };
   std::ranges::transform(std::views::iota(0uz, pixels.size()), pixels.begin(),
                          [&](size_t i) { return colors[(i % 320) / 80]; });
   PresentFrame(pixels);
   if (::testing::Test::HasFatalFailure()) return;
-  sdlrdp_rect const damage { 18, 20, 8, 6 };
+  sdlrdp_rect const damage{ 18, 20, 8, 6 };
   std::ranges::for_each(std::views::iota(20, 26),
                         [&](int y) { std::ranges::fill(std::span(pixels).subspan((y * 320) + 18, 8), 0x55aaffu); });
   Frame(ClientSession(), ObserverSession(), pixels, 320, 200, damage);

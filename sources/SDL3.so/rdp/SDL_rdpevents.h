@@ -4,6 +4,6 @@
 void SDL_RDP_CheckPicture(SDL_VideoData const* data, int w, int h);
 void SDL_RDP_DesktopMode(SDL_VideoData* data, int w, int h);
 void SDL_RDP_PumpEvents(SDL_VideoDevice* _this);
-int SDL_RDP_WaitEventTimeout(SDL_VideoDevice* _this, Sint64 timeoutNS);
+int  SDL_RDP_WaitEventTimeout(SDL_VideoDevice* _this, Sint64 timeoutNS);
 void SDL_RDP_SendWakeupEvent(SDL_VideoDevice* _this, SDL_Window* window);
 #endif

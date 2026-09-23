@@ -5,7 +5,7 @@ namespace BackendGate {
 class CodecSession : public testing::TestWithParam<Mode>, protected BackendEvents {
 protected:
   void SetUp() override {
-    sdlrdp_config config { "127.0.0.1", 0, certificates.Path().c_str(), 320, 200, 0, Logs::Collect, &logs };
+    sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), 320, 200, 0, Logs::Collect, &logs };
     config.codec = GetParam().codec;
     static std::once_flag tls_initialized;
     std::call_once(tls_initialized, [&] { InitializeTls(config); });
@@ -27,7 +27,7 @@ protected:
   }
   void Reopen(unsigned width, unsigned height) {
     backend.reset();
-    sdlrdp_config config { "127.0.0.1", 0, certificates.Path().c_str(), width, height, 0 };
+    sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), width, height, 0 };
     config.codec = GetParam().codec;
     sdlrdp_handle* handle = nullptr;
     ASSERT_EQ(sdlrdp_open(&config, &handle), 0);
@@ -72,7 +72,7 @@ protected:
     if (expected != previous) {
       ThenChangedCodec(expected);
     } else {
-      std::array<sdlrdp_event, 4> events {                                                          };
+      std::array<sdlrdp_event, 4> events{ };
       auto                        count  = sdlrdp_poll(backend.get(), events.data(), events.size());
       EXPECT_TRUE(std::ranges::all_of(std::span(events).first(count),
                                       [](auto const& event) { return event.type == SDLRDP_REFRESH; }));
@@ -110,7 +110,7 @@ protected:
     ASSERT_EQ(opening.get(), 0);
     backend.reset(handle);
     EXPECT_EQ(sdlrdp_wait(handle, 0), 1);
-    sdlrdp_event event { };
+    sdlrdp_event event{ };
     ASSERT_EQ(sdlrdp_poll(handle, &event, 1), 1u);
     EXPECT_EQ(event.type, SDLRDP_CONNECTED);
   }
@@ -153,7 +153,7 @@ protected:
 inline std::string ModeName(testing::TestParamInfo<Mode> const& info) {
   Expects(info.param.codec >= SDLRDP_CODEC_AUTO, "codec is at least the first enumerator");
   Expects(info.param.codec <= SDLRDP_CODEC_AVC420, "codec does not exceed the final enumerator");
-  constexpr std::array names { "Auto", "Planar", "RemoteFX", "NSCodec", "Raw", "Progressive", "Avc420" };
+  constexpr std::array names{ "Auto", "Planar", "RemoteFX", "NSCodec", "Raw", "Progressive", "Avc420" };
   return std::string(names[info.param.codec]) + (info.param.surface ? "Surface" : "Bitmap");
 }
 using Headless::FrameObserver;

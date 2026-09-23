@@ -89,7 +89,7 @@ static bool SDL_RDP_OpenShared(struct SDL_RDP_Registry* state) {
 
 bool SDL_RDP_AcquireBackend(SDL_RDP_Backend* backend, sdlrdp_handle** handle, sdlrdp_config* config) {
   struct SDL_RDP_Registry* const state = SDL_RDP_Registry();
-  bool                           ok    = true;
+  bool ok = true;
   if (SDL_ShouldInit(&state->shared_init)) {
     state->shared_lock = SDL_CreateMutex();
     SDL_SetInitialized(&state->shared_init, state->shared_lock != NULL);

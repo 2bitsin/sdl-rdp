@@ -9,12 +9,12 @@ class WakeEvent {
 public:
   enum class Phase { Idle, Pending };
   explicit WakeEvent(HANDLE value);
-  HANDLE get() const;
+  HANDLE   get() const;
   explicit operator bool() const;
-  void Transition(Phase next);
+  void     Transition(Phase next);
 
 private:
   EventHandle        handle;
-  std::atomic<Phase> phase  { Phase::Idle };
+  std::atomic<Phase> phase { Phase::Idle };
 };
 }

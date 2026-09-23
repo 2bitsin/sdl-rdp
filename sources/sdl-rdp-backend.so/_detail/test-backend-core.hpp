@@ -59,15 +59,15 @@ public:
   CertificateDirectory(CertificateDirectory const&) = delete;
   CertificateDirectory(CertificateDirectory&&)      = delete;
   CertificateDirectory() {
-    std::array<char, 40> pattern { };
+    std::array<char, 40> pattern{ };
     std::ranges::copy(std::string("/tmp/sdlrdp-gate-XXXXXX"), pattern.begin());
     auto* result = mkdtemp(pattern.data());
     Expects(result != nullptr, "temporary directory created");
     path = result;
   }
   ~CertificateDirectory() { std::filesystem::remove_all(path); }
-  CertificateDirectory& operator = (CertificateDirectory const&) = delete;
-  CertificateDirectory& operator = (CertificateDirectory&&)      = delete;
+  CertificateDirectory& operator =(CertificateDirectory const&) = delete;
+  CertificateDirectory& operator =(CertificateDirectory&&) = delete;
   std::filesystem::path const& Path() const { return path; }
 
 private:
@@ -102,8 +102,8 @@ public:
   ~Socket() {
     if (descriptor >= 0) close(descriptor);
   }
-  Socket& operator = (Socket const&) = delete;
-  Socket& operator = (Socket&&)      = delete;
+  Socket& operator =(Socket const&) = delete;
+  Socket& operator =(Socket&&) = delete;
   int Get() const { return descriptor; }
   void Release() { descriptor = -1; }
 
@@ -148,8 +148,8 @@ public:
     update->BitmapUpdate = bitmap;
     active               = nullptr;
   }
-  FrameCounter& operator = (FrameCounter const&) = delete;
-  FrameCounter& operator = (FrameCounter&&)      = delete;
+  FrameCounter& operator =(FrameCounter const&) = delete;
+  FrameCounter& operator =(FrameCounter&&) = delete;
   static BOOL ReceiveSurface(rdpContext* context, SURFACE_BITS_COMMAND const* command) {
     Expects(active, "observer is installed");
     Expects(command, "wire command is supplied");
@@ -189,7 +189,7 @@ protected:
     return backend->state->current && backend->state->current->acknowledged >= backend->state->presented;
   }
   std::vector<sdlrdp_event> Events() const {
-    std::array<sdlrdp_event, 256> batch {                                                        };
+    std::array<sdlrdp_event, 256> batch{ };
     auto                          count = sdlrdp_poll(backend.get(), batch.data(), batch.size());
     return { batch.begin(), batch.begin() + count };
   }
@@ -210,9 +210,9 @@ protected:
   std::vector<sdlrdp_event> Events(unsigned wanted) {
     return EventsUntil([=](auto const& events) { return events.size() >= wanted; }, false);
   }
-  CertificateDirectory certificates;
-  Logs                 logs;
-  std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> backend{ nullptr, sdlrdp_close };
+  CertificateDirectory                                    certificates;
+  Logs                                                    logs;
+  std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> backend     { nullptr, sdlrdp_close };
 };
 using Headless::FrameObserver;
 }
