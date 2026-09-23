@@ -27,7 +27,7 @@ public:
         this);
   }
   std::map<std::string, std::string> values;
-  std::vector<Warning> warnings;
+  std::vector<Warning>               warnings;
 };
 TEST(Ini, TrimsBlanksAndPreservesQuotedBlanks) {
   Ini ini(" \tSDL_RDP_PORT \t= 33892 \t\nSDL_RDP_USER = \" alice \" \t\nSDL_RDP_PASSWORD = \"\"\n");

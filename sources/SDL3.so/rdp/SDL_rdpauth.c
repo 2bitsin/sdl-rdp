@@ -43,7 +43,7 @@ void SDL_RDP_AuthRelease(void) {
   SDL_free((void*)state->auth_config->password);
   SDL_free((void*)state->auth_config->domain);
   state->auth_config->user = state->auth_config->password = state->auth_config->domain = NULL;
-  state->auth_config                                                                   = NULL;
+  state->auth_config       = NULL;
 }
 
 static bool SDL_RDP_CopyPair(sdlrdp_config* config) {
@@ -79,10 +79,10 @@ static bool SDL_RDP_AuthMode(sdlrdp_config* config, char const* mode) {
 bool SDL_RDP_AuthConfig(sdlrdp_config* config, SDL_RDP_Backend* backend) {
   struct SDL_RDP_Registry* const state = SDL_RDP_Registry();
   char const*                    mode  = SDL_RDP_Setting(SDL_HINT_RDP_AUTH);
-  config->user                         = SDL_RDP_Setting(SDL_HINT_RDP_USER);
-  config->password                     = SDL_RDP_Setting(SDL_HINT_RDP_PASSWORD);
-  config->domain                       = SDL_RDP_Setting(SDL_HINT_RDP_DOMAIN);
-  config->auth                         = config->password ? SDLRDP_AUTH_NLA : SDLRDP_AUTH_NONE;
+  config->user     = SDL_RDP_Setting(SDL_HINT_RDP_USER);
+  config->password = SDL_RDP_Setting(SDL_HINT_RDP_PASSWORD);
+  config->domain   = SDL_RDP_Setting(SDL_HINT_RDP_DOMAIN);
+  config->auth     = config->password ? SDLRDP_AUTH_NLA : SDLRDP_AUTH_NONE;
   if (!SDL_RDP_AuthMode(config, mode)) return false;
   if (!SDL_RDP_CopyPair(config)) return false;
   config->verify      = SDL_RDP_VerifyCredentials;

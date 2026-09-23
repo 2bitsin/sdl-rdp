@@ -6,8 +6,11 @@
 
 namespace Backend {
 struct AuthenticationState {
-  bool checked = false, rejected = false, hash_attempted = false;
-  std::string user, domain;
+  bool        checked        = false;
+  bool        rejected       = false;
+  bool        hash_attempted = false;
+  std::string user;
+  std::string domain;
 };
 struct Authentication {
 public:
@@ -21,7 +24,9 @@ public:
 
 private:
   sdlrdp_config config;
-  std::string user, password, domain;
+  std::string   user;
+  std::string   password;
+  std::string   domain;
 };
 BOOL Authenticate(freerdp_peer* client, SEC_WINNT_AUTH_IDENTITY const*, BOOL automatic);
 bool AuthenticateSettings(freerdp_peer* client);

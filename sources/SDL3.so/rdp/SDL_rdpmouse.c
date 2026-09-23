@@ -3,7 +3,8 @@
 
 struct SDL_CursorData {
   SDL_Surface* surface;
-  int hot_x, hot_y;
+  int          hot_x;
+  int          hot_y;
 };
 
 static void SDL_RDP_FreeCursor(SDL_Cursor* cursor) {

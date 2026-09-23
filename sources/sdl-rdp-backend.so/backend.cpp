@@ -10,7 +10,8 @@
 
 namespace {
 // A 32-bit row must fit BitmapUpdate bitmapLength (UINT16); height is UINT16.
-constexpr unsigned MAX_WIDTH = 65535 / 4, MAX_HEIGHT = 65535;
+constexpr unsigned MAX_WIDTH  = 65535 / 4;
+constexpr unsigned MAX_HEIGHT = 65535;
 void Dimensions(unsigned width, unsigned height) {
   if (!width || width > MAX_WIDTH) throw std::runtime_error("Desktop width must be 1..16383.");
   if (!height || height > MAX_HEIGHT) throw std::runtime_error("Desktop height must be 1..65535.");
@@ -80,7 +81,7 @@ int sdlrdp_present(sdlrdp_handle* handle, void const* pixels, int pitch, unsigne
     Dimensions(width, height);
     if (!handle || !pixels || (!rects && count) || std::cmp_less(pitch, width * 4))
       throw std::runtime_error("Present failed: invalid handle, pixels, rectangles or pitch.");
-    std::span const damage{ rects, count };
+    std::span const damage { rects, count };
     ValidateDamage(damage, width, height);
     handle->state->trace.Line("present", [&] { return std::format("dirty={}", count); });
     handle->state->Present(pixels, pitch, width, height, damage);

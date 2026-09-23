@@ -10,7 +10,7 @@ inline void ShareDrive(Client& client, char const* path, char const* name = "sha
   freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
   Expects(freerdp_settings_set_bool(client.Instance()->context->settings, FreeRDP_AudioPlayback, FALSE),
           "drive-only client has no audio device");
-  std::array<char const*, 3> arguments{ "drive", name, path };
+  std::array<char const*, 3> arguments { "drive", name, path };
   Expects(freerdp_client_add_device_channel(client.Instance()->context->settings, 3, arguments.data()),
           "drive device configured");
   client.Instance()->LoadChannels = [](freerdp* instance) -> BOOL {
@@ -22,10 +22,10 @@ inline void ShareDrive(Client& client, char const* path, char const* name = "sha
   };
 }
 struct DriveCapture {
-  unsigned requests = 0;
-  std::vector<Backend::DrivePacket> io;
+  unsigned                                   requests = 0;
+  std::vector<Backend::DrivePacket>          io;
   std::vector<std::pair<unsigned, unsigned>> replies;
-  bool hold = false;
+  bool                                       hold     = false;
 };
 inline void ObserveDrive(DriveCapture& capture, std::span<BYTE const> bytes) {
   Backend::DrivePacket packet;
@@ -74,10 +74,10 @@ private:
     }
     return self.original(instance, id, data, size, flags, total);
   }
-  DriveCapture observed;
-  inline static thread_local DriveObserver* active = nullptr;
-  freerdp*            instance;
-  pReceiveChannelData original;
+  DriveCapture                              observed;
+  inline static thread_local DriveObserver* active   = nullptr;
+  freerdp*                                  instance;
+  pReceiveChannelData                       original;
 };
 
 }

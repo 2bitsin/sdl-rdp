@@ -24,7 +24,7 @@ inline std::pair<double, double> ToneMeasurements(std::vector<INT16> const& samp
   for (std::size_t frame = 1; frame < frames; ++frame) {
     auto sample = samples[start + (frame * 2)];
     crossings += samples[start + ((frame - 1) * 2)] <= 0 && sample > 0;
-    square += double(sample) * sample;
+    square    += double(sample) * sample;
   }
   auto frequency = crossings * double(rate) / double(frames);
   auto db        = 20 * std::log10(std::sqrt(square / double(frames - 1)) * std::numbers::sqrt2 / 32767);
@@ -41,10 +41,16 @@ struct SoundCapture {
   std::vector<Clock::time_point> received;
   std::vector<AUDIO_FORMAT>      server_formats;
   std::deque<Confirmation>       pending;
-  unsigned rate = 44100, version = 8, volume = 0xffffffffu;
-  std::size_t confirmed_frames = 0, maximum_pending_frames = 0;
-  bool advertise_unmatched = false, advertise_both_rates = false;
-  bool ready = false, auto_confirm = true, opened = false;
+  unsigned                       rate                   = 44100;
+  unsigned                       version                = 8;
+  unsigned                       volume                 = 0xffffffffu;
+  std::size_t                    confirmed_frames       = 0;
+  std::size_t                    maximum_pending_frames = 0;
+  bool                           advertise_unmatched    = false;
+  bool                           advertise_both_rates   = false;
+  bool                           ready                  = false;
+  bool                           auto_confirm           = true;
+  bool                           opened                 = false;
 };
 class SoundClient;
 struct SoundProtocol {
@@ -87,7 +93,7 @@ public:
   bool Send(std::span<BYTE const> bytes) const {
     Expects(!bytes.empty(), "sound PDU is nonempty");
     auto* instance = client.Instance().get();
-    auto id        = freerdp_channels_get_id_by_name(instance, "rdpsnd");
+    auto  id       = freerdp_channels_get_id_by_name(instance, "rdpsnd");
     return id && instance->SendChannelData(instance, id, bytes.data(), bytes.size());
   }
   void Capture(std::span<BYTE const> bytes) {
@@ -118,20 +124,20 @@ public:
   SoundCapture const& CaptureState() const { return capture; }
 
 private:
-  friend struct SoundProtocol;
-  SoundCapture  capture;
-  inline static thread_local SoundClient* active = nullptr;
-  Client& client;
+  friend struct                           SoundProtocol;
+  SoundCapture                            capture;
+  inline static thread_local SoundClient* active        = nullptr;
+  Client&                                 client;
   decltype(freerdp::LoadChannels) previous_load = nullptr;
-  CHANNEL_ENTRY_POINTS_EX entry{};
-  void* init    = nullptr;
-  DWORD channel = 0;
-  std::vector<BYTE> incoming;
-  std::array<BYTE, 4> first{};
-  unsigned wave_bytes     = 0;
-  UINT16   timestamp      = 0;
-  BYTE     block          = 0;
-  bool     expecting_wave = false;
+  CHANNEL_ENTRY_POINTS_EX entry          {         };
+  void*                   init           = nullptr;
+  DWORD                   channel        = 0;
+  std::vector<BYTE>       incoming;
+  std::array<BYTE, 4>     first          {         };
+  unsigned                wave_bytes     = 0;
+  UINT16                  timestamp      = 0;
+  BYTE                    block          = 0;
+  bool                    expecting_wave = false;
 };
 }
 
@@ -142,7 +148,7 @@ inline BOOL SoundProtocol::Register(CHANNEL_ENTRY_POINTS_EX* points, void* handl
   Expects(self != nullptr, "capture context supplied");
   self->entry = *points;
   self->init  = handle;
-  CHANNEL_DEF definition{};
+  CHANNEL_DEF definition { };
   std::memcpy(definition.name, "rdpsnd", 7);
   definition.options = CHANNEL_OPTION_INITIALIZED | CHANNEL_OPTION_ENCRYPT_RDP;
   return points->pVirtualChannelInitEx(self, nullptr, handle, &definition, 1, VIRTUAL_CHANNEL_VERSION_WIN2000,
@@ -184,7 +190,7 @@ inline void ReadSoundFormats(wStream* stream, SoundCapture& capture) {
   });
 }
 inline std::vector<AUDIO_FORMAT> SupportedSoundFormats(SoundCapture const& capture) {
-  AUDIO_FORMAT const own{ WAVE_FORMAT_PCM, 2, capture.rate, capture.rate * 4, 4, 16, 0, nullptr };
+  AUDIO_FORMAT const        own       { WAVE_FORMAT_PCM, 2, capture.rate, capture.rate * 4, 4, 16, 0, nullptr };
   std::vector<AUDIO_FORMAT> supported;
   std::ranges::copy_if(capture.server_formats, std::back_inserter(supported), [&](auto const& format) {
     return capture.advertise_both_rates || audio_format_compatible(&own, &format);
@@ -214,8 +220,8 @@ inline void WriteSoundFormatHeader(wStream* out, SoundCapture const& capture, st
 inline std::vector<BYTE> SoundFormatReply(SoundCapture const& capture) {
   auto supported = SupportedSoundFormats(capture);
   std::vector<BYTE> bytes(24 + (supported.size() * 18));
-  wStream output{};
-  auto* out = Stream_StaticInit(&output, bytes.data(), bytes.size());
+  wStream output {                                                        };
+  auto*   out    = Stream_StaticInit(&output, bytes.data(), bytes.size());
   WriteSoundFormatHeader(out, capture, supported.size(), bytes.size());
   std::ranges::for_each(supported, [&](auto const& format) {
     Expects(audio_format_write(out, &format), "supported PCM format serialized");
@@ -254,10 +260,10 @@ inline void SoundProtocol::Receive(SoundClient& self) {
     return;
   }
   Expects(self.incoming.size() >= 4, "sound PDU header complete");
-  wStream storage{};
-  auto* stream = Stream_StaticInit(&storage, self.incoming.data(), self.incoming.size());
-  BYTE   type = 0;
-  UINT16 size = 0;
+  wStream storage {                                                                         };
+  auto*   stream  = Stream_StaticInit(&storage, self.incoming.data(), self.incoming.size());
+  BYTE    type    = 0;
+  UINT16  size    = 0;
   Stream_Read_UINT8(stream, type);
   Stream_Seek(stream, 1);
   Stream_Read_UINT16(stream, size);

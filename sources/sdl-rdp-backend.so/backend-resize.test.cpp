@@ -35,11 +35,11 @@ public:
     std::scoped_lock const lock(state.session_guard);
     Expects(peer.resizing, "peer has an in-flight resize");
     Expects(peer.disp != nullptr, "peer has a display channel");
-    DISPLAY_CONTROL_MONITOR_LAYOUT monitor{};
+    DISPLAY_CONTROL_MONITOR_LAYOUT monitor { };
     monitor.Flags  = DISPLAY_CONTROL_MONITOR_PRIMARY;
     monitor.Width  = peer.desktop.w;
     monitor.Height = peer.desktop.h;
-    DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const layout{ sizeof(monitor), 1, &monitor };
+    DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const layout { sizeof(monitor), 1, &monitor };
     EXPECT_EQ(peer.disp->DispMonitorLayout(peer.disp.get(), &layout), CHANNEL_RC_OK);
   }
   void ConfirmActiveCallback() {
@@ -54,11 +54,11 @@ public:
   }
 
 private:
-  inline static ResizeProbe* active = nullptr;
-  Backend::State& state;
-  Backend::Peer&  peer;
-  pDesktopResize  original;
-  unsigned calls = 0;
+  inline static ResizeProbe* active   = nullptr;
+  Backend::State&            state;
+  Backend::Peer&             peer;
+  pDesktopResize             original;
+  unsigned                   calls    = 0;
 };
 class ResizeStorm : public RoundFive {
 protected:
@@ -132,7 +132,7 @@ protected:
     ThenFinalLayout(client, display, probe, last_width, last_height, expected);
   }
   Clock::time_point started;
-  unsigned intervening = 0;
+  unsigned          intervening = 0;
 };
 namespace {
 void ThenOriginalPicture(Client& client) {

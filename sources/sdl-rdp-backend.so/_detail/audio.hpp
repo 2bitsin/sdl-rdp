@@ -9,7 +9,7 @@
 
 namespace Backend {
 struct State;
-class Peer;
+class  Peer;
 class AudioChannel {
 public:
   using Clock                       = std::chrono::steady_clock;
@@ -32,24 +32,32 @@ public:
 private:
   friend struct AudioProtocol;
   struct Block {
-    BYTE     id    {};
-    uint64_t frames{};
+    BYTE              id     { };
+    uint64_t          frames { };
     Clock::time_point sent;
   };
-  Peer&  peer;
-  State& owner;
-  HANDLE channels;
+  Peer&                                                                      peer;
+  State&                                                                     owner;
+  HANDLE                                                                     channels;
   std::unique_ptr<RdpsndServerContext, Releases<rdpsnd_server_context_free>> sound;
-  AUDIO_FORMAT selected{};
-  bool rejected = false, gate_warned = false;
-  bool ready = false, server_clock = false, has_confirmation = false;
-  uint64_t sent = 0, confirmed = 0, clock_frames = 0;
-  Clock::time_point first, clock_start;
-  uint64_t blocks_sent = 0, gaps_over_40ms = 0;
-  Clock::time_point last_send;
-  Clock::duration gap_total{}, gap_max{};
-  std::deque<Block>    pending;
-  std::vector<int16_t> buffer;
+  AUDIO_FORMAT                                                               selected         {       };
+  bool                                                                       rejected         = false;
+  bool                                                                       gate_warned      = false;
+  bool                                                                       ready            = false;
+  bool                                                                       server_clock     = false;
+  bool                                                                       has_confirmation = false;
+  uint64_t                                                                   sent             = 0;
+  uint64_t                                                                   confirmed        = 0;
+  uint64_t                                                                   clock_frames     = 0;
+  Clock::time_point                                                          first;
+  Clock::time_point                                                          clock_start;
+  uint64_t                                                                   blocks_sent      = 0;
+  uint64_t                                                                   gaps_over_40ms   = 0;
+  Clock::time_point                                                          last_send;
+  Clock::duration                                                            gap_total        {       };
+  Clock::duration                                                            gap_max          {       };
+  std::deque<Block>                                                          pending;
+  std::vector<int16_t>                                                       buffer;
 };
 struct AudioProtocol {
 public:

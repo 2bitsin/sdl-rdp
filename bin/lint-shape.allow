@@ -91,3 +91,4 @@ sdl-rdp-sample.exe/sample-video.test.cpp:136: VideoDriver.ResizeStormWithLayoutE
 sdl-rdp-sample.exe/sample-video.test.cpp:169: VideoDriver.ExclusiveScreenChangeDoesNotResizePicture body lines 26 > 20 # size in #19
 sdl-rdp-sample.exe/vsync.test.cpp:92: Exercise body lines 37 > 20 # size in #19
 sdl-rdp-sample.exe/vsync.test.cpp:92: Exercise complexity 12 > 10 # size in #19
+sdl-rdp-backend.so/_detail/state.hpp: Peer lines 153 > 150 # split in #5

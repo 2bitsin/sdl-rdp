@@ -18,7 +18,7 @@ protected:
 
   void Open(unsigned w = 640, unsigned h = 480, sdlrdp_aspect aspect = {}, sdlrdp_codec codec = SDLRDP_CODEC_RAW,
             unsigned audio_latency = 0) {
-    sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), w, h, 0, Logs::Collect, &logs };
+    sdlrdp_config config { "127.0.0.1", 0, certificates.Path().c_str(), w, h, 0, Logs::Collect, &logs };
     config.aspect           = aspect;
     config.codec            = codec;
     config.audio_latency_ms = audio_latency;
@@ -152,7 +152,7 @@ protected:
     pixels = GraphicsScene(4, false);
     Present(pixels, 640, 480);
     ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0) && client.Matches(pixels); }));
-    auto events = Events();
+    auto events  = Events();
     auto changed = std::ranges::find(events, SDLRDP_CODEC_CHANGED, &sdlrdp_event::type);
     ASSERT_NE(changed, events.end());
     EXPECT_EQ(changed->codec_changed.codec, SDLRDP_CODEC_RAW);
@@ -162,7 +162,7 @@ protected:
   void ThenGraphicsTimeoutStatistics() {
     backend.reset();
     EXPECT_EQ(GraphicsObserver().Observed().frames.size(), 7u);
-    auto text = logs.Text(true);
+    auto        text  = logs.Text(true);
     std::smatch match;
     ASSERT_TRUE(std::regex_search(text, match, std::regex(R"(Frames: 7 sent,[^\n]*, ([0-9]+) timed out\.)"))) << text;
     EXPECT_GE(std::stoull(match[1].str()), 2u);

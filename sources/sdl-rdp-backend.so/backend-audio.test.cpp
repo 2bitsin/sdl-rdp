@@ -110,9 +110,9 @@ UINT ObserveProgressivePayload(RdpgfxClientContext* channel, RDPGFX_SURFACE_COMM
 }
 unsigned ProduceProgressiveFrames(sdlrdp_handle* backend) {
   std::vector<UINT32> pixels(1280uz * 800);
-  sdlrdp_rect const full{ 0, 0, 1280, 800 };
-  auto     deadline  = Clock::now() + std::chrono::seconds(2);
-  unsigned presented = 0;
+  sdlrdp_rect const full      { 0, 0, 1280, 800                        };
+  auto              deadline  = Clock::now() + std::chrono::seconds(2);
+  unsigned          presented = 0;
   while (Clock::now() < deadline) {
     if (!sdlrdp_wait_frame(backend, 10)) continue;
     Headless::MovingTilePattern(pixels, 1280, 800, presented);
@@ -146,7 +146,7 @@ TEST_F(AudioGate, AudioNeverConfirmsUsesServerClock) {
   GivenUnconfirmedSession();
   if (::testing::Test::HasFatalFailure()) return;
   std::vector<INT16> const pcm(48000uz * 2, 1234);
-  auto started = Clock::now();
+  auto started  = Clock::now();
   auto writing  = std::async(std::launch::async, [&] { return sdlrdp_audio_write(backend.get(), pcm.data(), 48000); });
   auto captured = ClientSession().Until([&] { return AudioSession().CaptureState().samples.size() == pcm.size(); });
   if (!captured) sdlrdp_audio_close(backend.get());
@@ -185,7 +185,7 @@ TEST_F(AudioGate, AudioOneMillisecondPartialBlock) {
   audio.CaptureState().rate = 48000;
   ConnectAudio(client, audio);
   if (::testing::Test::HasFatalFailure()) return;
-  std::array<INT16, 1920> pcm{};
+  std::array<INT16, 1920> pcm { };
   ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 48), 48);
   auto writing =
       std::async(std::launch::async, [&] { return sdlrdp_audio_write(backend.get(), pcm.data() + 96, 912); });

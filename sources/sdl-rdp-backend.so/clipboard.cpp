@@ -30,10 +30,10 @@ bool ClipboardChannel::Open() {
   opened = true;
   CLIPRDR_GENERAL_CAPABILITY_SET general{ CB_CAPSTYPE_GENERAL, CB_CAPSTYPE_GENERAL_LEN, CB_CAPS_VERSION_2,
                                           CB_USE_LONG_FORMAT_NAMES };
-  CLIPRDR_CAPABILITIES caps{ .common = { .msgType = CB_CLIP_CAPS } };
+  CLIPRDR_CAPABILITIES caps { .common = { .msgType = CB_CLIP_CAPS } };
   caps.cCapabilitiesSets = 1;
   caps.capabilitySets    = reinterpret_cast<CLIPRDR_CAPABILITY_SET*>(&general);
-  CLIPRDR_MONITOR_READY const monitor{ .common = { .msgType = CB_MONITOR_READY } };
+  CLIPRDR_MONITOR_READY const monitor { .common = { .msgType = CB_MONITOR_READY } };
   return context->ServerCapabilities(context.get(), &caps) == CHANNEL_RC_OK &&
          context->MonitorReady(context.get(), &monitor) == CHANNEL_RC_OK;
 }
@@ -48,22 +48,22 @@ UINT ClipboardChannel::Announce() {
   Expects(opened, "clipboard channel open");
   std::array<CLIPRDR_FORMAT, 2> formats{ { { .formatId = CF_UNICODETEXT, .formatName = nullptr },
                                            { .formatId = CF_TEXT, .formatName = nullptr } } };
-  CLIPRDR_FORMAT_LIST list{ .common = { .msgType = CB_FORMAT_LIST } };
+  CLIPRDR_FORMAT_LIST list { .common = { .msgType = CB_FORMAT_LIST } };
   list.numFormats = 2;
   list.formats    = formats.data();
-  auto result     = context->ServerFormatList(context.get(), &list);
+  auto result = context->ServerFormatList(context.get(), &list);
   if (result == CHANNEL_RC_OK) announced = peer.owner.clipboard.generation;
   return result;
 }
 UINT ClipboardChannel::Request() {
   Expects(!pending, "no clipboard request is pending");
   Expects(has_unicode, "peer offers Unicode clipboard text");
-  CLIPRDR_FORMAT_DATA_REQUEST request{ .common = { .msgType = CB_FORMAT_DATA_REQUEST } };
+  CLIPRDR_FORMAT_DATA_REQUEST request { .common = { .msgType = CB_FORMAT_DATA_REQUEST } };
   request.requestedFormatId = CF_UNICODETEXT;
   requested                 = offered;
   requested_generation      = offered_generation;
-  auto result               = context->ServerFormatDataRequest(context.get(), &request);
-  pending                   = result == CHANNEL_RC_OK;
+  auto result = context->ServerFormatDataRequest(context.get(), &request);
+  pending = result == CHANNEL_RC_OK;
   return result;
 }
 void ClipboardChannel::Changed(std::string text) {
@@ -79,9 +79,9 @@ void ClipboardChannel::Changed(std::string text) {
   peer.owner.Push({ .type = SDLRDP_CLIPBOARD });
 }
 UINT ClipboardChannel::RespondToList() {
-  CLIPRDR_FORMAT_LIST_RESPONSE response{ .common = { .msgType = CB_FORMAT_LIST_RESPONSE } };
+  CLIPRDR_FORMAT_LIST_RESPONSE response { .common = { .msgType = CB_FORMAT_LIST_RESPONSE } };
   response.common.msgFlags = CB_RESPONSE_OK;
-  auto result              = context->ServerFormatListResponse(context.get(), &response);
+  auto result = context->ServerFormatListResponse(context.get(), &response);
   if (result == CHANNEL_RC_OK) {
     ready              = true;
     offered_generation = peer.owner.clipboard.generation;
@@ -114,8 +114,8 @@ UINT ClipboardChannel::RequestOfferedText(CLIPRDR_FORMAT_LIST const& list) {
 }
 namespace {
 UINT SendClipboardText(CliprdrServerContext* context, Clipboard const& clipboard, UINT32 format) {
-  std::string ansi;
-  CLIPRDR_FORMAT_DATA_RESPONSE response{ .common = { .msgType = CB_FORMAT_DATA_RESPONSE } };
+  std::string                  ansi;
+  CLIPRDR_FORMAT_DATA_RESPONSE response { .common = { .msgType = CB_FORMAT_DATA_RESPONSE } };
   response.common.msgFlags = CB_RESPONSE_OK;
   if (format == CF_UNICODETEXT) {
     response.requestedFormatData = clipboard.unicode.data();

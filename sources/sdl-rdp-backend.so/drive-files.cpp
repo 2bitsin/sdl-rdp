@@ -72,7 +72,7 @@ std::unique_ptr<sdlrdp_file> Open(sdlrdp_handle* handle, unsigned drive, char co
   return file;
 }
 DrivePacket Information(sdlrdp_file& file, unsigned type) {
-  DrivePacket packet;
+  DrivePacket        packet;
   constexpr unsigned padding_after_length = 24;
   packet.Put(type);
   packet.Put(0);
@@ -91,14 +91,14 @@ int64_t UnixSeconds(uint64_t value) {
   return int64_t(value / filetime_ticks_per_second) - epoch;
 }
 sdlrdp_stat Stat(sdlrdp_file& file) {
-  auto basic                                = Information(file, FileBasicInformation);
+  auto               basic                  = Information(file, FileBasicInformation);
   constexpr unsigned last_write_time_offset = 16;
   constexpr unsigned change_time_size       = 8;
   basic.Skip(last_write_time_offset);
   auto modified = basic.Get(8);
   basic.Skip(change_time_size);
-  auto attributes = basic.Get(4);
-  auto standard                         = Information(file, FileStandardInformation);
+  auto               attributes         = basic.Get(4);
+  auto               standard           = Information(file, FileStandardInformation);
   constexpr unsigned end_of_file_offset = 8;
   standard.Skip(end_of_file_offset);
   return { standard.Get(8), bool(attributes & FILE_ATTRIBUTE_DIRECTORY), UnixSeconds(modified) };
@@ -110,7 +110,7 @@ void ValidateTransfer(sdlrdp_handle* handle, sdlrdp_file* file, uint64_t offset,
 }
 
 void SetInformation(sdlrdp_file& file, unsigned type, DrivePacket body) {
-  DrivePacket packet;
+  DrivePacket        packet;
   constexpr unsigned padding_after_length = 24;
   packet.Put(type);
   packet.Put(body.Bytes().size());
@@ -122,7 +122,7 @@ sdlrdp_dirent Entry(DrivePacket& packet) {
   constexpr unsigned end_of_file_offset         = 40;
   constexpr unsigned allocation_size_field_size = 8;
   packet.Skip(end_of_file_offset);
-  sdlrdp_dirent entry{};
+  sdlrdp_dirent entry { };
   entry.size = packet.Get(8);
   packet.Skip(allocation_size_field_size);
   entry.directory = bool(packet.Get(4) & FILE_ATTRIBUTE_DIRECTORY);
@@ -153,7 +153,7 @@ void CollectEntries(DrivePacket& response, unsigned& skipped, unsigned offset, s
 }
 DrivePacket DirectoryQuery(bool first, std::span<uint8_t const> pattern) {
   constexpr unsigned padding_after_path_length = 23;
-  DrivePacket packet;
+  DrivePacket        packet;
   packet.Put(FileDirectoryInformation);
   packet.Put(first, 1);
   packet.Put(first ? pattern.size() : 0);
@@ -164,16 +164,16 @@ DrivePacket DirectoryQuery(bool first, std::span<uint8_t const> pattern) {
 int Enumerate(sdlrdp_handle* handle, unsigned drive, char const* path, unsigned offset, sdlrdp_dirent* out,
               unsigned max) {
   if (!out && max) throw std::runtime_error("Directory output is null.");
-  auto file        = Open(handle, drive, path, SDLRDP_FILE_READ, FileKind::Directory);
+  auto     file    = Open(handle, drive, path, SDLRDP_FILE_READ, FileKind::Directory);
   auto     pattern = DrivePath((std::string(path) + "/*").c_str());
   unsigned count   = 0;
   unsigned skipped = 0;
   bool     first   = true;
   while (count < max) {
-    auto packet   = DirectoryQuery(first, pattern);
-    first         = false;
+    auto packet = DirectoryQuery(first, pattern);
+    first = false;
     auto response = Exchange(*file, IRP_MJ_DIRECTORY_CONTROL, packet, IRP_MN_QUERY_DIRECTORY, true);
-    auto length = response.Get(4);
+    auto length   = response.Get(4);
     if (!length) break;
     response.Seek(0);
     CollectEntries(response, skipped, offset, { out, max }, count);
@@ -184,7 +184,7 @@ int Enumerate(sdlrdp_handle* handle, unsigned drive, char const* path, unsigned 
 }
 void sdlrdp_file::Close() {
   if (std::exchange(closed, true)) return;
-  DrivePacket packet;
+  DrivePacket        packet;
   constexpr unsigned padding_after_request_header = 32;
   packet.Zero(padding_after_request_header);
   Exchange(*this, IRP_MJ_CLOSE, packet);
@@ -207,9 +207,9 @@ int sdlrdp_drive_list(sdlrdp_handle* handle, sdlrdp_drive* out, unsigned max) {
 int sdlrdp_drive_open(sdlrdp_handle* handle, unsigned drive, char const* path, unsigned flags, sdlrdp_file** out) {
   return Call(handle, [&] {
     if (!out) throw std::runtime_error("File output is null.");
-    *out      = nullptr;
+    *out = nullptr;
     auto kind = flags & SDLRDP_FILE_DIRECTORY ? FileKind::Directory : FileKind::File;
-    *out      = Open(handle, drive, path, flags, kind).release();
+    *out = Open(handle, drive, path, flags, kind).release();
     return 0;
   });
 }
@@ -238,7 +238,7 @@ int sdlrdp_drive_stat(sdlrdp_handle* h, unsigned drive, char const* path, sdlrdp
   return Call(h, [&] {
     if (!out) throw std::runtime_error("Stat output is null.");
     auto file = Open(h, drive, path, 0, FileKind::Any);
-    *out      = Stat(*file);
+    *out = Stat(*file);
     file->Close();
     return 0;
   });
@@ -256,7 +256,7 @@ int sdlrdp_drive_mkdir(sdlrdp_handle* h, unsigned drive, char const* path) {
 }
 int sdlrdp_drive_remove(sdlrdp_handle* h, unsigned drive, char const* path) {
   return Call(h, [&] {
-    auto file = Open(h, drive, path, 0, FileKind::Any, DELETE);
+    auto        file = Open(h, drive, path, 0, FileKind::Any, DELETE);
     DrivePacket body;
     body.Put(1, 1);
     SetInformation(*file, FileDispositionInformation, std::move(body));
@@ -268,7 +268,7 @@ int sdlrdp_drive_rename(sdlrdp_handle* h, unsigned drive, char const* path, char
   return Call(h, [&] {
     auto name = DrivePath(destination);
     name.resize(name.size() - 2);
-    auto file = Open(h, drive, path, 0, FileKind::Any, DELETE);
+    auto        file = Open(h, drive, path, 0, FileKind::Any, DELETE);
     DrivePacket body;
     body.Put(0, 1);
     body.Put(0, 1);

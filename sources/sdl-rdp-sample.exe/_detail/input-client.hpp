@@ -12,9 +12,9 @@ public:
     advanced = nullptr;
     touch    = nullptr;
     freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
-    auto* context = client.Instance()->context;
-    std::array<char const*, 1> ainput{ AINPUT_CHANNEL_NAME };
-    std::array<char const*, 1> rdpei{ RDPEI_CHANNEL_NAME };
+    auto*                      context = client.Instance()->context;
+    std::array<char const*, 1> ainput  { AINPUT_CHANNEL_NAME        };
+    std::array<char const*, 1> rdpei   { RDPEI_CHANNEL_NAME         };
     Expects(freerdp_client_add_dynamic_channel(context->settings, 1, ainput.data()), "ainput enabled");
     Expects(freerdp_client_add_dynamic_channel(context->settings, 1, rdpei.data()), "rdpei enabled");
     PubSub_SubscribeChannelConnected(context->pubSub, Connected);
@@ -63,7 +63,9 @@ private:
     return TRUE;
   }
   inline static thread_local PositionObserver* active = nullptr;
-  unsigned count = 0, x = 0, y = 0;
+  unsigned                                     count  = 0;
+  unsigned                                     x      = 0;
+  unsigned                                     y      = 0;
 };
 struct PointerObserver {
 public:
@@ -78,7 +80,7 @@ private:
     auto const& shape = update->colorPtrAttr;
     if (shape.width != 8 || shape.height != 8 || update->xorBpp != 32) return TRUE;
     auto const* pixels = reinterpret_cast<UINT32 const*>(shape.xorMaskData);
-    active->red        = std::all_of(pixels, pixels + 64, [](UINT32 pixel) { return pixel == 0xffff0000; });
+    active->red = std::all_of(pixels, pixels + 64, [](UINT32 pixel) { return pixel == 0xffff0000; });
     return TRUE;
   }
   inline static thread_local PointerObserver* active = nullptr;
@@ -127,10 +129,11 @@ private:
     return active->original_paint ? active->original_paint(context) : TRUE;
   }
   bool received = false;
-  int width = 0, height = 0;
+  int  width    = 0;
+  int  height   = 0;
 
   inline static thread_local FirstFrameSize* active = nullptr;
-  Client& client;
+  Client&                                    client;
   decltype(freerdp::PostConnect) original_connect;
   pEndPaint original_paint  = nullptr;
   bool      paint_installed = false;

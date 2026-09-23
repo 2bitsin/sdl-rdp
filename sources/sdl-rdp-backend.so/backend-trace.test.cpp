@@ -20,10 +20,10 @@ protected:
     ASSERT_NE(std::ranges::find(events, SDLRDP_KEY, &sdlrdp_event::type), events.end());
   }
   static void ThenTimestamp(std::string const& line, std::size_t start, int64_t now) {
-    auto end     = line.find(' ', start + 3);
-    auto value   = std::string_view(line).substr(start + 3, end == std::string::npos ? end : end - start - 3);
-    int64_t time = 0;
-    auto parsed  = std::from_chars(value.data(), value.data() + value.size(), time);
+    auto    end    = line.find(' ', start + 3);
+    auto    value  = std::string_view(line).substr(start + 3, end == std::string::npos ? end : end - start - 3);
+    int64_t time   = 0;
+    auto    parsed = std::from_chars(value.data(), value.data() + value.size(), time);
     EXPECT_EQ(parsed.ec, std::errc()) << line;
     EXPECT_EQ(parsed.ptr, value.data() + value.size()) << line;
     EXPECT_LE(std::abs(now - time), 60000) << line;

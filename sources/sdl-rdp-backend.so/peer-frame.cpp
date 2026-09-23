@@ -143,13 +143,13 @@ sdlrdp_rect Peer::CaptureFrame() {
   if (picture.w != desktop.w || picture.h != desktop.h || snapshot_width != owner.frame_width ||
       snapshot_height != owner.frame_height)
     RestartRefresh();
-  snapshot        = owner.shadow;
-  snapshot_width  = owner.frame_width;
-  snapshot_height = owner.frame_height;
-  sequence        = owner.presented;
+  snapshot         =  owner.shadow;
+  snapshot_width   =  owner.frame_width;
+  snapshot_height  =  owner.frame_height;
+  sequence         =  owner.presented;
   frames_coalesced += dirty_presents ? dirty_presents - 1 : 0;
-  dirty_presents   = 0;
-  encoded_at_start = encoder.encode_time;
+  dirty_presents   =  0;
+  encoded_at_start =  encoder.encode_time;
   sending.Swap(dirty);
   dirty.clear();
   return picture;
@@ -157,8 +157,8 @@ sdlrdp_rect Peer::CaptureFrame() {
 bool Peer::ResizeDesktop(sdlrdp_rect picture) {
   Expects(client != nullptr, "peer exists");
   Expects(snapshot != nullptr, "resize has a frame");
-  desktop        = picture;
-  resizing       = true;
+  desktop  = picture;
+  resizing = true;
   auto* settings = client->context->settings;
   if (!freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth, picture.w) ||
       !freerdp_settings_set_uint32(settings, FreeRDP_DesktopHeight, picture.h) ||

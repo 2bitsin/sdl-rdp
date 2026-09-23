@@ -46,8 +46,8 @@ void RunLogChild(std::array<int, 2> pipefd) {
 }
 }
 TEST(CopyRows, PaddedRows) {
-  std::array<BYTE, 8> source{ 1, 2, 9, 9, 3, 4, 9, 9 };
-  std::array<BYTE, 6> destination{ 8, 8, 8, 8, 8, 8 };
+  std::array<BYTE, 8> source      { 1, 2, 9, 9, 3, 4, 9, 9 };
+  std::array<BYTE, 6> destination { 8, 8, 8, 8, 8, 8       };
   Backend::CopyRows(source, 4, destination, 3, 2, 2);
   EXPECT_EQ(destination, (std::array<BYTE, 6>{ 1, 2, 8, 3, 4, 8 }));
   Backend::CopyRows(source, 4, destination, 3, 2, 2, true);
@@ -56,8 +56,8 @@ TEST(CopyRows, PaddedRows) {
 }
 TEST(Errors, WidthAndBind) {
   CertificateDirectory const certificates;
-  sdlrdp_config config{ "192.0.2.1", 0, certificates.Path().c_str(), 0, 200, 0 };
-  sdlrdp_handle* handle = nullptr;
+  sdlrdp_config              config       { "192.0.2.1", 0, certificates.Path().c_str(), 0, 200, 0 };
+  sdlrdp_handle*             handle       = nullptr;
   ASSERT_EQ(sdlrdp_open(&config, &handle), -1);
   EXPECT_EQ(handle, nullptr);
   EXPECT_TRUE(std::string_view(sdlrdp_last_error()).contains("width"));
@@ -71,9 +71,9 @@ TEST(Errors, WidthAndBind) {
 namespace {
 void MeasureFullFrame(sdlrdp_handle* handle, Client& client, std::vector<UINT32> const& pixels, sdlrdp_codec codec) {
   FrameCounter counter(client);
-  auto bytes   = client.Received();
-  auto started = Clock::now();
-  sdlrdp_rect const area{ 0, 0, 1024, 768 };
+  auto              bytes   = client.Received();
+  auto              started = Clock::now();
+  sdlrdp_rect const area    { 0, 0, 1024, 768   };
   ASSERT_EQ(sdlrdp_present(handle, pixels.data(), 4096, 1024, 768, &area, 1), 0);
   ASSERT_TRUE(client.Until([&] { return counter.Frames() == 1; }));
   auto elapsed = std::chrono::duration<double, std::milli>(Clock::now() - started).count();
@@ -85,8 +85,8 @@ void MeasureFullFrame(sdlrdp_handle* handle, Client& client, std::vector<UINT32>
 }
 void WhenFullFrameMeasured(CertificateDirectory const& certificates, Logs& logs, std::vector<UINT32> const& pixels,
                            sdlrdp_codec codec) {
-  sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), 1024, 768, 0, Logs::Collect, &logs };
-  config.codec          = codec;
+  sdlrdp_config config { "127.0.0.1", 0, certificates.Path().c_str(), 1024, 768, 0, Logs::Collect, &logs };
+  config.codec = codec;
   sdlrdp_handle* handle = nullptr;
   ASSERT_EQ(sdlrdp_open(&config, &handle), 0);
   std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> const backend(handle, sdlrdp_close);
@@ -108,7 +108,7 @@ void ThenCertificate(std::string const& first, std::filesystem::path const& data
   std::unique_ptr<X509, Backend::Releases<X509_free>> const cert(
       PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
   ASSERT_TRUE(cert);
-  std::array<char, 256> hostname{};
+  std::array<char, 256> hostname { };
   ASSERT_EQ(gethostname(hostname.data(), hostname.size()), 0);
   EXPECT_EQ(X509_check_host(cert.get(), hostname.data(), 0, 0, nullptr), 1);
   ThenCertificateLifetime(cert.get());
@@ -152,8 +152,8 @@ TEST(Logging, ListenerCallback) {
   CertificateDirectory const certificates;
   Logs                       logs;
   ASSERT_EQ(setenv("WLOG_LEVEL", "INFO", 1), 0);
-  sdlrdp_config const config{ "127.0.0.1", 0, certificates.Path().c_str(), 320, 200, 0, Logs::Collect, &logs };
-  sdlrdp_handle* raw = nullptr;
+  sdlrdp_config const config { "127.0.0.1", 0, certificates.Path().c_str(), 320, 200, 0, Logs::Collect, &logs };
+  sdlrdp_handle*      raw    = nullptr;
   ASSERT_EQ(sdlrdp_open(&config, &raw), 0);
   std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> const backend(raw, sdlrdp_close);
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, "Listening on socket"));
@@ -164,7 +164,7 @@ TEST(Logging, NewestHandleRoutesAndClears) {
   Logs                       first;
   Logs                       second;
   sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), 320, 200, 0, Logs::Collect, &first };
-  sdlrdp_handle* raw = nullptr;
+  sdlrdp_handle*             raw          = nullptr;
   ASSERT_EQ(sdlrdp_open(&config, &raw), 0);
   std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> a(raw, sdlrdp_close);
   config.log_user = &second;
@@ -179,7 +179,7 @@ TEST(Logging, NewestHandleRoutesAndClears) {
   EXPECT_FALSE(second.Contains("closed handle marker"));
 }
 TEST(Logging, NoFreerdpStdout) {
-  std::array<int, 2> pipefd{};
+  std::array<int, 2> pipefd { };
   ASSERT_EQ(pipe(pipefd.data()), 0);
   auto child = fork();
   ASSERT_GE(child, 0);
@@ -187,8 +187,8 @@ TEST(Logging, NoFreerdpStdout) {
     RunLogChild(pipefd);
   }
   close(pipefd[1]);
-  Headless::Descriptor const input{ pipefd[0] };
-  auto output = Headless::ReadText(input.Get());
+  Headless::Descriptor const input  { pipefd[0]                       };
+  auto                       output = Headless::ReadText(input.Get());
   ThenLoggingChild(child, output);
 }
 
@@ -210,20 +210,20 @@ public:
   ProcessEnvironment& operator = (ProcessEnvironment&&)      = delete;
 
 private:
-  std::filesystem::path cwd = std::filesystem::current_path();
+  std::filesystem::path      cwd  = std::filesystem::current_path();
   std::optional<std::string> data;
 };
 TEST(Certificate, StableDefaultAndPermissions) {
   CertificateDirectory const temporary;
   ProcessEnvironment const   restore;
-  auto data = temporary.Path() / "data";
+  auto                       data      = temporary.Path() / "data";
   ASSERT_EQ(setenv("XDG_DATA_HOME", data.c_str(), 1), 0);
   std::string first;
   for (auto const& directory : { temporary.Path() / "one", temporary.Path() / "two" }) {
     std::filesystem::create_directory(directory);
     std::filesystem::current_path(directory);
-    sdlrdp_config const config{ "127.0.0.1", 0, nullptr, 320, 200, 0 };
-    sdlrdp_handle* handle = nullptr;
+    sdlrdp_config const config { "127.0.0.1", 0, nullptr, 320, 200, 0 };
+    sdlrdp_handle*      handle = nullptr;
     ASSERT_EQ(sdlrdp_open(&config, &handle), 0);
     sdlrdp_close(handle);
     auto certificate = Headless::ReadText((data / "sdl-rdp/server.crt").c_str());

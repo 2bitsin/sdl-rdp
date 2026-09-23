@@ -72,7 +72,7 @@ static bool SDL_RDP_LoadDisplay(SDL_RDP_Backend* backend) {
 
 bool SDL_RDP_LoadBackend(SDL_RDP_Backend* backend) {
   char const* path = SDL_RDP_Setting(SDL_HINT_RDP_BACKEND);
-  backend->object  = SDL_LoadObject(path && *path ? path : SDL_RDP_DYNAMIC);
+  backend->object = SDL_LoadObject(path && *path ? path : SDL_RDP_DYNAMIC);
   if (!backend->object) {
     return false;
   }

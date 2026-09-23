@@ -24,17 +24,17 @@ void Draw(SDL_Window* window, unsigned frame, bool full) {
   auto* surface = SDL_GetWindowSurface(window);
   Check(surface != nullptr);
   Check(SDL_FillSurfaceRect(surface, nullptr, 0x00010101));
-  SDL_Rect const block{ int(frame % unsigned(surface->w)), 40, 32, 32 };
+  SDL_Rect const block { int(frame % unsigned(surface->w)), 40, 32, 32 };
   Check(SDL_FillSurfaceRect(surface, &block, 0x0000ff00));
-  SDL_Rect const damage{ 0, 40, surface->w, std::min(32, std::max(0, surface->h - 40)) };
+  SDL_Rect const damage { 0, 40, surface->w, std::min(32, std::max(0, surface->h - 40)) };
   Check(full ? SDL_UpdateWindowSurface(window) : SDL_UpdateWindowSurfaceRects(window, &damage, 1));
 }
 
 void CycleCodec() {
-  static constexpr std::array codecs{ "auto", "planar", "remotefx", "nscodec", "raw", "progressive" };
-  char const* hint = SDL_GetHint(SDL_HINT_RDP_CODEC);
-  auto const* current = std::ranges::find(codecs, std::string_view(hint ? hint : "auto"));
-  auto next = current == codecs.end() ? 0 : (current - codecs.begin() + 1) % codecs.size();
+  static constexpr std::array codecs  { "auto", "planar", "remotefx", "nscodec", "raw", "progressive"                };
+  char const*                 hint    = SDL_GetHint(SDL_HINT_RDP_CODEC);
+  auto const*                 current = std::ranges::find(codecs, std::string_view(hint ? hint : "auto"));
+  auto                        next    = current == codecs.end() ? 0 : (current - codecs.begin() + 1) % codecs.size();
   Check(SDL_SetHint(SDL_HINT_RDP_CODEC, codecs[next]));
 }
 
@@ -73,9 +73,9 @@ void DrawScheduled(SDL_Window* window, unsigned& frame, bool& full, Uint64& next
 }
 void Run(SDL_Window* window, bool tight, bool partial, DriveOptions drives) {
   std::string codec;
-  bool     full  = true;
-  unsigned frame = 0;
-  Uint64   next  = 0;
+  bool        full  = true;
+  unsigned    frame = 0;
+  Uint64      next  = 0;
   for (;;) {
     SDL_Event event;
     if (SDL_WaitEventTimeout(&event, tight ? 0 : 10) && !ProcessEvent(event, window, frame, full, partial)) return;
@@ -86,8 +86,8 @@ void Run(SDL_Window* window, bool tight, bool partial, DriveOptions drives) {
 }
 
 void SDLCALL FeedTone(void* userdata, SDL_AudioStream* stream, int additional, int /*unused*/) {
-  auto& frame = *static_cast<Uint64*>(userdata);
-  std::array<Sint16, 960> samples{};
+  auto&                   frame   = *static_cast<Uint64*>(userdata);
+  std::array<Sint16, 960> samples {                                 };
   while (additional > 0) {
     auto count = std::min(additional / int(2 * sizeof(Sint16)), 480);
     if (!count) return;
@@ -102,8 +102,8 @@ void SDLCALL FeedTone(void* userdata, SDL_AudioStream* stream, int additional, i
 }
 
 SDL_AudioStream* OpenTone(Uint64& frame) {
-  SDL_AudioSpec const spec{ SDL_AUDIO_S16, 2, 48000 };
-  auto* stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, FeedTone, &frame);
+  SDL_AudioSpec const spec   { SDL_AUDIO_S16, 2, 48000                                                               };
+  auto*               stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, FeedTone, &frame);
   Check(stream != nullptr);
   auto device = SDL_GetAudioStreamDevice(stream);
   PrintAudioFormat(device);
@@ -113,10 +113,15 @@ SDL_AudioStream* OpenTone(Uint64& frame) {
 
 struct Options {
   DriveOptions drives;
-  char const* clip = nullptr;
-  int width = 640, height = 480;
-  int mode_width = 0, mode_height = 0;
-  bool tight = false, fullscreen = false, tone = false, partial = false;
+  char const*  clip        = nullptr;
+  int          width       = 640;
+  int          height      = 480;
+  int          mode_width  = 0;
+  int          mode_height = 0;
+  bool         tight       = false;
+  bool         fullscreen  = false;
+  bool         tone        = false;
+  bool         partial     = false;
 };
 
 void ParseSize(std::string_view size, int& width, int& height) {
@@ -129,8 +134,8 @@ void ParseSize(std::string_view size, int& width, int& height) {
 void Fullscreen(SDL_Window* window, Options const& options) {
   if (options.mode_width) {
     auto mode = *SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
-    mode.w    = options.mode_width;
-    mode.h    = options.mode_height;
+    mode.w = options.mode_width;
+    mode.h = options.mode_height;
     Check(SDL_SetWindowFullscreenMode(window, &mode));
   }
   if (options.fullscreen) Check(SDL_SetWindowFullscreen(window, true));
@@ -221,7 +226,7 @@ void RunWindow(Options const& options) {
 int main(int argc,
          char** argv) { // NOLINT(bugprone-exception-escape): Allocation failure terminates the sample.
   Authenticator authentication;
-  auto options = ParseOptions(argc, argv, authentication);
+  auto          options        = ParseOptions(argc, argv, authentication);
   authentication.Defaults();
   ConfigureVideo();
   Check(SDL_Init(SDL_INIT_VIDEO | (options.tone ? SDL_INIT_AUDIO : 0)));

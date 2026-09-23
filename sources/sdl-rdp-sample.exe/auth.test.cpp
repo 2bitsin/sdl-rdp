@@ -64,8 +64,9 @@ public:
   bool Arguments() const { return arguments.load(); }
 
 private:
-  std::atomic<unsigned> verified = 0, looked_up = 0;
-  std::atomic<bool> arguments = true;
+  std::atomic<unsigned> verified  = 0;
+  std::atomic<unsigned> looked_up = 0;
+  std::atomic<bool>     arguments = true;
 };
 }
 namespace {
@@ -110,14 +111,14 @@ void ConnectPropertyCredentials(unsigned port) {
 }
 }
 TEST(DriverAuthentication, PropertiesReadAtCallTime) {
-  oxbox::platform::ScratchArea const certificates{ "driver-auth", "sdl-rdp" };
+  oxbox::platform::ScratchArea const certificates { "driver-auth", "sdl-rdp" };
   GivenAuthenticationHints(certificates.Path());
   if (::testing::Test::HasFatalFailure()) return;
   PropertyCredentials credentials;
   ASSERT_TRUE(SDL_Init(SDL_INIT_VIDEO));
   Quit const quit;
-  auto properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
-  auto port       = SDL_GetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0);
+  auto       properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
+  auto       port       = SDL_GetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0);
   GivenPropertyCredentials(properties, credentials);
   if (::testing::Test::HasFatalFailure()) return;
   ConnectPropertyCredentials(port);

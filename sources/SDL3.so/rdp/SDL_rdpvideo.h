@@ -7,8 +7,9 @@ struct SDL_VideoData {
   sdlrdp_handle*  handle;
   SDL_DisplayID   display;
   SDL_Window*     window;
-  int picture_width, picture_height;
-  unsigned audio_rate;
+  int             picture_width;
+  int             picture_height;
+  unsigned        audio_rate;
   SDL_DisplayMode refresh_modes[2];
 };
 void SDL_RDP_InitMouse(void);

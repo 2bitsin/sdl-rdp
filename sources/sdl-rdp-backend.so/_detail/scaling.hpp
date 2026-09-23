@@ -29,8 +29,8 @@ inline void ScaleColumns(Peer& peer, sdlrdp_rect area) {
   peer.scale_columns.resize(area.w);
   auto ratio = double(peer.snapshot_width) / peer.desktop.w;
   for (int x = 0; x < area.w; ++x) {
-    auto position         = std::clamp(((area.x + x + 0.5) * ratio) - 0.5, 0.0, double(peer.snapshot_width - 1));
-    auto first = unsigned(position);
+    auto position = std::clamp(((area.x + x + 0.5) * ratio) - 0.5, 0.0, double(peer.snapshot_width - 1));
+    auto first    = unsigned(position);
     peer.scale_columns[x] = { .first  = first * 4,
                               .second = std::min(first + 1, peer.snapshot_width - 1) * 4,
                               .weight = float(position - first) };
@@ -58,13 +58,13 @@ inline void ScaleBand(Peer& peer, sdlrdp_rect area, std::span<BYTE> buffer, bool
   ScaleColumns(peer, area);
   auto ratio = double(peer.snapshot_height) / peer.desktop.h;
   for (int y = 0; y < area.h; ++y) {
-    auto position      = std::clamp(((area.y + y + 0.5) * ratio) - 0.5, 0.0, double(peer.snapshot_height - 1));
-    auto first = unsigned(position);
-    auto second        = std::min(first + 1, peer.snapshot_height - 1);
-    auto        weight = float(position - first);
-    auto const* top    = peer.snapshot->data() + (std::size_t(first) * Avc::Aligned(peer.snapshot_width) * 4);
-    auto const* bottom = peer.snapshot->data() + (std::size_t(second) * Avc::Aligned(peer.snapshot_width) * 4);
-    auto*       out    = buffer.data() + (std::size_t(flip ? area.h - y - 1 : y) * pitch);
+    auto        position = std::clamp(((area.y + y + 0.5) * ratio) - 0.5, 0.0, double(peer.snapshot_height - 1));
+    auto        first    = unsigned(position);
+    auto        second   = std::min(first + 1, peer.snapshot_height - 1);
+    auto        weight   = float(position - first);
+    auto const* top      = peer.snapshot->data() + (std::size_t(first) * Avc::Aligned(peer.snapshot_width) * 4);
+    auto const* bottom   = peer.snapshot->data() + (std::size_t(second) * Avc::Aligned(peer.snapshot_width) * 4);
+    auto*       out      = buffer.data() + (std::size_t(flip ? area.h - y - 1 : y) * pitch);
     ScalePixels(peer.scale_columns, top, bottom, weight, out);
   }
 }

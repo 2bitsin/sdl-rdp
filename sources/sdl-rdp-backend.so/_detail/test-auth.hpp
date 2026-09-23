@@ -22,8 +22,8 @@ inline void ThenInformational(sdlrdp_log_level level, std::string const& text) {
   EXPECT_NE(level, SDLRDP_LOG_ERROR) << text;
 }
 inline bool ReceiveIdentity(sdlrdp_handle* handle, char const* user, char const* domain, bool authenticated) {
-  std::array<sdlrdp_event, 32> events{};
-  bool connected = false;
+  std::array<sdlrdp_event, 32> events    {       };
+  bool                         connected = false;
   while (auto count = sdlrdp_poll(handle, events.data(), 32))
     for (auto const& event : std::span(events.data(), count)) {
       if (event.type != SDLRDP_CONNECTED) continue;
@@ -73,11 +73,11 @@ protected:
   }
   static int Verify(void* raw, char const* domain, char const* user, char const* password) {
     auto& self = *static_cast<Authentication*>(raw);
-    self.order += 'V';
-    self.seen_domain     = domain;
-    self.seen_user       = user;
-    self.seen_password   = password;
-    self.callback_thread = std::this_thread::get_id();
+    self.order           += 'V';
+    self.seen_domain     =  domain;
+    self.seen_user       =  user;
+    self.seen_password   =  password;
+    self.callback_thread =  std::this_thread::get_id();
     return self.permit;
   }
   static int Lookup(void* raw, char const* domain, char const* user, unsigned char* hash) {
@@ -119,8 +119,8 @@ protected:
   void RejectionLogs(char const* password, unsigned expected = 1) {
     handle.reset();
     std::scoped_lock const lock(guard);
-    unsigned rejected = 0;
-    unsigned warnings = 0;
+    unsigned    rejected = 0;
+    unsigned    warnings = 0;
     std::string trace;
     for (auto const& [level, text] : logs) {
       warnings += level == SDLRDP_LOG_WARN;
@@ -147,7 +147,7 @@ protected:
     EXPECT_EQ(warnings, 1);
   }
   void ThenCertificateDisconnect(std::string_view closed) {
-    unsigned disconnects = 0;
+    unsigned    disconnects = 0;
     std::string trace;
     for (auto const& [level, text] : logs) {
       ThenInformational(level, text);
@@ -171,16 +171,19 @@ protected:
       });
     }));
   }
-  oxbox::platform::ScratchArea certificates{ "auth", "sdl-rdp" };
+  oxbox::platform::ScratchArea certificates { "auth", "sdl-rdp" };
   std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> handle{ nullptr, sdlrdp_close };
-  sdlrdp_config config{};
-  std::mutex              guard;
-  std::condition_variable logged;
+  sdlrdp_config                                         config          {                            };
+  std::mutex                                            guard;
+  std::condition_variable                               logged;
   std::vector<std::pair<sdlrdp_log_level, std::string>> logs;
-  std::string order, seen_user, seen_domain, seen_password;
-  std::vector<std::string> rejections;
-  bool permit = true;
-  std::thread::id callback_thread;
-  std::thread::id client_thread = std::this_thread::get_id();
+  std::string                                           order;
+  std::string                                           seen_user;
+  std::string                                           seen_domain;
+  std::string                                           seen_password;
+  std::vector<std::string>                              rejections;
+  bool                                                  permit          = true;
+  std::thread::id                                       callback_thread;
+  std::thread::id                                       client_thread   = std::this_thread::get_id();
 };
 }

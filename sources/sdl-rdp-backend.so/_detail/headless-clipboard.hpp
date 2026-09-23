@@ -8,7 +8,9 @@
 
 namespace Headless {
 struct ClipboardCapture {
-  std::atomic_uint requests = 0, responses = 0, accepted = 0;
+  std::atomic_uint requests  = 0;
+  std::atomic_uint responses = 0;
+  std::atomic_uint accepted  = 0;
 };
 class ClipboardClient;
 inline ClipboardClient& HeldClipboard(CliprdrClientContext* context) {
@@ -49,7 +51,7 @@ public:
   }
   UINT RequestFormat(UINT32 format) {
     Expects(channel.load(), "clipboard channel connected");
-    CLIPRDR_FORMAT_DATA_REQUEST request{ .common = { .msgType = CB_FORMAT_DATA_REQUEST } };
+    CLIPRDR_FORMAT_DATA_REQUEST request { .common = { .msgType = CB_FORMAT_DATA_REQUEST } };
     request.requestedFormatId = format;
     return channel.load()->ClientFormatDataRequest(channel.load(), &request);
   }
@@ -59,8 +61,8 @@ public:
       std::scoped_lock const lock(guard);
       outgoing = std::move(bytes);
     }
-    CLIPRDR_FORMAT format{ UINT32(unicode ? CF_UNICODETEXT : CF_DIB), nullptr };
-    CLIPRDR_FORMAT_LIST list{ .common = { .msgType = CB_FORMAT_LIST } };
+    CLIPRDR_FORMAT      format { UINT32(unicode ? CF_UNICODETEXT : CF_DIB), nullptr };
+    CLIPRDR_FORMAT_LIST list   { .common = { .msgType = CB_FORMAT_LIST }            };
     list.numFormats = 1;
     list.formats    = &format;
     return channel.load()->ClientFormatList(channel.load(), &list);
@@ -72,10 +74,10 @@ private:
     if (std::string_view(event->name) != CLIPRDR_SVC_CHANNEL_NAME) return;
     Expects(attaching, "one clipboard attachment per connecting thread");
     auto* context = static_cast<CliprdrClientContext*>(event->pInterface);
-    context->custom                   = attaching;
-    context->MonitorReady             = Ready;
-    context->ServerFormatList         = Formats;
-    context->ServerFormatDataRequest  = Request;
+    context->custom                  = attaching;
+    context->MonitorReady            = Ready;
+    context->ServerFormatList        = Formats;
+    context->ServerFormatDataRequest = Request;
     context->ServerFormatListResponse = [](CliprdrClientContext* ctx, CLIPRDR_FORMAT_LIST_RESPONSE const*) -> UINT {
       ++HeldClipboard(ctx).observed.accepted;
       return CHANNEL_RC_OK;
@@ -86,14 +88,14 @@ private:
   static UINT Ready(CliprdrClientContext* context, CLIPRDR_MONITOR_READY const* /*unused*/) {
     CLIPRDR_GENERAL_CAPABILITY_SET general{ CB_CAPSTYPE_GENERAL, CB_CAPSTYPE_GENERAL_LEN, CB_CAPS_VERSION_2,
                                             CB_USE_LONG_FORMAT_NAMES };
-    CLIPRDR_CAPABILITIES caps{ .common = { .msgType = CB_CLIP_CAPS } };
+    CLIPRDR_CAPABILITIES caps { .common = { .msgType = CB_CLIP_CAPS } };
     caps.cCapabilitiesSets = 1;
     caps.capabilitySets    = reinterpret_cast<CLIPRDR_CAPABILITY_SET*>(&general);
-    auto result            = context->ClientCapabilities(context, &caps);
+    auto result = context->ClientCapabilities(context, &caps);
     if (result != CHANNEL_RC_OK) return result;
     auto& self = HeldClipboard(context);
     if (!self.outgoing.empty()) return self.Offer(self.outgoing);
-    CLIPRDR_FORMAT_LIST const list{ .common = { .msgType = CB_FORMAT_LIST } };
+    CLIPRDR_FORMAT_LIST const list { .common = { .msgType = CB_FORMAT_LIST } };
     return context->ClientFormatList(context, &list);
   }
   static UINT Formats(CliprdrClientContext* context, CLIPRDR_FORMAT_LIST const* list) {
@@ -104,18 +106,18 @@ private:
       for (auto const& format : std::span(list->formats, list->numFormats))
         self.formats.push_back(format.formatId);
     }
-    CLIPRDR_FORMAT_LIST_RESPONSE response{ .common = { .msgType = CB_FORMAT_LIST_RESPONSE } };
+    CLIPRDR_FORMAT_LIST_RESPONSE response { .common = { .msgType = CB_FORMAT_LIST_RESPONSE } };
     response.common.msgFlags = CB_RESPONSE_OK;
-    auto result              = context->ClientFormatListResponse(context, &response);
+    auto result = context->ClientFormatListResponse(context, &response);
     if (result != CHANNEL_RC_OK) return result;
-    CLIPRDR_FORMAT_DATA_REQUEST request{ .common = { .msgType = CB_FORMAT_DATA_REQUEST } };
+    CLIPRDR_FORMAT_DATA_REQUEST request { .common = { .msgType = CB_FORMAT_DATA_REQUEST } };
     request.requestedFormatId = CF_UNICODETEXT;
     return context->ClientFormatDataRequest(context, &request);
   }
   static UINT Request(CliprdrClientContext* context, CLIPRDR_FORMAT_DATA_REQUEST const* request) {
     auto& self = HeldClipboard(context);
     std::scoped_lock const lock(self.guard);
-    CLIPRDR_FORMAT_DATA_RESPONSE response{ .common = { .msgType = CB_FORMAT_DATA_RESPONSE } };
+    CLIPRDR_FORMAT_DATA_RESPONSE response { .common = { .msgType = CB_FORMAT_DATA_RESPONSE } };
     response.common.msgFlags     = request->requestedFormatId == CF_UNICODETEXT ? CB_RESPONSE_OK : CB_RESPONSE_FAIL;
     response.common.dataLen      = self.outgoing.size();
     response.requestedFormatData = self.outgoing.data();
@@ -130,12 +132,13 @@ private:
     ++self.observed.responses;
     return CHANNEL_RC_OK;
   }
-  ClipboardCapture observed;
+  ClipboardCapture                            observed;
   inline static thread_local ClipboardClient* attaching = nullptr;
-  Client&    client;
-  std::mutex guard;
-  std::vector<BYTE> outgoing, incoming;
-  std::vector<UINT32> formats;
-  std::atomic<CliprdrClientContext*> channel = nullptr;
+  Client&                                     client;
+  std::mutex                                  guard;
+  std::vector<BYTE>                           outgoing;
+  std::vector<BYTE>                           incoming;
+  std::vector<UINT32>                         formats;
+  std::atomic<CliprdrClientContext*>          channel   = nullptr;
 };
 }

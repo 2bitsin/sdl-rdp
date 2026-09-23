@@ -33,13 +33,13 @@ protected:
   }
   void MeasureFrames(Client& client, bool noise, unsigned& maximum_error, double& latency) {
     for (unsigned frame = 1; frame <= 20; ++frame) {
-      auto pixels              = GraphicsScene(frame, noise);
-      auto presented = Clock::now();
-      sdlrdp_rect const damage = noise ? sdlrdp_rect{ 0, 0, 640, 480 } : sdlrdp_rect{ int(frame - 1), 40, 33, 32 };
+      auto              pixels    = GraphicsScene(frame, noise);
+      auto              presented = Clock::now();
+      sdlrdp_rect const damage    = noise ? sdlrdp_rect{ 0, 0, 640, 480 } : sdlrdp_rect{ int(frame - 1), 40, 33, 32 };
       ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 640 * 4, 640, 480, &damage, 1), 0);
       ASSERT_TRUE(client.Until([&] { return Acknowledged(); })) << logs.Text(true);
-      latency += std::chrono::duration<double, std::milli>(Clock::now() - presented).count();
-      maximum_error = std::max(maximum_error, client.MaxError(pixels));
+      latency       += std::chrono::duration<double, std::milli>(Clock::now() - presented).count();
+      maximum_error =  std::max(maximum_error, client.MaxError(pixels));
     }
   }
   static void RecordMeasurement(std::size_t bytes, double elapsed, double milliseconds, double latency,
@@ -62,8 +62,8 @@ protected:
     double   latency        = 0;
     MeasureFrames(client, noise, maximum_error, latency);
     if (::testing::Test::HasFatalFailure()) return;
-    auto elapsed = std::chrono::duration<double>(Clock::now() - start).count();
-    auto bytes   = client.Received() - initial_bytes;
+    auto elapsed      = std::chrono::duration<double>(Clock::now() - start).count();
+    auto bytes        = client.Received() - initial_bytes;
     auto milliseconds = std::chrono::duration<double, std::milli>(EncodeDuration() - initial_encode).count();
     RecordMeasurement(bytes, elapsed, milliseconds, latency, maximum_error);
     RecordGraphicsTiming(client, codec);

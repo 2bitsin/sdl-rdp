@@ -19,7 +19,7 @@ void ResetAuthenticationLogging() {
   LogRoute::WithFilter([](auto& filter) { filter = {}; });
 }
 void PeerNegotiationLogging(rdpSettings const* settings) {
-  LogRoute::WithFilter([=](auto& filter) { filter.peer_settings = settings; });
+  LogRoute::WithFilter([ = ](auto& filter) { filter.peer_settings = settings; });
 }
 bool NegotiationRefused() {
   return LogRoute::WithFilter([](auto const& filter) { return filter.negotiation_failed; });
@@ -103,7 +103,7 @@ bool TransportEcho(std::string_view prefix, std::string_view text) {
 }
 constexpr std::array<std::string_view, 2> ntlm{ "Message Integrity Check (MIC) verification failed!",
                                                 "NtProofString verification failed!" };
-constexpr std::array<std::string_view, 1> nla{ "SPNEGO failed with NTSTATUS:" };
+constexpr std::array<std::string_view, 1> nla { "SPNEGO failed with NTSTATUS:" };
 constexpr std::array<std::string_view, 8> core{ "STATE_RUN_FAILED",
                                                 "rdp_server_accept_nego() fail",
                                                 "freerdp_post_connect failed",
@@ -163,7 +163,7 @@ BOOL LogRoute::Forward(wLogMessage const* message) {
 void LogRoute::Install() {
   auto* root = WLog_GetRoot();
   utilities::Expects(root != nullptr, "WLog root exists");
-  wLogCallbacks callbacks{ Forward, Forward, Forward, Forward };
+  wLogCallbacks callbacks { Forward, Forward, Forward, Forward };
   if (!WLog_SetLogAppenderType(root, WLOG_APPENDER_CALLBACK) ||
       !WLog_ConfigureAppender(WLog_GetLogAppender(root), "callbacks", &callbacks))
     throw std::runtime_error("WLog callback installation failed.");

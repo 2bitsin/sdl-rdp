@@ -55,7 +55,7 @@ void Refresh::Acknowledge(Clock::time_point now, Clock::duration latency) {
     Step(FromLatency(latency));
   } else if (mode == RefreshMode::Average) {
     if (last_ack != Clock::time_point{}) {
-      average       = 0.8 * average + 0.2 * std::chrono::duration<double>(now - last_ack).count();
+      average = 0.8 * average + 0.2 * std::chrono::duration<double>(now - last_ack).count();
       auto estimate = unsigned(std::clamp(std::round(1.0 / average), 10.0, double(ceiling)));
       if (std::abs(double(estimate) - rate) > rate * 0.05) rate = estimate;
     }

@@ -195,7 +195,7 @@ protected:
     GivenAudioHints();
     if (::testing::Test::HasFatalFailure()) return;
     ASSERT_TRUE(SDL_Init(SDL_INIT_AUDIO)) << SDL_GetError();
-    SDL_AudioSpec const spec{ SDL_AUDIO_S16, 2, 48000 };
+    SDL_AudioSpec const spec { SDL_AUDIO_S16, 2, 48000 };
     stream.reset(SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr));
     ASSERT_TRUE(stream) << SDL_GetError();
     auto port = ListeningPort(pid_t(Number(fs::read_symlink("/proc/self").string())));
@@ -214,8 +214,8 @@ protected:
   }
   std::unique_ptr<Client>                sound_client;
   std::unique_ptr<Headless::SoundClient> sound;
-  SDL_LogOutputFunction previous_log      = nullptr;
-  void*                 previous_log_user = nullptr;
+  SDL_LogOutputFunction                  previous_log      = nullptr;
+  void*                                  previous_log_user = nullptr;
   std::unique_ptr<SDL_AudioStream, decltype(&SDL_DestroyAudioStream)> stream{ nullptr, SDL_DestroyAudioStream };
 };
 TEST_F(AudioDriver, NoClientTenSecondClock) {
@@ -233,8 +233,8 @@ TEST_F(AudioDriver, NoClientTenSecondClock) {
   EXPECT_EQ(SDL_GetAudioStreamQueued(stream.get()), 0);
   // Consuming ten seconds of PCM may run one lead ahead of real time.
   // SDL may dequeue one buffer ahead; scheduling delays only make this longer.
-  int buffer_frames = 0;
-  SDL_AudioSpec format{};
+  int           buffer_frames = 0;
+  SDL_AudioSpec format        {   };
   ASSERT_TRUE(SDL_GetAudioDeviceFormat(SDL_GetAudioStreamDevice(stream.get()), &format, &buffer_frames));
   EXPECT_GE(elapsed, 10.0 - 0.150 - (double(buffer_frames) / format.freq));
   RecordProperty("no_client_ten_seconds_elapsed", std::to_string(elapsed));
@@ -277,7 +277,7 @@ TEST_F(AudioDriver, StallRefillsTheLead) {
 }
 TEST_F(AudioDriver, LeadAtOrAboveLatencyFailsOpen) {
   stream.reset();
-  SDL_AudioSpec const spec{ SDL_AUDIO_S16, 2, 48000 };
+  SDL_AudioSpec const spec { SDL_AUDIO_S16, 2, 48000 };
   for (auto const* lead : { "500", "501" }) {
     ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_AUDIO_LEAD, lead));
     stream.reset(SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr));
@@ -288,7 +288,7 @@ TEST_F(AudioDriver, LeadAtOrAboveLatencyFailsOpen) {
 TEST_F(AudioDriver, ZeroLeadKeepsRealtimeClock) {
   stream.reset();
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_AUDIO_LEAD, "0"));
-  SDL_AudioSpec const spec{ SDL_AUDIO_S16, 2, 48000 };
+  SDL_AudioSpec const spec { SDL_AUDIO_S16, 2, 48000 };
   stream.reset(SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr));
   ASSERT_TRUE(stream) << SDL_GetError();
   std::vector<Sint16> pcm(48000uz * 2, 1234);

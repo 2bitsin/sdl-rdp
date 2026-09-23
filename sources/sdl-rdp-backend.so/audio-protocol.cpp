@@ -49,8 +49,8 @@ uint64_t AudioProtocol::Credit(AudioChannel& self) {
     auto now = AudioChannel::Clock::now();
     credit = self.clock_frames + uint64_t(std::chrono::duration<double>(now - self.clock_start).count() * self.Rate());
     if (credit >= self.sent) {
-      credit = self.clock_frames = self.sent;
-      self.clock_start           = now;
+      credit           = self.clock_frames = self.sent;
+      self.clock_start = now;
     }
   }
   return credit;
@@ -83,8 +83,8 @@ bool AudioProtocol::Ready(AudioChannel& self) {
 UINT AudioProtocol::Confirmed(RdpsndServerContext* context, BYTE id, UINT16 timestamp) {
   Expects(context, "callback context exists");
   Expects(context->data, "channel context carries its owner");
-  auto& self = *static_cast<AudioChannel*>(context->data);
-  auto found = std::ranges::find(self.pending, id, &AudioChannel::Block::id);
+  auto& self  = *static_cast<AudioChannel*>(context->data);
+  auto  found = std::ranges::find(self.pending, id, &AudioChannel::Block::id);
   if (found == self.pending.end()) return CHANNEL_RC_OK;
   auto rtt = std::chrono::duration<double, std::milli>(AudioChannel::Clock::now() - found->sent).count();
   if (self.owner.trace.Enabled())
@@ -94,8 +94,8 @@ UINT AudioProtocol::Confirmed(RdpsndServerContext* context, BYTE id, UINT16 time
     self.owner.Log(
         SDLRDP_LOG_INFO,
         std::format("Audio block confirm round trip: {:.3f} ms; client timestamp={}; block={}.", rtt, timestamp, id));
-  self.confirmed += found->frames;
-  self.has_confirmation = true;
+  self.confirmed        += found->frames;
+  self.has_confirmation =  true;
   self.pending.erase(found);
   self.owner.audio_changed.notify_all();
   return CHANNEL_RC_OK;
@@ -104,7 +104,7 @@ void AudioProtocol::RecordBlock(AudioChannel& self, AudioChannel::Clock::time_po
   if (self.blocks_sent++) {
     auto gap = now - self.last_send;
     self.gap_total += gap;
-    self.gap_max = std::max(self.gap_max, gap);
+    self.gap_max   =  std::max(self.gap_max, gap);
     if (gap > std::chrono::milliseconds(40)) ++self.gaps_over_40ms;
   }
   self.last_send = now;

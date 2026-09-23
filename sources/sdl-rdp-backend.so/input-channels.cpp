@@ -27,15 +27,15 @@ void Input::Free(freerdp_peer* /*unused*/, rdpContext* context) {
 }
 
 void Input::InstallChannels(Peer& peer) {
-  advanced->data              = &peer;
-  advanced->rdpcontext        = peer.client->context;
-  advanced->MouseEvent        = Advanced;
+  advanced->data       = &peer;
+  advanced->rdpcontext = peer.client->context;
+  advanced->MouseEvent = Advanced;
   advanced->ChannelIdAssigned = [](ainput_server_context* context, UINT32 id) -> BOOL {
     Held(*static_cast<Peer*>(context->data)).advanced_id = id;
     return TRUE;
   };
-  touch->user_data           = &peer;
-  touch->onTouchEvent        = Touch;
+  touch->user_data    = &peer;
+  touch->onTouchEvent = Touch;
   touch->onChannelIdAssigned = [](RdpeiServerContext* context, UINT32 id) -> BOOL {
     Held(*static_cast<Peer*>(context->user_data)).touch_id = id;
     return TRUE;

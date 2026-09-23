@@ -4,19 +4,24 @@
 namespace Headless {
 struct GraphicsCapture {
   struct Reset {
-    UINT32 width, height;
+    UINT32                   width;
+    UINT32                   height;
     std::vector<MONITOR_DEF> monitors;
-    std::size_t desktops, frames;
+    std::size_t              desktops;
+    std::size_t              frames;
   };
   std::vector<RDPGFX_FRAME_ACKNOWLEDGE_PDU> frames;
-  bool automatic = true, advertise = true;
-  std::vector<RDPGFX_CREATE_SURFACE_PDU> surfaces;
-  std::vector<unsigned>                  avc_nals;
-  std::vector<RECTANGLE_16>              avc_rects;
-  std::vector<RDPGFX_H264_QUANT_QUALITY> avc_quality;
-  std::vector<Reset>                     resets;
-  std::vector<std::pair<UINT32, UINT32>> desktops;
-  unsigned deleted = 0, progressive_headers = 0, commands = 0;
+  bool                                      automatic           = true;
+  bool                                      advertise           = true;
+  std::vector<RDPGFX_CREATE_SURFACE_PDU>    surfaces;
+  std::vector<unsigned>                     avc_nals;
+  std::vector<RECTANGLE_16>                 avc_rects;
+  std::vector<RDPGFX_H264_QUANT_QUALITY>    avc_quality;
+  std::vector<Reset>                        resets;
+  std::vector<std::pair<UINT32, UINT32>>    desktops;
+  unsigned                                  deleted             = 0;
+  unsigned                                  progressive_headers = 0;
+  unsigned                                  commands            = 0;
 };
 class GraphicsObserver {
 public:
@@ -62,9 +67,9 @@ public:
 private:
   static void Connected(void* /*unused*/, ChannelConnectedEventArgs const* event) {
     if (std::string_view(event->name) != RDPGFX_DVC_CHANNEL_NAME) return;
-    active->channel                = static_cast<RdpgfxClientContext*>(event->pInterface);
-    active->create                 = active->channel->CreateSurface;
-    active->remove                 = active->channel->DeleteSurface;
+    active->channel = static_cast<RdpgfxClientContext*>(event->pInterface);
+    active->create  = active->channel->CreateSurface;
+    active->remove  = active->channel->DeleteSurface;
     active->channel->CreateSurface = [](RdpgfxClientContext* channel,
                                         RDPGFX_CREATE_SURFACE_PDU const* surface) -> UINT {
       active->observed.surfaces.push_back(*surface);
@@ -90,7 +95,7 @@ private:
   }
   void ObserveFrameLifecycle() {
     Expects(channel != nullptr, "graphics channel connected");
-    surface                 = channel->SurfaceCommand;
+    surface = channel->SurfaceCommand;
     channel->SurfaceCommand = [](RdpgfxClientContext* channel, RDPGFX_SURFACE_COMMAND const* command) -> UINT {
       ++active->observed.commands;
       if (command->codecId == RDPGFX_CODECID_AVC420) active->ObserveAvc(*command);
@@ -99,7 +104,7 @@ private:
         ++active->observed.progressive_headers;
       return active->surface(channel, command);
     };
-    reset                  = channel->ResetGraphics;
+    reset = channel->ResetGraphics;
     channel->ResetGraphics = [](RdpgfxClientContext* channel, RDPGFX_RESET_GRAPHICS_PDU const* reset) -> UINT {
       active->observed.resets.push_back({ reset->width,
                                           reset->height,
@@ -111,8 +116,8 @@ private:
     ObserveFrames();
   }
   void ObserveFrames() {
-    original        = channel->FrameAcknowledge;
-    end             = channel->EndFrame;
+    original = channel->FrameAcknowledge;
+    end      = channel->EndFrame;
     channel->OnOpen = [](RdpgfxClientContext*, BOOL* send_caps, BOOL* send_acks) -> UINT {
       *send_caps = active->observed.advertise;
       *send_acks = FALSE;
@@ -121,22 +126,22 @@ private:
     channel->EndFrame = [](RdpgfxClientContext* channel, RDPGFX_END_FRAME_PDU const* frame) -> UINT {
       auto result = active->end(channel, frame);
       if (result != CHANNEL_RC_OK) return result;
-      RDPGFX_FRAME_ACKNOWLEDGE_PDU const ack{ 0, frame->frameId, UINT32(active->observed.frames.size() + 1) };
+      RDPGFX_FRAME_ACKNOWLEDGE_PDU const ack { 0, frame->frameId, UINT32(active->observed.frames.size() + 1) };
       active->observed.frames.push_back(ack);
       return active->observed.automatic ? active->original(channel, &ack) : CHANNEL_RC_OK;
     };
   }
 
-  RdpgfxClientContext* channel = nullptr;
-  GraphicsCapture observed;
-  inline static thread_local GraphicsObserver* active = nullptr;
-  Client& client;
-  pcRdpgfxFrameAcknowledge original       = nullptr;
-  pcRdpgfxEndFrame         end            = nullptr;
-  pcRdpgfxSurfaceCommand   surface        = nullptr;
-  pcRdpgfxCreateSurface    create         = nullptr;
-  pcRdpgfxDeleteSurface    remove         = nullptr;
-  pcRdpgfxResetGraphics    reset          = nullptr;
-  pDesktopResize           desktop_resize = nullptr;
+  RdpgfxClientContext*                         channel        = nullptr;
+  GraphicsCapture                              observed;
+  inline static thread_local GraphicsObserver* active         = nullptr;
+  Client&                                      client;
+  pcRdpgfxFrameAcknowledge                     original       = nullptr;
+  pcRdpgfxEndFrame                             end            = nullptr;
+  pcRdpgfxSurfaceCommand                       surface        = nullptr;
+  pcRdpgfxCreateSurface                        create         = nullptr;
+  pcRdpgfxDeleteSurface                        remove         = nullptr;
+  pcRdpgfxResetGraphics                        reset          = nullptr;
+  pDesktopResize                               desktop_resize = nullptr;
 };
 }

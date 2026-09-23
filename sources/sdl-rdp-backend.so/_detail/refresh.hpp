@@ -6,11 +6,15 @@
 #include <cstdint>
 
 namespace Backend {
-enum class Direction { Down, Hold, Up };
+enum class Direction   { Down, Hold, Up                 };
 enum class RefreshMode { Fixed, Client, Average, Sender };
 struct WireSample {
-  bool available = false;
-  unsigned outq = 0, notsent = 0, unacked = 0, rtt = 0, mss = 0;
+  bool     available     = false;
+  unsigned outq          = 0;
+  unsigned notsent       = 0;
+  unsigned unacked       = 0;
+  unsigned rtt           = 0;
+  unsigned mss           = 0;
   uint64_t delivery_rate = 0;
 };
 WireSample SampleWire(int descriptor);
@@ -32,10 +36,12 @@ struct Refresh {
   void Drained(WireSample const& wire);
 
 private:
-  RefreshMode mode = RefreshMode::Fixed;
-  unsigned ceiling = 60, rate = 60;
-  double      average        = 0;
-  std::size_t awaiting_empty = 0;
-  Clock::time_point last_ack, last_blocked;
+  RefreshMode       mode           = RefreshMode::Fixed;
+  unsigned          ceiling        = 60;
+  unsigned          rate           = 60;
+  double            average        = 0;
+  std::size_t       awaiting_empty = 0;
+  Clock::time_point last_ack;
+  Clock::time_point last_blocked;
 };
 }

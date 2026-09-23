@@ -59,7 +59,7 @@ public:
   CertificateDirectory(CertificateDirectory const&) = delete;
   CertificateDirectory(CertificateDirectory&&)      = delete;
   CertificateDirectory() {
-    std::array<char, 40> pattern{};
+    std::array<char, 40> pattern { };
     std::ranges::copy(std::string("/tmp/sdlrdp-gate-XXXXXX"), pattern.begin());
     auto* result = mkdtemp(pattern.data());
     Expects(result != nullptr, "temporary directory created");
@@ -77,7 +77,7 @@ inline std::size_t ResidentBytes() {
   auto        statm    = Headless::ReadText("/proc/self/statm");
   std::size_t total    = 0;
   std::size_t resident = 0;
-  auto first           = std::from_chars(statm.data(), statm.data() + statm.size(), total);
+  auto        first    = std::from_chars(statm.data(), statm.data() + statm.size(), total);
   Expects(first.ec == std::errc(), "total page count parses successfully");
   Expects(first.ptr != statm.data() + statm.size(), "resident page count follows the total");
   auto second = std::from_chars(first.ptr + 1, statm.data() + statm.size(), resident);
@@ -85,7 +85,7 @@ inline std::size_t ResidentBytes() {
   return resident * std::size_t(sysconf(_SC_PAGESIZE));
 }
 inline bool Listening(unsigned port) {
-  auto tcp = Headless::ReadText("/proc/net/tcp");
+  auto tcp     = Headless::ReadText("/proc/net/tcp");
   auto address = std::format("0100007F:{:04X}", port);
   return std::ranges::any_of(tcp | std::views::split('\n'), [&](auto row) {
     std::string_view const line(row.begin(), row.end());
@@ -112,7 +112,7 @@ private:
 };
 inline void InitializeTls(sdlrdp_config config) {
   // Issue 1: prime FreeRDP's lazy BIO method before the in-process client races it.
-  config.log         = nullptr;
+  config.log = nullptr;
   sdlrdp_handle* raw = nullptr;
   Expects(sdlrdp_open(&config, &raw) == 0, "TLS initialization listener opens");
   std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> const backend(raw, sdlrdp_close);
@@ -172,11 +172,12 @@ public:
   unsigned BitmapPdus() const { return bitmap_pdus; }
 
 private:
-  unsigned frames = 0, bitmap_pdus = 0;
-  inline static thread_local FrameCounter* active = nullptr;
-  rdpUpdate*    update;
-  pSurfaceBits  surface;
-  pBitmapUpdate bitmap;
+  unsigned                                 frames      = 0;
+  unsigned                                 bitmap_pdus = 0;
+  inline static thread_local FrameCounter* active      = nullptr;
+  rdpUpdate*                               update;
+  pSurfaceBits                             surface;
+  pBitmapUpdate                            bitmap;
 };
 // Both fixtures share the same bounded event accumulation; predicates inspect the
 // whole sequence, so an early poll cannot lose half of a transition.
@@ -188,13 +189,13 @@ protected:
     return backend->state->current && backend->state->current->acknowledged >= backend->state->presented;
   }
   std::vector<sdlrdp_event> Events() const {
-    std::array<sdlrdp_event, 256> batch{};
-    auto count = sdlrdp_poll(backend.get(), batch.data(), batch.size());
+    std::array<sdlrdp_event, 256> batch {                                                        };
+    auto                          count = sdlrdp_poll(backend.get(), batch.data(), batch.size());
     return { batch.begin(), batch.begin() + count };
   }
   std::vector<sdlrdp_event> EventsUntil(auto predicate, bool include_refresh = true, Client* client = nullptr) {
     std::vector<sdlrdp_event> result;
-    auto deadline = Clock::now() + std::chrono::seconds(10);
+    auto                      deadline = Clock::now() + std::chrono::seconds(10);
     do {
       for (auto event : Events())
         if (include_refresh || event.type != SDLRDP_REFRESH) result.push_back(event);

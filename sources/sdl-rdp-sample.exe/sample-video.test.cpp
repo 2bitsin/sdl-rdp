@@ -123,12 +123,12 @@ void ThenEqualLayout(Client& client, Headless::DisplayClient& display) {
 }
 namespace {
 void ThenAudioDeviceChanges(Client& client, SDL_AudioStream* stream) {
-  SDL_AudioSpec before{};
+  SDL_AudioSpec before { };
   ASSERT_TRUE(SDL_GetAudioDeviceFormat(SDL_GetAudioStreamDevice(stream), &before, nullptr));
   EXPECT_EQ(before.freq, 44100);
   ASSERT_TRUE(client.Until([&] {
     SDL_PumpEvents();
-    SDL_AudioSpec actual{};
+    SDL_AudioSpec actual { };
     return SDL_GetAudioDeviceFormat(SDL_GetAudioStreamDevice(stream), &actual, nullptr) && actual.freq == 48000;
   }));
 }
@@ -202,8 +202,8 @@ TEST_F(VideoDriver, WindowResizeMovesDesktopMode) {
 
 TEST_F(VideoDriver, FullscreenModeMovesDesktopMode) {
   auto mode = *SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
-  mode.w    = 1920;
-  mode.h    = 1080;
+  mode.w = 1920;
+  mode.h = 1080;
   ASSERT_TRUE(SDL_SetWindowFullscreenMode(window, &mode));
   ASSERT_TRUE(SDL_SetWindowFullscreen(window, true));
   Desktop(1920, 1080);
@@ -247,7 +247,7 @@ TEST_F(VideoDriver, DefaultPresentDoesNotWaitForAcknowledgements) {
 TEST_F(VideoDriver, AudioEventChangesOpenDeviceFormat) {
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "rdp"));
   ASSERT_TRUE(SDL_Init(SDL_INIT_AUDIO));
-  SDL_AudioSpec const spec{ SDL_AUDIO_S16, 2, 44100 };
+  SDL_AudioSpec const spec { SDL_AUDIO_S16, 2, 44100 };
   std::unique_ptr<SDL_AudioStream, decltype(&SDL_DestroyAudioStream)> const stream{
     SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr), SDL_DestroyAudioStream
   };

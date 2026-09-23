@@ -12,10 +12,10 @@ sdlrdp_rect State::Picture(unsigned w, unsigned h) const {
   Expects(w, "shadow width is positive");
   Expects(h, "shadow height is positive");
   if (!aspect.num || !aspect.den) return { 0, 0, int(w), int(h) };
-  auto divisor     = std::gcd(aspect.num, aspect.den);
-  uint64_t const n = aspect.num / divisor;
-  uint64_t const d = aspect.den / divisor;
-  auto units       = std::max((w + n - 1) / n, (h + d - 1) / d);
+  auto           divisor = std::gcd(aspect.num, aspect.den);
+  uint64_t const n       = aspect.num / divisor;
+  uint64_t const d       = aspect.den / divisor;
+  auto           units   = std::max((w + n - 1) / n, (h + d - 1) / d);
   if (units * n > 16383 || units * d > 65535)
     throw std::runtime_error("Aspect-corrected desktop exceeds RDP dimensions.");
   return { 0, 0, int(units * n), int(units * d) };
@@ -58,7 +58,7 @@ bool State::ChangePicture(unsigned w, unsigned h) {
 void State::SetAspect(sdlrdp_aspect value) {
   std::scoped_lock const lock(peers_guard, frame_guard);
   auto previous = aspect;
-  aspect        = value;
+  aspect = value;
   try {
     Picture();
   } catch (...) {
@@ -85,7 +85,7 @@ void Peer::FrameSent(std::size_t bytes) {
   if (ack_enabled) pending.push_back({ frame_id, sequence, now });
   auto elapsed = encoder.encode_time - encoded_at_start;
   encode_total += elapsed;
-  encode_max = std::max(encode_max, elapsed);
+  encode_max   =  std::max(encode_max, elapsed);
   ++frames_sent;
 }
 void Peer::LogFrames() {
@@ -110,7 +110,7 @@ bool Peer::Marker(UINT16 action) {
   Expects(client != nullptr, "client transport exists");
   Expects(client->context, "client context exists");
   if (!freerdp_settings_get_bool(client->context->settings, FreeRDP_FrameMarkerCommandEnabled)) return true;
-  SURFACE_FRAME_MARKER const marker{ action, frame_id };
+  SURFACE_FRAME_MARKER const marker { action, frame_id };
   return client->context->update->SurfaceFrameMarker(client->context, &marker);
 }
 bool Peer::Pacing() {
@@ -157,7 +157,7 @@ BOOL Peer::Acknowledge(rdpContext* context, UINT32 id) {
 void Peer::RecordAcknowledgement(Clock::duration elapsed) {
   Expects(elapsed >= Clock::duration::zero(), "acknowledgement follows frame send");
   ack_total += elapsed;
-  ack_max = std::max(ack_max, elapsed);
+  ack_max   =  std::max(ack_max, elapsed);
   ++ack_count;
   if (elapsed > std::chrono::milliseconds(100)) ++ack_over_100ms;
 }

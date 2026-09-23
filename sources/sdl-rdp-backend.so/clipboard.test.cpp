@@ -36,20 +36,20 @@ protected:
     ASSERT_TRUE(client.Until([&] { return clipboard.Observed().accepted.load() == 1; }));
   }
   void SetUp() override {
-    auto directory = certificates.Path().string();
-    sdlrdp_config config{};
-    config.log            = Headless::Logs::Collect;
-    config.log_user       = &logs;
-    config.bind           = "127.0.0.1";
-    config.cert_dir       = directory.c_str();
-    config.width          = 320;
-    config.height         = 200;
+    auto          directory = certificates.Path().string();
+    sdlrdp_config config    {                              };
+    config.log      = Headless::Logs::Collect;
+    config.log_user = &logs;
+    config.bind     = "127.0.0.1";
+    config.cert_dir = directory.c_str();
+    config.width    = 320;
+    config.height   = 200;
     sdlrdp_handle* opened = nullptr;
     ASSERT_EQ(sdlrdp_open(&config, &opened), 0) << sdlrdp_last_error();
     handle.reset(opened);
   }
-  Headless::Logs logs;
-  oxbox::platform::ScratchArea certificates{ "clipboard", "sdl-rdp" };
+  Headless::Logs               logs;
+  oxbox::platform::ScratchArea certificates { "clipboard", "sdl-rdp" };
   std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> handle{ nullptr, sdlrdp_close };
   std::unique_ptr<Headless::Client>          client;
   std::unique_ptr<Headless::ClipboardClient> clipboard;
@@ -64,7 +64,7 @@ void OfferMalformedText(Headless::Client& client, Headless::ClipboardClient& cli
 TEST_F(Clipboard, EmptyConnectUnchanged) {
   GivenClipboard();
   if (::testing::Test::HasFatalFailure()) return;
-  std::array<sdlrdp_event, 32> events{};
+  std::array<sdlrdp_event, 32> events { };
   while (auto count = sdlrdp_poll(handle.get(), events.data(), 32)) {
     EXPECT_FALSE(std::ranges::any_of(std::span(events.data(), count),
                                      [](auto const& event) { return event.type == SDLRDP_CLIPBOARD; }));
@@ -93,7 +93,7 @@ TEST_F(Clipboard, LiveSetAndMalformedResponse) {
   if (::testing::Test::HasFatalFailure()) return;
   ASSERT_EQ(sdlrdp_set_clipboard_text(handle.get(), "hello"), 0);
   ASSERT_TRUE(client->Until([&] { return clipboard->Received({ 'h', 0, 'e', 0, 'l', 0, 'l', 0, 'o', 0, 0, 0 }); }));
-  std::array<sdlrdp_event, 32> initial{};
+  std::array<sdlrdp_event, 32> initial { };
   while (sdlrdp_poll(handle.get(), initial.data(), 32)) {
   }
   auto const* retained = sdlrdp_get_clipboard_text(handle.get());
@@ -102,8 +102,8 @@ TEST_F(Clipboard, LiveSetAndMalformedResponse) {
   ASSERT_EQ(clipboard->Offer({ 'w', 0, 'o', 0, 'r', 0, 'l', 0, 'd', 0, 0, 0 }), CHANNEL_RC_OK);
   bool changed = false;
   ASSERT_TRUE(client->Until([&] {
-    std::array<sdlrdp_event, 32> events{};
-    auto count = sdlrdp_poll(handle.get(), events.data(), 32);
+    std::array<sdlrdp_event, 32> events {                                              };
+    auto                         count  = sdlrdp_poll(handle.get(), events.data(), 32);
     changed |= std::ranges::any_of(std::span(events.data(), count),
                                    [](auto const& event) { return event.type == SDLRDP_CLIPBOARD; });
     return changed;
@@ -125,7 +125,7 @@ TEST_F(Clipboard, NonTextOfferClearsText) {
   if (::testing::Test::HasFatalFailure()) return;
   ASSERT_EQ(sdlrdp_set_clipboard_text(handle.get(), "app"), 0);
   ASSERT_TRUE(client->Until([&] { return clipboard->Received({ 'a', 0, 'p', 0, 'p', 0, 0, 0 }); }));
-  std::array<sdlrdp_event, 32> events{};
+  std::array<sdlrdp_event, 32> events { };
   while (sdlrdp_poll(handle.get(), events.data(), 32)) {
   }
   ThenNonTextOffer(events);

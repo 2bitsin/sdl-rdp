@@ -85,13 +85,13 @@ AudioChannel::AudioChannel(Peer& peer)
 }
 AudioChannel::~AudioChannel() {
   sound.reset();
-  int major   { 0 };
-  int minor   { 0 };
-  int revision{ 0 };
+  int major    { 0 };
+  int minor    { 0 };
+  int revision { 0 };
   freerdp_get_version(&major, &minor, &revision);
   if (major != 3 || minor != 15 || revision != 0) return;
   // FreeRDP 3.15.0 returns the existing static-channel handle from Open.
-  auto name = std::to_array(RDPSND_CHANNEL_NAME);
+  auto  name    = std::to_array(RDPSND_CHANNEL_NAME);
   auto* channel = WTSVirtualChannelOpen(channels, WTS_CURRENT_SESSION, name.data());
   if (channel) WTSVirtualChannelClose(channel);
 }
@@ -120,8 +120,8 @@ unsigned AudioChannel::Remaining() const {
   return (selected.nSamplesPerSec / 50) - unsigned(buffer.size() / 2);
 }
 void AudioChannel::Reset() {
-  sent = confirmed = clock_frames = 0;
-  first = clock_start = {};
+  sent         = confirmed = clock_frames = 0;
+  first        = clock_start = {};
   server_clock = has_confirmation = false;
   pending.clear();
   buffer.clear();

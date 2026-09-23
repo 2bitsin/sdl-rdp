@@ -14,7 +14,7 @@ public:
   void Transition(Phase next);
 
 private:
-  EventHandle handle;
-  std::atomic<Phase> phase{ Phase::Idle };
+  EventHandle        handle;
+  std::atomic<Phase> phase  { Phase::Idle };
 };
 }

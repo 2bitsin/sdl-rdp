@@ -55,8 +55,8 @@ void LogDeparture(Peer& peer) {
 }
 unsigned Bind(freerdp_listener* listener, sdlrdp_config const& config) {
   Expects(listener != nullptr, "listener exists");
-  Socket socket;
-  sockaddr_in address{};
+  Socket      socket;
+  sockaddr_in address { };
   address.sin_family = AF_INET;
   address.sin_port   = htons(config.port);
   PrepareListenerSocket(socket.Get());
@@ -75,14 +75,14 @@ unsigned Bind(freerdp_listener* listener, sdlrdp_config const& config) {
 }
 void ComposeRow(std::span<BYTE const> source, std::span<BYTE const> former, std::span<BYTE> target, auto damage) {
   for (int x = 0; std::cmp_less(x, target.size() / 4);) {
-    auto covered{ std::ranges::find_if(damage, [x](auto rect) { return rect.x <= x && x < rect.x + rect.w; }) };
-    auto ahead{ damage | std::views::filter([x](auto rect) { return rect.x > x; }) };
-    auto nearest{ std::ranges::min_element(ahead, {}, &sdlrdp_rect::x) };
+    auto covered { std::ranges::find_if(damage, [x](auto rect) { return rect.x <= x && x < rect.x + rect.w; }) };
+    auto ahead   { damage | std::views::filter([x](auto rect) { return rect.x > x; })                          };
+    auto nearest { std::ranges::min_element(ahead, {}, &sdlrdp_rect::x)                                        };
     auto end{ covered != damage.end()  ? covered->x + covered->w
               : nearest != ahead.end() ? nearest->x
                                        : int(target.size() / 4) };
-    auto output{ target.subspan(x * 4, (end - x) * 4) };
-    auto input{ covered != damage.end() ? source : former };
+    auto output { target.subspan(x * 4, (end - x) * 4)      };
+    auto input  { covered != damage.end() ? source : former };
     if (input.empty())
       std::ranges::fill(output, 0);
     else
@@ -108,7 +108,7 @@ void State::Publish(std::shared_ptr<std::vector<BYTE>> next, unsigned w, unsigne
   Picture(w, h);
   auto resized = frame_width != w || frame_height != h;
   shadow       = std::move(next);
-  frame_width = width = w;
+  frame_width  = width = w;
   frame_height = height = h;
   ++presented;
   for (auto const& peer : peers)
@@ -179,7 +179,7 @@ BOOL State::Accepted(freerdp_listener* listener, freerdp_peer* client) {
 void State::Listen(std::stop_token const& quit) {
   Expects(listener != nullptr, "listener exists");
   Expects(stop != nullptr, "listener owns its stop event");
-  std::array<HANDLE, 32> handles{};
+  std::array<HANDLE, 32> handles { };
   while (!quit.stop_requested()) {
     auto count = listener->GetEventHandles(listener.get(), handles.data(), 30);
     if (!count) break;
@@ -218,9 +218,9 @@ void State::Takeover(Peer& peer, sdlrdp_event event) {
   std::ranges::for_each(peers, [&](auto const& old) {
     if (old.get() != &peer && old->active.exchange(false)) ReplacePeer(*old);
   });
-  current     = &peer;
-  peer.active = peer.activated = true;
-  peer.activated_at            = Peer::Clock::now();
+  current           = &peer;
+  peer.active       = peer.activated = true;
+  peer.activated_at = Peer::Clock::now();
   if (shadow) peer.Post({ 0, 0, int(frame_width), int(frame_height) });
   if (freerdp_settings_get_bool(peer.client->context->settings, FreeRDP_SupportGraphicsPipeline))
     peer.connection = event;

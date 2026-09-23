@@ -45,7 +45,7 @@ public:
   }
 
 private:
-  std::mutex guard;
+  std::mutex                                            guard;
   std::vector<std::pair<sdlrdp_log_level, std::string>> lines;
 };
 }

@@ -36,7 +36,7 @@ namespace {
 void ThenFrameStatistics(Logs& logs) {
   EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "Frames:"), 1u);
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, "Frames: 3 sent, 2 coalesced; encode ")) << logs.Text(true);
-  auto text = logs.Text(true);
+  auto        text  = logs.Text(true);
   std::smatch match;
   ASSERT_TRUE(std::regex_search(
       text, match,

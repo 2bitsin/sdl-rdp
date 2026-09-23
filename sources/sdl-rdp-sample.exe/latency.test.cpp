@@ -28,7 +28,7 @@ void ReportLatency(std::vector<int64_t>& latency, std::string_view event) {
 void CheckLatency(std::string const& trace, std::string_view event, std::span<int64_t const> sent) {
   Expects(!event.empty(), "trace event is named");
   Expects(!sent.empty(), "client sent measured events");
-  auto prefix = std::format("trace {} t=", event);
+  auto                 prefix  = std::format("trace {} t=", event);
   std::vector<int64_t> latency;
   std::istringstream lines(trace);
   for (std::string line; std::getline(lines, line);) {
@@ -111,8 +111,8 @@ TEST_F(Sample, InputAndClipboardUnderTightVideo) {
   if (::testing::Test::HasFatalFailure()) return;
   std::vector<int64_t> keys;
   std::vector<int64_t> clips;
-  auto start  = Clock::now();
-  auto before = frames.Frames().size();
+  auto                 start  = Clock::now();
+  auto                 before = frames.Frames().size();
   SampleLatency(client, frames, clipboard, keys, clips, start);
   if (::testing::Test::HasFatalFailure()) return;
   EXPECT_GE(frames.Frames().size() - before, 60u);

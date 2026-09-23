@@ -6,9 +6,9 @@
 namespace BackendGate {
 using Headless::SoundClient;
 inline int WriteRealtimeAudio(sdlrdp_handle* backend) {
-  std::array<INT16, 480uz * 2> pcm{};
-  auto start   = Clock::now();
-  int  written = 0;
+  std::array<INT16, 480uz * 2> pcm     {              };
+  auto                         start   = Clock::now();
+  int                          written = 0;
   for (unsigned tick = 1; tick <= 200; ++tick) {
     std::this_thread::sleep_until(start + std::chrono::milliseconds(tick * 10));
     auto count = sdlrdp_audio_write(backend, pcm.data(), 480);
@@ -96,7 +96,7 @@ protected:
   }
   void CheckAudioStatistics(SoundClient const& audio) {
     Expects(!backend, "connection statistics have been flushed");
-    auto text = logs.Text(true);
+    auto        text  = logs.Text(true);
     std::smatch match;
     ASSERT_TRUE(std::regex_search(
         text, match,

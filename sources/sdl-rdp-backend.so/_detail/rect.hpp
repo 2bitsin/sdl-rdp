@@ -20,7 +20,7 @@ inline void Merge(std::optional<sdlrdp_rect>& region, sdlrdp_rect area) {
   auto y      = std::min(region->y, area.y);
   auto right  = std::max(region->x + region->w, area.x + area.w);
   auto bottom = std::max(region->y + region->h, area.y + area.h);
-  region      = sdlrdp_rect{ x, y, right - x, bottom - y };
+  region = sdlrdp_rect{ x, y, right - x, bottom - y };
 }
 inline std::optional<sdlrdp_rect> Intersect(sdlrdp_rect left, sdlrdp_rect right) {
   Expects(left.w >= 0, "left rectangle width is nonnegative");

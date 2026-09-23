@@ -11,7 +11,8 @@
 
 namespace Backend::Avc {
 struct IntraRefresh {
-  unsigned period, count;
+  unsigned period;
+  unsigned count;
 };
 IntraRefresh IntraRefreshFor(unsigned fps);
 unsigned Bitrate(unsigned width, unsigned height, unsigned kbps = 0);
@@ -35,10 +36,12 @@ public:
 private:
   std::vector<RECTANGLE_16>              rects;
   std::vector<RDPGFX_H264_QUANT_QUALITY> quality;
-  sdlrdp_rect bounds{};
+  sdlrdp_rect                            bounds  { };
 };
 struct EncodingTimes {
-  std::chrono::nanoseconds convert{}, upload{}, encode{};
+  std::chrono::nanoseconds convert { };
+  std::chrono::nanoseconds upload  { };
+  std::chrono::nanoseconds encode  { };
 };
 class Encoder {
 public:

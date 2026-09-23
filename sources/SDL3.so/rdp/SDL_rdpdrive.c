@@ -36,7 +36,7 @@ static sdlrdp_drive* RDP_DriveList(SDL_RDP_Backend* backend, sdlrdp_handle* hand
 }
 
 bool SDL_RDP_FindDrive(SDL_RDP_Backend* backend, sdlrdp_handle* handle, char const* name, unsigned* id) {
-  int count = 0;
+  int           count  = 0;
   sdlrdp_drive* drives = RDP_DriveList(backend, handle, &count);
   if (!drives) return false;
   for (int i = 0; i < count; ++i) {
@@ -51,7 +51,7 @@ bool SDL_RDP_FindDrive(SDL_RDP_Backend* backend, sdlrdp_handle* handle, char con
 }
 
 static Sint64 SDLCALL RDP_FileSize(void* userdata) {
-  RDP_File* file = userdata;
+  RDP_File*   file = userdata;
   sdlrdp_stat info;
   if (file->backend.drive_fstat(file->handle, file->file, &info) < 0) {
     SDL_SetError("%s", file->backend.last_error());
@@ -181,7 +181,7 @@ SDL_IOStream* SDLCALL SDL_RDP_OpenFile(char const* drive, char const* path, char
 }
 
 void SDL_RDP_UpdateDrives(SDL_RDP_Backend* backend, sdlrdp_handle* handle, SDL_PropertiesID props) {
-  int count = 0;
+  int           count  = 0;
   sdlrdp_drive* drives = RDP_DriveList(backend, handle, &count);
   if (!drives) return;
   size_t capacity = 1;

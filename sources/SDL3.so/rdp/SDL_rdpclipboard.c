@@ -38,8 +38,8 @@ void SDL_RDP_InitClipboard(SDL_VideoDevice* device) {
 
 void SDL_RDP_ClipboardUpdate(SDL_VideoData* data) {
   char const* types[] = { "text/plain;charset=utf-8" };
-  size_t count = data->backend.has_clipboard_text(data->handle) > 0 ? 1 : 0;
-  char** copy         = SDL_CopyClipboardMimeTypes(types, count, true);
+  size_t      count   = data->backend.has_clipboard_text(data->handle) > 0 ? 1 : 0;
+  char**      copy    = SDL_CopyClipboardMimeTypes(types, count, true);
   if (copy) {
     SDL_SendClipboardUpdate(false, copy, count);
   }

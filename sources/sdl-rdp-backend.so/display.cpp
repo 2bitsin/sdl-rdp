@@ -50,7 +50,7 @@ bool Peer::OpenDisplayControl() {
   };
   disp->MaxNumMonitors        = 16;
   disp->MaxMonitorAreaFactorA = disp->MaxMonitorAreaFactorB = 8192;
-  disp_open                                                 = disp->Open(disp.get()) == CHANNEL_RC_OK;
+  disp_open                   = disp->Open(disp.get()) == CHANNEL_RC_OK;
   return disp_open;
 }
 UINT Peer::Layout(DispServerContext* context, DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const* pdu) {
@@ -64,10 +64,10 @@ UINT Peer::Layout(DispServerContext* context, DISPLAY_CONTROL_MONITOR_LAYOUT_PDU
   int64_t bottom = 0;
   for (unsigned i = 0; i < pdu->NumMonitors; ++i) {
     auto const& monitor = pdu->Monitors[i];
-    left                = std::min(left, int64_t(monitor.Left));
-    top                 = std::min(top, int64_t(monitor.Top));
-    right               = std::max(right, int64_t(monitor.Left) + monitor.Width);
-    bottom              = std::max(bottom, int64_t(monitor.Top) + monitor.Height);
+    left   = std::min(left, int64_t(monitor.Left));
+    top    = std::min(top, int64_t(monitor.Top));
+    right  = std::max(right, int64_t(monitor.Left) + monitor.Width);
+    bottom = std::max(bottom, int64_t(monitor.Top) + monitor.Height);
   }
   if (right - left == self.desktop.w && bottom - top == self.desktop.h) return CHANNEL_RC_OK;
   self.owner.Push(

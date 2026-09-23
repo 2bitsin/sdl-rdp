@@ -13,7 +13,7 @@
 
 namespace {
 TEST(AuthenticationIdentity, UnicodeAndAnsi) {
-  std::array<UINT16, 5> unicode{ 0x017e, 0x0105, 's', 'i', 's' };
+  std::array<UINT16, 5> unicode { 0x017e, 0x0105, 's', 'i', 's' };
   EXPECT_EQ(Backend::IdentityText(unicode.data(), 5, SEC_WINNT_AUTH_IDENTITY_UNICODE), "žąsis");
   auto ansi = std::to_array("Aé");
   EXPECT_EQ(

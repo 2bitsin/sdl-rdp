@@ -22,8 +22,8 @@ protected:
     auto path = std::to_array("/tmp/sdlrdp-gfx-resize-XXXXXX");
     ASSERT_NE(mkdtemp(path.data()), nullptr);
     certificates = path.data();
-    sdlrdp_config config{ "127.0.0.1", 0, certificates.c_str(), 640, 480, 0, Headless::Logs::Collect, &logs };
-    config.codec          = SDLRDP_CODEC_PROGRESSIVE;
+    sdlrdp_config config { "127.0.0.1", 0, certificates.c_str(), 640, 480, 0, Headless::Logs::Collect, &logs };
+    config.codec = SDLRDP_CODEC_PROGRESSIVE;
     sdlrdp_handle* handle = nullptr;
     ASSERT_EQ(sdlrdp_open(&config, &handle), 0);
     backend.reset(handle);
@@ -35,7 +35,7 @@ protected:
   }
   void PresentProgressivePixel(Headless::Client& client, Headless::GraphicsObserver& observer,
                                std::vector<UINT32>& pixels, unsigned w, unsigned h, unsigned generations) {
-    auto frames = observer.Observed().frames.size();
+    auto              frames = observer.Observed().frames.size();
     sdlrdp_rect const damage = { .x = 0, .y = 0, .w = 1, .h = 1 };
     pixels.front() ^= 0x222222;
     ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), w * 4, w, h, &damage, 1), 0);
@@ -50,9 +50,9 @@ protected:
 void ThenBilinearPixels(rdpGdi const* gdi, std::vector<UINT32> const& pixels) {
   for (int y = 0; y < 240; ++y) {
     auto position = std::clamp(((y + 0.5) * (200.0 / 240)) - 0.5, 0.0, 199.0);
-    auto first = unsigned(position);
+    auto first    = unsigned(position);
     auto second   = std::min(first + 1, 199u);
-    auto weight = float(position - first);
+    auto weight   = float(position - first);
     auto const* actual =
         reinterpret_cast<UINT32 const*>(gdi->primary_buffer + (static_cast<std::size_t>(y) * gdi->stride));
     for (int x = 0; x < 320; ++x) {
@@ -75,12 +75,12 @@ void ThenProgressiveGeneration(Headless::GraphicsObserver const& observer, unsig
   EXPECT_EQ(observer.Observed().surfaces.back().width, w);
   EXPECT_EQ(observer.Observed().surfaces.back().height, h);
 }
-constexpr std::array ResizeSequence{ std::pair{ 640u, 480u }, std::pair{ 320u, 200u }, std::pair{ 640u, 480u } };
+constexpr std::array ResizeSequence { std::pair{ 640u, 480u }, std::pair{ 320u, 200u }, std::pair{ 640u, 480u } };
 void MatchCostStatistics(std::string const& text, std::smatch& match, char const* expression) {
   ASSERT_TRUE(std::regex_search(text, match, std::regex(expression))) << text;
 }
 void RecordProgressiveCost(Headless::Logs& logs) {
-  auto text = logs.Text(true);
+  auto        text  = logs.Text(true);
   std::smatch match;
   MatchCostStatistics(
       text, match,
@@ -113,7 +113,7 @@ TEST_F(GraphicsResize, RawAspectMatchesBilinear) {
   std::vector<UINT32> pixels(320uz * 200);
   std::mt19937 random(17); // NOLINT(cert-msc32-c, cert-msc51-cpp): Reproducible codec input.
   std::ranges::generate(pixels, [&] { return random() & 0x00ffffff; });
-  sdlrdp_rect const full{ 0, 0, 320, 200 };
+  sdlrdp_rect const full { 0, 0, 320, 200 };
   ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &full, 1), 0);
   ASSERT_TRUE(client.Until([&] { return !observer.Observed().frames.empty(); })) << logs.Text(true);
   auto* gdi = client.Instance()->context->gdi;
@@ -132,7 +132,7 @@ TEST_F(GraphicsResize, ProgressiveContextAndFullDamage) {
   for (auto [w, h] : ResizeSequence) {
     std::vector<UINT32> pixels(static_cast<std::size_t>(w) * h, 0x335577 + (generations * 0x221100));
     SCOPED_TRACE(std::to_string(w) + "x" + std::to_string(h));
-    sdlrdp_rect const damage{ 0, 0, int(w), int(h) };
+    sdlrdp_rect const damage { 0, 0, int(w), int(h) };
     ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), w * 4, w, h, &damage, 1), 0);
     ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text(true);
     ++generations;
@@ -177,14 +177,14 @@ TEST_F(GraphicsCost, FullRandomFrame) {
   std::vector<UINT32> pixels(1280uz * 800);
   std::mt19937 random(17); // NOLINT(cert-msc32-c, cert-msc51-cpp): Reproducible codec input.
   std::ranges::generate(pixels, [&] { return random() & 0x00ffffff; });
-  sdlrdp_rect const full{ 0, 0, 1280, 800 };
+  sdlrdp_rect const full { 0, 0, 1280, 800 };
   ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 5120, 1280, 800, &full, 1), 0);
   AwaitAcknowledgement(client, 1);
   if (::testing::Test::HasFatalFailure()) return;
   ThenProgressiveCost(client, observer);
 }
 void RecordAvcCost(Headless::Logs& logs) {
-  auto text = logs.Text(true);
+  auto        text  = logs.Text(true);
   std::smatch match;
   MatchCostStatistics(
       text, match,
@@ -207,7 +207,7 @@ TEST_F(GraphicsCost, AvcFullFrame) {
   ConnectGraphics(client);
   if (::testing::Test::HasFatalFailure()) return;
   std::vector<UINT32> pixels(1920uz * 1080);
-  sdlrdp_rect const full{ 0, 0, 1920, 1080 };
+  sdlrdp_rect const full { 0, 0, 1920, 1080 };
   for (unsigned frame = 0; frame < 10; ++frame) {
     Headless::MovingTilePattern(pixels, 1920, 1080, frame);
     ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 7680, 1920, 1080, &full, 1), 0);
@@ -225,9 +225,9 @@ void ApplyPlanarDamage(std::vector<UINT32>& pixels, std::vector<UINT32>& expecte
   std::ranges::for_each(std::views::iota(part.y, part.y + part.h), [&](int row) {
     std::ranges::fill(std::span(pixels).subspan((row * 354) + part.x, part.w), 0x55aaffu);
   });
-  expected = pixels;
+  expected       =  pixels;
   pixels.front() ^= 0x00ffffff;
-  pixels.back() ^= 0x00ffffff;
+  pixels.back()  ^= 0x00ffffff;
 }
 TEST_F(GraphicsCost, PlanarPartialMatchesFull) {
   Open(354, 226, SDLRDP_CODEC_PLANAR);
@@ -239,13 +239,13 @@ TEST_F(GraphicsCost, PlanarPartialMatchesFull) {
   if (::testing::Test::HasFatalFailure()) return;
   std::vector<UINT32> pixels(354uz * 226);
   Headless::MovingTilePattern(pixels, 354, 226, 0);
-  sdlrdp_rect const full{ 0, 0, 354, 226 };
-  sdlrdp_rect const part{ 17, 19, 177, 113 };
-  auto expected = pixels;
+  sdlrdp_rect const full     { 0, 0, 354, 226   };
+  sdlrdp_rect const part     { 17, 19, 177, 113 };
+  auto              expected = pixels;
   PresentPlanar(backend.get(), client, observer, pixels, expected, full);
   ApplyPlanarDamage(pixels, expected, part);
   PresentPlanar(backend.get(), client, observer, pixels, expected, part);
-  pixels    = expected;
+  pixels = expected;
   auto* gdi = client.Instance()->context->gdi;
   std::vector<BYTE> partial(gdi->primary_buffer, gdi->primary_buffer + (std::size_t(gdi->stride) * gdi->height));
   PresentPlanar(backend.get(), client, observer, pixels, expected, full);

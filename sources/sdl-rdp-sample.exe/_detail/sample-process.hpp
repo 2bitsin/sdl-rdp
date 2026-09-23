@@ -44,10 +44,10 @@ inline fs::path BuildRoot() {
 
 inline pid_t Spawn(std::vector<std::string> arguments, int& output) {
   Expects(!arguments.empty(), "child arguments supplied");
-  std::array<int, 2> descriptors{};
+  std::array<int, 2> descriptors { };
   Expects(pipe2(descriptors.data(), O_CLOEXEC) == 0, "stdout pipe created");
-  output    = descriptors[0];
-  pid_t pid = -1;
+  output = descriptors[0];
+  pid_t                      pid     = -1;
   posix_spawn_file_actions_t actions;
   Expects(posix_spawn_file_actions_init(&actions) == 0, "spawn actions initialized");
   Expects(posix_spawn_file_actions_adddup2(&actions, descriptors[1], STDERR_FILENO) == 0, "child stderr is redirected");
@@ -88,10 +88,10 @@ public:
       }
       auto left = std::chrono::ceil<std::chrono::milliseconds>(deadline - Clock::now()).count();
       if (left <= 0) return false;
-      pollfd descriptor{ .fd = output, .events = POLLIN, .revents = 0 };
+      pollfd descriptor { .fd = output, .events = POLLIN, .revents = 0 };
       if (poll(&descriptor, 1, int(left)) <= 0) return false;
-      std::array<char, 4096> buffer{};
-      auto count = read(output, buffer.data(), buffer.size());
+      std::array<char, 4096> buffer {                                            };
+      auto                   count  = read(output, buffer.data(), buffer.size());
       if (count <= 0) return false;
       pending.append(buffer.data(), count);
       transcript.append(buffer.data(), count);
@@ -114,8 +114,8 @@ public:
 
 private:
   std::string transcript;
-  int   output = -1;
-  pid_t pid    = -1;
+  int         output     = -1;
+  pid_t       pid        = -1;
   std::string pending;
 };
 
@@ -156,7 +156,7 @@ inline unsigned ListeningPort(pid_t pid = 0) {
   std::vector<std::string> sockets;
   for (auto const& entry : fs::directory_iterator("/proc/" + std::to_string(pid) + "/fd")) {
     std::error_code error;
-    auto target = fs::read_symlink(entry.path(), error).string();
+    auto            target = fs::read_symlink(entry.path(), error).string();
     if (!error && target.starts_with("socket:[")) sockets.push_back(target);
   }
   std::ifstream tcp("/proc/net/tcp");

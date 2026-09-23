@@ -6,8 +6,8 @@
 
 namespace Backend {
 void State::SetPointer(unsigned w, unsigned h, unsigned x, unsigned y, void const* pixels) {
-  Pointer next{ .width = w, .height = h, .hot_x = x, .hot_y = y };
-  auto stride = ((w + 15) / 16) * 2;
+  Pointer next   { .width = w, .height = h, .hot_x = x, .hot_y = y };
+  auto    stride = ((w + 15) / 16) * 2;
   next.mask.resize(static_cast<std::size_t>(stride) * h);
   next.pixels.resize(static_cast<std::size_t>(w * h) * 4);
   for (unsigned row = 0; row < h; ++row) {
@@ -52,7 +52,7 @@ bool Peer::SendPointer() {
   auto* update  = context->update->pointer;
   bool  result  = false;
   if (!shape.width) {
-    POINTER_SYSTEM_UPDATE const hidden{ SYSPTR_NULL };
+    POINTER_SYSTEM_UPDATE const hidden { SYSPTR_NULL };
     result = update->PointerSystem(context, &hidden);
   } else if (shape.width <= 96 && shape.height <= 96) {
     POINTER_NEW_UPDATE const image{ 32,

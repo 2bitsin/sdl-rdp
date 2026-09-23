@@ -230,7 +230,7 @@ protected:
   }
   void Start() {
     Expects(process == nullptr, "sample has not started");
-    auto arguments                                                     = Arguments(certificates.Path(), false);
+    auto arguments = Arguments(certificates.Path(), false);
     *std::ranges::find(arguments, std::string("SDL_RDP_CODEC=planar")) = "SDL_RDP_CODEC=" + std::string(GetParam());
     arguments.insert(arguments.end(), { "--fullscreen", "--mode", "320x200", "--partial" });
     process = std::make_unique<Process>(arguments);

@@ -30,7 +30,7 @@ inline void ThenGraphicsReset(Headless::GraphicsObserver const& observer, std::s
 class FrameChecks : protected BackendEvents {
 protected:
   void Present(std::vector<UINT32> const& pixels, unsigned w, unsigned h) {
-    sdlrdp_rect const full{ 0, 0, int(w), int(h) };
+    sdlrdp_rect const full { 0, 0, int(w), int(h) };
     ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), w * 4, w, h, &full, 1), 0);
   }
   void FillLegacyWindow(Client& client, FrameObserver& observer, std::vector<UINT32>& pixels) {
@@ -51,7 +51,7 @@ protected:
     ASSERT_TRUE(update->SuppressOutput(client.Instance()->context, 0, nullptr));
     ASSERT_EQ(Events(2).size(), 2u);
     ASSERT_TRUE(freerdp_input_send_keyboard_event(client.Instance()->context->input, KBD_FLAGS_DOWN, 0x1e));
-    auto suppressed = Events(1); // Input follows SuppressOutput on the same connection.
+    auto suppressed = Events(1);  // Input follows SuppressOutput on the same connection.
     ASSERT_EQ(suppressed.size(), 1u);
     ASSERT_EQ(suppressed.front().type, SDLRDP_KEY);
   }
@@ -69,7 +69,7 @@ protected:
   }
   static void ThenScaledHighlight(Client& client) {
     auto* actual = reinterpret_cast<UINT32*>(client.Instance()->context->gdi->primary_buffer);
-    auto rows    = std::views::iota(0, 480);
+    auto  rows   = std::views::iota(0, 480);
     auto brightest =
         std::ranges::max_element(rows, {}, [&](int y) { return actual[static_cast<std::ptrdiff_t>(y) * 640] & 255; });
     EXPECT_LE(std::abs(*brightest - 240), 1);
@@ -100,13 +100,13 @@ protected:
     testing::Test::RecordProperty("acknowledged_frames", std::to_string(observer.Frames().size()));
   }
   static void ThenReadable(Client const& client) {
-    std::array<HANDLE, 64> handles{};
+    std::array<HANDLE, 64> handles { };
     auto count = freerdp_get_event_handles(client.Instance()->context, handles.data(), handles.size());
     ASSERT_GT(count, 0u);
     ASSERT_LT(WaitForMultipleObjects(count, handles.data(), FALSE, 10000), WAIT_OBJECT_0 + count);
   }
   void ThenQoe(Client& client, Headless::GraphicsObserver& observer) {
-    RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU qoe{ observer.Observed().frames.back().frameId, 1234, 7, 9 };
+    RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU qoe { observer.Observed().frames.back().frameId, 1234, 7, 9 };
     ASSERT_EQ(observer.Channel()->QoeFrameAcknowledge(observer.Channel(), &qoe), CHANNEL_RC_OK);
     ASSERT_TRUE(client.Until([&] {
       std::scoped_lock const lock(backend->state->session_guard);

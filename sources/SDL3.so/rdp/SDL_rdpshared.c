@@ -31,7 +31,7 @@ bool SDL_RDP_ParseAspect(char const* value, sdlrdp_aspect* aspect) {
   char*         end = NULL;
   unsigned long num = 0;
   unsigned long den = 0;
-  *aspect           = (sdlrdp_aspect){ 0 };
+  *aspect = (sdlrdp_aspect){ 0 };
   if (!value || !*value) return true;
   num = SDL_strtoul(value, &end, 10);
   if (end == value || *end != ':' || !num || num > SDL_MAX_UINT32) return SDL_SetError("Invalid RDP aspect: %s", value);

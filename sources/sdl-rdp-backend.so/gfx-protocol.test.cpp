@@ -16,7 +16,7 @@ TEST(GraphicsCapability, HighestSupportedVersion) {
   std::ranges::reverse(caps);
   EXPECT_EQ(Backend::SelectCapability(caps).version, RDPGFX_CAPVERSION_107);
   EXPECT_EQ(Backend::SelectCapability({}).version, 0u);
-  RDPGFX_CAPSET unknown{ 0xffffffff, 16, 0 };
+  RDPGFX_CAPSET unknown { 0xffffffff, 16, 0 };
   EXPECT_EQ(Backend::SelectCapability({ &unknown, 1 }).version, 0u);
 }
 TEST(GraphicsCapability, Version101ReservedLength) {
@@ -34,8 +34,8 @@ TEST(GraphicsCapability, MasksFlagsAndDisablesAvc) {
       RDPGFX_CAPS_FLAG_THINCLIENT | RDPGFX_CAPS_FLAG_SMALL_CACHE | RDPGFX_CAPS_FLAG_SCALEDMAP_DISABLE;
   for (UINT32 const version : { RDPGFX_CAPVERSION_8, RDPGFX_CAPVERSION_81, RDPGFX_CAPVERSION_10, RDPGFX_CAPVERSION_102,
                                 RDPGFX_CAPVERSION_107 }) {
-    RDPGFX_CAPSET cap{ version, 4, 0xffffffff };
-    auto selected = Backend::SelectCapability({ &cap, 1 });
+    RDPGFX_CAPSET cap      { version, 4, 0xffffffff                 };
+    auto          selected = Backend::SelectCapability({ &cap, 1 });
     EXPECT_EQ(selected.flags, handled | (version >= RDPGFX_CAPVERSION_10 ? RDPGFX_CAPS_FLAG_AVC_DISABLED : 0));
     EXPECT_EQ(selected.length, 4u);
     cap.length = 3;
@@ -43,7 +43,7 @@ TEST(GraphicsCapability, MasksFlagsAndDisablesAvc) {
   }
 }
 TEST(GraphicsTimestamp, PacksIndependentFields) {
-  SYSTEMTIME time{};
+  SYSTEMTIME time { };
   EXPECT_EQ(Backend::FrameTimestamp(time), 0u);
   time.wHour = 1;
   EXPECT_EQ(Backend::FrameTimestamp(time), 0x00400000u);
@@ -108,7 +108,7 @@ TEST(Avc, RegionMetablock) {
 }
 void ThenAvailableCapability(RDPGFX_CAPSET const& cap, UINT32 version) {
   for (bool const available : { false, true }) {
-    auto selected   = Backend::SelectCapability({ &cap, 1 }, available);
+    auto   selected = Backend::SelectCapability({ &cap, 1 }, available);
     UINT32 expected = 0;
     if (version == RDPGFX_CAPVERSION_81 && available) expected = RDPGFX_CAPS_FLAG_AVC420_ENABLED;
     if (version >= RDPGFX_CAPVERSION_10 && version != RDPGFX_CAPVERSION_101 && !available)
@@ -119,9 +119,9 @@ void ThenAvailableCapability(RDPGFX_CAPSET const& cap, UINT32 version) {
 TEST(GraphicsCapability, AllowsAvcWhenOfferedAndAvailable) {
   for (UINT32 const version : { RDPGFX_CAPVERSION_8, RDPGFX_CAPVERSION_81, RDPGFX_CAPVERSION_10, RDPGFX_CAPVERSION_101,
                                 RDPGFX_CAPVERSION_102, RDPGFX_CAPVERSION_107 }) {
-    RDPGFX_CAPSET cap{ version, version == RDPGFX_CAPVERSION_101 ? 16u : 4u, RDPGFX_CAPS_FLAG_AVC420_ENABLED };
+    RDPGFX_CAPSET cap { version, version == RDPGFX_CAPVERSION_101 ? 16u : 4u, RDPGFX_CAPS_FLAG_AVC420_ENABLED };
     ThenAvailableCapability(cap, version);
-    cap.flags     = version >= RDPGFX_CAPVERSION_10 ? RDPGFX_CAPS_FLAG_AVC_DISABLED : 0;
+    cap.flags = version >= RDPGFX_CAPVERSION_10 ? RDPGFX_CAPS_FLAG_AVC_DISABLED : 0;
     auto selected = Backend::SelectCapability({ &cap, 1 }, true);
     EXPECT_EQ(selected.flags,
               version >= RDPGFX_CAPVERSION_10 && version != RDPGFX_CAPVERSION_101 ? RDPGFX_CAPS_FLAG_AVC_DISABLED : 0u);

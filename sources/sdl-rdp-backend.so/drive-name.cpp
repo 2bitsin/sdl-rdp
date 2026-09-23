@@ -13,7 +13,7 @@ std::string DecodeDriveName(std::span<uint8_t const> bytes, unsigned drive_versi
     auto format = wide ? oxbox::utilities::TextFormat{ .encoding = oxbox::utilities::Encoding::UTF16,
                                                        .order    = std::endian::little }
                        : oxbox::utilities::TextFormat{};
-    auto label  = TranscodeRange<std::string>(std::as_bytes(bytes.first(bytes.size() - (wide ? 2 : 1))), format, {});
+    auto label = TranscodeRange<std::string>(std::as_bytes(bytes.first(bytes.size() - (wide ? 2 : 1))), format, {});
     if (label.find('\0') != std::string::npos) throw std::runtime_error("Embedded null in drive name.");
     return label;
   }

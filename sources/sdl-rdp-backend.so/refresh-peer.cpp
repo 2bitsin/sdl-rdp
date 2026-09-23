@@ -11,7 +11,7 @@ void State::SetRefresh(RefreshMode mode, unsigned ceiling) {
 void Peer::RestartRefresh() {
   Expects(client != nullptr, "peer exists");
   auto previous = refresh.Rate();
-  refresh       = owner.refresh;
+  refresh = owner.refresh;
   refresh.Restart();
   pending.clear();
   PublishRefresh(previous);
@@ -27,7 +27,7 @@ void Peer::MeasureWire(std::size_t bytes) {
   Expects(client != nullptr, "peer exists");
   auto wire = SampleWire(socket_descriptor);
   outq_total += wire.outq;
-  outq_max = std::max(outq_max, wire.outq);
+  outq_max   =  std::max(outq_max, wire.outq);
   if (owner.trace.Enabled())
     trace_pending.push_back(owner.trace.Format("frame", [&] {
       return std::format("id={} bytes={} outq={} unacked={} tcp_rtt={}", frame_id, bytes, wire.outq, wire.unacked,

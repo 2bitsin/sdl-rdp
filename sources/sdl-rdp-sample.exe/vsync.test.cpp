@@ -63,7 +63,7 @@ void DelayAcknowledgements(Client& client, Headless::FrameObserver& frames) {
 
 int BoundReceiveBuffer(Client& client) {
   Expects(client.Instance() != nullptr, "client exists");
-  std::array<HANDLE, 64> handles{};
+  std::array<HANDLE, 64> handles { };
   auto count = freerdp_get_event_handles(client.Instance()->context, handles.data(), handles.size());
   Expects(count > 0, "connected client has transport events");
   unsigned sockets  = 0;
@@ -85,8 +85,11 @@ int BoundReceiveBuffer(Client& client) {
 }
 
 struct Observation {
-  int scenario;
-  int64_t started, resumed = 0, reset = 0, finished = 0;
+  int     scenario;
+  int64_t started;
+  int64_t resumed  = 0;
+  int64_t reset    = 0;
+  int64_t finished = 0;
 };
 
 std::vector<Observation> Exercise(unsigned port, int scenario, std::string_view mode) {
@@ -99,9 +102,9 @@ std::vector<Observation> Exercise(unsigned port, int scenario, std::string_view 
   Expects(client.Until([&] { return Headless::DisplayClient::Ready(); }), "display channel opens");
   AcknowledgeFor(client, frames, 2s);
   std::vector<Observation> observations;
-  auto last = scenario == 0 ? 1 : scenario;
+  auto                     last         = scenario == 0 ? 1 : scenario;
   for (; scenario <= last; ++scenario) {
-    Observation observed{ .scenario = scenario, .started = WallTime() };
+    Observation observed { .scenario = scenario, .started = WallTime() };
     if (scenario < 2)
       InterruptAcknowledgements(client, frames, display, scenario == 1);
     else if (scenario == 2 || (scenario == 4 && mode != "auto-sender"))
@@ -255,8 +258,8 @@ protected:
     Expects(renderer != nullptr, "vsync renderer exists");
     auto port =
         SDL_GetNumberProperty(SDL_GetDisplayProperties(SDL_GetPrimaryDisplay()), SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0);
-    auto client    = std::async(std::launch::async, Exercise, unsigned(port), scenario, std::string_view(GetParam()));
-    unsigned frame = 0;
+    auto     client = std::async(std::launch::async, Exercise, unsigned(port), scenario, std::string_view(GetParam()));
+    unsigned frame  = 0;
     while (client.wait_for(0ms) != std::future_status::ready) {
       WhenFrameRendered(frame);
       if (::testing::Test::HasFatalFailure()) return;
@@ -282,12 +285,12 @@ protected:
     Sample::TearDown();
   }
   std::vector<Observation> observations;
-  SDL_Window*           window   = nullptr;
-  SDL_Renderer*         renderer = nullptr;
-  SDL_LogOutputFunction output   = nullptr;
-  void*                 userdata = nullptr;
-  std::string previous_trace;
-  SDL_LogPriority priority = SDL_LOG_PRIORITY_INVALID;
+  SDL_Window*              window         = nullptr;
+  SDL_Renderer*            renderer       = nullptr;
+  SDL_LogOutputFunction    output         = nullptr;
+  void*                    userdata       = nullptr;
+  std::string              previous_trace;
+  SDL_LogPriority          priority       = SDL_LOG_PRIORITY_INVALID;
 };
 
 TEST_P(VsyncRecovery, HeldAcknowledgementAndDisplayChannelResize) {

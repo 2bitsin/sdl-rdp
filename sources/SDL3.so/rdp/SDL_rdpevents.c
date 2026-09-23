@@ -33,8 +33,8 @@ void SDL_RDP_DesktopMode(SDL_VideoData* data, int w, int h) {
   SDL_RDP_CheckPicture(data, w, h);
   SDL_VideoDisplay* display = SDL_GetVideoDisplay(data->display);
   SDL_DisplayMode   mode    = display->desktop_mode;
-  mode.w                    = w;
-  mode.h                    = h;
+  mode.w = w;
+  mode.h = h;
   bool exclusive = display->fullscreen_active;
   // SDL_SetDesktopDisplayMode rejects the update while fullscreen_active.
   display->fullscreen_active = false;
@@ -132,7 +132,7 @@ static void SDL_RDP_Text(SDL_Window* window, sdlrdp_event const* event) {
 static void SDL_RDP_Key(SDL_Window* window, sdlrdp_event const* event) {
   SDL_Scancode scancode = windows_scancode_table[(event->key.scancode & 0xFF) | (event->key.extended ? 0x80 : 0)];
   SDL_Keycode  key      = 0;
-  char text[5];
+  char         text[5];
   SDL_SendKeyboardKey(0, SDL_DEFAULT_KEYBOARD_ID, (int)event->key.scancode, scancode, event->key.down != 0);
   if (!event->key.down || !SDL_TextInputActive(window)) {
     return;
@@ -280,10 +280,10 @@ static void SDL_RDP_Dispatch(SDL_VideoData* data, sdlrdp_event const* event) {
 }
 
 void SDL_RDP_PumpEvents(SDL_VideoDevice* _this) {
-  SDL_VideoData* data = _this->internal;
-  sdlrdp_event events[64];
-  unsigned count = 0;
-  unsigned i     = 0;
+  SDL_VideoData* data       = _this->internal;
+  sdlrdp_event   events[64];
+  unsigned       count      = 0;
+  unsigned       i          = 0;
   while ((count = data->backend.poll(data->handle, events, SDL_arraysize(events))) != 0) {
     for (i = 0; i < count; ++i) {
       SDL_RDP_Dispatch(data, &events[i]);

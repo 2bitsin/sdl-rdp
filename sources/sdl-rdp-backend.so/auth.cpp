@@ -21,7 +21,7 @@ public:
   BYTE* Data() { return bytes.data(); }
 
 private:
-  std::array<BYTE, 16> bytes{};
+  std::array<BYTE, 16> bytes { };
 };
 struct SettingsPassword {
 public:
@@ -63,8 +63,8 @@ void Reject(Peer& peer) {
                                               peer.client->hostname));
 }
 bool Verify(Peer& peer, char const* domain, char const* user, char const* password) {
-  SettingsPassword const clear{ peer.client->context->settings };
-  auto const& config = peer.owner.authentication.Config();
+  SettingsPassword const clear  { peer.client->context->settings     };
+  auto const&            config = peer.owner.authentication.Config();
   peer.authentication.user   = user;
   peer.authentication.domain = domain;
   sspi_FreeAuthIdentity(&peer.client->identity);
@@ -72,7 +72,7 @@ bool Verify(Peer& peer, char const* domain, char const* user, char const* passwo
     Reject(peer);
     return false;
   }
-  PlainPassword const plain{ password };
+  PlainPassword const plain { password };
   bool const accepted = config.verify ? config.verify(config.auth_user, domain, user, plain.Text()) != 0
                                       : sdlrdp_verify_pair(&config, domain, user, plain.Text()) != 0;
   if (!accepted) Reject(peer);
@@ -106,8 +106,8 @@ BOOL Authenticate(freerdp_peer* client, SEC_WINNT_AUTH_IDENTITY const*, BOOL aut
   }
 }
 bool AuthenticateSettings(freerdp_peer* client) {
-  auto& peer = Peer::Held(client);
-  SettingsPassword const clear{ client->context->settings };
+  auto&                  peer  = Peer::Held(client);
+  SettingsPassword const clear { client->context->settings };
   if (peer.authentication.checked) return peer.authentication.rejected ? Denied(client) : true;
   peer.authentication.checked = true;
   try {
@@ -126,8 +126,8 @@ void AuthenticationIdentity(freerdp_peer* client, sdlrdp_event& event) {
   Expects(client != nullptr, "client transport exists");
   Expects(event.type == SDLRDP_CONNECTED, "identity is attached to a connection event");
   auto& identity = client->identity;
-  auto user      = IdentityText(identity.User, identity.UserLength, identity.Flags);
-  auto domain    = IdentityText(identity.Domain, identity.DomainLength, identity.Flags);
+  auto  user     = IdentityText(identity.User, identity.UserLength, identity.Flags);
+  auto  domain   = IdentityText(identity.Domain, identity.DomainLength, identity.Flags);
   std::strncpy(event.connected.user, user.c_str(), sizeof(event.connected.user) - 1);
   std::strncpy(event.connected.domain, domain.c_str(), sizeof(event.connected.domain) - 1);
   event.connected.authenticated = client->authenticated != FALSE;
@@ -152,7 +152,7 @@ bool ResponseKey(Peer& peer, SEC_WINNT_AUTH_IDENTITY const& identity, BYTE* resp
   peer.authentication.user   = IdentityText(identity.User, identity.UserLength, identity.Flags);
   peer.authentication.domain = IdentityText(identity.Domain, identity.DomainLength, identity.Flags);
   auto const& config = peer.owner.authentication.Config();
-  NtHash hash;
+  NtHash      hash;
   bool const known = config.lookup ? config.lookup(config.auth_user, peer.authentication.domain.c_str(),
                                                    peer.authentication.user.c_str(), hash.Data()) != 0
                                    : sdlrdp_lookup_pair(&config, peer.authentication.domain.c_str(),

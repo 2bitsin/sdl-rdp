@@ -97,7 +97,7 @@ TEST_F(DesktopSample, LiveCodec) {
 }
 
 TEST_F(DesktopSample, WaitForClient) {
-  process       = std::make_unique<Process>(Arguments(certificates.Path(), true));
+  process = std::make_unique<Process>(Arguments(certificates.Path(), true));
   auto     deadline = Clock::now() + 10s;
   unsigned port     = 0;
   while (!(port = ListeningPort()) && Clock::now() < deadline)
@@ -207,7 +207,7 @@ TEST_F(DesktopSample, CursorShape) {
 TEST_F(DesktopSample, Soname) {
   auto library = BuildRoot() / "sources/SDL3.so/libSDL3.so.0";
   ASSERT_TRUE(fs::is_regular_file(library));
-  process    = std::make_unique<Process>(std::vector<std::string>{ "env", "objdump", "-p", library.string() });
+  process = std::make_unique<Process>(std::vector<std::string>{ "env", "objdump", "-p", library.string() });
   bool found = false;
   while (process->Line(line, Clock::now() + 10s)) {
     if (line.find("SONAME") == std::string::npos) continue;
@@ -237,8 +237,8 @@ TEST_F(DesktopSample, ClipboardAscii) {
 TEST_F(DesktopSample, ClipboardUnicode) {
   GivenClipboard("żółw");
   if (::testing::Test::HasFatalFailure()) return;
-  auto& client = SessionClient();
-  std::vector<BYTE> bytes{ 0x7c, 1, 0xf3, 0, 0x42, 1, 0x77, 0, 0, 0 };
+  auto&             client = SessionClient();
+  std::vector<BYTE> bytes  { 0x7c, 1, 0xf3, 0, 0x42, 1, 0x77, 0, 0, 0 };
   ASSERT_TRUE(client.Until([&] { return ClipboardSession().Received(bytes); }));
   SDL_Log("trace CLIPBOARD server formats=13,1 request=13 utf16le=7c01f300420177000000 text=żółw");
   ThenLegacyClipboard(client);

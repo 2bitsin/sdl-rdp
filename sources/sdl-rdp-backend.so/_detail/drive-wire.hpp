@@ -66,7 +66,7 @@ public:
 private:
   std::weak_ptr<DriveChannel> origin;
   std::vector<uint8_t>        bytes;
-  size_t position = 0;
+  size_t                      position = 0;
 };
 inline std::vector<uint8_t> DrivePath(char const* path) {
   if (!path) throw std::runtime_error("Drive path is null.");

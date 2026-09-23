@@ -13,7 +13,7 @@ static void SDLCALL SDL_RDP_CodecHintChanged(void* userdata, char const* name, c
                                              char const* newValue) {
   SDL_VideoData* data  = userdata;
   sdlrdp_codec   codec = SDLRDP_CODEC_AUTO;
-  newValue            = SDL_RDP_HintChangedValue(name, oldValue, newValue);
+  newValue = SDL_RDP_HintChangedValue(name, oldValue, newValue);
   if (data->handle && SDL_RDP_ParseCodec(newValue, &codec) && data->backend.set_codec(data->handle, codec) != 0) {
     SDL_SetError("%s", data->backend.last_error());
   }
@@ -93,8 +93,8 @@ static bool SDL_RDP_RelativeMouse(bool enabled) {
 }
 
 static bool SDL_RDP_VideoInit(SDL_VideoDevice* _this) {
-  SDL_VideoData* data = _this->internal;
-  sdlrdp_config config;
+  SDL_VideoData* data   = _this->internal;
+  sdlrdp_config  config;
   if (!SDL_RDP_AcquireBackend(&data->backend, &data->handle, &config)) {
     return false;
   }

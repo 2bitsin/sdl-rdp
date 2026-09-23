@@ -99,12 +99,13 @@ private:
                         rectangle.destBottom + 1);
     return result;
   }
-  unsigned full = 0, deliveries = 0;
-  inline static thread_local FullDesktopFrames* active = nullptr;
-  rdpUpdate*        update;
-  pSurfaceBits      surface;
-  pBitmapUpdate     bitmap;
-  std::vector<bool> rows;
+  unsigned                                      full       = 0;
+  unsigned                                      deliveries = 0;
+  inline static thread_local FullDesktopFrames* active     = nullptr;
+  rdpUpdate*                                    update;
+  pSurfaceBits                                  surface;
+  pBitmapUpdate                                 bitmap;
+  std::vector<bool>                             rows;
 };
 
 class NextFrame {
@@ -165,13 +166,13 @@ private:
       received = true;
     }
   }
-  bool                                  received = false;
-  testing::AssertionResult              matches  = testing::AssertionFailure() << "no complete frame";
-  inline static thread_local NextFrame* active   = nullptr;
-  Client&       client;
-  unsigned      column;
-  pSurfaceBits  original;
-  pBitmapUpdate original_bitmap;
+  bool                                  received        = false;
+  testing::AssertionResult              matches         = testing::AssertionFailure() << "no complete frame";
+  inline static thread_local NextFrame* active          = nullptr;
+  Client&                               client;
+  unsigned                              column;
+  pSurfaceBits                          original;
+  pBitmapUpdate                         original_bitmap;
 };
 
 inline void ThenAdvanced(Client& client) {
@@ -216,14 +217,14 @@ protected:
     client_logs = &logs;
     auto* root = WLog_GetRoot();
     ASSERT_NE(root, nullptr);
-    wLogCallbacks callbacks{ CollectClientLog, CollectClientLog, CollectClientLog, CollectClientLog };
+    wLogCallbacks callbacks { CollectClientLog, CollectClientLog, CollectClientLog, CollectClientLog };
     ASSERT_TRUE(WLog_SetLogAppenderType(root, WLOG_APPENDER_CALLBACK));
     ASSERT_TRUE(WLog_ConfigureAppender(WLog_GetLogAppender(root), "callbacks", &callbacks));
   }
   std::string ConnectLogs() {
     // Drain the child pipe too: connect can fail before another Read consumes its diagnostics.
     std::string ignored;
-    auto deadline = Clock::now() + 10ms;
+    auto        deadline = Clock::now() + 10ms;
     if (process)
       while (process->Line(ignored, deadline)) {
       }
@@ -280,10 +281,10 @@ protected:
         << "send Escape";
     ASSERT_TRUE(process->Exit()) << "sample exit 0 within ten seconds: " << process->Transcript();
   }
-  Headless::Logs logs;
-  oxbox::platform::ScratchArea certificates{ "certificates", "sdl-rdp" };
-  std::unique_ptr<Process> process;
-  std::string              line;
+  Headless::Logs               logs;
+  oxbox::platform::ScratchArea certificates { "certificates", "sdl-rdp" };
+  std::unique_ptr<Process>     process;
+  std::string                  line;
 
 private:
   static BOOL CollectClientLog(wLogMessage const* message) {
@@ -296,7 +297,7 @@ private:
     }
     return TRUE;
   }
-  inline static std::mutex log_guard;
+  inline static std::mutex      log_guard;
   inline static Headless::Logs* client_logs = nullptr;
 };
 

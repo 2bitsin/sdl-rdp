@@ -36,8 +36,8 @@ auto BitmapRectangle(Frame const& band, bool compressed) -> BITMAP_DATA {
   Expects(!band.pixels.empty(), "bitmap payload exists");
   auto payload   = band.pixels;
   auto rectangle = BITMAP_DATA{};
-  rectangle.destLeft = band.area.x;
-  rectangle.destTop  = band.area.y;
+  rectangle.destLeft           = band.area.x;
+  rectangle.destTop            = band.area.y;
   // Bitmap update corners are inclusive, unlike a surface command's.
   rectangle.destRight          = (band.area.x + band.area.w) - 1u;
   rectangle.destBottom         = (band.area.y + band.area.h) - 1u;
@@ -89,12 +89,12 @@ bool LegacyFrame::Prepare(Peer& peer) {
   next.reset();
   if (!SelectEncoder(peer)) return false;
   auto* settings = peer.client->context->settings;
-  depth          = freerdp_settings_get_uint32(settings, FreeRDP_ColorDepth);
+  depth = freerdp_settings_get_uint32(settings, FreeRDP_ColorDepth);
   wire           = depth != 32                                                           ? Wire::Bitmap
                    : peer.encoder.Codec() == SDLRDP_CODEC_PLANAR                         ? Wire::Planar
                    : freerdp_settings_get_bool(settings, FreeRDP_SurfaceCommandsEnabled) ? Wire::Surface
                                                                                          : Wire::Bitmap;
-  codec          = wire == Wire::Surface ? peer.encoder.Id(settings) : 0;
+  codec = wire == Wire::Surface ? peer.encoder.Id(settings) : 0;
   return true;
 }
 void LegacyFrame::AppendPlanar(Packet& packet, std::size_t& wire_size, sdlrdp_rect area,
@@ -111,8 +111,8 @@ void LegacyFrame::AppendPlanar(Packet& packet, std::size_t& wire_size, sdlrdp_re
 bool LegacyFrame::Planar(Peer& peer, sdlrdp_rect area) {
   Expects(area.w > 0, "planar width exists");
   Expects(area.h > 0, "planar height exists");
-  auto& encoder = peer.encoder;
-  Packet packet;
+  auto&       encoder   = peer.encoder;
+  Packet      packet;
   std::size_t wire_size = 4;
   encoder.scratch.resize(std::size_t(area.w) * 4);
   for (int y = 0; y < area.h; ++y) {

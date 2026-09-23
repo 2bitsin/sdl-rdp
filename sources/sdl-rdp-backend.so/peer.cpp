@@ -35,10 +35,10 @@ bool SecurityEnded(Peer& peer) {
   Expects(peer.client != nullptr, "peer owns its transport");
   Expects(peer.client->context, "peer transport has a context");
   if (!NegotiationRefused() && !TlsHandshakeFailed()) return false;
-  auto* settings = peer.client->context->settings;
+  auto* settings  = peer.client->context->settings;
   // FreeRDP 3.15 nego.c publishes requestedProtocols even after negotiation fails.
-  auto requested = freerdp_settings_get_uint32(settings, FreeRDP_RequestedProtocols);
-  auto protocols = ProtocolNames(requested, !requested);
+  auto  requested = freerdp_settings_get_uint32(settings, FreeRDP_RequestedProtocols);
+  auto  protocols = ProtocolNames(requested, !requested);
   if (NegotiationRefused()) {
     auto offered = (freerdp_settings_get_bool(settings, FreeRDP_TlsSecurity) ? SecurityTls : 0) |
                    (freerdp_settings_get_bool(settings, FreeRDP_NlaSecurity) ? SecurityNla : 0);
@@ -54,24 +54,24 @@ bool SecurityEnded(Peer& peer) {
 }
 sdlrdp_event Connected(rdpSettings const* settings) {
   Expects(settings != nullptr, "settings exist");
-  sdlrdp_event event{ .type = SDLRDP_CONNECTED };
+  sdlrdp_event event { .type = SDLRDP_CONNECTED };
   event.connected.width           = freerdp_settings_get_uint32(settings, FreeRDP_DesktopWidth);
   event.connected.height          = freerdp_settings_get_uint32(settings, FreeRDP_DesktopHeight);
   event.connected.keyboard_layout = freerdp_settings_get_uint32(settings, FreeRDP_KeyboardLayout);
   event.connected.bpp             = freerdp_settings_get_uint32(settings, FreeRDP_ColorDepth);
-  auto const* name                = freerdp_settings_get_string(settings, FreeRDP_ClientHostname);
+  auto const* name = freerdp_settings_get_string(settings, FreeRDP_ClientHostname);
   if (name) std::strncpy(event.connected.client_name, name, sizeof(event.connected.client_name) - 1);
   return event;
 }
 bool SendCookie(rdpContext* context) {
   Expects(context != nullptr, "session context exists");
-  ARC_SC_PRIVATE_PACKET cookie{};
+  ARC_SC_PRIVATE_PACKET cookie { };
   cookie.cbLen   = 28;
   cookie.version = AUTO_RECONNECT_VERSION_1;
   cookie.logonId = 1;
   if (winpr_RAND(cookie.arcRandomBits, sizeof(cookie.arcRandomBits)) != 0) return false;
   if (!freerdp_settings_set_pointer_len(context->settings, FreeRDP_ServerAutoReconnectCookie, &cookie, 1)) return false;
-  logon_info_ex info{};
+  logon_info_ex info { };
   info.haveCookie = TRUE;
   info.LogonId    = cookie.logonId;
   std::ranges::copy(cookie.arcRandomBits, info.ArcRandomBits);
@@ -107,10 +107,10 @@ void Peer::InstallCallbacks() const {
   raw->context->update->SurfaceFrameAcknowledge = Acknowledge;
   raw->context->update->SuppressOutput          = Suppress;
   auto* input = raw->context->input;
-  input->KeyboardEvent                          = Keyboard;
-  input->UnicodeKeyboardEvent                   = Input::Unicode;
-  input->MouseEvent                             = Mouse;
-  input->ExtendedMouseEvent                     = ExtendedMouse;
+  input->KeyboardEvent        = Keyboard;
+  input->UnicodeKeyboardEvent = Input::Unicode;
+  input->MouseEvent           = Mouse;
+  input->ExtendedMouseEvent   = ExtendedMouse;
 }
 std::pair<DWORD, DWORD> Peer::PollParameters(std::span<HANDLE> handles) {
   DWORD count   = 0;
@@ -232,8 +232,8 @@ bool Peer::PollStep(std::stop_token const& quit, std::span<HANDLE> handles) {
   if (!count) return false;
   auto result = WaitForMultipleObjects(count, handles.data(), FALSE, timeout);
   if (result == WAIT_FAILED || quit.stop_requested()) return false;
-  std::array<HANDLE, MAXIMUM_WAIT_OBJECTS> signalled{};
-  HANDLE* end = nullptr;
+  std::array<HANDLE, MAXIMUM_WAIT_OBJECTS> signalled {         };
+  HANDLE*                                  end       = nullptr;
   try {
     end = std::ranges::copy_if(handles.first(count), signalled.begin(), Signalled).out;
   } catch (std::runtime_error const&) {
@@ -252,7 +252,7 @@ void Peer::Serve(std::stop_token const& quit) {
   ResetAuthenticationLogging();
   PeerNegotiationLogging(client->context->settings);
   // WinPR BIO signals readability only; retry blocked output every 5 ms for static frames.
-  std::array<HANDLE, MAXIMUM_WAIT_OBJECTS> handles{};
+  std::array<HANDLE, MAXIMUM_WAIT_OBJECTS> handles { };
   if (Configure() && client->Initialize(client.get())) {
     while (!quit.stop_requested() && PollStep(quit, handles)) {
     }

@@ -20,7 +20,7 @@ inline bool AllowsAvc(RDPGFX_CAPSET const& cap) {
              : cap.version >= RDPGFX_CAPVERSION_10 && !(cap.flags & RDPGFX_CAPS_FLAG_AVC_DISABLED);
 }
 inline RDPGFX_CAPSET SelectCapability(std::span<RDPGFX_CAPSET const> caps, bool avc_available = false) {
-  RDPGFX_CAPSET selected{};
+  RDPGFX_CAPSET selected { };
   for (auto const& cap : caps) {
     if (std::ranges::find(versions, cap.version) != versions.end() && cap.version > selected.version &&
         cap.length >= (cap.version == RDPGFX_CAPVERSION_101 ? Version101DataLength : FlagsDataLength))

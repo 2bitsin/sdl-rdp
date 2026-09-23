@@ -23,7 +23,7 @@ IntraRefresh IntraRefreshFor(unsigned fps) {
   Expects(fps, "refresh rate is positive");
   Expects(fps <= UINT32_MAX / 2, "doubled refresh rate fits NVENC");
   // Recovery target: refresh every two seconds, spreading each sweep over half a second.
-  IntraRefresh refresh{ .period = 2 * fps, .count = std::max(1u, fps / 2) };
+  IntraRefresh refresh { .period = 2 * fps, .count = std::max(1u, fps / 2) };
   Ensures(refresh.count <= refresh.period, "refresh sweep fits its period");
   return refresh;
 }
@@ -68,10 +68,10 @@ void Regions::Add(sdlrdp_rect area) {
   else {
     auto right  = std::max(bounds.x + bounds.w, area.x + area.w);
     auto bottom = std::max(bounds.y + bounds.h, area.y + area.h);
-    bounds.x    = std::min(bounds.x, area.x);
-    bounds.y    = std::min(bounds.y, area.y);
-    bounds.w    = right - bounds.x;
-    bounds.h    = bottom - bounds.y;
+    bounds.x = std::min(bounds.x, area.x);
+    bounds.y = std::min(bounds.y, area.y);
+    bounds.w = right - bounds.x;
+    bounds.h = bottom - bounds.y;
   }
   rects.push_back({ UINT16(area.x), UINT16(area.y), UINT16(area.x + area.w), UINT16(area.y + area.h) });
   quality.push_back({ 0x9a, 100, 26, 0, 1 });
@@ -90,18 +90,22 @@ public:
   void Close();
 
 private:
-  friend class Encoder;
-  CudaFunctions*  cuda   = nullptr;
-  NvencFunctions* loader = nullptr;
-  NV_ENCODE_API_FUNCTION_LIST api{};
-  CUdevice          device  = 0;
-  CUcontext         context = nullptr;
-  void*             session = nullptr;
-  NV_ENC_INPUT_PTR  input   = nullptr;
-  NV_ENC_OUTPUT_PTR output  = nullptr;
-  unsigned width = 0, height = 0, w = 0, h = 0;
-  bool small = false, first = true;
-  std::string error;
+  friend class                Encoder;
+  CudaFunctions*              cuda    = nullptr;
+  NvencFunctions*             loader  = nullptr;
+  NV_ENCODE_API_FUNCTION_LIST api     {         };
+  CUdevice                    device  = 0;
+  CUcontext                   context = nullptr;
+  void*                       session = nullptr;
+  NV_ENC_INPUT_PTR            input   = nullptr;
+  NV_ENC_OUTPUT_PTR           output  = nullptr;
+  unsigned                    width   = 0;
+  unsigned                    height  = 0;
+  unsigned                    w       = 0;
+  unsigned                    h       = 0;
+  bool                        small   = false;
+  bool                        first   = true;
+  std::string                 error;
 };
 bool Encoder::Impl::Check(int status, char const* operation) {
   Expects(operation, "operation name exists");
@@ -125,7 +129,7 @@ bool Encoder::Impl::Session() {
       !Check(cuda->cuDeviceGet(&device, 0), "cuDeviceGet") ||
       !Check(cuda->cuDevicePrimaryCtxRetain(&context, device), "retain CUDA context"))
     return false;
-  NV_ENC_OPEN_ENCODE_SESSION_EX_PARAMS open{};
+  NV_ENC_OPEN_ENCODE_SESSION_EX_PARAMS open { };
   open.version    = NV_ENC_OPEN_ENCODE_SESSION_EX_PARAMS_VER;
   open.deviceType = NV_ENC_DEVICE_TYPE_CUDA;
   open.device     = context;
@@ -151,10 +155,10 @@ void ConfigureColour(NV_ENC_CONFIG_H264_VUI_PARAMETERS& vui) {
   vui.colourMatrix                 = NV_ENC_VUI_MATRIX_COEFFS_BT709;
 }
 void ConfigureH264(NV_ENC_CONFIG_H264& h264, unsigned fps) {
-  h264.chromaFormatIDC    = 1;
-  h264.level              = NV_ENC_LEVEL_AUTOSELECT;
-  h264.idrPeriod          = NVENC_INFINITE_GOPLENGTH;
-  h264.repeatSPSPPS       = 1;
+  h264.chromaFormatIDC = 1;
+  h264.level           = NV_ENC_LEVEL_AUTOSELECT;
+  h264.idrPeriod       = NVENC_INFINITE_GOPLENGTH;
+  h264.repeatSPSPPS    = 1;
   auto refresh = IntraRefreshFor(fps);
   h264.enableIntraRefresh = 1;
   h264.intraRefreshPeriod = refresh.period;
@@ -170,27 +174,27 @@ void ConfigurePreset(NV_ENC_CONFIG& config, unsigned bitrate, unsigned fps) {
 }
 }
 NV_ENC_INITIALIZE_PARAMS Encoder::Impl::Parameters(unsigned fps, NV_ENC_CONFIG* config) const {
-  NV_ENC_INITIALIZE_PARAMS init{};
-  init.version     = NV_ENC_INITIALIZE_PARAMS_VER;
-  init.encodeGUID  = NV_ENC_CODEC_H264_GUID;
-  init.presetGUID  = NV_ENC_PRESET_P4_GUID;
-  init.tuningInfo  = NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY;
-  init.encodeWidth = init.maxEncodeWidth = w;
-  init.encodeHeight = init.maxEncodeHeight = h;
-  init.darWidth                            = width;
-  init.darHeight                           = height;
-  init.frameRateNum                        = fps;
-  init.frameRateDen                        = 1;
-  init.enablePTD                           = 1;
-  init.enableEncodeAsync                   = 0;
-  init.encodeConfig                        = config;
+  NV_ENC_INITIALIZE_PARAMS init { };
+  init.version           = NV_ENC_INITIALIZE_PARAMS_VER;
+  init.encodeGUID        = NV_ENC_CODEC_H264_GUID;
+  init.presetGUID        = NV_ENC_PRESET_P4_GUID;
+  init.tuningInfo        = NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY;
+  init.encodeWidth       = init.maxEncodeWidth = w;
+  init.encodeHeight      = init.maxEncodeHeight = h;
+  init.darWidth          = width;
+  init.darHeight         = height;
+  init.frameRateNum      = fps;
+  init.frameRateDen      = 1;
+  init.enablePTD         = 1;
+  init.enableEncodeAsync = 0;
+  init.encodeConfig      = config;
   return init;
 }
 bool Encoder::Impl::Initialize(unsigned bitrate, unsigned fps) {
   Expects(session != nullptr, "encoder session exists");
   Expects(bitrate > 0, "encoder bitrate is positive");
   Expects(fps > 0, "encoder frame rate is positive");
-  NV_ENC_PRESET_CONFIG preset{};
+  NV_ENC_PRESET_CONFIG preset { };
   preset.version           = NV_ENC_PRESET_CONFIG_VER;
   preset.presetCfg.version = NV_ENC_CONFIG_VER;
   if (!Check(api.nvEncGetEncodePresetConfigEx(session, NV_ENC_CODEC_H264_GUID, NV_ENC_PRESET_P4_GUID,
@@ -206,14 +210,14 @@ bool Encoder::Impl::Buffers() {
   Expects(session != nullptr, "encoder session exists");
   Expects(w % 16 == 0, "encoder width is aligned");
   Expects(h % 16 == 0, "encoder height is aligned");
-  NV_ENC_CREATE_INPUT_BUFFER in{};
+  NV_ENC_CREATE_INPUT_BUFFER in { };
   in.version   = NV_ENC_CREATE_INPUT_BUFFER_VER;
   in.width     = w;
   in.height    = h;
   in.bufferFmt = NV_ENC_BUFFER_FORMAT_IYUV;
   if (!Check(api.nvEncCreateInputBuffer(session, &in), "create input buffer")) return false;
   input = in.inputBuffer;
-  NV_ENC_CREATE_BITSTREAM_BUFFER out{};
+  NV_ENC_CREATE_BITSTREAM_BUFFER out { };
   out.version = NV_ENC_CREATE_BITSTREAM_BUFFER_VER;
   if (!Check(api.nvEncCreateBitstreamBuffer(session, &out), "create bitstream buffer")) return false;
   output = out.bitstreamBuffer;
@@ -224,10 +228,10 @@ int ConvertInput(NV_ENC_LOCK_INPUT_BUFFER const& lock, prim_size_t const& size, 
                  unsigned stride) {
   Expects(lock.pitch >= size.width, "I420 pitch covers aligned width");
   Expects(lock.pitch % 2 == 0, "I420 pitch is even");
-  auto* y{ static_cast<BYTE*>(lock.bufferDataPtr) };
+  auto* y { static_cast<BYTE*>(lock.bufferDataPtr) };
   std::array<BYTE*, 3> planes{ y, y + (std::size_t(lock.pitch) * size.height),
                                y + (std::size_t(lock.pitch) * size.height * 5 / 4) };
-  std::array<UINT32, 3> pitches{ lock.pitch, lock.pitch / 2, lock.pitch / 2 };
+  std::array<UINT32, 3> pitches { lock.pitch, lock.pitch / 2, lock.pitch / 2 };
   return primitives_get()->RGBToYUV420_8u_P3AC4R(bgrx.data(), PIXEL_FORMAT_BGRX32, stride, planes.data(),
                                                  pitches.data(), &size);
 }
@@ -236,17 +240,17 @@ bool Encoder::Impl::Fill(std::span<BYTE const> bgrx, unsigned stride, Encoder& t
   Expects(session != nullptr, "encoder session exists");
   Expects(input != nullptr, "encoder input buffer exists");
   using Clock = std::chrono::steady_clock;
-  auto start = Clock::now();
-  NV_ENC_LOCK_INPUT_BUFFER lock{};
+  auto                     start = Clock::now();
+  NV_ENC_LOCK_INPUT_BUFFER lock  {              };
   lock.version     = NV_ENC_LOCK_INPUT_BUFFER_VER;
   lock.inputBuffer = input;
   if (!Check(api.nvEncLockInputBuffer(session, &lock), "lock input")) return false;
-  timing.times.upload  = Clock::now() - start;
-  start                = Clock::now();
-  auto status          = ConvertInput(lock, { w, h }, bgrx, stride);
+  timing.times.upload = Clock::now() - start;
+  start               = Clock::now();
+  auto status = ConvertInput(lock, { w, h }, bgrx, stride);
   timing.times.convert = Clock::now() - start;
   start                = Clock::now();
-  auto unlocked        = Check(api.nvEncUnlockInputBuffer(session, input), "unlock input");
+  auto unlocked = Check(api.nvEncUnlockInputBuffer(session, input), "unlock input");
   timing.times.upload += Clock::now() - start;
   return Check(status, "BT.709 conversion") && unlocked;
 }
@@ -293,15 +297,15 @@ bool Encoder::Available() {
   return UnavailableReason().empty();
 }
 bool Encoder::Impl::MinimumSize() {
-  NV_ENC_CAPS_PARAM caps{};
-  caps.version     = NV_ENC_CAPS_PARAM_VER;
+  NV_ENC_CAPS_PARAM caps { };
+  caps.version = NV_ENC_CAPS_PARAM_VER;
   int min_width  = 0;
   int min_height = 0;
   caps.capsToQuery = NV_ENC_CAPS_WIDTH_MIN;
-  bool ok          = Check(api.nvEncGetEncodeCaps(session, NV_ENC_CODEC_H264_GUID, &caps, &min_width), "minimum width");
+  bool ok = Check(api.nvEncGetEncodeCaps(session, NV_ENC_CODEC_H264_GUID, &caps, &min_width), "minimum width");
   caps.capsToQuery = NV_ENC_CAPS_HEIGHT_MIN;
   ok    = Check(api.nvEncGetEncodeCaps(session, NV_ENC_CODEC_H264_GUID, &caps, &min_height), "minimum height") && ok;
-  small = ok && (std::cmp_less(w, min_width) || std::cmp_less(h, min_height));
+  small            = ok && (std::cmp_less(w, min_width) || std::cmp_less(h, min_height));
   if (small) error = "surface below NVENC minimum picture size";
   return ok;
 }
@@ -325,7 +329,7 @@ bool Encoder::Open(unsigned width, unsigned height, unsigned bitrate, unsigned f
   return true;
 }
 NV_ENC_PIC_PARAMS Encoder::Impl::Picture(bool force_idr) const {
-  NV_ENC_PIC_PARAMS pic{};
+  NV_ENC_PIC_PARAMS pic { };
   pic.version         = NV_ENC_PIC_PARAMS_VER;
   pic.inputBuffer     = input;
   pic.outputBitstream = output;
@@ -346,9 +350,9 @@ std::span<BYTE const> Encoder::Encode(std::span<BYTE const> bgrx, unsigned strid
   auto pic   = impl->Picture(force_idr);
   auto start = std::chrono::steady_clock::now();
   if (!impl->Check(impl->api.nvEncEncodePicture(impl->session, &pic), "encode picture")) return {};
-  NV_ENC_LOCK_BITSTREAM lock{ .version = NV_ENC_LOCK_BITSTREAM_VER, .outputBitstream = impl->output };
+  NV_ENC_LOCK_BITSTREAM lock { .version = NV_ENC_LOCK_BITSTREAM_VER, .outputBitstream = impl->output };
   if (!impl->Check(impl->api.nvEncLockBitstream(impl->session, &lock), "lock bitstream")) return {};
-  times.encode     = std::chrono::steady_clock::now() - start;
+  times.encode = std::chrono::steady_clock::now() - start;
   auto const* data = static_cast<BYTE const*>(lock.bitstreamBufferPtr);
   encoded.assign(data, data + lock.bitstreamSizeInBytes);
   if (!impl->Check(impl->api.nvEncUnlockBitstream(impl->session, impl->output), "unlock bitstream")) return {};

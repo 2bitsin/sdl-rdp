@@ -31,8 +31,8 @@ SDL_IOStream* OpenDriveFile(char const* value, char const* mode) {
 }
 SDL_EnumerationResult ListEntry(void* user, char const* directory, char const* name) {
 
-  auto* storage = static_cast<SDL_Storage*>(user);
-  SDL_PathInfo info{};
+  auto*        storage = static_cast<SDL_Storage*>(user);
+  SDL_PathInfo info    {                                 };
   if (!SDL_GetStoragePathInfo(storage, (std::string(directory) + name).c_str(), &info)) return SDL_ENUM_FAILURE;
   SDL_Log("entry name=%s size=%llu dir=%d", name, (unsigned long long)info.size, info.type == SDL_PATHTYPE_DIRECTORY);
   return SDL_ENUM_CONTINUE;
@@ -78,8 +78,8 @@ bool ReadDigest(SDL_IOStream* file, EVP_MD_CTX* hash, uint64_t& total) {
   return true;
 }
 void LogDigest(EVP_MD_CTX* hash, uint64_t total) {
-  std::array<unsigned char, EVP_MAX_MD_SIZE> digest{};
-  unsigned size = 0;
+  std::array<unsigned char, EVP_MAX_MD_SIZE> digest {   };
+  unsigned                                   size   = 0;
   Check(EVP_DigestFinal_ex(hash, digest.data(), &size) == 1);
   auto hex = std::ranges::fold_left(
       std::span(digest).first(size), std::string{},

@@ -13,8 +13,8 @@ protected:
     auto* path = mkdtemp(pattern);
     ASSERT_NE(path, nullptr);
     directory = path;
-    sdlrdp_config config{ "127.0.0.1", 0, directory.c_str(), width, height, 0, Logs::Collect, &logs };
-    config.codec          = codec;
+    sdlrdp_config config { "127.0.0.1", 0, directory.c_str(), width, height, 0, Logs::Collect, &logs };
+    config.codec = codec;
     sdlrdp_handle* handle = nullptr;
     ASSERT_EQ(sdlrdp_open(&config, &handle), 0) << sdlrdp_last_error();
     backend.reset(handle);

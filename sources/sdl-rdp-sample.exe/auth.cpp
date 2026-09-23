@@ -17,7 +17,7 @@ void SDLCALL Authenticator::AuthenticationLog(void* user, int category, SDL_LogP
   self.previous(self.previous_user, category, priority, message);
   if (!text.starts_with(prefix)) return;
   text.remove_prefix(prefix.size());
-  auto end = text.find('"');
+  auto end  = text.find('"');
   auto name = text.substr(0, end);
   if (auto slash = name.find('\\'); slash != std::basic_string_view<char, std::char_traits<char>>::npos)
     name.remove_prefix(slash + 1);

@@ -49,7 +49,7 @@ TEST_F(RoundFive, SuppressOutput) {
   Present(pixels, 640, 480);
   ThenSuppressed(client, observer, bytes);
   if (::testing::Test::HasFatalFailure()) return;
-  RECTANGLE_16 const area{ 0, 0, 639, 479 };
+  RECTANGLE_16 const area { 0, 0, 639, 479 };
   ASSERT_TRUE(update->SuppressOutput(client.Instance()->context, 1, &area));
   ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == 1; }));
   EXPECT_TRUE(client.Matches(pixels));
@@ -140,7 +140,7 @@ TEST_F(RoundFive, ColourDepths) {
 namespace {
 void ProduceFrames(sdlrdp_handle* backend, std::atomic<unsigned>& presents, std::stop_token const& stop) {
   std::vector<UINT32> pixels(1024uz * 768);
-  sdlrdp_rect const area{ 0, 0, 1024, 768 };
+  sdlrdp_rect const area { 0, 0, 1024, 768 };
   while (!stop.stop_requested()) {
     auto sequence = presents.load() + 1;
     std::fill_n(pixels.begin(), 1024, sequence);

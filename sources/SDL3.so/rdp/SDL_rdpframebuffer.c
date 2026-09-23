@@ -36,12 +36,12 @@ static bool SDL_RDP_FrameResult(SDL_VideoData* data, int result) {
 }
 
 bool SDL_RDP_UpdateWindowFramebuffer(SDL_VideoDevice* _this, SDL_Window* window, SDL_Rect const* rects, int numrects) {
-  SDL_VideoData* data = _this->internal;
-  SDL_Surface* surface = SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_RDP_SURFACE, NULL);
-  sdlrdp_rect* damage  = NULL;
-  int          i       = 0;
-  int          result  = 0;
-  bool         isstack = false;
+  SDL_VideoData* data    = _this->internal;
+  SDL_Surface*   surface = SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_RDP_SURFACE, NULL);
+  sdlrdp_rect*   damage  = NULL;
+  int            i       = 0;
+  int            result  = 0;
+  bool           isstack = false;
   if (!surface) return SDL_SetError("Couldn't find RDP surface for window");
   if (numrects <= 0) return true;
   damage = SDL_small_alloc(sdlrdp_rect, (size_t)numrects, &isstack);

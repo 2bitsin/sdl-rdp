@@ -69,7 +69,7 @@ TEST_P(Gate, ResizeAndWakeup) {
   backend.reset();
 }
 TEST_P(Gate, LateClientAndBurst) {
-  sdlrdp_rect const area{ 0, 0, 320, 200 };
+  sdlrdp_rect const area { 0, 0, 320, 200 };
   ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &area, 1), 0);
   Client client(sdlrdp_port(backend.get()), GetParam().surface);
   ConnectCodec(client);
@@ -79,14 +79,14 @@ TEST_P(Gate, LateClientAndBurst) {
 }
 TEST_P(Gate, DesktopIsPicture) {
   backend.reset();
-  sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), 640, 480, 0, Logs::Collect, &logs };
-  config.codec          = GetParam().codec;
+  sdlrdp_config config { "127.0.0.1", 0, certificates.Path().c_str(), 640, 480, 0, Logs::Collect, &logs };
+  config.codec = GetParam().codec;
   sdlrdp_handle* handle = nullptr;
   ASSERT_EQ(sdlrdp_open(&config, &handle), 0);
   backend.reset(handle);
   std::vector<UINT32> frame(640uz * 480);
   std::ranges::generate(frame, [index = 0u]() mutable { return (index++ * 2654435761u) & 0x00ffffff; });
-  sdlrdp_rect const area{ 0, 0, 640, 480 };
+  sdlrdp_rect const area { 0, 0, 640, 480 };
   ASSERT_EQ(sdlrdp_present(handle, frame.data(), 640 * 4, 640, 480, &area, 1), 0);
   Client client(sdlrdp_port(handle), GetParam().surface);
   ConnectCodec(client);
@@ -97,11 +97,11 @@ TEST_P(Gate, DesktopIsPicture) {
 TEST_P(Gate, WaitForClient) {
   auto port = sdlrdp_port(backend.get());
   backend.reset();
-  sdlrdp_config config{ "127.0.0.1", port, certificates.Path().c_str(), 320, 200, 1 };
-  config.codec          = GetParam().codec;
-  sdlrdp_handle* handle = nullptr;
-  auto opening          = std::async(std::launch::async, [&] { return sdlrdp_open(&config, &handle); });
-  auto deadline = Clock::now() + std::chrono::seconds(10);
+  sdlrdp_config config { "127.0.0.1", port, certificates.Path().c_str(), 320, 200, 1 };
+  config.codec = GetParam().codec;
+  sdlrdp_handle* handle   = nullptr;
+  auto           opening  = std::async(std::launch::async, [&] { return sdlrdp_open(&config, &handle); });
+  auto           deadline = Clock::now() + std::chrono::seconds(10);
   while (!Listening(port) && Clock::now() < deadline)
     std::this_thread::yield();
   EXPECT_EQ(opening.wait_for(std::chrono::milliseconds(0)), std::future_status::timeout);
@@ -122,7 +122,7 @@ TEST_P(Gate, BlockedSinglePresent) {
   ASSERT_EQ(events.front().type, SDLRDP_CONNECTED);
   pixels.resize(2048uz * 1536);
   std::ranges::generate(pixels, [index = 0u]() mutable { return (index++ * 2654435761u) & 0x00ffffff; });
-  sdlrdp_rect area{ 0, 0, 2048, 1536 };
+  sdlrdp_rect area { 0, 0, 2048, 1536 };
   // Keep the client unpumped until the presenter completes. Completion therefore
   // cannot depend on the client draining output; ten seconds is a progress bound.
   auto presenting = std::async(std::launch::async,
@@ -205,7 +205,7 @@ TEST_P(Gate, TinyDamage) {
 TEST_P(Gate, ProbeClosesBeforeActivation) {
   {
     Socket const socket;
-    sockaddr_in address{};
+    sockaddr_in  address { };
     address.sin_family      = AF_INET;
     address.sin_port        = htons(sdlrdp_port(backend.get()));
     address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);

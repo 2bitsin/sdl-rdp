@@ -86,8 +86,8 @@ inline void DisconnectGraphicsDecoder(void* raw, ChannelDisconnectedEventArgs co
   gdi_graphics_pipeline_uninit(context->gdi, static_cast<RdpgfxClientContext*>(event->pInterface));
 }
 inline BOOL LoadGraphicsChannel(freerdp* instance) {
-  std::array<char const*, 1> channel{ "rdpgfx" };
-  auto* settings = instance->context->settings;
+  std::array<char const*, 1> channel  { "rdpgfx"                    };
+  auto*                      settings = instance->context->settings;
   auto entry     = reinterpret_cast<PVIRTUALCHANNELENTRYEX>(freerdp_load_channel_addin_entry(
       "drdynvc", nullptr, nullptr, FREERDP_ADDIN_CHANNEL_STATIC | FREERDP_ADDIN_CHANNEL_ENTRYEX));
   return entry && freerdp_client_add_dynamic_channel(settings, 1, channel.data()) &&
@@ -130,8 +130,8 @@ public:
             "client credentials configured");
   }
   bool Pump(unsigned timeout = 10) const {
-    std::array<HANDLE, 64> handles{};
-    auto count = freerdp_get_event_handles(instance->context, handles.data(), handles.size());
+    std::array<HANDLE, 64> handles {                                                                              };
+    auto                   count   = freerdp_get_event_handles(instance->context, handles.data(), handles.size());
     return count && WaitForMultipleObjects(count, handles.data(), FALSE, timeout) != WAIT_FAILED &&
            freerdp_check_event_handles(instance->context);
   }
@@ -181,8 +181,8 @@ public:
   void Tolerance(unsigned value) { tolerance = value; }
 
 private:
-  std::unique_ptr<freerdp, ReleaseClient> instance{ freerdp_new() };
-  unsigned tolerance = 0;
+  std::unique_ptr<freerdp, ReleaseClient> instance  { freerdp_new() };
+  unsigned                                tolerance = 0;
 };
 struct FrameObserver {
 public:
@@ -227,19 +227,20 @@ private:
         (pixels[0] & 0xffffff) == (pixels[(static_cast<std::ptrdiff_t>(gdi->height - 1)) * gdi->width] & 0xffffff);
     return TRUE;
   }
-  inline static thread_local FrameObserver* active = nullptr;
-  rdpUpdate*                     update;
-  pSurfaceFrameMarker            original;
-  std::vector<UINT32>            ids;
-  std::vector<Clock::time_point> received;
-  bool coherent = true;
-  std::vector<Clock::time_point> ack_times;
+  inline static thread_local FrameObserver* active    = nullptr;
+  rdpUpdate*                                update;
+  pSurfaceFrameMarker                       original;
+  std::vector<UINT32>                       ids;
+  std::vector<Clock::time_point>            received;
+  bool                                      coherent  = true;
+  std::vector<Clock::time_point>            ack_times;
 };
 struct DisplayCapture {
-  bool echo_resize = false;
-  std::chrono::milliseconds finalization_delay{};
+  bool                      echo_resize        = false;
+  std::chrono::milliseconds finalization_delay {       };
   std::function<void()> finalizing;
-  unsigned desktops = 0, echoes = 0;
+  unsigned desktops = 0;
+  unsigned echoes   = 0;
 };
 struct DisplayClient {
 public:
@@ -260,8 +261,8 @@ public:
             "display control enabled");
     PubSub_SubscribeChannelConnected(context->pubSub, Connected);
     client.Instance()->LoadChannels = [](freerdp* instance) -> BOOL {
-      std::array<char const*, 1> channel{ "disp" };
-      auto* settings = instance->context->settings;
+      std::array<char const*, 1> channel  { "disp"                      };
+      auto*                      settings = instance->context->settings;
       auto entry     = reinterpret_cast<PVIRTUALCHANNELENTRYEX>(freerdp_load_channel_addin_entry(
           "drdynvc", nullptr, nullptr, FREERDP_ADDIN_CHANNEL_STATIC | FREERDP_ADDIN_CHANNEL_ENTRYEX));
       return entry && freerdp_client_add_dynamic_channel(settings, 1, channel.data()) &&
@@ -279,7 +280,7 @@ public:
   DisplayClient& operator = (DisplayClient const&) = delete;
   DisplayClient& operator = (DisplayClient&&)      = delete;
   static DISPLAY_CONTROL_MONITOR_LAYOUT Monitor(unsigned width, unsigned height, unsigned millimetres = 400) {
-    DISPLAY_CONTROL_MONITOR_LAYOUT monitor{};
+    DISPLAY_CONTROL_MONITOR_LAYOUT monitor { };
     monitor.Flags              = DISPLAY_CONTROL_MONITOR_PRIMARY;
     monitor.Width              = width;
     monitor.Height             = height;
@@ -314,17 +315,17 @@ private:
   }
   static void Connected(void* /*unused*/, ChannelConnectedEventArgs const* event) {
     if (std::string_view(event->name) != DISP_DVC_CHANNEL_NAME) return;
-    channel                            = static_cast<DispClientContext*>(event->pInterface);
+    channel = static_cast<DispClientContext*>(event->pInterface);
     channel.load()->DisplayControlCaps = [](DispClientContext*, UINT32, UINT32, UINT32) -> UINT {
       ready = true;
       return CHANNEL_RC_OK;
     };
   }
-  DisplayCapture observed;
-  inline static thread_local DisplayClient* active = nullptr;
-  Client&        client;
-  pDesktopResize desktop_resize;
-  inline static std::atomic<DispClientContext*> channel = nullptr;
-  inline static std::atomic_bool                ready   = false;
+  DisplayCapture                                observed;
+  inline static thread_local DisplayClient*     active         = nullptr;
+  Client&                                       client;
+  pDesktopResize                                desktop_resize;
+  inline static std::atomic<DispClientContext*> channel        = nullptr;
+  inline static std::atomic_bool                ready          = false;
 };
 } // namespace Headless

@@ -31,9 +31,9 @@ TEST_F(Authentication, TlsFixedPair) {
 }
 TEST_F(Authentication, DnsDomain) {
   std::string const domain = std::string(63, 'a') + "." + std::string(63, 'b') + ".example.org";
-  config.domain            = domain.c_str();
-  config.user              = "alice";
-  config.password          = "correct-secret";
+  config.domain   = domain.c_str();
+  config.user     = "alice";
+  config.password = "correct-secret";
   Open(SDLRDP_AUTH_TLS, false);
   Attempt("alice", "correct-secret", domain.c_str(), false, true);
 }

@@ -66,7 +66,7 @@ static void SDL_RDP_IniEntry(void* user, int index, char const* key, char const*
 
 static bool SDL_RDP_ReadIni(char const* path, bool required) {
   struct SDL_RDP_Registry* const state = SDL_RDP_Registry();
-  SDL_PathInfo info;
+  SDL_PathInfo                   info;
   state->ini_text = SDL_LoadFile(path, NULL);
   if (state->ini_text) {
     SDL_RDP_IniParse(state->ini_text, SDL_RDP_IniEntry, (void*)path);
