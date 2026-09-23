@@ -284,6 +284,7 @@ BOOL Peer::Activate(freerdp_peer* client)
   event.connected.codec = self.encoder.codec;
   event.connected.screen_width = self.screen_width;
   event.connected.screen_height = self.screen_height;
+  event.connected.refresh_millihertz = self.effective_refresh.load() * 1000;
   self.ack_enabled = freerdp_settings_get_uint32(client->context->settings, FreeRDP_FrameAcknowledge) != 0;
   self.desktop = {0, 0, int(event.connected.width), int(event.connected.height)};
   self.owner.Takeover(self, event);
@@ -360,29 +361,40 @@ bool Peer::Drain()
   Expects(client->context != nullptr, "peer context exists");
   if (!active) return true;
   if (client->DrainOutputBuffer(client.get()) < 0) return false;
-  if (client->IsWriteBlocked(client.get())) {
-    std::scoped_lock lock(owner.frame_guard);
-    wake.Transition(WakeEvent::Phase::Idle);
-    return true;
-  }
-  {
-    std::scoped_lock lock(owner.frame_guard);
-    wake.Transition(WakeEvent::Phase::Idle);
-    if (!freerdp_is_active_state(client->context)) return true;
-    if (resizing) {
-      resizing = false;
-      if (!dirty.empty()) {
-        snapshot.reset();
-        dirty.Add({0, 0, int(owner.frame_width), int(owner.frame_height)});
-      }
-    }
-    if (!Pacing() || suppressed) return true;
-  }
+  if (!ReadyFrame()) return true;
   if (connection) return true;
   if (!SendPointer()) return false;
   if (!snapshot && !BeginFrame()) return false;
   if (!snapshot || resizing) return true;
   return PrepareFrame();
+}
+bool Peer::ReadyFrame()
+{
+  Expects(client != nullptr, "peer exists");
+  Expects(client->context != nullptr, "peer context exists");
+  std::scoped_lock lock(owner.frame_guard);
+  wake.Transition(WakeEvent::Phase::Idle);
+  if (client->IsWriteBlocked(client.get())) {
+    auto previous = refresh.rate;
+    refresh.Blocked(Clock::now());
+    PublishRefresh(previous);
+    return false;
+  }
+  if (!freerdp_is_active_state(client->context)) return false;
+  if (resizing) {
+    resizing = false;
+    RestartRefresh();
+    if (!dirty.empty()) {
+      snapshot.reset();
+      dirty.Add({0, 0, int(owner.frame_width), int(owner.frame_height)});
+    }
+  }
+  if (refresh.awaiting_empty) {
+    auto previous = refresh.rate;
+    refresh.Drained(SampleWire(socket_descriptor));
+    PublishRefresh(previous);
+  }
+  return Pacing() && !suppressed;
 }
 bool Peer::PrepareFrame()
 {
@@ -397,11 +409,13 @@ bool Peer::PrepareFrame()
 }
 BOOL Peer::Capabilities(freerdp_peer* client)
 {
+  Expects(client != nullptr, "peer exists");
   auto& self = Held(client);
   if (!AuthenticateSettings(client)) return FALSE;
   auto settings = client->context->settings;
   std::scoped_lock lock(self.owner.frame_guard);
   if (!self.activated) {
+    self.RestartRefresh();
     self.screen_width = freerdp_settings_get_uint32(settings, FreeRDP_DesktopWidth);
     self.screen_height = freerdp_settings_get_uint32(settings, FreeRDP_DesktopHeight);
   }
@@ -420,7 +434,8 @@ sdlrdp_rect Peer::CaptureFrame()
   std::scoped_lock lock(owner.frame_guard);
   if (dirty.empty() || !owner.shadow) return desktop;
   auto picture = owner.Picture();
-  if (picture.w != desktop.w || picture.h != desktop.h) pending.clear();
+  if (picture.w != desktop.w || picture.h != desktop.h ||
+      snapshot_width != owner.frame_width || snapshot_height != owner.frame_height) RestartRefresh();
   snapshot = owner.shadow;
   snapshot_width = owner.frame_width; snapshot_height = owner.frame_height;
   sequence = owner.presented;

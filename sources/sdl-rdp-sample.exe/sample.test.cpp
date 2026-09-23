@@ -523,6 +523,9 @@ protected:
   void Observe(Client& client, Headless::FrameObserver& frames) {
     Expects(process != nullptr, "sample is running");
     ASSERT_TRUE(ReadInput(client, "event FOCUS_GAINED "));
+    ASSERT_TRUE(freerdp_input_send_keyboard_event(client.instance->context->input, KBD_FLAGS_DOWN, 0x30));
+    ASSERT_TRUE(freerdp_input_send_keyboard_event(client.instance->context->input, KBD_FLAGS_RELEASE, 0x30));
+    ASSERT_TRUE(ReadInput(client, "event KEY_UP "));
     auto desktop = Count("event DISPLAY_DESKTOP_MODE_CHANGED ");
     auto current = Count("event DISPLAY_CURRENT_MODE_CHANGED ");
     std::string_view kind = GetParam();

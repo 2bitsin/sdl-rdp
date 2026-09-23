@@ -625,13 +625,26 @@ diff -ruN a/src/render/SDL_render.c b/src/render/SDL_render.c
      if (mode && mode->refresh_rate_numerator > 0 && mode->refresh_rate_denominator > 0) {
          refresh_num = mode->refresh_rate_numerator;
          refresh_den = mode->refresh_rate_denominator;
-@@ -5490,6 +5491,9 @@
+@@ -5490,6 +5491,13 @@
  static void SDL_SimulateRenderVSync(SDL_Renderer *renderer)
  {
      Uint64 now, elapsed;
 +    if (renderer->window && SDL_strcmp(SDL_GetCurrentVideoDriver(), "rdp") == 0) {
-+        SDL_CalculateSimulatedVSyncInterval(renderer, renderer->window);
++        const SDL_DisplayMode *mode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(renderer->window));
++        if (mode && mode->refresh_rate != renderer->rdp_refresh_rate) {
++            renderer->rdp_refresh_rate = mode->refresh_rate;
++            SDL_CalculateSimulatedVSyncInterval(renderer, renderer->window);
++        }
 +    }
      const Uint64 interval = renderer->simulate_vsync_interval_ns;
 
      if (!interval) {
+--- a/src/render/SDL_sysrender.h
++++ b/src/render/SDL_sysrender.h
+@@ -294,5 +294,6 @@
+     // Whether we should simulate vsync
+     bool wanted_vsync;
+     bool simulate_vsync;
++    float rdp_refresh_rate;
+     Uint64 simulate_vsync_interval_ns;
+     Uint64 last_present;

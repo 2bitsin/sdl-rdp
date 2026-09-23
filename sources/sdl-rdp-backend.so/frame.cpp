@@ -198,7 +198,9 @@ bool LegacyFrame::Send(Peer& peer)
   if (peer.client->IsWriteBlocked(peer.client.get())) return true;
   if (!peer.Marker(SURFACECMD_FRAMEACTION_END)) return false;
   std::scoped_lock lock(peer.owner.frame_guard);
-  peer.FrameSent();
+  std::size_t bytes = 0;
+  for (auto const& packet : packets) for (auto const& band : packet.bands) bytes += band.pixels.size();
+  peer.FrameSent(bytes);
   peer.snapshot.reset();
   peer.sending.clear();
   packets.clear();

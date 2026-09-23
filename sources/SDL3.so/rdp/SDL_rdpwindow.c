@@ -41,10 +41,10 @@ void SDL_RDP_ShowWindow(SDL_VideoDevice *_this, SDL_Window *window)
 
 bool SDL_RDP_ResizePicture(SDL_VideoData *data, int w, int h)
 {
+    SDL_assert(data);
+    SDL_assert(w > 0);
+    SDL_assert(h > 0);
     SDL_VideoDisplay *display = SDL_GetVideoDisplay(data->display);
-    if (data->picture_width == w && data->picture_height == h) {
-        return true;
-    }
     if (data->backend.resize(data->handle, w, h) != 0) {
         return SDL_SetError("%s", data->backend.last_error());
     }
@@ -58,12 +58,14 @@ bool SDL_RDP_ResizePicture(SDL_VideoData *data, int w, int h)
 
 SDL_FullscreenResult SDL_RDP_SetWindowFullscreen(SDL_VideoDevice *_this, SDL_Window *window, SDL_VideoDisplay *display, SDL_FullscreenOp fullscreen)
 {
+    SDL_assert(_this);
+    SDL_assert(window);
     const SDL_DisplayMode *mode = window->requested_fullscreen_mode.w ?
         &window->requested_fullscreen_mode : &display->desktop_mode;
     SDL_VideoData *data = _this->internal;
     int w = fullscreen == SDL_FULLSCREEN_OP_LEAVE ? window->windowed.w : mode->w;
     int h = fullscreen == SDL_FULLSCREEN_OP_LEAVE ? window->windowed.h : mode->h;
-    if ((w != window->w || h != window->h) && !SDL_RDP_ResizePicture(data, w, h)) {
+    if (!SDL_RDP_ResizePicture(data, w, h)) {
         return SDL_FULLSCREEN_FAILED;
     }
     if (fullscreen == SDL_FULLSCREEN_OP_LEAVE) {

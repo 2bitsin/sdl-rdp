@@ -35,8 +35,10 @@ bool GfxChannel::Check(UINT result, char const* operation)
 }
 void Peer::AnnounceConnection(sdlrdp_codec codec)
 {
+  Expects(client != nullptr, "peer exists");
   if (!connection) return;
   connection->connected.codec = codec;
+  connection->connected.refresh_millihertz = effective_refresh.load() * 1000;
   owner.Push(*connection);
   owner.Push({.type = SDLRDP_SCREEN, .screen = {screen_width, screen_height}});
   connection.reset();

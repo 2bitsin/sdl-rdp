@@ -65,11 +65,28 @@ static void SDL_RDP_Resize(SDL_VideoData *data, unsigned width, unsigned height)
     }
 }
 
+static void SDL_RDP_Refresh(SDL_VideoData *data, unsigned millihertz)
+{
+    SDL_assert(data);
+    SDL_assert(millihertz > 0);
+    SDL_VideoDisplay *display = SDL_GetVideoDisplay(data->display);
+    if (display->current_mode->refresh_rate == millihertz / 1000.0f) return;
+    SDL_DisplayMode *mode = display->current_mode == &data->refresh_modes[0] ?
+        &data->refresh_modes[1] : &data->refresh_modes[0];
+    *mode = *display->current_mode;
+    mode->refresh_rate = millihertz / 1000.0f;
+    mode->refresh_rate_numerator = (int)millihertz;
+    mode->refresh_rate_denominator = 1000;
+    SDL_SetCurrentDisplayMode(display, mode);
+
+}
+
 static void SDL_RDP_Connected(SDL_VideoData *data, const sdlrdp_event *event)
 {
     SDL_assert(data);
     SDL_assert(event);
     SDL_Window *window = data->window;
+    SDL_RDP_Refresh(data, event->connected.refresh_millihertz);
     SDL_RDP_ScreenMode(data, (int)event->connected.screen_width, (int)event->connected.screen_height);
     SDL_RDP_Resize(data, event->connected.screen_width, event->connected.screen_height);
     SDL_SetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING,
@@ -173,6 +190,14 @@ static void SDL_RDP_AudioEvent(SDL_VideoData *data, const sdlrdp_event *event)
 #endif
 }
 
+static void SDL_RDP_RestoreRefresh(SDL_VideoData *data)
+{
+    SDL_assert(data);
+    SDL_VideoDisplay *display = SDL_GetVideoDisplay(data->display);
+    if (display->current_mode->refresh_rate != display->desktop_mode.refresh_rate)
+        SDL_RDP_Refresh(data, (unsigned)(display->desktop_mode.refresh_rate * 1000));
+}
+
 static void SDL_RDP_WindowEvent(SDL_VideoData *data, const sdlrdp_event *event)
 {
     SDL_assert(data);
@@ -180,16 +205,19 @@ static void SDL_RDP_WindowEvent(SDL_VideoData *data, const sdlrdp_event *event)
     SDL_assert(event);
     switch (event->type) {
     case SDLRDP_CONNECTED: SDL_RDP_Connected(data, event); break;
-    case SDLRDP_DISCONNECTED: SDL_RDP_Disconnected(data); break;
+    case SDLRDP_DISCONNECTED: SDL_RDP_RestoreRefresh(data); SDL_RDP_Disconnected(data); break;
     case SDLRDP_CODEC_CHANGED:
         SDL_SetStringProperty(SDL_GetWindowProperties(data->window), SDL_PROP_WINDOW_RDP_CODEC_STRING,
                               SDL_RDP_CodecName(event->codec_changed.codec));
         break;
-    case SDLRDP_RESIZE: case SDLRDP_REFRESH: break;
+    case SDLRDP_RESIZE: break;
+    case SDLRDP_REFRESH: SDL_RDP_Refresh(data, event->refresh.millihertz); break;
     case SDLRDP_SCREEN: SDL_RDP_Resize(data, event->screen.width, event->screen.height); break;
     case SDLRDP_TEXT: SDL_RDP_Text(data->window, event); break;
     case SDLRDP_TOUCH: SDL_RDP_Touch(data->window, event); break;
-    default: SDL_RDP_Input(data->window, event); break;
+    case SDLRDP_KEY: case SDLRDP_MOUSE_MOVE: case SDLRDP_MOUSE_BUTTON:
+    case SDLRDP_MOUSE_WHEEL: case SDLRDP_MOUSE_RELATIVE: SDL_RDP_Input(data->window, event); break;
+    default: SDL_assert(!"unhandled rdp event"); break;
     }
 }
 

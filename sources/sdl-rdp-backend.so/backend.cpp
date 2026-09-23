@@ -198,3 +198,14 @@ void sdlrdp_audio_close(sdlrdp_handle* handle)
   try { handle->state->CloseAudio(); }
   catch (std::exception const& error) { last_error = error.what(); }
 }
+
+int sdlrdp_set_refresh(sdlrdp_handle* handle, unsigned mode, unsigned ceiling)
+{
+  Backend::Expects(handle != nullptr, "backend is open");
+  if (mode > 3 || !ceiling || ceiling > unsigned(INT32_MAX) / 1000 || (mode && ceiling < 10)) {
+    last_error = "Invalid refresh mode or ceiling.";
+    return -1;
+  }
+  handle->state->SetRefresh(Backend::RefreshMode(mode), ceiling);
+  return 0;
+}

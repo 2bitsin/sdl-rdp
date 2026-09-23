@@ -7,6 +7,7 @@
 #include "rect.hpp"
 #include "logging.hpp"
 #include "trace.hpp"
+#include "refresh.hpp"
 #include "encoder.hpp"
 #include "legacy-frame.hpp"
 #include "clipboard.hpp"
@@ -67,7 +68,10 @@ struct State {
   Pointer pointer;
   uint64_t pointer_generation = 0;
   void Resize(unsigned w, unsigned h);
+  bool ChangePicture(unsigned w, unsigned h);
   void SetAspect(sdlrdp_aspect value);
+  void SetRefresh(RefreshMode mode, unsigned ceiling);
+  Refresh refresh;
   int WaitFrame(int timeout);
   void OpenAudio();
   unsigned AudioRate();
@@ -118,6 +122,7 @@ public:
   bool PollStep(std::stop_token quit, std::span<HANDLE> handles);
   Encoder encoder;
   bool Drain();
+  bool ReadyFrame();
   bool TransportStep(std::stop_token quit, std::span<HANDLE const> ready);
   bool EncodeAndSend(std::stop_token quit);
   bool SendPointer();
@@ -133,8 +138,17 @@ public:
   bool ResizeDesktop(sdlrdp_rect picture);
   bool BeginFrame();
   bool Marker(UINT16 action);
-  void FrameSent(std::size_t bytes = 0);
+  void FrameSent(std::size_t bytes);
   void LogFrames();
+  // Refresh updates require owner.frame_guard; the encoder reads effective_refresh atomically.
+  void RestartRefresh();
+  void PublishRefresh(unsigned previous);
+  void MeasureWire(std::size_t bytes);
+  Refresh refresh;
+  std::atomic_uint effective_refresh{60};
+  uint64_t outq_total = 0;
+  unsigned outq_max = 0;
+  bool wire_unavailable_logged = false;
   // RDP has no acknowledgement deadline; one second bounds a viewer-tolerable frozen picture.
   static constexpr auto     AcknowledgementTimeout = std::chrono::seconds(1);
   static constexpr unsigned FrameWindow            = 2;
@@ -166,6 +180,7 @@ public:
   static BOOL Mouse(rdpInput* input, UINT16 flags, UINT16 x, UINT16 y);
   static BOOL ExtendedMouse(rdpInput* input, UINT16 flags, UINT16 x, UINT16 y);
   PeerHandle client;
+  int socket_descriptor = client->sockfd;
   State& owner;
   WakeEvent                wake;
   DWORD                    handle_count  { 0 };
@@ -181,6 +196,7 @@ public:
   UINT32 frame_id = 0;
   struct Pending { UINT32 id; uint64_t sequence; Clock::time_point sent{}; };
   std::deque<Pending> pending;
+  void RecordAcknowledgements(std::deque<Pending>::iterator last, Clock::time_point now);
 
   uint64_t avc_frames = 0;
   std::chrono::nanoseconds avc_convert{}, avc_upload{}, avc_encode{};

@@ -19,6 +19,25 @@ static void SDLCALL SDL_RDP_CodecHintChanged(void *userdata, const char *name, c
     }
 }
 
+static int SDL_RDP_ConfigureRefresh(SDL_VideoData *data)
+{
+    SDL_assert(data);
+    const char *value = SDL_RDP_Setting(SDL_HINT_RDP_REFRESH);
+    unsigned kind = 0;
+    int hz = 60;
+    if (value && SDL_strcmp(value, "auto-client") == 0) kind = 1;
+    else if (value && SDL_strcmp(value, "auto-client-average") == 0) kind = 2;
+    else if (value && SDL_strcmp(value, "auto-sender") == 0) kind = 3;
+    else hz = SDL_RDP_GetInteger(SDL_HINT_RDP_REFRESH, 60);
+    if (hz <= 0 || hz > SDL_MAX_SINT32 / 1000) {
+        SDL_SetError("SDL_RDP_REFRESH must be positive integer Hz representable in millihertz, auto-client, auto-client-average or auto-sender");
+        SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "%s", SDL_GetError());
+        return 0;
+    }
+    if (data->backend.set_refresh(data->handle, kind, hz) != 0) return 0;
+    return hz;
+}
+
 static bool SDL_RDP_InitDisplay(SDL_VideoData *data, const sdlrdp_config *config)
 {
     SDL_assert(data);
@@ -28,8 +47,9 @@ static bool SDL_RDP_InitDisplay(SDL_VideoData *data, const sdlrdp_config *config
     mode.format = SDL_PIXELFORMAT_XRGB8888;
     mode.w = (int)config->width;
     mode.h = (int)config->height;
-    mode.refresh_rate = mode.refresh_rate_numerator = SDL_RDP_GetInteger(SDL_HINT_RDP_REFRESH, 60);
-    if (mode.refresh_rate_numerator <= 0) return SDL_SetError("SDL_RDP_REFRESH must be a positive integer Hz value");
+    mode.refresh_rate_numerator = SDL_RDP_ConfigureRefresh(data);
+    if (!mode.refresh_rate_numerator) return false;
+    mode.refresh_rate = (float)mode.refresh_rate_numerator;
     mode.refresh_rate_denominator = 1;
     data->display = SDL_AddBasicVideoDisplay(&mode);
     if (data->display) SDL_RDP_AuthDisplay(SDL_GetDisplayProperties(data->display));
@@ -58,10 +78,11 @@ static bool SDL_RDP_GetDisplayModes(SDL_VideoDevice *_this, SDL_VideoDisplay *di
 
 static bool SDL_RDP_SetDisplayMode(SDL_VideoDevice *_this, SDL_VideoDisplay *display, SDL_DisplayMode *mode)
 {
+    SDL_assert(_this);
+    SDL_assert(mode);
     SDL_VideoData *data = _this->internal;
     // SDL_SetDisplayModeForDisplay sets current_mode on success before the client reactivates.
-    return (data->window && mode->w == data->window->w && mode->h == data->window->h) ||
-        SDL_RDP_ResizePicture(data, mode->w, mode->h);
+    return SDL_RDP_ResizePicture(data, mode->w, mode->h);
 }
 
 static bool SDL_RDP_RelativeMouse(bool enabled)

@@ -40,7 +40,6 @@ typedef struct {
   unsigned avc_bitrate_kbps; /* 0 selects a pixel-count-scaled default. */
 } sdlrdp_config;
 typedef enum {
-  /* SDLRDP_REFRESH is reserved and ignored; acknowledgements do not declare refresh. */
   SDLRDP_CONNECTED, SDLRDP_DISCONNECTED, SDLRDP_RESIZE, SDLRDP_KEY,
   SDLRDP_MOUSE_MOVE, SDLRDP_MOUSE_BUTTON, SDLRDP_MOUSE_WHEEL, SDLRDP_CODEC_CHANGED, SDLRDP_SCREEN, SDLRDP_REFRESH,
   SDLRDP_CLIPBOARD, SDLRDP_TEXT, SDLRDP_MOUSE_RELATIVE, SDLRDP_TOUCH, SDLRDP_AUDIO, SDLRDP_DRIVE
@@ -50,14 +49,14 @@ typedef struct {
   sdlrdp_event_type type;
   union {
     struct { unsigned width, height, bpp; char client_name[64]; sdlrdp_codec codec;
-      unsigned screen_width, screen_height, refresh_millihertz, keyboard_layout; /* refresh_millihertz is ignored. */
+      unsigned screen_width, screen_height, refresh_millihertz, keyboard_layout;
       char user[256], domain[256]; int authenticated; } connected;
     struct { int added; unsigned id; char name[512]; } drive;
     struct { unsigned freq; int connected; } audio;
     struct { sdlrdp_codec codec; } codec_changed;
     struct { unsigned width, height; } resize;
     struct { unsigned width, height; } screen;
-    struct { unsigned millihertz; } refresh; /* Ignored; retained for ABI layout. */
+    struct { unsigned millihertz; } refresh;
     struct { unsigned scancode; int extended; int down; } key;
     struct { int x, y; } mouse_move;
     struct { unsigned button; int down; } mouse_button;
@@ -93,6 +92,8 @@ const char* sdlrdp_get_clipboard_text(sdlrdp_handle*);
 int sdlrdp_has_clipboard_text(sdlrdp_handle*);
 int sdlrdp_resize(sdlrdp_handle*, unsigned, unsigned);
 int sdlrdp_set_aspect(sdlrdp_handle*, sdlrdp_aspect);
+/* mode: 0 fixed, 1 auto-client, 2 auto-client-average, 3 auto-sender. */
+int sdlrdp_set_refresh(sdlrdp_handle*, unsigned mode, unsigned ceiling_hz);
 /* 1 when all but the latest present are acknowledged or no acknowledging peer; 0 on timeout, -1 on error. Negative waits indefinitely. */
 int sdlrdp_wait_frame(sdlrdp_handle*, int timeout_ms);
 int sdlrdp_audio_open(sdlrdp_handle*);

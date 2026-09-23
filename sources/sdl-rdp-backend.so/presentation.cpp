@@ -27,14 +27,11 @@ void State::EnsurePicture()
 }
 void State::Resize(unsigned w, unsigned h)
 {
+  Expects(w > 0, "picture width is positive");
+  Expects(h > 0, "picture height is positive");
   std::scoped_lock producer(producer_guard);
   std::scoped_lock session(session_guard);
-  {
-    std::scoped_lock lock(frame_guard);
-    Picture(w, h);
-    shadow.reset();
-    width = w; height = h;
-  }
+  if (!ChangePicture(w, h)) return;
   EnsurePicture();
   std::scoped_lock lock(peers_guard, frame_guard);
   ++presented;
@@ -42,6 +39,18 @@ void State::Resize(unsigned w, unsigned h)
     peer->dirty.clear();
     peer->Post({0, 0, int(w), int(h)});
   }
+}
+bool State::ChangePicture(unsigned w, unsigned h)
+{
+  Expects(w > 0, "picture width is positive");
+  Expects(h > 0, "picture height is positive");
+  std::scoped_lock lock(frame_guard);
+  Picture(w, h);
+  if (current) current->RestartRefresh();
+  if (width == w && height == h) return false;
+  shadow.reset();
+  width = w; height = h;
+  return true;
 }
 void State::SetAspect(sdlrdp_aspect value)
 {
@@ -67,7 +76,7 @@ void Peer::FrameSent(std::size_t bytes)
 {
   Expects(snapshot != nullptr, "sent frame has a snapshot");
   auto now = Clock::now();
-  if (owner.trace.enabled) trace_pending.push_back(owner.trace.Format("frame", [&] { return std::format("id={} bytes={}", frame_id, bytes); }));
+  MeasureWire(bytes);
   if (ack_enabled) pending.push_back({frame_id, sequence, now});
   auto elapsed = encoder.encode_time - encoded_at_start;
   encode_total += elapsed;
@@ -82,10 +91,11 @@ void Peer::LogFrames()
     Milliseconds(avc_convert).count() / avc_frames, Milliseconds(avc_upload).count() / avc_frames,
     Milliseconds(avc_encode).count() / avc_frames) : std::string{};
   owner.Log(SDLRDP_LOG_INFO, std::format(
-    "Frames: {} sent, {} coalesced; encode {:.1f} ms mean, {:.1f} ms max{}; acknowledgement {:.1f} ms mean, {:.1f} ms max, {} over 100 ms, {} timed out.",
+    "Frames: {} sent, {} coalesced; encode {:.1f} ms mean, {:.1f} ms max{}; acknowledgement {:.1f} ms mean, {:.1f} ms max, {} over 100 ms, {} timed out. Send buffer: {:.1f} bytes mean, {} bytes max.",
     frames_sent, frames_coalesced, frames_sent ? Milliseconds(encode_total).count() / frames_sent : 0,
     Milliseconds(encode_max).count(), phases, ack_count ? Milliseconds(ack_total).count() / ack_count : 0,
-    Milliseconds(ack_max).count(), ack_over_100ms, acks_timed_out));
+    Milliseconds(ack_max).count(), ack_over_100ms, acks_timed_out,
+    frames_sent ? double(outq_total) / frames_sent : 0, outq_max));
 }
 bool Peer::Marker(UINT16 action)
 {
@@ -157,8 +167,7 @@ void Peer::AcceptAcknowledgement(UINT32 id)
   self.acknowledged = found->sequence;
   auto now = Clock::now();
   if (owner.trace.enabled) trace_pending.push_back(owner.trace.Format("ack", [&] { return std::format("id={} age={:.1f}", id, std::chrono::duration<double, std::milli>(now - found->sent).count()); }));
-  for (auto frame = self.pending.begin(); frame != found + 1; ++frame)
-    RecordAcknowledgement(now - frame->sent);
+  RecordAcknowledgements(found, now);
   self.pending.erase(self.pending.begin(), found + 1);
   self.owner.frame_changed.notify_all();
   self.wake.Transition(WakeEvent::Phase::Pending);

@@ -29,6 +29,9 @@ bool GfxChannel::Select()
 bool GfxChannel::SelectAvc()
 {
   Expects(confirmed, "codec follows capability confirmation");
+  auto rate = peer.effective_refresh.load();
+  if (avc.IsOpen() && avc_rate != rate) { avc.Close(); force_idr = true; }
+  avc_rate = rate;
   bool explicit_avc = peer.owner.codec.load() == SDLRDP_CODEC_AVC420;
   if (avc_rejected && (!explicit_avc || avc_logged)) return false;
   std::string reason;
@@ -36,7 +39,7 @@ bool GfxChannel::SelectAvc()
   else if (!avc_allowed) reason = "confirmed capabilities do not allow AVC420";
   else if (!avc.IsOpen()) {
     auto w = unsigned(peer.desktop.w), h = unsigned(peer.desktop.h);
-    if (!avc.Open(w, h, Avc::Bitrate(w, h, peer.owner.avc_bitrate_kbps), 60))
+    if (!avc.Open(w, h, Avc::Bitrate(w, h, peer.owner.avc_bitrate_kbps), avc_rate))
       reason = avc.Error();
   }
   if (reason.empty()) return true;

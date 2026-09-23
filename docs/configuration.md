@@ -30,7 +30,7 @@ those before the RDP driver runs. Set them through hints or the environment.
 Settings include:
 `SDL_RDP_PORT` (3389, 0 for ephemeral), `SDL_RDP_BIND` (0.0.0.0),
 `SDL_RDP_CERT_DIR` (`$XDG_DATA_HOME/sdl-rdp` or `~/.local/share/sdl-rdp`), `SDL_RDP_WIDTH`, `SDL_RDP_HEIGHT` (1024x768),
-`SDL_RDP_REFRESH` (60 Hz; positive integer, set before video initialization),
+`SDL_RDP_REFRESH` (integer Hz, `auto-client`, `auto-client-average`, or `auto-sender`; default 60, set before video initialization),
 `SDL_RDP_WAIT_FOR_CLIENT`, `SDL_RDP_BACKEND` (path of the backend library),
 `SDL_RDP_AUDIO_LATENCY` (500 ms), `SDL_RDP_AUDIO_LEAD` (150 ms).
 `SDL_RDP_VSYNC` defaults to `0`: surface updates return as soon as the backend takes the frame, and SDL renderer vsync uses the display refresh rate for timed pacing.
@@ -79,11 +79,41 @@ Measured legacy title-screen traffic at 1280x800 explains the auto preference:
 
 Session facts arrive as native SDL events: a client attaching is
 EXPOSED + FOCUS_GAINED, leaving is OCCLUDED + FOCUS_LOST, the display mode
-reports the client's screen. Desktop and current modes use the declared
-`SDL_RDP_REFRESH` rate, including after resize and disconnect. It accepts an
-application hint, environment variable or ini setting with the precedence above.
-Acknowledgement timing controls the backend send window and statistics only;
-it never changes the display refresh rate or SDL's simulated vsync pacing.
+reports the client's screen. `SDL_RDP_REFRESH` accepts an application hint, environment variable or ini
+setting with the precedence above; unknown values fail initialization and log
+one SDL error. The desktop mode declares the ceiling (60 Hz for adaptive modes),
+and the current mode exposes the effective rate used by simulated vsync and AVC.
+
+- Integer Hz keeps a fixed declared rate, independent of transport or client timing.
+  It gives predictable pacing but cannot adapt to a slow link.
+- `auto-client` uses send-to-ack latency, stepping down 10 Hz above two declared
+  frame intervals and up 10 Hz below one, bounded by 10 Hz and the declared ceiling.
+  It recovers independently of the app's present frequency, but includes client
+  processing and acknowledgement delay as well as transport latency; Doom with
+  xfreerdp3 on a LAN settled at 10 presents/s in both client-based modes.
+- `auto-client-average` uses the original 0.8/0.2 moving average of acknowledgement
+  gaps with its original 5% publication threshold, bounded by 10 Hz and the
+  declared ceiling with reconnect gaps excluded.
+  Acknowledgements arrive only as fast as the app presents, so this mode can settle
+  at its 10 Hz floor (Doom with xfreerdp3 on a LAN: 10 presents/s, as with
+  `auto-client`) and only a mode or size change restarts it at the ceiling;
+  matching the client's rate trades away automatic recovery.
+- `auto-sender` samples Linux TCP_INFO and SIOCOUTQ after each written frame,
+  stepping down 10 Hz when queued bytes or unacknowledged segments exceed one
+  frame, also stepping down on blocked writes at most once per current frame
+  interval, and up 10 Hz after a completed write into an empty send buffer,
+  within the same bounds.
+  It measures socket pressure independently of RDP acknowledgements but cannot
+  measure client decoding speed; unavailable TCP measurements disable queue-based
+  adaptation and produce one warning per connection, while blocked writes still
+  step down.
+
+Every adaptive estimate restarts at the ceiling on picture or mode changes and
+surface recreation, excluding old acknowledgements and reconnect drain time.
+`SDL_RDP_VSYNC=1` still blocks present on acknowledgement and composes with every
+refresh mode. `SDL_RDP_TRACE=1` includes `outq` bytes, `unacked` segments and
+`tcp_rtt` microseconds after writes; disconnect statistics include mean and
+maximum send-buffer occupancy.
 The current mode keeps the selected fullscreen size in exclusive fullscreen.
 Details are properties (bound port on the display, client name on the window). A failed open is in `SDL_GetError()`,
 backend diagnostics go to `SDL_Log`.

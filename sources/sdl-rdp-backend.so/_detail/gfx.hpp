@@ -50,7 +50,7 @@ private:
   sdlrdp_codec requested = SDLRDP_CODEC_AUTO;
   bool avc_allowed = false, avc_logged = false, avc_rejected = false, force_idr = true;
   bool headers = false, logged = false;
-  unsigned width = 0, height = 0;
+  unsigned width = 0, height = 0, avc_rate = 0;
   UINT32 queue_depth = 0;
   std::size_t frame_bytes = 0, last_bytes = 0;
   struct Packet {

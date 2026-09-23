@@ -39,8 +39,22 @@ static bool SDL_RDP_LoadChannels(SDL_RDP_Backend *backend)
     return true;
 }
 
+static bool SDL_RDP_LoadPresentation(SDL_RDP_Backend *backend)
+{
+    SDL_assert(backend);
+    SDL_RDP_LOAD(set_codec);
+    SDL_RDP_LOAD(set_refresh);
+    SDL_RDP_LOAD(set_relative_mouse);
+    SDL_RDP_LOAD(wait_frame);
+    SDL_RDP_LOAD(resize);
+    SDL_RDP_LOAD(set_aspect);
+    SDL_RDP_LOAD(set_pointer);
+    return true;
+}
+
 bool SDL_RDP_LoadBackend(SDL_RDP_Backend *backend)
 {
+    SDL_assert(backend);
     const char *path = SDL_RDP_Setting(SDL_HINT_RDP_BACKEND);
     backend->object = SDL_LoadObject(path && *path ? path : SDL_RDP_DYNAMIC);
     if (!backend->object) {
@@ -56,12 +70,7 @@ bool SDL_RDP_LoadBackend(SDL_RDP_Backend *backend)
     SDL_RDP_LOAD(poll);
     SDL_RDP_LOAD(wait);
     SDL_RDP_LOAD(wakeup);
-    SDL_RDP_LOAD(set_codec);
-    SDL_RDP_LOAD(set_relative_mouse);
-    SDL_RDP_LOAD(wait_frame);
-    SDL_RDP_LOAD(resize);
-    SDL_RDP_LOAD(set_aspect);
-    SDL_RDP_LOAD(set_pointer);
+    if (!SDL_RDP_LoadPresentation(backend)) return false;
     if (!SDL_RDP_LoadChannels(backend)) return false;
     SDL_ClearError();
     return true;
