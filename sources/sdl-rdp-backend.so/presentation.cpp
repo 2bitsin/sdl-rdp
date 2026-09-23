@@ -75,20 +75,35 @@ bool Peer::Pacing()
 {
   Expects(client != nullptr, "peer exists");
   // 250 ms allows fifteen 60 Hz refresh periods for a first acknowledgement.
-  if (ack_enabled && !ack_seen && first_sent != Clock::time_point{}
+  if (!Graphics() && ack_enabled && !ack_seen && first_sent != Clock::time_point{}
       && Clock::now() - first_sent >= std::chrono::milliseconds(250)) {
     ack_enabled = false;
     pending.clear();
     owner.frame_changed.notify_all();
   }
-  return !ack_enabled || pending.size() < 2;
+  return !ack_enabled || (pending.size() < 2 && (!Graphics() || gfx->Budget()));
+}
+void Peer::GraphicsDeadline()
+{
+  Expects(client != nullptr, "peer exists");
+  if (!connection || Graphics() || Clock::now() < activated_at + GraphicsConnectionWait) return;
+  gfx.reset();
+  gfx_id = UINT32_MAX;
+  gfx_attempted = true;
+  owner.Log(SDLRDP_LOG_WARN, "GFX confirmation timed out; using legacy surface bits.");
+  AnnounceConnection(encoder.codec);
 }
 DWORD Peer::Timeout()
 {
   Expects(client != nullptr, "peer exists");
+  if (connection) {
+    auto remaining = activated_at + GraphicsConnectionWait - Clock::now();
+    auto wait = DWORD(std::max<int64_t>(0, std::chrono::ceil<std::chrono::milliseconds>(remaining).count()));
+    return client->IsWriteBlocked(client.get()) ? std::min<DWORD>(wait, 5) : wait;
+  }
   if (client->IsWriteBlocked(client.get())) return 5;
   std::scoped_lock lock(owner.frame_guard);
-  if (!ack_enabled || ack_seen || first_sent == Clock::time_point{}) return INFINITE;
+  if (Graphics() || !ack_enabled || ack_seen || first_sent == Clock::time_point{}) return INFINITE;
   auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - first_sent).count();
   return DWORD(std::max<int64_t>(1, 250 - elapsed));
 }
@@ -96,9 +111,15 @@ BOOL Peer::Acknowledge(rdpContext* context, UINT32 id)
 {
   Expects(context && context->peer, "acknowledgement has a peer");
   auto& self = Held(context->peer);
+  if (!self.Graphics()) self.AcceptAcknowledgement(id);
+  return TRUE;
+}
+void Peer::AcceptAcknowledgement(UINT32 id)
+{
+  auto& self = *this;
   std::scoped_lock lock(self.owner.frame_guard);
   auto found = std::ranges::find(self.pending, id, &Pending::id);
-  if (found == self.pending.end()) return TRUE;
+  if (found == self.pending.end()) return;
   self.acknowledged = found->sequence;
   self.pending.erase(self.pending.begin(), found + 1);
   auto now = Clock::now();
@@ -115,7 +136,6 @@ BOOL Peer::Acknowledge(rdpContext* context, UINT32 id)
   self.last_ack = now;
   self.owner.frame_changed.notify_all();
   SetEvent(self.wake.get());
-  return TRUE;
 }
 BOOL Peer::Suppress(rdpContext* context, BYTE allow, RECTANGLE_16 const*)
 {

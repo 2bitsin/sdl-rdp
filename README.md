@@ -56,13 +56,13 @@ with only pixel-aspect correction applied on the server. Client screen changes
 update SDL's desktop display mode. A fullscreen window follows that mode.
 Client-side smart sizing can stretch the picture to the client's screen.
 `SDL_RDP_CODEC` accepts `auto` (default), `remotefx`, `nscodec`, `planar`,
-and `raw`. Auto selects RemoteFX, then NSCodec, then planar, then raw among
+`raw`, and `progressive`. On legacy connections, auto selects RemoteFX, then NSCodec, then planar, then raw among
 negotiated codecs. An unsupported explicit preference uses that same fallback.
 Planar is the explicit lossless choice; RemoteFX and NSCodec are lossy.
 The hint can change live; `SDL_PROP_WINDOW_RDP_CODEC_STRING` reports the
 negotiated codec on the window.
 
-Measured title-screen traffic at 1280x800 explains the auto preference:
+Measured legacy title-screen traffic at 1280x800 explains the auto preference:
 
 | Codec | Wire traffic |
 |---|---:|
@@ -76,6 +76,36 @@ reports the client's screen and measured refresh rate; details are properties (b
 display, client name on the window). A failed open is in `SDL_GetError()`,
 backend diagnostics go to `SDL_Log`.
 
+## Graphics pipeline
+
+Clients that negotiate MS-RDPEGFX use `progressive` by default. `planar` and
+`raw` select exact RGB transport; `auto`, `progressive`, `remotefx`, and `nscodec`
+select progressive on the pipeline. RemoteFX and NSCodec remain legacy choices.
+Clients without GFX, with a rejected channel, or without confirmation within
+three seconds of activation use legacy codec selection. The connected event and `SDL_PROP_WINDOW_RDP_CODEC_STRING`
+report the negotiated codec; both sides need ABI 6.
+
+Progressive encodes damaged tiles with FreeRDP's single-pass RemoteFX encoder,
+without refinement passes. SYNC/CONTEXT headers are sent once per surface.
+Resize replaces the context and surface and sends a full picture without deactivating the session; pointer PDUs continue.
+
+At most two frames await acknowledgement. This project's byte-budget rule also
+limits pending payload bytes + nonzero client `queueDepth` + next payload to
+max(64 KiB, twice the larger of the last and next payloads), excluding TLS/DVC
+headers. With no outstanding frames, one probe is allowed for stale backlog
+reports. The suspend value clears outstanding frames and disables waiting until
+another acknowledgement arrives. Capabilities are logged at INFO once per peer;
+`SDL_LOGGING=video=info` shows them in SDL applications.
+
+| Client | Progressive | AVC420 (round two) | AVC444 |
+|---|---|---|---|
+| Windows 10/11 mstsc | Yes | Yes | Yes, including v2 |
+| macOS Windows App / Microsoft Remote Desktop | Yes | Yes | Unverified |
+| iOS / Android Windows App | Assumed; unverified | Unsupported in xrdp tests | Unsupported in xrdp tests |
+| FreeRDP 3.15 | Yes | Yes | Yes |
+
+Round two will add AVC420 through NVENC with capability-based selection.
+
 ## Clipboard
 
 Clipboard text travels both ways through SDL's `SDL_SetClipboardText`,
@@ -87,7 +117,7 @@ with ASCII fallback (`?` for non-ASCII characters).
 Clipboard redirection must be enabled in the RDP client (`/clipboard` in
 xfreerdp). Images and files are not supported yet.
 
-The backend ABI is version 5; clipboard adds `sdlrdp_set_clipboard_text`,
+The backend ABI is version 6; graphics adds `SDLRDP_CODEC_PROGRESSIVE`. Clipboard provides `sdlrdp_set_clipboard_text`,
 `sdlrdp_get_clipboard_text`, and `sdlrdp_has_clipboard_text`. The getter's
 pointer belongs to the handle; copy it before another clipboard API call.
 

@@ -417,3 +417,19 @@ TEST_F(AudioDriver, AudioOnlyPlaysBlackDesktop) {
 }
 
 }
+
+namespace SampleGate {
+TEST_F(Sample, GraphicsPipelinePattern) {
+  auto arguments = Arguments(certificates.Path(), false);
+  arguments.insert(arguments.begin() + 1, "SDL_LOGGING=video=info");
+  process = std::make_unique<Process>(arguments);
+  ASSERT_TRUE(Read("port "));
+  Client client(Number(std::string_view(line).substr(5)), true, 640, 480);
+  client.EnableGraphics();
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(client.Until([&] { return Pattern(client, false); })) << Pattern(client, false).message();
+  ASSERT_TRUE(Read("GFX advertised")) << process->transcript;
+  RecordProperty("trace", process->transcript);
+  ASSERT_NO_FATAL_FAILURE(Escape(client));
+}
+}

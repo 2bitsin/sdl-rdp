@@ -9,6 +9,7 @@
 #include "clipboard.hpp"
 #include "input.hpp"
 #include "audio.hpp"
+#include "gfx.hpp"
 #include <atomic>
 #include <condition_variable>
 #include <deque>
@@ -109,15 +110,28 @@ public:
   static Peer& Held(freerdp_peer* client);
   static BOOL Capabilities(freerdp_peer* client);
   static BOOL Acknowledge(rdpContext*, UINT32);
+  void AcceptAcknowledgement(UINT32);
   static BOOL Suppress(rdpContext*, BYTE, RECTANGLE_16 const*);
   bool BeginFrame();
   bool Marker(UINT16 action);
   bool Pacing();
+  void GraphicsDeadline();
   DWORD Timeout();
-  static constexpr DWORD AppendedHandleCount = 4 + Input::MaxHandles;
+  static constexpr DWORD AppendedHandleCount = 5 + Input::MaxHandles;
   bool Channels();
   bool OpenStaticChannels();
   bool OpenDisplayControl();
+  bool GraphicsChannel();
+  bool Graphics() const { return gfx && gfx->confirmed; }
+  std::unique_ptr<GfxChannel> gfx;
+  bool gfx_attempted = false;
+  UINT32 gfx_id = UINT32_MAX;
+  static constexpr auto GraphicsConnectionWait = std::chrono::seconds(3);
+  Clock::time_point activated_at{};
+  std::chrono::nanoseconds graphics_ready_time{};
+  RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU graphics_qoe{};
+  std::optional<sdlrdp_event> connection;
+  void AnnounceConnection(sdlrdp_codec codec);
   static BOOL ChannelCreated(void*, UINT32, INT32);
   bool SoundChannel();
   bool sound_attempted = false;
@@ -140,7 +154,7 @@ public:
   unsigned rect_index = 0, row = 0;
   uint64_t sequence = 0, acknowledged = 0;
   UINT32 frame_id = 0;
-  struct Pending { UINT32 id; uint64_t sequence; };
+  struct Pending { UINT32 id; uint64_t sequence; std::size_t bytes = 0; };
   std::deque<Pending> pending;
 
   Clock::time_point first_sent{}, last_ack{};

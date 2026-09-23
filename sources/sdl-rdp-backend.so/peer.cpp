@@ -85,6 +85,7 @@ Peer::~Peer()
   clipboard.reset();
   sound.reset();
   disp.reset();
+  gfx.reset();
   if (channels) WTSCloseServer(channels);
 }
 void Peer::Start()
@@ -113,6 +114,7 @@ bool Peer::Configure()
     && freerdp_settings_set_bool(settings, FreeRDP_RdpSecurity, TRUE)
     && freerdp_settings_set_bool(settings, FreeRDP_RemoteFxCodec, TRUE)
     && freerdp_settings_set_bool(settings, FreeRDP_NSCodec, TRUE)
+    && freerdp_settings_set_bool(settings, FreeRDP_SupportGraphicsPipeline, TRUE)
     && freerdp_settings_set_bool(settings, FreeRDP_AutoReconnectionEnabled, TRUE)
     && freerdp_settings_set_bool(settings, FreeRDP_WaitForOutputBufferFlush, FALSE)
     && freerdp_settings_set_uint32(settings, FreeRDP_EncryptionLevel, ENCRYPTION_LEVEL_CLIENT_COMPATIBLE)
@@ -134,6 +136,7 @@ DWORD Peer::EventHandles(std::span<HANDLE> handles)
   count += Input::Held(*this).Handles(handles.data() + count);
   if (clipboard) handles[count++] = clipboard->Event();
   if (sound) handles[count++] = sound->Event();
+  if (gfx) handles[count++] = gfx->Event();
   handles[count++] = wake.get();
   handles[count++] = WTSVirtualChannelManagerGetEventHandle(channels);
   Ensures(count - transport_count <= AppendedHandleCount, "appended events fit reserved budget");
@@ -149,6 +152,7 @@ void Peer::Serve(std::stop_token quit)
       DWORD count, transport_count, timeout;
       {
         std::scoped_lock lock(owner.session_guard);
+        GraphicsDeadline();
         count = EventHandles(handles);
         timeout = Timeout();
       }
@@ -175,7 +179,7 @@ bool Peer::Channels()
   Expects(client && client->context, "channel peer exists");
   if (!channels || !active) return true;
   return WTSVirtualChannelManagerCheckFileDescriptor(channels)
-    && Input::Held(*this).Channels(*this) && OpenStaticChannels() && OpenDisplayControl();
+    && Input::Held(*this).Channels(*this) && OpenStaticChannels() && OpenDisplayControl() && GraphicsChannel();
 }
 void Peer::TransportEnded()
 {
@@ -230,9 +234,10 @@ bool Peer::Drain()
     ResetEvent(wake.get());
     if (suppressed || !Pacing()) return true;
   }
+  if (connection) return true;
   if (!SendPointer()) return false;
   if (!snapshot && !BeginFrame()) return false;
-  return !snapshot || resizing || SendFrame(*this);
+  return !snapshot || resizing || (Graphics() ? gfx->Send() : SendFrame(*this));
 }
 BOOL Peer::Capabilities(freerdp_peer* client)
 {
@@ -268,11 +273,11 @@ bool Peer::BeginFrame()
   }
   if (picture.w != desktop.w || picture.h != desktop.h) {
     desktop = picture;
-    resizing = true;
+    resizing = !Graphics();
     auto settings = client->context->settings;
     if (!freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth, picture.w)
         || !freerdp_settings_set_uint32(settings, FreeRDP_DesktopHeight, picture.h)
-        || !client->context->update->DesktopResize(client->context)) return false;
+        || (resizing && !client->context->update->DesktopResize(client->context))) return false;
     sending.clear();
     sending.Add({0, 0, int(snapshot_width), int(snapshot_height)});
   }

@@ -88,7 +88,10 @@ public:
     Expects(freerdp_settings_set_bool(context->settings, FreeRDP_RedirectClipboard, TRUE), "clipboard enabled");
     PubSub_SubscribeChannelConnected(context->pubSub, Connected);
     client.instance->LoadChannels = [](freerdp* instance) -> BOOL {
-      return freerdp_client_load_addins(instance->context->channels, instance->context->settings);
+      auto settings = instance->context->settings;
+      auto entry = reinterpret_cast<PVIRTUALCHANNELENTRYEX>(freerdp_load_channel_addin_entry(
+        CLIPRDR_SVC_CHANNEL_NAME, nullptr, nullptr, FREERDP_ADDIN_CHANNEL_STATIC | FREERDP_ADDIN_CHANNEL_ENTRYEX));
+      return entry && freerdp_channels_client_load_ex(instance->context->channels, settings, entry, settings) == 0;
     };
   }
   ~ClipboardClient() {

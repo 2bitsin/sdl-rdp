@@ -13,7 +13,7 @@ typedef enum { SDLRDP_LOG_ERROR, SDLRDP_LOG_WARN, SDLRDP_LOG_INFO } sdlrdp_log_l
 /* Planar is lossless BitmapUpdate; RemoteFX and NSCodec use lossy SurfaceBits. */
 typedef enum {
   SDLRDP_CODEC_AUTO, SDLRDP_CODEC_PLANAR, SDLRDP_CODEC_REMOTEFX,
-  SDLRDP_CODEC_NSCODEC, SDLRDP_CODEC_RAW
+  SDLRDP_CODEC_NSCODEC, SDLRDP_CODEC_RAW, SDLRDP_CODEC_PROGRESSIVE
 } sdlrdp_codec;
 typedef struct {
   const char* bind; /* NULL selects 0.0.0.0; numeric IPv4. */
@@ -54,7 +54,7 @@ typedef struct {
   };
 } sdlrdp_event;
 const char* sdlrdp_last_error(void);
-#define SDLRDP_ABI_VERSION 5
+#define SDLRDP_ABI_VERSION 6
 unsigned sdlrdp_version(void);
 int sdlrdp_open(const sdlrdp_config*, sdlrdp_handle**);
 /* Close joins workers; callers must finish concurrent ABI calls first. */

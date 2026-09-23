@@ -25,7 +25,7 @@ int sdlrdp_open(sdlrdp_config const* config, sdlrdp_handle** out)
     *out = nullptr;
     if (!config) throw std::runtime_error("Open failed: configuration is null.");
     Dimensions(config->width, config->height);
-    if (config->codec < SDLRDP_CODEC_AUTO || config->codec > SDLRDP_CODEC_RAW)
+    if (config->codec < SDLRDP_CODEC_AUTO || config->codec > SDLRDP_CODEC_PROGRESSIVE)
       throw std::runtime_error("Invalid codec preference.");
     if (config->port > 65535) throw std::runtime_error("Open failed: port exceeds 65535.");
     auto handle = std::make_unique<sdlrdp_handle>();
@@ -81,7 +81,7 @@ void sdlrdp_wakeup(sdlrdp_handle* handle)
 
 int sdlrdp_set_codec(sdlrdp_handle* handle, sdlrdp_codec codec)
 {
-  if (!handle || codec < SDLRDP_CODEC_AUTO || codec > SDLRDP_CODEC_RAW) {
+  if (!handle || codec < SDLRDP_CODEC_AUTO || codec > SDLRDP_CODEC_PROGRESSIVE) {
     last_error = "Invalid handle or codec preference.";
     return -1;
   }

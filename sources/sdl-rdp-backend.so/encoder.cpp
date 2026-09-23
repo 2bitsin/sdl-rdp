@@ -6,6 +6,7 @@
 
 namespace Backend {
 namespace {
+constexpr std::size_t InitialStreamCapacity = 64 * 1024;
 bool Available(rdpSettings const* settings, sdlrdp_codec codec)
 {
   utilities::Expects(settings != nullptr, "negotiated settings exist");
@@ -15,10 +16,23 @@ bool Available(rdpSettings const* settings, sdlrdp_codec codec)
     case SDLRDP_CODEC_REMOTEFX: return surface && freerdp_settings_get_bool(settings, FreeRDP_RemoteFxCodec);
     case SDLRDP_CODEC_NSCODEC: return surface && freerdp_settings_get_bool(settings, FreeRDP_NSCodec);
     case SDLRDP_CODEC_RAW: return true;
+    case SDLRDP_CODEC_PROGRESSIVE:
     case SDLRDP_CODEC_AUTO: return false;
     default: utilities::Unreachable(codec);
   }
 }
+}
+bool Encoder::SetupPlanar(rdpSettings const* settings, bool xrgb)
+{
+  utilities::Expects(settings != nullptr, "negotiated settings exist");
+  auto alpha = xrgb || freerdp_settings_get_bool(settings, FreeRDP_DrawAllowSkipAlpha);
+  if (skip_alpha != alpha) { planar.reset(); planar_width = 0; }
+  skip_alpha = alpha;
+  dynamic_color = freerdp_settings_get_bool(settings, FreeRDP_DrawAllowDynamicColorFidelity);
+  if (!stream) stream.reset(Stream_New(nullptr, InitialStreamCapacity));
+  if (!planar) planar.reset(freerdp_bitmap_planar_context_new(PLANAR_FORMAT_HEADER_RLE
+    | (skip_alpha ? PLANAR_FORMAT_HEADER_NA : 0), 1, 1));
+  return stream && planar;
 }
 bool Encoder::Select(rdpSettings const* settings, sdlrdp_codec preference)
 {
@@ -27,15 +41,11 @@ bool Encoder::Select(rdpSettings const* settings, sdlrdp_codec preference)
   constexpr std::array choices{SDLRDP_CODEC_REMOTEFX, SDLRDP_CODEC_NSCODEC, SDLRDP_CODEC_PLANAR, SDLRDP_CODEC_RAW};
   codec = Available(settings, preference) ? preference
     : *std::ranges::find_if(choices, [=](auto choice) { return Available(settings, choice); });
-  if (!stream) stream.reset(Stream_New(nullptr, 65536));
+  if (!stream) stream.reset(Stream_New(nullptr, InitialStreamCapacity));
   if (!stream) return false;
   switch (codec) {
     case SDLRDP_CODEC_PLANAR:
-      skip_alpha = freerdp_settings_get_bool(settings, FreeRDP_DrawAllowSkipAlpha);
-      dynamic_color = freerdp_settings_get_bool(settings, FreeRDP_DrawAllowDynamicColorFidelity);
-      if (!planar) planar.reset(freerdp_bitmap_planar_context_new(PLANAR_FORMAT_HEADER_RLE
-        | (skip_alpha ? PLANAR_FORMAT_HEADER_NA : 0), 1, 1));
-      return bool(planar);
+      return SetupPlanar(settings);
     case SDLRDP_CODEC_REMOTEFX:
       if (!rfx) rfx.reset(rfx_context_new_ex(TRUE, THREADING_FLAGS_DISABLE_THREADS));
       if (rfx) rfx_context_set_pixel_format(rfx.get(), PIXEL_FORMAT_BGRX32);
@@ -50,6 +60,13 @@ bool Encoder::Select(rdpSettings const* settings, sdlrdp_codec preference)
   }
 }
 bool Encoder::Encode(std::span<BYTE const> pixels, unsigned width, unsigned height)
+{
+  auto start = std::chrono::steady_clock::now();
+  auto result = EncodePayload(pixels, width, height);
+  encode_time += std::chrono::steady_clock::now() - start;
+  return result;
+}
+bool Encoder::EncodePayload(std::span<BYTE const> pixels, unsigned width, unsigned height)
 {
   utilities::Expects(width && height && pixels.size() == std::size_t(width) * height * 4,
                      "encoder input is a packed band");

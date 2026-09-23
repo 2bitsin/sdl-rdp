@@ -9,7 +9,8 @@ static const struct
     { "planar", SDLRDP_CODEC_PLANAR },
     { "remotefx", SDLRDP_CODEC_REMOTEFX },
     { "nscodec", SDLRDP_CODEC_NSCODEC },
-    { "raw", SDLRDP_CODEC_RAW }
+    { "raw", SDLRDP_CODEC_RAW },
+    { "progressive", SDLRDP_CODEC_PROGRESSIVE }
 };
 
 bool SDL_RDP_ParseCodec(const char *name, sdlrdp_codec *codec)

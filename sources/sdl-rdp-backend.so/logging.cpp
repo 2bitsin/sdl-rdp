@@ -26,6 +26,9 @@ bool ExpectedLibraryMessage(wLogMessage const& message)
   auto text = std::string_view(message.TextString);
   constexpr std::pair<std::string_view, std::string_view> known[] = {
     {"com.freerdp.core.transport", "BIO_read retries exceeded"},
+    {"com.freerdp.core.transport", "BIO_should_retry returned an error: error:80000068:system library::Connection reset by peer"},
+    {"com.freerdp.core.transport", "BIO_write returned a system error 32: Broken pipe"},
+    {"com.freerdp.core.transport", "BIO_should_retry returned an error: error:80000020:system library::Broken pipe"},
     {"com.freerdp.channels.rdpsnd.server", "client doesn't support any format!"},
   };
   for (auto const& [source, message_text] : known)
