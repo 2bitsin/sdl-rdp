@@ -79,10 +79,10 @@ void Peer::LogFrames()
   Expects(activated, "statistics belong to an activated connection");
   using Milliseconds = std::chrono::duration<double, std::milli>;
   owner.Log(SDLRDP_LOG_INFO, std::format(
-    "Frames: {} sent, {} coalesced; encode {:.1f} ms mean, {:.1f} ms max; acknowledgement {:.1f} ms mean, {:.1f} ms max.",
+    "Frames: {} sent, {} coalesced; encode {:.1f} ms mean, {:.1f} ms max; acknowledgement {:.1f} ms mean, {:.1f} ms max, {} over 100 ms.",
     frames_sent, frames_coalesced, frames_sent ? Milliseconds(encode_total).count() / frames_sent : 0,
     Milliseconds(encode_max).count(), ack_count ? Milliseconds(ack_total).count() / ack_count : 0,
-    Milliseconds(ack_max).count()));
+    Milliseconds(ack_max).count(), ack_over_100ms));
 }
 bool Peer::Marker(UINT16 action)
 {
@@ -148,6 +148,7 @@ void Peer::AcceptAcknowledgement(UINT32 id)
     self.ack_total += elapsed;
     self.ack_max = std::max(self.ack_max, elapsed);
     ++self.ack_count;
+    if (elapsed > std::chrono::milliseconds(100)) ++self.ack_over_100ms;
   }
   self.pending.erase(self.pending.begin(), found + 1);
   if (self.ack_seen) {

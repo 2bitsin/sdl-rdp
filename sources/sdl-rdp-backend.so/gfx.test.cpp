@@ -451,7 +451,7 @@ TEST_F(GraphicsCost, FullRandomFrame) {
   auto text = logs.Text(true);
   std::smatch match;
   ASSERT_TRUE(std::regex_search(text, match, std::regex(
-    R"(Frames: 1 sent, 0 coalesced; encode ([0-9.]+) ms mean, ([0-9.]+) ms max; acknowledgement ([0-9.]+) ms mean, ([0-9.]+) ms max\.)"))) << text;
+    R"(Frames: 1 sent, 0 coalesced; encode ([0-9.]+) ms mean, ([0-9.]+) ms max; acknowledgement ([0-9.]+) ms mean, ([0-9.]+) ms max, ([0-9]+) over 100 ms\.)"))) << text;
   auto milliseconds = std::stod(match[1]);
   RecordProperty("encode_ms", milliseconds);
   RecordProperty("statistics", match.str());

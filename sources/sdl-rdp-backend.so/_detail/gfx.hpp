@@ -19,6 +19,8 @@ public:
   bool Open();
   bool Pump();
   HANDLE Event() const;
+  bool Prepare();
+  bool Encode();
   bool Send();
   bool Budget() const;
   bool confirmed = false;
@@ -34,7 +36,6 @@ private:
   bool Raw();
   bool Planar();
   bool WriteCommand(sdlrdp_rect area, std::span<BYTE> data, UINT32 codec, Avc::Regions& regions);
-  bool Prepare();
   bool Command(sdlrdp_rect area, std::span<BYTE const> data, UINT32 codec, Avc::Regions regions = {});
   bool Check(UINT result, char const* operation);
   static UINT Caps(RdpgfxServerContext*, RDPGFX_CAPS_ADVERTISE_PDU const*);

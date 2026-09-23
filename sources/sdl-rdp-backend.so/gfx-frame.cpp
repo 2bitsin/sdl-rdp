@@ -163,7 +163,12 @@ bool GfxChannel::Prepare()
 {
   Expects(peer.snapshot && confirmed, "confirmed frame snapshot exists");
   if (!prepared.empty()) return true;
-  if (!Surface() || !Select()) return false;
+  return Surface() && Select();
+}
+bool GfxChannel::Encode()
+{
+  Expects(peer.snapshot && confirmed && width && height, "confirmed frame surface exists");
+  if (!prepared.empty()) return true;
   constexpr std::size_t StartFrameBytes = 16, EndFrameBytes = 12;
   frame_bytes = StartFrameBytes + EndFrameBytes;
   if (peer.encoder.codec == SDLRDP_CODEC_AVC420) return Avc420();
@@ -173,7 +178,7 @@ bool GfxChannel::Prepare()
 bool GfxChannel::Send()
 {
   Expects(peer.snapshot && confirmed, "confirmed frame snapshot exists");
-  if (!Prepare()) return false;
+  Expects(!prepared.empty(), "frame is encoded before transport");
   { std::scoped_lock lock(peer.owner.frame_guard); if (peer.ack_enabled && !Budget()) return true; }
   SYSTEMTIME time;
   GetSystemTime(&time);

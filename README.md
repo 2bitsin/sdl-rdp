@@ -132,6 +132,8 @@ report the negotiated codec; both sides need ABI 7.
 
 Progressive encodes damaged tiles with FreeRDP's single-pass RemoteFX encoder,
 without refinement passes. SYNC/CONTEXT headers are sent once per surface.
+Graphics-pipeline encoding runs outside the session lock; legacy `SendFrame`
+encoding for clients without the graphics pipeline remains under it.
 Resize replaces the context and surface and sends a full picture without deactivating the session; pointer PDUs continue.
 
 At most two frames await acknowledgement. This project's byte-budget rule also
@@ -141,6 +143,10 @@ headers. With no outstanding frames, one probe is allowed for stale backlog
 reports. The suspend value clears outstanding frames and disables waiting until
 another acknowledgement arrives. Capabilities are logged at INFO once per peer;
 `SDL_LOGGING=video=info` shows them in SDL applications.
+At disconnect, the INFO `Frames:` line reports sent and coalesced frames, mean and
+maximum encode and acknowledgement times, and the count of acknowledgements over
+100 ms; the adjacent `Audio:` line, when a sound channel exists, reports blocks
+sent, mean and maximum gaps between sends, and the count of gaps over 40 ms.
 
 | Client | Progressive | AVC420 | AVC444 |
 |---|---|---|---|

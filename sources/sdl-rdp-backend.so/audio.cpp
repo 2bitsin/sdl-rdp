@@ -1,5 +1,6 @@
 #include "_detail/state.hpp"
 #include <algorithm>
+#include <freerdp/channels/wtsvc.h>
 #include <ranges>
 #include <stdexcept>
 
@@ -34,7 +35,7 @@ bool Peer::SoundChannel()
   return true;
 }
 AudioChannel::AudioChannel(State& state, HANDLE channels, rdpContext* context, HANDLE event)
- : owner(state), wake(event), sound(rdpsnd_server_context_new(channels))
+ : owner(state), channels(channels), wake(event), sound(rdpsnd_server_context_new(channels))
 {
   Expects(channels && context && event, "sound channel has transport and wake event");
   if (!sound) throw std::runtime_error("Audio channel allocation failed.");
@@ -187,19 +188,37 @@ bool AudioChannel::Send(std::span<int16_t const> samples)
   auto now = Clock::now();
   auto block = sound->block_no;
   auto timestamp = UINT16(std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count());
+  // SendSamples2 queues PDUs; flush them while the peer may be encoding.
   if (sound->SendSamples2(sound.get(), sound->selected_client_format, buffer.data(),
-      buffer.size() * sizeof(int16_t), timestamp, 0) != CHANNEL_RC_OK) {
+      buffer.size() * sizeof(int16_t), timestamp, 0) != CHANNEL_RC_OK
+      || !WTSVirtualChannelManagerCheckFileDescriptorEx(channels, FALSE)) {
     ready = false;
     owner.Log(SDLRDP_LOG_WARN, "Audio transport ended; discarding samples until reconnection.");
     owner.Push({.type = SDLRDP_AUDIO, .audio = {0, 0}});
     owner.audio_changed.notify_all();
     return false;
   }
+  if (blocks_sent++) {
+    auto gap = now - last_send;
+    gap_total += gap;
+    gap_max = std::max(gap_max, gap);
+    if (gap > std::chrono::milliseconds(40)) ++gaps_over_40ms;
+  }
+  last_send = now;
   if (first == Clock::time_point{}) first = now;
   if (!server_clock) pending.push_back({block, buffer.size() / 2, now});
   buffer.clear();
   SetEvent(wake);
   return true;
+}
+void AudioChannel::LogAudio()
+{
+  Expects(sound != nullptr, "audio statistics have a channel");
+  using Milliseconds = std::chrono::duration<double, std::milli>;
+  owner.Log(SDLRDP_LOG_INFO, std::format(
+    "Audio: {} blocks sent; gap {:.1f} ms mean, {:.1f} ms max; {} gaps over 40 ms.",
+    blocks_sent, blocks_sent > 1 ? Milliseconds(gap_total).count() / (blocks_sent - 1) : 0,
+    Milliseconds(gap_max).count(), gaps_over_40ms));
 }
 void State::OpenAudio()
 {

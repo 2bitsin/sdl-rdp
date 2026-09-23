@@ -111,6 +111,8 @@ public:
   DWORD EventHandles(std::span<HANDLE> handles);
   Encoder encoder;
   bool Drain();
+  bool TransportStep(std::stop_token quit);
+  bool EncodeAndSend(std::stop_token quit);
   bool SendPointer();
   uint64_t pointer_generation = 0;
   void TransportEnded();
@@ -168,10 +170,11 @@ public:
 
   Clock::time_point first_sent{}, last_ack{};
   double ack_interval = 0;
-  uint64_t frames_sent = 0, frames_coalesced = 0, dirty_presents = 0, ack_count = 0;
+  uint64_t frames_sent = 0, frames_coalesced = 0, dirty_presents = 0, ack_count = 0, ack_over_100ms = 0;
   std::chrono::nanoseconds encoded_at_start{}, encode_total{}, encode_max{}, ack_total{}, ack_max{};
   unsigned refresh = 0, screen_width = 0, screen_height = 0;
   bool ack_enabled = false, ack_seen = false, suppressed = false;
+  bool encode_pending = false;
   HANDLE channels = nullptr;
   std::unique_ptr<DispServerContext, Releases<disp_server_context_free>> disp;
   std::unique_ptr<ClipboardChannel> clipboard;

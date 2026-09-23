@@ -148,6 +148,7 @@ void State::Depart(Peer& peer)
   if (peer.drive) peer.drive->Disconnect();
   if (peer.activated) {
     peer.LogFrames();
+    if (peer.sound) peer.sound->LogAudio();
     auto name = freerdp_settings_get_string(peer.client->context->settings, FreeRDP_ClientHostname);
     Log(SDLRDP_LOG_INFO, std::format("Client {} disconnected.", name ? name : peer.client->hostname));
   }

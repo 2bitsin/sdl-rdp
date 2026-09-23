@@ -189,7 +189,7 @@ void Peer::Serve(std::stop_token quit)
   std::array<HANDLE, MAXIMUM_WAIT_OBJECTS> handles{};
   if (Configure() && client->Initialize(client.get())) {
     while (!quit.stop_requested()) {
-      DWORD count, transport_count, timeout;
+      DWORD count, timeout;
       {
         std::scoped_lock lock(owner.session_guard);
         GraphicsDeadline();
@@ -199,12 +199,7 @@ void Peer::Serve(std::stop_token quit)
       if (!count) break;
       if (WaitForMultipleObjects(count, handles.data(), FALSE, timeout) == WAIT_FAILED
           || quit.stop_requested()) break;
-      std::scoped_lock lock(owner.session_guard);
-      if (quit.stop_requested()) break;
-      if (!client->CheckFileDescriptor(client.get()) || !Channels() || !SoundChannel() || !Drain()) {
-        TransportEnded();
-        break;
-      }
+      if (!TransportStep(quit)) break;
     }
     std::scoped_lock lock(owner.session_guard);
     client->Disconnect(client.get());
@@ -281,9 +276,37 @@ void Peer::Post(sdlrdp_rect area)
   dirty.Add(area);
   SetEvent(wake.get());
 }
+bool Peer::TransportStep(std::stop_token quit)
+{
+  Expects(client && client->context, "peer context exists");
+  {
+    std::scoped_lock lock(owner.session_guard);
+    if (quit.stop_requested()) return false;
+    if (!client->CheckFileDescriptor(client.get()) || !Channels() || !SoundChannel() || !Drain()) {
+      TransportEnded();
+      return false;
+    }
+  }
+  return EncodeAndSend(quit);
+}
+bool Peer::EncodeAndSend(std::stop_token quit)
+{
+  Expects(client && client->context, "peer context exists");
+  if (!encode_pending) return true;
+  Expects(gfx && snapshot, "graphics frame is ready for encoding");
+  auto encoded = gfx->Encode();
+  std::scoped_lock lock(owner.session_guard);
+  encode_pending = false;
+  if (quit.stop_requested()) return false;
+  if (!active) return true;
+  if (encoded && gfx->Send()) return true;
+  TransportEnded();
+  return false;
+}
 bool Peer::Drain()
 {
   Expects(client && client->context, "peer context exists");
+  encode_pending = false;
   if (!active) return true;
   if (client->DrainOutputBuffer(client.get()) < 0) return false;
   if (client->IsWriteBlocked(client.get())) {
@@ -299,7 +322,10 @@ bool Peer::Drain()
   if (connection) return true;
   if (!SendPointer()) return false;
   if (!snapshot && !BeginFrame()) return false;
-  return !snapshot || resizing || (Graphics() ? gfx->Send() : SendFrame(*this));
+  if (!snapshot || resizing) return true;
+  if (!Graphics()) return SendFrame(*this);
+  encode_pending = gfx->Prepare();
+  return encode_pending;
 }
 BOOL Peer::Capabilities(freerdp_peer* client)
 {
