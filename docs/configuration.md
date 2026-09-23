@@ -30,6 +30,7 @@ those before the RDP driver runs. Set them through hints or the environment.
 Settings include:
 `SDL_RDP_PORT` (3389, 0 for ephemeral), `SDL_RDP_BIND` (0.0.0.0),
 `SDL_RDP_CERT_DIR` (`$XDG_DATA_HOME/sdl-rdp` or `~/.local/share/sdl-rdp`), `SDL_RDP_WIDTH`, `SDL_RDP_HEIGHT` (1024x768),
+`SDL_RDP_REFRESH` (60 Hz; positive integer, set before video initialization),
 `SDL_RDP_WAIT_FOR_CLIENT`, `SDL_RDP_BACKEND` (path of the backend library),
 `SDL_RDP_AUDIO_LATENCY` (500 ms), `SDL_RDP_AUDIO_LEAD` (150 ms).
 `SDL_RDP_VSYNC` defaults to `0`: surface updates return as soon as the backend takes the frame, and SDL renderer vsync uses the display refresh rate for timed pacing.
@@ -50,7 +51,7 @@ For exclusive fullscreen, select an advertised mode with
 `SDL_GetFullscreenDisplayModes`, pass it to
 `SDL_SetWindowFullscreenMode(window, &mode)`, then call
 `SDL_SetWindowFullscreen(window, true)`. The driver advertises the client screen
-and these sizes at the client's refresh rate:
+and these sizes at the declared `SDL_RDP_REFRESH` rate:
 
 320x200, 320x240, 320x256, 400x300, 512x384, 640x350, 640x400, 640x480,
 720x400, 720x480, 800x600, 1024x768, 1280x720, 1280x800, 1920x1080,
@@ -78,9 +79,12 @@ Measured legacy title-screen traffic at 1280x800 explains the auto preference:
 
 Session facts arrive as native SDL events: a client attaching is
 EXPOSED + FOCUS_GAINED, leaving is OCCLUDED + FOCUS_LOST, the display mode
-reports the client's screen. The desktop mode keeps the refresh known at connect
-and at each screen change. Live refresh estimates update only the current mode,
-which keeps the selected fullscreen size while exclusive fullscreen is active.
+reports the client's screen. Desktop and current modes use the declared
+`SDL_RDP_REFRESH` rate, including after resize and disconnect. It accepts an
+application hint, environment variable or ini setting with the precedence above.
+Acknowledgement timing controls the backend send window and statistics only;
+it never changes the display refresh rate or SDL's simulated vsync pacing.
+The current mode keeps the selected fullscreen size in exclusive fullscreen.
 Details are properties (bound port on the display, client name on the window). A failed open is in `SDL_GetError()`,
 backend diagnostics go to `SDL_Log`.
 

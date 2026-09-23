@@ -36,7 +36,7 @@ bool GfxChannel::SelectAvc()
   else if (!avc_allowed) reason = "confirmed capabilities do not allow AVC420";
   else if (!avc.IsOpen()) {
     auto w = unsigned(peer.desktop.w), h = unsigned(peer.desktop.h);
-    if (!avc.Open(w, h, Avc::Bitrate(w, h, peer.owner.avc_bitrate_kbps), std::max(1u, peer.refresh ? peer.refresh / 1000 : 60)))
+    if (!avc.Open(w, h, Avc::Bitrate(w, h, peer.owner.avc_bitrate_kbps), 60))
       reason = avc.Error();
   }
   if (reason.empty()) return true;

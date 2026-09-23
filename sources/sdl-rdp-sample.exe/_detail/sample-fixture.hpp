@@ -350,23 +350,20 @@ protected:
     bool received = false;
     return client.Until([&] { return received || (received = Read(expected, 1ms)); });
   }
+  void DelayAcknowledgement(Client& client, Headless::FrameObserver& frames) {
+    Expects(frames.ack_times.size() >= 2, "two previous acknowledgements define the delay");
+    ASSERT_TRUE(freerdp_input_send_keyboard_event(client.instance->context->input, KBD_FLAGS_DOWN, 0x1e));
+    ASSERT_TRUE(ReadInput(client, "event KEY_DOWN "));
+    auto interval = frames.ack_times.back() - frames.ack_times[frames.ack_times.size() - 2];
+    std::this_thread::sleep_until(frames.ack_times.back() + interval * 3);
+  }
   void IncrementalFrames(Client& client, Headless::FrameObserver& frames, FullDesktopFrames& desktop, std::string_view change) {
+    Expects(!change.empty(), "frame trigger is named");
     auto baseline = desktop.full;
     auto before = frames.ids.size();
     auto deliveries = desktop.deliveries;
-    if (change == "refresh") {
-      ASSERT_GE(frames.ack_times.size(), 2u);
-      ASSERT_TRUE(freerdp_input_send_keyboard_event(client.instance->context->input, KBD_FLAGS_DOWN, 0x1e));
-      ASSERT_TRUE(ReadInput(client, "event KEY_DOWN "));
-      auto interval = frames.ack_times.back() - frames.ack_times[frames.ack_times.size() - 2];
-      std::this_thread::sleep_until(frames.ack_times.back() + interval * 3);
-    }
+    if (change == "delayed ack") ASSERT_NO_FATAL_FAILURE(DelayAcknowledgement(client, frames));
     ASSERT_TRUE(frames.Ack());
-    if (change == "refresh") {
-      ASSERT_TRUE(ReadInput(client, "event DISPLAY_CURRENT_MODE_CHANGED "));
-      EXPECT_FALSE(line.contains("numerator=0 "));
-      SDL_Log("trace refresh change: %s", line.c_str());
-    }
     ASSERT_TRUE(client.Until([&] { return frames.ids.size() >= before + 2; }));
     EXPECT_EQ(desktop.full, baseline);
     EXPECT_GT(desktop.deliveries, deliveries);

@@ -53,7 +53,7 @@ diff -ruN a/CMakeLists.txt b/CMakeLists.txt
 diff -ruN a/include/SDL3/SDL_hints.h b/include/SDL3/SDL_hints.h
 --- a/include/SDL3/SDL_hints.h
 +++ b/include/SDL3/SDL_hints.h
-@@ -3163,6 +3163,30 @@
+@@ -3163,6 +3163,31 @@
   */
  #define SDL_HINT_QUIT_ON_LAST_WINDOW_CLOSE "SDL_QUIT_ON_LAST_WINDOW_CLOSE"
  
@@ -74,6 +74,7 @@ diff -ruN a/include/SDL3/SDL_hints.h b/include/SDL3/SDL_hints.h
 +#define SDL_HINT_RDP_PORT "SDL_RDP_PORT"
 +#define SDL_HINT_RDP_WAIT_FOR_CLIENT "SDL_RDP_WAIT_FOR_CLIENT"
 +#define SDL_HINT_RDP_WIDTH "SDL_RDP_WIDTH"
++#define SDL_HINT_RDP_REFRESH "SDL_RDP_REFRESH"
 +/* UTF-8 fixed credentials; unset domain accepts any domain. Set before init. */
 +#define SDL_HINT_RDP_USER "SDL_RDP_USER"
 +#define SDL_HINT_RDP_PASSWORD "SDL_RDP_PASSWORD"

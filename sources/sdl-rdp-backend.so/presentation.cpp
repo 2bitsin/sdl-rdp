@@ -138,8 +138,17 @@ BOOL Peer::Acknowledge(rdpContext* context, UINT32 id)
   if (!self.Graphics()) self.AcceptAcknowledgement(id);
   return TRUE;
 }
+void Peer::RecordAcknowledgement(Clock::duration elapsed)
+{
+  Expects(elapsed >= Clock::duration::zero(), "acknowledgement follows frame send");
+  ack_total += elapsed;
+  ack_max = std::max(ack_max, elapsed);
+  ++ack_count;
+  if (elapsed > std::chrono::milliseconds(100)) ++ack_over_100ms;
+}
 void Peer::AcceptAcknowledgement(UINT32 id)
 {
+  Expects(client != nullptr, "acknowledgement belongs to a peer");
   auto& self = *this;
   std::scoped_lock lock(self.owner.frame_guard);
   auto found = std::ranges::find(self.pending, id, &Pending::id);
@@ -147,25 +156,9 @@ void Peer::AcceptAcknowledgement(UINT32 id)
   self.acknowledged = found->sequence;
   auto now = Clock::now();
   owner.trace.Line("ack", [&] { return std::format("id={} age={:.1f}", id, std::chrono::duration<double, std::milli>(now - found->sent).count()); });
-  for (auto frame = self.pending.begin(); frame != found + 1; ++frame) {
-    auto elapsed = now - frame->sent;
-    self.ack_total += elapsed;
-    self.ack_max = std::max(self.ack_max, elapsed);
-    ++self.ack_count;
-    if (elapsed > std::chrono::milliseconds(100)) ++self.ack_over_100ms;
-  }
+  for (auto frame = self.pending.begin(); frame != found + 1; ++frame)
+    RecordAcknowledgement(now - frame->sent);
   self.pending.erase(self.pending.begin(), found + 1);
-  if (self.ack_seen) {
-    auto ms = std::chrono::duration<double, std::milli>(now - self.last_ack).count();
-    self.ack_interval = self.ack_interval ? self.ack_interval * 0.8 + ms * 0.2 : ms;
-    auto rate = unsigned(std::clamp(1000000.0 / self.ack_interval, 1.0, 1000000.0));
-    if (!self.refresh || std::abs(double(rate) - self.refresh) > self.refresh * 0.05) {
-      self.refresh = rate;
-      self.owner.Push({.type = SDLRDP_REFRESH, .refresh = {rate}});
-    }
-  }
-  self.ack_seen = true;
-  self.last_ack = now;
   self.owner.frame_changed.notify_all();
   SetEvent(self.wake.get());
 }

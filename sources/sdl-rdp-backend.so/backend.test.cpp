@@ -776,38 +776,30 @@ TEST(Certificate, StableDefaultAndPermissions) {
   EXPECT_EQ(std::filesystem::status(data / "sdl-rdp/server.key").permissions() & Perm::mask,
     Perm::owner_read | Perm::owner_write);
 }
-TEST_F(RoundFive, WaitAndRefresh) {
+static bool WaitForAcknowledgement(Backend::State& state) {
+  Expects(state.current != nullptr, "active peer owns the pending frame");
+  std::unique_lock lock(state.frame_guard);
+  return state.frame_changed.wait_for(lock, std::chrono::seconds(10), [&] {
+    return state.current->acknowledged >= state.presented;
+  });
+}
+TEST_F(RoundFive, WaitWithoutRefreshFeedback) {
+  Expects(backend == nullptr, "backend has not opened");
   Open(320, 200);
   Client client(sdlrdp_port(backend.get()), true);
   Connect(client);
-  auto connected = Events(2);
-  ASSERT_EQ(connected.size(), 2u);
+  ASSERT_EQ(Events(2).size(), 2u);
   FrameObserver observer(client);
   std::vector<UINT32> pixels(320 * 200, 0x445566);
-  unsigned refresh = 0;
   for (unsigned i = 1; i <= 20; ++i) {
     Present(pixels, 320, 200);
-    auto waiting = std::async(std::launch::async, [&] {
-      auto& state = *backend->state;
-      std::unique_lock lock(state.frame_guard);
-      return state.frame_changed.wait_for(lock, std::chrono::seconds(10), [&] {
-        return state.current->acknowledged >= state.presented;
-      });
-    });
+    auto waiting = std::async(std::launch::async, WaitForAcknowledgement, std::ref(*backend->state));
     ASSERT_TRUE(client.Until([&] { return observer.ids.size() == i; }));
     EXPECT_EQ(waiting.wait_for(std::chrono::milliseconds(0)), std::future_status::timeout);
     ASSERT_TRUE(observer.Ack());
     ASSERT_EQ(waiting.get(), 1);
-    observer.ack_processed.push_back(Clock::now());
-    // WaitFrame establishes ACK processing, including any refresh event push.
-    for (auto const& event : Events())
-      if (event.type == SDLRDP_REFRESH) refresh = event.refresh.millihertz;
-    if (i < 2) continue;
-    auto [low, high] = observer.RefreshBounds();
-    EXPECT_GE(refresh / 1000.0, low);
-    EXPECT_LE(refresh / 1000.0, high);
+    for (auto const& event : Events()) EXPECT_NE(event.type, SDLRDP_REFRESH);
   }
-  EXPECT_GT(refresh, 0u);
 }
 TEST_F(RoundFive, NeverAcknowledges) {
   Open(320, 200);

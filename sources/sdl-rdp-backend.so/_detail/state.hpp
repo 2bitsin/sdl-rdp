@@ -122,8 +122,11 @@ public:
   static Peer& Held(freerdp_peer* client);
   static BOOL Capabilities(freerdp_peer* client);
   static BOOL Acknowledge(rdpContext*, UINT32);
+  void RecordAcknowledgement(Clock::duration elapsed);
   void AcceptAcknowledgement(UINT32);
   static BOOL Suppress(rdpContext*, BYTE, RECTANGLE_16 const*);
+  sdlrdp_rect CaptureFrame();
+  bool ResizeDesktop(sdlrdp_rect picture);
   bool BeginFrame();
   bool Marker(UINT16 action);
   void FrameSent(std::size_t bytes = 0);
@@ -173,15 +176,13 @@ public:
   struct Pending { UINT32 id; uint64_t sequence; Clock::time_point sent{}; };
   std::deque<Pending> pending;
 
-  Clock::time_point last_ack{};
-  double ack_interval = 0;
   uint64_t avc_frames = 0;
   std::chrono::nanoseconds avc_convert{}, avc_upload{}, avc_encode{};
   uint64_t acks_timed_out = 0;
   uint64_t frames_sent = 0, frames_coalesced = 0, dirty_presents = 0, ack_count = 0, ack_over_100ms = 0;
   std::chrono::nanoseconds encoded_at_start{}, encode_total{}, encode_max{}, ack_total{}, ack_max{};
-  unsigned refresh = 0, screen_width = 0, screen_height = 0;
-  bool ack_enabled = false, ack_seen = false, suppressed = false;
+  unsigned screen_width = 0, screen_height = 0;
+  bool ack_enabled = false, suppressed = false;
   HANDLE channels = nullptr;
   std::unique_ptr<DispServerContext, Releases<disp_server_context_free>> disp;
   std::unique_ptr<ClipboardChannel> clipboard;

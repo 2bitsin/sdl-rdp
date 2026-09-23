@@ -10,7 +10,6 @@ struct SDL_VideoData
     SDL_Window *window;
     int picture_width, picture_height;
     unsigned audio_rate;
-    SDL_DisplayMode refresh_modes[2];
 };
 void SDL_RDP_InitMouse(void);
 bool SDL_RDP_ParseAspect(const char *value, sdlrdp_aspect *aspect);

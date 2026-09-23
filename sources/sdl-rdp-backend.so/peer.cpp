@@ -254,7 +254,8 @@ void Peer::TransportEnded()
 }
 BOOL Peer::Activate(freerdp_peer* client)
 {
-  Expects(client && client->context, "peer context exists");
+  Expects(client != nullptr, "peer exists");
+  Expects(client->context != nullptr, "peer context exists");
   auto& self = Held(client);
   if (self.active.load()) { SetEvent(self.wake.get()); return TRUE; }
   if (!AuthenticateSettings(client)) return FALSE;
@@ -265,7 +266,6 @@ BOOL Peer::Activate(freerdp_peer* client)
   event.connected.codec = self.encoder.codec;
   event.connected.screen_width = self.screen_width;
   event.connected.screen_height = self.screen_height;
-  event.connected.refresh_millihertz = self.refresh;
   self.ack_enabled = freerdp_settings_get_uint32(client->context->settings, FreeRDP_FrameAcknowledge) != 0;
   self.desktop = {0, 0, int(event.connected.width), int(event.connected.height)};
   self.owner.Takeover(self, event);
@@ -396,35 +396,46 @@ BOOL Peer::Capabilities(freerdp_peer* client)
   return freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth, picture.w)
     && freerdp_settings_set_uint32(settings, FreeRDP_DesktopHeight, picture.h);
 }
+sdlrdp_rect Peer::CaptureFrame()
+{
+  Expects(!resizing, "no resize in flight");
+  std::scoped_lock lock(owner.frame_guard);
+  if (dirty.empty() || !owner.shadow) return desktop;
+  auto picture = owner.Picture();
+  if (picture.w != desktop.w || picture.h != desktop.h) pending.clear();
+  snapshot = owner.shadow;
+  snapshot_width = owner.frame_width; snapshot_height = owner.frame_height;
+  sequence = owner.presented;
+  frames_coalesced += dirty_presents ? dirty_presents - 1 : 0;
+  dirty_presents = 0;
+  encoded_at_start = encoder.encode_time;
+  sending = std::move(dirty);
+  dirty = {};
+  return picture;
+}
+bool Peer::ResizeDesktop(sdlrdp_rect picture)
+{
+  Expects(client != nullptr, "peer exists");
+  Expects(snapshot != nullptr, "resize has a frame");
+  desktop = picture;
+  resizing = true;
+  auto settings = client->context->settings;
+  if (!freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth, picture.w)
+      || !freerdp_settings_set_uint32(settings, FreeRDP_DesktopHeight, picture.h)
+      || !client->context->update->DesktopResize(client->context)) return false;
+  Ensures(resizing, "desktop resize remains in flight until the client is active");
+  sending.clear();
+  sending.Add({0, 0, int(snapshot_width), int(snapshot_height)});
+  return true;
+}
 bool Peer::BeginFrame()
 {
   Expects(!resizing, "no resize in flight");
   Expects(freerdp_is_active_state(client->context), "resize requires an active client");
-  sdlrdp_rect picture;
-  {
-    std::scoped_lock lock(owner.frame_guard);
-    if (dirty.empty() || !owner.shadow) return true;
-    picture = owner.Picture();
-    snapshot = owner.shadow;
-    snapshot_width = owner.frame_width; snapshot_height = owner.frame_height;
-    sequence = owner.presented;
-    frames_coalesced += dirty_presents ? dirty_presents - 1 : 0;
-    dirty_presents = 0;
-    encoded_at_start = encoder.encode_time;
-    sending = std::move(dirty);
-    dirty = {};
-  }
-  if (picture.w != desktop.w || picture.h != desktop.h) {
-    desktop = picture;
-    resizing = true;
-    auto settings = client->context->settings;
-    if (!freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth, picture.w)
-        || !freerdp_settings_set_uint32(settings, FreeRDP_DesktopHeight, picture.h)
-        || !client->context->update->DesktopResize(client->context)) return false;
-    Ensures(resizing, "desktop resize remains in flight until the client is active");
-    sending.clear();
-    sending.Add({0, 0, int(snapshot_width), int(snapshot_height)});
-  }
+  auto picture = CaptureFrame();
+  if (!snapshot) return true;
+  if (picture.w != desktop.w || picture.h != desktop.h)
+    if (!ResizeDesktop(picture)) return false;
   ++frame_id;
   return true;
 }

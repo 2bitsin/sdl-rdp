@@ -12,7 +12,8 @@ static const SDL_TouchID SDL_RDP_TOUCH_ID = 1;
 
 static void SDL_RDP_CopyRefresh(SDL_DisplayMode *target, const SDL_DisplayMode *source)
 {
-    SDL_assert(target && source);
+    SDL_assert(target);
+    SDL_assert(source);
     target->refresh_rate = source->refresh_rate;
     target->refresh_rate_numerator = source->refresh_rate_numerator;
     target->refresh_rate_denominator = source->refresh_rate_denominator;
@@ -20,9 +21,11 @@ static void SDL_RDP_CopyRefresh(SDL_DisplayMode *target, const SDL_DisplayMode *
 
 void SDL_RDP_DesktopMode(SDL_VideoData *data, int w, int h)
 {
+    SDL_assert(data);
+    SDL_assert(w > 0);
+    SDL_assert(h > 0);
     SDL_VideoDisplay *display = SDL_GetVideoDisplay(data->display);
     SDL_DisplayMode mode = display->desktop_mode;
-    SDL_RDP_CopyRefresh(&mode, display->current_mode);
     mode.w = w;
     mode.h = h;
     bool exclusive = display->fullscreen_active;
@@ -62,26 +65,11 @@ static void SDL_RDP_Resize(SDL_VideoData *data, unsigned width, unsigned height)
     }
 }
 
-static void SDL_RDP_Refresh(SDL_VideoData *data, unsigned millihertz)
-{
-    if (!millihertz) return;
-    SDL_VideoDisplay *display = SDL_GetVideoDisplay(data->display);
-    // Preserve the old record until SDL has compared it with the new one.
-    SDL_DisplayMode *mode = display->current_mode == &data->refresh_modes[0] ?
-        &data->refresh_modes[1] : &data->refresh_modes[0];
-    *mode = display->desktop_mode;
-    mode->w = display->current_mode->w;
-    mode->h = display->current_mode->h;
-    mode->refresh_rate = millihertz / 1000.0f;
-    mode->refresh_rate_numerator = millihertz;
-    mode->refresh_rate_denominator = 1000;
-    SDL_SetCurrentDisplayMode(display, mode);
-}
-
 static void SDL_RDP_Connected(SDL_VideoData *data, const sdlrdp_event *event)
 {
+    SDL_assert(data);
+    SDL_assert(event);
     SDL_Window *window = data->window;
-    SDL_RDP_Refresh(data, event->connected.refresh_millihertz);
     SDL_RDP_ScreenMode(data, (int)event->connected.screen_width, (int)event->connected.screen_height);
     SDL_RDP_Resize(data, event->connected.screen_width, event->connected.screen_height);
     SDL_SetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING,
@@ -185,23 +173,11 @@ static void SDL_RDP_AudioEvent(SDL_VideoData *data, const sdlrdp_event *event)
 #endif
 }
 
-static void SDL_RDP_Dispatch(SDL_VideoData *data, const sdlrdp_event *event)
+static void SDL_RDP_WindowEvent(SDL_VideoData *data, const sdlrdp_event *event)
 {
-    if (event->type == SDLRDP_DRIVE) {
-        SDL_RDP_UpdateDrives(&data->backend, data->handle, SDL_GetDisplayProperties(data->display));
-        return;
-    }
-    if (event->type == SDLRDP_CLIPBOARD) {
-        SDL_RDP_ClipboardUpdate(data);
-        return;
-    }
-    if (event->type == SDLRDP_AUDIO) {
-        SDL_RDP_AudioEvent(data, event);
-        return;
-    }
-    if (!data->window) {
-        return;
-    }
+    SDL_assert(data);
+    SDL_assert(data->window);
+    SDL_assert(event);
     switch (event->type) {
     case SDLRDP_CONNECTED: SDL_RDP_Connected(data, event); break;
     case SDLRDP_DISCONNECTED: SDL_RDP_Disconnected(data); break;
@@ -209,15 +185,25 @@ static void SDL_RDP_Dispatch(SDL_VideoData *data, const sdlrdp_event *event)
         SDL_SetStringProperty(SDL_GetWindowProperties(data->window), SDL_PROP_WINDOW_RDP_CODEC_STRING,
                               SDL_RDP_CodecName(event->codec_changed.codec));
         break;
-    case SDLRDP_RESIZE: break;
+    case SDLRDP_RESIZE: case SDLRDP_REFRESH: break;
     case SDLRDP_SCREEN: SDL_RDP_Resize(data, event->screen.width, event->screen.height); break;
-    case SDLRDP_REFRESH: SDL_RDP_Refresh(data, event->refresh.millihertz); break;
     case SDLRDP_TEXT: SDL_RDP_Text(data->window, event); break;
     case SDLRDP_TOUCH: SDL_RDP_Touch(data->window, event); break;
-    case SDLRDP_MOUSE_RELATIVE:
-    case SDLRDP_KEY: case SDLRDP_MOUSE_MOVE: case SDLRDP_MOUSE_BUTTON: case SDLRDP_MOUSE_WHEEL:
-        SDL_RDP_Input(data->window, event); break;
-    default: SDL_assert(!"unhandled rdp event"); break;
+    default: SDL_RDP_Input(data->window, event); break;
+    }
+}
+
+static void SDL_RDP_Dispatch(SDL_VideoData *data, const sdlrdp_event *event)
+{
+    SDL_assert(data);
+    SDL_assert(event);
+    switch (event->type) {
+    case SDLRDP_DRIVE:
+        SDL_RDP_UpdateDrives(&data->backend, data->handle, SDL_GetDisplayProperties(data->display));
+        break;
+    case SDLRDP_CLIPBOARD: SDL_RDP_ClipboardUpdate(data); break;
+    case SDLRDP_AUDIO: SDL_RDP_AudioEvent(data, event); break;
+    default: if (data->window) SDL_RDP_WindowEvent(data, event); break;
     }
 }
 

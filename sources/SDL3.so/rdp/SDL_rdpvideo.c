@@ -21,13 +21,15 @@ static void SDLCALL SDL_RDP_CodecHintChanged(void *userdata, const char *name, c
 
 static bool SDL_RDP_InitDisplay(SDL_VideoData *data, const sdlrdp_config *config)
 {
+    SDL_assert(data);
+    SDL_assert(config);
     SDL_DisplayMode mode;
     SDL_zero(mode);
     mode.format = SDL_PIXELFORMAT_XRGB8888;
     mode.w = (int)config->width;
     mode.h = (int)config->height;
-    // SDL 3.4.8 SDL_CalculateSimulatedVSyncInterval defaults to 60 Hz before measurement.
-    mode.refresh_rate = mode.refresh_rate_numerator = 60;
+    mode.refresh_rate = mode.refresh_rate_numerator = SDL_RDP_GetInteger(SDL_HINT_RDP_REFRESH, 60);
+    if (mode.refresh_rate_numerator <= 0) return SDL_SetError("SDL_RDP_REFRESH must be a positive integer Hz value");
     mode.refresh_rate_denominator = 1;
     data->display = SDL_AddBasicVideoDisplay(&mode);
     if (data->display) SDL_RDP_AuthDisplay(SDL_GetDisplayProperties(data->display));
