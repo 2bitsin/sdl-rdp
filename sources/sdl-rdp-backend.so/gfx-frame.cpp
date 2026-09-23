@@ -9,6 +9,7 @@ bool GfxChannel::Select()
   Expects(confirmed, "codec follows capability confirmation");
   auto preference = peer.owner.codec.load();
   auto choice = preference;
+  if (choice == SDLRDP_CODEC_AUTO) choice = SDLRDP_CODEC_AVC420;
   if (choice == SDLRDP_CODEC_AVC420 && !SelectAvc()) choice = SDLRDP_CODEC_PROGRESSIVE;
   if (choice != SDLRDP_CODEC_AVC420 && choice != SDLRDP_CODEC_RAW && choice != SDLRDP_CODEC_PLANAR) choice = SDLRDP_CODEC_PROGRESSIVE;
   auto previous = peer.encoder.codec;
@@ -28,7 +29,8 @@ bool GfxChannel::Select()
 bool GfxChannel::SelectAvc()
 {
   Expects(confirmed, "codec follows capability confirmation");
-  if (avc_rejected) return false;
+  bool explicit_avc = peer.owner.codec.load() == SDLRDP_CODEC_AVC420;
+  if (avc_rejected && (!explicit_avc || avc_logged)) return false;
   std::string reason;
   if (!Avc::Encoder::Available()) reason = Avc::Encoder::UnavailableReason();
   else if (!avc_allowed) reason = "confirmed capabilities do not allow AVC420";
@@ -38,8 +40,9 @@ bool GfxChannel::SelectAvc()
       reason = avc.Error();
   }
   if (reason.empty()) return true;
-  if (!avc_logged) peer.owner.Log(SDLRDP_LOG_INFO, "AVC420 falls back to progressive: " + reason + ".");
-  avc_logged = avc_rejected = true;
+  if (!avc_logged && explicit_avc) peer.owner.Log(SDLRDP_LOG_INFO, "AVC420 falls back to progressive: " + reason + ".");
+  avc_logged |= explicit_avc;
+  avc_rejected = true;
   return false;
 }
 bool GfxChannel::Avc420()

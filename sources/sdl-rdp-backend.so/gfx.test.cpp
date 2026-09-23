@@ -168,6 +168,55 @@ protected:
     ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0) == 1; }));
   }
 };
+TEST_F(AvcGraphics, AutoWithAvcStartsWithIdr) {
+  if (!Backend::Avc::Encoder::Available()) GTEST_SKIP() << Backend::Avc::Encoder::UnavailableReason();
+  Open(SDLRDP_CODEC_AUTO);
+  Headless::Client client(sdlrdp_port(backend.get()), true);
+  client.EnableGraphics(true);
+  Headless::GraphicsObserver observer(client);
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
+  std::vector<UINT32> pixels(320 * 200, 0x55aaff);
+  ASSERT_NO_FATAL_FAILURE(Frame(client, observer, pixels, 320, 200, {0, 0, 320, 200}));
+  bool reported = false;
+  ASSERT_TRUE(client.Until([&] {
+    std::array<sdlrdp_event, 32> events;
+    auto count = sdlrdp_poll(backend.get(), events.data(), events.size());
+    for (unsigned i = 0; i < count; ++i) {
+      if (events[i].type == SDLRDP_CONNECTED) reported |= events[i].connected.codec == SDLRDP_CODEC_AVC420;
+      if (events[i].type == SDLRDP_CODEC_CHANGED) reported |= events[i].codec_changed.codec == SDLRDP_CODEC_AVC420;
+    }
+    return reported;
+  }));
+  ASSERT_EQ(observer.avc_nals.size(), 1u);
+  EXPECT_TRUE(observer.avc_nals.front() & (1u << 5));
+  EXPECT_EQ(observer.progressive_headers, 0u);
+  EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "falls back"), 0u);
+}
+TEST_F(AvcGraphics, AutoWithoutAvcUsesProgressiveSilently) {
+  Open(SDLRDP_CODEC_AUTO);
+  Headless::Client client(sdlrdp_port(backend.get()), true);
+  client.EnableGraphics();
+  ASSERT_TRUE(freerdp_settings_set_bool(client.instance->context->settings, FreeRDP_GfxH264, FALSE));
+  Headless::GraphicsObserver observer(client);
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
+  std::vector<UINT32> pixels(320 * 200, 0x55aaff);
+  ASSERT_NO_FATAL_FAILURE(Frame(client, observer, pixels, 320, 200, {0, 0, 320, 200}));
+  bool reported = false;
+  ASSERT_TRUE(client.Until([&] {
+    std::array<sdlrdp_event, 32> events;
+    auto count = sdlrdp_poll(backend.get(), events.data(), events.size());
+    for (unsigned i = 0; i < count; ++i) {
+      if (events[i].type == SDLRDP_CONNECTED) reported |= events[i].connected.codec == SDLRDP_CODEC_PROGRESSIVE;
+      if (events[i].type == SDLRDP_CODEC_CHANGED) reported |= events[i].codec_changed.codec == SDLRDP_CODEC_PROGRESSIVE;
+    }
+    return reported;
+  }));
+  EXPECT_TRUE(observer.avc_nals.empty());
+  EXPECT_EQ(observer.progressive_headers, 1u);
+  EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "falls back"), 0u);
+}
 TEST_F(AvcGraphics, DecodesPFrameAndResize) {
   if (!Backend::Avc::Encoder::Available()) GTEST_SKIP() << Backend::Avc::Encoder::UnavailableReason();
   Open();
@@ -234,6 +283,36 @@ TEST_F(AvcGraphics, SmallSurfaceFallsBack) {
   EXPECT_TRUE(observer.avc_nals.empty());
   EXPECT_EQ(observer.progressive_headers, 1u);
   EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "surface below NVENC minimum"), 1u);
+}
+TEST_F(AvcGraphics, AutoSmallSurfaceLogsFallbackWhenAvcRequested) {
+  if (!Backend::Avc::Encoder::Available()) GTEST_SKIP() << Backend::Avc::Encoder::UnavailableReason();
+  Open(SDLRDP_CODEC_AUTO, 32, 32);
+  Headless::Client client(sdlrdp_port(backend.get()), true);
+  client.EnableGraphics(true);
+  Headless::GraphicsObserver observer(client);
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); })) << logs.Text(true);
+  std::vector<UINT32> pixels(32 * 32, 0x55aaff);
+  ASSERT_NO_FATAL_FAILURE(Frame(client, observer, pixels, 32, 32, {0, 0, 32, 32}));
+  EXPECT_TRUE(observer.avc_nals.empty());
+  EXPECT_EQ(observer.progressive_headers, 1u);
+  EXPECT_FALSE(logs.Contains("falls back"));
+  EXPECT_FALSE(logs.Contains("surface below NVENC minimum"));
+  std::array<sdlrdp_event, 32> events;
+  while (sdlrdp_poll(backend.get(), events.data(), events.size())) {}
+  ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_AVC420), 0);
+  ASSERT_NO_FATAL_FAILURE(Frame(client, observer, pixels, 32, 32, {0, 0, 32, 32}));
+  EXPECT_TRUE(observer.avc_nals.empty());
+  EXPECT_EQ(observer.progressive_headers, 1u);
+  EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "surface below NVENC minimum"), 1u);
+  EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "falls back"), 1u);
+  bool changed = false;
+  ASSERT_TRUE(client.Until([&] {
+    auto count = sdlrdp_poll(backend.get(), events.data(), events.size());
+    for (unsigned i = 0; i < count; ++i)
+      changed |= events[i].type == SDLRDP_CODEC_CHANGED && events[i].codec_changed.codec == SDLRDP_CODEC_PROGRESSIVE;
+    return changed;
+  }));
 }
 TEST_F(AvcGraphics, ProgressiveConnectionSwitchesToAvcWithIdr) {
   if (!Backend::Avc::Encoder::Available()) GTEST_SKIP() << Backend::Avc::Encoder::UnavailableReason();
