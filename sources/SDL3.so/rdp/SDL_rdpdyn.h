@@ -53,6 +53,7 @@ bool SDL_RDP_LoadBackend(SDL_RDP_Backend *backend);
 void SDL_RDP_UnloadBackend(SDL_RDP_Backend *backend);
 bool SDL_RDP_AcquireBackend(SDL_RDP_Backend *backend, sdlrdp_handle **handle, sdlrdp_config *config);
 void SDL_RDP_ReleaseBackend(void);
+void SDL_RDP_AudioRate(unsigned rate);
 bool SDL_RDP_ParseCodec(const char *name, sdlrdp_codec *codec);
 bool SDL_RDP_ParseAspect(const char *value, sdlrdp_aspect *aspect);
 #endif

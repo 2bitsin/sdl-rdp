@@ -11,6 +11,10 @@ them. `./buildutil build` builds everything, `./buildutil test` runs the gate,
 and `./buildutil build --release` writes the release libraries under
 `_build/<profile>/`.
 
+The SDL patch touches CMake/build configuration, public hint/video headers, `src/SDL_hints*`, and audio/video/storage bootstrap files to register RDP drivers and hints.
+It adds `src/{audio,storage}/rdp/` drivers; `src/video/SDL_video.c` preserves driver errors and reports initial refresh changes.
+`src/render/SDL_render.c` updates simulated vsync from the live current mode for RDP only, including exclusive fullscreen.
+
 # Consuming
 
 `buildutil publish` packages `sdl-rdp` for conan. A project takes it with one

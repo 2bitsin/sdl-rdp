@@ -188,7 +188,7 @@ bool GfxChannel::Send()
 {
   Expects(peer.snapshot && confirmed, "confirmed frame snapshot exists");
   Expects(!prepared.empty(), "frame is encoded before transport");
-  { std::scoped_lock lock(peer.owner.frame_guard); if (peer.ack_enabled && !Budget()) return true; }
+  { std::scoped_lock lock(peer.owner.frame_guard); if (!peer.Pacing()) return true; }
   SYSTEMTIME time;
   GetSystemTime(&time);
   RDPGFX_START_FRAME_PDU start{FrameTimestamp(time), peer.frame_id};

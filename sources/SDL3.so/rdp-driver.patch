@@ -218,14 +218,14 @@ diff -ruN a/src/audio/SDL_sysaudio.h b/src/audio/SDL_sysaudio.h
 diff -ruN a/src/audio/rdp/SDL_rdpaudio.c b/src/audio/rdp/SDL_rdpaudio.c
 --- a/src/audio/rdp/SDL_rdpaudio.c
 +++ b/src/audio/rdp/SDL_rdpaudio.c
-@@ -0,0 +1,103 @@
+@@ -0,0 +1,133 @@
 +#include "SDL_internal.h"
 +#include "SDL_rdpaudio.h"
 +
 +static void RDPAUDIO_DetectDevices(SDL_AudioDevice **playback, SDL_AudioDevice **recording)
 +{
 +    const SDL_AudioSpec spec = {SDL_AUDIO_S16, 2, 44100};
-+    *playback = SDL_AddAudioDevice(false, "RDP client", &spec, NULL);
++    *playback = SDL_AddAudioDevice(false, "RDP client", &spec, &RDPAUDIO_bootstrap);
 +}
 +
 +static bool RDPAUDIO_OpenDevice(SDL_AudioDevice *device)
@@ -241,7 +241,8 @@ diff -ruN a/src/audio/rdp/SDL_rdpaudio.c b/src/audio/rdp/SDL_rdpaudio.c
 +    device->hidden->lead = SDL_MS_TO_NS((Uint64)lead);
 +    device->spec.format = SDL_AUDIO_S16;
 +    device->spec.channels = 2;
-+    device->spec.freq = 44100;
++    device->hidden->rate = device->hidden->backend.audio_rate(device->hidden->handle);
++    device->spec.freq = device->hidden->rate ? (int)device->hidden->rate : 44100;
 +    device->sample_frames = device->spec.freq / 100;
 +    SDL_UpdatedAudioDeviceFormat(device);
 +    if (device->hidden->backend.audio_open(device->hidden->handle) < 0) {
@@ -252,6 +253,44 @@ diff -ruN a/src/audio/rdp/SDL_rdpaudio.c b/src/audio/rdp/SDL_rdpaudio.c
 +    return device->hidden->mixbuf != NULL;
 +}
 +
++static bool RDPAUDIO_ChangeRate(SDL_AudioDevice *device, unsigned rate)
++{
++    SDL_assert(device && device->hidden);
++    struct SDL_PrivateAudioData *data = device->hidden;
++    if (rate && !data->rate) data->next = SDL_GetTicksNS();
++    data->rate = rate;
++    if (!rate || rate == (unsigned)device->spec.freq) return true;
++    SDL_AudioSpec spec = device->spec;
++    spec.freq = (int)rate;
++    if (!SDL_AudioDeviceFormatChangedAlreadyLocked(device, &spec, spec.freq / 100)) return false;
++    Uint8 *mixbuf = SDL_realloc(data->mixbuf, device->buffer_size);
++    if (!mixbuf) return false;
++    data->mixbuf = mixbuf;
++    return true;
++}
++
++void SDL_RDP_AudioRate(unsigned rate)
++{
++    if (!SDL_GetCurrentAudioDriver() || SDL_strcmp(SDL_GetCurrentAudioDriver(), "rdp")) return;
++    SDL_AudioDevice *device = SDL_FindPhysicalAudioDeviceByHandle(&RDPAUDIO_bootstrap);
++    if (!device) return;
++    SDL_LockMutex(device->lock);
++    if (device->hidden && !RDPAUDIO_ChangeRate(device, rate)) SDL_AudioDeviceDisconnected(device);
++    SDL_UnlockMutex(device->lock);
++}
++
++static void RDPAUDIO_PumpEvents(SDL_AudioDevice *device)
++{
++    if (SDL_WasInit(SDL_INIT_VIDEO)) return;
++    sdlrdp_event events[64];
++    struct SDL_PrivateAudioData *data = device->hidden;
++    unsigned count;
++    while ((count = data->backend.poll(data->handle, events, SDL_arraysize(events))) != 0) {
++        for (unsigned i = 0; i < count; ++i)
++            if (events[i].type == SDLRDP_AUDIO) SDL_RDP_AudioRate(events[i].audio.freq);
++    }
++}
++
 +static bool RDPAUDIO_WaitDevice(SDL_AudioDevice *device)
 +{
 +    struct SDL_PrivateAudioData *data = device->hidden;
@@ -260,21 +299,14 @@ diff -ruN a/src/audio/rdp/SDL_rdpaudio.c b/src/audio/rdp/SDL_rdpaudio.c
 +        result = data->backend.audio_wait(data->handle, 100);
 +    } while (!result && !SDL_GetAtomicInt(&device->shutdown));
 +    if (result < 0) return SDL_SetError("%s", data->backend.last_error());
-+    const unsigned rate = data->backend.audio_rate(data->handle);
-+    if (rate && device->spec.freq && rate != (unsigned)device->spec.freq) {
-+        SDL_AudioSpec newspec = device->spec;
-+        newspec.freq = (int)rate;
-+        if (!SDL_AudioDeviceFormatChanged(device, &newspec, newspec.freq / 100)) return false;
-+        Uint8 *mixbuf = SDL_realloc(data->mixbuf, device->buffer_size);
-+        if (!mixbuf) return false;
-+        data->mixbuf = mixbuf;
-+    }
++    RDPAUDIO_PumpEvents(device);
++    SDL_LockMutex(device->lock);
 +    const Uint64 now = SDL_GetTicksNS();
-+    if (rate && !data->rate) data->next = now;
-+    data->rate = rate;
 +    data->next += (Uint64)device->sample_frames * SDL_NS_PER_SECOND / device->spec.freq;
-+    if (data->next > now + data->lead) SDL_DelayNS(data->next - now - data->lead);
-+    else if (data->next < now) data->next = now;
++    const Uint64 delay = data->next > now + data->lead ? data->next - now - data->lead : 0;
++    if (data->next < now) data->next = now;
++    SDL_UnlockMutex(device->lock);
++    if (delay) SDL_DelayNS(delay);
 +    return true;
 +}
 +
@@ -282,8 +314,6 @@ diff -ruN a/src/audio/rdp/SDL_rdpaudio.c b/src/audio/rdp/SDL_rdpaudio.c
 +{
 +    struct SDL_PrivateAudioData *data = device->hidden;
 +    const unsigned frames = buflen / (2 * sizeof(Sint16));
-+    const unsigned rate = data->backend.audio_rate(data->handle);
-+    if (rate && rate != (unsigned)device->spec.freq) return true;
 +    if (data->backend.audio_write(data->handle, buffer, frames) != (int)frames) {
 +        return SDL_SetError("%s", data->backend.last_error());
 +    }
@@ -581,3 +611,26 @@ diff -ruN a/src/video/SDL_video.c b/src/video/SDL_video.c
  }
  
  void SDL_SetDesktopDisplayMode(SDL_VideoDisplay *display, const SDL_DisplayMode *mode)
+diff -ruN a/src/render/SDL_render.c b/src/render/SDL_render.c
+--- a/src/render/SDL_render.c
++++ b/src/render/SDL_render.c
+@@ -1028,7 +1028,8 @@
+     if (displayID == 0) {
+         displayID = SDL_GetPrimaryDisplay();
+     }
+-    mode = SDL_GetDesktopDisplayMode(displayID);
++    mode = window && SDL_strcmp(SDL_GetCurrentVideoDriver(), "rdp") == 0 ?
++        SDL_GetCurrentDisplayMode(displayID) : SDL_GetDesktopDisplayMode(displayID);
+     if (mode && mode->refresh_rate_numerator > 0 && mode->refresh_rate_denominator > 0) {
+         refresh_num = mode->refresh_rate_numerator;
+         refresh_den = mode->refresh_rate_denominator;
+@@ -5490,6 +5491,9 @@
+ static void SDL_SimulateRenderVSync(SDL_Renderer *renderer)
+ {
+     Uint64 now, elapsed;
++    if (renderer->window && SDL_strcmp(SDL_GetCurrentVideoDriver(), "rdp") == 0) {
++        SDL_CalculateSimulatedVSyncInterval(renderer, renderer->window);
++    }
+     const Uint64 interval = renderer->simulate_vsync_interval_ns;
+
+     if (!interval) {

@@ -64,6 +64,7 @@ static void SDL_RDP_Resize(SDL_VideoData *data, unsigned width, unsigned height)
 
 static void SDL_RDP_Refresh(SDL_VideoData *data, unsigned millihertz)
 {
+    if (!millihertz) return;
     SDL_VideoDisplay *display = SDL_GetVideoDisplay(data->display);
     // Preserve the old record until SDL has compared it with the new one.
     SDL_DisplayMode *mode = display->current_mode == &data->refresh_modes[0] ?
@@ -175,6 +176,15 @@ static void SDL_RDP_Input(SDL_Window *window, const sdlrdp_event *event)
     }
 }
 
+static void SDL_RDP_AudioEvent(SDL_VideoData *data, const sdlrdp_event *event)
+{
+    SDL_assert(data && event->type == SDLRDP_AUDIO);
+    data->audio_rate = event->audio.freq;
+#ifdef SDL_AUDIO_DRIVER_RDP
+    SDL_RDP_AudioRate(data->audio_rate);
+#endif
+}
+
 static void SDL_RDP_Dispatch(SDL_VideoData *data, const sdlrdp_event *event)
 {
     if (event->type == SDLRDP_DRIVE) {
@@ -183,6 +193,10 @@ static void SDL_RDP_Dispatch(SDL_VideoData *data, const sdlrdp_event *event)
     }
     if (event->type == SDLRDP_CLIPBOARD) {
         SDL_RDP_ClipboardUpdate(data);
+        return;
+    }
+    if (event->type == SDLRDP_AUDIO) {
+        SDL_RDP_AudioEvent(data, event);
         return;
     }
     if (!data->window) {
@@ -195,7 +209,7 @@ static void SDL_RDP_Dispatch(SDL_VideoData *data, const sdlrdp_event *event)
         SDL_SetStringProperty(SDL_GetWindowProperties(data->window), SDL_PROP_WINDOW_RDP_CODEC_STRING,
                               SDL_RDP_CodecName(event->codec_changed.codec));
         break;
-    case SDLRDP_AUDIO: case SDLRDP_RESIZE: break;
+    case SDLRDP_RESIZE: break;
     case SDLRDP_SCREEN: SDL_RDP_Resize(data, event->screen.width, event->screen.height); break;
     case SDLRDP_REFRESH: SDL_RDP_Refresh(data, event->refresh.millihertz); break;
     case SDLRDP_TEXT: SDL_RDP_Text(data->window, event); break;

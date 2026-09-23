@@ -7,6 +7,7 @@
 #include "logging.hpp"
 #include "trace.hpp"
 #include "encoder.hpp"
+#include "legacy-frame.hpp"
 #include "clipboard.hpp"
 #include "input.hpp"
 #include "audio.hpp"
@@ -127,6 +128,9 @@ public:
   bool Marker(UINT16 action);
   void FrameSent(std::size_t bytes = 0);
   void LogFrames();
+  // RDP has no acknowledgement deadline; one second bounds a viewer-tolerable frozen picture.
+  static constexpr auto     AcknowledgementTimeout = std::chrono::seconds(1);
+  static constexpr unsigned FrameWindow            = 2;
   bool Pacing();
   void GraphicsDeadline();
   DWORD Timeout();
@@ -164,32 +168,36 @@ public:
   std::vector<Column> scale_columns;
   int scale_x = -1, scale_width = 0;
   unsigned scale_source = 0;
-  unsigned rect_index = 0, row = 0;
   uint64_t sequence = 0, acknowledged = 0;
   UINT32 frame_id = 0;
-  struct Pending { UINT32 id; uint64_t sequence; std::size_t bytes = 0; Clock::time_point sent{}; };
+  struct Pending { UINT32 id; uint64_t sequence; Clock::time_point sent{}; };
   std::deque<Pending> pending;
 
-  Clock::time_point first_sent{}, last_ack{};
+  Clock::time_point last_ack{};
   double ack_interval = 0;
   uint64_t avc_frames = 0;
   std::chrono::nanoseconds avc_convert{}, avc_upload{}, avc_encode{};
+  uint64_t acks_timed_out = 0;
   uint64_t frames_sent = 0, frames_coalesced = 0, dirty_presents = 0, ack_count = 0, ack_over_100ms = 0;
   std::chrono::nanoseconds encoded_at_start{}, encode_total{}, encode_max{}, ack_total{}, ack_max{};
   unsigned refresh = 0, screen_width = 0, screen_height = 0;
   bool ack_enabled = false, ack_seen = false, suppressed = false;
-  bool encode_pending = false;
   HANDLE channels = nullptr;
   std::unique_ptr<DispServerContext, Releases<disp_server_context_free>> disp;
   std::unique_ptr<ClipboardChannel> clipboard;
   std::shared_ptr<DriveChannel> drive;
   UINT32 display_id = UINT32_MAX;
-  bool disp_open = false, resizing = false, frame_started = false;
+  bool disp_open = false, resizing = false;
   sdlrdp_rect desktop{};
   bool activated = false;
   std::atomic_bool active = false, finished = false;
   std::jthread thread;
+private:
+  enum class EncodeState { Idle, Legacy, Graphics, LegacyReady };
+  void TransitionEncode(EncodeState next);
+  bool PrepareFrame();
+  EncodeState encode_state { EncodeState::Idle };
+  LegacyFrame legacy       {};
 };
-bool SendFrame(Peer& peer);
 }
 struct sdlrdp_handle { std::unique_ptr<Backend::State> state; };

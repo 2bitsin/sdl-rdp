@@ -279,7 +279,8 @@ void Peer::Post(sdlrdp_rect area)
 }
 bool Peer::TransportStep(std::stop_token quit)
 {
-  Expects(client && client->context, "peer context exists");
+  Expects(client != nullptr, "peer exists");
+  Expects(client->context != nullptr, "peer context exists");
   {
     std::scoped_lock lock(owner.session_guard);
     if (quit.stop_requested()) return false;
@@ -290,24 +291,55 @@ bool Peer::TransportStep(std::stop_token quit)
   }
   return EncodeAndSend(quit);
 }
+void Peer::TransitionEncode(EncodeState next)
+{
+  switch (encode_state) {
+    case EncodeState::Idle:
+      Expects(next != EncodeState::LegacyReady, "encoding precedes legacy writes");
+      break;
+    case EncodeState::Legacy:
+      Expects(next == EncodeState::LegacyReady, "legacy encoding produces packets");
+      break;
+    case EncodeState::Graphics:
+    case EncodeState::LegacyReady:
+      Expects(next == EncodeState::Idle, "completed encoding returns to idle");
+      break;
+    default: utilities::Unreachable(encode_state);
+  }
+  encode_state = next;
+}
 bool Peer::EncodeAndSend(std::stop_token quit)
 {
-  Expects(client && client->context, "peer context exists");
-  if (!encode_pending) return true;
-  Expects(gfx && snapshot, "graphics frame is ready for encoding");
-  auto encoded = gfx->Encode();
+  Expects(client != nullptr, "peer exists");
+  Expects(client->context != nullptr, "peer context exists");
+  bool encoded;
+  switch (encode_state) {
+    case EncodeState::Idle:
+    case EncodeState::LegacyReady: return true;
+    case EncodeState::Legacy: encoded = legacy.Encode(*this); break;
+    case EncodeState::Graphics:
+      Expects(gfx != nullptr, "graphics channel exists");
+      Expects(snapshot != nullptr, "immutable frame exists");
+      encoded = gfx->Encode();
+      break;
+    default: utilities::Unreachable(encode_state);
+  }
   std::scoped_lock lock(owner.session_guard);
-  encode_pending = false;
+  auto kind = encode_state;
+  TransitionEncode(kind == EncodeState::Legacy ? EncodeState::LegacyReady : EncodeState::Idle);
   if (quit.stop_requested()) return false;
   if (!active) return true;
-  if (encoded && gfx->Send()) return true;
+  if (encoded && (kind == EncodeState::Legacy ? legacy.Send(*this) : gfx->Send())) {
+    if (kind == EncodeState::Legacy && !snapshot) TransitionEncode(EncodeState::Idle);
+    return true;
+  }
   TransportEnded();
   return false;
 }
 bool Peer::Drain()
 {
-  Expects(client && client->context, "peer context exists");
-  encode_pending = false;
+  Expects(client != nullptr, "peer exists");
+  Expects(client->context != nullptr, "peer context exists");
   if (!active) return true;
   if (client->DrainOutputBuffer(client.get()) < 0) return false;
   if (client->IsWriteBlocked(client.get())) {
@@ -326,15 +358,24 @@ bool Peer::Drain()
         dirty.Add({0, 0, int(owner.frame_width), int(owner.frame_height)});
       }
     }
-    if (suppressed || !Pacing()) return true;
+    if (!Pacing() || suppressed) return true;
   }
   if (connection) return true;
   if (!SendPointer()) return false;
   if (!snapshot && !BeginFrame()) return false;
   if (!snapshot || resizing) return true;
-  if (!Graphics()) return SendFrame(*this);
-  encode_pending = gfx->Prepare();
-  return encode_pending;
+  return PrepareFrame();
+}
+bool Peer::PrepareFrame()
+{
+  if (encode_state == EncodeState::LegacyReady) {
+    if (!legacy.Send(*this)) return false;
+    if (!snapshot) TransitionEncode(EncodeState::Idle);
+    return true;
+  }
+  if (!(Graphics() ? gfx->Prepare() : legacy.Prepare(*this))) return false;
+  TransitionEncode(Graphics() ? EncodeState::Graphics : EncodeState::Legacy);
+  return true;
 }
 BOOL Peer::Capabilities(freerdp_peer* client)
 {
@@ -357,7 +398,8 @@ BOOL Peer::Capabilities(freerdp_peer* client)
 }
 bool Peer::BeginFrame()
 {
-  Expects(!resizing && freerdp_is_active_state(client->context), "resize requires an active client with no resize in flight");
+  Expects(!resizing, "no resize in flight");
+  Expects(freerdp_is_active_state(client->context), "resize requires an active client");
   sdlrdp_rect picture;
   {
     std::scoped_lock lock(owner.frame_guard);
@@ -371,7 +413,6 @@ bool Peer::BeginFrame()
     encoded_at_start = encoder.encode_time;
     sending = std::move(dirty);
     dirty = {};
-    rect_index = row = 0;
   }
   if (picture.w != desktop.w || picture.h != desktop.h) {
     desktop = picture;
@@ -385,7 +426,6 @@ bool Peer::BeginFrame()
     sending.Add({0, 0, int(snapshot_width), int(snapshot_height)});
   }
   ++frame_id;
-  frame_started = false;
   return true;
 }
 }

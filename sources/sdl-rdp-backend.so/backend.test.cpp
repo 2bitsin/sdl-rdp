@@ -1235,7 +1235,7 @@ protected:
     EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "Audio:"), 1u);
     EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "Frames:"), 1u);
     EXPECT_TRUE(std::regex_search(text, std::regex(
-      R"(acknowledgement [0-9.]+ ms mean, [0-9.]+ ms max, [0-9]+ over 100 ms\.)"))) << text;
+      R"(acknowledgement [0-9.]+ ms mean, [0-9.]+ ms max, [0-9]+ over 100 ms, [0-9]+ timed out\.)"))) << text;
   }
   void EstablishConfirmations(Client& client, SoundClient& audio) {
     // Fill one latency window, then return its credit. This distinguishes a
@@ -2024,8 +2024,43 @@ TEST_F(RoundFive, GraphicsFrameStatistics) {
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, "Frames: 3 sent, 2 coalesced; encode ")) << logs.Text(true);
   auto text = logs.Text(true);
   std::smatch match;
-  ASSERT_TRUE(std::regex_search(text, match, std::regex(R"(acknowledgement [0-9.]+ ms mean, [0-9.]+ ms max, ([0-9]+) over 100 ms\.)"))) << text;
+  ASSERT_TRUE(std::regex_search(text, match, std::regex(R"(acknowledgement [0-9.]+ ms mean, [0-9.]+ ms max, ([0-9]+) over 100 ms, ([0-9]+) timed out\.)"))) << text;
   EXPECT_EQ(match[1], "0");
+  EXPECT_EQ(match[2], "0");
   RecordProperty("statistics", logs.Text(true));
+}
+}
+
+namespace {
+TEST_F(RoundFive, GraphicsAcknowledgementsAgeOutAndResume) {
+  Open(320, 200, {}, SDLRDP_CODEC_PROGRESSIVE);
+  Client client(sdlrdp_port(backend.get()), true);
+  client.EnableGraphics();
+  Headless::GraphicsObserver observer(client);
+  observer.automatic = false;
+  Connect(client);
+  ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
+  std::vector<UINT32> pixels(320 * 200, 0x123456);
+  for (unsigned count = 1; count <= 4; ++count) {
+    Present(pixels, 320, 200);
+    ASSERT_TRUE(client.Until([&] { return observer.frames.size() == count; }));
+  }
+  ASSERT_TRUE(observer.AckFrame(3, 0));
+  ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0) != 0; }));
+  for (unsigned count = 5; count <= 6; ++count) {
+    Present(pixels, 320, 200);
+    ASSERT_TRUE(client.Until([&] { return observer.frames.size() == count; }));
+  }
+  Present(pixels, 320, 200);
+  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 0);
+  ASSERT_TRUE(observer.AckFrame(4, 0));
+  ASSERT_TRUE(client.Until([&] { return observer.frames.size() == 7; }));
+  backend.reset();
+  EXPECT_EQ(observer.frames.size(), 7u);
+  auto text = logs.Text(true);
+  std::smatch match;
+  ASSERT_TRUE(std::regex_search(text, match,
+    std::regex(R"(Frames: 7 sent,[^\n]*, ([0-9]+) timed out\.)"))) << text;
+  EXPECT_GE(std::stoull(match[1].str()), 2u);
 }
 }

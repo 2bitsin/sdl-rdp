@@ -22,7 +22,7 @@ public:
   bool Prepare();
   bool Encode();
   bool Send();
-  bool Budget() const;
+  unsigned FrameWindow() const;
   bool confirmed = false;
 private:
   void AccountAvcFrame();

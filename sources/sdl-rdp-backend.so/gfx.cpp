@@ -128,16 +128,11 @@ UINT GfxChannel::Qoe(RdpgfxServerContext* context, RDPGFX_QOE_FRAME_ACKNOWLEDGE_
   self.peer.graphics_qoe = *ack;
   return CHANNEL_RC_OK;
 }
-bool GfxChannel::Budget() const
+unsigned GfxChannel::FrameWindow() const
 {
-  Expects(peer.ack_enabled && queue_depth != SUSPEND_FRAME_ACKNOWLEDGEMENT,
-    "queue depth is outstanding bytes, or zero when unavailable; acknowledgements are not suspended");
-  constexpr std::size_t MinimumByteBudget = 64 * 1024, BufferedFrames = 2;
-  if (!queue_depth || peer.pending.empty()) return true;
-  auto bytes = std::accumulate(peer.pending.begin(), peer.pending.end(), std::size_t{},
-    [](auto sum, auto const& frame) { return sum + frame.bytes; });
-  auto next = prepared.empty() ? last_bytes : frame_bytes;
-  return bytes + queue_depth + next <= std::max<std::size_t>(std::max(last_bytes, next) * BufferedFrames, MinimumByteBudget);
+  Expects(queue_depth != SUSPEND_FRAME_ACKNOWLEDGEMENT, "acknowledgements are enabled");
+  // MS-RDPEGFX 2.2.2.13 reports bytes, not frames; reserve at most one slot for that backlog.
+  return queue_depth && queue_depth >= last_bytes ? Peer::FrameWindow - 1 : Peer::FrameWindow;
 }
 bool GfxChannel::Surface()
 {

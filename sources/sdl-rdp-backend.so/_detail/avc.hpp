@@ -9,6 +9,8 @@
 #include <vector>
 
 namespace Backend::Avc {
+struct IntraRefresh { unsigned period, count; };
+IntraRefresh IntraRefreshFor(unsigned fps);
 unsigned Bitrate(unsigned width, unsigned height, unsigned kbps = 0);
 unsigned Aligned(unsigned dimension);
 void Pad(std::span<BYTE const> pixels, unsigned stride, unsigned width, unsigned height, std::vector<BYTE>& padded);

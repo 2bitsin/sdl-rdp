@@ -32,10 +32,8 @@ Settings include:
 `SDL_RDP_CERT_DIR` (`$XDG_DATA_HOME/sdl-rdp` or `~/.local/share/sdl-rdp`), `SDL_RDP_WIDTH`, `SDL_RDP_HEIGHT` (1024x768),
 `SDL_RDP_WAIT_FOR_CLIENT`, `SDL_RDP_BACKEND` (path of the backend library),
 `SDL_RDP_AUDIO_LATENCY` (500 ms), `SDL_RDP_AUDIO_LEAD` (150 ms).
-`SDL_RDP_VSYNC` defaults to `1`: surface updates wait up to 100 ms for the
-client to acknowledge every frame except the latest present, allowing rendering
-to overlap the latest frame's encoding, delivery and decoding. At most two frames
-are in flight. Set it to `0` to return immediately.
+`SDL_RDP_VSYNC` defaults to `0`: surface updates return as soon as the backend takes the frame, and SDL renderer vsync uses the display refresh rate for timed pacing.
+Set it to `1` to wait up to 100 ms for client acknowledgements, allowing the latest present to remain in flight.
 `SDL_RDP_ASPECT` sets the picture's display aspect (for example `4:3`);
 empty means square pixels. It can change live, and
 `SDL_PROP_WINDOW_RDP_ASPECT_STRING` reports it on the window.

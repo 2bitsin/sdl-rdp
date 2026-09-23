@@ -26,6 +26,9 @@ static bool SDL_RDP_InitDisplay(SDL_VideoData *data, const sdlrdp_config *config
     mode.format = SDL_PIXELFORMAT_XRGB8888;
     mode.w = (int)config->width;
     mode.h = (int)config->height;
+    // SDL 3.4.8 SDL_CalculateSimulatedVSyncInterval defaults to 60 Hz before measurement.
+    mode.refresh_rate = mode.refresh_rate_numerator = 60;
+    mode.refresh_rate_denominator = 1;
     data->display = SDL_AddBasicVideoDisplay(&mode);
     if (data->display) SDL_RDP_AuthDisplay(SDL_GetDisplayProperties(data->display));
     if (data->display) SDL_RDP_UpdateDrives(&data->backend, data->handle, SDL_GetDisplayProperties(data->display));

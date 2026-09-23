@@ -14,6 +14,14 @@
 namespace Backend::Avc {
 using utilities::Expects;
 using utilities::Ensures;
+IntraRefresh IntraRefreshFor(unsigned fps)
+{
+  Expects(fps && fps <= UINT32_MAX / 2, "refresh period fits NVENC");
+  // Recovery target: refresh every two seconds, spreading each sweep over half a second.
+  IntraRefresh refresh{2 * fps, std::max(1u, fps / 2)};
+  Ensures(refresh.count <= refresh.period, "refresh sweep fits its period");
+  return refresh;
+}
 unsigned Aligned(unsigned dimension)
 {
   Expects(dimension && dimension <= 32766, "surface dimension fits the graphics protocol");
@@ -118,6 +126,10 @@ bool Encoder::Impl::Initialize(unsigned bitrate, unsigned fps)
   auto& h264 = config.encodeCodecConfig.h264Config;
   h264.chromaFormatIDC = 1; h264.level = NV_ENC_LEVEL_AUTOSELECT;
   h264.idrPeriod = NVENC_INFINITE_GOPLENGTH; h264.repeatSPSPPS = 1;
+  auto refresh = IntraRefreshFor(fps);
+  h264.enableIntraRefresh  = 1;
+  h264.intraRefreshPeriod  = refresh.period;
+  h264.intraRefreshCnt     = refresh.count;
   auto& vui = h264.h264VUIParameters;
   vui.videoSignalTypePresentFlag = 1; vui.videoFullRangeFlag = 1; vui.colourDescriptionPresentFlag = 1;
   vui.colourPrimaries = NV_ENC_VUI_COLOR_PRIMARIES_BT709;

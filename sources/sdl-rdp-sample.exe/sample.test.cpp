@@ -749,8 +749,15 @@ TEST_F(Sample, ToneAndVsync) {
     Headless::FrameObserver observer(client);
     ASSERT_TRUE(client.Until([&] {
       if (!observer.ids.empty()) observer.Ack();
-      return audio.samples.size() >= audio.rate * 2 && (!tight || observer.ids.size() >= 2);
+      return !audio.received.empty() && Clock::now() >= audio.received.front() + 3s;
     }));
+    ASSERT_EQ(audio.rate, 44100u);
+    std::ranges::for_each(std::views::iota(0, 3), [&](int second) {
+      auto start  = audio.received.front() + std::chrono::seconds(second);
+      auto blocks = std::ranges::count_if(audio.received, [&](auto time) { return time >= start && time < start + 1s; });
+      EXPECT_GE(blocks, 45) << "tight=" << tight << " second=" << second;
+      SDL_Log("tone tight=%d second=%d blocks=%zu", tight, second, std::size_t(blocks));
+    });
     auto [frequency, db] = Headless::ToneMeasurements(audio.samples, audio.rate);
     EXPECT_NEAR(frequency, 440, 8.8);
     EXPECT_NEAR(db, -12, 0.3);
@@ -973,5 +980,44 @@ TEST_F(Sample, GraphicsPipelinePattern) {
   ASSERT_TRUE(Read("GFX advertised")) << process->transcript;
   RecordProperty("trace", process->transcript);
   ASSERT_NO_FATAL_FAILURE(Escape(client));
+}
+}
+
+namespace SampleGate {
+TEST_F(VideoDriver, DefaultPresentDoesNotWaitForAcknowledgements) {
+  auto properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
+  Client client(SDL_GetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0), true, 1280, 800);
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  Headless::FrameObserver observer(client);
+  SDL_PumpEvents();
+  ASSERT_NE(SDL_GetWindowSurface(window), nullptr);
+  auto start = Clock::now();
+  for (unsigned i = 0; i < 10; ++i) ASSERT_TRUE(SDL_UpdateWindowSurface(window));
+  // Ten old 100 ms waits exceed this half-second regression budget.
+  EXPECT_LT(Clock::now() - start, 500ms);
+}
+
+TEST_F(VideoDriver, AudioEventChangesOpenDeviceFormat) {
+  ASSERT_TRUE(SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "rdp"));
+  ASSERT_TRUE(SDL_Init(SDL_INIT_AUDIO));
+  SDL_AudioSpec spec{SDL_AUDIO_S16, 2, 44100};
+  std::unique_ptr<SDL_AudioStream, decltype(&SDL_DestroyAudioStream)> stream{
+    SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr), SDL_DestroyAudioStream};
+  ASSERT_TRUE(stream) << SDL_GetError();
+  auto properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
+  Client client(SDL_GetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0), true, 1280, 800);
+  Headless::SoundClient audio(client);
+  audio.rate = 48000;
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(client.Until([&] { return audio.ready; }));
+  SDL_AudioSpec before{};
+  ASSERT_TRUE(SDL_GetAudioDeviceFormat(SDL_GetAudioStreamDevice(stream.get()), &before, nullptr));
+  EXPECT_EQ(before.freq, 44100);
+  ASSERT_TRUE(client.Until([&] {
+    SDL_PumpEvents();
+    SDL_AudioSpec actual{};
+    return SDL_GetAudioDeviceFormat(SDL_GetAudioStreamDevice(stream.get()), &actual, nullptr) && actual.freq == 48000;
+  }));
+  SDL_ResetHint(SDL_HINT_AUDIO_DRIVER);
 }
 }

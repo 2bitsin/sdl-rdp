@@ -485,7 +485,7 @@ TEST_F(GraphicsCost, FullRandomFrame) {
   auto text = logs.Text(true);
   std::smatch match;
   ASSERT_TRUE(std::regex_search(text, match, std::regex(
-    R"(Frames: 1 sent, 0 coalesced; encode ([0-9.]+) ms mean, ([0-9.]+) ms max; acknowledgement ([0-9.]+) ms mean, ([0-9.]+) ms max, ([0-9]+) over 100 ms\.)"))) << text;
+    R"(Frames: 1 sent, 0 coalesced; encode ([0-9.]+) ms mean, ([0-9.]+) ms max; acknowledgement ([0-9.]+) ms mean, ([0-9.]+) ms max, ([0-9]+) over 100 ms, [0-9]+ timed out\.)"))) << text;
   auto milliseconds = std::stod(match[1]);
   RecordProperty("encode_ms", milliseconds);
   RecordProperty("statistics", match.str());
@@ -543,4 +543,17 @@ TEST_F(GraphicsCost, AvcFullFrame) {
   RecordAvcCost(logs);
 }
 
+}
+
+TEST(AvcConfiguration, IntraRefreshUsesConfiguredFrameRate) {
+  struct Case { unsigned fps, period, count; };
+  constexpr std::array cases{
+    Case{  1,   2,  1}, Case{ 24,  48, 12}, Case{ 30,  60, 15},
+    Case{ 59, 118, 29}, Case{ 60, 120, 30}, Case{144, 288, 72}
+  };
+  std::ranges::for_each(cases, [](auto value) {
+    auto refresh = Backend::Avc::IntraRefreshFor(value.fps);
+    EXPECT_EQ(refresh.period, value.period);
+    EXPECT_EQ(refresh.count,  value.count);
+  });
 }

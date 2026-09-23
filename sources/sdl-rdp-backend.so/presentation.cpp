@@ -68,8 +68,7 @@ void Peer::FrameSent(std::size_t bytes)
   Expects(snapshot != nullptr, "sent frame has a snapshot");
   auto now = Clock::now();
   owner.trace.Line("frame", [&] { return std::format("id={} bytes={}", frame_id, bytes); });
-  if (ack_enabled) pending.push_back({frame_id, sequence, bytes, now});
-  if (first_sent == Clock::time_point{}) first_sent = now;
+  if (ack_enabled) pending.push_back({frame_id, sequence, now});
   auto elapsed = encoder.encode_time - encoded_at_start;
   encode_total += elapsed;
   encode_max = std::max(encode_max, elapsed);
@@ -83,10 +82,10 @@ void Peer::LogFrames()
     Milliseconds(avc_convert).count() / avc_frames, Milliseconds(avc_upload).count() / avc_frames,
     Milliseconds(avc_encode).count() / avc_frames) : std::string{};
   owner.Log(SDLRDP_LOG_INFO, std::format(
-    "Frames: {} sent, {} coalesced; encode {:.1f} ms mean, {:.1f} ms max{}; acknowledgement {:.1f} ms mean, {:.1f} ms max, {} over 100 ms.",
+    "Frames: {} sent, {} coalesced; encode {:.1f} ms mean, {:.1f} ms max{}; acknowledgement {:.1f} ms mean, {:.1f} ms max, {} over 100 ms, {} timed out.",
     frames_sent, frames_coalesced, frames_sent ? Milliseconds(encode_total).count() / frames_sent : 0,
     Milliseconds(encode_max).count(), phases, ack_count ? Milliseconds(ack_total).count() / ack_count : 0,
-    Milliseconds(ack_max).count(), ack_over_100ms));
+    Milliseconds(ack_max).count(), ack_over_100ms, acks_timed_out));
 }
 bool Peer::Marker(UINT16 action)
 {
@@ -99,14 +98,14 @@ bool Peer::Marker(UINT16 action)
 bool Peer::Pacing()
 {
   Expects(client != nullptr, "peer exists");
-  // 250 ms allows fifteen 60 Hz refresh periods for a first acknowledgement.
-  if (!Graphics() && ack_enabled && !ack_seen && first_sent != Clock::time_point{}
-      && Clock::now() - first_sent >= std::chrono::milliseconds(250)) {
-    ack_enabled = false;
-    pending.clear();
+  auto now = Clock::now();
+  while (!pending.empty() && now - pending.front().sent >= AcknowledgementTimeout) {
+    acknowledged = pending.front().sequence;
+    pending.pop_front();
+    ++acks_timed_out;
     owner.frame_changed.notify_all();
   }
-  return !ack_enabled || (pending.size() < 2 && (!Graphics() || gfx->Budget()));
+  return !ack_enabled || pending.size() < (Graphics() ? gfx->FrameWindow() : FrameWindow);
 }
 void Peer::GraphicsDeadline()
 {
@@ -128,9 +127,9 @@ DWORD Peer::Timeout()
   }
   if (client->IsWriteBlocked(client.get())) return 5;
   std::scoped_lock lock(owner.frame_guard);
-  if (Graphics() || !ack_enabled || ack_seen || first_sent == Clock::time_point{}) return INFINITE;
-  auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - first_sent).count();
-  return DWORD(std::max<int64_t>(1, 250 - elapsed));
+  if (pending.empty()) return INFINITE;
+  auto remaining = pending.front().sent + AcknowledgementTimeout - Clock::now();
+  return DWORD(std::max<int64_t>(1, std::chrono::ceil<std::chrono::milliseconds>(remaining).count()));
 }
 BOOL Peer::Acknowledge(rdpContext* context, UINT32 id)
 {
