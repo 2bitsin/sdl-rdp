@@ -5,6 +5,9 @@
 #include "_detail/headless-tls.hpp"
 #include "_detail/test-logs.hpp"
 #include <filesystem>
+#include "_detail/state.hpp"
+#include <regex>
+#include <random>
 
 namespace {
 TEST(GraphicsCapability, HighestSupportedVersion) {
@@ -102,5 +105,62 @@ TEST_F(GraphicsResize, ProgressiveContextAndFullDamage) {
     EXPECT_LE(client.MaxError(pixels), client.tolerance);
     EXPECT_EQ(observer.progressive_headers, generations);
   }
+}
+}
+
+namespace {
+class GraphicsCost : public testing::Test {
+protected:
+  Headless::Logs logs;
+  std::filesystem::path directory;
+  std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> backend{nullptr, sdlrdp_close};
+  void SetUp() override {
+    char pattern[] = "/tmp/sdlrdp-cost-XXXXXX";
+    auto path = mkdtemp(pattern);
+    ASSERT_NE(path, nullptr);
+    directory = path;
+    sdlrdp_config config{"127.0.0.1", 0, directory.c_str(), 1280, 800, 0, Headless::Logs::Collect, &logs};
+    config.codec = SDLRDP_CODEC_PROGRESSIVE;
+    sdlrdp_handle* handle = nullptr;
+    ASSERT_EQ(sdlrdp_open(&config, &handle), 0);
+    backend.reset(handle);
+    Headless::InitializeTls(sdlrdp_port(handle));
+  }
+  void TearDown() override {
+    backend.reset();
+    std::filesystem::remove_all(directory);
+  }
+};
+TEST_F(GraphicsCost, FullRandomFrame) {
+  Headless::Client client(sdlrdp_port(backend.get()), true, 1280, 800);
+  client.EnableGraphics();
+  Headless::GraphicsObserver observer(client);
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  EXPECT_EQ(client.instance->context->codecs->ThreadingFlags, THREADING_FLAGS_DISABLE_THREADS);
+  ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
+  std::vector<UINT32> pixels(1280 * 800);
+  std::mt19937 random(17);
+  std::ranges::generate(pixels, [&] { return random() & 0x00ffffff; });
+  sdlrdp_rect full{0, 0, 1280, 800};
+  ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 5120, 1280, 800, &full, 1), 0);
+  ASSERT_TRUE(client.Until([&] {
+    std::scoped_lock lock(backend->state->frame_guard);
+    return backend->state->current->acknowledged == 1;
+  }));
+  ASSERT_EQ(observer.frames.size(), 1u);
+  freerdp_disconnect(client.instance.get());
+  backend.reset();
+  auto text = logs.Text(true);
+  std::smatch match;
+  ASSERT_TRUE(std::regex_search(text, match, std::regex(
+    R"(Frames: 1 sent, 0 coalesced; encode ([0-9.]+) ms mean, ([0-9.]+) ms max; acknowledgement ([0-9.]+) ms mean, ([0-9.]+) ms max\.)"))) << text;
+  auto milliseconds = std::stod(match[1]);
+  RecordProperty("encode_ms", milliseconds);
+  RecordProperty("statistics", match.str());
+  EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "Frames:"), 1u);
+  EXPECT_EQ(match[1], match[2]);
+  EXPECT_EQ(match[3], match[4]);
+  // measured 2026-09-23 on the dev box, 88 cores: 138 ms without threads, 228 ms with the WinPR pool
+  EXPECT_LT(milliseconds, 200.0);
 }
 }

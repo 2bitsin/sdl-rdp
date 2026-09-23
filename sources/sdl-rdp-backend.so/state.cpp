@@ -146,6 +146,7 @@ void State::Depart(Peer& peer)
   std::scoped_lock lock(session_guard);
   if (peer.drive) peer.drive->Disconnect();
   if (peer.activated) {
+    peer.LogFrames();
     auto name = freerdp_settings_get_string(peer.client->context->settings, FreeRDP_ClientHostname);
     Log(SDLRDP_LOG_INFO, std::format("Client {} disconnected.", name ? name : peer.client->hostname));
   }
@@ -221,6 +222,7 @@ void State::Present(void const* pixels, int pitch, unsigned w, unsigned h,
   frame_width = width = w; frame_height = height = h;
   ++presented;
   for (auto const& peer : peers) if (peer->active) {
+    ++peer->dirty_presents;
     if (resized) { peer->dirty.clear(); peer->Post({0, 0, int(w), int(h)}); }
     else for (auto area : damage) peer->Post(area);
   }

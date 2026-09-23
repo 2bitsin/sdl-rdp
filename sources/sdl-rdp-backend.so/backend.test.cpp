@@ -166,6 +166,11 @@ struct BackendEvents {
   CertificateDirectory certificates;
   Logs logs;
   std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> backend{nullptr, sdlrdp_close};
+  bool Acknowledged() {
+    Expects(backend != nullptr, "backend exists");
+    std::scoped_lock lock(backend->state->frame_guard);
+    return backend->state->current && backend->state->current->acknowledged >= backend->state->presented;
+  }
   std::vector<sdlrdp_event> Events() {
     std::array<sdlrdp_event, 256> batch{};
     auto count = sdlrdp_poll(backend.get(), batch.data(), batch.size());
@@ -779,7 +784,13 @@ TEST_F(RoundFive, WaitAndRefresh) {
   unsigned refresh = 0;
   for (unsigned i = 1; i <= 20; ++i) {
     Present(pixels, 320, 200);
-    auto waiting = std::async(std::launch::async, [&] { return sdlrdp_wait_frame(backend.get(), 10000); });
+    auto waiting = std::async(std::launch::async, [&] {
+      auto& state = *backend->state;
+      std::unique_lock lock(state.frame_guard);
+      return state.frame_changed.wait_for(lock, std::chrono::seconds(10), [&] {
+        return state.current->acknowledged >= state.presented;
+      });
+    });
     ASSERT_TRUE(client.Until([&] { return observer.ids.size() == i; }));
     EXPECT_EQ(waiting.wait_for(std::chrono::milliseconds(0)), std::future_status::timeout);
     ASSERT_TRUE(observer.Ack());
@@ -805,6 +816,8 @@ TEST_F(RoundFive, NeverAcknowledges) {
   auto start = Clock::now();
   Present(pixels, 320, 200);
   ASSERT_TRUE(client.Until([&] { return observer.ids.size() == 1; }));
+  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 10000), 1);
+  Present(pixels, 320, 200);
   EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 10000), 1);
   EXPECT_GE(Clock::now() - start, std::chrono::milliseconds(200));
   EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 1);
@@ -1012,7 +1025,7 @@ TEST_F(RoundFive, GraphicsDisconnectDuringWrite) {
   Events();
   std::vector<UINT32> pixels(width * height);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, width, height));
-  ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0); }));
+  ASSERT_TRUE(client.Until([&] { return Acknowledged(); }));
   UINT32 value = 1;
   for (auto& pixel : pixels) {
     value ^= value << 13; value ^= value >> 17; value ^= value << 5;
@@ -1023,7 +1036,7 @@ TEST_F(RoundFive, GraphicsDisconnectDuringWrite) {
   auto count = freerdp_get_event_handles(client.instance->context, handles.data(), handles.size());
   ASSERT_GT(count, 0u);
   ASSERT_LT(WaitForMultipleObjects(count, handles.data(), FALSE, 10000), WAIT_OBJECT_0 + count);
-  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 0);
+  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 1);
   ASSERT_TRUE(freerdp_disconnect(client.instance.get()));
   auto events = EventsUntil([](auto const& events) {
     return std::ranges::any_of(events, [](auto const& event) { return event.type == SDLRDP_DISCONNECTED; });
@@ -1378,8 +1391,7 @@ TEST_P(GraphicsGate, AcknowledgementPacingAndSuspend) {
     ASSERT_TRUE(client.Until([&] { return observer.frames.size() == count; })) << logs.Text(true);
   }
   ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &full, 1), 0);
-  auto deadline = Clock::now() + std::chrono::milliseconds(300);
-  while (Clock::now() < deadline) ASSERT_TRUE(client.Pump());
+  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 1), 0);
   EXPECT_EQ(observer.frames.size(), 2u);
   EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 0);
   ASSERT_TRUE(observer.Ack(SUSPEND_FRAME_ACKNOWLEDGEMENT));
@@ -1394,7 +1406,7 @@ TEST_P(GraphicsGate, AcknowledgementPacingAndSuspend) {
   EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 0);
   ASSERT_TRUE(observer.Ack());
   ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0) == 1; }));
-  RecordProperty("trace", "two unacknowledged frames held for 300 ms; suspend releases third; resume waits; cumulative ack releases wait");
+  RecordProperty("trace", "two unacknowledged frames exhaust the window; suspend releases third; resume waits; cumulative ack releases wait");
 }
 TEST_P(GraphicsGate, QueueDepthThrottlesBytes) {
   Client client(sdlrdp_port(backend.get()), true);
@@ -1493,7 +1505,7 @@ protected:
     if (codec == SDLRDP_CODEC_PROGRESSIVE)
       ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
     Present(GraphicsScene(0, noise), 640, 480);
-    ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0); }));
+    ASSERT_TRUE(client.Until([&] { return Acknowledged(); }));
     auto encode = [&] {
       std::scoped_lock lock(backend->state->session_guard);
       return backend->state->current->encoder.encode_time;
@@ -1508,7 +1520,7 @@ protected:
       auto presented = Clock::now();
       sdlrdp_rect damage = noise ? sdlrdp_rect{0, 0, 640, 480} : sdlrdp_rect{int(frame - 1), 40, 33, 32};
       ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 640 * 4, 640, 480, &damage, 1), 0);
-      ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0); })) << logs.Text(true);
+      ASSERT_TRUE(client.Until([&] { return Acknowledged(); })) << logs.Text(true);
       latency += std::chrono::duration<double, std::milli>(Clock::now() - presented).count();
       maximum_error = std::max(maximum_error, client.MaxError(pixels));
     }
@@ -1543,7 +1555,7 @@ TEST_F(RoundFive, GraphicsAutoUsesProgressive) {
   EXPECT_EQ(connected->connected.codec, SDLRDP_CODEC_PROGRESSIVE);
   auto pixels = GraphicsScene(3, false);
   Present(pixels, 640, 480);
-  ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0); }));
+  ASSERT_TRUE(client.Until([&] { return Acknowledged(); }));
   EXPECT_LE(client.MaxError(pixels), 24u);
   ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_RAW), 0);
   pixels = GraphicsScene(4, false);
@@ -1567,13 +1579,13 @@ TEST_F(RoundFive, ProgressiveDamageAndQoe) {
   ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
   auto pixels = GraphicsScene(5, false);
   Present(pixels, 640, 480);
-  ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0); }));
+  ASSERT_TRUE(client.Until([&] { return Acknowledged(); }));
   auto before = client.Received();
   sdlrdp_rect damage{17, 19, 7, 5};
   for (int y = damage.y; y < damage.y + damage.h; ++y)
     for (int x = damage.x; x < damage.x + damage.w; ++x) pixels[y * 640 + x] = 0x00ff0000;
   ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 640 * 4, 640, 480, &damage, 1), 0);
-  ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0); }));
+  ASSERT_TRUE(client.Until([&] { return Acknowledged(); }));
   EXPECT_LE(client.MaxError(pixels), 24u);
   EXPECT_EQ(observer.progressive_headers, 1u);
   EXPECT_EQ(observer.surfaces.size(), 1u);
@@ -1602,7 +1614,7 @@ TEST_F(RoundFive, GraphicsVersion101) {
   ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed version=0x000a0100 flags=0x00000000"); }));
   auto pixels = GraphicsScene(3, false);
   Present(pixels, 640, 480);
-  ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0); }));
+  ASSERT_TRUE(client.Until([&] { return Acknowledged(); }));
   EXPECT_LE(client.MaxError(pixels), 24u);
   RecordProperty("trace", "10.1-only advertisement confirms its 16-byte reserved capability data with no flags; progressive decodes");
 }
@@ -1671,8 +1683,81 @@ TEST_F(RoundFive, GraphicsCodecSwitchPreservesUndamagedTiles) {
   sdlrdp_rect damage{18, 45, 1, 1};
   pixels[45 * 640 + 18] = 0x0000ee00;
   ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 640 * 4, 640, 480, &damage, 1), 0);
-  ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0); }));
+  ASSERT_TRUE(client.Until([&] { return Acknowledged(); }));
   EXPECT_LE(client.MaxError(pixels), 24u);
   RecordProperty("trace", "raw picture; switch to progressive with one pixel of damage; entire decoded picture preserved");
+}
+}
+
+namespace {
+TEST_F(RoundFive, PipelinedLegacyPresent) {
+  Open(320, 200);
+  Client client(sdlrdp_port(backend.get()), true);
+  Connect(client);
+  FrameObserver observer(client);
+  std::vector<UINT32> pixels(320 * 200, 0x123456);
+  Present(pixels, 320, 200);
+  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 1);
+  ASSERT_TRUE(client.Until([&] { return observer.ids.size() == 1; }));
+  Present(pixels, 320, 200);
+  ASSERT_TRUE(client.Until([&] { return observer.ids.size() == 2; }));
+  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 1), 0);
+  auto update = client.instance->context->update;
+  ASSERT_TRUE(update->SurfaceFrameAcknowledge(update->context, observer.ids.front()));
+  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 10000), 1);
+  Present(pixels, 320, 200);
+  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 1), 0);
+}
+TEST_F(RoundFive, PipelinedGraphicsPresent) {
+  Open(320, 200, {}, SDLRDP_CODEC_PROGRESSIVE);
+  Client client(sdlrdp_port(backend.get()), true);
+  client.EnableGraphics();
+  Headless::GraphicsObserver observer(client);
+  observer.automatic = false;
+  Connect(client);
+  ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
+  std::vector<UINT32> pixels(320 * 200, 0x123456);
+  Present(pixels, 320, 200);
+  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 1);
+  ASSERT_TRUE(client.Until([&] { return observer.frames.size() == 1; }));
+  Present(pixels, 320, 200);
+  ASSERT_TRUE(client.Until([&] { return observer.frames.size() == 2; }));
+  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 1), 0);
+  ASSERT_TRUE(observer.AckFrame(0, 0));
+  ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0) == 1; }));
+  Present(pixels, 320, 200);
+  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 1), 0);
+}
+}
+
+namespace {
+TEST_F(RoundFive, GraphicsFrameStatistics) {
+  Open(320, 200, {}, SDLRDP_CODEC_PROGRESSIVE);
+  Client client(sdlrdp_port(backend.get()), true);
+  client.EnableGraphics();
+  Headless::GraphicsObserver observer(client);
+  observer.automatic = false;
+  Connect(client);
+  ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
+  std::vector<UINT32> pixels(320 * 200, 0x123456);
+  for (unsigned count = 1; count <= 2; ++count) {
+    Present(pixels, 320, 200);
+    ASSERT_TRUE(client.Until([&] { return observer.frames.size() == count; }));
+  }
+  for (unsigned count = 0; count < 3; ++count) Present(pixels, 320, 200);
+  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 1), 0);
+  ASSERT_TRUE(observer.AckFrame(0, 0));
+  ASSERT_TRUE(client.Until([&] { return observer.frames.size() == 3; }));
+  ASSERT_TRUE(observer.Ack());
+  ASSERT_TRUE(client.Until([&] { return Acknowledged(); }));
+  {
+    std::scoped_lock lock(backend->state->frame_guard);
+    EXPECT_EQ(backend->state->current->ack_count, 3u);
+  }
+  freerdp_disconnect(client.instance.get());
+  backend.reset();
+  EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "Frames:"), 1u);
+  EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, "Frames: 3 sent, 2 coalesced; encode ")) << logs.Text(true);
+  RecordProperty("statistics", logs.Text(true));
 }
 }

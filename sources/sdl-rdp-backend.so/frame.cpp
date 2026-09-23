@@ -183,10 +183,7 @@ bool SendFrame(Peer& peer)
   }
   if (!peer.Marker(SURFACECMD_FRAMEACTION_END)) return false;
   std::scoped_lock lock(peer.owner.frame_guard);
-  if (peer.ack_enabled) {
-    peer.pending.push_back({peer.frame_id, peer.sequence});
-    if (peer.first_sent == Peer::Clock::time_point{}) peer.first_sent = Peer::Clock::now();
-  }
+  peer.FrameSent();
   peer.snapshot.reset();
   peer.sending.clear();
   return true;

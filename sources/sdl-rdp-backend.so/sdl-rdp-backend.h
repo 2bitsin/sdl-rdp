@@ -91,7 +91,7 @@ const char* sdlrdp_get_clipboard_text(sdlrdp_handle*);
 int sdlrdp_has_clipboard_text(sdlrdp_handle*);
 int sdlrdp_resize(sdlrdp_handle*, unsigned, unsigned);
 int sdlrdp_set_aspect(sdlrdp_handle*, sdlrdp_aspect);
-/* 1 when acknowledged or no acknowledging peer; 0 on timeout, -1 on error. Negative waits indefinitely. */
+/* 1 when all but the latest present are acknowledged or no acknowledging peer; 0 on timeout, -1 on error. Negative waits indefinitely. */
 int sdlrdp_wait_frame(sdlrdp_handle*, int timeout_ms);
 int sdlrdp_audio_open(sdlrdp_handle*);
 unsigned sdlrdp_audio_rate(sdlrdp_handle*);
