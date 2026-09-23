@@ -10,6 +10,7 @@ BOOL Peer::Keyboard(rdpInput* input, UINT16 flags, UINT8 code)
   auto& self = Held(input->context->peer);
   std::scoped_lock lock(self.owner.session_guard);
   if (!self.active) return TRUE;
+  self.owner.trace.Line("key", [&] { return std::format("code={} extended={} down={}", code, int(!!(flags & KBD_FLAGS_EXTENDED)), int(!(flags & KBD_FLAGS_RELEASE))); });
   self.owner.Push({.type = SDLRDP_KEY,
     .key = {code, !!(flags & KBD_FLAGS_EXTENDED), !(flags & KBD_FLAGS_RELEASE)}});
   return TRUE;
@@ -21,6 +22,7 @@ BOOL Peer::Mouse(rdpInput* input, UINT16 flags, UINT16 x, UINT16 y)
   auto& owner = self.owner;
   std::scoped_lock lock(owner.session_guard);
   if (!self.active) return TRUE;
+  if (flags & (PTR_FLAGS_BUTTON1 | PTR_FLAGS_BUTTON2 | PTR_FLAGS_BUTTON3)) owner.trace.Line("mouse", [&] { return std::format("flags={} x={} y={}", flags, x, y); });
   if ((flags & PTR_FLAGS_MOVE) && !Input::Motion(self, x, y)) return FALSE;
   constexpr std::array<unsigned, 3> buttons{PTR_FLAGS_BUTTON1, PTR_FLAGS_BUTTON3, PTR_FLAGS_BUTTON2};
   for (unsigned i = 0; i < buttons.size(); ++i)

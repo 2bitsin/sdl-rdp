@@ -67,6 +67,7 @@ void Peer::FrameSent(std::size_t bytes)
 {
   Expects(snapshot != nullptr, "sent frame has a snapshot");
   auto now = Clock::now();
+  owner.trace.Line("frame", [&] { return std::format("id={} bytes={}", frame_id, bytes); });
   if (ack_enabled) pending.push_back({frame_id, sequence, bytes, now});
   if (first_sent == Clock::time_point{}) first_sent = now;
   auto elapsed = encoder.encode_time - encoded_at_start;
@@ -146,6 +147,7 @@ void Peer::AcceptAcknowledgement(UINT32 id)
   if (found == self.pending.end()) return;
   self.acknowledged = found->sequence;
   auto now = Clock::now();
+  owner.trace.Line("ack", [&] { return std::format("id={} age={:.1f}", id, std::chrono::duration<double, std::milli>(now - found->sent).count()); });
   for (auto frame = self.pending.begin(); frame != found + 1; ++frame) {
     auto elapsed = now - frame->sent;
     self.ack_total += elapsed;

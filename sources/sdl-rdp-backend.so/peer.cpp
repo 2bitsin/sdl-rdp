@@ -269,6 +269,7 @@ BOOL Peer::Activate(freerdp_peer* client)
   self.ack_enabled = freerdp_settings_get_uint32(client->context->settings, FreeRDP_FrameAcknowledge) != 0;
   self.desktop = {0, 0, int(event.connected.width), int(event.connected.height)};
   self.owner.Takeover(self, event);
+  self.owner.trace.Line("connect", [&] { return std::format("client={}", event.connected.client_name); });
   return TRUE;
 }
 void Peer::Post(sdlrdp_rect area)

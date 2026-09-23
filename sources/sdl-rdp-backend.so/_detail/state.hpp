@@ -5,6 +5,7 @@
 #include "contract.hpp"
 #include "rect.hpp"
 #include "logging.hpp"
+#include "trace.hpp"
 #include "encoder.hpp"
 #include "clipboard.hpp"
 #include "input.hpp"
@@ -39,9 +40,10 @@ struct Pointer {
 };
 class Peer;
 struct State {
-  explicit State(sdlrdp_config const& config);
+  explicit State(sdlrdp_config const& config, bool tracing = false);
   ~State();
   void Log(sdlrdp_log_level level, std::string const& text) const;
+  Trace trace;
   LogRoute log_route;
   Authentication authentication;
   void (*log)(void*, sdlrdp_log_level, const char*);

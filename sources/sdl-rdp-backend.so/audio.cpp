@@ -1,11 +1,23 @@
 #include "_detail/state.hpp"
 #include <algorithm>
+#include <cmath>
 #include <freerdp/channels/wtsvc.h>
 #include <ranges>
 #include <stdexcept>
 
 namespace Backend {
 namespace {
+std::string Levels(std::span<int16_t const> samples)
+{
+  Expects(!samples.empty(), "audio block has samples");
+  double squares = 0;
+  int peak = 0;
+  for (auto sample : samples) {
+    squares += double(sample) * sample;
+    peak = std::max(peak, std::abs(int(sample)));
+  }
+  return std::format("rms={} peak={}", int(std::sqrt(squares / samples.size())), peak);
+}
 void ApplyVolume(std::span<int16_t> stereo, UINT32 volume)
 {
   Expects(stereo.size() % 2 == 0, "stereo frames are complete");
@@ -158,8 +170,13 @@ bool AudioChannel::Ready()
   auto available = unused && (sent <= credit || sent - credit < uint64_t(owner.audio_latency) * Rate() / 1000);
   if (!available && !gate_warned) {
     gate_warned = true;
+    owner.trace.Line("audio-gate", [&] { return std::format("behind={:.1f}", (sent > credit ? sent - credit : 0) * 1000.0 / Rate()); });
     owner.Log(SDLRDP_LOG_WARN, std::format("Audio confirmation gate waiting: client is {:.3f} ms behind.",
       (sent > credit ? sent - credit : 0) * 1000.0 / Rate()));
+  }
+  if (available && gate_warned && owner.trace.enabled) {
+    gate_warned = false;
+    owner.trace.Line("audio-open");
   }
   return available;
 }
@@ -170,6 +187,7 @@ UINT AudioChannel::Confirmed(RdpsndServerContext* context, BYTE id, UINT16 times
   auto found = std::ranges::find(self.pending, id, &Block::id);
   if (found == self.pending.end()) return CHANNEL_RC_OK;
   auto rtt = std::chrono::duration<double, std::milli>(Clock::now() - found->sent).count();
+  self.owner.trace.Line("audio-confirm", [&] { return std::format("id={} rtt={:.1f}", id, rtt); });
   if (!self.has_confirmation) self.owner.Log(SDLRDP_LOG_INFO,
     std::format("Audio block confirm round trip: {:.3f} ms; client timestamp={}; block={}.", rtt, timestamp, id));
   self.confirmed += found->frames;
@@ -198,6 +216,7 @@ bool AudioChannel::Send(std::span<int16_t const> samples)
     owner.audio_changed.notify_all();
     return false;
   }
+  owner.trace.Line("audio-block", [&] { return std::format("id={} frames={} {}", block, sent, Levels(buffer)); });
   if (blocks_sent++) {
     auto gap = now - last_send;
     gap_total += gap;

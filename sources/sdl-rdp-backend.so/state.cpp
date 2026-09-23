@@ -45,8 +45,9 @@ unsigned Bind(freerdp_listener* listener, sdlrdp_config const& config)
   return ntohs(address.sin_port);
 }
 }
-State::State(sdlrdp_config const& config)
- : log_route(config), authentication(config), log(config.log), user(config.log_user), codec(config.codec), width(config.width), height(config.height), aspect(config.aspect),
+void Trace::Emit(std::string const& text) const { owner.Log(SDLRDP_LOG_INFO, text); }
+State::State(sdlrdp_config const& config, bool tracing)
+ : trace{*this, tracing}, log_route(config), authentication(config), log(config.log), user(config.log_user), codec(config.codec), width(config.width), height(config.height), aspect(config.aspect),
    credentials(EnsureCertificate(config.cert_dir ? std::filesystem::path(config.cert_dir) : DefaultCertificateDirectory())),
    listener(freerdp_listener_new()), stop(CreateEvent(nullptr, TRUE, FALSE, nullptr))
 {
@@ -151,6 +152,7 @@ void State::Depart(Peer& peer)
     if (peer.sound) peer.sound->LogAudio();
     auto name = freerdp_settings_get_string(peer.client->context->settings, FreeRDP_ClientHostname);
     Log(SDLRDP_LOG_INFO, std::format("Client {} disconnected.", name ? name : peer.client->hostname));
+    trace.Line("disconnect");
   }
   {
     std::scoped_lock frame(frame_guard);

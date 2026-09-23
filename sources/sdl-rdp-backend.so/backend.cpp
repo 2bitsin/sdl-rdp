@@ -1,5 +1,6 @@
 #include "_detail/state.hpp"
 #include <algorithm>
+#include <cstdlib>
 #include <string>
 #include <format>
 #include <stdexcept>
@@ -33,7 +34,8 @@ int sdlrdp_open(sdlrdp_config const* config, sdlrdp_handle** out)
       throw std::runtime_error("Invalid codec preference.");
     if (config->port > 65535) throw std::runtime_error("Open failed: port exceeds 65535.");
     auto handle = std::make_unique<sdlrdp_handle>();
-    handle->state = std::make_unique<Backend::State>(*config);
+    auto trace = std::getenv("SDL_RDP_TRACE");
+    handle->state = std::make_unique<Backend::State>(*config, trace && std::string_view(trace) == "1");
     if (config->wait_for_client) handle->state->Wait(-1);
     *out = handle.release();
     return 0;
@@ -63,6 +65,7 @@ int sdlrdp_present(sdlrdp_handle* handle, void const* pixels, int pitch,
     std::span damage{rects, count};
     if (!std::ranges::all_of(damage, valid))
       throw std::runtime_error("Present failed: damage rectangle exceeds framebuffer bounds.");
+    handle->state->trace.Line("present", [&] { return std::format("dirty={}", count); });
     handle->state->Present(pixels, pitch, width, height, damage); return 0;
   } catch (std::exception const& error) { last_error = error.what(); return -1; }
 }

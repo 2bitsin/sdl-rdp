@@ -85,3 +85,10 @@ and at each screen change. Live refresh estimates update only the current mode,
 which keeps the selected fullscreen size while exclusive fullscreen is active.
 Details are properties (bound port on the display, client name on the window). A failed open is in `SDL_GetError()`,
 backend diagnostics go to `SDL_Log`.
+
+`SDL_RDP_TRACE=1` prints a wall-clock stamped line per input event, audio block,
+confirmation, frame and acknowledgement through the backend log callback at info
+level, for correlating with a client-side recording. Timestamps are integer
+milliseconds since the epoch. The variable is read once when the backend opens;
+tracing is disabled by default. Lines also include presentation, connection and
+audio gate transitions, with audio RMS and peak levels on the S16 scale.
