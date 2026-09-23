@@ -1,5 +1,7 @@
 #pragma once
 #include <sdl-rdp-backend.so/_detail/headless-client.hpp>
+#include <sdl-rdp-backend.so/_detail/test-logs.hpp>
+#include <winpr/wlog.h>
 #include <oxbox/platform/scratch-area.hpp>
 #include <gtest/gtest.h>
 #include <freerdp/input.h>
@@ -221,7 +223,35 @@ public:
 };
 
 class Sample : public testing::Test {
+  inline static std::mutex log_guard;
+  inline static Headless::Logs* client_logs = nullptr;
+  static BOOL CollectClientLog(wLogMessage const* message) {
+    std::scoped_lock lock(log_guard);
+    if (client_logs && message->TextString) {
+      auto level = message->Level == WLOG_ERROR ? SDLRDP_LOG_ERROR
+        : message->Level == WLOG_WARN ? SDLRDP_LOG_WARN : SDLRDP_LOG_INFO;
+      Headless::Logs::Collect(client_logs, level, message->TextString);
+    }
+    return TRUE;
+  }
 protected:
+  Headless::Logs logs;
+  void SetUp() override {
+    std::scoped_lock lock(log_guard);
+    client_logs = &logs;
+    auto root = WLog_GetRoot();
+    ASSERT_NE(root, nullptr);
+    wLogCallbacks callbacks{CollectClientLog, CollectClientLog, CollectClientLog, CollectClientLog};
+    ASSERT_TRUE(WLog_SetLogAppenderType(root, WLOG_APPENDER_CALLBACK));
+    ASSERT_TRUE(WLog_ConfigureAppender(WLog_GetLogAppender(root), "callbacks", &callbacks));
+  }
+  std::string ConnectLogs() {
+    // Drain the child pipe too: connect can fail before another Read consumes its diagnostics.
+    std::string ignored;
+    auto deadline = Clock::now() + 10ms;
+    if (process) while (process->Line(ignored, deadline)) {}
+    return "\nclient:\n" + logs.Text(true) + "\nsample:\n" + (process ? process->transcript : "");
+  }
   oxbox::platform::ScratchArea certificates{"certificates", "sdl-rdp"};
   std::unique_ptr<Process> process;
   std::string line;
@@ -266,7 +296,10 @@ protected:
     ASSERT_TRUE(client.Until([&] { return frame.received; })) << "next complete frame after motion";
     ASSERT_TRUE(frame.matches) << "frame excludes pointer: " << frame.matches.message();
   }
-  void TearDown() override { if (process) SDL_Log("%s", process->transcript.c_str()); }
+  void TearDown() override {
+    { std::scoped_lock lock(log_guard); client_logs = nullptr; }
+    if (process) SDL_Log("%s", process->transcript.c_str());
+  }
   void Escape(Client& client) {
     ASSERT_TRUE(freerdp_input_send_keyboard_event(client.instance->context->input, KBD_FLAGS_DOWN, 1)) << "send Escape";
     ASSERT_TRUE(process->Exit()) << "sample exit 0 within ten seconds: " << process->transcript;

@@ -1,5 +1,7 @@
 #ifndef SDL_RDP_BACKEND_H
 #define SDL_RDP_BACKEND_H
+#include <stdint.h>
+#include <stddef.h>
 #ifndef __cplusplus
 #include <uchar.h>
 #endif
@@ -39,7 +41,7 @@ typedef struct {
 typedef enum {
   SDLRDP_CONNECTED, SDLRDP_DISCONNECTED, SDLRDP_RESIZE, SDLRDP_KEY,
   SDLRDP_MOUSE_MOVE, SDLRDP_MOUSE_BUTTON, SDLRDP_MOUSE_WHEEL, SDLRDP_CODEC_CHANGED, SDLRDP_SCREEN, SDLRDP_REFRESH,
-  SDLRDP_CLIPBOARD, SDLRDP_TEXT, SDLRDP_MOUSE_RELATIVE, SDLRDP_TOUCH, SDLRDP_AUDIO
+  SDLRDP_CLIPBOARD, SDLRDP_TEXT, SDLRDP_MOUSE_RELATIVE, SDLRDP_TOUCH, SDLRDP_AUDIO, SDLRDP_DRIVE
 } sdlrdp_event_type;
 typedef enum { SDLRDP_TOUCH_DOWN, SDLRDP_TOUCH_MOVE, SDLRDP_TOUCH_UP, SDLRDP_TOUCH_CANCEL } sdlrdp_touch_phase;
 typedef struct {
@@ -48,6 +50,7 @@ typedef struct {
     struct { unsigned width, height, bpp; char client_name[64]; sdlrdp_codec codec;
       unsigned screen_width, screen_height, refresh_millihertz, keyboard_layout;
       char user[256], domain[256]; int authenticated; } connected;
+    struct { int added; unsigned id; char name[512]; } drive;
     struct { unsigned freq; int connected; } audio;
     struct { sdlrdp_codec codec; } codec_changed;
     struct { unsigned width, height; } resize;
@@ -95,6 +98,29 @@ unsigned sdlrdp_audio_rate(sdlrdp_handle*);
 int sdlrdp_audio_write(sdlrdp_handle*, const void* frames, unsigned count);
 int sdlrdp_audio_wait(sdlrdp_handle*, int timeout_ms);
 void sdlrdp_audio_close(sdlrdp_handle*);
+typedef struct sdlrdp_file sdlrdp_file;
+typedef struct { unsigned id; char name[512]; } sdlrdp_drive;
+/* modified is Unix time in seconds. */
+typedef struct { uint64_t size; int directory; int64_t modified; } sdlrdp_stat;
+typedef struct { char name[1024]; uint64_t size; int directory; } sdlrdp_dirent;
+enum { SDLRDP_FILE_READ = 1, SDLRDP_FILE_WRITE = 2, SDLRDP_FILE_CREATE = 4,
+       SDLRDP_FILE_TRUNCATE = 8, SDLRDP_FILE_DIRECTORY = 16 };
+/* Blocking calls; coordinate file lifetime with close. Reads/writes accept at most INT_MAX bytes. */
+int sdlrdp_drive_list(sdlrdp_handle*, sdlrdp_drive*, unsigned max);
+int sdlrdp_drive_open(sdlrdp_handle*, unsigned drive, const char* path, unsigned flags, sdlrdp_file**);
+int sdlrdp_drive_read(sdlrdp_handle*, sdlrdp_file*, uint64_t offset, void*, size_t);
+int sdlrdp_drive_write(sdlrdp_handle*, sdlrdp_file*, uint64_t offset, const void*, size_t);
+int sdlrdp_drive_stat(sdlrdp_handle*, unsigned drive, const char* path, sdlrdp_stat*);
+/* Offset is the number of entries consumed; concurrent directory changes may reorder entries. */
+int sdlrdp_drive_enumerate(sdlrdp_handle*, unsigned drive, const char* path, unsigned offset,
+                          sdlrdp_dirent*, unsigned max);
+int sdlrdp_drive_mkdir(sdlrdp_handle*, unsigned drive, const char* path);
+int sdlrdp_drive_remove(sdlrdp_handle*, unsigned drive, const char* path);
+int sdlrdp_drive_rename(sdlrdp_handle*, unsigned drive, const char* path, const char* destination);
+int sdlrdp_drive_fstat(sdlrdp_handle*, sdlrdp_file*, sdlrdp_stat*);
+int sdlrdp_drive_flush(sdlrdp_handle*, sdlrdp_file*);
+/* Frees the file handle even when returning -1. */
+int sdlrdp_drive_close(sdlrdp_handle*, sdlrdp_file*);
 #ifdef __cplusplus
 }
 #endif

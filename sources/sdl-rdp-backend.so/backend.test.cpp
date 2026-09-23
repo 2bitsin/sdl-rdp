@@ -27,6 +27,7 @@
 #include <future>
 #include <thread>
 #include "_detail/test-io.hpp"
+#include "_detail/test-logs.hpp"
 #include <charconv>
 #include <format>
 #include <mutex>
@@ -75,31 +76,8 @@ bool Listening(unsigned port)
     return line.contains(address) && line.contains(" 0A ");
   });
 }
-struct Logs {
-  std::mutex guard;
-  std::vector<std::pair<sdlrdp_log_level, std::string>> lines;
-  static void Collect(void* user, sdlrdp_log_level level, const char* text) {
-    auto& self = *static_cast<Logs*>(user);
-    std::scoped_lock lock(self.guard);
-    self.lines.emplace_back(level, text);
-  }
-  std::string Text(bool include_info = false) {
-    std::scoped_lock lock(guard);
-    return lines | std::views::filter([=](auto const& line) { return include_info || line.first != SDLRDP_LOG_INFO; })
-      | std::views::transform([](auto const& line) -> auto const& { return line.second; })
-      | std::views::join_with('\n') | std::ranges::to<std::string>();
-  }
-  bool Contains(sdlrdp_log_level level, std::string_view text) {
-    std::scoped_lock lock(guard);
-    return std::ranges::any_of(lines, [=](auto const& line) {
-      return line.first == level && line.second.contains(text);
-    });
-  }
-  bool Contains(std::string_view text) {
-    std::scoped_lock lock(guard);
-    return std::ranges::any_of(lines, [=](auto const& line) { return line.second.contains(text); });
-  }
-};
+using Headless::Logs;
+
 TEST(CopyRows, PaddedRows) {
   std::array<BYTE, 8> source{1, 2, 9, 9, 3, 4, 9, 9};
   std::array<BYTE, 6> destination{8, 8, 8, 8, 8, 8};
@@ -264,7 +242,7 @@ protected:
 TEST_P(Gate, FramesAndInput) {
   Client client(sdlrdp_port(backend.get()), GetParam());
   client.tolerance = GetParam().codec == SDLRDP_CODEC_REMOTEFX ? 40 : GetParam().codec == SDLRDP_CODEC_NSCODEC ? 3 : 0;
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << logs.Text(true);
   auto events = Events(2);
   ASSERT_EQ(events.size(), 2u);
   ASSERT_EQ(events[0].type, SDLRDP_CONNECTED);
@@ -303,7 +281,7 @@ TEST_P(Gate, ResizeAndWakeup) {
   backend.reset(handle);
   Client client(sdlrdp_port(handle), GetParam());
   client.tolerance = GetParam().codec == SDLRDP_CODEC_REMOTEFX ? 40 : GetParam().codec == SDLRDP_CODEC_NSCODEC ? 3 : 0;
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << logs.Text(true);
   auto events = Events(2);
   ASSERT_EQ(events.size(), 2u);
   EXPECT_EQ(events[0].type, SDLRDP_CONNECTED);
@@ -325,7 +303,7 @@ TEST_P(Gate, LateClientAndBurst) {
   ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &area, 1), 0);
   Client client(sdlrdp_port(backend.get()), GetParam());
   client.tolerance = GetParam().codec == SDLRDP_CODEC_REMOTEFX ? 40 : GetParam().codec == SDLRDP_CODEC_NSCODEC ? 3 : 0;
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << logs.Text(true);
   ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text();
   auto before = ResidentBytes();
   for (unsigned frame = 0; frame < 200; ++frame) {
@@ -351,7 +329,7 @@ TEST_P(Gate, DesktopIsPicture) {
   ASSERT_EQ(sdlrdp_present(handle, frame.data(), 640 * 4, 640, 480, &area, 1), 0);
   Client client(sdlrdp_port(handle), GetParam());
   client.tolerance = GetParam().codec == SDLRDP_CODEC_REMOTEFX ? 40 : GetParam().codec == SDLRDP_CODEC_NSCODEC ? 3 : 0;
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << logs.Text(true);
   ASSERT_TRUE(client.Until([&] { return client.Matches(frame); })) << logs.Text();
   EXPECT_EQ(client.instance->context->gdi->width, 640);
   EXPECT_EQ(client.instance->context->gdi->height, 480);
@@ -369,7 +347,7 @@ TEST_P(Gate, WaitForClient) {
   EXPECT_EQ(opening.wait_for(std::chrono::milliseconds(0)), std::future_status::timeout);
   Client client(port, GetParam());
   client.tolerance = GetParam().codec == SDLRDP_CODEC_REMOTEFX ? 40 : GetParam().codec == SDLRDP_CODEC_NSCODEC ? 3 : 0;
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << logs.Text(true);
   ASSERT_EQ(opening.wait_for(std::chrono::seconds(10)), std::future_status::ready);
   ASSERT_EQ(opening.get(), 0);
   backend.reset(handle);
@@ -387,7 +365,7 @@ TEST_P(Gate, BlockedSinglePresent) {
   backend.reset(handle);
   Client client(sdlrdp_port(handle), GetParam(), 2048, 1536);
   client.tolerance = GetParam().codec == SDLRDP_CODEC_REMOTEFX ? 40 : GetParam().codec == SDLRDP_CODEC_NSCODEC ? 3 : 0;
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << logs.Text(true);
   auto events = Events(2);
   ASSERT_EQ(events.size(), 2u);
   ASSERT_EQ(events.front().type, SDLRDP_CONNECTED);
@@ -411,10 +389,10 @@ TEST_P(Gate, BlockedSinglePresent) {
 }
 TEST_P(Gate, NewestClientTakesOver) {
   Client first(sdlrdp_port(backend.get()), GetParam());
-  ASSERT_TRUE(freerdp_connect(first.instance.get()));
+  ASSERT_TRUE(freerdp_connect(first.instance.get())) << logs.Text(true);
   ASSERT_EQ(Events(2).size(), 2u);
   Client second(sdlrdp_port(backend.get()), GetParam(), 400, 240);
-  ASSERT_TRUE(freerdp_connect(second.instance.get()));
+  ASSERT_TRUE(freerdp_connect(second.instance.get())) << logs.Text(true);
   auto events = Events(3);
   ASSERT_EQ(events.size(), 3u);
   EXPECT_EQ(events[0].type, SDLRDP_DISCONNECTED);
@@ -437,7 +415,7 @@ TEST_P(Gate, NewestClientTakesOver) {
 }
 TEST_P(Gate, LiveCodecChange) {
   Client client(sdlrdp_port(backend.get()), GetParam());
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << logs.Text(true);
   ASSERT_EQ(Events(2).size(), 2u);
   auto previous = GetParam().codec;
   for (auto codec : {SDLRDP_CODEC_RAW, SDLRDP_CODEC_PLANAR, SDLRDP_CODEC_REMOTEFX,
@@ -470,7 +448,7 @@ TEST_P(Gate, LiveCodecChange) {
 TEST_P(Gate, ExactFlatColour) {
   Client client(sdlrdp_port(backend.get()), GetParam());
   client.tolerance = GetParam().codec == SDLRDP_CODEC_REMOTEFX || GetParam().codec == SDLRDP_CODEC_NSCODEC ? 3 : 0;
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << logs.Text(true);
   ASSERT_EQ(Events(2).size(), 2u);
   std::ranges::fill(pixels, 0x00ffffffu);
   ASSERT_NO_FATAL_FAILURE(Frame(client, {0, 0, 320, 200}));
@@ -479,7 +457,7 @@ TEST_P(Gate, ExactFlatColour) {
 TEST_P(Gate, TinyDamage) {
   Client client(sdlrdp_port(backend.get()), GetParam());
   client.tolerance = GetParam().codec == SDLRDP_CODEC_REMOTEFX ? 40 : GetParam().codec == SDLRDP_CODEC_NSCODEC ? 3 : 0;
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << logs.Text(true);
   ASSERT_NO_FATAL_FAILURE(Frame(client, {0, 0, 320, 200}));
   pixels[51 * 320 + 73] = 0x000000ff;
   ASSERT_NO_FATAL_FAILURE(Frame(client, {73, 51, 1, 1}));
@@ -522,7 +500,7 @@ TEST(Measurement, FullFrames1024x768) {
     std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> backend(handle, sdlrdp_close);
     Client client(sdlrdp_port(handle), true, 1024, 768);
     client.tolerance = codec == SDLRDP_CODEC_REMOTEFX ? 40 : codec == SDLRDP_CODEC_NSCODEC ? 3 : 0;
-    ASSERT_TRUE(freerdp_connect(client.instance.get()));
+    ASSERT_TRUE(freerdp_connect(client.instance.get())) << logs.Text(true);
     ASSERT_TRUE(client.Until([&] { return HasCookie(client); }));
     FrameCounter counter(client);
     auto bytes = client.Received();
@@ -641,7 +619,7 @@ protected:
   }
   void Connect(Client& client, bool ack = true) {
     ASSERT_TRUE(freerdp_settings_set_uint32(client.instance->context->settings, FreeRDP_FrameAcknowledge, ack ? 2 : 0));
-    ASSERT_TRUE(freerdp_connect(client.instance.get())) << logs.Text();
+    ASSERT_TRUE(freerdp_connect(client.instance.get())) << logs.Text(true);
     ASSERT_TRUE(client.Until([&] { return HasCookie(client); }));
   }
 };
@@ -949,7 +927,7 @@ TEST(Planar, Noisy640Rows) {
 TEST_F(RoundFive, AutoPrefersRemoteFX) {
   Open(320, 200, {}, SDLRDP_CODEC_AUTO);
   Client client(sdlrdp_port(backend.get()), true);
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << logs.Text(true);
   auto events = EventsUntil([](auto const& events) {
     return std::ranges::any_of(events, [](auto const& event) { return event.type == SDLRDP_CONNECTED; });
   });

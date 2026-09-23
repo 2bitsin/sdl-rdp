@@ -11,6 +11,7 @@
 #include "audio.hpp"
 #include "gfx.hpp"
 #include "auth.hpp"
+#include "drive.hpp"
 #include <atomic>
 #include <condition_variable>
 #include <deque>
@@ -55,6 +56,7 @@ struct State {
   void Present(void const* pixels, int pitch, unsigned w, unsigned h,
                std::span<sdlrdp_rect const> damage);
   void SetPointer(unsigned w, unsigned h, unsigned x, unsigned y, void const* pixels);
+  std::atomic_uint next_drive{1};
   Clipboard clipboard;
   Pointer pointer;
   uint64_t pointer_generation = 0;
@@ -168,6 +170,7 @@ public:
   HANDLE channels = nullptr;
   std::unique_ptr<DispServerContext, Releases<disp_server_context_free>> disp;
   std::unique_ptr<ClipboardChannel> clipboard;
+  std::shared_ptr<DriveChannel> drive;
   UINT32 display_id = UINT32_MAX;
   bool disp_open = false, resizing = false, frame_started = false;
   sdlrdp_rect desktop{};

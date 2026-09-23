@@ -1,6 +1,7 @@
 #include "sdl-rdp-backend.h"
 #include "_detail/headless-clipboard.hpp"
 #include "_detail/transcode.hpp"
+#include "_detail/test-logs.hpp"
 #include <oxbox/platform/scratch-area.hpp>
 #include <gtest/gtest.h>
 #include <cstring>
@@ -8,11 +9,14 @@
 namespace {
 class Clipboard : public testing::Test {
 protected:
+  Headless::Logs logs;
   oxbox::platform::ScratchArea certificates{"clipboard", "sdl-rdp"};
   std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> handle{nullptr, sdlrdp_close};
   void SetUp() override {
     auto directory = certificates.Path().string();
     sdlrdp_config config{};
+    config.log = Headless::Logs::Collect;
+    config.log_user = &logs;
     config.bind = "127.0.0.1";
     config.cert_dir = directory.c_str();
     config.width = 320; config.height = 200;
@@ -24,7 +28,7 @@ protected:
 TEST_F(Clipboard, EmptyConnectUnchanged) {
   Headless::Client client(sdlrdp_port(handle.get()), false);
   Headless::ClipboardClient clipboard(client);
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << logs.Text(true);
   ASSERT_TRUE(client.Until([&] { return clipboard.accepted.load() == 1; }));
   sdlrdp_event events[32];
   while (auto count = sdlrdp_poll(handle.get(), events, 32)) {
@@ -53,7 +57,7 @@ TEST_F(Clipboard, LocalTextAndErrors) {
 TEST_F(Clipboard, LiveSetAndMalformedResponse) {
   Headless::Client client(sdlrdp_port(handle.get()), false);
   Headless::ClipboardClient clipboard(client);
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << logs.Text(true);
   ASSERT_TRUE(client.Until([&] { return clipboard.accepted.load() == 1; }));
   ASSERT_EQ(sdlrdp_set_clipboard_text(handle.get(), "hello"), 0);
   ASSERT_TRUE(client.Until([&] { return clipboard.Received({'h',0,'e',0,'l',0,'l',0,'o',0,0,0}); }));
@@ -80,7 +84,7 @@ TEST_F(Clipboard, FirstOfferRetainsAppText) {
   ASSERT_EQ(sdlrdp_set_clipboard_text(handle.get(), "app"), 0);
   Headless::Client client(sdlrdp_port(handle.get()), false);
   Headless::ClipboardClient clipboard(client, {'c',0,'l',0,'i',0,'e',0,'n',0,'t',0,0,0});
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << logs.Text(true);
   ASSERT_TRUE(client.Until([&] { return clipboard.Received({'a',0,'p',0,'p',0,0,0}); }));
   EXPECT_EQ(clipboard.accepted.load(), 1u);
   EXPECT_EQ(clipboard.requests.load(), 0u);
@@ -89,7 +93,7 @@ TEST_F(Clipboard, FirstOfferRetainsAppText) {
 TEST_F(Clipboard, NonTextOfferClearsText) {
   Headless::Client client(sdlrdp_port(handle.get()), false);
   Headless::ClipboardClient clipboard(client);
-  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(freerdp_connect(client.instance.get())) << logs.Text(true);
   ASSERT_TRUE(client.Until([&] { return clipboard.accepted.load() == 1; }));
   ASSERT_EQ(sdlrdp_set_clipboard_text(handle.get(), "app"), 0);
   ASSERT_TRUE(client.Until([&] { return clipboard.Received({'a',0,'p',0,'p',0,0,0}); }));

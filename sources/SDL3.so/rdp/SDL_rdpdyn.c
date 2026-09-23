@@ -14,6 +14,31 @@ static bool SDL_RDP_LoadAuthentication(SDL_RDP_Backend *backend)
     return true;
 }
 
+static bool SDL_RDP_LoadChannels(SDL_RDP_Backend *backend)
+{
+    SDL_RDP_LOAD(set_clipboard_text);
+    SDL_RDP_LOAD(get_clipboard_text);
+    SDL_RDP_LOAD(has_clipboard_text);
+    SDL_RDP_LOAD(audio_open);
+    SDL_RDP_LOAD(audio_rate);
+    SDL_RDP_LOAD(audio_write);
+    SDL_RDP_LOAD(audio_wait);
+    SDL_RDP_LOAD(audio_close);
+    SDL_RDP_LOAD(drive_list);
+    SDL_RDP_LOAD(drive_open);
+    SDL_RDP_LOAD(drive_read);
+    SDL_RDP_LOAD(drive_write);
+    SDL_RDP_LOAD(drive_stat);
+    SDL_RDP_LOAD(drive_enumerate);
+    SDL_RDP_LOAD(drive_mkdir);
+    SDL_RDP_LOAD(drive_remove);
+    SDL_RDP_LOAD(drive_rename);
+    SDL_RDP_LOAD(drive_fstat);
+    SDL_RDP_LOAD(drive_flush);
+    SDL_RDP_LOAD(drive_close);
+    return true;
+}
+
 bool SDL_RDP_LoadBackend(SDL_RDP_Backend *backend)
 {
     const char *path = SDL_GetHint(SDL_HINT_RDP_BACKEND);
@@ -37,14 +62,7 @@ bool SDL_RDP_LoadBackend(SDL_RDP_Backend *backend)
     SDL_RDP_LOAD(resize);
     SDL_RDP_LOAD(set_aspect);
     SDL_RDP_LOAD(set_pointer);
-    SDL_RDP_LOAD(set_clipboard_text);
-    SDL_RDP_LOAD(get_clipboard_text);
-    SDL_RDP_LOAD(has_clipboard_text);
-    SDL_RDP_LOAD(audio_open);
-    SDL_RDP_LOAD(audio_rate);
-    SDL_RDP_LOAD(audio_write);
-    SDL_RDP_LOAD(audio_wait);
-    SDL_RDP_LOAD(audio_close);
+    if (!SDL_RDP_LoadChannels(backend)) return false;
     SDL_ClearError();
     return true;
 }
