@@ -42,7 +42,29 @@ Opt in only: probing never picks the driver and no listener opens unasked.
     SDL_VIDEO_DRIVER=rdp        # from the shell, any SDL program
     SDL_HINT_VIDEO_DRIVER       # from code, before SDL_Init: an app's --rdp flag
 
-Driver settings are hints with environment variables of the same name:
+Driver settings use these sources in order: an application hint set through SDL,
+`libSDL3.ini`, then the environment variable with the same name. SDL can reject
+`SDL_SetHint` when an environment variable already exists; use
+`SDL_SetHintWithPriority(..., SDL_HINT_OVERRIDE)` in that case.
+The ini is read once on the first driver setting lookup and cached for the process.
+The first file found wins as a whole: `SDL_RDP_INI` (application hint, else
+environment), `libSDL3.ini` beside the loaded SDL3 shared library, then
+`libSDL3.ini` in the current working directory. An unreadable explicit path fails
+driver startup; missing default files are fine. `SDL_HINT_RDP_INI` names the path
+hint; setting it inside the file does not select another file.
+
+Each line is `NAME = value`, using environment names, e.g. `SDL_RDP_PORT = 33892`.
+Leading/trailing blanks are trimmed; double quotes preserve inner blanks and allow `""`.
+Blank lines and lines beginning with `#` or `;` (after trimming) are ignored.
+`[section]` lines are ignored; duplicate keys use the last value.
+Unknown keys and lines without `=` are skipped with a file/line warning; values are never logged.
+
+File permissions can restrict access to `SDL_RDP_PASSWORD` in the ini, unlike
+exposing it in the environment; keep the file readable only by the intended user.
+The ini cannot select `SDL_VIDEO_DRIVER` or `SDL_AUDIO_DRIVER`: SDL core reads
+those before the RDP driver runs. Set them through hints or the environment.
+
+Settings include:
 `SDL_RDP_PORT` (3389, 0 for ephemeral), `SDL_RDP_BIND` (0.0.0.0),
 `SDL_RDP_CERT_DIR` (`$XDG_DATA_HOME/sdl-rdp` or `~/.local/share/sdl-rdp`), `SDL_RDP_WIDTH`, `SDL_RDP_HEIGHT` (1024x768),
 `SDL_RDP_WAIT_FOR_CLIENT`, `SDL_RDP_BACKEND` (path of the backend library).
@@ -138,7 +160,7 @@ Set `SDL_HINT_RDP_USER`, `SDL_HINT_RDP_PASSWORD`, and optionally
 `SDL_HINT_RDP_DOMAIN` before initializing audio or video (environment names
 `SDL_RDP_USER`, `SDL_RDP_PASSWORD`, `SDL_RDP_DOMAIN`). An unset domain accepts
 any domain; a set domain must match exactly.
-The `SDL_RDP_PASSWORD` environment variable is readable by other processes of the same user; set the password hint from code as an alternative. Set `SDL_HINT_RDP_AUTH` to override
+The `SDL_RDP_PASSWORD` environment variable is readable by other processes of the same user; set the password hint from code or use a permission-restricted ini file as an alternative. Set `SDL_HINT_RDP_AUTH` to override
 the default. The sample accepts `--user <u> --password <p> [--domain <d>]
 [--auth none|tls|nla]`; `--verify-deny` exercises application rejection.
 

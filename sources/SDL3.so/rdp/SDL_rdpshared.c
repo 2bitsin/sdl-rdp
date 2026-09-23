@@ -10,7 +10,7 @@ static sdlrdp_config shared_config;
 
 static int SDL_RDP_GetInteger(const char *name, int fallback)
 {
-    const char *hint = SDL_GetHint(name);
+    const char *hint = SDL_RDP_Setting(name);
     char *end;
     long value;
     if (!hint) {
@@ -49,22 +49,23 @@ bool SDL_RDP_ParseAspect(const char *value, sdlrdp_aspect *aspect)
 
 static bool SDL_RDP_Config(sdlrdp_config *config)
 {
+    if (!SDL_RDP_SettingsReady()) return false;
     SDL_zero(*config);
     config->log = SDL_RDP_Log;
     config->log_user = NULL;
-    config->bind = SDL_GetHint(SDL_HINT_RDP_BIND);
-    config->cert_dir = SDL_GetHint(SDL_HINT_RDP_CERT_DIR);
+    config->bind = SDL_RDP_Setting(SDL_HINT_RDP_BIND);
+    config->cert_dir = SDL_RDP_Setting(SDL_HINT_RDP_CERT_DIR);
     config->port = SDL_RDP_GetInteger(SDL_HINT_RDP_PORT, 3389);
     config->width = SDL_RDP_GetInteger(SDL_HINT_RDP_WIDTH, 1024);
     config->height = SDL_RDP_GetInteger(SDL_HINT_RDP_HEIGHT, 768);
     config->audio_latency_ms = SDL_RDP_GetInteger(SDL_HINT_RDP_AUDIO_LATENCY, 500);
-    config->wait_for_client = SDL_GetHintBoolean(SDL_HINT_RDP_WAIT_FOR_CLIENT, false);
+    config->wait_for_client = SDL_RDP_SettingBoolean(SDL_HINT_RDP_WAIT_FOR_CLIENT, false);
     if (config->audio_latency_ms > SDL_MAX_SINT32 || config->port > 65535 || !config->width || config->width > SDL_MAX_SINT32 ||
         !config->height || config->height > SDL_MAX_SINT32) {
         return SDL_SetError("Invalid RDP port or dimensions");
     }
-    if (!SDL_RDP_ParseCodec(SDL_GetHint(SDL_HINT_RDP_CODEC), &config->codec) ||
-        !SDL_RDP_ParseAspect(SDL_GetHint(SDL_HINT_RDP_ASPECT), &config->aspect)) {
+    if (!SDL_RDP_ParseCodec(SDL_RDP_Setting(SDL_HINT_RDP_CODEC), &config->codec) ||
+        !SDL_RDP_ParseAspect(SDL_RDP_Setting(SDL_HINT_RDP_ASPECT), &config->aspect)) {
         return false;
     }
     return SDL_RDP_AuthConfig(config, &shared_backend);

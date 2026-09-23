@@ -41,7 +41,7 @@ static bool SDL_RDP_LoadChannels(SDL_RDP_Backend *backend)
 
 bool SDL_RDP_LoadBackend(SDL_RDP_Backend *backend)
 {
-    const char *path = SDL_GetHint(SDL_HINT_RDP_BACKEND);
+    const char *path = SDL_RDP_Setting(SDL_HINT_RDP_BACKEND);
     backend->object = SDL_LoadObject(path && *path ? path : SDL_RDP_DYNAMIC);
     if (!backend->object) {
         return false;

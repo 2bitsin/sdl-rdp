@@ -44,6 +44,10 @@ typedef struct SDL_RDP_Backend
     int (*drive_close)(sdlrdp_handle*, sdlrdp_file*);
     void (*wakeup)(sdlrdp_handle *);
 } SDL_RDP_Backend;
+const char *SDL_RDP_Setting(const char *name);
+const char *SDL_RDP_HintChangedValue(const char *name, const char *oldValue, const char *newValue);
+bool SDL_RDP_SettingBoolean(const char *name, bool fallback);
+bool SDL_RDP_SettingsReady(void);
 bool SDL_RDP_LoadBackend(SDL_RDP_Backend *backend);
 void SDL_RDP_UnloadBackend(SDL_RDP_Backend *backend);
 bool SDL_RDP_AcquireBackend(SDL_RDP_Backend *backend, sdlrdp_handle **handle, sdlrdp_config *config);
