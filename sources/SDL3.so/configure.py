@@ -106,6 +106,8 @@ def command_settings(entry):
     defines = [arg[2:] for arg in arguments if arg.startswith('-D')]
     options = [arg for arg in arguments if arg.startswith(('-m', '-W')) or
                arg in ('-pthread', '-fno-strict-aliasing', '-fno-strict-overflow')]
+    options = [f'$<$<C_COMPILER_ID:Clang>:{arg}>'
+               if arg.startswith('-Wdocumentation') else arg for arg in options]
     if Path(entry["file"]).name.startswith("SDL_rdp"):
         options.append("-Wsign-compare")
     return includes, defines, options

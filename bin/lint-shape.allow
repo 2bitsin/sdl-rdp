@@ -1,0 +1,15 @@
+sources/sdl-rdp-backend.so/_detail/audio.hpp: AudioChannel data members 22 > 10
+sources/sdl-rdp-backend.so/_detail/clipboard.hpp: ClipboardChannel data members 11 > 10
+sources/sdl-rdp-backend.so/_detail/encoder.hpp: Encoder data members 15 > 10
+sources/sdl-rdp-backend.so/_detail/gfx.hpp: GfxChannel data members 20 > 10
+sources/sdl-rdp-backend.so/_detail/gfx.hpp: GfxChannel member functions 26 > 15
+sources/sdl-rdp-backend.so/_detail/headless-audio.hpp: SoundClient lines 163 > 150
+sources/sdl-rdp-backend.so/_detail/headless-audio.hpp: SoundClient data members 26 > 10
+sources/sdl-rdp-backend.so/_detail/headless-gfx.hpp: GraphicsObserver data members 22 > 10
+sources/sdl-rdp-backend.so/_detail/input.hpp: Input data members 14 > 10
+sources/sdl-rdp-backend.so/_detail/state.hpp: State data members 39 > 10
+sources/sdl-rdp-backend.so/_detail/state.hpp: State member functions 23 > 15
+sources/sdl-rdp-backend.so/_detail/state.hpp: Peer data members 69 > 10
+sources/sdl-rdp-backend.so/_detail/state.hpp: Peer member functions 38 > 15
+sources/sdl-rdp-backend.so/auth.test.cpp: Authentication data members 14 > 10
+sources/sdl-rdp-backend.so/avc.cpp: Encoder data members 17 > 10

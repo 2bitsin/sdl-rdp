@@ -46,4 +46,56 @@ struct PositionObserver {
     return TRUE;
   }
 };
+struct PointerObserver {
+  inline static thread_local PointerObserver *active = nullptr;
+  bool red = false;
+  explicit PointerObserver(Client& client) {
+    active = this;
+    client.instance->context->update->pointer->PointerNew = Receive;
+  }
+  static BOOL Receive(rdpContext*, POINTER_NEW_UPDATE const* update) {
+    auto& shape = update->colorPtrAttr;
+    if (shape.width != 8 || shape.height != 8 || update->xorBpp != 32) return TRUE;
+    auto pixels = reinterpret_cast<UINT32 const*>(shape.xorMaskData);
+    active->red = std::all_of(pixels, pixels + 64, [](UINT32 pixel) { return pixel == 0xffff0000; });
+    return TRUE;
+  }
+};
+class FirstFrameSize {
+  inline static thread_local FirstFrameSize* active = nullptr;
+  Client& client;
+  decltype(freerdp::PostConnect) original_connect;
+  pEndPaint original_paint = nullptr;
+  bool paint_installed = false;
+public:
+  bool received = false;
+  int width = 0, height = 0;
+  explicit FirstFrameSize(Client& value) : client(value), original_connect(value.instance->PostConnect) {
+    Expects(!active && original_connect, "one first-frame observer before connection");
+    active = this;
+    client.instance->PostConnect = Connect;
+  }
+  ~FirstFrameSize() {
+    client.instance->PostConnect = original_connect;
+    if (paint_installed) client.instance->context->update->EndPaint = original_paint;
+    active = nullptr;
+  }
+  static BOOL Connect(freerdp* instance) {
+    Expects(active && instance, "first-frame observer and client exist");
+    if (!active->original_connect(instance)) return FALSE;
+    active->original_paint = instance->context->update->EndPaint;
+    instance->context->update->EndPaint = Paint;
+    active->paint_installed = true;
+    return TRUE;
+  }
+  static BOOL Paint(rdpContext* context) {
+    Expects(active && context && context->gdi, "first-frame observer and framebuffer exist");
+    if (!active->received) {
+      active->width = context->gdi->width;
+      active->height = context->gdi->height;
+      active->received = true;
+    }
+    return active->original_paint ? active->original_paint(context) : TRUE;
+  }
+};
 }

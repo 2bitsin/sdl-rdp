@@ -3,18 +3,13 @@
 #endif
 #include "SDL_rdpdyn.h"
 #include "SDL_rdpini.h"
+#include "SDL_rdpregistry.h"
 #include "src/SDL_hints_c.h"
 #if defined(SDL_PLATFORM_WINDOWS)
 #include "src/core/windows/SDL_windows.h"
 #elif defined(SDL_PLATFORM_LINUX) || defined(SDL_PLATFORM_MACOS)
 #include <dlfcn.h>
 #endif
-
-static SDL_InitState ini_init;
-static const char *ini_values[SDL_RDP_SETTING_COUNT];
-static char *ini_text;
-static bool ini_failed;
-static char *ini_failed_path;
 
 static char *SDL_RDP_LibraryIni(void)
 {
@@ -55,28 +50,30 @@ static char *SDL_RDP_LibraryIni(void)
 
 static void SDL_RDP_IniEntry(void *user, int index, const char *key, const char *value, unsigned line)
 {
+    struct SDL_RDP_Registry *const state = SDL_RDP_Registry();
     const char *path = user;
     if (index == -2) {
         SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "%s:%u: malformed ini line (missing '=')", path, line);
     } else if (index < 0) {
         SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "%s:%u: unknown RDP setting '%s'", path, line, key);
     } else {
-        ini_values[index] = value;
+        state->ini_values[index] = value;
     }
 }
 
 static bool SDL_RDP_ReadIni(const char *path, bool required)
 {
+    struct SDL_RDP_Registry *const state = SDL_RDP_Registry();
     SDL_PathInfo info;
-    ini_text = SDL_LoadFile(path, NULL);
-    if (ini_text) {
-        SDL_RDP_IniParse(ini_text, SDL_RDP_IniEntry, (void *)path);
+    state->ini_text = SDL_LoadFile(path, NULL);
+    if (state->ini_text) {
+        SDL_RDP_IniParse(state->ini_text, SDL_RDP_IniEntry, (void *)path);
         return true;
     }
-    ini_failed = required || SDL_GetPathInfo(path, &info);
-    if (ini_failed) ini_failed_path = SDL_strdup(path);
+    state->ini_failed = required || SDL_GetPathInfo(path, &info);
+    if (state->ini_failed) state->ini_failed_path = SDL_strdup(path);
     SDL_ClearError();
-    return ini_failed;
+    return state->ini_failed;
 }
 
 static void SDL_RDP_LoadIni(void)
@@ -97,17 +94,19 @@ static void SDL_RDP_LoadIni(void)
 
 bool SDL_RDP_SettingsReady(void)
 {
-    if (SDL_ShouldInit(&ini_init)) {
+    struct SDL_RDP_Registry *const state = SDL_RDP_Registry();
+    if (SDL_ShouldInit(&state->ini_init)) {
         SDL_RDP_LoadIni();
-        SDL_SetInitialized(&ini_init, true);
+        SDL_SetInitialized(&state->ini_init, true);
     }
-    return !ini_failed || SDL_SetError("Could not read RDP settings file %s", ini_failed_path ? ini_failed_path : "");
+    return !state->ini_failed || SDL_SetError("Could not read RDP settings file %s", state->ini_failed_path ? state->ini_failed_path : "");
 }
 
 static const char *SDL_RDP_SettingFallback(const char *name)
 {
+    struct SDL_RDP_Registry *const state = SDL_RDP_Registry();
     int index = SDL_RDP_IniIndex(name);
-    if (index >= 0 && index != SDL_RDP_SETTING_INI && ini_values[index]) return ini_values[index];
+    if (index >= 0 && index != SDL_RDP_SETTING_INI && state->ini_values[index]) return state->ini_values[index];
     return SDL_getenv(name);
 }
 

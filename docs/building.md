@@ -20,3 +20,20 @@ It adds `src/{audio,storage}/rdp/` drivers; `src/video/SDL_video.c` preserves dr
 `buildutil publish` packages `sdl-rdp` for conan. A project takes it with one
 `Require` line and links the `SDL3` component; the backend is never linked,
 only found next to it at runtime.
+
+# Quality gate
+
+Run `./buildutil test` and `./buildutil analyze` before committing.
+`bin/lint-shape.py` checks non-blank file lines, class lines, member counts,
+access/function/data ordering, and wholly-comment line percentages in `sources/`.
+`bin/lint-shape.allow` records exact outstanding class measurements. A smaller
+measurement or a removed violation makes its entry stale; remove or reduce the
+entry in the same change. Never raise a limit; the allow list only shrinks.
+Run `python3 bin/lint-shape.py --allow bin/lint-shape.allow` directly to inspect
+shape failures. Run `bin/lint-clones.sh` for the clone gate (40 tokens, 5 lines).
+Both run under CTest when tests are built. Missing `npx` explicitly skips the
+clone gate with exit code 77; it never passes silently.
+
+The driver C files in `rdp/` are compiled directly, not copied into the SDL patch.
+For bootstrap changes, extract two pristine copies of the pinned SDL archive,
+apply `rdp-driver.patch` to one, edit it, then regenerate with `diff -ruN a b`.

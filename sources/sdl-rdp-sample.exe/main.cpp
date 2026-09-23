@@ -238,12 +238,12 @@ void Fullscreen(SDL_Window *window, const Options &options)
     if (options.fullscreen) Check(SDL_SetWindowFullscreen(window, true));
 }
 
-Options ParseOptions(int argc, char **argv)
+Options ParseOptions(int argc, char **argv, Authenticator& authentication)
 {
     Options options;
     for (int i = 1; i < argc; ++i) {
         std::string_view arg(argv[i]);
-        if (AuthOption(arg, i, argc, argv)) continue;
+        if (authentication.Option(arg, i, argc, argv)) continue;
         if (arg == "--clip" && i + 1 < argc) options.clip = argv[++i];
         else if (arg == "--ls" && i + 1 < argc) options.drives.list = argv[++i];
         else if (arg == "--cat" && i + 1 < argc) options.drives.cat = argv[++i];
@@ -274,8 +274,9 @@ SDL_Cursor *CreateCursor()
 
 int main(int argc, char **argv)
 {
-    auto options = ParseOptions(argc, argv);
-    AuthenticationDefaults();
+    Authenticator authentication;
+    auto options = ParseOptions(argc, argv, authentication);
+    authentication.Defaults();
     SDL_Log("SDL_GetVersion() %d", SDL_GetVersion());
     std::string drivers = "drivers";
     std::ranges::for_each(std::views::iota(0, SDL_GetNumVideoDrivers()),
@@ -287,7 +288,7 @@ int main(int argc, char **argv)
         Check(SDL_SetHint(SDL_HINT_RDP_CODEC, requested.c_str()));
     }
     Check(SDL_Init(SDL_INIT_VIDEO | (options.tone ? SDL_INIT_AUDIO : 0)));
-    InstallAuthentication();
+    authentication.Install();
     if (options.clip) Check(SDL_SetClipboardText(options.clip));
     auto display = SDL_GetPrimaryDisplay();
     SDL_Log("port %lld", (long long)SDL_GetNumberProperty(SDL_GetDisplayProperties(display), SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0));

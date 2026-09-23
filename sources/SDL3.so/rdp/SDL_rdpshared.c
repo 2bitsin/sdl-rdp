@@ -1,12 +1,13 @@
+#include "SDL_rdpregistry.h"
 #include "SDL_rdpdyn.h"
 #include "SDL_rdpauth.h"
 
-static SDL_InitState shared_init;
-static SDL_Mutex *shared_lock;
-static unsigned shared_refs;
-static SDL_RDP_Backend shared_backend;
-static sdlrdp_handle *shared_handle;
-static sdlrdp_config shared_config;
+static struct SDL_RDP_Registry registry; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables): SDL bootstrap has no user pointer shared by video and audio.
+
+struct SDL_RDP_Registry *SDL_RDP_Registry(void)
+{
+    return &registry;
+}
 
 int SDL_RDP_GetInteger(const char *name, int fallback)
 {
@@ -49,6 +50,7 @@ bool SDL_RDP_ParseAspect(const char *value, sdlrdp_aspect *aspect)
 
 static bool SDL_RDP_Config(sdlrdp_config *config)
 {
+    struct SDL_RDP_Registry *const state = SDL_RDP_Registry();
     if (!SDL_RDP_SettingsReady()) return false;
     SDL_zero(*config);
     config->log = SDL_RDP_Log;
@@ -71,45 +73,47 @@ static bool SDL_RDP_Config(sdlrdp_config *config)
         !SDL_RDP_ParseAspect(SDL_RDP_Setting(SDL_HINT_RDP_ASPECT), &config->aspect)) {
         return false;
     }
-    return SDL_RDP_AuthConfig(config, &shared_backend);
+    return SDL_RDP_AuthConfig(config, &state->shared_backend);
 }
 
 bool SDL_RDP_AcquireBackend(SDL_RDP_Backend *backend, sdlrdp_handle **handle, sdlrdp_config *config)
 {
+    struct SDL_RDP_Registry *const state = SDL_RDP_Registry();
     bool ok = true;
-    if (SDL_ShouldInit(&shared_init)) {
-        shared_lock = SDL_CreateMutex();
-        SDL_SetInitialized(&shared_init, shared_lock != NULL);
+    if (SDL_ShouldInit(&state->shared_init)) {
+        state->shared_lock = SDL_CreateMutex();
+        SDL_SetInitialized(&state->shared_init, state->shared_lock != NULL);
     }
-    if (!shared_lock) return false;
-    SDL_LockMutex(shared_lock);
-    if (!shared_refs) {
-        ok = SDL_RDP_Config(&shared_config) && SDL_RDP_LoadBackend(&shared_backend);
-        if (ok && shared_backend.open(&shared_config, &shared_handle) != 0) {
-            SDL_SetError("%s", shared_backend.last_error());
+    if (!state->shared_lock) return false;
+    SDL_LockMutex(state->shared_lock);
+    if (!state->shared_refs) {
+        ok = SDL_RDP_Config(&state->shared_config) && SDL_RDP_LoadBackend(&state->shared_backend);
+        if (ok && state->shared_backend.open(&state->shared_config, &state->shared_handle) != 0) {
+            SDL_SetError("%s", state->shared_backend.last_error());
             ok = false;
         }
-        if (!ok) { SDL_RDP_UnloadBackend(&shared_backend); SDL_RDP_AuthRelease(); }
+        if (!ok) { SDL_RDP_UnloadBackend(&state->shared_backend); SDL_RDP_AuthRelease(); }
     }
     if (ok) {
-        ++shared_refs;
-        *backend = shared_backend;
-        *handle = shared_handle;
-        if (config) *config = shared_config;
+        ++state->shared_refs;
+        *backend = state->shared_backend;
+        *handle = state->shared_handle;
+        if (config) *config = state->shared_config;
     }
-    SDL_UnlockMutex(shared_lock);
+    SDL_UnlockMutex(state->shared_lock);
     return ok;
 }
 
 void SDL_RDP_ReleaseBackend(void)
 {
-    SDL_LockMutex(shared_lock);
-    SDL_assert(shared_refs > 0);
-    if (!--shared_refs) {
-        shared_backend.close(shared_handle);
-        shared_handle = NULL;
+    struct SDL_RDP_Registry *const state = SDL_RDP_Registry();
+    SDL_LockMutex(state->shared_lock);
+    SDL_assert(state->shared_refs > 0);
+    if (!--state->shared_refs) {
+        state->shared_backend.close(state->shared_handle);
+        state->shared_handle = NULL;
         SDL_RDP_AuthRelease();
-        SDL_RDP_UnloadBackend(&shared_backend);
+        SDL_RDP_UnloadBackend(&state->shared_backend);
     }
-    SDL_UnlockMutex(shared_lock);
+    SDL_UnlockMutex(state->shared_lock);
 }

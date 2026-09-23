@@ -73,18 +73,23 @@ static Sint64 SDLCALL RDP_FileSeek(void *userdata, Sint64 offset, SDL_IOWhence w
     return file->position;
 }
 
-static size_t SDLCALL RDP_FileRead(void *userdata, void *buffer, size_t size, SDL_IOStatus *status)
+static size_t RDP_FileResult(RDP_File *file, int count, size_t size, SDL_IOStatus *status, SDL_IOStatus short_status)
 {
-    RDP_File *file = userdata;
-    int count = file->backend.drive_read(file->handle, file->file, file->position, buffer, SDL_min(size, SDL_MAX_SINT32));
     if (count < 0) {
         *status = SDL_IO_STATUS_ERROR;
         SDL_SetError("%s", file->backend.last_error());
         return 0;
     }
     file->position += count;
-    if ((size_t)count < size) *status = SDL_IO_STATUS_EOF;
+    if ((size_t)count < size) *status = short_status;
     return count;
+}
+
+static size_t SDLCALL RDP_FileRead(void *userdata, void *buffer, size_t size, SDL_IOStatus *status)
+{
+    RDP_File *file = userdata;
+    int count = file->backend.drive_read(file->handle, file->file, file->position, buffer, SDL_min(size, SDL_MAX_SINT32));
+    return RDP_FileResult(file, count, size, status, SDL_IO_STATUS_EOF);
 }
 
 static size_t SDLCALL RDP_FileWrite(void *userdata, const void *buffer, size_t size, SDL_IOStatus *status)
@@ -95,14 +100,7 @@ static size_t SDLCALL RDP_FileWrite(void *userdata, const void *buffer, size_t s
         return 0;
     }
     int count = file->backend.drive_write(file->handle, file->file, file->position, buffer, SDL_min(size, SDL_MAX_SINT32));
-    if (count < 0) {
-        *status = SDL_IO_STATUS_ERROR;
-        SDL_SetError("%s", file->backend.last_error());
-        return 0;
-    }
-    file->position += count;
-    if ((size_t)count < size) *status = SDL_IO_STATUS_ERROR;
-    return count;
+    return RDP_FileResult(file, count, size, status, SDL_IO_STATUS_ERROR);
 }
 
 static bool SDLCALL RDP_FileFlush(void *userdata, SDL_IOStatus *status)
