@@ -336,11 +336,11 @@ bool Peer::BeginFrame()
   }
   if (picture.w != desktop.w || picture.h != desktop.h) {
     desktop = picture;
-    resizing = !Graphics();
+    resizing = true;
     auto settings = client->context->settings;
     if (!freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth, picture.w)
         || !freerdp_settings_set_uint32(settings, FreeRDP_DesktopHeight, picture.h)
-        || (resizing && !client->context->update->DesktopResize(client->context))) return false;
+        || !client->context->update->DesktopResize(client->context)) return false;
     sending.clear();
     sending.Add({0, 0, int(snapshot_width), int(snapshot_height)});
   }
