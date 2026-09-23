@@ -57,7 +57,7 @@ static bool SDL_RDP_Config(sdlrdp_config *config)
     config->port = SDL_RDP_GetInteger(SDL_HINT_RDP_PORT, 3389);
     config->width = SDL_RDP_GetInteger(SDL_HINT_RDP_WIDTH, 1024);
     config->height = SDL_RDP_GetInteger(SDL_HINT_RDP_HEIGHT, 768);
-    config->audio_latency_ms = SDL_RDP_GetInteger(SDL_HINT_RDP_AUDIO_LATENCY, 100);
+    config->audio_latency_ms = SDL_RDP_GetInteger(SDL_HINT_RDP_AUDIO_LATENCY, 500);
     config->wait_for_client = SDL_GetHintBoolean(SDL_HINT_RDP_WAIT_FOR_CLIENT, false);
     if (config->audio_latency_ms > SDL_MAX_SINT32 || config->port > 65535 || !config->width || config->width > SDL_MAX_SINT32 ||
         !config->height || config->height > SDL_MAX_SINT32) {

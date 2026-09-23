@@ -198,8 +198,10 @@ pointer belongs to the handle; copy it before another clipboard API call.
 Select playback with `SDL_AUDIO_DRIVER=rdp`. The single playback device,
 "RDP client", starts at 48 kHz, 16-bit stereo PCM and switches to the
 client’s negotiated rate (48 kHz or 44.1 kHz). SDL converts application
-streams to the current device format. `SDL_RDP_AUDIO_LATENCY` is the unconfirmed audio
-limit in milliseconds (default 100). The driver maintains a real-time
+streams to the current device format. `SDL_RDP_AUDIO_LATENCY` controls how far
+the server may run ahead of the client’s confirmed playback before it waits, in milliseconds (default 500).
+This window guards against a stalled client; the SDL driver paces the stream.
+Audio is sent in 20 ms blocks. The driver maintains a real-time
 audio clock even when no client is attached, discarding those samples.
 The backend does no rate conversion: `sdlrdp_audio_open(handle)` opens playback,
 `sdlrdp_audio_rate(handle)` returns the negotiated rate (0 without a playing

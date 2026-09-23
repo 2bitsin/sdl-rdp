@@ -29,7 +29,7 @@ typedef struct {
   void* log_user;
   sdlrdp_codec codec;
   sdlrdp_aspect aspect; /* Display aspect; either zero selects square pixels. */
-  unsigned audio_latency_ms; /* 0 selects 100 ms. */
+  unsigned audio_latency_ms; /* 0 selects 500 ms ahead of confirmed playback. */
   sdlrdp_auth auth; /* Zero defaults to no authentication. */
   /* Peer worker callbacks; pointers and auth_user must live until close returns.
      Missing callbacks fail closed unless a fixed password supplies the fallback. */

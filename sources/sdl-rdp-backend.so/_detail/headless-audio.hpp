@@ -43,6 +43,7 @@ class SoundClient {
 public:
   struct Confirmation { UINT16 timestamp; BYTE block; unsigned frames; Clock::time_point received; };
   std::vector<INT16> samples;
+  std::vector<Clock::time_point> received;
   std::vector<AUDIO_FORMAT> server_formats;
   std::deque<Confirmation> pending;
   unsigned rate = 48000, version = 8, volume = 0xffffffffu;
@@ -134,7 +135,8 @@ public:
     auto start = samples.size();
     samples.resize(start + bytes.size() / 2);
     std::memcpy(samples.data() + start, bytes.data(), bytes.size());
-    pending.push_back({timestamp, block, unsigned(bytes.size() / 4), Clock::now()});
+    received.push_back(Clock::now());
+    pending.push_back({timestamp, block, unsigned(bytes.size() / 4), received.back()});
     maximum_pending_frames = std::max(maximum_pending_frames, samples.size() / 2 - confirmed_frames);
     if (auto_confirm) Expects(Confirm(), "wave confirmation sent");
   }
