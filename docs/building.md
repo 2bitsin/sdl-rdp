@@ -25,16 +25,30 @@ only found next to it at runtime.
 
 Run `./buildutil test` and `./buildutil analyze` before committing.
 `bin/lint-shape.py` checks non-blank file lines, class lines, member counts,
-access/function/data ordering, and wholly-comment line percentages in `sources/`.
-`bin/lint-shape.allow` records exact outstanding class measurements. A smaller
+access/function/data ordering, and wholly-comment line percentages in `sources/`;
+function and lambda body lines (over 20 needs an allow entry, over 40 fails),
+complexity, parameters and nesting, lines over 120 columns, compound contracts,
+NOLINT lines and C files in `sources/`; and columns, body lines, parameters and
+nesting in `bin/*.py`.
+`bin/lint-shape.allow` records exact outstanding measurements, each with the one
+round that removes it as a required `# reason`; paths are relative to `sources/`
+(`.` is the whole tree), the lint prints each finding in exactly this form so a
+report line pastes in unchanged, the file is data and exempt from the 120-column
+rule, and a body over 40 lines cannot be listed. A smaller
 measurement or a removed violation makes its entry stale; remove or reduce the
-entry in the same change. Never raise a limit; the allow list only shrinks.
+entry in the same change. A function entry is keyed by the line of its parameter
+list, so moving the definition makes its entry stale and the change re-measures
+it. Never raise a limit; the allow list only shrinks. A brace opened or closed by
+a macro is not seen by the lint; a file it leaves unbalanced is reported as
+`unbalanced braces`.
 Run `python3 bin/lint-shape.py --allow bin/lint-shape.allow` directly to inspect
 shape failures. Run `bin/lint-clones.sh` for the clone gate (40 tokens, 5 lines).
 Test fixtures retain protected data members so derived test bodies can use them.
-The C driver (`sources/SDL3.so/rdp`) is SDL's own style and is outside clang-tidy; it is glue only, and new code goes on the C++ side.
-Both lint gates run under CTest when tests are built. Missing `npx` explicitly skips the
-clone gate with exit code 77; it never passes silently.
+The C driver (`sources/SDL3.so/rdp`) is SDL's own style and is outside
+clang-tidy; it is glue only, and new code goes on the C++ side.
+Both lint gates and the lint's own tests run under CTest when tests are built.
+Missing `npx` skips the clone gate, and missing pytest skips `shape-lint-tests`,
+with exit code 77 and the reason printed; neither passes silently.
 
 The driver C files in `rdp/` are compiled directly, not copied into the SDL patch.
 For bootstrap changes, extract two pristine copies of the pinned SDL archive,

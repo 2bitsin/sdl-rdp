@@ -5,9 +5,10 @@ import pathlib
 import re
 
 DECLARATION = re.compile(r'^( +)([\w:][\w:< >*&]*?) +([A-Za-z_]\w*)(?: *(=) *(.*)| *(\{.*\}))?;$')
-LITERALS = re.compile(r'R"(?P<delimiter>[^ ()\\\t\r\n]{0,16})\(.*?\)(?P=delimiter)"'
-                      r'|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|//[^\n]*|/\*.*?\*/', re.S)
-EXCLUDED = {'return', 'co_return', 'throw', 'delete', 'using', 'typedef', 'case'}
+LITERALS    = re.compile(r'R"(?P<delimiter>[^ ()\\\t\r\n]{0,16})\(.*?\)(?P=delimiter)"'
+                         r'|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|//[^\n]*|/\*.*?\*/', re.S)
+COLUMNS     = 120
+EXCLUDED    = {'return', 'co_return', 'throw', 'delete', 'using', 'typedef', 'case'}
 
 
 def columns(line):
@@ -36,32 +37,37 @@ def align(text):
     lines = clean_padding(text).splitlines()
     cursor = 0
     while cursor < len(lines):
-        first = columns(lines[cursor])
-        if first is None:
-            cursor += 1
-            continue
-        end = cursor + 1
-        group = [first]
-        while end < len(lines):
-            item = columns(lines[end])
-            if item is None or (item[0], item[3]) != (first[0], first[3]):
-                break
-            group.append(item)
-            end += 1
-        width = max(len(item[1]) for item in group)
-        names = max(len(item[2]) for item in group)
-        proposed = []
-        for indent, kind, name, shape, value in group:
-            declaration = indent + kind.ljust(width) + ' ' + name
-            if shape == '=':
-                declaration += ' ' * (names - len(name)) + ' = ' + value
-            elif shape == '{}':
-                declaration += ' ' * (names - len(name)) + value
-            proposed.append(declaration + ';')
-        if all(len(line) <= 120 for line in proposed):
+        group = run(lines, cursor)
+        end = cursor + max(len(group), 1)
+        proposed = aligned(group)
+        if group and all(len(line) <= COLUMNS for line in proposed):
             lines[cursor:end] = proposed
         cursor = end
     return '\n'.join(lines) + '\n'
+
+
+def run(lines, cursor):
+    """Return the declarations of one indent and shape starting at cursor."""
+    group = []
+    for line in lines[cursor:]:
+        item = columns(line)
+        if item is None or (group and (item[0], item[3]) != (group[0][0], group[0][3])):
+            break
+        group.append(item)
+    return group
+
+
+def aligned(group):
+    width = max((len(item[1]) for item in group), default=0)
+    names = max((len(item[2]) for item in group), default=0)
+    return [declaration(item, width, names) for item in group]
+
+
+def declaration(item, width, names):
+    indent, kind, name, shape, value = item
+    padding = ' ' * (names - len(name))
+    tail = {'=': padding + ' = ' + value, '{}': padding + value}.get(shape, '')
+    return indent + kind.ljust(width) + ' ' + name + tail + ';'
 
 
 def main():
