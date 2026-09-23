@@ -28,7 +28,7 @@ void ApplyVolume(std::span<int16_t> stereo, UINT32 volume)
   }
 }
 }
-bool Peer::SoundChannel(HANDLE ready)
+bool Peer::SoundChannel(std::span<HANDLE const> ready)
 {
   Expects(channels != nullptr, "channel manager exists");
   if (!active) return true;
@@ -40,7 +40,9 @@ bool Peer::SoundChannel(HANDLE ready)
     sound = std::make_unique<AudioChannel>(*this);
     healthy = sound->Initialize();
   }
-  if (sound && (!healthy || (ready == sound->Event() && !sound->Pump()))) {
+  if (!sound) return true;
+  if (healthy && std::ranges::contains(ready, sound->Event())) healthy = sound->Pump();
+  if (!healthy) {
     handle_count = 0;
     sound.reset();
     owner.Push({.type = SDLRDP_AUDIO, .audio = {0, 0}});

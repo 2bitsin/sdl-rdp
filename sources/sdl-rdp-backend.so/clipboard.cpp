@@ -36,10 +36,10 @@ bool ClipboardChannel::Open()
   return context->ServerCapabilities(context.get(), &caps) == CHANNEL_RC_OK
     && context->MonitorReady(context.get(), &monitor) == CHANNEL_RC_OK;
 }
-bool ClipboardChannel::Pump(HANDLE signaled)
+bool ClipboardChannel::Pump(std::span<HANDLE const> signaled)
 {
   Expects(opened, "clipboard channel open");
-  if (signaled == Event() && context->CheckEventHandle(context.get()) != CHANNEL_RC_OK) return false;
+  if (std::ranges::contains(signaled, Event()) && context->CheckEventHandle(context.get()) != CHANNEL_RC_OK) return false;
   if (!ready || announced == peer.owner.clipboard.generation) return true;
   return Announce() == CHANNEL_RC_OK;
 }
@@ -74,6 +74,7 @@ void ClipboardChannel::Changed(std::string text)
   clipboard.text = std::move(text);
   clipboard.unicode = std::move(unicode);
   announced = ++clipboard.generation;
+  peer.owner.trace.Line("clipboard", [&] { return std::format("generation={} bytes={}", clipboard.generation, clipboard.text.size()); });
   peer.owner.Push({.type = SDLRDP_CLIPBOARD});
 }
 UINT ClipboardChannel::RespondToList()

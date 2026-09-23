@@ -135,7 +135,8 @@ bool Encoder::Impl::Initialize(unsigned bitrate, unsigned fps)
   auto& rc = config.rcParams;
   rc.enableLookahead = 0; rc.lookaheadDepth = 0;
   rc.rateControlMode = NV_ENC_PARAMS_RC_CBR; rc.averageBitRate = bitrate;
-  rc.vbvBufferSize = std::max(1u, bitrate / fps); rc.vbvInitialDelay = rc.vbvBufferSize; rc.zeroReorderDelay = 1;
+  rc.vbvBufferSize = unsigned(std::clamp<uint64_t>(uint64_t(bitrate) * 2 / fps, 1, UINT32_MAX));
+  rc.vbvInitialDelay = rc.vbvBufferSize; rc.zeroReorderDelay = 1;
   auto& h264 = config.encodeCodecConfig.h264Config;
   h264.chromaFormatIDC = 1; h264.level = NV_ENC_LEVEL_AUTOSELECT;
   h264.idrPeriod = NVENC_INFINITE_GOPLENGTH; h264.repeatSPSPPS = 1;

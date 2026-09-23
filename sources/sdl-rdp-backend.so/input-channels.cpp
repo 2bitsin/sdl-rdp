@@ -51,14 +51,14 @@ bool Input::Open(Peer& peer)
     && advanced->ChannelHandle(advanced.get(), &advanced_event)
     && rdpei_server_init(touch.get()) == CHANNEL_RC_OK;
 }
-bool Input::Channels(Peer& peer, HANDLE ready)
+bool Input::Channels(Peer& peer, std::span<HANDLE const> ready)
 {
   Expects(peer.channels != nullptr, "channel manager exists");
   if (WTSVirtualChannelManagerGetDrdynvcState(peer.channels) != DRDYNVC_STATE_READY) return true;
   if (!opened) return Open(peer);
-  if (advanced_ready && ready == advanced_event
+  if (advanced_ready && std::ranges::contains(ready, advanced_event)
       && advanced->Poll(advanced.get()) != CHANNEL_RC_OK) return false;
-  if (touch_ready && ready == rdpei_server_get_event_handle(touch.get())) {
+  if (touch_ready && std::ranges::contains(ready, rdpei_server_get_event_handle(touch.get()))) {
     auto result = rdpei_server_handle_messages(touch.get());
     // FreeRDP 3.15 channels/rdpei/server/rdpei_main.c:701 maps ERROR_NO_DATA to ERROR_READ_FAULT.
     if (result != CHANNEL_RC_OK && result != ERROR_READ_FAULT) return false;

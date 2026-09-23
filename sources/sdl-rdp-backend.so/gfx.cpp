@@ -42,9 +42,9 @@ void Peer::AnnounceConnection(sdlrdp_codec codec)
   connection.reset();
   wake.Transition(WakeEvent::Phase::Pending);
 }
-bool Peer::GraphicsChannel(HANDLE ready)
+bool Peer::GraphicsChannel(std::span<HANDLE const> ready)
 {
-  if (gfx) return ready != gfx->Event() || gfx->Pump();
+  if (gfx) return !std::ranges::contains(ready, gfx->Event()) || gfx->Pump();
   if (gfx_attempted || !freerdp_settings_get_bool(client->context->settings, FreeRDP_SupportGraphicsPipeline)
       || WTSVirtualChannelManagerGetDrdynvcState(channels) != DRDYNVC_STATE_READY) return true;
   gfx_attempted = true;

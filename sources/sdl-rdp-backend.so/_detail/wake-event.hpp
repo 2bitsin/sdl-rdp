@@ -3,6 +3,7 @@
 #include <atomic>
 
 namespace Backend {
+bool Signalled(HANDLE event);
 class WakeEvent {
 public:
   enum class Phase { Idle, Pending };

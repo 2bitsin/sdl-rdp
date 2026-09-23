@@ -1,4 +1,5 @@
 #pragma once
+#include <span>
 #include "rdp-handles.hpp"
 #include <freerdp/peer.h>
 #include <freerdp/server/ainput.h>
@@ -22,7 +23,7 @@ struct Input {
   static Input& Held(Peer&);
   static BOOL Create(freerdp_peer*, rdpContext*);
   static void Free(freerdp_peer*, rdpContext*);
-  bool Channels(Peer& peer, HANDLE ready);
+  bool Channels(Peer& peer, std::span<HANDLE const> ready);
   bool Open(Peer& peer);
   unsigned Handles(HANDLE* handles);
   void Close();

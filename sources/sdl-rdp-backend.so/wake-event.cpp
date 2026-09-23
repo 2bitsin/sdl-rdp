@@ -1,8 +1,18 @@
 #include "_detail/wake-event.hpp"
 #include "_detail/contract.hpp"
 #include <winpr/synch.h>
+#include <stdexcept>
 
 namespace Backend {
+bool Signalled(HANDLE event)
+{
+  utilities::Expects(event != nullptr, "event exists");
+  utilities::Expects(event != INVALID_HANDLE_VALUE, "event handle is valid");
+  auto result = WaitForSingleObject(event, 0);
+  if (result == WAIT_FAILED) throw std::runtime_error("Event readiness wait failed.");
+  return result == WAIT_OBJECT_0;
+}
+
 WakeEvent::WakeEvent(HANDLE value) : handle(value) {}
 HANDLE WakeEvent::get() const { return handle.get(); }
 WakeEvent::operator bool() const { return bool(handle); }

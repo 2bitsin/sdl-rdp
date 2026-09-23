@@ -204,16 +204,14 @@ void DriveChannel::Receive(DrivePacket& packet)
   default: break;
   }
 }
-bool DriveChannel::Pump(HANDLE signaled)
+bool DriveChannel::Pump(std::span<HANDLE const> signaled)
 {
   std::scoped_lock lock(mutex);
   if (!connected) { CloseTransport(); return true; }
-  if (signaled != event) return true;
+  if (!std::ranges::contains(signaled, event)) return true;
   try {
     for (;;) {
-      auto ready = WaitForSingleObject(event, 0);
-      if (ready == WAIT_FAILED) throw std::runtime_error("Drive channel event wait failed.");
-      if (ready != WAIT_OBJECT_0) return true;
+      if (!Signalled(event)) return true;
       ULONG length = 0;
       if (!WTSVirtualChannelRead(channel, 0, nullptr, 0, &length))
         throw std::runtime_error("Drive channel read failed.");

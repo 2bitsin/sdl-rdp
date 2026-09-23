@@ -118,7 +118,7 @@ public:
   bool PollStep(std::stop_token quit, std::span<HANDLE> handles);
   Encoder encoder;
   bool Drain();
-  bool TransportStep(std::stop_token quit, HANDLE ready);
+  bool TransportStep(std::stop_token quit, std::span<HANDLE const> ready);
   bool EncodeAndSend(std::stop_token quit);
   bool SendPointer();
   uint64_t pointer_generation = 0;
@@ -142,10 +142,10 @@ public:
   void GraphicsDeadline();
   DWORD Timeout();
   static constexpr DWORD AppendedHandleCount = 5 + Input::MaxHandles;
-  bool Channels(HANDLE ready);
-  bool OpenStaticChannels(HANDLE ready);
+  bool Channels(std::span<HANDLE const> ready);
+  bool OpenStaticChannels(std::span<HANDLE const> ready);
   bool OpenDisplayControl();
-  bool GraphicsChannel(HANDLE ready);
+  bool GraphicsChannel(std::span<HANDLE const> ready);
   bool Graphics() const { return gfx && gfx->confirmed; }
   std::unique_ptr<GfxChannel> gfx;
   bool gfx_attempted = false;
@@ -157,7 +157,7 @@ public:
   std::optional<sdlrdp_event> connection;
   void AnnounceConnection(sdlrdp_codec codec);
   static BOOL ChannelCreated(void*, UINT32, INT32);
-  bool SoundChannel(HANDLE ready);
+  bool SoundChannel(std::span<HANDLE const> ready);
   bool sound_attempted = false;
   std::unique_ptr<AudioChannel> sound;
   static UINT Layout(DispServerContext*, DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const*);

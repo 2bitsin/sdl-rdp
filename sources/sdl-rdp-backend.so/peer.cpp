@@ -182,6 +182,7 @@ DWORD Peer::EventHandles(std::span<HANDLE> handles)
 }
 bool Peer::PollStep(std::stop_token quit, std::span<HANDLE> handles)
 {
+  Expects(handles.size() <= MAXIMUM_WAIT_OBJECTS, "event array fits the wait and readiness budget");
   DWORD count, timeout;
   {
     std::scoped_lock lock(owner.session_guard);
@@ -193,7 +194,12 @@ bool Peer::PollStep(std::stop_token quit, std::span<HANDLE> handles)
   if (!count) return false;
   auto result = WaitForMultipleObjects(count, handles.data(), FALSE, timeout);
   if (result == WAIT_FAILED || quit.stop_requested()) return false;
-  auto ready = result < count ? handles[result] : nullptr;
+  std::array<HANDLE, MAXIMUM_WAIT_OBJECTS> signalled{};
+  auto end = signalled.begin();
+  try {
+    end = std::ranges::copy_if(handles.first(count), signalled.begin(), Signalled).out;
+  } catch (std::runtime_error const&) { return false; }
+  auto ready = std::span<HANDLE const>(signalled.begin(), end);
   if (result < count) std::ranges::rotate(handles.first(count), handles.begin() + result + 1);
   auto healthy = TransportStep(quit, ready);
   std::ranges::for_each(trace_pending, [&](auto const& text) { owner.trace.Emit(text); });
@@ -220,7 +226,7 @@ void Peer::Serve(std::stop_token quit)
   SetEvent(owner.reap.get());
   ResetAuthenticationLogging();
 }
-bool Peer::OpenStaticChannels(HANDLE ready)
+bool Peer::OpenStaticChannels(std::span<HANDLE const> ready)
 {
   if (!clipboard && WTSVirtualChannelManagerIsChannelJoined(channels, CLIPRDR_SVC_CHANNEL_NAME)) {
     handle_count = 0;
@@ -235,7 +241,7 @@ bool Peer::OpenStaticChannels(HANDLE ready)
   if (drive) drive->Pump(ready);
   return !clipboard || clipboard->Pump(ready);
 }
-bool Peer::Channels(HANDLE ready)
+bool Peer::Channels(std::span<HANDLE const> ready)
 {
   Expects(client && client->context, "channel peer exists");
   if (!channels || !active) return true;
@@ -289,7 +295,7 @@ void Peer::Post(sdlrdp_rect area)
   dirty.Add(area);
   wake.Transition(WakeEvent::Phase::Pending);
 }
-bool Peer::TransportStep(std::stop_token quit, HANDLE ready)
+bool Peer::TransportStep(std::stop_token quit, std::span<HANDLE const> ready)
 {
   Expects(client != nullptr, "peer exists");
   Expects(client->context != nullptr, "peer context exists");

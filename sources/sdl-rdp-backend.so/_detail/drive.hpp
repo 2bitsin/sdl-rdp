@@ -1,4 +1,5 @@
 #pragma once
+#include <span>
 #include "sdl-rdp-backend.h"
 #include "drive-wire.hpp"
 #include <winpr/wtypes.h>
@@ -26,7 +27,7 @@ public:
   explicit DriveChannel(Peer&);
   ~DriveChannel();
   bool Open();
-  bool Pump(HANDLE signaled);
+  bool Pump(std::span<HANDLE const> signaled);
   HANDLE Event() const { return event; }
   void Disconnect();
   void Abort(std::string const&);
