@@ -21,7 +21,7 @@ using Bio         = std::unique_ptr<BIO, Releases<BIO_free>>;
 struct DirectoryLock {
 public:
   DirectoryLock(DirectoryLock const&) = delete;
-  DirectoryLock(DirectoryLock&&)      = delete;
+  DirectoryLock(DirectoryLock&&) = delete;
   explicit DirectoryLock(std::filesystem::path const& directory)
       : fd(open(directory.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC)) {
     if (fd < 0) throw std::runtime_error("Certificate directory open failed.");
@@ -81,8 +81,8 @@ void Generate(Credentials const& paths) {
 std::filesystem::path DefaultCertificateDirectory() {
   if (auto* data = std::getenv("XDG_DATA_HOME"); data && *data) return std::filesystem::path(data) / "sdl-rdp";
   if (auto* home = std::getenv("HOME"); home && *home) return std::filesystem::path(home) / ".local/share/sdl-rdp";
-  std::array<char, 16384> buffer{ };
-  passwd                  entry { };
+  std::array<char, 16384> buffer { };
+  passwd                  entry  { };
   passwd*                 found  = nullptr;
   if (getpwuid_r(getuid(), &entry, buffer.data(), buffer.size(), &found) || !found)
     throw std::runtime_error("User home directory unavailable.");

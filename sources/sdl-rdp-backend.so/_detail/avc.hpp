@@ -45,10 +45,10 @@ struct EncodingTimes {
 };
 class Encoder {
 public:
-  Encoder();
-  Encoder(Encoder const&) = delete;
-  Encoder(Encoder&&)      = delete;
-  ~Encoder();
+                        Encoder();
+                        Encoder(Encoder const&) = delete;
+                        Encoder(Encoder&&) = delete;
+                        ~Encoder();
   Encoder&              operator =(Encoder const&) = delete;
   Encoder&              operator =(Encoder&&) = delete;
   static bool           Available();

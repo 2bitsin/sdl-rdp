@@ -9,9 +9,9 @@ struct State;
 struct Trace {
 public:
   Trace(Trace const&) = delete;
-  Trace(Trace&&)      = delete;
+  Trace(Trace&&) = delete;
   Trace(State& state, bool tracing) : owner{ state }, enabled{ tracing } { }
-  ~Trace()                       = default;
+         ~Trace() = default;
   Trace& operator =(Trace const&) = delete;
   Trace& operator =(Trace&&) = delete;
   bool Enabled() const { return enabled; }

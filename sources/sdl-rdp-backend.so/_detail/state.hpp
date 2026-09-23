@@ -53,10 +53,10 @@ struct Pointer {
 class Peer;
 struct State {
 public:
-  State(State const&) = delete;
-  State(State&&)      = delete;
-  explicit State(sdlrdp_config const& config, bool tracing = false);
-  ~State();
+                                     State(State const&) = delete;
+                                     State(State&&) = delete;
+  explicit                           State(sdlrdp_config const& config, bool tracing = false);
+                                     ~State();
   State&                             operator =(State const&) = delete;
   State&                             operator =(State&&) = delete;
   void                               Log(sdlrdp_log_level level, std::string const& text) const;
@@ -90,7 +90,7 @@ public:
   Authentication                                  authentication;
   void                                            (*log)            (void*, sdlrdp_log_level, char const*);
   void*                                           user;
-  std::atomic_uint                                next_drive        { 1                                          };
+  std::atomic_uint                                next_drive         { 1                                          };
   Clipboard                                       clipboard;
   Pointer                                         pointer;
   uint64_t                                        pointer_generation = 0;
@@ -102,14 +102,14 @@ public:
   unsigned                                        width;
   unsigned                                        height;
   unsigned                                        port               = 0;
-  sdlrdp_aspect                                   aspect            {                                            };
+  sdlrdp_aspect                                   aspect             {                                            };
   uint64_t                                        presented          = 0;
   Peer*                                           current            = nullptr;
   std::condition_variable                         frame_changed;
   Credentials                                     credentials;
   ListenerHandle                                  listener;
   EventHandle                                     stop;
-  EventHandle                                     reap              { CreateEvent(nullptr, TRUE, FALSE, nullptr) };
+  EventHandle                                     reap               { CreateEvent(nullptr, TRUE, FALSE, nullptr) };
   // frame_guard protects the shadow and every peer's dirty region.
   std::recursive_mutex                            session_guard;
   std::mutex                                      peers_guard;
@@ -132,8 +132,8 @@ private:
 class Peer // NOLINT(clang-analyzer-optin.performance.Padding): Member teardown order.
 {
 public:
-  Peer(Peer const&) = delete;
-  Peer(Peer&&)      = delete;
+        Peer(Peer const&) = delete;
+        Peer(Peer&&) = delete;
   Peer& operator =(Peer const&) = delete;
   Peer& operator =(Peer&&) = delete;
   using Clock                  = std::chrono::steady_clock;
@@ -147,8 +147,8 @@ public:
     uint64_t          sequence = 0;
     Clock::time_point sent;
   };
-  Peer(PeerHandle accepted, State& state);
-  ~Peer();
+                          Peer(PeerHandle accepted, State& state);
+                          ~Peer();
   void                    Start();
   void                    Post(sdlrdp_rect area);
   void                    InstallCallbacks() const;
@@ -192,7 +192,7 @@ public:
   void EndAudio();
   bool SoundChannel(std::span<HANDLE const> ready);
   Refresh                                  refresh;
-  std::atomic_uint                         effective_refresh      { 60 };
+  std::atomic_uint                         effective_refresh       { 60 };
   uint64_t                                 outq_total              = 0;
   unsigned                                 outq_max                = 0;
   bool                                     wire_unavailable_logged = false;
@@ -208,8 +208,8 @@ public:
   UINT32                                   gfx_id                  = UINT32_MAX;
   static constexpr auto                    GraphicsConnectionWait  = std::chrono::seconds(3);
   Clock::time_point                        activated_at;
-  std::chrono::nanoseconds                 graphics_ready_time    {    };
-  RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU         graphics_qoe           {    };
+  std::chrono::nanoseconds                 graphics_ready_time     {    };
+  RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU         graphics_qoe            {    };
   std::optional<sdlrdp_event>              connection;
   bool                                     sound_attempted         = false;
   std::unique_ptr<AudioChannel>            sound;
@@ -217,7 +217,7 @@ public:
   int                                      socket_descriptor       = client->sockfd;
   State&                                   owner;
   WakeEvent                                wake;
-  DWORD                                    handle_count           { 0  };
+  DWORD                                    handle_count            { 0  };
   std::vector<std::string>                 trace_pending;
   Region                                   dirty;
   Region                                   sending;
@@ -234,20 +234,20 @@ public:
   std::deque<Pending>                      pending;
 
   uint64_t                                                               avc_frames       = 0;
-  std::chrono::nanoseconds                                               avc_convert     { };
-  std::chrono::nanoseconds                                               avc_upload      { };
-  std::chrono::nanoseconds                                               avc_encode      { };
+  std::chrono::nanoseconds                                               avc_convert      { };
+  std::chrono::nanoseconds                                               avc_upload       { };
+  std::chrono::nanoseconds                                               avc_encode       { };
   uint64_t                                                               acks_timed_out   = 0;
   uint64_t                                                               frames_sent      = 0;
   uint64_t                                                               frames_coalesced = 0;
   uint64_t                                                               dirty_presents   = 0;
   uint64_t                                                               ack_count        = 0;
   uint64_t                                                               ack_over_100ms   = 0;
-  std::chrono::nanoseconds                                               encoded_at_start{ };
-  std::chrono::nanoseconds                                               encode_total    { };
-  std::chrono::nanoseconds                                               encode_max      { };
-  std::chrono::nanoseconds                                               ack_total       { };
-  std::chrono::nanoseconds                                               ack_max         { };
+  std::chrono::nanoseconds                                               encoded_at_start { };
+  std::chrono::nanoseconds                                               encode_total     { };
+  std::chrono::nanoseconds                                               encode_max       { };
+  std::chrono::nanoseconds                                               ack_total        { };
+  std::chrono::nanoseconds                                               ack_max          { };
   unsigned                                                               screen_width     = 0;
   unsigned                                                               screen_height    = 0;
   bool                                                                   ack_enabled      = false;
@@ -259,7 +259,7 @@ public:
   UINT32                                                                 display_id       = UINT32_MAX;
   bool                                                                   disp_open        = false;
   bool                                                                   resizing         = false;
-  sdlrdp_rect                                                            desktop         { };
+  sdlrdp_rect                                                            desktop          { };
   bool                                                                   activated        = false;
   std::atomic_bool                                                       active           = false;
   std::atomic_bool                                                       finished         = false;

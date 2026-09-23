@@ -19,7 +19,7 @@ void ThenDriveStorage(SDL_PropertiesID properties) {
 }
 }
 TEST_F(Sample, DriveCommands) {
-  oxbox::platform::ScratchArea const share   { "sample-drive", "sdl-rdp" };
+  oxbox::platform::ScratchArea const share    { "sample-drive", "sdl-rdp" };
   std::string                        original = "client disk contents\n";
   oxbox::platform::WriteBinaryFile(share.Path() / "source", std::as_bytes(std::span(original)));
   auto arguments = Arguments(certificates.Path(), false);

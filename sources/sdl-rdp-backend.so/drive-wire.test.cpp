@@ -6,7 +6,7 @@ namespace {
 void SendMalformedDrivePacket(Headless::Client& client) {
   auto*               instance  = client.Instance().get();
   auto                channel   = freerdp_channels_get_id_by_name(instance, RDPDR_CHANNEL_NAME);
-  std::array<BYTE, 4> malformed{ 0x72, 0x44, 0x41, 0x44 };
+  std::array<BYTE, 4> malformed { 0x72, 0x44, 0x41, 0x44 };
   ASSERT_TRUE(instance->SendChannelData(instance, channel, malformed.data(), malformed.size()));
 }
 Backend::DrivePacket EmptyBasicInformation(Headless::DriveObserver& observer) {
@@ -121,7 +121,7 @@ TEST_F(DriveWire, MalformedInformationKeepsVideoSession) {
   auto* file     = held_file;
   auto& observer = *this->observer;
   auto stat      = std::async(std::launch::async, [&] {
-    sdlrdp_stat info  { };
+    sdlrdp_stat info   { };
     auto        result = sdlrdp_drive_fstat(handle.get(), file, &info);
     return std::pair(result, std::string(sdlrdp_last_error()));
   });

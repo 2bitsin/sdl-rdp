@@ -13,8 +13,8 @@ namespace {
 struct NtHash {
 public:
   NtHash(NtHash const&) = delete;
-  NtHash(NtHash&&)      = delete;
-  NtHash()              = default;
+  NtHash(NtHash&&) = delete;
+  NtHash() = default;
   ~NtHash() { OPENSSL_cleanse(bytes.data(), bytes.size()); }
   NtHash& operator =(NtHash const&) = delete;
   NtHash& operator =(NtHash&&) = delete;
@@ -26,7 +26,7 @@ private:
 struct SettingsPassword {
 public:
   SettingsPassword(SettingsPassword const&) = delete;
-  SettingsPassword(SettingsPassword&&)      = delete;
+  SettingsPassword(SettingsPassword&&) = delete;
   explicit SettingsPassword(rdpSettings* value) : settings{ value } { }
   ~SettingsPassword() {
     auto* password = freerdp_settings_get_string_writable(settings, FreeRDP_Password);
@@ -43,7 +43,7 @@ private:
 struct PlainPassword {
 public:
   PlainPassword(PlainPassword const&) = delete;
-  PlainPassword(PlainPassword&&)      = delete;
+  PlainPassword(PlainPassword&&) = delete;
   explicit PlainPassword(char const* text) : value{ text } { }
   ~PlainPassword() { OPENSSL_cleanse(value.data(), value.size()); }
   PlainPassword& operator =(PlainPassword const&) = delete;
@@ -63,7 +63,7 @@ void Reject(Peer& peer) {
                                               peer.client->hostname));
 }
 bool Verify(Peer& peer, char const* domain, char const* user, char const* password) {
-  SettingsPassword const clear { peer.client->context->settings };
+  SettingsPassword const clear  { peer.client->context->settings };
   auto const&            config = peer.owner.authentication.Config();
   peer.authentication.user   = user;
   peer.authentication.domain = domain;
@@ -107,7 +107,7 @@ BOOL Authenticate(freerdp_peer* client, SEC_WINNT_AUTH_IDENTITY const*, BOOL aut
 }
 bool AuthenticateSettings(freerdp_peer* client) {
   auto&                  peer  = Peer::Held(client);
-  SettingsPassword const clear{ client->context->settings };
+  SettingsPassword const clear { client->context->settings };
   if (peer.authentication.checked) return peer.authentication.rejected ? Denied(client) : true;
   peer.authentication.checked = true;
   try {

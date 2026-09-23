@@ -72,7 +72,7 @@ protected:
     if (expected != previous) {
       ThenChangedCodec(expected);
     } else {
-      std::array<sdlrdp_event, 4> events{ };
+      std::array<sdlrdp_event, 4> events { };
       auto                        count  = sdlrdp_poll(backend.get(), events.data(), events.size());
       EXPECT_TRUE(std::ranges::all_of(std::span(events).first(count),
                                       [](auto const& event) { return event.type == SDLRDP_REFRESH; }));

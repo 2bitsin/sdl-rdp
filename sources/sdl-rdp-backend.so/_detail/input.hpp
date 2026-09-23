@@ -35,10 +35,10 @@ private:
   void        InstallChannels(Peer& peer);
   friend class                                                                 Peer;
   static constexpr unsigned                                                    MaxHandles     = 2;
-  std::array<oxbox::utilities::UtfDecodeState, 2>                              unicode       {         };
+  std::array<oxbox::utilities::UtfDecodeState, 2>                              unicode        {         };
   std::unique_ptr<ainput_server_context, Releases<ainput_server_context_free>> advanced;
   std::unique_ptr<RdpeiServerContext, Releases<rdpei_server_context_free>>     touch;
-  HANDLE                                                                       advanced_event{ nullptr };
+  HANDLE                                                                       advanced_event { nullptr };
   bool                                                                         opened         = false;
   bool                                                                         have_relative  = false;
   bool                                                                         relative       = false;

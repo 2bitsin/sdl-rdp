@@ -9,6 +9,8 @@ import pytest
 SPEC   = importlib.util.spec_from_file_location('align_columns', pathlib.Path(__file__).with_name('align-columns.py'))
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
+
+
 def align(text):
     return MODULE.align(text).text
 
@@ -85,7 +87,7 @@ def align(text):
     ),
     pytest.param(
         'int rate{60};\nint x = 0;\nint longer = some_very_long_expression;\n',
-        'int rate  { 60 };\nint x      = 0;\nint longer = some_very_long_expression;\n',
+        'int rate   { 60 };\nint x      = 0;\nint longer = some_very_long_expression;\n',
         id='closer_width_uses_only_braces',
     ),
     pytest.param(
@@ -108,7 +110,7 @@ def align(text):
     pytest.param(
         'bool f : 1;\nalignas(16) char buffer[64];\nint x{2}; /* note */\nint longer{3}; // end\n',
         'bool             f          : 1;\nalignas(16) char buffer[64];\n'
-        'int              x         { 2 };  /* note */\nint              longer    { 3 };  // end\n',
+        'int              x          { 2 };  /* note */\nint              longer     { 3 };  // end\n',
         id='bitfield_alignas_and_block_comment',
     ),
     pytest.param(
@@ -373,8 +375,8 @@ PEER_EXPECTED = '''
   UINT32                                   gfx_id                 = UINT32_MAX;
   static constexpr auto                    GraphicsConnectionWait = std::chrono::seconds(3);
   Clock::time_point                        activated_at;
-  std::chrono::nanoseconds                 graphics_ready_time   {   };
-  RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU         graphics_qoe          {   };
+  std::chrono::nanoseconds                 graphics_ready_time    {   };
+  RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU         graphics_qoe           {   };
   std::optional<sdlrdp_event>              connection;
   bool                                     sound_attempted        = false;
   std::unique_ptr<AudioChannel>            sound;
@@ -382,7 +384,7 @@ PEER_EXPECTED = '''
   int                                      socket_descriptor      = client->sockfd;
   State&                                   owner;
   WakeEvent                                wake;
-  DWORD                                    handle_count          { 0 };
+  DWORD                                    handle_count           { 0 };
   std::vector<std::string>                 trace_pending;
   Region                                   dirty;
   Region                                   sending;
@@ -399,20 +401,20 @@ PEER_EXPECTED = '''
   std::deque<Pending>                      pending;
 
   uint64_t                                                               avc_frames       = 0;
-  std::chrono::nanoseconds                                               avc_convert     { };
-  std::chrono::nanoseconds                                               avc_upload      { };
-  std::chrono::nanoseconds                                               avc_encode      { };
+  std::chrono::nanoseconds                                               avc_convert      { };
+  std::chrono::nanoseconds                                               avc_upload       { };
+  std::chrono::nanoseconds                                               avc_encode       { };
   uint64_t                                                               acks_timed_out   = 0;
   uint64_t                                                               frames_sent      = 0;
   uint64_t                                                               frames_coalesced = 0;
   uint64_t                                                               dirty_presents   = 0;
   uint64_t                                                               ack_count        = 0;
   uint64_t                                                               ack_over_100ms   = 0;
-  std::chrono::nanoseconds                                               encoded_at_start{ };
-  std::chrono::nanoseconds                                               encode_total    { };
-  std::chrono::nanoseconds                                               encode_max      { };
-  std::chrono::nanoseconds                                               ack_total       { };
-  std::chrono::nanoseconds                                               ack_max         { };
+  std::chrono::nanoseconds                                               encoded_at_start { };
+  std::chrono::nanoseconds                                               encode_total     { };
+  std::chrono::nanoseconds                                               encode_max       { };
+  std::chrono::nanoseconds                                               ack_total        { };
+  std::chrono::nanoseconds                                               ack_max          { };
   unsigned                                                               screen_width     = 0;
   unsigned                                                               screen_height    = 0;
   bool                                                                   ack_enabled      = false;
@@ -425,6 +427,7 @@ PEER_EXPECTED = '''
   bool                                                                   disp_open        = false;
   bool                                                                   resizing         = false;
 '''
+
 
 def test_peer_idempotence():
     assert align(PEER) == PEER_EXPECTED
@@ -486,3 +489,95 @@ def test_all_operator_declarations(source, expected):
     assert item.kind == 'function'
     assert align(source) == expected
     assert align(expected) == expected
+
+
+@pytest.mark.parametrize(('source', 'expected'), [
+    (
+        'int a{};\nint c = 5;\n',
+        'int a { };\nint c = 5;\n',
+    ),
+    (
+        'int table{ 1, 2 };\nint x : 3;\nint uninitialised;\n',
+        'int table         { 1, 2 };\nint x             : 3;\nint uninitialised;\n',
+    ),
+    (
+        '  : alpha{ 1 },\n    beta{ 22 },\n    gamma_long{ 3 } {}\n',
+        '  : alpha     { 1  },\n    beta      { 22 },\n    gamma_long{ 3  } { }\n',
+    ),
+    (
+        'auto t = f(g(x) ? a : b,   c);\n',
+        'auto t = f(g(x) ? a : b,   c);\n',
+    ),
+    (
+        'Thing() : alpha{1},   beta{22} {}\n',
+        'Thing() : alpha{ 1 }, beta{ 22 } { }\n',
+    ),
+    (
+        '  void (*close)(Handle*);\n'
+        '  int (*drive_enumerate)(Handle*, unsigned drive,\n'
+        '                         unsigned max);\n'
+        '  bool (*ready)(Handle*);\n',
+        '  void (*close)          (Handle*);\n'
+        '  int  (*drive_enumerate)(Handle*, unsigned drive,\n'
+        '                         unsigned max);\n'
+        '  bool (*ready)          (Handle*);\n',
+    ),
+    (
+        'struct Peer {\n  Peer(Handle accepted);\n  ~Peer();\n  void Start();\n'
+        '  bool Ready(int first,\n             int second) const;\n  unsigned Count();\n};\n',
+        'struct Peer {\n           Peer(Handle accepted);\n           ~Peer();\n  void     Start();\n'
+        '  bool     Ready(int first,\n             int second) const;\n  unsigned Count();\n};\n',
+    ),
+], ids=['mixed_empty_and_equals', 'table_and_bitfield', 'last_initialiser_has_body',
+        'ternary_untouched', 'constructor_list', 'multiline_function_pointer', 'constructors_and_members'])
+def test_review_round_three(source, expected):
+    assert align(source) == expected
+    assert align(expected) == expected
+
+
+def test_overflow_collapses_padding_and_check_reports_it(tmp_path):
+    value = 'x' * 110
+    source = '  int   huge    =   ' + value + ';\n'
+    expected = '  int huge = ' + value + ';\n'
+    result = MODULE.align(source)
+    assert result.text == expected
+    assert result.exceptions == [MODULE.Overflow(1, expected.rstrip())]
+    assert align(expected) == expected
+    path = tmp_path / 'overflow.cpp'
+    path.write_text(source)
+    command = [sys.executable, MODULE.__file__, '--check', str(path)]
+    checked = subprocess.run(command, capture_output=True, text=True)
+    assert (checked.returncode, checked.stdout, checked.stderr) == (1, f'{path}\n', '')
+    assert path.read_text() == source
+    path.write_text(expected)
+    checked = subprocess.run(command, capture_output=True, text=True)
+    assert (checked.returncode, checked.stdout, checked.stderr) == (0, '', '')
+
+
+@pytest.mark.parametrize(('source', 'expected'), [
+    (
+        'struct Peer {\n  Peer();\n  // member declarations\n'
+        '  unsigned Count(int first,\n                 int second);\n};\n',
+        'struct Peer {\n           Peer();\n  // member declarations\n'
+        '  unsigned Count(int first,\n                 int second);\n};\n',
+    ),
+    (
+        'int    long_name =   f("keep   spaces",   ' + 'x' * 110 + '); // keep   comment\n',
+        'int long_name = f("keep   spaces", ' + 'x' * 110 + '); // keep   comment\n',
+    ),
+], ids=['constructor_before_multiline_member', 'overflow_preserves_protected_spacing'])
+def test_continuation_and_protection(source, expected):
+    assert align(source) == expected
+    assert align(expected) == expected
+
+
+def test_uppercase_calls_keep_control_flow_indentation():
+    source = ('void Check() {\n'
+              '  Open(AUTH_TLS);\n'
+              '  Client client(port(), false);\n'
+              '  for (unsigned i = 0; i < 10; ++i)\n'
+              '    Attempt("alice", "wrong-secret", false);\n'
+              '  Attempt("alice", "correct-secret", true);\n'
+              '}\n')
+    assert align(source) == source
+    assert align(align(source)) == source

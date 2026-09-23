@@ -37,7 +37,7 @@ protected:
   }
   void SetUp() override {
     auto          directory = certificates.Path().string();
-    sdlrdp_config config   { };
+    sdlrdp_config config    { };
     config.log      = Headless::Logs::Collect;
     config.log_user = &logs;
     config.bind     = "127.0.0.1";
@@ -102,7 +102,7 @@ TEST_F(Clipboard, LiveSetAndMalformedResponse) {
   ASSERT_EQ(clipboard->Offer({ 'w', 0, 'o', 0, 'r', 0, 'l', 0, 'd', 0, 0, 0 }), CHANNEL_RC_OK);
   bool changed = false;
   ASSERT_TRUE(client->Until([&] {
-    std::array<sdlrdp_event, 32> events{ };
+    std::array<sdlrdp_event, 32> events { };
     auto                         count  = sdlrdp_poll(handle.get(), events.data(), 32);
     changed |= std::ranges::any_of(std::span(events.data(), count),
                                    [](auto const& event) { return event.type == SDLRDP_CLIPBOARD; });

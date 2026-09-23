@@ -13,10 +13,10 @@ class  Peer;
 class AudioChannel {
 public:
   using Clock                       = std::chrono::steady_clock;
-  AudioChannel(AudioChannel const&) = delete;
-  AudioChannel(AudioChannel&&)      = delete;
-  explicit AudioChannel(Peer& peer);
-  ~AudioChannel();
+                AudioChannel(AudioChannel const&) = delete;
+                AudioChannel(AudioChannel&&) = delete;
+  explicit      AudioChannel(Peer& peer);
+                ~AudioChannel();
   AudioChannel& operator =(AudioChannel const&) = delete;
   AudioChannel& operator =(AudioChannel&&) = delete;
   bool          Initialize();
@@ -40,7 +40,7 @@ private:
   State&                                                                     owner;
   HANDLE                                                                     channels;
   std::unique_ptr<RdpsndServerContext, Releases<rdpsnd_server_context_free>> sound;
-  AUDIO_FORMAT                                                               selected        { };
+  AUDIO_FORMAT                                                               selected         { };
   bool                                                                       rejected         = false;
   bool                                                                       gate_warned      = false;
   bool                                                                       ready            = false;
@@ -54,8 +54,8 @@ private:
   uint64_t                                                                   blocks_sent      = 0;
   uint64_t                                                                   gaps_over_40ms   = 0;
   Clock::time_point                                                          last_send;
-  Clock::duration                                                            gap_total       { };
-  Clock::duration                                                            gap_max         { };
+  Clock::duration                                                            gap_total        { };
+  Clock::duration                                                            gap_max          { };
   std::deque<Block>                                                          pending;
   std::vector<int16_t>                                                       buffer;
 };

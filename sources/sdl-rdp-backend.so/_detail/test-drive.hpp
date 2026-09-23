@@ -30,7 +30,7 @@ protected:
   }
   void SetUp() override {
     auto          path   = scratch.Path().string();
-    sdlrdp_config config{ };
+    sdlrdp_config config { };
     config.bind     = "127.0.0.1";
     config.cert_dir = path.c_str();
     config.width    = 320;
@@ -104,7 +104,7 @@ protected:
     return file;
   }
   void ThenRemovedDrive() {
-    std::array<sdlrdp_event, 32> events{ };
+    std::array<sdlrdp_event, 32> events { };
     auto                         count  = sdlrdp_poll(handle.get(), events.data(), 32);
     EXPECT_TRUE(std::ranges::any_of(std::span(events.data(), count), [&](auto const& event) {
       return event.type == SDLRDP_DRIVE && !event.drive.added && event.drive.id == drive;
@@ -128,8 +128,8 @@ protected:
   }
   sdlrdp_file*                                            held_file = nullptr;
   Headless::Logs                                          logs;
-  oxbox::platform::ScratchArea                            scratch  { "drive", "sdl-rdp"    };
-  std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> handle   { nullptr, sdlrdp_close };
+  oxbox::platform::ScratchArea                            scratch   { "drive", "sdl-rdp"    };
+  std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> handle    { nullptr, sdlrdp_close };
   std::unique_ptr<Headless::Client>                       client;
   std::unique_ptr<Headless::DriveObserver>                observer;
   std::jthread                                            pump;

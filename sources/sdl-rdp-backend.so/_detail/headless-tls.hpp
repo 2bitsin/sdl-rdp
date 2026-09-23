@@ -11,8 +11,8 @@ namespace Headless {
 struct TlsSocket {
 public:
   TlsSocket(TlsSocket const&) = delete;
-  TlsSocket(TlsSocket&&)      = delete;
-  TlsSocket()                 = default;
+  TlsSocket(TlsSocket&&) = delete;
+  TlsSocket() = default;
   ~TlsSocket() {
     if (descriptor >= 0) close(descriptor);
   }

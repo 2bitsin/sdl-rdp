@@ -24,10 +24,10 @@ public:
     bool               negotiation_failed   { false   };
     bool               handshake_failed     { false   };
   };
-  explicit LogRoute(sdlrdp_config const& config);
-  LogRoute(LogRoute const&) = delete;
-  LogRoute(LogRoute&&)      = delete;
-  ~LogRoute();
+  explicit  LogRoute(sdlrdp_config const& config);
+            LogRoute(LogRoute const&) = delete;
+            LogRoute(LogRoute&&) = delete;
+            ~LogRoute();
   LogRoute& operator =(LogRoute const&) = delete;
   LogRoute& operator =(LogRoute&&) = delete;
   static auto WithFilter(auto operation) {

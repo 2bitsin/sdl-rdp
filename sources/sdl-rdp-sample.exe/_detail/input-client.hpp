@@ -13,8 +13,8 @@ public:
     touch    = nullptr;
     freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
     auto*                      context = client.Instance()->context;
-    std::array<char const*, 1> ainput { AINPUT_CHANNEL_NAME };
-    std::array<char const*, 1> rdpei  { RDPEI_CHANNEL_NAME  };
+    std::array<char const*, 1> ainput  { AINPUT_CHANNEL_NAME };
+    std::array<char const*, 1> rdpei   { RDPEI_CHANNEL_NAME  };
     Expects(freerdp_client_add_dynamic_channel(context->settings, 1, ainput.data()), "ainput enabled");
     Expects(freerdp_client_add_dynamic_channel(context->settings, 1, rdpei.data()), "rdpei enabled");
     PubSub_SubscribeChannelConnected(context->pubSub, Connected);
@@ -40,7 +40,7 @@ private:
 struct PositionObserver {
 public:
   PositionObserver(PositionObserver const&) = delete;
-  PositionObserver(PositionObserver&&)      = delete;
+  PositionObserver(PositionObserver&&) = delete;
   explicit PositionObserver(Client& client) {
     Expects(!active, "one pointer observer per thread");
     active                                                       = this;
@@ -89,7 +89,7 @@ private:
 class FirstFrameSize {
 public:
   FirstFrameSize(FirstFrameSize const&) = delete;
-  FirstFrameSize(FirstFrameSize&&)      = delete;
+  FirstFrameSize(FirstFrameSize&&) = delete;
   explicit FirstFrameSize(Client& value) : client(value), original_connect(value.Instance()->PostConnect) {
     Expects(!active, "no observer is already installed");
     Expects(original_connect, "original connection callback is installed");

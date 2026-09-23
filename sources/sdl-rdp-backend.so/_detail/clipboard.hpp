@@ -12,15 +12,15 @@ class Peer;
 struct Clipboard {
   std::string       text;
   std::string       exported;
-  std::vector<BYTE> unicode   { 0, 0 };
+  std::vector<BYTE> unicode    { 0, 0 };
   uint64_t          generation = 0;
 };
 class ClipboardChannel {
 public:
-  ClipboardChannel(ClipboardChannel const&) = delete;
-  ClipboardChannel(ClipboardChannel&&)      = delete;
-  explicit ClipboardChannel(Peer& value);
-  ~ClipboardChannel();
+                    ClipboardChannel(ClipboardChannel const&) = delete;
+                    ClipboardChannel(ClipboardChannel&&) = delete;
+  explicit          ClipboardChannel(Peer& value);
+                    ~ClipboardChannel();
   ClipboardChannel& operator =(ClipboardChannel const&) = delete;
   ClipboardChannel& operator =(ClipboardChannel&&) = delete;
   bool              Open();

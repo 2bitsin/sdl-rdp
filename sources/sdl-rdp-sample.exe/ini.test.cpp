@@ -52,7 +52,7 @@ void ThenLiveAspect(SDL_Window* window) {
 }
 }
 TEST_P(IniSample, WorkingDirectoryPortAndBackend) {
-  oxbox::platform::ScratchArea const directory{ "ini", "sdl-rdp" };
+  oxbox::platform::ScratchArea const directory { "ini", "sdl-rdp" };
   auto                               port      = AvailablePort();
   WriteIni(directory.Path() / "libSDL3.ini", port);
   auto args = IniArguments(directory.Path(), certificates.Path());
@@ -67,7 +67,7 @@ TEST_P(IniSample, WorkingDirectoryPortAndBackend) {
 INSTANTIATE_TEST_SUITE_P(IniPrecedence, IniSample, testing::Bool());
 
 TEST_F(Sample, IniExplicitPathWinsAsWholeFile) {
-  oxbox::platform::ScratchArea const directory{ "ini-explicit", "sdl-rdp" };
+  oxbox::platform::ScratchArea const directory { "ini-explicit", "sdl-rdp" };
   auto                               port      = AvailablePort();
   WriteIni(directory.Path() / "chosen.ini", port);
   WriteInvalidIni(directory.Path());
@@ -104,7 +104,7 @@ TEST_F(Sample, IniApplicationHintWins) {
 }
 
 TEST_F(Sample, IniLibraryDirectoryWinsOverWorkingDirectory) {
-  oxbox::platform::ScratchArea const directory{ "ini-library", "sdl-rdp" };
+  oxbox::platform::ScratchArea const directory { "ini-library", "sdl-rdp" };
   auto                               library   = directory.Path() / "library";
   fs::create_directory(library);
   fs::create_symlink(BuildRoot() / "sources/SDL3.so/libSDL3.so.0", library / "libSDL3.so.0");
@@ -119,7 +119,7 @@ TEST_F(Sample, IniLibraryDirectoryWinsOverWorkingDirectory) {
 
 namespace SampleGate {
 TEST_F(Sample, IniCodeHintsCacheAndLiveReset) {
-  oxbox::platform::ScratchArea const directory{ "ini-cache", "sdl-rdp" };
+  oxbox::platform::ScratchArea const directory { "ini-cache", "sdl-rdp" };
   auto                               file      = directory.Path() / "libSDL3.ini";
   WriteIni(file, 1);
   GivenIniHints(file);

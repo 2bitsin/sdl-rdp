@@ -46,7 +46,7 @@ inline void ObserveDrive(DriveCapture& capture, std::span<BYTE const> bytes) {
 struct DriveObserver {
 public:
   DriveObserver(DriveObserver const&) = delete;
-  DriveObserver(DriveObserver&&)      = delete;
+  DriveObserver(DriveObserver&&) = delete;
   explicit DriveObserver(Client& client) : instance(client.Instance().get()), original(instance->ReceiveChannelData) {
     Expects(!active, "one drive observer per thread");
     active                       = this;

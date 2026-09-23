@@ -50,7 +50,7 @@ inline testing::AssertionResult Pattern(Client& client, bool /*pointer*/) {
 class FullDesktopFrames {
 public:
   FullDesktopFrames(FullDesktopFrames const&) = delete;
-  FullDesktopFrames(FullDesktopFrames&&)      = delete;
+  FullDesktopFrames(FullDesktopFrames&&) = delete;
   explicit FullDesktopFrames(Client& client)
       : update(client.Instance()->context->update), surface(update->SurfaceBits), bitmap(update->BitmapUpdate) {
     Expects(!active, "no observer is already installed");
@@ -111,7 +111,7 @@ private:
 class NextFrame {
 public:
   NextFrame(NextFrame const&) = delete;
-  NextFrame(NextFrame&&)      = delete;
+  NextFrame(NextFrame&&) = delete;
   explicit NextFrame(Client& value, unsigned frame)
       : client(value), column(frame % 640), original(value.Instance()->context->update->SurfaceBits),
         original_bitmap(value.Instance()->context->update->BitmapUpdate) {

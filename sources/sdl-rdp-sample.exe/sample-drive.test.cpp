@@ -60,7 +60,7 @@ TEST_F(DriveSample, DriveDisconnectDuringCat) {
 }
 
 TEST_F(DriveSample, DriveMissingCatKeepsServing) {
-  oxbox::platform::ScratchArea const share    { "sample-missing", "sdl-rdp" };
+  oxbox::platform::ScratchArea const share     { "sample-missing", "sdl-rdp" };
   auto                               arguments = Arguments(certificates.Path(), false);
   arguments.insert(arguments.end(), { "--cat", "share/missing.bin" });
   GivenDriveProcess(arguments, share.Path());

@@ -21,7 +21,7 @@ inline ClipboardClient& HeldClipboard(CliprdrClientContext* context) {
 class ClipboardClient {
 public:
   ClipboardClient(ClipboardClient const&) = delete;
-  ClipboardClient(ClipboardClient&&)      = delete;
+  ClipboardClient(ClipboardClient&&) = delete;
   explicit ClipboardClient(Client& value, std::vector<BYTE> initial = { })
       : client(value), outgoing(std::move(initial)) {
     Expects(!attaching, "one clipboard client per connecting thread");

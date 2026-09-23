@@ -15,10 +15,10 @@ inline constexpr UINT32 GraphicsContextId = 1;
 class                   Peer;
 class GfxChannel {
 public:
-  GfxChannel(GfxChannel const&) = delete;
-  GfxChannel(GfxChannel&&)      = delete;
-  explicit GfxChannel(Peer& value);
-  ~GfxChannel();
+              GfxChannel(GfxChannel const&) = delete;
+              GfxChannel(GfxChannel&&) = delete;
+  explicit    GfxChannel(Peer& value);
+              ~GfxChannel();
   GfxChannel& operator =(GfxChannel const&) = delete;
   GfxChannel& operator =(GfxChannel&&) = delete;
   bool        Open();

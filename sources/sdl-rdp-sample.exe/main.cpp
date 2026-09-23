@@ -31,7 +31,7 @@ void Draw(SDL_Window* window, unsigned frame, bool full) {
 }
 
 void CycleCodec() {
-  static constexpr std::array codecs { "auto", "planar", "remotefx", "nscodec", "raw", "progressive" };
+  static constexpr std::array codecs  { "auto", "planar", "remotefx", "nscodec", "raw", "progressive" };
   char const*                 hint    = SDL_GetHint(SDL_HINT_RDP_CODEC);
   auto const*                 current = std::ranges::find(codecs, std::string_view(hint ? hint : "auto"));
   auto                        next    = current == codecs.end() ? 0 : (current - codecs.begin() + 1) % codecs.size();
@@ -87,7 +87,7 @@ void Run(SDL_Window* window, bool tight, bool partial, DriveOptions drives) {
 
 void SDLCALL FeedTone(void* userdata, SDL_AudioStream* stream, int additional, int /*unused*/) {
   auto&                   frame   = *static_cast<Uint64*>(userdata);
-  std::array<Sint16, 960> samples{ };
+  std::array<Sint16, 960> samples { };
   while (additional > 0) {
     auto count = std::min(additional / int(2 * sizeof(Sint16)), 480);
     if (!count) return;
@@ -102,7 +102,7 @@ void SDLCALL FeedTone(void* userdata, SDL_AudioStream* stream, int additional, i
 }
 
 SDL_AudioStream* OpenTone(Uint64& frame) {
-  SDL_AudioSpec const spec  { SDL_AUDIO_S16, 2, 48000 };
+  SDL_AudioSpec const spec   { SDL_AUDIO_S16, 2, 48000 };
   auto*               stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, FeedTone, &frame);
   Check(stream != nullptr);
   auto device = SDL_GetAudioStreamDevice(stream);

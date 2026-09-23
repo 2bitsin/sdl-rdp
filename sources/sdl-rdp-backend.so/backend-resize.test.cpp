@@ -6,7 +6,7 @@ namespace BackendGate {
 struct ResizeProbe {
 public:
   ResizeProbe(ResizeProbe const&) = delete;
-  ResizeProbe(ResizeProbe&&)      = delete;
+  ResizeProbe(ResizeProbe&&) = delete;
   explicit ResizeProbe(Backend::State& state)
       : state(state), peer(*state.current), original(peer.client->context->update->DesktopResize) {
     std::scoped_lock const lock(state.session_guard);

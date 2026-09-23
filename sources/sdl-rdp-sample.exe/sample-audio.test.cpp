@@ -234,7 +234,7 @@ TEST_F(AudioDriver, NoClientTenSecondClock) {
   // Consuming ten seconds of PCM may run one lead ahead of real time.
   // SDL may dequeue one buffer ahead; scheduling delays only make this longer.
   int           buffer_frames = 0;
-  SDL_AudioSpec format       { };
+  SDL_AudioSpec format        { };
   ASSERT_TRUE(SDL_GetAudioDeviceFormat(SDL_GetAudioStreamDevice(stream.get()), &format, &buffer_frames));
   EXPECT_GE(elapsed, 10.0 - 0.150 - (double(buffer_frames) / format.freq));
   RecordProperty("no_client_ten_seconds_elapsed", std::to_string(elapsed));

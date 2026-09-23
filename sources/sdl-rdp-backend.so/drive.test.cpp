@@ -59,7 +59,7 @@ protected:
   }
   void ThenRemovedEvent(std::array<sdlrdp_event, 32>& events, unsigned old) {
     auto         deadline = Headless::Clock::now() + 2s;
-    sdlrdp_drive value   { };
+    sdlrdp_drive value    { };
     while (sdlrdp_drive_list(handle.get(), &value, 1) && Headless::Clock::now() < deadline)
       std::this_thread::sleep_for(1ms);
     EXPECT_EQ(sdlrdp_drive_list(handle.get(), &value, 1), 0);
@@ -224,7 +224,7 @@ TEST_F(Drive, SparseOffsetAboveFourGiB) {
 }
 
 TEST_F(Drive, AnnounceAndRemoveEvents) {
-  std::array<sdlrdp_event, 32> events{ };
+  std::array<sdlrdp_event, 32> events { };
   auto                         count  = sdlrdp_poll(handle.get(), events.data(), 32);
   auto added = std::ranges::find_if(std::span(events.data(), count), [&](auto const& event) {
     return event.type == SDLRDP_DRIVE && event.drive.added && event.drive.id == drive;
@@ -278,7 +278,7 @@ TEST_F(Drive, TwoSharesIncludingUnicodeName) {
   Disconnect();
   Connect("żółw", true);
   Write("file", "data");
-  std::array<sdlrdp_drive, 2> drives  { };
+  std::array<sdlrdp_drive, 2> drives   { };
   auto                        deadline = Headless::Clock::now() + 2s;
   while (sdlrdp_drive_list(handle.get(), drives.data(), 2) != 2 && Headless::Clock::now() < deadline)
     std::this_thread::sleep_for(1ms);
@@ -294,7 +294,7 @@ TEST_F(Drive, TwoHundredEntriesInPagesOfThirtyTwo) {
   ASSERT_EQ(sdlrdp_drive_mkdir(handle.get(), drive, "many"), 0);
   auto                          expected = GivenDirectoryEntries();
   std::set<std::string>         actual;
-  std::array<sdlrdp_dirent, 32> entries { };
+  std::array<sdlrdp_dirent, 32> entries  { };
   unsigned                      offset   = 0;
   WhenDirectoryPaged(entries, actual, offset);
   if (::testing::Test::HasFatalFailure()) return;

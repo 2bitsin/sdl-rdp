@@ -81,7 +81,7 @@ public:
     };
   }
   SoundClient(SoundClient const&) = delete;
-  SoundClient(SoundClient&&)      = delete;
+  SoundClient(SoundClient&&) = delete;
   ~SoundClient() {
     freerdp_disconnect(client.Instance().get());
     client.Instance()->LoadChannels = previous_load;
@@ -129,11 +129,11 @@ private:
   inline static thread_local SoundClient* active         = nullptr;
   Client&                                 client;
   decltype(freerdp::LoadChannels)         previous_load  = nullptr;
-  CHANNEL_ENTRY_POINTS_EX                 entry         { };
+  CHANNEL_ENTRY_POINTS_EX                 entry          { };
   void*                                   init           = nullptr;
   DWORD                                   channel        = 0;
   std::vector<BYTE>                       incoming;
-  std::array<BYTE, 4>                     first         { };
+  std::array<BYTE, 4>                     first          { };
   unsigned                                wave_bytes     = 0;
   UINT16                                  timestamp      = 0;
   BYTE                                    block          = 0;
@@ -220,7 +220,7 @@ inline void WriteSoundFormatHeader(wStream* out, SoundCapture const& capture, st
 inline std::vector<BYTE> SoundFormatReply(SoundCapture const& capture) {
   auto supported = SupportedSoundFormats(capture);
   std::vector<BYTE> bytes(24 + (supported.size() * 18));
-  wStream output{ };
+  wStream output { };
   auto*   out    = Stream_StaticInit(&output, bytes.data(), bytes.size());
   WriteSoundFormatHeader(out, capture, supported.size(), bytes.size());
   std::ranges::for_each(supported, [&](auto const& format) {
@@ -260,7 +260,7 @@ inline void SoundProtocol::Receive(SoundClient& self) {
     return;
   }
   Expects(self.incoming.size() >= 4, "sound PDU header complete");
-  wStream storage{ };
+  wStream storage { };
   auto*   stream  = Stream_StaticInit(&storage, self.incoming.data(), self.incoming.size());
   BYTE    type    = 0;
   UINT16  size    = 0;

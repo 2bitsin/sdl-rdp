@@ -27,7 +27,7 @@ class GraphicsObserver {
 public:
   using Reset                               = GraphicsCapture::Reset;
   GraphicsObserver(GraphicsObserver const&) = delete;
-  GraphicsObserver(GraphicsObserver&&)      = delete;
+  GraphicsObserver(GraphicsObserver&&) = delete;
   explicit GraphicsObserver(Client& target)
       : client(target), desktop_resize(client.Instance()->context->update->DesktopResize) {
     Expects(!active, "one graphics observer per thread");

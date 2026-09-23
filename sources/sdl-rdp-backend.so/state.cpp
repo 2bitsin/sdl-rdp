@@ -24,8 +24,8 @@ namespace {
 struct Socket {
 public:
   Socket(Socket const&) = delete;
-  Socket(Socket&&)      = delete;
-  Socket()              = default;
+  Socket(Socket&&) = delete;
+  Socket() = default;
   ~Socket() {
     if (descriptor >= 0) ::close(descriptor);
   }

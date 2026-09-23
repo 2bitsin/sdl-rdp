@@ -66,7 +66,7 @@ class Process {
 public:
   explicit Process(std::vector<std::string> arguments) : pid(Spawn(std::move(arguments), output)) { }
   Process(Process const&) = delete;
-  Process(Process&&)      = delete;
+  Process(Process&&) = delete;
   ~Process() {
     if (pid > 0) {
       kill(pid, SIGKILL);
@@ -90,7 +90,7 @@ public:
       if (left <= 0) return false;
       pollfd descriptor{ .fd = output, .events = POLLIN, .revents = 0 };
       if (poll(&descriptor, 1, int(left)) <= 0) return false;
-      std::array<char, 4096> buffer{ };
+      std::array<char, 4096> buffer { };
       auto                   count  = read(output, buffer.data(), buffer.size());
       if (count <= 0) return false;
       pending.append(buffer.data(), count);

@@ -25,10 +25,10 @@ std::vector<BYTE> PadReference(std::vector<UINT32> const& pixels, unsigned width
   return padded;
 }
 std::vector<UINT32> Yuv420Reference(std::vector<UINT32> const& pixels, unsigned width, unsigned height) {
-  auto w     { Backend::Avc::Aligned(width)                  };
-  auto h     { Backend::Avc::Aligned(height)                 };
+  auto w      { Backend::Avc::Aligned(width)                  };
+  auto h      { Backend::Avc::Aligned(height)                 };
   auto padded = PadReference(pixels, width, height, w, h);
-  auto yuv   { std::vector<BYTE>(std::size_t(w) * h * 3 / 2) };
+  auto yuv    { std::vector<BYTE>(std::size_t(w) * h * 3 / 2) };
   std::array<BYTE*, 3> planes{ yuv.data(), yuv.data() + (std::size_t(w) * h),
                                yuv.data() + (std::size_t(w) * h * 5 / 4) };
   std::array<UINT32, 3> strides{ w, w / 2, w / 2 };
@@ -97,7 +97,7 @@ protected:
   void ThenReported(Headless::Client& client, sdlrdp_codec codec) {
     bool reported = false;
     ASSERT_TRUE(client.Until([&] {
-      std::array<sdlrdp_event, 32> events{ };
+      std::array<sdlrdp_event, 32> events { };
       auto                         count  = sdlrdp_poll(backend.get(), events.data(), events.size());
       reported |= std::ranges::any_of(std::span(events).first(count), [=](auto const& event) {
         return (event.type == SDLRDP_CONNECTED && event.connected.codec == codec) ||
@@ -136,7 +136,7 @@ protected:
   }
 
   void ThenCodecChanged() {
-    std::array<sdlrdp_event, 32> events { };
+    std::array<sdlrdp_event, 32> events  { };
     bool                         changed = false;
     ASSERT_TRUE(ClientSession().Until([&] {
       auto count = sdlrdp_poll(backend.get(), events.data(), events.size());

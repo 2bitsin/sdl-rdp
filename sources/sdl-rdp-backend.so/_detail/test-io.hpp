@@ -11,7 +11,7 @@ namespace Headless {
 struct Descriptor {
 public:
   Descriptor(Descriptor const&) = delete;
-  Descriptor(Descriptor&&)      = delete;
+  Descriptor(Descriptor&&) = delete;
   explicit Descriptor(int descriptor) : value{ descriptor } { }
   ~Descriptor() {
     if (value >= 0) close(value);

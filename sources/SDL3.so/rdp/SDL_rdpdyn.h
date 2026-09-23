@@ -36,13 +36,13 @@ typedef struct SDL_RDP_Backend {
   int               (*drive_stat)        (sdlrdp_handle*, unsigned drive, char const* path, sdlrdp_stat*);
   int (*drive_enumerate)(sdlrdp_handle*, unsigned drive, char const* path, unsigned offset, sdlrdp_dirent*,
                          unsigned max);
-  int  (*drive_mkdir) (sdlrdp_handle*, unsigned drive, char const* path);
-  int  (*drive_remove)(sdlrdp_handle*, unsigned drive, char const* path);
-  int  (*drive_rename)(sdlrdp_handle*, unsigned drive, char const* path, char const* destination);
-  int  (*drive_fstat) (sdlrdp_handle*, sdlrdp_file*, sdlrdp_stat*);
-  int  (*drive_flush) (sdlrdp_handle*, sdlrdp_file*);
-  int  (*drive_close) (sdlrdp_handle*, sdlrdp_file*);
-  void (*wakeup)      (sdlrdp_handle*);
+  int               (*drive_mkdir)       (sdlrdp_handle*, unsigned drive, char const* path);
+  int               (*drive_remove)      (sdlrdp_handle*, unsigned drive, char const* path);
+  int               (*drive_rename)      (sdlrdp_handle*, unsigned drive, char const* path, char const* destination);
+  int               (*drive_fstat)       (sdlrdp_handle*, sdlrdp_file*, sdlrdp_stat*);
+  int               (*drive_flush)       (sdlrdp_handle*, sdlrdp_file*);
+  int               (*drive_close)       (sdlrdp_handle*, sdlrdp_file*);
+  void              (*wakeup)            (sdlrdp_handle*);
 } SDL_RDP_Backend;
 char const* SDL_RDP_Setting(char const* name);
 char const* SDL_RDP_HintChangedValue(char const* name, char const* oldValue, char const* newValue);

@@ -73,8 +73,8 @@ namespace {
 struct Quit {
 public:
   Quit(Quit const&) = delete;
-  Quit(Quit&&)      = delete;
-  Quit()            = default;
+  Quit(Quit&&) = delete;
+  Quit() = default;
   ~Quit() {
     SDL_Quit();
     SDL_ResetHints();

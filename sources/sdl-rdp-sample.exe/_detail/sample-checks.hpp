@@ -69,7 +69,7 @@ protected:
     WhenNonAsciiKey(input);
   }
   void ThenDriveOutput(fs::path const& share, std::string const& original) {
-    std::array<unsigned char, EVP_MAX_MD_SIZE> digest{ };
+    std::array<unsigned char, EVP_MAX_MD_SIZE> digest { };
     unsigned                                   length = 0;
     ASSERT_EQ(EVP_Digest(original.data(), original.size(), digest.data(), &length, EVP_sha256(), nullptr), 1);
     auto hex = oxbox::utilities::ToHex(std::as_bytes(std::span(digest).first(length)));

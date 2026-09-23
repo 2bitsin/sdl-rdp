@@ -27,24 +27,24 @@ struct Slot {
 // FreeRDP 3.15 Drive* uses 32-bit offsets and a private reader; this peer owns both directions.
 class DriveChannel : public std::enable_shared_from_this<DriveChannel> {
 public:
-  DriveChannel(DriveChannel const&) = delete;
-  DriveChannel(DriveChannel&&)      = delete;
-  explicit DriveChannel(Peer& /*value*/);
-  ~DriveChannel();
+                DriveChannel(DriveChannel const&) = delete;
+                DriveChannel(DriveChannel&&) = delete;
+  explicit      DriveChannel(Peer& /*value*/);
+                ~DriveChannel();
   DriveChannel& operator =(DriveChannel const&) = delete;
   DriveChannel& operator =(DriveChannel&&) = delete;
   bool          Open();
   bool          Pump(std::span<HANDLE const> signaled);
   HANDLE Event() const { return event; }
-  void     Disconnect();
-  void     Abort(std::string const& /*cause*/);
-  int      List(sdlrdp_drive* /*out*/, unsigned /*max*/);
-  unsigned Device(unsigned id);
+  void                          Disconnect();
+  void                          Abort(std::string const& /*cause*/);
+  int                           List(sdlrdp_drive* /*out*/, unsigned /*max*/);
+  unsigned                      Device(unsigned id);
   std::shared_ptr<DriveRequest> Send(unsigned drive, unsigned file, unsigned major, DrivePacket const& body,
                                      unsigned minor = 0);
   DrivePacket Wait(std::shared_ptr<DriveRequest> const& /*request*/, std::string const& path, bool end = false);
-  size_t      WaitAny(std::span<Slot const> /*slots*/);
-  void        Warn(std::string const& /*cause*/) const;
+  size_t                        WaitAny(std::span<Slot const> /*slots*/);
+  void                          Warn(std::string const& /*cause*/) const;
 
 private:
   struct DeviceEntry {
@@ -81,10 +81,10 @@ private:
 struct sdlrdp_file {
 public:
   sdlrdp_file(sdlrdp_file const&) = delete;
-  sdlrdp_file(sdlrdp_file&&)      = delete;
+  sdlrdp_file(sdlrdp_file&&) = delete;
   sdlrdp_file(std::shared_ptr<Backend::DriveChannel> source, unsigned device, unsigned file, std::string name)
       : channel{ std::move(source) }, drive{ device }, wire{ file }, path{ std::move(name) } { }
-  ~sdlrdp_file();
+               ~sdlrdp_file();
   sdlrdp_file& operator =(sdlrdp_file const&) = delete;
   sdlrdp_file& operator =(sdlrdp_file&&) = delete;
   void         Close();

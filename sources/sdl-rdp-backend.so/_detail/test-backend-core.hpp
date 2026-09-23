@@ -57,7 +57,7 @@ using utilities::Expects;
 struct CertificateDirectory {
 public:
   CertificateDirectory(CertificateDirectory const&) = delete;
-  CertificateDirectory(CertificateDirectory&&)      = delete;
+  CertificateDirectory(CertificateDirectory&&) = delete;
   CertificateDirectory() {
     std::array<char, 40> pattern{ };
     std::ranges::copy(std::string("/tmp/sdlrdp-gate-XXXXXX"), pattern.begin());
@@ -97,8 +97,8 @@ using Headless::Logs;
 struct Socket {
 public:
   Socket(Socket const&) = delete;
-  Socket(Socket&&)      = delete;
-  Socket()              = default;
+  Socket(Socket&&) = delete;
+  Socket() = default;
   ~Socket() {
     if (descriptor >= 0) close(descriptor);
   }
@@ -133,7 +133,7 @@ inline bool HasCookie(Client const& client) {
 class FrameCounter {
 public:
   FrameCounter(FrameCounter const&) = delete;
-  FrameCounter(FrameCounter&&)      = delete;
+  FrameCounter(FrameCounter&&) = delete;
   explicit FrameCounter(Client& client)
       : update(client.Instance()->context->update), surface(update->SurfaceBits), bitmap(update->BitmapUpdate) {
     Expects(!active, "no observer is already installed");
@@ -189,7 +189,7 @@ protected:
     return backend->state->current && backend->state->current->acknowledged >= backend->state->presented;
   }
   std::vector<sdlrdp_event> Events() const {
-    std::array<sdlrdp_event, 256> batch{ };
+    std::array<sdlrdp_event, 256> batch { };
     auto                          count = sdlrdp_poll(backend.get(), batch.data(), batch.size());
     return { batch.begin(), batch.begin() + count };
   }

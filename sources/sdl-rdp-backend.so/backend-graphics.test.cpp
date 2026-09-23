@@ -132,7 +132,7 @@ TEST_P(GraphicsGate, AcknowledgementPacingAndSuspend) {
   if (::testing::Test::HasFatalFailure()) return;
   auto&             client   = *graphics_client;
   auto&             observer = *graphics_observer;
-  sdlrdp_rect const full    { 0, 0, 320, 200 };
+  sdlrdp_rect const full     { 0, 0, 320, 200 };
   FillGraphicsWindow(client, observer, full);
   if (::testing::Test::HasFatalFailure()) return;
   ThenFullGraphicsWindow(observer, full);
@@ -210,7 +210,7 @@ TEST_F(RoundFive, ProgressiveDamageAndQoe) {
   Present(pixels, 640, 480);
   ASSERT_TRUE(client.Until([&] { return Acknowledged(); }));
   auto              before = client.Received();
-  sdlrdp_rect const damage{ 17, 19, 7, 5 };
+  sdlrdp_rect const damage { 17, 19, 7, 5 };
   std::ranges::for_each(std::views::iota(damage.y, damage.y + damage.h), [&](int y) {
     std::ranges::fill(std::span(pixels).subspan((y * 640) + damage.x, damage.w), 0x00ff0000u);
   });

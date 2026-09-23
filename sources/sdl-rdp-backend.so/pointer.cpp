@@ -6,7 +6,7 @@
 
 namespace Backend {
 void State::SetPointer(unsigned w, unsigned h, unsigned x, unsigned y, void const* pixels) {
-  Pointer next  { .width = w, .height = h, .hot_x = x, .hot_y = y };
+  Pointer next   { .width = w, .height = h, .hot_x = x, .hot_y = y };
   auto    stride = ((w + 15) / 16) * 2;
   next.mask.resize(static_cast<std::size_t>(stride) * h);
   next.pixels.resize(static_cast<std::size_t>(w * h) * 4);

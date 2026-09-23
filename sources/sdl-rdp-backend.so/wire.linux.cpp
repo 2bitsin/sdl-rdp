@@ -9,7 +9,7 @@
 namespace Backend {
 WireSample SampleWire(int descriptor) {
   utilities::Expects(descriptor >= 0, "peer socket is open");
-  tcp_info  info  { };
+  tcp_info  info   { };
   socklen_t length = sizeof(info);
   int       outq   = 0;
   if (getsockopt(descriptor, IPPROTO_TCP, TCP_INFO, &info, &length) != 0 || ioctl(descriptor, SIOCOUTQ, &outq) != 0)

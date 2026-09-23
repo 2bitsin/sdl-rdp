@@ -49,8 +49,8 @@ std::string GfxChannel::AvcFailure() {
 bool GfxChannel::CompressProgressive(REGION16& damage, std::chrono::steady_clock::time_point start) {
   BYTE*  data    = nullptr;
   UINT32 size    = 0;
-  auto   picture{ Picture()               };
-  auto   stride { Avc::Aligned(width) * 4 };
+  auto   picture { Picture()               };
+  auto   stride  { Avc::Aligned(width) * 4 };
   auto result = progressive_compress(progressive.get(), picture.data(), picture.size(), PIXEL_FORMAT_BGRX32, width,
                                      height, stride, &damage, &data, &size);
   peer.encoder.encode_time += Peer::Clock::now() - start;
@@ -60,7 +60,7 @@ bool GfxChannel::CompressProgressive(REGION16& damage, std::chrono::steady_clock
 bool GfxChannel::ProgressiveDamage(REGION16& damage) {
   for (auto rect : peer.sending.Rects()) {
     auto               area = ScaleDamage(rect, peer);
-    RECTANGLE_16 const wire{ UINT16(area.x), UINT16(area.y), UINT16(area.x + area.w), UINT16(area.y + area.h) };
+    RECTANGLE_16 const wire { UINT16(area.x), UINT16(area.y), UINT16(area.x + area.w), UINT16(area.y + area.h) };
     if (!region16_union_rect(&damage, &damage, &wire)) {
       return false;
     }

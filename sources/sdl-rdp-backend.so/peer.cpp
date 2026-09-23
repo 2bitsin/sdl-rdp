@@ -80,7 +80,7 @@ bool SendCookie(rdpContext* context) {
 }
 namespace {
 bool InstallCredentials(rdpSettings* settings, std::string const& key_path, std::string const& certificate_path) {
-  std::unique_ptr<rdpPrivateKey, Releases<freerdp_key_free>> key(freerdp_key_new_from_file(key_path.c_str()));
+  std::unique_ptr<rdpPrivateKey, Releases<freerdp_key_free>>          key(freerdp_key_new_from_file(key_path.c_str()));
   std::unique_ptr<rdpCertificate, Releases<freerdp_certificate_free>> cert(
       freerdp_certificate_new_from_file(certificate_path.c_str()));
   if (!key || !cert) return false;
@@ -132,7 +132,7 @@ BOOL Peer::TakeControl() {
   event.connected.screen_width       = screen_width;
   event.connected.screen_height      = screen_height;
   ack_enabled = freerdp_settings_get_uint32(client->context->settings, FreeRDP_FrameAcknowledge) != 0;
-  desktop     = { .x = 0, .y = 0, .w = int(event.connected.width), .h = int(event.connected.height) };
+  desktop = { .x = 0, .y = 0, .w = int(event.connected.width), .h = int(event.connected.height) };
   owner.Takeover(*this, event);
   owner.trace.Line("connect", [&] { return std::format("client={}", event.connected.client_name); });
   return TRUE;
@@ -232,7 +232,7 @@ bool Peer::PollStep(std::stop_token const& quit, std::span<HANDLE> handles) {
   if (!count) return false;
   auto result = WaitForMultipleObjects(count, handles.data(), FALSE, timeout);
   if (result == WAIT_FAILED || quit.stop_requested()) return false;
-  std::array<HANDLE, MAXIMUM_WAIT_OBJECTS> signalled{ };
+  std::array<HANDLE, MAXIMUM_WAIT_OBJECTS> signalled { };
   HANDLE*                                  end       = nullptr;
   try {
     end = std::ranges::copy_if(handles.first(count), signalled.begin(), Signalled).out;

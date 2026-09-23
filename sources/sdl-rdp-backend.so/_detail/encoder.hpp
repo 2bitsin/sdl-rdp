@@ -35,7 +35,7 @@ private:
   unsigned                                                                             rfx_height    = 0;
   bool                                                                                 skip_alpha    = false;
   bool                                                                                 dynamic_color = false;
-  std::chrono::nanoseconds                                                             encode_time  { };
+  std::chrono::nanoseconds                                                             encode_time   { };
   std::span<BYTE>                                                                      payload;
   std::unique_ptr<BITMAP_PLANAR_CONTEXT, Releases<freerdp_bitmap_planar_context_free>> planar;
   std::unique_ptr<BITMAP_PLANAR_CONTEXT, Releases<freerdp_bitmap_planar_context_free>> plain;

@@ -56,7 +56,7 @@ TEST(CopyRows, PaddedRows) {
 }
 TEST(Errors, WidthAndBind) {
   CertificateDirectory const certificates;
-  sdlrdp_config              config      { "192.0.2.1", 0, certificates.Path().c_str(), 0, 200, 0 };
+  sdlrdp_config              config       { "192.0.2.1", 0, certificates.Path().c_str(), 0, 200, 0 };
   sdlrdp_handle*             handle       = nullptr;
   ASSERT_EQ(sdlrdp_open(&config, &handle), -1);
   EXPECT_EQ(handle, nullptr);
@@ -73,7 +73,7 @@ void MeasureFullFrame(sdlrdp_handle* handle, Client& client, std::vector<UINT32>
   FrameCounter counter(client);
   auto              bytes   = client.Received();
   auto              started = Clock::now();
-  sdlrdp_rect const area   { 0, 0, 1024, 768 };
+  sdlrdp_rect const area    { 0, 0, 1024, 768 };
   ASSERT_EQ(sdlrdp_present(handle, pixels.data(), 4096, 1024, 768, &area, 1), 0);
   ASSERT_TRUE(client.Until([&] { return counter.Frames() == 1; }));
   auto elapsed = std::chrono::duration<double, std::milli>(Clock::now() - started).count();
@@ -104,7 +104,7 @@ void CompressSignedDelta(BITMAP_PLANAR_CONTEXT* encoder, std::vector<UINT32>& pi
   ASSERT_NE(compressed.front() & PLANAR_FORMAT_HEADER_RLE, 0);
 }
 void ThenCertificate(std::string const& first, std::filesystem::path const& data) {
-  std::unique_ptr<BIO, Backend::Releases<BIO_free>> const bio(BIO_new_mem_buf(first.data(), int(first.size())));
+  std::unique_ptr<BIO, Backend::Releases<BIO_free>> const   bio(BIO_new_mem_buf(first.data(), int(first.size())));
   std::unique_ptr<X509, Backend::Releases<X509_free>> const cert(
       PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
   ASSERT_TRUE(cert);
@@ -152,7 +152,7 @@ TEST(Logging, ListenerCallback) {
   CertificateDirectory const certificates;
   Logs                       logs;
   ASSERT_EQ(setenv("WLOG_LEVEL", "INFO", 1), 0);
-  sdlrdp_config const config{ "127.0.0.1", 0, certificates.Path().c_str(), 320, 200, 0, Logs::Collect, &logs };
+  sdlrdp_config const config { "127.0.0.1", 0, certificates.Path().c_str(), 320, 200, 0, Logs::Collect, &logs };
   sdlrdp_handle*      raw    = nullptr;
   ASSERT_EQ(sdlrdp_open(&config, &raw), 0);
   std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> const backend(raw, sdlrdp_close);
@@ -187,7 +187,7 @@ TEST(Logging, NoFreerdpStdout) {
     RunLogChild(pipefd);
   }
   close(pipefd[1]);
-  Headless::Descriptor const input { pipefd[0] };
+  Headless::Descriptor const input  { pipefd[0] };
   auto                       output = Headless::ReadText(input.Get());
   ThenLoggingChild(child, output);
 }
@@ -195,7 +195,7 @@ TEST(Logging, NoFreerdpStdout) {
 struct ProcessEnvironment {
 public:
   ProcessEnvironment(ProcessEnvironment const&) = delete;
-  ProcessEnvironment(ProcessEnvironment&&)      = delete;
+  ProcessEnvironment(ProcessEnvironment&&) = delete;
   ProcessEnvironment() {
     if (auto* value = getenv("XDG_DATA_HOME")) data = value;
   }
@@ -222,7 +222,7 @@ TEST(Certificate, StableDefaultAndPermissions) {
   for (auto const& directory : { temporary.Path() / "one", temporary.Path() / "two" }) {
     std::filesystem::create_directory(directory);
     std::filesystem::current_path(directory);
-    sdlrdp_config const config{ "127.0.0.1", 0, nullptr, 320, 200, 0 };
+    sdlrdp_config const config { "127.0.0.1", 0, nullptr, 320, 200, 0 };
     sdlrdp_handle*      handle = nullptr;
     ASSERT_EQ(sdlrdp_open(&config, &handle), 0);
     sdlrdp_close(handle);
@@ -244,8 +244,8 @@ TEST(Planar, Noisy640Rows) {
   std::vector<BYTE> payload((640 * 4) + 1024);
   std::unique_ptr<BITMAP_PLANAR_CONTEXT, Backend::Releases<freerdp_bitmap_planar_context_free>> const decoder(
       freerdp_bitmap_planar_context_new(0, 640, 1));
-  std::vector<UINT32> pixels(640);
-  std::vector<UINT32> decoded(640);
+  std::vector<UINT32>                                                                                 pixels(640);
+  std::vector<UINT32>                                                                                 decoded(640);
   for (unsigned y = 0; y < 480; ++y) {
     std::ranges::generate(pixels, [i = y * 640]() mutable { return (i++ * 2654435761u) & 0xffffff; });
     UINT32 size = payload.size();

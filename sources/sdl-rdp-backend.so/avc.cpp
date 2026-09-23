@@ -93,7 +93,7 @@ private:
   friend class                Encoder;
   CudaFunctions*              cuda    = nullptr;
   NvencFunctions*             loader  = nullptr;
-  NV_ENCODE_API_FUNCTION_LIST api    { };
+  NV_ENCODE_API_FUNCTION_LIST api     { };
   CUdevice                    device  = 0;
   CUcontext                   context = nullptr;
   void*                       session = nullptr;
@@ -241,7 +241,7 @@ bool Encoder::Impl::Fill(std::span<BYTE const> bgrx, unsigned stride, Encoder& t
   Expects(input != nullptr, "encoder input buffer exists");
   using Clock = std::chrono::steady_clock;
   auto                     start = Clock::now();
-  NV_ENC_LOCK_INPUT_BUFFER lock { };
+  NV_ENC_LOCK_INPUT_BUFFER lock  { };
   lock.version     = NV_ENC_LOCK_INPUT_BUFFER_VER;
   lock.inputBuffer = input;
   if (!Check(api.nvEncLockInputBuffer(session, &lock), "lock input")) return false;
@@ -304,7 +304,7 @@ bool Encoder::Impl::MinimumSize() {
   caps.capsToQuery = NV_ENC_CAPS_WIDTH_MIN;
   bool ok = Check(api.nvEncGetEncodeCaps(session, NV_ENC_CODEC_H264_GUID, &caps, &min_width), "minimum width");
   caps.capsToQuery = NV_ENC_CAPS_HEIGHT_MIN;
-  ok    = Check(api.nvEncGetEncodeCaps(session, NV_ENC_CODEC_H264_GUID, &caps, &min_height), "minimum height") && ok;
+  ok = Check(api.nvEncGetEncodeCaps(session, NV_ENC_CODEC_H264_GUID, &caps, &min_height), "minimum height") && ok;
   small            = ok && (std::cmp_less(w, min_width) || std::cmp_less(h, min_height));
   if (small) error = "surface below NVENC minimum picture size";
   return ok;

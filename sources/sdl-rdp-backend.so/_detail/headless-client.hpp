@@ -86,7 +86,7 @@ inline void DisconnectGraphicsDecoder(void* raw, ChannelDisconnectedEventArgs co
   gdi_graphics_pipeline_uninit(context->gdi, static_cast<RdpgfxClientContext*>(event->pInterface));
 }
 inline BOOL LoadGraphicsChannel(freerdp* instance) {
-  std::array<char const*, 1> channel { "rdpgfx" };
+  std::array<char const*, 1> channel  { "rdpgfx" };
   auto*                      settings = instance->context->settings;
   auto entry     = reinterpret_cast<PVIRTUALCHANNELENTRYEX>(freerdp_load_channel_addin_entry(
       "drdynvc", nullptr, nullptr, FREERDP_ADDIN_CHANNEL_STATIC | FREERDP_ADDIN_CHANNEL_ENTRYEX));
@@ -130,7 +130,7 @@ public:
             "client credentials configured");
   }
   bool Pump(unsigned timeout = 10) const {
-    std::array<HANDLE, 64> handles{ };
+    std::array<HANDLE, 64> handles { };
     auto                   count   = freerdp_get_event_handles(instance->context, handles.data(), handles.size());
     return count && WaitForMultipleObjects(count, handles.data(), FALSE, timeout) != WAIT_FAILED &&
            freerdp_check_event_handles(instance->context);
@@ -181,13 +181,13 @@ public:
   void Tolerance(unsigned value) { tolerance = value; }
 
 private:
-  std::unique_ptr<freerdp, ReleaseClient> instance { freerdp_new() };
+  std::unique_ptr<freerdp, ReleaseClient> instance  { freerdp_new() };
   unsigned                                tolerance = 0;
 };
 struct FrameObserver {
 public:
   FrameObserver(FrameObserver const&) = delete;
-  FrameObserver(FrameObserver&&)      = delete;
+  FrameObserver(FrameObserver&&) = delete;
   explicit FrameObserver(Client& client)
       : update(client.Instance()->context->update), original(update->SurfaceFrameMarker) {
     Expects(!active, "one frame observer per thread");
@@ -237,7 +237,7 @@ private:
 };
 struct DisplayCapture {
   bool                      echo_resize        = false;
-  std::chrono::milliseconds finalization_delay{ };
+  std::chrono::milliseconds finalization_delay { };
   std::function<void()> finalizing;
   unsigned desktops = 0;
   unsigned echoes   = 0;
@@ -245,7 +245,7 @@ struct DisplayCapture {
 struct DisplayClient {
 public:
   DisplayClient(DisplayClient const&) = delete;
-  DisplayClient(DisplayClient&&)      = delete;
+  DisplayClient(DisplayClient&&) = delete;
   explicit DisplayClient(Client& client)
       : client(client), desktop_resize(client.Instance()->context->update->DesktopResize) {
     Expects(!active, "one display observer per thread");
@@ -261,7 +261,7 @@ public:
             "display control enabled");
     PubSub_SubscribeChannelConnected(context->pubSub, Connected);
     client.Instance()->LoadChannels = [](freerdp* instance) -> BOOL {
-      std::array<char const*, 1> channel { "disp" };
+      std::array<char const*, 1> channel  { "disp" };
       auto*                      settings = instance->context->settings;
       auto entry     = reinterpret_cast<PVIRTUALCHANNELENTRYEX>(freerdp_load_channel_addin_entry(
           "drdynvc", nullptr, nullptr, FREERDP_ADDIN_CHANNEL_STATIC | FREERDP_ADDIN_CHANNEL_ENTRYEX));

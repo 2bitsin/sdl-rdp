@@ -6,7 +6,7 @@
 namespace BackendGate {
 using Headless::SoundClient;
 inline int WriteRealtimeAudio(sdlrdp_handle* backend) {
-  std::array<INT16, 480uz * 2> pcm    { };
+  std::array<INT16, 480uz * 2> pcm     { };
   auto                         start   = Clock::now();
   int                          written = 0;
   for (unsigned tick = 1; tick <= 200; ++tick) {

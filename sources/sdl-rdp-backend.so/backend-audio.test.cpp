@@ -110,7 +110,7 @@ UINT ObserveProgressivePayload(RdpgfxClientContext* channel, RDPGFX_SURFACE_COMM
 }
 unsigned ProduceProgressiveFrames(sdlrdp_handle* backend) {
   std::vector<UINT32> pixels(1280uz * 800);
-  sdlrdp_rect const full     { 0, 0, 1280, 800 };
+  sdlrdp_rect const full      { 0, 0, 1280, 800 };
   auto              deadline  = Clock::now() + std::chrono::seconds(2);
   unsigned          presented = 0;
   while (Clock::now() < deadline) {

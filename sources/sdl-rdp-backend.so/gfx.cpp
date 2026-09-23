@@ -92,7 +92,7 @@ bool GfxChannel::ResetSurface() {
   if (width && !Check(context->DeleteSurface(context.get(), &remove), "delete surface")) return false;
   constexpr UINT32 PrimaryMonitor = 1;
   constexpr UINT32 MonitorCount   = 1;
-  MONITOR_DEF      monitor       { 0, 0, peer.desktop.w - 1, peer.desktop.h - 1, PrimaryMonitor };
+  MONITOR_DEF      monitor        { 0, 0, peer.desktop.w - 1, peer.desktop.h - 1, PrimaryMonitor };
   RDPGFX_RESET_GRAPHICS_PDU const reset{ unsigned(peer.desktop.w), unsigned(peer.desktop.h), MonitorCount, &monitor };
   RDPGFX_CREATE_SURFACE_PDU const create{ GraphicsSurfaceId, UINT16(peer.desktop.w), UINT16(peer.desktop.h),
                                           GFX_PIXEL_FORMAT_XRGB_8888 };

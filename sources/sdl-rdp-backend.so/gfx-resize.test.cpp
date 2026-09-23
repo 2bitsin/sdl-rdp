@@ -239,8 +239,8 @@ TEST_F(GraphicsCost, PlanarPartialMatchesFull) {
   if (::testing::Test::HasFatalFailure()) return;
   std::vector<UINT32> pixels(354uz * 226);
   Headless::MovingTilePattern(pixels, 354, 226, 0);
-  sdlrdp_rect const full    { 0, 0, 354, 226   };
-  sdlrdp_rect const part    { 17, 19, 177, 113 };
+  sdlrdp_rect const full     { 0, 0, 354, 226   };
+  sdlrdp_rect const part     { 17, 19, 177, 113 };
   auto              expected = pixels;
   PresentPlanar(backend.get(), client, observer, pixels, expected, full);
   ApplyPlanarDamage(pixels, expected, part);
