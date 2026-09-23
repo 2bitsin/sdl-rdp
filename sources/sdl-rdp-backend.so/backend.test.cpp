@@ -838,6 +838,39 @@ TEST_F(RoundFive, ResizeDesktop) {
   ASSERT_TRUE(client.Until([&] { return client.instance->context->gdi->width == 800 && client.Matches(pixels); })) << logs.Text();
   EXPECT_EQ(client.instance->context->gdi->height, 600);
 }
+TEST_F(RoundFive, PictureSizeReactivatesDesktop) {
+  for (bool graphics : {false, true}) {
+    Open();
+    Client client(sdlrdp_port(backend.get()), true, 640, 480);
+    if (graphics) client.EnableGraphics();
+    Headless::GraphicsObserver observer(client);
+    Connect(client, false);
+    std::vector<UINT32> pixels(640 * 480, 0x123456);
+    Present(pixels, 640, 480);
+    ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text(true);
+    for (auto [w, h] : {std::pair{320u, 200u}, std::pair{640u, 480u}}) {
+      auto desktops = observer.desktops.size(), resets = observer.resets.size(), frames = observer.frames.size();
+      pixels.assign(w * h, 0x654321);
+      Present(pixels, w, h);
+      ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text(true);
+      ASSERT_GT(observer.desktops.size(), desktops);
+      EXPECT_EQ(observer.desktops.back(), (std::pair{w, h}));
+      EXPECT_EQ(client.instance->context->gdi->width, int(w));
+      EXPECT_EQ(client.instance->context->gdi->height, int(h));
+      if (!graphics) continue;
+      ASSERT_EQ(observer.resets.size(), resets + 1);
+      auto const& reset = observer.resets.back();
+      EXPECT_EQ(reset.width, w); EXPECT_EQ(reset.height, h);
+      EXPECT_EQ(reset.desktops, desktops + 1);
+      EXPECT_EQ(reset.frames, frames);
+      ASSERT_EQ(reset.monitors.size(), 1u);
+      EXPECT_EQ(reset.monitors[0].left, 0); EXPECT_EQ(reset.monitors[0].top, 0);
+      EXPECT_EQ(reset.monitors[0].right, int(w) - 1); EXPECT_EQ(reset.monitors[0].bottom, int(h) - 1);
+      EXPECT_EQ(reset.monitors[0].flags, 1u);
+      EXPECT_EQ(observer.frames.size(), frames + 1);
+    }
+  }
+}
 TEST_F(RoundFive, ProducerDoesNotStarveOrTear) {
   Open(1024, 768);
   Client client(sdlrdp_port(backend.get()), true, 1024, 768);

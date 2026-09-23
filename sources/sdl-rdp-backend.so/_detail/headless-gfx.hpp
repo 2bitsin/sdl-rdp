@@ -10,20 +10,32 @@ class GraphicsObserver {
   pcRdpgfxSurfaceCommand surface = nullptr;
   pcRdpgfxCreateSurface create = nullptr;
   pcRdpgfxDeleteSurface remove = nullptr;
+  pcRdpgfxResetGraphics reset = nullptr;
+  pDesktopResize desktop_resize = nullptr;
 public:
   RdpgfxClientContext* channel = nullptr;
   std::vector<RDPGFX_FRAME_ACKNOWLEDGE_PDU> frames;
   bool automatic = true, advertise = true;
   std::vector<RDPGFX_CREATE_SURFACE_PDU> surfaces;
+  struct Reset { UINT32 width, height; std::vector<MONITOR_DEF> monitors; std::size_t desktops, frames; };
+  std::vector<Reset> resets;
+  std::vector<std::pair<UINT32, UINT32>> desktops;
   unsigned deleted = 0, progressive_headers = 0, commands = 0;
   explicit GraphicsObserver(Client& target) : client(target) {
     Expects(!active, "one graphics observer per thread");
     active = this;
+    desktop_resize = client.instance->context->update->DesktopResize;
+    client.instance->context->update->DesktopResize = [](rdpContext* context) -> BOOL {
+      active->desktops.emplace_back(freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopWidth),
+        freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopHeight));
+      return active->desktop_resize(context);
+    };
     PubSub_SubscribeChannelConnected(client.instance->context->pubSub, Connected);
   }
   ~GraphicsObserver() {
     freerdp_disconnect(client.instance.get());
     PubSub_UnsubscribeChannelConnected(client.instance->context->pubSub, Connected);
+    client.instance->context->update->DesktopResize = desktop_resize;
     active = nullptr;
   }
   static void Connected(void*, ChannelConnectedEventArgs const* event) {
@@ -46,7 +58,18 @@ public:
           && command->data[0] == 0xc0 && command->data[1] == 0xcc) ++active->progressive_headers;
       return active->surface(channel, command);
     };
+    active->ObserveResets();
     active->ObserveFrames();
+  }
+  void ObserveResets() {
+    Expects(channel != nullptr, "graphics channel connected");
+    reset = channel->ResetGraphics;
+    channel->ResetGraphics = [](RdpgfxClientContext* channel, RDPGFX_RESET_GRAPHICS_PDU const* reset) -> UINT {
+      active->resets.push_back({reset->width, reset->height,
+        {reset->monitorDefArray, reset->monitorDefArray + reset->monitorCount},
+        active->desktops.size(), active->frames.size()});
+      return active->reset(channel, reset);
+    };
   }
   void ObserveFrames() {
     original = channel->FrameAcknowledge;
