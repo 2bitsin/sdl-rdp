@@ -10,11 +10,29 @@
 
 static const SDL_TouchID SDL_RDP_TOUCH_ID = 1;
 
-static void SDL_RDP_CurrentMode(SDL_VideoData *data, const SDL_DisplayMode *mode)
+static void SDL_RDP_CopyRefresh(SDL_DisplayMode *target, const SDL_DisplayMode *source)
 {
-    data->mode_index ^= 1;
-    data->modes[data->mode_index] = *mode;
-    SDL_SetCurrentDisplayMode(SDL_GetVideoDisplay(data->display), &data->modes[data->mode_index]);
+    SDL_assert(target && source);
+    target->refresh_rate = source->refresh_rate;
+    target->refresh_rate_numerator = source->refresh_rate_numerator;
+    target->refresh_rate_denominator = source->refresh_rate_denominator;
+}
+
+static void SDL_RDP_ScreenMode(SDL_VideoData *data, const SDL_DisplayMode *mode)
+{
+    SDL_VideoDisplay *display = SDL_GetVideoDisplay(data->display);
+    SDL_DisplayMode requested = data->window->requested_fullscreen_mode;
+    bool exclusive = display->fullscreen_active;
+    // SDL_SetDesktopDisplayMode rejects the update while fullscreen_active.
+    display->fullscreen_active = false;
+    SDL_SetDesktopDisplayMode(display, mode);
+    display->fullscreen_active = exclusive;
+    SDL_ResetFullscreenDisplayModes(display);
+    if (requested.w) {
+        SDL_RDP_CopyRefresh(&requested, mode);
+        bool accepted = SDL_SetWindowFullscreenMode(data->window, &requested);
+        SDL_assert_always(accepted);
+    }
 }
 
 static void SDL_RDP_Resize(SDL_VideoData *data, unsigned width, unsigned height)
@@ -25,34 +43,43 @@ static void SDL_RDP_Resize(SDL_VideoData *data, unsigned width, unsigned height)
         return;
     }
     if (mode.w != (int)width || mode.h != (int)height) {
-        mode.refresh_rate = display->current_mode->refresh_rate;
-        mode.refresh_rate_numerator = display->current_mode->refresh_rate_numerator;
-        mode.refresh_rate_denominator = display->current_mode->refresh_rate_denominator;
+        SDL_RDP_CopyRefresh(&mode, display->current_mode);
         mode.w = (int)width;
         mode.h = (int)height;
-        SDL_SetDesktopDisplayMode(display, &mode);
-        SDL_RDP_CurrentMode(data, &mode);
+        SDL_RDP_ScreenMode(data, &mode);
     }
-    if (data->window->flags & SDL_WINDOW_FULLSCREEN) {
-        SDL_RDP_ApplyWindowSize(data, width, height);
+    if ((data->window->flags & SDL_WINDOW_FULLSCREEN) && !data->window->requested_fullscreen_mode.w) {
+        if (SDL_RDP_ResizePicture(data, width, height)) {
+            SDL_SendWindowEvent(data->window, SDL_EVENT_WINDOW_RESIZED, width, height);
+        }
     }
 }
 
 static void SDL_RDP_Refresh(SDL_VideoData *data, unsigned millihertz)
 {
     SDL_VideoDisplay *display = SDL_GetVideoDisplay(data->display);
-    SDL_DisplayMode mode = *display->current_mode;
-    mode.refresh_rate = millihertz / 1000.0f;
-    mode.refresh_rate_numerator = millihertz;
-    mode.refresh_rate_denominator = 1000;
-    SDL_RDP_CurrentMode(data, &mode);
+    // Preserve the old record until SDL has compared it with the new one.
+    SDL_DisplayMode *mode = display->current_mode == &data->refresh_modes[0] ?
+        &data->refresh_modes[1] : &data->refresh_modes[0];
+    *mode = *display->current_mode;
+    mode->refresh_rate = millihertz / 1000.0f;
+    mode->refresh_rate_numerator = millihertz;
+    mode->refresh_rate_denominator = 1000;
+    SDL_SetCurrentDisplayMode(display, mode);
 }
 
 static void SDL_RDP_Connected(SDL_VideoData *data, const sdlrdp_event *event)
 {
     SDL_Window *window = data->window;
+    SDL_VideoDisplay *display = SDL_GetVideoDisplay(data->display);
+    SDL_DisplayMode mode = display->desktop_mode;
+    mode.w = (int)event->connected.screen_width;
+    mode.h = (int)event->connected.screen_height;
+    mode.refresh_rate = event->connected.refresh_millihertz / 1000.0f;
+    mode.refresh_rate_numerator = event->connected.refresh_millihertz;
+    mode.refresh_rate_denominator = 1000;
+    SDL_RDP_ScreenMode(data, &mode);
     SDL_RDP_Resize(data, event->connected.screen_width, event->connected.screen_height);
-    SDL_RDP_Refresh(data, event->connected.refresh_millihertz);
     SDL_SetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING,
                           event->connected.client_name);
     SDL_SetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_CODEC_STRING,

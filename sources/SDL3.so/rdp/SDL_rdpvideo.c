@@ -32,6 +32,32 @@ static bool SDL_RDP_InitDisplay(SDL_VideoData *data, const sdlrdp_config *config
         SDL_PROP_DISPLAY_RDP_PORT_NUMBER, data->backend.port(data->handle));
 }
 
+static bool SDL_RDP_GetDisplayModes(SDL_VideoDevice *_this, SDL_VideoDisplay *display)
+{
+    static const int SDL_RDP_EmulatorModes[][2] = {
+        {320, 200}, {320, 240}, {320, 256}, {400, 300}, {512, 384},
+        {640, 350}, {640, 400}, {640, 480}, {720, 400}, {720, 480},
+        {800, 600}, {1024, 768}, {1280, 720}, {1280, 800},
+        {1920, 1080}, {1920, 1200}, {2560, 1440}, {3840, 2160}
+    };
+    SDL_DisplayMode mode = display->desktop_mode;
+    SDL_AddFullscreenDisplayMode(display, &mode);
+    for (unsigned i = 0; i < SDL_arraysize(SDL_RDP_EmulatorModes); ++i) {
+        mode.w = SDL_RDP_EmulatorModes[i][0];
+        mode.h = SDL_RDP_EmulatorModes[i][1];
+        SDL_AddFullscreenDisplayMode(display, &mode);
+    }
+    return true;
+}
+
+static bool SDL_RDP_SetDisplayMode(SDL_VideoDevice *_this, SDL_VideoDisplay *display, SDL_DisplayMode *mode)
+{
+    SDL_VideoData *data = _this->internal;
+    // SDL_SetDisplayModeForDisplay sets current_mode on success before the client reactivates.
+    return (data->window && mode->w == data->window->w && mode->h == data->window->h) ||
+        SDL_RDP_ResizePicture(data, mode->w, mode->h);
+}
+
 static bool SDL_RDP_RelativeMouse(bool enabled)
 {
     SDL_VideoData *data = SDL_GetVideoDevice()->internal;
@@ -77,6 +103,18 @@ static void SDL_RDP_DeleteDevice(SDL_VideoDevice *device)
     SDL_free(device);
 }
 
+static void SDL_RDP_InitWindowCallbacks(SDL_VideoDevice *device)
+{
+    device->CreateSDLWindow = SDL_RDP_CreateWindow;
+    device->DestroyWindow = SDL_RDP_DestroyWindow;
+    device->SetWindowFullscreen = SDL_RDP_SetWindowFullscreen;
+    device->SetWindowSize = SDL_RDP_SetWindowSize;
+    device->ShowWindow = SDL_RDP_ShowWindow;
+    device->CreateWindowFramebuffer = SDL_RDP_CreateWindowFramebuffer;
+    device->UpdateWindowFramebuffer = SDL_RDP_UpdateWindowFramebuffer;
+    device->DestroyWindowFramebuffer = SDL_RDP_DestroyWindowFramebuffer;
+}
+
 static SDL_VideoDevice *SDL_RDP_CreateDevice(void)
 {
     SDL_VideoDevice *device;
@@ -96,17 +134,12 @@ static SDL_VideoDevice *SDL_RDP_CreateDevice(void)
     device->is_dummy = true;
     device->VideoInit = SDL_RDP_VideoInit;
     device->VideoQuit = SDL_RDP_VideoQuit;
+    device->GetDisplayModes = SDL_RDP_GetDisplayModes;
+    device->SetDisplayMode = SDL_RDP_SetDisplayMode;
     device->PumpEvents = SDL_RDP_PumpEvents;
     device->WaitEventTimeout = SDL_RDP_WaitEventTimeout;
     device->SendWakeupEvent = SDL_RDP_SendWakeupEvent;
-    device->CreateSDLWindow = SDL_RDP_CreateWindow;
-    device->DestroyWindow = SDL_RDP_DestroyWindow;
-    device->SetWindowFullscreen = SDL_RDP_SetWindowFullscreen;
-    device->SetWindowSize = SDL_RDP_SetWindowSize;
-    device->ShowWindow = SDL_RDP_ShowWindow;
-    device->CreateWindowFramebuffer = SDL_RDP_CreateWindowFramebuffer;
-    device->UpdateWindowFramebuffer = SDL_RDP_UpdateWindowFramebuffer;
-    device->DestroyWindowFramebuffer = SDL_RDP_DestroyWindowFramebuffer;
+    SDL_RDP_InitWindowCallbacks(device);
     SDL_RDP_InitClipboard(device);
     device->free = SDL_RDP_DeleteDevice;
     return device;

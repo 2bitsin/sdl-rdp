@@ -172,6 +172,90 @@ inline testing::AssertionResult Pattern(Client& client, bool pointer) {
     << ") actual=" << std::hex << pixel(*mismatch) << " expected=" << expected(*mismatch);
 }
 
+class FirstFrameSize {
+  inline static thread_local FirstFrameSize* active = nullptr;
+  Client& client;
+  decltype(freerdp::PostConnect) original_connect;
+  pEndPaint original_paint = nullptr;
+  bool paint_installed = false;
+public:
+  bool received = false;
+  int width = 0, height = 0;
+  explicit FirstFrameSize(Client& value) : client(value), original_connect(value.instance->PostConnect) {
+    Expects(!active && original_connect, "one first-frame observer before connection");
+    active = this;
+    client.instance->PostConnect = Connect;
+  }
+  ~FirstFrameSize() {
+    client.instance->PostConnect = original_connect;
+    if (paint_installed) client.instance->context->update->EndPaint = original_paint;
+    active = nullptr;
+  }
+  static BOOL Connect(freerdp* instance) {
+    Expects(active && instance, "first-frame observer and client exist");
+    if (!active->original_connect(instance)) return FALSE;
+    active->original_paint = instance->context->update->EndPaint;
+    instance->context->update->EndPaint = Paint;
+    active->paint_installed = true;
+    return TRUE;
+  }
+  static BOOL Paint(rdpContext* context) {
+    Expects(active && context && context->gdi, "first-frame observer and framebuffer exist");
+    if (!active->received) {
+      active->width = context->gdi->width;
+      active->height = context->gdi->height;
+      active->received = true;
+    }
+    return active->original_paint ? active->original_paint(context) : TRUE;
+  }
+};
+
+class FullDesktopFrames {
+  inline static thread_local FullDesktopFrames* active = nullptr;
+  rdpUpdate* update;
+  pSurfaceBits surface;
+  pBitmapUpdate bitmap;
+  std::vector<bool> rows;
+public:
+  unsigned full = 0, deliveries = 0;
+  explicit FullDesktopFrames(Client& client) : update(client.instance->context->update),
+      surface(update->SurfaceBits), bitmap(update->BitmapUpdate) {
+    Expects(!active && surface && bitmap, "one desktop observer with GDI installed");
+    active = this;
+    update->SurfaceBits = ReceiveSurface;
+    update->BitmapUpdate = ReceiveBitmap;
+  }
+  ~FullDesktopFrames() {
+    update->SurfaceBits = surface;
+    update->BitmapUpdate = bitmap;
+    active = nullptr;
+  }
+  void Observe(rdpContext* context, unsigned left, unsigned top, unsigned right, unsigned bottom) {
+    auto gdi = context->gdi;
+    ++deliveries;
+    rows.resize(gdi->height);
+    if (left || right != unsigned(gdi->width) || top >= bottom || bottom > rows.size()) return;
+    std::fill(rows.begin() + top, rows.begin() + bottom, true);
+    if (std::ranges::all_of(rows, [](bool covered) { return covered; })) {
+      ++full;
+      std::fill(rows.begin(), rows.end(), false);
+    }
+  }
+  static BOOL ReceiveSurface(rdpContext* context, SURFACE_BITS_COMMAND const* command) {
+    Expects(active && command, "desktop observer and surface command exist");
+    auto result = active->surface(context, command);
+    if (result) active->Observe(context, command->destLeft, command->destTop, command->destRight, command->destBottom);
+    return result;
+  }
+  static BOOL ReceiveBitmap(rdpContext* context, BITMAP_UPDATE const* command) {
+    Expects(active && command, "desktop observer and bitmap command exist");
+    auto result = active->bitmap(context, command);
+    if (result) for (auto const& rectangle : std::span(command->rectangles, command->number))
+      active->Observe(context, rectangle.destLeft, rectangle.destTop, rectangle.destRight + 1, rectangle.destBottom + 1);
+    return result;
+  }
+};
+
 class NextFrame {
   inline static thread_local NextFrame* active = nullptr;
   Client& client;
@@ -265,6 +349,32 @@ protected:
     Expects(!expected.empty(), "expected input event supplied");
     bool received = false;
     return client.Until([&] { return received || (received = Read(expected, 1ms)); });
+  }
+  void IncrementalFrames(Client& client, Headless::FrameObserver& frames, FullDesktopFrames& desktop, std::string_view change) {
+    auto baseline = desktop.full;
+    auto before = frames.ids.size();
+    auto deliveries = desktop.deliveries;
+    if (change == "refresh") {
+      ASSERT_GE(frames.ack_times.size(), 2u);
+      ASSERT_TRUE(freerdp_input_send_keyboard_event(client.instance->context->input, KBD_FLAGS_DOWN, 0x1e));
+      ASSERT_TRUE(ReadInput(client, "event KEY_DOWN "));
+      auto interval = frames.ack_times.back() - frames.ack_times[frames.ack_times.size() - 2];
+      std::this_thread::sleep_until(frames.ack_times.back() + interval * 3);
+    }
+    ASSERT_TRUE(frames.Ack());
+    if (change == "refresh") {
+      ASSERT_TRUE(ReadInput(client, "event DISPLAY_CURRENT_MODE_CHANGED "));
+      EXPECT_FALSE(line.contains("numerator=0 "));
+      SDL_Log("trace refresh change: %s", line.c_str());
+    }
+    ASSERT_TRUE(client.Until([&] { return frames.ids.size() >= before + 2; }));
+    EXPECT_EQ(desktop.full, baseline);
+    EXPECT_GT(desktop.deliveries, deliveries);
+    EXPECT_EQ(client.instance->context->gdi->width, 320);
+    EXPECT_EQ(client.instance->context->gdi->height, 200);
+    SDL_Log("trace exclusive %.*s gdi=%dx%d new_full_desktop=%u frames=%zu", int(change.size()), change.data(),
+            client.instance->context->gdi->width, client.instance->context->gdi->height,
+            desktop.full - baseline, frames.ids.size() - before);
   }
   void Exposed() {
     ASSERT_TRUE(Read("event EXPOSED ")) << "EXPOSED missing: " << process->transcript;

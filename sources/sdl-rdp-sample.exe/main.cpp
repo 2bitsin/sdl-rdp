@@ -48,8 +48,9 @@ const char *EventName(Uint32 type)
 
 void PrintGeometry(const SDL_Event &event, SDL_Window *window)
 {
-    if (event.type == SDL_EVENT_WINDOW_EXPOSED || event.type == SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED) {
-        auto mode = SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
+    if (event.type == SDL_EVENT_WINDOW_EXPOSED || event.type == SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED ||
+        event.type == SDL_EVENT_WINDOW_RESIZED) {
+        auto mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
         int w, h;
         Check(SDL_GetWindowSize(window, &w, &h));
         SDL_Log("event GEOMETRY window=%dx%d desktop=%dx%d", w, h, mode->w, mode->h);
@@ -100,9 +101,13 @@ void PrintEvent(const SDL_Event &event, SDL_Window *window, unsigned frame)
     case SDL_EVENT_MOUSE_WHEEL:
         line += std::format(" x={} y={}", event.wheel.x, event.wheel.y);
         break;
-    case SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED:
+    case SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED: line += std::format(" width={} height={}", event.display.data1, event.display.data2); break;
+    case SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED: {
+        auto mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
         line += DisplayTiming();
+        line += std::format(" width={} height={}", mode->w, mode->h);
         break;
+    }
     case SDL_EVENT_WINDOW_EXPOSED:
         line += ClientProperties(window);
         break;
@@ -116,14 +121,15 @@ void PrintEvent(const SDL_Event &event, SDL_Window *window, unsigned frame)
     if (event.type == SDL_EVENT_WINDOW_EXPOSED) PrintAuthentication(window);
 }
 
-void Draw(SDL_Window *window, unsigned frame, const SDL_FPoint &pointer)
+void Draw(SDL_Window *window, unsigned frame, bool full)
 {
     auto surface = SDL_GetWindowSurface(window);
     Check(surface != nullptr);
     Check(SDL_FillSurfaceRect(surface, nullptr, 0x00010101));
     SDL_Rect block{int(frame % unsigned(surface->w)), 40, 32, 32};
     Check(SDL_FillSurfaceRect(surface, &block, 0x0000ff00));
-    Check(SDL_UpdateWindowSurface(window));
+    SDL_Rect damage{0, 40, surface->w, std::min(32, std::max(0, surface->h - 40))};
+    Check(full ? SDL_UpdateWindowSurface(window) : SDL_UpdateWindowSurfaceRects(window, &damage, 1));
 }
 
 void CycleCodec()
@@ -144,10 +150,10 @@ void PrintCodecChange(SDL_Window *window, std::string &previous)
     }
 }
 
-void Run(SDL_Window *window, bool tight, DriveOptions drives)
+void Run(SDL_Window *window, bool tight, bool partial, DriveOptions drives)
 {
     std::string codec;
-    SDL_FPoint pointer{-8, -8};
+    bool full = true;
     unsigned frame = 0;
     Uint64 next = 0;
     for (;;) {
@@ -155,19 +161,23 @@ void Run(SDL_Window *window, bool tight, DriveOptions drives)
         if (SDL_WaitEventTimeout(&event, tight ? 0 : 10)) {
             PrintEvent(event, window, frame);
             InputMode(event, window);
+            if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED || event.type == SDL_EVENT_WINDOW_EXPOSED) full = true;
+            if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F4)
+                Check(SDL_SetWindowFullscreen(window, !(SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN)));
             if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F1)
                 CycleCodec();
             if (event.type == SDL_EVENT_QUIT ||
                 (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE)) return;
             if (event.type == SDL_EVENT_MOUSE_MOTION) {
-                pointer = {event.motion.x, event.motion.y};
-                Draw(window, frame, pointer);
+                Draw(window, frame, full || !partial);
+                full = false;
             }
         }
         if (RunDrives(drives)) drives = {};
         PrintCodecChange(window, codec);
         if (SDL_GetTicks() >= next) {
-            Draw(window, frame++, pointer);
+            Draw(window, frame++, full || !partial);
+            full = false;
             next = SDL_GetTicks() + (tight ? 0 : 100);
         }
     }
@@ -205,8 +215,28 @@ struct Options {
     DriveOptions drives;
     const char *clip = nullptr;
     int width = 640, height = 480;
-    bool tight = false, fullscreen = false, tone = false;
+    int mode_width = 0, mode_height = 0;
+    bool tight = false, fullscreen = false, tone = false, partial = false;
 };
+
+void ParseSize(std::string_view size, int &width, int &height)
+{
+    auto first = std::from_chars(size.data(), size.data() + size.size(), width);
+    Check(first.ec == std::errc{} && first.ptr != size.data() + size.size() && *first.ptr == 'x');
+    auto second = std::from_chars(first.ptr + 1, size.data() + size.size(), height);
+    Check(second.ec == std::errc{} && second.ptr == size.data() + size.size() && width > 0 && height > 0);
+}
+
+void Fullscreen(SDL_Window *window, const Options &options)
+{
+    if (options.mode_width) {
+        auto mode = *SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
+        mode.w = options.mode_width;
+        mode.h = options.mode_height;
+        Check(SDL_SetWindowFullscreenMode(window, &mode));
+    }
+    if (options.fullscreen) Check(SDL_SetWindowFullscreen(window, true));
+}
 
 Options ParseOptions(int argc, char **argv)
 {
@@ -220,15 +250,12 @@ Options ParseOptions(int argc, char **argv)
         else if (arg == "--write" && i + 1 < argc) options.drives.write = argv[++i];
         else if (arg == "--tone") options.tone = true;
         else if (arg == "--tight") options.tight = true;
+        else if (arg == "--partial") options.partial = true;
         else if (arg == "--fullscreen") options.fullscreen = true;
         else if (arg == "--aspect" && i + 1 < argc) Check(SDL_SetHint(SDL_HINT_RDP_ASPECT, argv[++i]));
-        else if (arg == "--size" && i + 1 < argc) {
-            std::string_view size(argv[++i]);
-            auto first = std::from_chars(size.data(), size.data() + size.size(), options.width);
-            Check(first.ec == std::errc{} && first.ptr != size.data() + size.size() && *first.ptr == 'x');
-            auto second = std::from_chars(first.ptr + 1, size.data() + size.size(), options.height);
-            Check(second.ec == std::errc{} && second.ptr == size.data() + size.size() && options.width > 0 && options.height > 0);
-        } else { SDL_SetError("Unknown or incomplete option: %s", argv[i]); Check(false); }
+        else if (arg == "--size" && i + 1 < argc) ParseSize(argv[++i], options.width, options.height);
+        else if (arg == "--mode" && i + 1 < argc) ParseSize(argv[++i], options.mode_width, options.mode_height);
+        else { SDL_SetError("Unknown or incomplete option: %s", argv[i]); Check(false); }
     }
     return options;
 }
@@ -266,14 +293,15 @@ int main(int argc, char **argv)
     SDL_Log("port %lld", (long long)SDL_GetNumberProperty(SDL_GetDisplayProperties(display), SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0));
     {
         std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)> window(
-            SDL_CreateWindow("SDL RDP sample", options.width, options.height, options.fullscreen ? SDL_WINDOW_FULLSCREEN : 0), SDL_DestroyWindow);
+            SDL_CreateWindow("SDL RDP sample", options.width, options.height, 0), SDL_DestroyWindow);
         Check(window != nullptr);
+        Fullscreen(window.get(), options);
         std::unique_ptr<SDL_Cursor, decltype(&SDL_DestroyCursor)> cursor(CreateCursor(), SDL_DestroyCursor);
         Check(SDL_StartTextInput(window.get()));
         Uint64 tone_frame = 0;
         std::unique_ptr<SDL_AudioStream, decltype(&SDL_DestroyAudioStream)> tone(
             options.tone ? OpenTone(tone_frame) : nullptr, SDL_DestroyAudioStream);
-        Run(window.get(), options.tight, options.drives);
+        Run(window.get(), options.tight, options.partial, options.drives);
     }
     SDL_Quit();
 }
