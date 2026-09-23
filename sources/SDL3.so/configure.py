@@ -152,10 +152,6 @@ def settings(source, config):
     print('SDL system libraries: ' + ' '.join(dict.fromkeys(libraries)), flush=True)
     bc.emit_bytes("headers.install/share/licenses/SDL3/LICENSE.txt",
                   (source / "LICENSE.txt").read_bytes(), shared=True)
-    bc.emit("headers.install/share/cmake/sdl-rdp/components.cmake",
-            "add_library(sdl-rdp::SDL3 ALIAS sdl-rdp::SDL3.so)\n"
-            "add_library(sdl-rdp::sdl-rdp-backend ALIAS sdl-rdp::sdl-rdp-backend.so)\n",
-            shared=True)
     bc.emit('settings.cmake', '\n'.join(lines) + '\n')
     for header in (source / 'include/SDL3').glob('*.h'):
         bc.emit_bytes('headers.install/include/SDL3/' + header.name,
