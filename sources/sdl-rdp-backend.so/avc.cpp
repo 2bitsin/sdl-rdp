@@ -5,9 +5,8 @@
 // WinPR already supplies the ABI-compatible GUID type.
 #define GUID_DEFINED
 #include <ffnvcodec/dynlink_loader.h>
+#include <ranges>
 #include <freerdp/primitives.h>
-#include <freerdp/codec/color.h>
-#include <cstring>
 #include <format>
 #include <oxbox/utilities/bits.hpp>
 
@@ -24,34 +23,44 @@ IntraRefresh IntraRefreshFor(unsigned fps)
 }
 unsigned Aligned(unsigned dimension)
 {
-  Expects(dimension && dimension <= 32766, "surface dimension fits the graphics protocol");
+  Expects(dimension > 0, "surface dimension is positive");
+  Expects(dimension <= 32766, "surface dimension fits the graphics protocol");
   return oxbox::utilities::AlignUp<16>(dimension);
 }
 unsigned Bitrate(unsigned width, unsigned height, unsigned kbps)
 {
-  Expects(width && height && width <= 32766 && height <= 32766, "nonempty graphics surface");
+  Expects(width > 0, "surface width is positive");
+  Expects(height > 0, "surface height is positive");
+  Expects(width <= 32766, "surface width fits the graphics protocol");
+  Expects(height <= 32766, "surface height fits the graphics protocol");
   Expects(kbps <= UINT32_MAX / 1000, "bitrate fits NVENC");
   auto rate = kbps ? uint64_t(kbps) * 1000 : std::max(uint64_t(2000000), uint64_t(16000000) * width * height / (1920 * 1080));
   return unsigned(std::clamp<uint64_t>(rate, 1, UINT32_MAX));
 }
-void Pad(std::span<BYTE const> pixels, unsigned stride, unsigned width, unsigned height, std::vector<BYTE>& padded)
+void ReplicateEdges(std::span<BYTE> pixels, unsigned width, unsigned height)
 {
-  Expects(width && height && stride >= width * 4 && pixels.size() >= std::size_t(height - 1) * stride + width * 4,
-    "source rows contain the whole BGRX picture");
-  auto w = Aligned(width), h = Aligned(height);
-  padded.resize(std::size_t(w) * h * 4);
-  for (unsigned y = 0; y < h; ++y) {
-    auto src = pixels.data() + std::size_t(std::min(y, height - 1)) * stride;
-    auto dst = padded.data() + std::size_t(y) * w * 4;
-    std::memcpy(dst, src, width * 4);
-    for (unsigned x = width; x < w; ++x) std::memcpy(dst + x * 4, src + (width - 1) * 4, 4);
-  }
-  Ensures(w % 16 == 0 && h % 16 == 0, "encoded picture is macroblock aligned");
+  auto stride = Aligned(width) * 4;
+  Expects(pixels.size() >= std::size_t(stride) * Aligned(height), "picture includes aligned storage");
+  std::ranges::for_each(std::views::iota(0u, height), [&](unsigned row) {
+    auto line = pixels.subspan(std::size_t(row) * stride, stride);
+    auto edge = line.subspan((width - 1) * 4, 4);
+    std::ranges::for_each(line.subspan(width * 4) | std::views::chunk(4), [&](auto pixel) {
+      std::ranges::copy(edge, pixel.begin());
+    });
+  });
+  auto last = pixels.subspan(std::size_t(height - 1) * stride, stride);
+  std::ranges::for_each(std::views::iota(height, Aligned(height)), [&](unsigned row) {
+    std::ranges::copy(last, pixels.subspan(std::size_t(row) * stride, stride).begin());
+  });
 }
 void Regions::Add(sdlrdp_rect area)
 {
-  Expects(area.x >= 0 && area.y >= 0 && area.w > 0 && area.h > 0
-    && area.x + area.w <= 32766 && area.y + area.h <= 32766, "nonempty wire rectangle fits");
+  Expects(area.x >= 0, "region left edge is nonnegative");
+  Expects(area.y >= 0, "region top edge is nonnegative");
+  Expects(area.w > 0, "region width is positive");
+  Expects(area.h > 0, "region height is positive");
+  Expects(area.x + area.w <= 32766, "region right edge fits wire");
+  Expects(area.y + area.h <= 32766, "region bottom edge fits wire");
   if (rects.empty()) bounds = area;
   else {
     auto right = std::max(bounds.x + bounds.w, area.x + area.w);
@@ -74,7 +83,6 @@ struct Encoder::Impl {
   unsigned width = 0, height = 0, w = 0, h = 0;
   bool small = false, first = true;
   std::string error;
-  std::vector<BYTE> encoded, padded;
   bool Check(int status, char const* operation);
   bool Load();
   bool Session();
@@ -99,7 +107,10 @@ bool Encoder::Impl::Load()
 }
 bool Encoder::Impl::Session()
 {
-  Expects(cuda && loader && !session && !context, "loaded libraries and fresh session");
+  Expects(cuda != nullptr, "CUDA library is loaded");
+  Expects(loader != nullptr, "NVENC library is loaded");
+  Expects(session == nullptr, "encoder session is fresh");
+  Expects(context == nullptr, "CUDA context is fresh");
   api.version = NV_ENCODE_API_FUNCTION_LIST_VER;
   if (!Check(loader->NvEncodeAPICreateInstance(&api), "create API")
       || !Check(cuda->cuDeviceGet(&device, 0), "cuDeviceGet")
@@ -111,7 +122,9 @@ bool Encoder::Impl::Session()
 }
 bool Encoder::Impl::Initialize(unsigned bitrate, unsigned fps)
 {
-  Expects(session && bitrate && fps, "session and rate configured");
+  Expects(session != nullptr, "encoder session exists");
+  Expects(bitrate > 0, "encoder bitrate is positive");
+  Expects(fps > 0, "encoder frame rate is positive");
   NV_ENC_PRESET_CONFIG preset{};
   preset.version = NV_ENC_PRESET_CONFIG_VER; preset.presetCfg.version = NV_ENC_CONFIG_VER;
   if (!Check(api.nvEncGetEncodePresetConfigEx(session, NV_ENC_CODEC_H264_GUID, NV_ENC_PRESET_P4_GUID,
@@ -145,7 +158,9 @@ bool Encoder::Impl::Initialize(unsigned bitrate, unsigned fps)
 }
 bool Encoder::Impl::Buffers()
 {
-  Expects(session && w % 16 == 0 && h % 16 == 0, "initialized aligned encoder");
+  Expects(session != nullptr, "encoder session exists");
+  Expects(w % 16 == 0, "encoder width is aligned");
+  Expects(h % 16 == 0, "encoder height is aligned");
   NV_ENC_CREATE_INPUT_BUFFER in{};
   in.version = NV_ENC_CREATE_INPUT_BUFFER_VER; in.width = w; in.height = h;
   in.bufferFmt = NV_ENC_BUFFER_FORMAT_IYUV;
@@ -158,28 +173,23 @@ bool Encoder::Impl::Buffers()
 }
 bool Encoder::Impl::Fill(std::span<BYTE const> bgrx, unsigned stride, Encoder& timing)
 {
-  Expects(session && input, "encoder owns input buffer");
+  Expects(session != nullptr, "encoder session exists");
+  Expects(input != nullptr, "encoder input buffer exists");
   using Clock = std::chrono::steady_clock;
   auto start = Clock::now();
-  auto pixels = bgrx.data();
-  if (width != w || height != h) {
-    Pad(bgrx, stride, width, height, padded);
-    pixels = padded.data(); stride = w * 4;
-  }
-  timing.convert_time = Clock::now() - start;
-  start = Clock::now();
   NV_ENC_LOCK_INPUT_BUFFER lock{};
   lock.version = NV_ENC_LOCK_INPUT_BUFFER_VER; lock.inputBuffer = input;
   if (!Check(api.nvEncLockInputBuffer(session, &lock), "lock input")) return false;
-  Expects(lock.pitch >= w && lock.pitch % 2 == 0, "I420 pitch fits aligned rows");
-  auto y = static_cast<BYTE*>(lock.bufferDataPtr);
-  BYTE* planes[]{y, y + std::size_t(lock.pitch) * h, y + std::size_t(lock.pitch) * h * 5 / 4};
-  UINT32 pitches[]{lock.pitch, lock.pitch / 2, lock.pitch / 2};
+  Expects(lock.pitch >= w, "I420 pitch covers aligned width");
+  Expects(lock.pitch % 2 == 0, "I420 pitch is even");
+  auto        y         { static_cast<BYTE*>(lock.bufferDataPtr)                                      };
+  BYTE*       planes [] { y, y + std::size_t(lock.pitch) * h, y + std::size_t(lock.pitch) * h * 5 / 4 };
+  UINT32      pitches[] { lock.pitch, lock.pitch / 2, lock.pitch / 2                                  };
+  prim_size_t size      { w, h                                                                        };
   timing.upload_time = Clock::now() - start;
   start = Clock::now();
-  prim_size_t size{w, h};
-  auto status = primitives_get()->RGBToYUV420_8u_P3AC4R(pixels, PIXEL_FORMAT_BGRX32, stride, planes, pitches, &size);
-  timing.convert_time += Clock::now() - start;
+  auto status = primitives_get()->RGBToYUV420_8u_P3AC4R(bgrx.data(), PIXEL_FORMAT_BGRX32, stride, planes, pitches, &size);
+  timing.convert_time = Clock::now() - start;
   start = Clock::now();
   auto unlocked = Check(api.nvEncUnlockInputBuffer(session, input), "unlock input");
   timing.upload_time += Clock::now() - start;
@@ -215,7 +225,10 @@ std::string Encoder::UnavailableReason()
 bool Encoder::Available() { return UnavailableReason().empty(); }
 bool Encoder::Open(unsigned width, unsigned height, unsigned bitrate, unsigned fps)
 {
-  Expects(width && height && bitrate && fps, "picture and rate are nonzero");
+  Expects(width > 0, "picture width is positive");
+  Expects(height > 0, "picture height is positive");
+  Expects(bitrate > 0, "encoder bitrate is positive");
+  Expects(fps > 0, "encoder frame rate is positive");
   Close(); impl->error.clear(); impl->small = false;
   impl->width = width; impl->height = height; impl->w = Aligned(width); impl->h = Aligned(height);
   if (!impl->Load() || !impl->Session()) { Close(); return false; }
@@ -230,11 +243,11 @@ bool Encoder::Open(unsigned width, unsigned height, unsigned bitrate, unsigned f
   if (!ok || impl->small || !impl->Initialize(bitrate, fps) || !impl->Buffers()) { Close(); return false; }
   return true;
 }
-std::span<BYTE const> Encoder::Encode(std::span<BYTE const> bgrx, unsigned stride, bool force_idr)
+std::span<BYTE const> Encoder::Encode(std::span<BYTE const> bgrx, unsigned stride, bool force_idr, std::vector<BYTE>& encoded)
 {
   Expects(IsOpen(), "encoder is open");
-  Expects(stride >= impl->width * 4 && bgrx.size() >= std::size_t(impl->height - 1) * stride + impl->width * 4,
-    "source contains the whole BGRX picture");
+  Expects(stride >= impl->w * 4, "source stride covers aligned width");
+  Expects(bgrx.size() >= std::size_t(impl->h - 1) * stride + impl->w * 4, "source covers aligned height");
   convert_time = upload_time = encode_time = {};
   if (!impl->Fill(bgrx, stride, *this)) return {};
   NV_ENC_PIC_PARAMS pic{}; pic.version = NV_ENC_PIC_PARAMS_VER;
@@ -248,10 +261,10 @@ std::span<BYTE const> Encoder::Encode(std::span<BYTE const> bgrx, unsigned strid
   if (!impl->Check(impl->api.nvEncLockBitstream(impl->session, &lock), "lock bitstream")) return {};
   encode_time = std::chrono::steady_clock::now() - start;
   auto data = static_cast<BYTE const*>(lock.bitstreamBufferPtr);
-  impl->encoded.assign(data, data + lock.bitstreamSizeInBytes);
+  encoded.assign(data, data + lock.bitstreamSizeInBytes);
   if (!impl->Check(impl->api.nvEncUnlockBitstream(impl->session, impl->output), "unlock bitstream")) return {};
   impl->first = false;
-  Ensures(!impl->encoded.empty(), "one access unit produced synchronously");
-  return impl->encoded;
+  Ensures(!encoded.empty(), "one access unit produced synchronously");
+  return encoded;
 }
 }

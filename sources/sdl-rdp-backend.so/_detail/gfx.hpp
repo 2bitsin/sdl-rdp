@@ -30,6 +30,7 @@ private:
   bool Select();
   bool Progressive();
   bool Avc420();
+  std::span<BYTE const> Picture();
   bool SelectAvc();
   void ResetAvc();
   void ConfirmedCapability(RDPGFX_CAPSET const& cap);
@@ -37,7 +38,7 @@ private:
   bool Raw();
   bool Planar();
   bool WriteCommand(sdlrdp_rect area, std::span<BYTE> data, UINT32 codec, Avc::Regions& regions);
-  bool Command(sdlrdp_rect area, std::span<BYTE const> data, UINT32 codec, Avc::Regions regions = {});
+  bool Command(sdlrdp_rect area, std::span<BYTE const> data, UINT32 codec);
   bool Check(UINT result, char const* operation);
   static UINT Caps(RdpgfxServerContext*, RDPGFX_CAPS_ADVERTISE_PDU const*);
   static UINT Ack(RdpgfxServerContext*, RDPGFX_FRAME_ACKNOWLEDGE_PDU const*);
@@ -52,7 +53,14 @@ private:
   unsigned width = 0, height = 0;
   UINT32 queue_depth = 0;
   std::size_t frame_bytes = 0, last_bytes = 0;
-  struct Packet { sdlrdp_rect area; std::vector<BYTE> data; UINT32 codec; Avc::Regions regions; };
+  struct Packet {
+    sdlrdp_rect area   {};
+    std::size_t offset {};
+    std::size_t length {};
+    UINT32      codec  {};
+  };
+  Avc::Regions      regions;
+  std::vector<BYTE> payload;
   std::vector<Packet> prepared;
   std::vector<BYTE> pixels, band;
 };

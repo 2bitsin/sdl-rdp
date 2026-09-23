@@ -125,6 +125,14 @@ TEST_F(Sample, TakeoverFocus) {
   ASSERT_NO_FATAL_FAILURE(Escape(second));
 }
 
+TEST_F(Sample, InvalidCodecLogsValidNames) {
+  auto arguments = Arguments(certificates.Path(), false);
+  arguments.insert(arguments.end() - 1, "SDL_RDP_CODEC=avc");
+  process = std::make_unique<Process>(arguments);
+  ASSERT_TRUE(Read("ERROR: Invalid SDL_RDP_CODEC 'avc'; valid names: auto, planar, remotefx, nscodec, raw, progressive, avc420"))
+    << process->transcript;
+}
+
 TEST_F(Sample, AutoAvcCodecProperty) {
   if (!Backend::Avc::Encoder::Available()) GTEST_SKIP() << Backend::Avc::Encoder::UnavailableReason();
   auto arguments = Arguments(certificates.Path(), false);

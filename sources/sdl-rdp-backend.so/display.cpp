@@ -9,6 +9,7 @@ BOOL Peer::ChannelCreated(void* user, UINT32 id, INT32 status)
   Expects(user != nullptr, "channel creation has a peer");
   auto& peer = *static_cast<Peer*>(user);
   auto& input = Input::Held(peer);
+  peer.handle_count = 0;
   if (status < 0) {
     if (id == peer.gfx_id) {
       peer.gfx.reset();

@@ -19,7 +19,7 @@ void State::SetPointer(unsigned w, unsigned h, unsigned x, unsigned y, void cons
   std::scoped_lock lock(session_guard, peers_guard);
   pointer = std::move(next);
   ++pointer_generation;
-  for (auto const& peer : peers) if (peer->active) SetEvent(peer->wake.get());
+  for (auto const& peer : peers) if (peer->active) peer->wake.Transition(WakeEvent::Phase::Pending);
 }
 bool Peer::SendPointer()
 {

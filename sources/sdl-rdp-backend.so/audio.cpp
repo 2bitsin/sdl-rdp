@@ -28,7 +28,7 @@ void ApplyVolume(std::span<int16_t> stereo, UINT32 volume)
   }
 }
 }
-bool Peer::SoundChannel()
+bool Peer::SoundChannel(HANDLE ready)
 {
   Expects(channels != nullptr, "channel manager exists");
   if (!active) return true;
@@ -36,20 +36,24 @@ bool Peer::SoundChannel()
   if (!sound_attempted) {
     sound_attempted = true;
     if (!WTSVirtualChannelManagerIsChannelJoined(channels, RDPSND_CHANNEL_NAME)) return true;
-    sound = std::make_unique<AudioChannel>(owner, channels, client->context, wake.get());
+    handle_count = 0;
+    sound = std::make_unique<AudioChannel>(*this);
     healthy = sound->Initialize();
   }
-  if (sound && (!healthy || !sound->Pump())) {
+  if (sound && (!healthy || (ready == sound->Event() && !sound->Pump()))) {
+    handle_count = 0;
     sound.reset();
     owner.Push({.type = SDLRDP_AUDIO, .audio = {0, 0}});
     owner.audio_changed.notify_all();
   }
   return true;
 }
-AudioChannel::AudioChannel(State& state, HANDLE channels, rdpContext* context, HANDLE event)
- : owner(state), channels(channels), wake(event), sound(rdpsnd_server_context_new(channels))
+AudioChannel::AudioChannel(Peer& peer)
+ : peer(peer), owner(peer.owner), channels(peer.channels), sound(rdpsnd_server_context_new(channels))
 {
-  Expects(channels && context && event, "sound channel has transport and wake event");
+  auto context = peer.client->context;
+  Expects(channels != nullptr, "sound channel manager exists");
+  Expects(context != nullptr, "sound transport exists");
   if (!sound) throw std::runtime_error("Audio channel allocation failed.");
   sound->server_formats = audio_formats_new(2);
   if (!sound->server_formats) throw std::runtime_error("Audio format allocation failed.");
@@ -64,6 +68,18 @@ AudioChannel::AudioChannel(State& state, HANDLE channels, rdpContext* context, H
   sound->latency = 10;
   sound->Activated = Activated;
   sound->ConfirmBlock = Confirmed;
+}
+AudioChannel::~AudioChannel()
+{
+  sound.reset();
+  int major    { 0 };
+  int minor    { 0 };
+  int revision { 0 };
+  freerdp_get_version(&major, &minor, &revision);
+  if (major != 3 || minor != 15 || revision != 0) return;
+  // FreeRDP 3.15.0 returns the existing static-channel handle from Open.
+  auto channel = WTSVirtualChannelOpen(channels, WTS_CURRENT_SESSION, const_cast<char*>(RDPSND_CHANNEL_NAME));
+  if (channel) WTSVirtualChannelClose(channel);
 }
 bool AudioChannel::Initialize()
 {
@@ -188,7 +204,8 @@ UINT AudioChannel::Confirmed(RdpsndServerContext* context, BYTE id, UINT16 times
   auto found = std::ranges::find(self.pending, id, &Block::id);
   if (found == self.pending.end()) return CHANNEL_RC_OK;
   auto rtt = std::chrono::duration<double, std::milli>(Clock::now() - found->sent).count();
-  self.owner.trace.Line("audio-confirm", [&] { return std::format("id={} rtt={:.1f}", id, rtt); });
+  if (self.owner.trace.enabled) self.peer.trace_pending.push_back(
+    self.owner.trace.Format("audio-confirm", [&] { return std::format("id={} rtt={:.1f}", id, rtt); }));
   if (!self.has_confirmation) self.owner.Log(SDLRDP_LOG_INFO,
     std::format("Audio block confirm round trip: {:.3f} ms; client timestamp={}; block={}.", rtt, timestamp, id));
   self.confirmed += found->frames;
@@ -228,7 +245,7 @@ bool AudioChannel::Send(std::span<int16_t const> samples)
   if (first == Clock::time_point{}) first = now;
   if (!server_clock) pending.push_back({block, buffer.size() / 2, now});
   buffer.clear();
-  SetEvent(wake);
+  peer.wake.Transition(WakeEvent::Phase::Pending);
   return true;
 }
 void AudioChannel::LogAudio()

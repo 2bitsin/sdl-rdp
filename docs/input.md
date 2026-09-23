@@ -44,3 +44,5 @@ reported as native finger events. Missing pressure defaults to 1.
 Backend ABI version 4 adds `sdlrdp_set_relative_mouse`, `SDLRDP_TEXT`,
 `SDLRDP_MOUSE_RELATIVE`, `SDLRDP_TOUCH`, and the negotiated layout ID; wheel
 components are now floating-point notch counts. Driver and backend must match.
+
+FreeRDP 3.15.0 `rdpei_server_context_free` omits the private `outputStream` (about 256 bytes per connection); no public API exposes it for backend cleanup.

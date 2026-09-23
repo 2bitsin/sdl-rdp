@@ -45,22 +45,34 @@ bool GfxChannel::SelectAvc()
   avc_rejected = true;
   return false;
 }
+std::span<BYTE const> GfxChannel::Picture()
+{
+  Expects(peer.snapshot != nullptr, "picture snapshot exists");
+  if (width == peer.snapshot_width && height == peer.snapshot_height) return *peer.snapshot;
+  std::ranges::for_each(peer.sending.rects, [&](auto rect) {
+    auto area = ScaleDamage(rect, peer);
+    Snapshot(peer, area, std::span(pixels).subspan((std::size_t(area.y) * Avc::Aligned(width) + area.x) * 4), false, Avc::Aligned(width) * 4);
+  });
+  Avc::ReplicateEdges(pixels, width, height);
+  return pixels;
+}
 bool GfxChannel::Avc420()
 {
-  Expects(confirmed && width && height && avc.IsOpen(), "confirmed AVC surface exists");
+  Expects(confirmed, "graphics capability confirmed");
+  Expects(avc.IsOpen(), "AVC encoder is open");
   auto start = Peer::Clock::now();
-  Avc::Regions regions;
-  for (auto rect : peer.sending.rects) {
-    auto area = ScaleDamage(rect, peer);
-    Snapshot(peer, area, std::span(pixels).subspan((std::size_t(area.y) * width + area.x) * 4), false, width * 4);
-    regions.Add(area);
-  }
-  auto data = avc.Encode(pixels, width * 4, force_idr);
+  regions.rects.clear();
+  regions.quality.clear();
+  std::ranges::for_each(peer.sending.rects, [&](auto rect) { regions.Add(ScaleDamage(rect, peer)); });
+  auto picture { Picture()                                       };
+  auto stride  { Avc::Aligned(width) * 4                         };
+  auto data    { avc.Encode(picture, stride, force_idr, payload) };
   peer.encoder.encode_time += Peer::Clock::now() - start;
   if (data.empty()) return false;
   force_idr = false;
-  auto bounds = regions.bounds;
-  return Command(bounds, data, RDPGFX_CODECID_AVC420, std::move(regions));
+  frame_bytes += data.size() + 25 + regions.Bytes();
+  prepared.push_back({regions.bounds, 0, data.size(), RDPGFX_CODECID_AVC420});
+  return true;
 }
 void GfxChannel::AccountAvcFrame()
 {
@@ -71,21 +83,27 @@ void GfxChannel::AccountAvcFrame()
   peer.avc_upload += avc.upload_time;
   peer.avc_encode += avc.encode_time;
 }
-bool GfxChannel::Command(sdlrdp_rect area, std::span<BYTE const> data, UINT32 codec, Avc::Regions regions)
+bool GfxChannel::Command(sdlrdp_rect area, std::span<BYTE const> data, UINT32 codec)
 {
   Expects(!data.empty(), "encoded graphics payload exists");
   constexpr std::size_t WireToSurfaceHeaderBytes = 25;
   frame_bytes += data.size() + WireToSurfaceHeaderBytes;
-  if (codec == RDPGFX_CODECID_AVC420) frame_bytes += regions.Bytes();
-  prepared.push_back({area, {data.begin(), data.end()}, codec, std::move(regions)});
+  auto offset = payload.size();
+  if (!offset) payload.assign(data.begin(), data.end());
+  else payload.insert(payload.end(), data.begin(), data.end());
+  prepared.push_back({area, offset, data.size(), codec});
   return true;
 }
 bool GfxChannel::WriteCommand(sdlrdp_rect area, std::span<BYTE> data, UINT32 codec, Avc::Regions& regions)
 {
-  Expects(confirmed && !data.empty(), "confirmed graphics payload exists");
-  Expects(area.x >= 0 && area.y >= 0 && area.w > 0 && area.h > 0
-    && unsigned(area.x + area.w) <= width && unsigned(area.y + area.h) <= height,
-    "command rectangle fits the surface");
+  Expects(confirmed, "graphics capability confirmed");
+  Expects(!data.empty(), "graphics payload exists");
+  Expects(area.x >= 0, "command left edge is nonnegative");
+  Expects(area.y >= 0, "command top edge is nonnegative");
+  Expects(area.w > 0, "command width is positive");
+  Expects(area.h > 0, "command height is positive");
+  Expects(unsigned(area.x + area.w) <= width, "command right edge fits surface");
+  Expects(unsigned(area.y + area.h) <= height, "command bottom edge fits surface");
   RDPGFX_SURFACE_COMMAND command{};
   command.surfaceId = GraphicsSurfaceId;
   command.codecId = codec;
@@ -102,7 +120,9 @@ bool GfxChannel::WriteCommand(sdlrdp_rect area, std::span<BYTE> data, UINT32 cod
 }
 bool GfxChannel::Progressive()
 {
-  Expects(confirmed && width && height, "confirmed surface exists");
+  Expects(confirmed, "graphics capability confirmed");
+  Expects(width > 0, "surface width is positive");
+  Expects(height > 0, "surface height is positive");
   auto start = Peer::Clock::now();
   if (!progressive) progressive.reset(progressive_context_new_ex(TRUE, THREADING_FLAGS_DISABLE_THREADS));
   if (!progressive) return false;
@@ -110,14 +130,15 @@ bool GfxChannel::Progressive()
   region16_init(&damage);
   for (auto rect : peer.sending.rects) {
     auto area = ScaleDamage(rect, peer);
-    Snapshot(peer, area, std::span(pixels).subspan((std::size_t(area.y) * width + area.x) * 4), false, width * 4);
     RECTANGLE_16 wire{UINT16(area.x), UINT16(area.y), UINT16(area.x + area.w), UINT16(area.y + area.h)};
     if (!region16_union_rect(&damage, &damage, &wire)) { region16_uninit(&damage); return false; }
   }
   BYTE* data = nullptr;
   UINT32 size = 0;
-  auto result = progressive_compress(progressive.get(), pixels.data(), pixels.size(), PIXEL_FORMAT_BGRX32,
-    width, height, width * 4, &damage, &data, &size);
+  auto picture { Picture()               };
+  auto stride  { Avc::Aligned(width) * 4 };
+  auto result = progressive_compress(progressive.get(), picture.data(), picture.size(), PIXEL_FORMAT_BGRX32,
+    width, height, stride, &damage, &data, &size);
   peer.encoder.encode_time += Peer::Clock::now() - start;
   region16_uninit(&damage);
   return result >= 0 && data && ProgressivePayload({data, size});
@@ -143,7 +164,9 @@ bool GfxChannel::ProgressivePayload(std::span<BYTE> data)
 }
 bool GfxChannel::Raw()
 {
-  Expects(confirmed && width && height, "confirmed surface exists");
+  Expects(confirmed, "graphics capability confirmed");
+  Expects(width > 0, "surface width is positive");
+  Expects(height > 0, "surface height is positive");
   for (auto rect : peer.sending.rects) {
     auto area = ScaleDamage(rect, peer);
     band.resize(std::size_t(area.w) * area.h * 4);
@@ -154,7 +177,9 @@ bool GfxChannel::Raw()
 }
 bool GfxChannel::Planar()
 {
-  Expects(confirmed && width && height, "confirmed surface exists");
+  Expects(confirmed, "graphics capability confirmed");
+  Expects(width > 0, "surface width is positive");
+  Expects(height > 0, "surface height is positive");
   auto& encoder = peer.encoder;
   for (auto rect : peer.sending.rects) {
     auto area = ScaleDamage(rect, peer);
@@ -170,32 +195,38 @@ bool GfxChannel::Planar()
 }
 bool GfxChannel::Prepare()
 {
-  Expects(peer.snapshot && confirmed, "confirmed frame snapshot exists");
+  Expects(peer.snapshot != nullptr, "frame snapshot exists");
+  Expects(confirmed, "graphics capability confirmed");
   if (!prepared.empty()) return true;
   return Surface() && Select();
 }
 bool GfxChannel::Encode()
 {
-  Expects(peer.snapshot && confirmed && width && height, "confirmed frame surface exists");
+  Expects(peer.snapshot != nullptr, "frame snapshot exists");
+  Expects(confirmed, "graphics capability confirmed");
+  Expects(width > 0, "surface width is positive");
+  Expects(height > 0, "surface height is positive");
   if (!prepared.empty()) return true;
   constexpr std::size_t StartFrameBytes = 16, EndFrameBytes = 12;
   frame_bytes = StartFrameBytes + EndFrameBytes;
+  payload.clear();
   if (peer.encoder.codec == SDLRDP_CODEC_AVC420) return Avc420();
   if (peer.encoder.codec == SDLRDP_CODEC_PROGRESSIVE) return Progressive();
   return peer.encoder.codec == SDLRDP_CODEC_PLANAR ? Planar() : Raw();
 }
 bool GfxChannel::Send()
 {
-  Expects(peer.snapshot && confirmed, "confirmed frame snapshot exists");
+  Expects(peer.snapshot != nullptr, "frame snapshot exists");
+  Expects(confirmed, "graphics capability confirmed");
   Expects(!prepared.empty(), "frame is encoded before transport");
   { std::scoped_lock lock(peer.owner.frame_guard); if (!peer.Pacing()) return true; }
   SYSTEMTIME time;
   GetSystemTime(&time);
-  RDPGFX_START_FRAME_PDU start{FrameTimestamp(time), peer.frame_id};
-  RDPGFX_END_FRAME_PDU end{peer.frame_id};
+  RDPGFX_START_FRAME_PDU start { FrameTimestamp(time), peer.frame_id };
+  RDPGFX_END_FRAME_PDU   end   { peer.frame_id                       };
   if (!Check(context->StartFrame(context.get(), &start), "start frame")) return false;
   for (auto& packet : prepared)
-    if (!WriteCommand(packet.area, packet.data, packet.codec, packet.regions)) return false;
+    if (!WriteCommand(packet.area, std::span(payload).subspan(packet.offset, packet.length), packet.codec, regions)) return false;
   if (!Check(context->EndFrame(context.get(), &end), "end frame")) return false;
   std::scoped_lock lock(peer.owner.frame_guard);
   AccountAvcFrame();

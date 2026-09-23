@@ -42,8 +42,8 @@ inline void ScaleBand(Peer& peer, sdlrdp_rect area, std::span<BYTE> buffer, bool
     auto position = std::clamp((area.y + y + 0.5) * ratio - 0.5, 0.0, double(peer.snapshot_height - 1));
     auto first = unsigned(position), second = std::min(first + 1, peer.snapshot_height - 1);
     auto weight = float(position - first);
-    auto top = peer.snapshot->data() + std::size_t(first) * peer.snapshot_width * 4;
-    auto bottom = peer.snapshot->data() + std::size_t(second) * peer.snapshot_width * 4;
+    auto top = peer.snapshot->data() + std::size_t(first) * Avc::Aligned(peer.snapshot_width) * 4;
+    auto bottom = peer.snapshot->data() + std::size_t(second) * Avc::Aligned(peer.snapshot_width) * 4;
     auto out = buffer.data() + std::size_t(flip ? area.h - y - 1 : y) * pitch;
     for (auto column : peer.scale_columns) {
       for (unsigned c = 0; c < 4; ++c) {
@@ -69,7 +69,7 @@ inline auto Snapshot(Peer& peer, sdlrdp_rect area, std::span<BYTE> buffer, bool 
   if (peer.desktop.w != int(peer.snapshot_width) || peer.desktop.h != int(peer.snapshot_height))
     ScaleBand(peer, area, buffer, flip, pitch);
   else CopyRows(std::span<BYTE const>(*peer.snapshot).subspan(
-    (std::size_t(area.y) * peer.snapshot_width + area.x) * 4), peer.snapshot_width * 4,
+    (std::size_t(area.y) * Avc::Aligned(peer.snapshot_width) + area.x) * 4), Avc::Aligned(peer.snapshot_width) * 4,
     buffer, pitch, area.h, stride, flip);
   return {area, buffer.first(size)};
 }

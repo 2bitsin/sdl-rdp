@@ -28,6 +28,7 @@ bool Input::Open(Peer& peer)
 {
   Expects(peer.channels != nullptr, "channel manager exists");
   opened = true;
+  peer.handle_count = 0;
   advanced.reset(ainput_server_context_new(peer.channels));
   touch.reset(rdpei_server_context_new(peer.channels));
   if (!advanced || !touch) return false;
@@ -47,18 +48,17 @@ bool Input::Open(Peer& peer)
   return advanced->Initialize(advanced.get(), TRUE) == CHANNEL_RC_OK
     && advanced->Open(advanced.get()) == CHANNEL_RC_OK
     && advanced->Poll(advanced.get()) == CHANNEL_RC_OK
+    && advanced->ChannelHandle(advanced.get(), &advanced_event)
     && rdpei_server_init(touch.get()) == CHANNEL_RC_OK;
 }
-bool Input::Channels(Peer& peer)
+bool Input::Channels(Peer& peer, HANDLE ready)
 {
   Expects(peer.channels != nullptr, "channel manager exists");
   if (WTSVirtualChannelManagerGetDrdynvcState(peer.channels) != DRDYNVC_STATE_READY) return true;
   if (!opened) return Open(peer);
-  HANDLE event = nullptr;
-  if (advanced_ready && advanced->ChannelHandle(advanced.get(), &event)
-      && WaitForSingleObject(event, 0) == WAIT_OBJECT_0
+  if (advanced_ready && ready == advanced_event
       && advanced->Poll(advanced.get()) != CHANNEL_RC_OK) return false;
-  if (touch_ready && WaitForSingleObject(rdpei_server_get_event_handle(touch.get()), 0) == WAIT_OBJECT_0) {
+  if (touch_ready && ready == rdpei_server_get_event_handle(touch.get())) {
     auto result = rdpei_server_handle_messages(touch.get());
     // FreeRDP 3.15 channels/rdpei/server/rdpei_main.c:701 maps ERROR_NO_DATA to ERROR_READ_FAULT.
     if (result != CHANNEL_RC_OK && result != ERROR_READ_FAULT) return false;
@@ -69,12 +69,13 @@ unsigned Input::Handles(HANDLE* handles)
 {
   Expects(handles != nullptr, "space for two channel handles exists");
   unsigned count = 0;
-  if (advanced_ready && advanced->ChannelHandle(advanced.get(), &handles[count])) ++count;
+  if (advanced_ready) handles[count++] = advanced_event;
   if (touch_ready) handles[count++] = rdpei_server_get_event_handle(touch.get());
   return count;
 }
 void Input::Close()
 {
+  advanced_event = nullptr;
   advanced.reset();
   touch.reset();
 }

@@ -26,7 +26,7 @@ public:
   explicit DriveChannel(Peer&);
   ~DriveChannel();
   bool Open();
-  bool Pump();
+  bool Pump(HANDLE signaled);
   HANDLE Event() const { return event; }
   void Disconnect();
   void Abort(std::string const&);

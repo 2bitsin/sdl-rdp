@@ -13,6 +13,7 @@ struct Input {
   std::array<oxbox::utilities::UtfDecodeState, 2> unicode{};
   std::unique_ptr<ainput_server_context, Releases<ainput_server_context_free>> advanced;
   std::unique_ptr<RdpeiServerContext, Releases<rdpei_server_context_free>> touch;
+  HANDLE advanced_event{ nullptr };
   bool opened = false, have_relative = false, relative = false;
   UINT32 advanced_id = UINT32_MAX, touch_id = UINT32_MAX;
   bool advanced_ready = false, touch_ready = false;
@@ -21,7 +22,7 @@ struct Input {
   static Input& Held(Peer&);
   static BOOL Create(freerdp_peer*, rdpContext*);
   static void Free(freerdp_peer*, rdpContext*);
-  bool Channels(Peer& peer);
+  bool Channels(Peer& peer, HANDLE ready);
   bool Open(Peer& peer);
   unsigned Handles(HANDLE* handles);
   void Close();

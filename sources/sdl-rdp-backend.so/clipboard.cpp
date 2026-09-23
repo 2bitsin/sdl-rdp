@@ -36,10 +36,10 @@ bool ClipboardChannel::Open()
   return context->ServerCapabilities(context.get(), &caps) == CHANNEL_RC_OK
     && context->MonitorReady(context.get(), &monitor) == CHANNEL_RC_OK;
 }
-bool ClipboardChannel::Pump()
+bool ClipboardChannel::Pump(HANDLE signaled)
 {
   Expects(opened, "clipboard channel open");
-  if (context->CheckEventHandle(context.get()) != CHANNEL_RC_OK) return false;
+  if (signaled == Event() && context->CheckEventHandle(context.get()) != CHANNEL_RC_OK) return false;
   if (!ready || announced == peer.owner.clipboard.generation) return true;
   return Announce() == CHANNEL_RC_OK;
 }

@@ -73,7 +73,7 @@ int sdlrdp_set_relative_mouse(sdlrdp_handle* handle, int enabled)
     auto& input = Backend::Input::Held(*owner.current);
     input.relative = enabled != 0;
     input.warp_requested = false;
-    SetEvent(owner.current->wake.get());
+    owner.current->wake.Transition(Backend::WakeEvent::Phase::Pending);
   }
   return 0;
 }

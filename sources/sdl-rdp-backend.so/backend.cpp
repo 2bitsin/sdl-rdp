@@ -141,7 +141,7 @@ int sdlrdp_set_clipboard_text(sdlrdp_handle* handle, char const* text)
     state.clipboard.text = std::move(copied);
     state.clipboard.unicode = std::move(unicode);
     ++state.clipboard.generation;
-    if (state.current) SetEvent(state.current->wake.get());
+    if (state.current) state.current->wake.Transition(Backend::WakeEvent::Phase::Pending);
     return 0;
   } catch (std::exception const& error) { last_error = error.what(); return -1; }
 }

@@ -2,6 +2,7 @@
 #include "sdl-rdp-backend.h"
 #include <freerdp/freerdp.h>
 #include "rdp-handles.hpp"
+#include "wake-event.hpp"
 #include "contract.hpp"
 #include "rect.hpp"
 #include "logging.hpp"
@@ -58,6 +59,8 @@ struct State {
   void Depart(Peer& peer);
   void Present(void const* pixels, int pitch, unsigned w, unsigned h,
                std::span<sdlrdp_rect const> damage);
+  void Publish(std::shared_ptr<std::vector<BYTE>> next, unsigned w, unsigned h,
+               std::span<sdlrdp_rect const> damage);
   void SetPointer(unsigned w, unsigned h, unsigned x, unsigned y, void const* pixels);
   std::atomic_uint next_drive{1};
   Clipboard clipboard;
@@ -112,9 +115,10 @@ public:
   AuthenticationState authentication;
   void Serve(std::stop_token quit);
   DWORD EventHandles(std::span<HANDLE> handles);
+  bool PollStep(std::stop_token quit, std::span<HANDLE> handles);
   Encoder encoder;
   bool Drain();
-  bool TransportStep(std::stop_token quit);
+  bool TransportStep(std::stop_token quit, HANDLE ready);
   bool EncodeAndSend(std::stop_token quit);
   bool SendPointer();
   uint64_t pointer_generation = 0;
@@ -138,22 +142,22 @@ public:
   void GraphicsDeadline();
   DWORD Timeout();
   static constexpr DWORD AppendedHandleCount = 5 + Input::MaxHandles;
-  bool Channels();
-  bool OpenStaticChannels();
+  bool Channels(HANDLE ready);
+  bool OpenStaticChannels(HANDLE ready);
   bool OpenDisplayControl();
-  bool GraphicsChannel();
+  bool GraphicsChannel(HANDLE ready);
   bool Graphics() const { return gfx && gfx->confirmed; }
   std::unique_ptr<GfxChannel> gfx;
   bool gfx_attempted = false;
   UINT32 gfx_id = UINT32_MAX;
   static constexpr auto GraphicsConnectionWait = std::chrono::seconds(3);
-  Clock::time_point activated_at{};
-  std::chrono::nanoseconds graphics_ready_time{};
-  RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU graphics_qoe{};
+  Clock::time_point                activated_at        {  };
+  std::chrono::nanoseconds         graphics_ready_time {  };
+  RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU graphics_qoe        {  };
   std::optional<sdlrdp_event> connection;
   void AnnounceConnection(sdlrdp_codec codec);
   static BOOL ChannelCreated(void*, UINT32, INT32);
-  bool SoundChannel();
+  bool SoundChannel(HANDLE ready);
   bool sound_attempted = false;
   std::unique_ptr<AudioChannel> sound;
   static UINT Layout(DispServerContext*, DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const*);
@@ -163,7 +167,9 @@ public:
   static BOOL ExtendedMouse(rdpInput* input, UINT16 flags, UINT16 x, UINT16 y);
   PeerHandle client;
   State& owner;
-  EventHandle wake;
+  WakeEvent                wake;
+  DWORD                    handle_count  { 0 };
+  std::vector<std::string> trace_pending {   };
   Region dirty, sending;
   std::shared_ptr<std::vector<BYTE> const> snapshot;
   unsigned snapshot_width = 0, snapshot_height = 0;

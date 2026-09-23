@@ -13,11 +13,11 @@ struct IntraRefresh { unsigned period, count; };
 IntraRefresh IntraRefreshFor(unsigned fps);
 unsigned Bitrate(unsigned width, unsigned height, unsigned kbps = 0);
 unsigned Aligned(unsigned dimension);
-void Pad(std::span<BYTE const> pixels, unsigned stride, unsigned width, unsigned height, std::vector<BYTE>& padded);
+void ReplicateEdges(std::span<BYTE> pixels, unsigned width, unsigned height);
 struct Regions {
-  std::vector<RECTANGLE_16> rects;
-  std::vector<RDPGFX_H264_QUANT_QUALITY> quality;
-  sdlrdp_rect bounds{};
+  std::vector<RECTANGLE_16>              rects   {  };
+  std::vector<RDPGFX_H264_QUANT_QUALITY> quality {  };
+  sdlrdp_rect                            bounds  {  };
   void Add(sdlrdp_rect area);
   std::size_t Bytes() const {
     utilities::Expects(rects.size() == quality.size(), "every region has quantization metadata");
@@ -34,7 +34,7 @@ public:
   static bool Available();
   static std::string UnavailableReason();
   bool Open(unsigned width, unsigned height, unsigned bitrate, unsigned fps);
-  std::span<BYTE const> Encode(std::span<BYTE const> bgrx, unsigned stride, bool force_idr);
+  std::span<BYTE const> Encode(std::span<BYTE const> bgrx, unsigned stride, bool force_idr, std::vector<BYTE>& encoded);
   void Close();
   bool IsOpen() const;
   bool TooSmall() const;

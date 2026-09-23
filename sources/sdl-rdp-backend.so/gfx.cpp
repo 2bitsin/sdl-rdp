@@ -40,14 +40,15 @@ void Peer::AnnounceConnection(sdlrdp_codec codec)
   owner.Push(*connection);
   owner.Push({.type = SDLRDP_SCREEN, .screen = {screen_width, screen_height}});
   connection.reset();
-  SetEvent(wake.get());
+  wake.Transition(WakeEvent::Phase::Pending);
 }
-bool Peer::GraphicsChannel()
+bool Peer::GraphicsChannel(HANDLE ready)
 {
-  if (gfx) return gfx->Pump();
+  if (gfx) return ready != gfx->Event() || gfx->Pump();
   if (gfx_attempted || !freerdp_settings_get_bool(client->context->settings, FreeRDP_SupportGraphicsPipeline)
       || WTSVirtualChannelManagerGetDrdynvcState(channels) != DRDYNVC_STATE_READY) return true;
   gfx_attempted = true;
+  handle_count = 0;
   gfx = std::make_unique<GfxChannel>(*this);
   if (gfx->Open()) return true;
   gfx.reset();
@@ -118,7 +119,7 @@ UINT GfxChannel::Ack(RdpgfxServerContext* context, RDPGFX_FRAME_ACKNOWLEDGE_PDU 
   self.peer.ack_enabled = ack->queueDepth != SUSPEND_FRAME_ACKNOWLEDGEMENT;
   if (!self.peer.ack_enabled) self.peer.pending.clear();
   self.peer.owner.frame_changed.notify_all();
-  SetEvent(self.peer.wake.get());
+  self.peer.wake.Transition(WakeEvent::Phase::Pending);
   return CHANNEL_RC_OK;
 }
 UINT GfxChannel::Qoe(RdpgfxServerContext* context, RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU const* ack)
@@ -156,7 +157,7 @@ bool GfxChannel::Surface()
       || !Check(context->CreateSurface(context.get(), &create), "create surface")
       || !Check(context->MapSurfaceToOutput(context.get(), &map), "map surface")) return false;
   width = peer.desktop.w; height = peer.desktop.h;
-  pixels.resize(std::size_t(width) * height * 4);
+  pixels.resize(std::size_t(Avc::Aligned(width)) * Avc::Aligned(height) * 4);
   headers = false;
   progressive.reset();
   ResetAvc();

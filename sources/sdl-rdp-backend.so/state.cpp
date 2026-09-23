@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <algorithm>
+#include <ranges>
 #include <array>
 #include <utility>
 #include <stdexcept>
@@ -44,6 +45,48 @@ unsigned Bind(freerdp_listener* listener, sdlrdp_config const& config)
   socket.descriptor = -1;
   return ntohs(address.sin_port);
 }
+void ComposeRow(std::span<BYTE const> source, std::span<BYTE const> former,
+                std::span<BYTE> target, auto damage)
+{
+  for (int x = 0; x < int(target.size() / 4);) {
+    auto covered { std::ranges::find_if(damage, [x](auto rect) { return rect.x <= x && x < rect.x + rect.w; }) };
+    auto ahead   { damage | std::views::filter([x](auto rect) { return rect.x > x; })                          };
+    auto nearest { std::ranges::min_element(ahead, {}, &sdlrdp_rect::x)                                        };
+    auto end     { covered != damage.end() ? covered->x + covered->w
+      : nearest != ahead.end() ? nearest->x : int(target.size() / 4) };
+    auto output { target.subspan(x * 4, (end - x) * 4)      };
+    auto input  { covered != damage.end() ? source : former };
+    if (input.empty()) std::ranges::fill(output, 0);
+    else std::ranges::copy(input.subspan(x * 4, output.size()), output.begin());
+    x = end;
+  }
+}
+void ComposePicture(std::span<BYTE const> source, unsigned pitch, std::span<BYTE const> former,
+                    std::span<BYTE> target, unsigned width, unsigned height, std::span<sdlrdp_rect const> damage)
+{
+  auto stride = Avc::Aligned(width) * 4;
+  std::ranges::for_each(std::views::iota(0u, height), [&](unsigned row) {
+    auto active = damage | std::views::filter([row](auto rect) { return row >= unsigned(rect.y) && row < unsigned(rect.y + rect.h); });
+    ComposeRow(source.subspan(std::size_t(row) * pitch, width * 4),
+      former.empty() ? former : former.subspan(std::size_t(row) * stride, width * 4),
+      target.subspan(std::size_t(row) * stride, width * 4), active);
+  });
+}
+}
+void State::Publish(std::shared_ptr<std::vector<BYTE>> next,
+                    unsigned w, unsigned h, std::span<sdlrdp_rect const> damage)
+{
+  std::scoped_lock lock(peers_guard, frame_guard);
+  Picture(w, h);
+  auto resized = frame_width != w || frame_height != h;
+  shadow = std::move(next);
+  frame_width = width = w; frame_height = height = h;
+  ++presented;
+  for (auto const& peer : peers) if (peer->active) {
+    ++peer->dirty_presents;
+    if (resized) { peer->dirty.clear(); peer->Post({0, 0, int(w), int(h)}); }
+    else for (auto area : damage) peer->Post(area);
+  }
 }
 void Trace::Emit(std::string const& text) const { owner.Log(SDLRDP_LOG_INFO, text); }
 State::State(sdlrdp_config const& config, bool tracing)
@@ -75,7 +118,7 @@ State::~State()
   if (thread.joinable()) thread.join();
   for (auto const& peer : peers) {
     peer->thread.request_stop();
-    SetEvent(peer->wake.get());
+    peer->wake.Transition(WakeEvent::Phase::Pending);
   }
   for (auto const& peer : peers) if (peer->thread.joinable()) peer->thread.join();
   peers.clear();
@@ -127,7 +170,7 @@ void State::Takeover(Peer& peer, sdlrdp_event event)
     freerdp_send_error_info(old->client->context->rdp);
     old->client->Close(old->client.get());
     old->thread.request_stop();
-    SetEvent(old->wake.get());
+    old->wake.Transition(WakeEvent::Phase::Pending);
   }
   current = &peer;
   peer.active = peer.activated = true;
@@ -197,38 +240,22 @@ void State::Wakeup()
 void State::Present(void const* pixels, int pitch, unsigned w, unsigned h,
                     std::span<sdlrdp_rect const> damage)
 {
-  Expects(pixels && pitch >= int(w * 4), "source covers framebuffer rows");
+  Expects(pixels != nullptr, "source framebuffer exists");
+  Expects(pitch >= int(w * 4), "source pitch covers framebuffer rows");
   if (damage.empty()) return;
   std::scoped_lock producer(producer_guard);
   auto unused = std::ranges::find_if(buffers, [](auto const& buffer) { return buffer.use_count() == 1; });
   if (unused == buffers.end()) { buffers.push_back(std::make_shared<std::vector<BYTE>>()); unused = buffers.end() - 1; }
   auto next = *unused;
-  next->resize(std::size_t(w) * h * 4);
+  next->resize(std::size_t(Avc::Aligned(w)) * Avc::Aligned(h) * 4);
   std::shared_ptr<std::vector<BYTE>> previous;
   {
     std::scoped_lock lock(frame_guard);
-    previous = shadow;
+    if (frame_width == w && frame_height == h) previous = shadow;
   }
-  bool full = damage.size() == 1 && damage[0].x == 0 && damage[0].y == 0
-    && damage[0].w == int(w) && damage[0].h == int(h);
-  if (!full) {
-    if (previous && previous->size() == next->size()) *next = *previous;
-    else std::ranges::fill(*next, 0);
-  }
-  auto source = std::span(static_cast<BYTE const*>(pixels), std::size_t(pitch) * h);
-  for (auto area : damage)
-    CopyRows(source.subspan(std::size_t(area.y) * pitch + area.x * 4), pitch,
-      std::span(*next).subspan((std::size_t(area.y) * w + area.x) * 4), w * 4, area.h, area.w * 4);
-  std::scoped_lock lock(peers_guard, frame_guard);
-  Picture(w, h);
-  auto resized = frame_width != w || frame_height != h;
-  shadow = std::move(next);
-  frame_width = width = w; frame_height = height = h;
-  ++presented;
-  for (auto const& peer : peers) if (peer->active) {
-    ++peer->dirty_presents;
-    if (resized) { peer->dirty.clear(); peer->Post({0, 0, int(w), int(h)}); }
-    else for (auto area : damage) peer->Post(area);
-  }
+  ComposePicture({static_cast<BYTE const*>(pixels), std::size_t(pitch) * h}, pitch,
+    previous ? std::span<BYTE const>(*previous) : std::span<BYTE const>{}, *next, w, h, damage);
+  Avc::ReplicateEdges(*next, w, h);
+  Publish(std::move(next), w, h, damage);
 }
 }

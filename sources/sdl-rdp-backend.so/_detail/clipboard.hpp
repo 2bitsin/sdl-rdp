@@ -18,7 +18,7 @@ public:
   explicit ClipboardChannel(Peer& peer);
   ~ClipboardChannel();
   bool Open();
-  bool Pump();
+  bool Pump(HANDLE signaled);
   HANDLE Event() const;
 private:
   UINT Announce();

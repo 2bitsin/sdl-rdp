@@ -21,7 +21,7 @@ void State::EnsurePicture()
 {
   std::scoped_lock lock(frame_guard);
   if (shadow) return;
-  shadow = std::make_shared<std::vector<BYTE>>(std::size_t(width) * height * 4);
+  shadow = std::make_shared<std::vector<BYTE>>(std::size_t(Avc::Aligned(width)) * Avc::Aligned(height) * 4);
   frame_width = width; frame_height = height;
   if (current) current->Post({0, 0, int(width), int(height)});
 }
@@ -67,7 +67,7 @@ void Peer::FrameSent(std::size_t bytes)
 {
   Expects(snapshot != nullptr, "sent frame has a snapshot");
   auto now = Clock::now();
-  owner.trace.Line("frame", [&] { return std::format("id={} bytes={}", frame_id, bytes); });
+  if (owner.trace.enabled) trace_pending.push_back(owner.trace.Format("frame", [&] { return std::format("id={} bytes={}", frame_id, bytes); }));
   if (ack_enabled) pending.push_back({frame_id, sequence, now});
   auto elapsed = encoder.encode_time - encoded_at_start;
   encode_total += elapsed;
@@ -111,6 +111,7 @@ void Peer::GraphicsDeadline()
 {
   Expects(client != nullptr, "peer exists");
   if (!connection || Graphics() || Clock::now() < activated_at + GraphicsConnectionWait) return;
+  handle_count = 0;
   gfx.reset();
   gfx_id = UINT32_MAX;
   gfx_attempted = true;
@@ -155,12 +156,12 @@ void Peer::AcceptAcknowledgement(UINT32 id)
   if (found == self.pending.end()) return;
   self.acknowledged = found->sequence;
   auto now = Clock::now();
-  owner.trace.Line("ack", [&] { return std::format("id={} age={:.1f}", id, std::chrono::duration<double, std::milli>(now - found->sent).count()); });
+  if (owner.trace.enabled) trace_pending.push_back(owner.trace.Format("ack", [&] { return std::format("id={} age={:.1f}", id, std::chrono::duration<double, std::milli>(now - found->sent).count()); }));
   for (auto frame = self.pending.begin(); frame != found + 1; ++frame)
     RecordAcknowledgement(now - frame->sent);
   self.pending.erase(self.pending.begin(), found + 1);
   self.owner.frame_changed.notify_all();
-  SetEvent(self.wake.get());
+  self.wake.Transition(WakeEvent::Phase::Pending);
 }
 BOOL Peer::Suppress(rdpContext* context, BYTE allow, RECTANGLE_16 const*)
 {

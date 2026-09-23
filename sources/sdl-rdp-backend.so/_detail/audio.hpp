@@ -8,10 +8,12 @@
 
 namespace Backend {
 struct State;
+class Peer;
 class AudioChannel {
 public:
   using Clock = std::chrono::steady_clock;
-  AudioChannel(State& owner, HANDLE channels, rdpContext* context, HANDLE wake);
+  explicit AudioChannel(Peer& peer);
+  ~AudioChannel();
   bool Initialize();
   bool Pump();
   HANDLE Event() const;
@@ -27,8 +29,9 @@ private:
   static UINT Confirmed(RdpsndServerContext*, BYTE, UINT16);
   void Select(unsigned index);
   void RejectFormats();
+  Peer&  peer;
   State& owner;
-  HANDLE channels, wake;
+  HANDLE channels;
   std::unique_ptr<RdpsndServerContext, Releases<rdpsnd_server_context_free>> sound;
   AUDIO_FORMAT selected{};
   bool rejected = false, gate_warned = false;

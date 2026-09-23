@@ -26,7 +26,9 @@ bool SDL_RDP_ParseCodec(const char *name, sdlrdp_codec *codec)
             return true;
         }
     }
-    return SDL_SetError("Invalid RDP codec: %s", name);
+    SDL_SetError("Invalid SDL_RDP_CODEC '%s'; valid names: auto, planar, remotefx, nscodec, raw, progressive, avc420", name);
+    SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "%s", SDL_GetError());
+    return false;
 }
 
 const char *SDL_RDP_CodecName(sdlrdp_codec codec)

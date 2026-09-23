@@ -303,7 +303,7 @@ TEST_F(Authentication, PendingDisconnectLogLevels) {
       { std::scoped_lock frame(state.frame_guard); peer.dirty.Add({0, 0, 1, 1}); }
       freerdp_set_last_error(peer.client->context, code);
       peer.client->CheckFileDescriptor = [](freerdp_peer*) -> BOOL { return FALSE; };
-      SetEvent(peer.wake.get());
+      peer.wake.Transition(Backend::WakeEvent::Phase::Pending);
     }
     auto message = code == FREERDP_ERROR_CONNECT_FAILED ? "Peer transport failed with pending data:"
                                                        : "Peer disconnected:";

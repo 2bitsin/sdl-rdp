@@ -113,7 +113,7 @@ Peer::Peer(PeerHandle accepted, State& state)
 Peer::~Peer()
 {
   thread.request_stop();
-  SetEvent(wake.get());
+  wake.Transition(WakeEvent::Phase::Pending);
   if (thread.joinable()) thread.join();
   Input::Held(*this).Close();
   if (drive) drive->Disconnect();
@@ -180,6 +180,26 @@ DWORD Peer::EventHandles(std::span<HANDLE> handles)
   Ensures(count - transport_count <= AppendedHandleCount, "appended events fit reserved budget");
   return count;
 }
+bool Peer::PollStep(std::stop_token quit, std::span<HANDLE> handles)
+{
+  DWORD count, timeout;
+  {
+    std::scoped_lock lock(owner.session_guard);
+    GraphicsDeadline();
+    if (!handle_count || !activated) handle_count = EventHandles(handles);
+    count = handle_count;
+    timeout = Timeout();
+  }
+  if (!count) return false;
+  auto result = WaitForMultipleObjects(count, handles.data(), FALSE, timeout);
+  if (result == WAIT_FAILED || quit.stop_requested()) return false;
+  auto ready = result < count ? handles[result] : nullptr;
+  if (result < count) std::ranges::rotate(handles.first(count), handles.begin() + result + 1);
+  auto healthy = TransportStep(quit, ready);
+  std::ranges::for_each(trace_pending, [&](auto const& text) { owner.trace.Emit(text); });
+  trace_pending.clear();
+  return healthy;
+}
 void Peer::Serve(std::stop_token quit)
 {
   Expects(client && wake, "peer owns transport and wake event");
@@ -189,17 +209,7 @@ void Peer::Serve(std::stop_token quit)
   std::array<HANDLE, MAXIMUM_WAIT_OBJECTS> handles{};
   if (Configure() && client->Initialize(client.get())) {
     while (!quit.stop_requested()) {
-      DWORD count, timeout;
-      {
-        std::scoped_lock lock(owner.session_guard);
-        GraphicsDeadline();
-        count = EventHandles(handles);
-        timeout = Timeout();
-      }
-      if (!count) break;
-      if (WaitForMultipleObjects(count, handles.data(), FALSE, timeout) == WAIT_FAILED
-          || quit.stop_requested()) break;
-      if (!TransportStep(quit)) break;
+      if (!PollStep(quit, handles)) break;
     }
     std::scoped_lock lock(owner.session_guard);
     client->Disconnect(client.get());
@@ -210,25 +220,27 @@ void Peer::Serve(std::stop_token quit)
   SetEvent(owner.reap.get());
   ResetAuthenticationLogging();
 }
-bool Peer::OpenStaticChannels()
+bool Peer::OpenStaticChannels(HANDLE ready)
 {
   if (!clipboard && WTSVirtualChannelManagerIsChannelJoined(channels, CLIPRDR_SVC_CHANNEL_NAME)) {
+    handle_count = 0;
     clipboard = std::make_unique<ClipboardChannel>(*this);
     if (!clipboard->Open()) return false;
   }
   if (!drive && WTSVirtualChannelManagerIsChannelJoined(channels, "rdpdr")) {
+    handle_count = 0;
     drive = std::make_shared<DriveChannel>(*this);
     drive->Open();
   }
-  if (drive) drive->Pump();
-  return !clipboard || clipboard->Pump();
+  if (drive) drive->Pump(ready);
+  return !clipboard || clipboard->Pump(ready);
 }
-bool Peer::Channels()
+bool Peer::Channels(HANDLE ready)
 {
   Expects(client && client->context, "channel peer exists");
   if (!channels || !active) return true;
   return WTSVirtualChannelManagerCheckFileDescriptor(channels)
-    && Input::Held(*this).Channels(*this) && OpenStaticChannels() && OpenDisplayControl() && GraphicsChannel();
+    && Input::Held(*this).Channels(*this, ready) && OpenStaticChannels(ready) && OpenDisplayControl() && GraphicsChannel(ready);
 }
 void Peer::TransportEnded()
 {
@@ -257,7 +269,7 @@ BOOL Peer::Activate(freerdp_peer* client)
   Expects(client != nullptr, "peer exists");
   Expects(client->context != nullptr, "peer context exists");
   auto& self = Held(client);
-  if (self.active.load()) { SetEvent(self.wake.get()); return TRUE; }
+  if (self.active.load()) { self.wake.Transition(WakeEvent::Phase::Pending); return TRUE; }
   if (!AuthenticateSettings(client)) return FALSE;
   if (!SendCookie(client->context)) return FALSE;
   if (!self.encoder.Select(client->context->settings, self.owner.codec.load())) return FALSE;
@@ -275,16 +287,16 @@ BOOL Peer::Activate(freerdp_peer* client)
 void Peer::Post(sdlrdp_rect area)
 {
   dirty.Add(area);
-  SetEvent(wake.get());
+  wake.Transition(WakeEvent::Phase::Pending);
 }
-bool Peer::TransportStep(std::stop_token quit)
+bool Peer::TransportStep(std::stop_token quit, HANDLE ready)
 {
   Expects(client != nullptr, "peer exists");
   Expects(client->context != nullptr, "peer context exists");
   {
     std::scoped_lock lock(owner.session_guard);
     if (quit.stop_requested()) return false;
-    if (!client->CheckFileDescriptor(client.get()) || !Channels() || !SoundChannel() || !Drain()) {
+    if (!client->CheckFileDescriptor(client.get()) || !Channels(ready) || !SoundChannel(ready) || !Drain()) {
       TransportEnded();
       return false;
     }
@@ -344,12 +356,12 @@ bool Peer::Drain()
   if (client->DrainOutputBuffer(client.get()) < 0) return false;
   if (client->IsWriteBlocked(client.get())) {
     std::scoped_lock lock(owner.frame_guard);
-    ResetEvent(wake.get());
+    wake.Transition(WakeEvent::Phase::Idle);
     return true;
   }
   {
     std::scoped_lock lock(owner.frame_guard);
-    ResetEvent(wake.get());
+    wake.Transition(WakeEvent::Phase::Idle);
     if (!freerdp_is_active_state(client->context)) return true;
     if (resizing) {
       resizing = false;
@@ -409,8 +421,8 @@ sdlrdp_rect Peer::CaptureFrame()
   frames_coalesced += dirty_presents ? dirty_presents - 1 : 0;
   dirty_presents = 0;
   encoded_at_start = encoder.encode_time;
-  sending = std::move(dirty);
-  dirty = {};
+  sending.rects.swap(dirty.rects);
+  dirty.clear();
   return picture;
 }
 bool Peer::ResizeDesktop(sdlrdp_rect picture)

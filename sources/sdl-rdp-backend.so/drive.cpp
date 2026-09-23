@@ -65,7 +65,7 @@ void DriveChannel::Write(DrivePacket const& packet)
   ULONG written = 0;
   if (!WTSVirtualChannelWrite(channel, reinterpret_cast<char*>(const_cast<uint8_t*>(packet.bytes.data())),
       packet.bytes.size(), &written) || written != packet.bytes.size()) throw std::runtime_error("Drive transport disconnected.");
-  SetEvent(peer.wake.get());
+  peer.wake.Transition(WakeEvent::Phase::Pending);
 }
 void DriveChannel::Capabilities()
 {
@@ -204,10 +204,11 @@ void DriveChannel::Receive(DrivePacket& packet)
   default: break;
   }
 }
-bool DriveChannel::Pump()
+bool DriveChannel::Pump(HANDLE signaled)
 {
   std::scoped_lock lock(mutex);
   if (!connected) { CloseTransport(); return true; }
+  if (signaled != event) return true;
   try {
     for (;;) {
       auto ready = WaitForSingleObject(event, 0);
@@ -239,10 +240,10 @@ void DriveChannel::Shutdown()
   while (!devices.empty()) Remove(devices.begin()->second.wire);
   pending.clear();
   changed.notify_all();
-  SetEvent(peer.wake.get());
+  peer.wake.Transition(WakeEvent::Phase::Pending);
 }
 void DriveChannel::CloseTransport() {
-  if (channel) WTSVirtualChannelClose(channel);
+  if (channel) { peer.handle_count = 0; WTSVirtualChannelClose(channel); }
   channel = nullptr;
   event = nullptr;
 }
