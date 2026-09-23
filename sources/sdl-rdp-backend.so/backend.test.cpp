@@ -1260,8 +1260,9 @@ protected:
     SoundClient audio(client);
     ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
     ASSERT_TRUE(freerdp_input_send_keyboard_event(client.instance->context->input, KBD_FLAGS_DOWN, 0x1e));
-    std::vector<INT16> pcm(960 * 2 * 3, -1234);
-    ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 2880), 2880);
+    auto frames = 3 * (audio.rate / 50);
+    std::vector<INT16> pcm(frames * 2, -1234);
+    ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), frames), frames);
     Present(std::vector<UINT32>(320 * 200, 0xff123456), 320, 200);
     ASSERT_TRUE(client.Until([&] { return audio.samples.size() == pcm.size() && Acknowledged(); }));
     auto events = EventsUntil([](auto const& events) {
@@ -1330,9 +1331,10 @@ TEST_F(AudioGate, AudioPcmAndReconnect) {
     ASSERT_EQ(audio.server_formats.size(), 2u);
     EXPECT_EQ(audio.server_formats[0].nSamplesPerSec, 44100u);
     EXPECT_EQ(audio.server_formats[1].nSamplesPerSec, 48000u);
-    std::array<INT16, 1764> pcm{};
+    auto frames = audio.rate / 50;
+    std::vector<INT16> pcm(frames * 2);
     std::iota(pcm.begin(), pcm.end(), -480);
-    ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 882), 882);
+    ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), frames), frames);
     ASSERT_TRUE(client.Until([&] { return audio.samples.size() >= pcm.size(); }));
     EXPECT_EQ(audio.samples.size(), pcm.size());
     EXPECT_EQ(audio.samples.front(), pcm.front());
@@ -1394,8 +1396,9 @@ TEST_F(AudioGate, AudioBothRatesPrefer44100) {
   EXPECT_EQ(audio.server_formats[0].nSamplesPerSec, 44100u);
   EXPECT_EQ(audio.server_formats[1].nSamplesPerSec, 48000u);
   EXPECT_EQ(sdlrdp_audio_rate(backend.get()), 44100u);
-  std::vector<INT16> pcm(882 * 2, 1234);
-  ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 882), 882);
+  auto frames = audio.rate / 50;
+  std::vector<INT16> pcm(frames * 2, 1234);
+  ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), frames), frames);
   ASSERT_TRUE(client.Until([&] { return audio.samples.size() == pcm.size(); }));
   EXPECT_EQ(audio.samples, pcm);
 }
