@@ -170,6 +170,8 @@ public:
 
   Clock::time_point first_sent{}, last_ack{};
   double ack_interval = 0;
+  uint64_t avc_frames = 0;
+  std::chrono::nanoseconds avc_convert{}, avc_upload{}, avc_encode{};
   uint64_t frames_sent = 0, frames_coalesced = 0, dirty_presents = 0, ack_count = 0, ack_over_100ms = 0;
   std::chrono::nanoseconds encoded_at_start{}, encode_total{}, encode_max{}, ack_total{}, ack_max{};
   unsigned refresh = 0, screen_width = 0, screen_height = 0;

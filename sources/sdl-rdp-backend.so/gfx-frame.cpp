@@ -52,7 +52,7 @@ bool GfxChannel::Avc420()
   Avc::Regions regions;
   for (auto rect : peer.sending.rects) {
     auto area = ScaleDamage(rect, peer);
-    ScaleBand(peer, area, std::span(pixels).subspan((std::size_t(area.y) * width + area.x) * 4), false, width * 4);
+    Snapshot(peer, area, std::span(pixels).subspan((std::size_t(area.y) * width + area.x) * 4), false, width * 4);
     regions.Add(area);
   }
   auto data = avc.Encode(pixels, width * 4, force_idr);
@@ -61,6 +61,15 @@ bool GfxChannel::Avc420()
   force_idr = false;
   auto bounds = regions.bounds;
   return Command(bounds, data, RDPGFX_CODECID_AVC420, std::move(regions));
+}
+void GfxChannel::AccountAvcFrame()
+{
+  Expects(!prepared.empty(), "accounting a prepared frame");
+  if (prepared.front().codec != RDPGFX_CODECID_AVC420) return;
+  ++peer.avc_frames;
+  peer.avc_convert += avc.convert_time;
+  peer.avc_upload += avc.upload_time;
+  peer.avc_encode += avc.encode_time;
 }
 bool GfxChannel::Command(sdlrdp_rect area, std::span<BYTE const> data, UINT32 codec, Avc::Regions regions)
 {
@@ -101,7 +110,7 @@ bool GfxChannel::Progressive()
   region16_init(&damage);
   for (auto rect : peer.sending.rects) {
     auto area = ScaleDamage(rect, peer);
-    ScaleBand(peer, area, std::span(pixels).subspan((std::size_t(area.y) * width + area.x) * 4), false, width * 4);
+    Snapshot(peer, area, std::span(pixels).subspan((std::size_t(area.y) * width + area.x) * 4), false, width * 4);
     RECTANGLE_16 wire{UINT16(area.x), UINT16(area.y), UINT16(area.x + area.w), UINT16(area.y + area.h)};
     if (!region16_union_rect(&damage, &damage, &wire)) { region16_uninit(&damage); return false; }
   }
@@ -138,7 +147,7 @@ bool GfxChannel::Raw()
   for (auto rect : peer.sending.rects) {
     auto area = ScaleDamage(rect, peer);
     band.resize(std::size_t(area.w) * area.h * 4);
-    ScaleBand(peer, area, band, false);
+    Snapshot(peer, area, band, false);
     if (!Command(area, band, RDPGFX_CODECID_UNCOMPRESSED)) return false;
   }
   return true;
@@ -152,7 +161,7 @@ bool GfxChannel::Planar()
     band.resize(std::size_t(area.w) * 4);
     for (int y = area.y; y < area.y + area.h; ++y) {
       sdlrdp_rect row{area.x, y, area.w, 1};
-      ScaleBand(peer, row, band, false);
+      Snapshot(peer, row, band, false);
       if (!encoder.Encode(band, area.w, 1)
           || !Command(row, encoder.payload, RDPGFX_CODECID_PLANAR)) return false;
     }
@@ -189,6 +198,7 @@ bool GfxChannel::Send()
     if (!WriteCommand(packet.area, packet.data, packet.codec, packet.regions)) return false;
   if (!Check(context->EndFrame(context.get(), &end), "end frame")) return false;
   std::scoped_lock lock(peer.owner.frame_guard);
+  AccountAvcFrame();
   peer.FrameSent(frame_bytes);
   last_bytes = frame_bytes;
   prepared.clear();

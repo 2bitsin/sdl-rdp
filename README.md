@@ -145,7 +145,8 @@ another acknowledgement arrives. Capabilities are logged at INFO once per peer;
 `SDL_LOGGING=video=info` shows them in SDL applications.
 At disconnect, the INFO `Frames:` line reports sent and coalesced frames, mean and
 maximum encode and acknowledgement times, and the count of acknowledgements over
-100 ms; the adjacent `Audio:` line, when a sound channel exists, reports blocks
+100 ms. Connections that sent AVC420 frames also report mean conversion, input
+upload, and NVENC times for those frames; the adjacent `Audio:` line, when a sound channel exists, reports blocks
 sent, mean and maximum gaps between sends, and the count of gaps over 40 ms.
 
 | Client | Progressive | AVC420 | AVC444 |

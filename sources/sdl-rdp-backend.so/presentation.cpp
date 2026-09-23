@@ -78,10 +78,13 @@ void Peer::LogFrames()
 {
   Expects(activated, "statistics belong to an activated connection");
   using Milliseconds = std::chrono::duration<double, std::milli>;
+  auto phases = avc_frames ? std::format(" (convert {:.1f}, upload {:.1f}, nvenc {:.1f})",
+    Milliseconds(avc_convert).count() / avc_frames, Milliseconds(avc_upload).count() / avc_frames,
+    Milliseconds(avc_encode).count() / avc_frames) : std::string{};
   owner.Log(SDLRDP_LOG_INFO, std::format(
-    "Frames: {} sent, {} coalesced; encode {:.1f} ms mean, {:.1f} ms max; acknowledgement {:.1f} ms mean, {:.1f} ms max, {} over 100 ms.",
+    "Frames: {} sent, {} coalesced; encode {:.1f} ms mean, {:.1f} ms max{}; acknowledgement {:.1f} ms mean, {:.1f} ms max, {} over 100 ms.",
     frames_sent, frames_coalesced, frames_sent ? Milliseconds(encode_total).count() / frames_sent : 0,
-    Milliseconds(encode_max).count(), ack_count ? Milliseconds(ack_total).count() / ack_count : 0,
+    Milliseconds(encode_max).count(), phases, ack_count ? Milliseconds(ack_total).count() / ack_count : 0,
     Milliseconds(ack_max).count(), ack_over_100ms));
 }
 bool Peer::Marker(UINT16 action)

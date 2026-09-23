@@ -30,6 +30,7 @@
 #include <thread>
 #include "_detail/test-io.hpp"
 #include "_detail/test-logs.hpp"
+#include "_detail/test-pattern.hpp"
 #include <charconv>
 #include <format>
 #include <mutex>
@@ -1277,13 +1278,12 @@ TEST_F(AudioGate, AudioContinuousUnderProgressiveLoad) {
   };
   auto presenting = std::async(std::launch::async, [&] {
     std::vector<UINT32> pixels(1280 * 800);
-    std::mt19937 random(17);
     sdlrdp_rect full{0, 0, 1280, 800};
     auto deadline = Clock::now() + std::chrono::seconds(2);
     unsigned presented = 0;
     while (Clock::now() < deadline) {
       if (!sdlrdp_wait_frame(backend.get(), 10)) continue;
-      std::ranges::generate(pixels, [&] { return random() & 0x00ffffff; });
+      Headless::MovingTilePattern(pixels, 1280, 800, presented);
       if (sdlrdp_present(backend.get(), pixels.data(), 5120, 1280, 800, &full, 1)) break;
       ++presented;
     }

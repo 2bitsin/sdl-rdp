@@ -72,7 +72,7 @@ struct Encoder::Impl {
   bool Session();
   bool Initialize(unsigned bitrate, unsigned fps);
   bool Buffers();
-  bool Fill(std::span<BYTE const> bgrx, unsigned stride);
+  bool Fill(std::span<BYTE const> bgrx, unsigned stride, Encoder& timing);
   void Close();
 };
 bool Encoder::Impl::Check(int status, char const* operation)
@@ -144,14 +144,18 @@ bool Encoder::Impl::Buffers()
   output = out.bitstreamBuffer;
   return true;
 }
-bool Encoder::Impl::Fill(std::span<BYTE const> bgrx, unsigned stride)
+bool Encoder::Impl::Fill(std::span<BYTE const> bgrx, unsigned stride, Encoder& timing)
 {
   Expects(session && input, "encoder owns input buffer");
+  using Clock = std::chrono::steady_clock;
+  auto start = Clock::now();
   auto pixels = bgrx.data();
   if (width != w || height != h) {
     Pad(bgrx, stride, width, height, padded);
     pixels = padded.data(); stride = w * 4;
   }
+  timing.convert_time = Clock::now() - start;
+  start = Clock::now();
   NV_ENC_LOCK_INPUT_BUFFER lock{};
   lock.version = NV_ENC_LOCK_INPUT_BUFFER_VER; lock.inputBuffer = input;
   if (!Check(api.nvEncLockInputBuffer(session, &lock), "lock input")) return false;
@@ -159,9 +163,14 @@ bool Encoder::Impl::Fill(std::span<BYTE const> bgrx, unsigned stride)
   auto y = static_cast<BYTE*>(lock.bufferDataPtr);
   BYTE* planes[]{y, y + std::size_t(lock.pitch) * h, y + std::size_t(lock.pitch) * h * 5 / 4};
   UINT32 pitches[]{lock.pitch, lock.pitch / 2, lock.pitch / 2};
+  timing.upload_time = Clock::now() - start;
+  start = Clock::now();
   prim_size_t size{w, h};
   auto status = primitives_get()->RGBToYUV420_8u_P3AC4R(pixels, PIXEL_FORMAT_BGRX32, stride, planes, pitches, &size);
+  timing.convert_time += Clock::now() - start;
+  start = Clock::now();
   auto unlocked = Check(api.nvEncUnlockInputBuffer(session, input), "unlock input");
+  timing.upload_time += Clock::now() - start;
   return Check(status, "BT.709 conversion") && unlocked;
 }
 void Encoder::Impl::Close()
@@ -212,15 +221,20 @@ bool Encoder::Open(unsigned width, unsigned height, unsigned bitrate, unsigned f
 std::span<BYTE const> Encoder::Encode(std::span<BYTE const> bgrx, unsigned stride, bool force_idr)
 {
   Expects(IsOpen(), "encoder is open");
-  if (!impl->Fill(bgrx, stride)) return {};
+  Expects(stride >= impl->width * 4 && bgrx.size() >= std::size_t(impl->height - 1) * stride + impl->width * 4,
+    "source contains the whole BGRX picture");
+  convert_time = upload_time = encode_time = {};
+  if (!impl->Fill(bgrx, stride, *this)) return {};
   NV_ENC_PIC_PARAMS pic{}; pic.version = NV_ENC_PIC_PARAMS_VER;
   pic.inputBuffer = impl->input; pic.outputBitstream = impl->output;
   pic.bufferFmt = NV_ENC_BUFFER_FORMAT_IYUV; pic.pictureStruct = NV_ENC_PIC_STRUCT_FRAME;
   pic.inputWidth = impl->w; pic.inputHeight = impl->h;
   if (force_idr || impl->first) pic.encodePicFlags = NV_ENC_PIC_FLAG_FORCEIDR | NV_ENC_PIC_FLAG_OUTPUT_SPSPPS;
+  auto start = std::chrono::steady_clock::now();
   if (!impl->Check(impl->api.nvEncEncodePicture(impl->session, &pic), "encode picture")) return {};
   NV_ENC_LOCK_BITSTREAM lock{}; lock.version = NV_ENC_LOCK_BITSTREAM_VER; lock.outputBitstream = impl->output;
   if (!impl->Check(impl->api.nvEncLockBitstream(impl->session, &lock), "lock bitstream")) return {};
+  encode_time = std::chrono::steady_clock::now() - start;
   auto data = static_cast<BYTE const*>(lock.bitstreamBufferPtr);
   impl->encoded.assign(data, data + lock.bitstreamSizeInBytes);
   if (!impl->Check(impl->api.nvEncUnlockBitstream(impl->session, impl->output), "unlock bitstream")) return {};

@@ -25,6 +25,7 @@ public:
   bool Budget() const;
   bool confirmed = false;
 private:
+  void AccountAvcFrame();
   bool Surface();
   bool Select();
   bool Progressive();

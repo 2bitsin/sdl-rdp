@@ -2,6 +2,7 @@
 #include "contract.hpp"
 #include "sdl-rdp-backend.h"
 #include <freerdp/channels/rdpgfx.h>
+#include <chrono>
 #include <memory>
 #include <span>
 #include <string>
@@ -23,6 +24,7 @@ struct Regions {
 };
 class Encoder {
 public:
+  std::chrono::nanoseconds convert_time{}, upload_time{}, encode_time{};
   Encoder();
   ~Encoder();
   Encoder(Encoder const&) = delete;

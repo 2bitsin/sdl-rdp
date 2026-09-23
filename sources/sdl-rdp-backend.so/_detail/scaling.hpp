@@ -1,5 +1,6 @@
 #pragma once
 #include "state.hpp"
+#include "copy-rows.hpp"
 #include <cmath>
 
 namespace Backend {
@@ -53,5 +54,23 @@ inline void ScaleBand(Peer& peer, sdlrdp_rect area, std::span<BYTE> buffer, bool
       }
     }
   }
+}
+struct Frame { sdlrdp_rect area; std::span<BYTE> pixels; };
+inline auto Snapshot(Peer& peer, sdlrdp_rect area, std::span<BYTE> buffer, bool flip, std::size_t pitch = 0) -> Frame
+{
+  Expects(area.w > 0 && area.h > 0, "damage has positive extent");
+  Expects(peer.snapshot && area.x >= 0 && area.y >= 0
+    && area.x + area.w <= peer.desktop.w && area.y + area.h <= peer.desktop.h, "band fits snapshot desktop");
+  auto stride = std::size_t(area.w) * 4;
+  if (!pitch) pitch = stride;
+  auto size = (area.h - 1) * pitch + stride;
+  Expects(pitch >= stride && size <= buffer.size(), "wire band fits scratch storage");
+  // Uncompressed RDP bitmap rows travel bottom-up (MS-RDPBCGR 2.2.9.1.1.3.1.2.2).
+  if (peer.desktop.w != int(peer.snapshot_width) || peer.desktop.h != int(peer.snapshot_height))
+    ScaleBand(peer, area, buffer, flip, pitch);
+  else CopyRows(std::span<BYTE const>(*peer.snapshot).subspan(
+    (std::size_t(area.y) * peer.snapshot_width + area.x) * 4), peer.snapshot_width * 4,
+    buffer, pitch, area.h, stride, flip);
+  return {area, buffer.first(size)};
 }
 }

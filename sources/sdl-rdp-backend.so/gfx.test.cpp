@@ -4,6 +4,7 @@
 #include "_detail/headless-gfx.hpp"
 #include "_detail/headless-tls.hpp"
 #include "_detail/test-logs.hpp"
+#include "_detail/test-pattern.hpp"
 #include <filesystem>
 #include "_detail/state.hpp"
 #include <regex>
@@ -378,6 +379,38 @@ protected:
     if (!certificates.empty()) std::filesystem::remove_all(certificates);
   }
 };
+TEST_F(GraphicsResize, RawAspectMatchesBilinear) {
+  ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_RAW), 0);
+  ASSERT_EQ(sdlrdp_set_aspect(backend.get(), {4, 3}), 0);
+  Headless::Client client(sdlrdp_port(backend.get()), true, 320, 240);
+  client.EnableGraphics();
+  Headless::GraphicsObserver observer(client);
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  std::vector<UINT32> pixels(320 * 200);
+  std::mt19937 random(17);
+  std::ranges::generate(pixels, [&] { return random() & 0x00ffffff; });
+  sdlrdp_rect full{0, 0, 320, 200};
+  ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &full, 1), 0);
+  ASSERT_TRUE(client.Until([&] { return !observer.frames.empty(); })) << logs.Text(true);
+  auto gdi = client.instance->context->gdi;
+  ASSERT_EQ(gdi->width, 320); ASSERT_EQ(gdi->height, 240);
+  ASSERT_EQ(observer.frames.size(), 1u);
+  for (int y = 0; y < 240; ++y) {
+    auto position = std::clamp((y + 0.5) * (200.0 / 240) - 0.5, 0.0, 199.0);
+    auto first = unsigned(position), second = std::min(first + 1, 199u);
+    auto weight = float(position - first);
+    auto actual = reinterpret_cast<UINT32 const*>(gdi->primary_buffer + y * gdi->stride);
+    for (int x = 0; x < 320; ++x) {
+      UINT32 expected = 0;
+      for (unsigned c = 0; c < 3; ++c) {
+        float a = (pixels[first * 320 + x] >> (c * 8)) & 255;
+        float b = (pixels[second * 320 + x] >> (c * 8)) & 255;
+        expected |= UINT32(BYTE(a + (b - a) * weight + 0.5f)) << (c * 8);
+      }
+      ASSERT_EQ(actual[x] & 0xffffff, expected) << x << ',' << y;
+    }
+  }
+}
 TEST_F(GraphicsResize, ProgressiveContextAndFullDamage) {
   Headless::Client client(sdlrdp_port(backend.get()), true, 640, 480);
   client.EnableGraphics();
@@ -412,13 +445,13 @@ protected:
   Headless::Logs logs;
   std::filesystem::path directory;
   std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> backend{nullptr, sdlrdp_close};
-  void SetUp() override {
+  void Open(unsigned width = 1280, unsigned height = 800, sdlrdp_codec codec = SDLRDP_CODEC_PROGRESSIVE) {
     char pattern[] = "/tmp/sdlrdp-cost-XXXXXX";
     auto path = mkdtemp(pattern);
     ASSERT_NE(path, nullptr);
     directory = path;
-    sdlrdp_config config{"127.0.0.1", 0, directory.c_str(), 1280, 800, 0, Headless::Logs::Collect, &logs};
-    config.codec = SDLRDP_CODEC_PROGRESSIVE;
+    sdlrdp_config config{"127.0.0.1", 0, directory.c_str(), width, height, 0, Headless::Logs::Collect, &logs};
+    config.codec = codec;
     sdlrdp_handle* handle = nullptr;
     ASSERT_EQ(sdlrdp_open(&config, &handle), 0);
     backend.reset(handle);
@@ -426,10 +459,11 @@ protected:
   }
   void TearDown() override {
     backend.reset();
-    std::filesystem::remove_all(directory);
+    if (!directory.empty()) std::filesystem::remove_all(directory);
   }
 };
 TEST_F(GraphicsCost, FullRandomFrame) {
+  ASSERT_NO_FATAL_FAILURE(Open());
   Headless::Client client(sdlrdp_port(backend.get()), true, 1280, 800);
   client.EnableGraphics();
   Headless::GraphicsObserver observer(client);
@@ -461,4 +495,52 @@ TEST_F(GraphicsCost, FullRandomFrame) {
   // measured 2026-09-23 on the dev box, 88 cores: 138 ms without threads, 228 ms with the WinPR pool
   EXPECT_LT(milliseconds, 200.0);
 }
+void RecordAvcCost(Headless::Logs& logs) {
+  auto text = logs.Text(true);
+  std::smatch match;
+  ASSERT_TRUE(std::regex_search(text, match, std::regex(
+    R"(Frames: 10 sent, 0 coalesced; encode ([0-9.]+) ms mean, ([0-9.]+) ms max \(convert ([0-9.]+), upload ([0-9.]+), nvenc ([0-9.]+)\); acknowledgement)"))) << text;
+  for (auto [name, index] : {std::pair{"encode_ms", 1}, {"convert_ms", 3}, {"upload_ms", 4}, {"nvenc_ms", 5}})
+    testing::Test::RecordProperty(name, match[index].str());
+  testing::Test::RecordProperty("statistics", match.str());
+  // measured 2026-09-23 on an RTX 3090 at 1920x1080: 8.8 ms mean, 16.4 ms max after the row-copy dispatch (45.2 before)
+  EXPECT_LT(std::stod(match[1]), 20.0);
+  std::cout << match.str() << '\n';
+}
+TEST_F(GraphicsCost, AvcFullFrame) {
+  auto selected = primitives_get();
+  auto generic = primitives_get_generic();
+  auto cpu = primitives_get_by_type(PRIMITIVES_ONLY_CPU);
+  ASSERT_NE(selected, nullptr); ASSERT_NE(generic, nullptr); ASSERT_NE(cpu, nullptr);
+  RecordProperty("primitives_flags", std::to_string(primitives_flags(selected)));
+  RecordProperty("primitives_extcpu", bool(primitives_flags(selected) & PRIM_FLAGS_HAVE_EXTCPU));
+  RecordProperty("rgb_to_yuv420_generic", selected->RGBToYUV420_8u_P3AC4R == generic->RGBToYUV420_8u_P3AC4R);
+  RecordProperty("rgb_to_yuv420_cpu_optimized", cpu->RGBToYUV420_8u_P3AC4R != generic->RGBToYUV420_8u_P3AC4R);
+  std::cout << "FreeRDP primitives flags: " << primitives_flags(selected)
+    << "; RGBToYUV420 generic: " << (selected->RGBToYUV420_8u_P3AC4R == generic->RGBToYUV420_8u_P3AC4R)
+    << "; CPU optimized available: " << (cpu->RGBToYUV420_8u_P3AC4R != generic->RGBToYUV420_8u_P3AC4R) << '\n';
+  if (!Backend::Avc::Encoder::Available()) GTEST_SKIP() << Backend::Avc::Encoder::UnavailableReason();
+  ASSERT_NO_FATAL_FAILURE(Open(1920, 1080, SDLRDP_CODEC_AVC420));
+  Headless::Client client(sdlrdp_port(backend.get()), true, 1920, 1080);
+  client.EnableGraphics(true);
+  Headless::GraphicsObserver observer(client);
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
+  std::vector<UINT32> pixels(1920 * 1080);
+  sdlrdp_rect full{0, 0, 1920, 1080};
+  for (unsigned frame = 0; frame < 10; ++frame) {
+    Headless::MovingTilePattern(pixels, 1920, 1080, frame);
+    ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 7680, 1920, 1080, &full, 1), 0);
+    ASSERT_TRUE(client.Until([&] {
+      std::scoped_lock lock(backend->state->frame_guard);
+      return backend->state->current->acknowledged == frame + 1;
+    })) << logs.Text(true);
+  }
+  ASSERT_EQ(observer.avc_nals.size(), 10u);
+  ASSERT_EQ(observer.frames.size(), 10u);
+  freerdp_disconnect(client.instance.get());
+  backend.reset();
+  RecordAvcCost(logs);
+}
+
 }
