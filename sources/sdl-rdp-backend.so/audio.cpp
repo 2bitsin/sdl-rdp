@@ -75,7 +75,7 @@ unsigned AudioChannel::Rate() const { return ready ? selected.nSamplesPerSec : 0
 unsigned AudioChannel::Remaining() const
 {
   Expects(ready, "audio has a selected format");
-  return selected.nSamplesPerSec / 100 - unsigned(buffer.size() / 2);
+  return selected.nSamplesPerSec / 50 - unsigned(buffer.size() / 2);
 }
 void AudioChannel::Reset()
 {
@@ -131,7 +131,6 @@ void AudioChannel::AdoptServerClock()
 {
   Expects(ready, "audio has a selected format");
   auto now = Clock::now();
-  // 500 ms permits five default latency windows before abandoning an absent confirmation path.
   if (server_clock || has_confirmation || first == Clock::time_point{}
       || now - first < std::chrono::milliseconds(500)) return;
   server_clock = true;
@@ -155,7 +154,13 @@ bool AudioChannel::Ready()
   }
   if (!buffer.empty()) return true;
   auto unused = std::ranges::find(pending, sound->block_no, &Block::id) == pending.end();
-  return unused && (sent <= credit || sent - credit < uint64_t(owner.audio_latency) * Rate() / 1000);
+  auto available = unused && (sent <= credit || sent - credit < uint64_t(owner.audio_latency) * Rate() / 1000);
+  if (!available && !gate_warned) {
+    gate_warned = true;
+    owner.Log(SDLRDP_LOG_WARN, std::format("Audio confirmation gate waiting: client is {:.3f} ms behind.",
+      (sent > credit ? sent - credit : 0) * 1000.0 / Rate()));
+  }
+  return available;
 }
 UINT AudioChannel::Confirmed(RdpsndServerContext* context, BYTE id, UINT16 timestamp)
 {

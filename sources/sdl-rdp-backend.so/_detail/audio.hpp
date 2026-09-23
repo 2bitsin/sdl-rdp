@@ -30,7 +30,7 @@ private:
   HANDLE wake;
   std::unique_ptr<RdpsndServerContext, Releases<rdpsnd_server_context_free>> sound;
   AUDIO_FORMAT selected{};
-  bool rejected = false;
+  bool rejected = false, gate_warned = false;
   bool ready = false, server_clock = false, has_confirmation = false;
   uint64_t sent = 0, confirmed = 0, clock_frames = 0;
   Clock::time_point first{}, clock_start{};

@@ -605,7 +605,7 @@ INSTANTIATE_TEST_SUITE_P(Codec, Gate, testing::Values(
 using Headless::FrameObserver;
 class RoundFive : public testing::Test, protected BackendEvents {
 protected:
-  void Open(unsigned w = 640, unsigned h = 480, sdlrdp_aspect aspect = {}, sdlrdp_codec codec = SDLRDP_CODEC_RAW, unsigned audio_latency = 100) {
+  void Open(unsigned w = 640, unsigned h = 480, sdlrdp_aspect aspect = {}, sdlrdp_codec codec = SDLRDP_CODEC_RAW, unsigned audio_latency = 0) {
     sdlrdp_config config{"127.0.0.1", 0, certificates.path.c_str(), w, h, 0, Logs::Collect, &logs};
     config.aspect = aspect; config.codec = codec; config.audio_latency_ms = audio_latency;
     InitializeTls(config);
@@ -1020,11 +1020,11 @@ protected:
   void EstablishConfirmations(Client& client, SoundClient& audio) {
     // Fill one latency window, then return its credit. This distinguishes a
     // slow confirming client from the deliberate no-confirmation fallback.
-    std::vector<INT16> pcm(4800 * 2);
+    std::vector<INT16> pcm(24000 * 2);
     auto automatic = audio.auto_confirm;
     audio.auto_confirm = true;
-    ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 4800), 4800);
-    ASSERT_TRUE(client.Until([&] { return audio.confirmed_frames == 4800; }));
+    ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 24000), 24000);
+    ASSERT_TRUE(client.Until([&] { return audio.confirmed_frames == 24000; }));
     ASSERT_EQ(sdlrdp_audio_wait(backend.get(), 10000), 1);
     audio.auto_confirm = automatic;
     audio.samples.clear();
@@ -1054,9 +1054,9 @@ TEST_F(AudioGate, AudioPcmAndReconnect) {
     ASSERT_EQ(audio.server_formats.size(), 2u);
     EXPECT_EQ(audio.server_formats[0].nSamplesPerSec, 48000u);
     EXPECT_EQ(audio.server_formats[1].nSamplesPerSec, 44100u);
-    std::array<INT16, 960> pcm{};
+    std::array<INT16, 1920> pcm{};
     std::iota(pcm.begin(), pcm.end(), -480);
-    ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 480), 480);
+    ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 960), 960);
     ASSERT_TRUE(client.Until([&] { return audio.samples.size() >= pcm.size(); }));
     EXPECT_EQ(audio.samples.size(), pcm.size());
     EXPECT_EQ(audio.samples.front(), pcm.front());
@@ -1117,16 +1117,16 @@ TEST_F(AudioGate, AudioInitialVolume) {
   audio.volume = 0x8000ffffu;
   ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
   EXPECT_EQ(sdlrdp_audio_rate(backend.get()), 44100u);
-  std::vector<INT16> pcm(441 * 2);
+  std::vector<INT16> pcm(882 * 2);
   std::generate(pcm.begin(), pcm.end(), [i = 0]() mutable { return ++i % 2 ? -12000 : 12000; });
   ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 44), 44);
-  ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data() + 88, 397), 397);
+  ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data() + 88, 838), 838);
   ASSERT_TRUE(client.Until([&] { return audio.samples.size() == pcm.size(); }));
   for (auto frame : audio.samples | std::views::chunk(2)) {
     EXPECT_EQ(frame[0], -12000);
     EXPECT_EQ(frame[1], 6000);
   }
-  RecordProperty("volume_pcm", "44100 Hz; 44+397 frames; left=-12000 right=6000; volume=0x8000ffff");
+  RecordProperty("volume_pcm", "44100 Hz; 44+838 frames; left=-12000 right=6000; volume=0x8000ffff");
 }
 TEST_F(AudioGate, AudioSlowConfirmsBoundTenSeconds) {
   Open(320, 200);
@@ -1148,9 +1148,51 @@ TEST_F(AudioGate, AudioSlowConfirmsBoundTenSeconds) {
   }
   if (audio.confirmed_frames < 480000) sdlrdp_audio_close(backend.get());
   EXPECT_EQ(audio.confirmed_frames, 480000u);
-  EXPECT_LE(audio.maximum_pending_frames, 5280u);
+  EXPECT_LE(audio.maximum_pending_frames, 24960u);
+  EXPECT_TRUE(logs.Contains(SDLRDP_LOG_WARN, "Audio confirmation gate waiting: client is 500.000 ms behind."));
+  RecordProperty("audio_diagnostics", logs.Text(true));
   EXPECT_EQ(writing.get(), 480000);
   RecordProperty("maximum_unconfirmed_ms", std::to_string(audio.maximum_pending_frames / 48.0));
+}
+TEST_F(AudioGate, AudioPlaybackConfirmsKeepRealtimeStreamContinuous) {
+  Open(320, 200);
+  ASSERT_EQ(sdlrdp_audio_open(backend.get()), 0);
+  Client client(sdlrdp_port(backend.get()), true);
+  SoundClient audio(client);
+  audio.auto_confirm = false;
+  ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
+  auto writing = std::async(std::launch::async, [&] {
+    std::array<INT16, 480 * 2> pcm{};
+    auto start = Clock::now();
+    int written = 0;
+    for (unsigned tick = 1; tick <= 200; ++tick) {
+      std::this_thread::sleep_until(start + std::chrono::milliseconds(tick * 10));
+      auto count = sdlrdp_audio_write(backend.get(), pcm.data(), 480);
+      if (count != 480) return written;
+      written += count;
+    }
+    return written;
+  });
+  auto deadline = Clock::now() + std::chrono::seconds(4);
+  while (audio.confirmed_frames < 96000 && Clock::now() < deadline) {
+    if (!client.Pump(2)) break;
+    while (!audio.pending.empty() && Clock::now() - audio.pending.front().received >= std::chrono::milliseconds(150))
+      if (!audio.Confirm()) break;
+  }
+  sdlrdp_audio_close(backend.get());
+  auto written = writing.get();
+  EXPECT_EQ(written, 96000);
+  EXPECT_EQ(audio.samples.size() / 2, written);
+  ASSERT_GT(audio.received.size(), 1u);
+  double maximum_gap = 0;
+  for (std::size_t i = 1; i < audio.received.size(); ++i)
+    maximum_gap = std::max(maximum_gap, std::chrono::duration<double, std::milli>(audio.received[i] - audio.received[i - 1]).count());
+  auto block_ms = 1000.0 * audio.samples.size() / 2 / audio.received.size() / audio.rate;
+  RecordProperty("maximum_block_gap_ms", std::to_string(maximum_gap));
+  EXPECT_LE(maximum_gap, 2 * block_ms + 10);
+  EXPECT_EQ(audio.received.size(), 100u);
+  EXPECT_FALSE(logs.Contains("Audio confirmation gate waiting"));
+  EXPECT_EQ(audio.confirmed_frames, 96000u);
 }
 TEST_F(AudioGate, AudioNeverConfirmsUsesServerClock) {
   Open(320, 200);
@@ -1182,17 +1224,17 @@ TEST_F(AudioGate, AudioDisconnectDuringBlockedWrite) {
     audio.auto_confirm = reconnect;
     ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
     ASSERT_NO_FATAL_FAILURE(EstablishConfirmations(client, audio));
-    unsigned frames = reconnect ? 480 : 480000;
+    unsigned frames = reconnect ? 960 : 480000;
     std::vector<INT16> pcm(frames * 2, 1234);
     auto writing = std::async(std::launch::async, [&] {
       return sdlrdp_audio_write(backend.get(), pcm.data(), frames);
     });
-    auto received = client.Until([&] { return audio.samples.size() >= (reconnect ? 960u : 9600u); });
+    auto received = client.Until([&] { return audio.samples.size() >= (reconnect ? 1920u : 48000u); });
     EXPECT_TRUE(received);
     if (!reconnect) EXPECT_EQ(writing.wait_for(std::chrono::milliseconds(0)), std::future_status::timeout);
     EXPECT_TRUE(freerdp_disconnect(client.instance.get()));
     EXPECT_EQ(writing.get(), frames);
-    if (reconnect) EXPECT_EQ(audio.samples.size(), 960u);
+    if (reconnect) EXPECT_EQ(audio.samples.size(), 1920u);
   }
 }
 TEST_F(AudioGate, AudioOneMillisecondPartialBlock) {
@@ -1201,15 +1243,15 @@ TEST_F(AudioGate, AudioOneMillisecondPartialBlock) {
   Client client(sdlrdp_port(backend.get()), true);
   SoundClient audio(client);
   ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
-  std::array<INT16, 960> pcm{};
+  std::array<INT16, 1920> pcm{};
   ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 48), 48);
   auto writing = std::async(std::launch::async, [&] {
-    return sdlrdp_audio_write(backend.get(), pcm.data() + 96, 432);
+    return sdlrdp_audio_write(backend.get(), pcm.data() + 96, 912);
   });
   auto captured = client.Until([&] { return audio.samples.size() == pcm.size(); });
   if (!captured) sdlrdp_audio_close(backend.get());
   EXPECT_TRUE(captured);
-  EXPECT_EQ(writing.get(), 432);
+  EXPECT_EQ(writing.get(), 912);
 }
 TEST_F(AudioGate, AudioFallbackIdleDoesNotAccumulateCredit) {
   Open(320, 200);
@@ -1228,7 +1270,7 @@ TEST_F(AudioGate, AudioFallbackIdleDoesNotAccumulateCredit) {
     if (!captured) sdlrdp_audio_close(backend.get());
     EXPECT_TRUE(captured);
     EXPECT_EQ(writing.get(), 48000);
-    EXPECT_GE(Clock::now() - started, std::chrono::milliseconds(850));
+    EXPECT_GE(Clock::now() - started, std::chrono::milliseconds(burst == 1 ? 950 : 450));
     if (burst == 1) std::this_thread::sleep_for(std::chrono::milliseconds(500));
   }
 }
@@ -1241,17 +1283,21 @@ TEST_F(AudioGate, AudioReorderedConfirmsCreditOnlyTheirBlock) {
   audio.auto_confirm = false;
   ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
   ASSERT_NO_FATAL_FAILURE(EstablishConfirmations(client, audio));
-  std::vector<INT16> pcm(4800 * 2, 1234);
-  ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 4800), 4800);
-  ASSERT_TRUE(client.Until([&] { return audio.pending.size() == 10; }));
+  std::vector<INT16> pcm(24000 * 2, 1234);
+  ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 24000), 24000);
+  ASSERT_TRUE(client.Until([&] { return audio.pending.size() == 25; }));
   EXPECT_EQ(sdlrdp_audio_wait(backend.get(), 0), 0);
-  ASSERT_TRUE(audio.Confirm(9));
+  ASSERT_TRUE(audio.Confirm(24));
   EXPECT_EQ(sdlrdp_audio_wait(backend.get(), 10000), 1);
-  ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 480), 480);
-  ASSERT_TRUE(client.Until([&] { return audio.samples.size() == 10560; }));
+  ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 960), 960);
+  ASSERT_TRUE(client.Until([&] { return audio.samples.size() == 49920; }));
   EXPECT_EQ(sdlrdp_audio_wait(backend.get(), 0), 0);
   ASSERT_TRUE(audio.Confirm());
   EXPECT_EQ(sdlrdp_audio_wait(backend.get(), 10000), 1);
+  std::scoped_lock lock(logs.guard);
+  EXPECT_EQ(std::ranges::count_if(logs.lines, [](auto const& line) {
+    return line.first == SDLRDP_LOG_WARN && line.second.contains("Audio confirmation gate waiting");
+  }), 1);
 }
 
 namespace {

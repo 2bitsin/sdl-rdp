@@ -53,7 +53,7 @@ State::State(sdlrdp_config const& config)
   if (!listener || !stop || !reap) throw std::runtime_error("listener allocation failed");
   static std::once_flag wts;
   std::call_once(wts, [] { WTSRegisterWtsApiFunctionTable(FreeRDP_InitWtsApi()); });
-  audio_latency = config.audio_latency_ms ? config.audio_latency_ms : 100;
+  audio_latency = config.audio_latency_ms ? config.audio_latency_ms : 500;
   Picture();
   winpr_InitializeSSL(WINPR_SSL_INIT_DEFAULT);
   listener->info = this;
