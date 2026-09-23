@@ -2,6 +2,7 @@
 #include "input.hpp"
 #include <SDL3/SDL.h>
 #include "clipboard.hpp"
+#include "auth.hpp"
 #include <format>
 #include <charconv>
 #include <string>
@@ -61,6 +62,14 @@ void PrintAudioFormat(SDL_AudioDeviceID device)
     SDL_Log("audio device=%s freq=%d", SDL_GetAudioDeviceName(device), actual.freq);
 }
 
+std::string DisplayTiming()
+{
+    auto mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
+    Check(mode != nullptr);
+    return std::format(" refresh={} numerator={} denominator={}", mode->refresh_rate,
+                       mode->refresh_rate_numerator, mode->refresh_rate_denominator);
+}
+
 void PrintEvent(const SDL_Event &event, SDL_Window *window, unsigned frame)
 {
     if (PrintClipboardEvent(event)) return;
@@ -82,12 +91,9 @@ void PrintEvent(const SDL_Event &event, SDL_Window *window, unsigned frame)
     case SDL_EVENT_MOUSE_WHEEL:
         line += std::format(" x={} y={}", event.wheel.x, event.wheel.y);
         break;
-    case SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED: {
-        auto mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
-        line += std::format(" refresh={} numerator={} denominator={}", mode->refresh_rate,
-                            mode->refresh_rate_numerator, mode->refresh_rate_denominator);
+    case SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED:
+        line += DisplayTiming();
         break;
-    }
     case SDL_EVENT_WINDOW_EXPOSED:
         line += std::format(" keyboard_layout={} client_name={} codec={}",
                     SDL_GetNumberProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_KEYBOARD_LAYOUT_NUMBER, 0), SDL_GetStringProperty(SDL_GetWindowProperties(window),
@@ -101,6 +107,7 @@ void PrintEvent(const SDL_Event &event, SDL_Window *window, unsigned frame)
     }
     SDL_Log("%s", line.c_str());
     PrintGeometry(event, window);
+    if (event.type == SDL_EVENT_WINDOW_EXPOSED) PrintAuthentication(window);
 }
 
 void Draw(SDL_Window *window, unsigned frame, const SDL_FPoint &pointer)
@@ -198,6 +205,7 @@ Options ParseOptions(int argc, char **argv)
     Options options;
     for (int i = 1; i < argc; ++i) {
         std::string_view arg(argv[i]);
+        if (AuthOption(arg, i, argc, argv)) continue;
         if (arg == "--clip" && i + 1 < argc) options.clip = argv[++i];
         else if (arg == "--tone") options.tone = true;
         else if (arg == "--tight") options.tight = true;
@@ -229,6 +237,7 @@ SDL_Cursor *CreateCursor()
 int main(int argc, char **argv)
 {
     auto options = ParseOptions(argc, argv);
+    AuthenticationDefaults();
     SDL_Log("SDL_GetVersion() %d", SDL_GetVersion());
     std::string drivers = "drivers";
     std::ranges::for_each(std::views::iota(0, SDL_GetNumVideoDrivers()),
@@ -240,6 +249,7 @@ int main(int argc, char **argv)
         Check(SDL_SetHint(SDL_HINT_RDP_CODEC, requested.c_str()));
     }
     Check(SDL_Init(SDL_INIT_VIDEO | (options.tone ? SDL_INIT_AUDIO : 0)));
+    InstallAuthentication();
     if (options.clip) Check(SDL_SetClipboardText(options.clip));
     auto display = SDL_GetPrimaryDisplay();
     SDL_Log("port %lld", (long long)SDL_GetNumberProperty(SDL_GetDisplayProperties(display), SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0));

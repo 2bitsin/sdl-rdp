@@ -1,0 +1,22 @@
+#pragma once
+#include "transcode.hpp"
+#include "contract.hpp"
+#include <winpr/sspi.h>
+#include <string>
+#include <string_view>
+
+namespace Backend {
+inline std::string QualifiedName(std::string_view domain, std::string_view user)
+{
+  return domain.empty() ? std::string(user) : std::string(domain) + "\\" + std::string(user);
+}
+inline std::string IdentityText(UINT16 const* text, ULONG length, ULONG flags)
+{
+  utilities::Expects(text || !length, "identity buffer covers length");
+  using oxbox::utilities::Encoding;
+  // FreeRDP on Linux fills ANSI identities from UTF-8 settings (3.15 winpr/libwinpr/sspi/sspi_winpr.c).
+  auto unicode = (flags & SEC_WINNT_AUTH_IDENTITY_UNICODE) != 0;
+  auto bytes = std::span(reinterpret_cast<std::byte const*>(text), length * (unicode ? 2 : 1));
+  return TranscodeRange<std::string>(bytes, {unicode ? Encoding::UTF16 : Encoding::UTF8, std::endian::native}, {});
+}
+}

@@ -46,7 +46,7 @@ unsigned Bind(freerdp_listener* listener, sdlrdp_config const& config)
 }
 }
 State::State(sdlrdp_config const& config)
- : log_route(config), log(config.log), user(config.user), codec(config.codec), width(config.width), height(config.height), aspect(config.aspect),
+ : log_route(config), authentication(config), log(config.log), user(config.log_user), codec(config.codec), width(config.width), height(config.height), aspect(config.aspect),
    credentials(EnsureCertificate(config.cert_dir ? std::filesystem::path(config.cert_dir) : DefaultCertificateDirectory())),
    listener(freerdp_listener_new()), stop(CreateEvent(nullptr, TRUE, FALSE, nullptr))
 {

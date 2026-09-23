@@ -1,0 +1,131 @@
+#include "_detail/state.hpp"
+#include "_detail/auth.hpp"
+#include "_detail/auth-identity.hpp"
+#include <freerdp/settings.h>
+#include <openssl/crypto.h>
+#include <winpr/ntlm.h>
+#include <cstring>
+
+namespace Backend {
+namespace {
+struct NtHash {
+  std::array<BYTE, 16> bytes{};
+  ~NtHash() { OPENSSL_cleanse(bytes.data(), bytes.size()); }
+};
+struct SettingsPassword {
+  rdpSettings* settings;
+  ~SettingsPassword() {
+    auto password = freerdp_settings_get_string_writable(settings, FreeRDP_Password);
+    if (password) OPENSSL_cleanse(password, std::strlen(password));
+    // FreeRDP 3.15 include/freerdp/settings.h: set_string copies input; NULL removes the old entry.
+    Ensures(freerdp_settings_set_string(settings, FreeRDP_Password, nullptr), "password cleared");
+  }
+};
+struct PlainPassword {
+  std::string value;
+  ~PlainPassword() { OPENSSL_cleanse(value.data(), value.size()); }
+};
+void Reject(Peer& peer)
+{
+  if (peer.authentication.rejected) return;
+  peer.authentication.rejected = true;
+  peer.client->authenticated = FALSE;
+  AuthenticationRejectedLogging();
+  peer.owner.Log(SDLRDP_LOG_WARN, std::format("Authentication rejected: user \"{}\" from {}",
+    QualifiedName(peer.authentication.domain, peer.authentication.user), peer.client->hostname));
+}
+bool Verify(Peer& peer, char const* domain, char const* user, char const* password)
+{
+  SettingsPassword clear{peer.client->context->settings};
+  auto const& config = peer.owner.authentication.config;
+  peer.authentication.user = user;
+  peer.authentication.domain = domain;
+  sspi_FreeAuthIdentity(&peer.client->identity);
+  if (sspi_SetAuthIdentityA(&peer.client->identity, user, domain, nullptr) <= 0) { Reject(peer); return false; }
+  PlainPassword plain{password};
+  bool accepted = config.verify ? config.verify(config.auth_user, domain, user, plain.value.c_str()) != 0
+    : sdlrdp_verify_pair(&config, domain, user, plain.value.c_str()) != 0;
+  if (!accepted) Reject(peer);
+  peer.client->authenticated = accepted;
+  return accepted;
+}
+bool Denied(freerdp_peer* client)
+{
+  Expects(client && client->context, "denied session exists");
+  freerdp_set_error_info(client->context->rdp, ERRINFO_SERVER_DENIED_CONNECTION);
+  freerdp_send_error_info(client->context->rdp);
+  return false;
+}
+char const* Setting(freerdp_peer* client, FreeRDP_Settings_Keys_String key)
+{
+  auto value = freerdp_settings_get_string(client->context->settings, key);
+  return value ? value : "";
+}
+}
+BOOL Authenticate(freerdp_peer* client, SEC_WINNT_AUTH_IDENTITY const*, BOOL automatic)
+{
+  auto& peer = Peer::Held(client);
+  if (!automatic || peer.owner.authentication.config.auth == SDLRDP_AUTH_NONE) return FALSE;
+  // FreeRDP 3.15 stores delegated credentials in settings, not nla_get_identity().
+  peer.authentication.checked = true;
+  try {
+    auto accepted = Verify(peer, Setting(client, FreeRDP_Domain), Setting(client, FreeRDP_Username),
+                           Setting(client, FreeRDP_Password));
+    return accepted;
+  } catch (...) { Reject(peer); return FALSE; }
+}
+bool AuthenticateSettings(freerdp_peer* client)
+{
+  auto& peer = Peer::Held(client);
+  SettingsPassword clear{client->context->settings};
+  if (peer.authentication.checked) return peer.authentication.rejected ? Denied(client) : true;
+  peer.authentication.checked = true;
+  try {
+    auto domain = Setting(client, FreeRDP_Domain), user = Setting(client, FreeRDP_Username);
+    if (peer.owner.authentication.config.auth == SDLRDP_AUTH_NONE)
+      return sspi_SetAuthIdentityA(&client->identity, user, domain, nullptr) > 0;
+    if (Verify(peer, domain, user, Setting(client, FreeRDP_Password))) return true;
+    return Denied(client);
+  } catch (...) { Reject(peer); return Denied(client); }
+}
+void AuthenticationIdentity(freerdp_peer* client, sdlrdp_event& event)
+{
+  Expects(client && event.type == SDLRDP_CONNECTED, "connection event carries identity");
+  auto& identity = client->identity;
+  auto user = IdentityText(identity.User, identity.UserLength, identity.Flags);
+  auto domain = IdentityText(identity.Domain, identity.DomainLength, identity.Flags);
+  std::strncpy(event.connected.user, user.c_str(), sizeof(event.connected.user) - 1);
+  std::strncpy(event.connected.domain, domain.c_str(), sizeof(event.connected.domain) - 1);
+  event.connected.authenticated = client->authenticated != FALSE;
+}
+SECURITY_STATUS AuthenticationHash(void* raw, SEC_WINNT_AUTH_IDENTITY const* identity,
+  SecBuffer const*, BYTE const*, BYTE const*, SecBuffer const*, BYTE* response)
+{
+  Expects(raw && identity && response, "NTLM callback has peer, identity and output");
+  auto& peer = Peer::Held(static_cast<freerdp_peer*>(raw));
+  peer.authentication.hash_attempted = true;
+  try {
+    peer.authentication.user = IdentityText(identity->User, identity->UserLength, identity->Flags);
+    peer.authentication.domain = IdentityText(identity->Domain, identity->DomainLength, identity->Flags);
+    auto const& config = peer.owner.authentication.config;
+    NtHash hash;
+    bool known = config.lookup ? config.lookup(config.auth_user, peer.authentication.domain.c_str(), peer.authentication.user.c_str(), hash.bytes.data()) != 0
+      : sdlrdp_lookup_pair(&config, peer.authentication.domain.c_str(), peer.authentication.user.c_str(), hash.bytes.data()) != 0;
+    // FreeRDP 3.15's NTLM callback consumes a response key and treats nonzero as success.
+    auto user = TranscodeRange<std::vector<BYTE>>(std::as_bytes(std::span(peer.authentication.user)), {},
+      {oxbox::utilities::Encoding::UTF16, std::endian::little});
+    auto domain = TranscodeRange<std::vector<BYTE>>(std::as_bytes(std::span(peer.authentication.domain)), {},
+      {oxbox::utilities::Encoding::UTF16, std::endian::little});
+    auto user_length = user.size(), domain_length = domain.size();
+    user.resize(user_length + sizeof(WCHAR)); domain.resize(domain_length + sizeof(WCHAR));
+    bool result = known && NTOWFv2FromHashW(hash.bytes.data(), reinterpret_cast<WCHAR*>(user.data()), user_length,
+      reinterpret_cast<WCHAR*>(domain.data()), domain_length, response);
+    if (!result) Reject(peer);
+    return result ? 1 : 0;
+  } catch (...) { Reject(peer); return 0; }
+}
+void Peer::AuthenticationEnded()
+{
+  if (authentication.hash_attempted && !authentication.checked) Reject(*this);
+}
+}

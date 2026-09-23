@@ -1,4 +1,5 @@
 #include "SDL_rdpdyn.h"
+#include "SDL_rdpauth.h"
 
 static SDL_InitState shared_init;
 static SDL_Mutex *shared_lock;
@@ -50,7 +51,7 @@ static bool SDL_RDP_Config(sdlrdp_config *config)
 {
     SDL_zero(*config);
     config->log = SDL_RDP_Log;
-    config->user = NULL;
+    config->log_user = NULL;
     config->bind = SDL_GetHint(SDL_HINT_RDP_BIND);
     config->cert_dir = SDL_GetHint(SDL_HINT_RDP_CERT_DIR);
     config->port = SDL_RDP_GetInteger(SDL_HINT_RDP_PORT, 3389);
@@ -66,7 +67,7 @@ static bool SDL_RDP_Config(sdlrdp_config *config)
         !SDL_RDP_ParseAspect(SDL_GetHint(SDL_HINT_RDP_ASPECT), &config->aspect)) {
         return false;
     }
-    return true;
+    return SDL_RDP_AuthConfig(config, &shared_backend);
 }
 
 bool SDL_RDP_AcquireBackend(SDL_RDP_Backend *backend, sdlrdp_handle **handle, sdlrdp_config *config)
@@ -84,7 +85,7 @@ bool SDL_RDP_AcquireBackend(SDL_RDP_Backend *backend, sdlrdp_handle **handle, sd
             SDL_SetError("%s", shared_backend.last_error());
             ok = false;
         }
-        if (!ok) SDL_RDP_UnloadBackend(&shared_backend);
+        if (!ok) { SDL_RDP_UnloadBackend(&shared_backend); SDL_RDP_AuthRelease(); }
     }
     if (ok) {
         ++shared_refs;
@@ -103,6 +104,7 @@ void SDL_RDP_ReleaseBackend(void)
     if (!--shared_refs) {
         shared_backend.close(shared_handle);
         shared_handle = NULL;
+        SDL_RDP_AuthRelease();
         SDL_RDP_UnloadBackend(&shared_backend);
     }
     SDL_UnlockMutex(shared_lock);

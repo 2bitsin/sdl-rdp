@@ -15,18 +15,26 @@ typedef enum {
   SDLRDP_CODEC_AUTO, SDLRDP_CODEC_PLANAR, SDLRDP_CODEC_REMOTEFX,
   SDLRDP_CODEC_NSCODEC, SDLRDP_CODEC_RAW, SDLRDP_CODEC_PROGRESSIVE
 } sdlrdp_codec;
+typedef enum { SDLRDP_AUTH_NONE, SDLRDP_AUTH_TLS, SDLRDP_AUTH_NLA } sdlrdp_auth;
 typedef struct {
   const char* bind; /* NULL selects 0.0.0.0; numeric IPv4. */
   unsigned port; /* 0 selects an ephemeral port. */
   const char* cert_dir; /* NULL selects the per-user data directory. */
   unsigned width, height;
   int wait_for_client; /* Open waits for activation when nonzero. */
-  /* Called on worker threads; user and callback must live until close returns. */
+  /* Called on worker threads; log_user and callback must live until close returns. */
   void (*log)(void* user, sdlrdp_log_level level, const char* text);
-  void* user;
+  void* log_user;
   sdlrdp_codec codec;
   sdlrdp_aspect aspect; /* Display aspect; either zero selects square pixels. */
   unsigned audio_latency_ms; /* 0 selects 100 ms. */
+  sdlrdp_auth auth; /* Zero defaults to no authentication. */
+  /* Peer worker callbacks; pointers and auth_user must live until close returns.
+     Missing callbacks fail closed unless a fixed password supplies the fallback. */
+  int (*verify)(void* auth_user, const char* domain, const char* user, const char* password);
+  int (*lookup)(void* auth_user, const char* domain, const char* user, unsigned char nt_hash[16]);
+  void* auth_user;
+  const char *user, *password, *domain; /* UTF-8, copied by open; NULL means unset. */
 } sdlrdp_config;
 typedef enum {
   SDLRDP_CONNECTED, SDLRDP_DISCONNECTED, SDLRDP_RESIZE, SDLRDP_KEY,
@@ -38,7 +46,8 @@ typedef struct {
   sdlrdp_event_type type;
   union {
     struct { unsigned width, height, bpp; char client_name[64]; sdlrdp_codec codec;
-      unsigned screen_width, screen_height, refresh_millihertz, keyboard_layout; } connected;
+      unsigned screen_width, screen_height, refresh_millihertz, keyboard_layout;
+      char user[256], domain[256]; int authenticated; } connected;
     struct { unsigned freq; int connected; } audio;
     struct { sdlrdp_codec codec; } codec_changed;
     struct { unsigned width, height; } resize;
@@ -53,6 +62,9 @@ typedef struct {
     struct { unsigned id; float x, y, pressure; sdlrdp_touch_phase phase; } touch;
   };
 } sdlrdp_event;
+/* Fixed-pair fallbacks for drivers; nonzero means accepted/known. */
+int sdlrdp_verify_pair(const sdlrdp_config*, const char* domain, const char* user, const char* password);
+int sdlrdp_lookup_pair(const sdlrdp_config*, const char* domain, const char* user, unsigned char nt_hash[16]);
 const char* sdlrdp_last_error(void);
 #define SDLRDP_ABI_VERSION 6
 unsigned sdlrdp_version(void);

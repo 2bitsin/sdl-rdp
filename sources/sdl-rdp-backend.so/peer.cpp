@@ -17,6 +17,38 @@
 
 namespace Backend {
 namespace {
+std::string ProtocolNames(UINT32 mask, bool rdp)
+{
+  std::string names = rdp ? "RDP" : "";
+  for (auto [flag, name] : std::array<std::pair<UINT32, char const*>, 5>{{
+      {SecurityTls, "TLS"}, {SecurityNla, "NLA"}, {SecurityNlaExt, "NLA_EXT"},
+      {SecurityRdstls, "RDSTLS"}, {SecurityRdsaad, "RDSAAD"}}}) {
+    if (!(mask & flag)) continue;
+    if (!names.empty()) names += '|';
+    names += name;
+  }
+  return names;
+}
+bool SecurityEnded(Peer& peer)
+{
+  Expects(peer.client && peer.client->context, "security context exists");
+  if (!NegotiationRefused() && !TlsHandshakeFailed()) return false;
+  auto settings = peer.client->context->settings;
+  // FreeRDP 3.15 nego.c publishes requestedProtocols even after negotiation fails.
+  auto requested = freerdp_settings_get_uint32(settings, FreeRDP_RequestedProtocols);
+  auto protocols = ProtocolNames(requested, !requested);
+  if (NegotiationRefused()) {
+    auto offered = (freerdp_settings_get_bool(settings, FreeRDP_TlsSecurity) ? SecurityTls : 0)
+      | (freerdp_settings_get_bool(settings, FreeRDP_NlaSecurity) ? SecurityNla : 0);
+    peer.owner.Log(SDLRDP_LOG_WARN, std::format("Connection refused: client requested {}, server offers {}",
+      protocols, ProtocolNames(offered, freerdp_settings_get_bool(settings, FreeRDP_RdpSecurity))));
+  } else {
+    auto selected = freerdp_settings_get_uint32(settings, FreeRDP_SelectedProtocol);
+    peer.owner.Log(SDLRDP_LOG_WARN, std::format("TLS handshake failed: client requested {}, server selected {}",
+      protocols, ProtocolNames(selected, !selected)));
+  }
+  return true;
+}
 sdlrdp_event Connected(rdpSettings const* settings)
 {
   Expects(settings != nullptr, "settings exist");
@@ -62,6 +94,8 @@ Peer::Peer(PeerHandle accepted, State& state)
   raw->ContextFree = Input::Free;
   raw->ContextExtra = this;
   raw->Activate = Activate;
+  raw->Logon = Authenticate;
+  raw->SspiNtlmHashCallback = AuthenticationHash;
   raw->Capabilities = Capabilities;
   raw->PostConnect = [](freerdp_peer*) -> BOOL { return TRUE; };
   if (!freerdp_peer_context_new(raw)) throw std::runtime_error("peer context failed");
@@ -109,9 +143,10 @@ bool Peer::Configure()
   key.release();
   if (!freerdp_settings_set_pointer_len(settings, FreeRDP_RdpServerCertificate, cert.get(), 1)) return false;
   cert.release();
-  return freerdp_settings_set_bool(settings, FreeRDP_NlaSecurity, FALSE)
+  return freerdp_settings_set_string(settings, FreeRDP_AuthenticationPackageList, "!kerberos")
+    && freerdp_settings_set_bool(settings, FreeRDP_NlaSecurity, owner.authentication.config.auth == SDLRDP_AUTH_NLA)
     && freerdp_settings_set_bool(settings, FreeRDP_TlsSecurity, TRUE)
-    && freerdp_settings_set_bool(settings, FreeRDP_RdpSecurity, TRUE)
+    && freerdp_settings_set_bool(settings, FreeRDP_RdpSecurity, owner.authentication.config.auth == SDLRDP_AUTH_NONE)
     && freerdp_settings_set_bool(settings, FreeRDP_RemoteFxCodec, TRUE)
     && freerdp_settings_set_bool(settings, FreeRDP_NSCodec, TRUE)
     && freerdp_settings_set_bool(settings, FreeRDP_SupportGraphicsPipeline, TRUE)
@@ -145,6 +180,8 @@ DWORD Peer::EventHandles(std::span<HANDLE> handles)
 void Peer::Serve(std::stop_token quit)
 {
   Expects(client && wake, "peer owns transport and wake event");
+  ResetAuthenticationLogging();
+  PeerNegotiationLogging(client->context->settings);
   // WinPR BIO signals readability only; retry blocked output every 5 ms for static frames.
   std::array<HANDLE, MAXIMUM_WAIT_OBJECTS> handles{};
   if (Configure() && client->Initialize(client.get())) {
@@ -173,6 +210,7 @@ void Peer::Serve(std::stop_token quit)
   owner.Depart(*this);
   finished = true;
   SetEvent(owner.reap.get());
+  ResetAuthenticationLogging();
 }
 bool Peer::Channels()
 {
@@ -184,6 +222,8 @@ bool Peer::Channels()
 void Peer::TransportEnded()
 {
   Expects(client && client->context, "transport context exists");
+  if (SecurityEnded(*this)) return;
+  AuthenticationEnded();
   auto code = freerdp_get_last_error(client->context);
   auto error = freerdp_get_last_error_name(code);
   bool pending;
@@ -191,20 +231,26 @@ void Peer::TransportEnded()
     std::scoped_lock lock(owner.frame_guard);
     pending = !dirty.empty() || snapshot != nullptr || client->IsWriteBlocked(client.get());
   }
-  if (ExpectedDisconnect(code)) owner.Log(SDLRDP_LOG_INFO, std::format("Peer disconnected: {}.", error));
+  if (ExpectedDisconnect(code)) owner.Log(SDLRDP_LOG_INFO, activated
+    ? std::format("Peer disconnected: {}.", error)
+    : std::format("Connection closed before activation: {}.", error));
   else if (active && pending)
     owner.Log(SDLRDP_LOG_ERROR, std::format("Peer transport failed with pending data: {}.", error));
   else if (!activated)
-    owner.Log(SDLRDP_LOG_INFO, std::format("Connection closed before activation. {}", error));
+    owner.Log(SDLRDP_LOG_INFO, code
+      ? std::format("Connection closed before activation: {}.", error)
+      : "Connection closed before activation.");
 }
 BOOL Peer::Activate(freerdp_peer* client)
 {
   Expects(client && client->context, "peer context exists");
   auto& self = Held(client);
   if (self.active.load()) { self.resizing = false; SetEvent(self.wake.get()); return TRUE; }
+  if (!AuthenticateSettings(client)) return FALSE;
   if (!SendCookie(client->context)) return FALSE;
   if (!self.encoder.Select(client->context->settings, self.owner.codec.load())) return FALSE;
   auto event = Connected(client->context->settings);
+  AuthenticationIdentity(client, event);
   event.connected.codec = self.encoder.codec;
   event.connected.screen_width = self.screen_width;
   event.connected.screen_height = self.screen_height;
@@ -242,6 +288,7 @@ bool Peer::Drain()
 BOOL Peer::Capabilities(freerdp_peer* client)
 {
   auto& self = Held(client);
+  if (!AuthenticateSettings(client)) return FALSE;
   auto settings = client->context->settings;
   std::scoped_lock lock(self.owner.frame_guard);
   if (!self.activated) {

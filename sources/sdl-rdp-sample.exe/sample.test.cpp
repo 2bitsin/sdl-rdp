@@ -55,7 +55,7 @@ TEST_F(Sample, TakeoverFocus) {
   ASSERT_TRUE(freerdp_connect(second.instance.get()));
   for (auto expected : {"OCCLUDED", "FOCUS_LOST", "MOUSE_LEAVE", "EXPOSED", "FOCUS_GAINED", "MOUSE_ENTER"}) {
     do { ASSERT_TRUE(process->Line(line, Clock::now() + 10s)) << process->transcript; }
-    while (!line.starts_with("event ") || line.starts_with("event GEOMETRY "));
+    while (!line.starts_with("event ") || line.starts_with("event GEOMETRY ") || line.starts_with("event CONNECTED "));
     EXPECT_TRUE(line.starts_with("event " + std::string(expected) + " ")) << line;
   }
   SDL_Log("%s", process->transcript.c_str());

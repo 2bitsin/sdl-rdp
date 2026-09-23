@@ -56,6 +56,9 @@ static void SDL_RDP_Connected(SDL_VideoData *data, const sdlrdp_event *event)
                           event->connected.client_name);
     SDL_SetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_CODEC_STRING,
                           SDL_RDP_CodecName(event->connected.codec));
+    SDL_SetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_USER_STRING, event->connected.user);
+    SDL_SetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_DOMAIN_STRING, event->connected.domain);
+    SDL_SetBooleanProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_AUTHENTICATED_BOOLEAN, event->connected.authenticated != 0);
     SDL_SendWindowEvent(window, SDL_EVENT_WINDOW_EXPOSED, 0, 0);
     SDL_AddTouch(SDL_RDP_TOUCH_ID, SDL_TOUCH_DEVICE_DIRECT, "RDP touch");
     SDL_SetNumberProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_KEYBOARD_LAYOUT_NUMBER, event->connected.keyboard_layout);

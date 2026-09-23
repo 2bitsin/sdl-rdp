@@ -24,6 +24,8 @@ int sdlrdp_open(sdlrdp_config const* config, sdlrdp_handle** out)
     if (!out) throw std::runtime_error("Open failed: output handle is null.");
     *out = nullptr;
     if (!config) throw std::runtime_error("Open failed: configuration is null.");
+    if (config->auth < SDLRDP_AUTH_NONE || config->auth > SDLRDP_AUTH_NLA)
+      throw std::runtime_error("Invalid authentication mode.");
     Dimensions(config->width, config->height);
     if (config->codec < SDLRDP_CODEC_AUTO || config->codec > SDLRDP_CODEC_PROGRESSIVE)
       throw std::runtime_error("Invalid codec preference.");

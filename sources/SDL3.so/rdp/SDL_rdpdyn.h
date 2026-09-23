@@ -7,6 +7,8 @@ typedef struct SDL_RDP_Backend
     SDL_SharedObject *object;
     const char *(*last_error)(void);
     unsigned (*version)(void);
+    int (*verify_pair)(const sdlrdp_config *, const char *, const char *, const char *);
+    int (*lookup_pair)(const sdlrdp_config *, const char *, const char *, unsigned char[16]);
     int (*open)(const sdlrdp_config *, sdlrdp_handle **);
     void (*close)(sdlrdp_handle *);
     unsigned (*port)(const sdlrdp_handle *);
