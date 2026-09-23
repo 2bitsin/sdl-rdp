@@ -110,15 +110,20 @@ public:
     server_formats.resize(count);
     for (auto& format : server_formats)
       Expects(audio_format_read(stream, &format) && format.cbSize == 0, "server announces plain PCM");
-    std::array<BYTE, 42> bytes{};
+    AUDIO_FORMAT own{WAVE_FORMAT_PCM, 2, rate, rate * 4, 4, 16, 0, nullptr};
+    std::vector<AUDIO_FORMAT> supported;
+    for (auto const& format : server_formats)
+      if (audio_format_compatible(&own, &format)) supported.push_back(format);
+    std::vector<BYTE> bytes(24 + supported.size() * 18);
     wStream output{};
     auto out = Stream_StaticInit(&output, bytes.data(), bytes.size());
-    Stream_Write_UINT8(out, 7); Stream_Write_UINT8(out, 0); Stream_Write_UINT16(out, 38);
+    Stream_Write_UINT8(out, 7); Stream_Write_UINT8(out, 0); Stream_Write_UINT16(out, bytes.size() - 4);
     Stream_Write_UINT32(out, 3); Stream_Write_UINT32(out, volume); Stream_Write_UINT32(out, 0);
-    Stream_Write_UINT16(out, 0); Stream_Write_UINT16(out, 1); Stream_Write_UINT8(out, 0);
+    Stream_Write_UINT16(out, 0); Stream_Write_UINT16(out, supported.size()); Stream_Write_UINT8(out, 0);
     Stream_Write_UINT16(out, version); Stream_Write_UINT8(out, 0);
-    AUDIO_FORMAT format{WAVE_FORMAT_PCM, 2, rate, rate * 4, 4, 16, 0, nullptr};
-    Expects(audio_format_write(out, &format) && Send(bytes), "client PCM format sent");
+    for (auto const& format : supported)
+      Expects(audio_format_write(out, &format), "supported PCM format serialized");
+    Expects(Send(bytes), "client format intersection sent");
     if (version >= 6) Expects(Send(std::array<BYTE, 8>{12, 0, 4, 0, 2, 0, 0, 0}), "quality mode sent");
     ready = true;
   }

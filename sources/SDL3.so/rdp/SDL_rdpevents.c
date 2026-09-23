@@ -74,8 +74,27 @@ static void SDL_RDP_Disconnected(SDL_VideoData *data)
 static void SDL_RDP_Text(SDL_Window *window, const sdlrdp_event *event)
 {
     char text[5];
-    if (event->text.down && SDL_TextInputActive(window)) {
-        *SDL_UCS4ToUTF8(event->text.codepoint, text) = '\0';
+    if (event->text.down) {
+        SDL_SendKeyboardUnicodeKey(0, event->text.codepoint);
+        if (SDL_TextInputActive(window)) {
+            *SDL_UCS4ToUTF8(event->text.codepoint, text) = '\0';
+            SDL_SendKeyboardText(text);
+        }
+    }
+}
+
+static void SDL_RDP_Key(SDL_Window *window, const sdlrdp_event *event)
+{
+    SDL_Scancode scancode = windows_scancode_table[(event->key.scancode & 0xFF) | (event->key.extended ? 0x80 : 0)];
+    SDL_Keycode key;
+    char text[5];
+    SDL_SendKeyboardKey(0, SDL_DEFAULT_KEYBOARD_ID, event->key.scancode, scancode, event->key.down != 0);
+    if (!event->key.down || !SDL_TextInputActive(window)) {
+        return;
+    }
+    key = SDL_GetKeyFromScancode(scancode, SDL_GetModState(), false);
+    if (key >= 0x20 && key != 0x7f && key <= 0x10ffff) {
+        *SDL_UCS4ToUTF8(key, text) = '\0';
         SDL_SendKeyboardText(text);
     }
 }
@@ -99,8 +118,7 @@ static void SDL_RDP_Input(SDL_Window *window, const sdlrdp_event *event)
     static const Uint8 buttons[] = { 0, SDL_BUTTON_LEFT, SDL_BUTTON_MIDDLE, SDL_BUTTON_RIGHT, SDL_BUTTON_X1, SDL_BUTTON_X2 };
     switch (event->type) {
     case SDLRDP_KEY:
-        SDL_SendKeyboardKey(0, SDL_DEFAULT_KEYBOARD_ID, event->key.scancode,
-            windows_scancode_table[(event->key.scancode & 0xFF) | (event->key.extended ? 0x80 : 0)], event->key.down != 0);
+        SDL_RDP_Key(window, event);
         break;
     case SDLRDP_MOUSE_RELATIVE:
         SDL_SendMouseMotion(0, window, SDL_DEFAULT_MOUSE_ID, true, (float)event->mouse_relative.dx, (float)event->mouse_relative.dy);

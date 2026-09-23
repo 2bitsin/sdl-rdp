@@ -21,6 +21,19 @@ protected:
     handle.reset(opened);
   }
 };
+TEST_F(Clipboard, EmptyConnectUnchanged) {
+  Headless::Client client(sdlrdp_port(handle.get()), false);
+  Headless::ClipboardClient clipboard(client);
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(client.Until([&] { return clipboard.accepted.load() == 1; }));
+  sdlrdp_event events[32];
+  while (auto count = sdlrdp_poll(handle.get(), events, 32)) {
+    EXPECT_FALSE(std::ranges::any_of(std::span(events, count),
+      [](auto const& event) { return event.type == SDLRDP_CLIPBOARD; }));
+  }
+  EXPECT_STREQ(sdlrdp_get_clipboard_text(handle.get()), "");
+  RecordProperty("trace", "empty connect: format list accepted; CLIPBOARD events=0");
+}
 TEST_F(Clipboard, LocalTextAndErrors) {
   EXPECT_EQ(sdlrdp_has_clipboard_text(handle.get()), 0);
   EXPECT_STREQ(sdlrdp_get_clipboard_text(handle.get()), "");

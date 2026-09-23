@@ -32,10 +32,11 @@ AudioChannel::AudioChannel(State& state, HANDLE channels, rdpContext* context, H
 {
   Expects(channels && context && event, "sound channel has transport and wake event");
   if (!sound) throw std::runtime_error("Audio channel allocation failed.");
-  sound->server_formats = audio_formats_new(1);
+  sound->server_formats = audio_formats_new(2);
   if (!sound->server_formats) throw std::runtime_error("Audio format allocation failed.");
-  sound->num_server_formats = 1;
+  sound->num_server_formats = 2;
   sound->server_formats[0] = {WAVE_FORMAT_PCM, 2, 48000, 192000, 4, 16, 0, nullptr};
+  sound->server_formats[1] = {WAVE_FORMAT_PCM, 2, 44100, 176400, 4, 16, 0, nullptr};
   sound->src_format = &sound->server_formats[0];
   sound->data = this;
   sound->rdpcontext = context;
@@ -92,15 +93,13 @@ void AudioChannel::Activated(RdpsndServerContext* context)
     self.owner.Log(SDLRDP_LOG_WARN, "Audio requires rdpsnd Wave2 support (version 8).");
     return;
   }
-  auto formats = std::span(context->client_formats, context->num_client_formats);
-  auto selected = std::ranges::find_if(formats, [](auto const& format) {
-    return format.wFormatTag == WAVE_FORMAT_PCM && format.nChannels == 2 && format.wBitsPerSample == 16
-      && (format.nSamplesPerSec == 48000 || format.nSamplesPerSec == 44100);
-  });
-  if (selected == formats.end()) return;
-  self.Select(unsigned(selected - formats.begin()));
-  self.owner.Log(SDLRDP_LOG_INFO, std::format("Audio selected: stereo S16 at {} Hz.", selected->nSamplesPerSec));
-  self.owner.Push({.type = SDLRDP_AUDIO, .audio = {selected->nSamplesPerSec, 1}});
+  if (!context->num_client_formats) return;
+  auto const& selected = context->client_formats[0];
+  if (selected.wFormatTag != WAVE_FORMAT_PCM || selected.nChannels != 2 || selected.wBitsPerSample != 16
+      || (selected.nSamplesPerSec != 48000 && selected.nSamplesPerSec != 44100)) return;
+  self.Select(0);
+  self.owner.Log(SDLRDP_LOG_INFO, std::format("Audio selected: stereo S16 at {} Hz.", selected.nSamplesPerSec));
+  self.owner.Push({.type = SDLRDP_AUDIO, .audio = {selected.nSamplesPerSec, 1}});
 }
 void AudioChannel::AdoptServerClock()
 {

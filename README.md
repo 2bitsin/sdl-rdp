@@ -127,8 +127,10 @@ linked, only found next to it at runtime.
 
 ## Input
 
-Scancodes produce SDL key events. RDP Unicode keyboard events produce UTF-8
-`SDL_EVENT_TEXT_INPUT` while `SDL_StartTextInput(window)` is active; stopping
+Scancodes produce SDL key events and printable key presses also produce UTF-8
+`SDL_EVENT_TEXT_INPUT` using SDL’s current keymap and modifiers. RDP Unicode
+keyboard events produce key down/up pairs and printable text. Text is emitted
+only while `SDL_StartTextInput(window)` is active; stopping
 text input suppresses text without suppressing keys. UTF-16 surrogate pairs
 are assembled separately for key-down and key-up, and only down produces text.
 The sample starts text input; F2 toggles it and F3 toggles relative mouse mode.
@@ -140,15 +142,16 @@ Windows character keymaps using Windows `MapVirtualKey`/`ToUnicode` APIs; it
 ships no portable Windows-layout-to-character table. FreeRDP 3.15 has no
 `freerdp_keyboard_get_rdp_scancode_from_virtual_key_code` API; WinPR's
 `GetVirtualScanCodeFromVirtualKeyCode` maps VKs by keyboard **type**, not layout.
-This driver therefore uses SDL's default keymap:
-physical scancode A has keycode `a` for every layout, while layout-specific
-characters (including accented characters) arrive through Unicode text input.
+This driver uses the keymap SDL holds, falling back to SDL’s default US keymap.
+The negotiated layout ID alone does not install a character map. Unicode input
+provides layout-specific characters, including accented characters.
 
 `SDL_SetWindowRelativeMouseMode` uses relative deltas from FreeRDP's `ainput`
 channel when the client supplies them. Otherwise each absolute motion is
-measured from the RDP desktop centre and the server sends `PointerPosition`
-back to that centre. Centre echoes produce no motion. This fallback requires
-the client to honour pointer repositioning; mstsc behavior has not been verified.
+measured from the previous reported position. Near an edge, the server requests
+`PointerPosition` back to the desktop centre. Only an immediate centre echo
+is treated as a warp and produces no motion; ignored requests preserve normal
+deltas. mstsc behavior has not been verified.
 Leaving relative mode restores absolute motion. Vertical and horizontal wheels
 retain their signed fractions of a 120-unit notch.
 

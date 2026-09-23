@@ -77,6 +77,7 @@ void ClipboardChannel::Changed(std::string text)
 {
   Expects(peer.active, "clipboard sender is active");
   auto& clipboard = peer.owner.clipboard;
+  if (clipboard.text == text) return;
   auto unicode = ClipboardUnicode(text);
   clipboard.text = std::move(text);
   clipboard.unicode = std::move(unicode);

@@ -955,10 +955,23 @@ TEST_F(RoundFive, ExpectedDisconnectLogLevels) {
     EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, name));
     EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, name));
   }
+  for (auto [category, message] : std::array<std::pair<const char*, const char*>, 4>{{
+      {"com.freerdp.core.peer", "ERRCONNECT_CONNECT_TRANSPORT_FAILED [0x0002000D]"},
+      {"com.freerdp.core.transport", "BIO_read retries exceeded"},
+      {"com.freerdp.core.transport", "BIO_read returned a system error 104: Connection reset by peer"},
+      {"com.freerdp.core", "ERRCONNECT_CONNECT_TRANSPORT_FAILED [0x0002000D]"}}}) {
+    WLog_Print(WLog_Get(category), WLOG_ERROR, "%s", message);
+    EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, message));
+    EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, message));
+  }
+  auto failure = "BIO_read returned a system error 5: Input/output error";
+  WLog_Print(WLog_Get("com.freerdp.core.transport"), WLOG_ERROR, "%s", failure);
+  EXPECT_TRUE(logs.Contains(SDLRDP_LOG_ERROR, failure));
   WLog_Print(peer, WLOG_ERROR, "transport failure marker");
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_ERROR, "transport failure marker"));
   WLog_Print(WLog_Get("com.freerdp.core.transport"), WLOG_ERROR, "ERRINFO_LOGOFF_BY_USER [0x0001000C]");
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_ERROR, "ERRINFO_LOGOFF_BY_USER"));
+  RecordProperty("trace", logs.Text(true));
 }
 
 #include "_detail/headless-audio.hpp"
@@ -1011,8 +1024,9 @@ TEST_F(AudioGate, AudioPcmAndReconnect) {
     Client client(sdlrdp_port(backend.get()), true);
     SoundClient audio(client);
     ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
-    ASSERT_EQ(audio.server_formats.size(), 1u);
+    ASSERT_EQ(audio.server_formats.size(), 2u);
     EXPECT_EQ(audio.server_formats[0].nSamplesPerSec, 48000u);
+    EXPECT_EQ(audio.server_formats[1].nSamplesPerSec, 44100u);
     std::array<INT16, 960> pcm{};
     std::iota(pcm.begin(), pcm.end(), -480);
     ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 480), 480);
