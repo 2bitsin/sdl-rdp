@@ -7,7 +7,7 @@ bool SDL_RDP_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_Proper
         return SDL_SetError("RDP supports one window");
     }
     _this->internal->window = window;
-    SDL_RDP_AspectHintChanged(_this->internal, SDL_HINT_RDP_ASPECT, NULL, SDL_GetHint(SDL_HINT_RDP_ASPECT));
+    SDL_RDP_AspectHintChanged(_this->internal, SDL_HINT_RDP_ASPECT, NULL, SDL_RDP_Setting(SDL_HINT_RDP_ASPECT));
     window->x = window->windowed.x = window->floating.x = 0;
     window->y = window->windowed.y = window->floating.y = 0;
     if (!SDL_RDP_ResizePicture(_this->internal, window->w, window->h)) {

@@ -4,6 +4,7 @@ void SDLCALL SDL_RDP_AspectHintChanged(void *userdata, const char *name, const c
 {
     SDL_VideoData *data = userdata;
     sdlrdp_aspect aspect;
+    newValue = SDL_RDP_HintChangedValue(name, oldValue, newValue);
     if (!data->handle || !SDL_RDP_ParseAspect(newValue, &aspect)) return;
     if (data->backend.set_aspect(data->handle, aspect) != 0) {
         SDL_SetError("%s", data->backend.last_error());

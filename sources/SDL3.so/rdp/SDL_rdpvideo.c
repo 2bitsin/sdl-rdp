@@ -12,6 +12,7 @@ static void SDLCALL SDL_RDP_CodecHintChanged(void *userdata, const char *name, c
 {
     SDL_VideoData *data = userdata;
     sdlrdp_codec codec;
+    newValue = SDL_RDP_HintChangedValue(name, oldValue, newValue);
     if (data->handle && SDL_RDP_ParseCodec(newValue, &codec) &&
         data->backend.set_codec(data->handle, codec) != 0) {
         SDL_SetError("%s", data->backend.last_error());

@@ -53,11 +53,14 @@ diff -ruN a/CMakeLists.txt b/CMakeLists.txt
 diff -ruN a/include/SDL3/SDL_hints.h b/include/SDL3/SDL_hints.h
 --- a/include/SDL3/SDL_hints.h
 +++ b/include/SDL3/SDL_hints.h
-@@ -3163,6 +3163,25 @@
+@@ -3163,6 +3163,28 @@
   */
  #define SDL_HINT_QUIT_ON_LAST_WINDOW_CLOSE "SDL_QUIT_ON_LAST_WINDOW_CLOSE"
  
 +/* Listener settings are shared by audio and video; set before opening either. */
++/** Path to libSDL3.ini; application hint takes precedence over environment. */
++#define SDL_HINT_RDP_INI "SDL_RDP_INI"
++
 +#define SDL_HINT_RDP_BACKEND "SDL_RDP_BACKEND"
 +#define SDL_HINT_RDP_BIND "SDL_RDP_BIND"
 +#define SDL_HINT_RDP_CERT_DIR "SDL_RDP_CERT_DIR"
@@ -151,6 +154,41 @@ diff -ruN a/include/build_config/SDL_build_config.h.cmake b/include/build_config
  #cmakedefine SDL_VIDEO_DRIVER_OFFSCREEN 1
  #cmakedefine SDL_VIDEO_DRIVER_PS2 1
  #cmakedefine SDL_VIDEO_DRIVER_PSP 1
+diff -ruN a/src/SDL_hints.c b/src/SDL_hints.c
+--- a/src/SDL_hints.c
++++ b/src/SDL_hints.c
+@@ -255,6 +255,20 @@
+     return SDL_SetHintWithPriority(name, value, SDL_HINT_NORMAL);
+ }
+
++const char *SDL_GetHintFromCode(const char *name)
++{
++    const char *result = NULL;
++    const SDL_PropertiesID hints = GetHintProperties(false);
++    if (name && hints) {
++        SDL_Hint *hint;
++        SDL_LockProperties(hints);
++        hint = (SDL_Hint *)SDL_GetPointerProperty(hints, name, NULL);
++        if (hint) result = SDL_GetPersistentString(hint->value);
++        SDL_UnlockProperties(hints);
++    }
++    return result;
++}
++
+ const char *SDL_GetHint(const char *name)
+ {
+     if (!name) {
+diff -ruN a/src/SDL_hints_c.h b/src/SDL_hints_c.h
+--- a/src/SDL_hints_c.h
++++ b/src/SDL_hints_c.h
+@@ -26,6 +26,7 @@
+ #define SDL_hints_c_h_
+
+ extern void SDL_InitHints(void);
++extern const char *SDL_GetHintFromCode(const char *name);
+ extern bool SDL_GetStringBoolean(const char *value, bool default_value);
+ extern int SDL_GetStringInteger(const char *value, int default_value);
+ extern void SDL_QuitHints(void);
 diff -ruN a/src/audio/SDL_audio.c b/src/audio/SDL_audio.c
 --- a/src/audio/SDL_audio.c
 +++ b/src/audio/SDL_audio.c

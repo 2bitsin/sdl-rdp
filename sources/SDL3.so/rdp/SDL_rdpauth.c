@@ -60,10 +60,10 @@ static bool SDL_RDP_CopyPair(sdlrdp_config *config)
 
 bool SDL_RDP_AuthConfig(sdlrdp_config *config, SDL_RDP_Backend *backend)
 {
-    const char *mode = SDL_GetHint(SDL_HINT_RDP_AUTH);
-    config->user = SDL_GetHint(SDL_HINT_RDP_USER);
-    config->password = SDL_GetHint(SDL_HINT_RDP_PASSWORD);
-    config->domain = SDL_GetHint(SDL_HINT_RDP_DOMAIN);
+    const char *mode = SDL_RDP_Setting(SDL_HINT_RDP_AUTH);
+    config->user = SDL_RDP_Setting(SDL_HINT_RDP_USER);
+    config->password = SDL_RDP_Setting(SDL_HINT_RDP_PASSWORD);
+    config->domain = SDL_RDP_Setting(SDL_HINT_RDP_DOMAIN);
     config->auth = config->password ? SDLRDP_AUTH_NLA : SDLRDP_AUTH_NONE;
     if (mode) {
         if (!SDL_strcmp(mode, "none")) config->auth = SDLRDP_AUTH_NONE;
