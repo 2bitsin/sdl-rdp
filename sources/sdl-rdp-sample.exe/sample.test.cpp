@@ -181,6 +181,8 @@ TEST_F(Sample, FullscreenFollowsScreen) {
   ASSERT_TRUE(freerdp_connect(client.instance.get())) << ConnectLogs();
   ASSERT_TRUE(Read("event RESIZED "));
   EXPECT_TRUE(line.ends_with("data1=1024 data2=768")) << line;
+  ASSERT_TRUE(Read("event PIXEL_SIZE_CHANGED "));
+  EXPECT_TRUE(line.ends_with("data1=1024 data2=768")) << line;
   ASSERT_TRUE(client.Until([&] { return display.ready.load(); }));
   DISPLAY_CONTROL_MONITOR_LAYOUT monitor{};
   monitor.Flags = DISPLAY_CONTROL_MONITOR_PRIMARY;
@@ -191,6 +193,195 @@ TEST_F(Sample, FullscreenFollowsScreen) {
   ASSERT_TRUE(client.Until([&] { auto gdi = client.instance->context->gdi; return gdi->width == 1920 && gdi->height == 1080; }));
   ASSERT_TRUE(Read("event RESIZED "));
   EXPECT_TRUE(line.ends_with("data1=1920 data2=1080")) << line;
+  ASSERT_TRUE(Read("event PIXEL_SIZE_CHANGED "));
+  EXPECT_TRUE(line.ends_with("data1=1920 data2=1080")) << line;
+  ASSERT_NO_FATAL_FAILURE(Escape(client));
+}
+
+TEST_F(Sample, FirstFrameObserverWithoutSuccessfulConnect) {
+  Client client(0, true);
+  auto paint = +[](rdpContext*) -> BOOL { return TRUE; };
+  auto connect = +[](freerdp*) -> BOOL { return FALSE; };
+  client.instance->context->update->EndPaint = paint;
+  client.instance->PostConnect = connect;
+  for (bool attempt : {false, true}) {
+    {
+      FirstFrameSize frame(client);
+      if (attempt) EXPECT_FALSE(client.instance->PostConnect(client.instance.get()));
+    }
+    EXPECT_EQ(client.instance->context->update->EndPaint, paint);
+    EXPECT_EQ(client.instance->PostConnect, connect);
+  }
+}
+
+TEST_F(Sample, ExplicitFullscreenBeforeConnect) {
+  auto arguments = Arguments(certificates.Path(), false);
+  arguments.insert(arguments.end(), {"--fullscreen", "--mode", "320x200"});
+  process = std::make_unique<Process>(arguments);
+  ASSERT_TRUE(Read("port "));
+  auto port = Number(std::string_view(line).substr(5));
+  ASSERT_TRUE(Read("event GEOMETRY window=320x200 desktop=320x200"));
+  Client client(port, true, 1280, 800);
+  FirstFrameSize frame(client);
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_TRUE(client.Until([&] { return frame.received; }));
+  EXPECT_EQ(frame.width, 320);
+  EXPECT_EQ(frame.height, 200);
+  ASSERT_NO_FATAL_FAILURE(Escape(client));
+}
+
+TEST_F(Sample, ExplicitFullscreenRestoresWindow) {
+  auto arguments = Arguments(certificates.Path(), false);
+  arguments.insert(arguments.end(), {"--fullscreen", "--mode", "320x200"});
+  process = std::make_unique<Process>(arguments);
+  ASSERT_TRUE(Read("port "));
+  Client client(Number(std::string_view(line).substr(5)), true, 1280, 800);
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_NO_FATAL_FAILURE(Exposed());
+  ASSERT_TRUE(Read("event GEOMETRY window=320x200 desktop=320x200"));
+  ASSERT_TRUE(client.Until([&] { auto gdi = client.instance->context->gdi; return gdi->width == 320 && gdi->height == 200; }));
+  SDL_Log("trace explicit screen=1280x800 gdi=320x200");
+  auto input = client.instance->context->input;
+  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x3e));
+  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x3e));
+  ASSERT_TRUE(Read("event GEOMETRY window=640x480 desktop=1280x800"));
+  ASSERT_TRUE(client.Until([&] { auto gdi = client.instance->context->gdi; return gdi->width == 640 && gdi->height == 480; }));
+  SDL_Log("trace leave gdi=640x480 screen=1280x800");
+  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x3e));
+  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x3e));
+  ASSERT_TRUE(Read("event GEOMETRY window=320x200 desktop=320x200"));
+  ASSERT_TRUE(client.Until([&] { auto gdi = client.instance->context->gdi; return gdi->width == 320 && gdi->height == 200; }));
+  SDL_Log("trace reenter gdi=320x200");
+  ASSERT_NO_FATAL_FAILURE(Escape(client));
+}
+
+TEST_F(Sample, ExplicitFullscreenSurvivesScreenChange) {
+  auto arguments = Arguments(certificates.Path(), false);
+  arguments.insert(arguments.end(), {"--fullscreen", "--mode", "320x200"});
+  process = std::make_unique<Process>(arguments);
+  ASSERT_TRUE(Read("port "));
+  Client client(Number(std::string_view(line).substr(5)), true, 1280, 800);
+  Headless::DisplayClient display(client);
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_NO_FATAL_FAILURE(Exposed());
+  ASSERT_TRUE(Read("event GEOMETRY window=320x200 desktop=320x200"));
+  ASSERT_TRUE(client.Until([&] { return display.ready.load(); }));
+  DISPLAY_CONTROL_MONITOR_LAYOUT monitor{};
+  monitor.Flags = DISPLAY_CONTROL_MONITOR_PRIMARY;
+  monitor.Width = 1920; monitor.Height = 1080;
+  monitor.PhysicalWidth = 500; monitor.PhysicalHeight = 300;
+  monitor.DesktopScaleFactor = monitor.DeviceScaleFactor = 100;
+  ASSERT_EQ(display.channel.load()->SendMonitorLayout(display.channel.load(), 1, &monitor), CHANNEL_RC_OK);
+  ASSERT_TRUE(ReadInput(client, "event DISPLAY_DESKTOP_MODE_CHANGED type=" + std::to_string(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED) + " width=1920 height=1080"));
+  ASSERT_TRUE(Read("event GEOMETRY window=320x200 desktop=320x200"));
+  ASSERT_TRUE(client.Until([&] { auto gdi = client.instance->context->gdi; return gdi->width == 320 && gdi->height == 200; }));
+  SDL_Log("trace screen=1920x1080 gdi=320x200");
+  ASSERT_TRUE(freerdp_input_send_keyboard_event(client.instance->context->input, KBD_FLAGS_DOWN, 0x3e));
+  ASSERT_TRUE(Read("event GEOMETRY window=640x480 desktop=1920x1080"));
+  ASSERT_TRUE(client.Until([&] { auto gdi = client.instance->context->gdi; return gdi->width == 640 && gdi->height == 480; }));
+  SDL_Log("trace leave gdi=640x480 screen=1920x1080");
+  ASSERT_NO_FATAL_FAILURE(Escape(client));
+}
+
+class RefreshMode : public Sample, public testing::WithParamInterface<const char*> {};
+
+TEST_P(RefreshMode, EstimatesOnlyChangeCurrentMode) {
+  auto arguments = Arguments(certificates.Path(), false);
+  arguments.insert(arguments.end() - 1, {"SDL_RDP_WIDTH=640", "SDL_RDP_HEIGHT=480"});
+  arguments.push_back("--tight");
+  std::string_view kind = GetParam();
+  if (kind != "windowed") arguments.push_back("--fullscreen");
+  if (kind == "exclusive") arguments.insert(arguments.end(), {"--mode", "320x200"});
+  process = std::make_unique<Process>(arguments);
+  ASSERT_TRUE(Read("port "));
+  Client client(Number(std::string_view(line).substr(5)), true, 1024, 768);
+  ASSERT_TRUE(freerdp_settings_set_uint32(client.instance->context->settings, FreeRDP_FrameAcknowledge, 2));
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  Headless::FrameObserver frames(client);
+  ASSERT_TRUE(client.Until([&] { return !frames.ids.empty(); }));
+  ASSERT_TRUE(frames.Ack());
+  ASSERT_TRUE(ReadInput(client, "event FOCUS_GAINED "));
+  auto count = [&](std::string_view event) {
+    unsigned total = 0;
+    for (std::size_t at = 0; (at = process->transcript.find(event, at)) != std::string::npos; at += event.size()) ++total;
+    return total;
+  };
+  auto desktop = count("event DISPLAY_DESKTOP_MODE_CHANGED ");
+  ASSERT_EQ(desktop, 1u) << process->transcript; // 640x480 startup -> 1024x768 client screen.
+  auto current = count("event DISPLAY_CURRENT_MODE_CHANGED ");
+  unsigned estimates = 0, acknowledgements = 0;
+  auto next_ack = Clock::now();
+  ASSERT_TRUE(client.Until([&] {
+    if (!frames.ids.empty() && Clock::now() >= next_ack) {
+      EXPECT_TRUE(frames.Ack());
+      next_ack = Clock::now() + (++acknowledgements % 2 ? 20ms : 120ms);
+    }
+    while (process->Line(line, Clock::now() + 1ms)) {
+      if (!line.starts_with("event DISPLAY_CURRENT_MODE_CHANGED ")) continue;
+      ++estimates;
+      EXPECT_FALSE(line.contains("numerator=0 ")) << line;
+      EXPECT_TRUE(line.ends_with(kind == "exclusive" ? " width=320 height=200" : " width=1024 height=768")) << line;
+    }
+    return estimates >= 5;
+  })) << process->transcript;
+  // An input barrier drains all mode events preceding the final acknowledgement.
+  ASSERT_TRUE(freerdp_input_send_keyboard_event(client.instance->context->input, KBD_FLAGS_DOWN, 0x1e));
+  ASSERT_TRUE(ReadInput(client, "event KEY_DOWN "));
+  EXPECT_GE(count("event DISPLAY_CURRENT_MODE_CHANGED "), current + 5);
+  EXPECT_EQ(count("event DISPLAY_DESKTOP_MODE_CHANGED "), desktop) << process->transcript;
+  ASSERT_NO_FATAL_FAILURE(Escape(client));
+}
+
+INSTANTIATE_TEST_SUITE_P(Window, RefreshMode, testing::Values("windowed", "borderless", "exclusive"));
+
+class ExclusiveFullscreen : public Sample, public testing::WithParamInterface<const char*> {};
+
+TEST_P(ExclusiveFullscreen, DoesNotRepaintOnModeChanges) {
+  auto arguments = Arguments(certificates.Path(), false);
+  *std::ranges::find(arguments, std::string("SDL_RDP_CODEC=planar")) = "SDL_RDP_CODEC=" + std::string(GetParam());
+  arguments.insert(arguments.end(), {"--fullscreen", "--mode", "320x200", "--partial"});
+  process = std::make_unique<Process>(arguments);
+  ASSERT_TRUE(Read("port "));
+  Client client(Number(std::string_view(line).substr(5)), true, 1280, 800);
+  Headless::DisplayClient display(client);
+  ASSERT_TRUE(freerdp_settings_set_uint32(client.instance->context->settings, FreeRDP_FrameAcknowledge, 2));
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  FullDesktopFrames desktop(client);
+  Headless::FrameObserver frames(client);
+  ASSERT_TRUE(client.Until([&] { return !frames.ids.empty(); }));
+  auto initial = frames.ids.size();
+  ASSERT_TRUE(frames.Ack());
+  ASSERT_TRUE(ReadInput(client, "event FOCUS_GAINED "));
+  ASSERT_TRUE(client.Until([&] { return display.ready.load() && frames.ids.size() >= initial + 2; }));
+  initial = frames.ids.size();
+  ASSERT_TRUE(frames.Ack());
+  ASSERT_TRUE(client.Until([&] { return frames.ids.size() >= initial + 2; }));
+  ASSERT_GT(desktop.full, 0u);
+  DISPLAY_CONTROL_MONITOR_LAYOUT monitor{};
+  monitor.Flags = DISPLAY_CONTROL_MONITOR_PRIMARY;
+  monitor.Width = 1920; monitor.Height = 1080;
+  monitor.PhysicalWidth = 500; monitor.PhysicalHeight = 300;
+  monitor.DesktopScaleFactor = monitor.DeviceScaleFactor = 100;
+  ASSERT_EQ(display.channel.load()->SendMonitorLayout(display.channel.load(), 1, &monitor), CHANNEL_RC_OK);
+  ASSERT_TRUE(ReadInput(client, "event DISPLAY_DESKTOP_MODE_CHANGED type=" + std::to_string(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED) + " width=1920 height=1080"));
+  ASSERT_NO_FATAL_FAILURE(IncrementalFrames(client, frames, desktop, "screen"));
+  ASSERT_NO_FATAL_FAILURE(IncrementalFrames(client, frames, desktop, "refresh"));
+  ASSERT_NO_FATAL_FAILURE(Escape(client));
+}
+
+INSTANTIATE_TEST_SUITE_P(Delivery, ExclusiveFullscreen, testing::Values("planar", "nscodec"));
+
+TEST_F(Sample, ExplicitFullscreenKeepsDeclaredAspect) {
+  auto arguments = Arguments(certificates.Path(), false);
+  arguments.insert(arguments.end(), {"--fullscreen", "--mode", "320x200", "--aspect", "4:3"});
+  process = std::make_unique<Process>(arguments);
+  ASSERT_TRUE(Read("port "));
+  Client client(Number(std::string_view(line).substr(5)), true, 1280, 800);
+  ASSERT_TRUE(freerdp_connect(client.instance.get()));
+  ASSERT_NO_FATAL_FAILURE(Exposed());
+  ASSERT_TRUE(Read("event GEOMETRY window=320x200 desktop=320x200"));
+  ASSERT_TRUE(client.Until([&] { auto gdi = client.instance->context->gdi; return gdi->width == 320 && gdi->height == 240; }));
+  SDL_Log("trace explicit aspect=4:3 window=320x200 gdi=320x240");
   ASSERT_NO_FATAL_FAILURE(Escape(client));
 }
 

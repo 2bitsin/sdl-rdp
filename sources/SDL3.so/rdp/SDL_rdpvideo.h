@@ -8,8 +8,7 @@ struct SDL_VideoData
     sdlrdp_handle *handle;
     SDL_DisplayID display;
     SDL_Window *window;
-    SDL_DisplayMode modes[2];
-    unsigned mode_index;
+    SDL_DisplayMode refresh_modes[2];
 };
 void SDL_RDP_InitMouse(void);
 bool SDL_RDP_ParseAspect(const char *value, sdlrdp_aspect *aspect);
