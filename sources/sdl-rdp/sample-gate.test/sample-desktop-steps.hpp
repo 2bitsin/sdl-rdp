@@ -17,6 +17,5 @@ protected:
   auto        ThenTakeoverEvent(char const* expected)                                     -> void;
   auto        WhenSmallerDesktop(Client& first)                                           -> void;
   auto        WhenWholeSampleReconnects(Client const& client, unsigned port)              -> void;
-  auto        GivenWholeSample()                                                          -> void;
 };
 }

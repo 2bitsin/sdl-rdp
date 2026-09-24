@@ -5,6 +5,7 @@
 #include <openssl/evp.h>
 #include <oxbox/utilities/hex.hpp>
 #include <sdl-rdp/headless-client.test/drive-observer.hpp>
+#include <sdl-rdp/headless-client.test/input-steps.hpp>
 #include <sdl-rdp/headless-client.test/io.hpp>
 #include <sdl-rdp/headless-client.test/share-drive.hpp>
 #include <algorithm>
@@ -41,18 +42,17 @@ auto SampleChecks::ThenAbsoluteMouse(rdpInput* input) -> void {
   ASSERT_TRUE(Read("event MOUSE_MOTION "));
   EXPECT_TRUE(line.contains(" x=100 y=120 ")) << line;
 }
-auto SampleChecks::WhenShiftedText(rdpInput* input) -> void {
+auto SampleChecks::WhenShiftedText(Client const& client) -> void {
+  auto* input = client.Instance()->context->input;
   ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x2a));
-  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x1e));
-  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x1e));
+  ASSERT_NO_FATAL_FAILURE(client.Tap(0x1e));
   ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x2a));
   ASSERT_TRUE(Read("event TEXT_INPUT text=A"));
 }
-auto SampleChecks::WhenScancodeText(rdpInput* input) -> void {
-  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x1e));
-  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x1e));
+auto SampleChecks::WhenScancodeText(Client const& client) -> void {
+  ASSERT_NO_FATAL_FAILURE(client.Tap(0x1e));
   ASSERT_TRUE(Read("event TEXT_INPUT text=a"));
-  WhenShiftedText(input);
+  WhenShiftedText(client);
 }
 auto SampleChecks::WhenNonAsciiKey(rdpInput* input) -> void {
   ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(input, KBD_FLAGS_DOWN, 0xe4));
@@ -70,8 +70,7 @@ auto SampleChecks::ThenUnicodeKeyEvents() -> void {
 auto SampleChecks::WhenUnicodeKeys(rdpInput* input) -> void {
   ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(input, KBD_FLAGS_DOWN, 'a'));
   ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(input, KBD_FLAGS_RELEASE, 'a'));
-  ThenUnicodeKeyEvents();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ThenUnicodeKeyEvents());
   WhenNonAsciiKey(input);
 }
 auto SampleChecks::ThenDriveOutput(fs::path const& share, std::string const& original) -> void {
@@ -116,15 +115,15 @@ auto SampleChecks::DisconnectReading(unsigned port, fs::path const& share) -> vo
   {
     Client client(port, true, 640, 480);
     Headless::ShareDrive(client, share.c_str());
-    ASSERT_TRUE(freerdp_connect(client.Instance().get())) << ConnectLogs();
+    ASSERT_NO_FATAL_FAILURE(Connect(client));
     Headless::DriveObserver observer(client);
     ASSERT_TRUE(client.Until([&] {
-      return std::ranges::any_of(observer.Observed().io, [](auto packet) {
+      return std::ranges::any_of(observer.Observed().io, [](Backend::DrivePacket packet) {
         packet.Skip(12);
-        return packet.Get(4) == IRP_MJ_READ;
+        return packet.Read<uint32_t>() == IRP_MJ_READ;
       });
     }));
-    ASSERT_TRUE(freerdp_disconnect(client.Instance().get()));
+    ASSERT_TRUE(client.Disconnect());
   }
 }
 auto SampleChecks::ThenClipboardCleared(Client& client, Headless::ClipboardClient& clipboard) -> void {

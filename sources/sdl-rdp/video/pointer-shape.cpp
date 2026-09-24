@@ -2,18 +2,22 @@
 
 #include <sdl-rdp/core/frame-snapshot.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 
 #include <freerdp/freerdp.h>
 #include <freerdp/settings.h>
 #include <freerdp/update.h>
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <ranges>
 #include <span>
+#include <vector>
 
 namespace Backend {
 namespace {
 constexpr unsigned ColorPointerLimit = 96;
+constexpr uint16_t ColorBits         = 32;
 constexpr BYTE     TransparentAlpha  = 0;
 auto MaskStride(unsigned width) -> std::size_t {
   return std::size_t((width + 15) / 16) * 2;
@@ -22,6 +26,10 @@ auto MarkTransparent(std::span<BYTE const> source, std::span<BYTE> mask_row) -> 
   constexpr std::size_t AlphaByte = 3;
   for (auto column : std::views::iota(0uz, source.size() / PixelBytes))
     if (source[(column * PixelBytes) + AlphaByte] == TransparentAlpha) mask_row[column / 8] |= 0x80 >> (column % 8);
+}
+// abi: FreeRDP's pointer update structs hold the buffers as non-const pointers and only read them.
+auto ReadOnly(std::vector<std::uint8_t> const& bytes) -> std::uint8_t* {
+  return const_cast<std::uint8_t*>(bytes.data());
 }
 auto Delivered(BOOL sent) -> PointerDelivery {
   return sent ? PointerDelivery::Sent : PointerDelivery::Failed;
@@ -42,33 +50,46 @@ PointerShape::PointerShape(Extent size, unsigned x, unsigned y, std::span<BYTE c
     MarkTransparent(source, std::span(_mask).subspan(target * stride, stride));
   }
 }
-auto PointerShape::Send(rdpContext& context) -> PointerDelivery {
+auto PointerShape::ColorImage() const -> POINTER_COLOR_UPDATE {
+  auto const large = LargeImage();
+  return { .cacheIndex    = large.cacheIndex,
+           .hotSpotX      = large.hotSpotX,
+           .hotSpotY      = large.hotSpotY,
+           .width         = large.width,
+           .height        = large.height,
+           .lengthAndMask = Narrowed<std::uint16_t>(large.lengthAndMask),
+           .lengthXorMask = Narrowed<std::uint16_t>(large.lengthXorMask),
+           .xorMaskData   = large.xorMaskData,
+           .andMaskData   = large.andMaskData };
+}
+auto PointerShape::LargeImage() const -> POINTER_LARGE_UPDATE {
+  return { .xorBpp        = ColorBits,
+           .cacheIndex    = 0,
+           .hotSpotX      = Narrowed<std::uint16_t>(_hot_x),
+           .hotSpotY      = Narrowed<std::uint16_t>(_hot_y),
+           .width         = Narrowed<std::uint16_t>(_size.width),
+           .height        = Narrowed<std::uint16_t>(_size.height),
+           .lengthAndMask = Narrowed<std::uint32_t>(_mask.size()),
+           .lengthXorMask = Narrowed<std::uint32_t>(_pixels.size()),
+           .xorMaskData   = ReadOnly(_pixels),
+           .andMaskData   = ReadOnly(_mask) };
+}
+auto PointerShape::Send(rdpContext& context) const -> PointerDelivery {
   auto* update = context.update->pointer;
   if (!_size.width) {
     POINTER_SYSTEM_UPDATE const hidden{ SYSPTR_NULL };
     return Delivered(update->PointerSystem(&context, &hidden));
   }
   if (_size.width <= ColorPointerLimit && _size.height <= ColorPointerLimit) {
-    POINTER_NEW_UPDATE const image{ 32,
-                                    { 0, UINT16(_hot_x), UINT16(_hot_y), UINT16(_size.width), UINT16(_size.height),
-                                      UINT16(_mask.size()), UINT16(_pixels.size()), _pixels.data(), _mask.data() } };
+    POINTER_NEW_UPDATE const image{ ColorBits, ColorImage() };
     return Delivered(update->PointerNew(&context, &image));
   }
   if (!(freerdp_settings_get_uint32(context.settings, FreeRDP_LargePointerFlag) & LARGE_POINTER_FLAG_384x384))
     return PointerDelivery::Unsupported;
   return Delivered(SendLarge(context));
 }
-auto PointerShape::SendLarge(rdpContext& context) -> BOOL {
-  POINTER_LARGE_UPDATE const image{ 32,
-                                    0,
-                                    UINT16(_hot_x),
-                                    UINT16(_hot_y),
-                                    UINT16(_size.width),
-                                    UINT16(_size.height),
-                                    UINT32(_mask.size()),
-                                    UINT32(_pixels.size()),
-                                    _pixels.data(),
-                                    _mask.data() };
+auto PointerShape::SendLarge(rdpContext& context) const -> BOOL {
+  auto const image = LargeImage();
   return context.update->pointer->PointerLarge(&context, &image);
 }
 }

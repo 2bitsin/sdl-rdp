@@ -93,11 +93,8 @@ auto Peer::Signal() -> void {
 auto Peer::Settled(FrameLock const& held, uint64_t target) const -> bool {
   return _pacing.Settled(held, target);
 }
-auto Peer::Audio() const noexcept -> AudioChannel* {
-  return _redirection.Audio();
-}
-auto Peer::Drive() const -> std::shared_ptr<DriveChannel> {
-  return _redirection.Drive();
+auto Peer::Redirected() const noexcept -> Redirection const& {
+  return _redirection;
 }
 auto Peer::Point(MouseMode mode) -> void {
   _input_events.Point(mode);

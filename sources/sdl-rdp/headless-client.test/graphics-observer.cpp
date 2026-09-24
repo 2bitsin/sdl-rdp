@@ -18,7 +18,7 @@ GraphicsObserver::GraphicsObserver(Client& target)
   PubSub_SubscribeChannelConnected(client.Instance()->context->pubSub, Connected);
 }
 GraphicsObserver::~GraphicsObserver() {
-  freerdp_disconnect(client.Instance().get());
+  client.Disconnect();
   PubSub_UnsubscribeChannelConnected(client.Instance()->context->pubSub, Connected);
   client.Instance()->context->update->DesktopResize = desktop_resize;
   active                                            = nullptr;

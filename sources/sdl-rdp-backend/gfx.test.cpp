@@ -1,4 +1,5 @@
 #include <sdl-rdp/core/picture-geometry.hpp>
+#include <sdl-rdp/headless-client.test/backend-instance.hpp>
 #include <sdl-rdp/headless-client.test/graphics-backend.hpp>
 #include <sdl-rdp/headless-client.test/graphics-observer.hpp>
 #include <sdl-rdp/headless-client.test/pattern.hpp>
@@ -77,19 +78,10 @@ auto ThenScaledError(Headless::Client& client, std::vector<UINT32> const& scaled
   testing::Test::RecordProperty("scaled_maximum_channel_error", error);
   EXPECT_LE(error, 8u);
 }
-auto RequireAvc() -> void {
-  if (!Backend::Avc::Encoder::Available()) GTEST_SKIP() << Backend::Avc::Encoder::UnavailableReason();
-}
 class AvcSession : public Headless::GraphicsBackend {
 protected:
-  auto GivenAvc() -> void {
-    RequireAvc();
-    if (::testing::Test::IsSkipped()) return;
-    GivenGraphics(SDLRDP_CODEC_AVC420);
-  }
   auto GivenAutoFrame(bool avc = true) -> void {
-    GivenGraphics(SDLRDP_CODEC_AUTO, 320, 200, avc);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(GivenGraphics(SDLRDP_CODEC_AUTO, 320, 200, avc));
     PresentFrame(std::vector<UINT32>(320uz * 200, 0x55aaff));
   }
   auto PresentFrame(std::vector<UINT32> const& pixels, unsigned width = 320, unsigned height = 200) -> void {
@@ -112,8 +104,7 @@ protected:
   }
   auto GivenGraphics(sdlrdp_codec codec = SDLRDP_CODEC_AVC420, unsigned width = 320, unsigned height = 200,
                      bool avc = true) -> void {
-    Open(codec, width, height);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(Open(codec, width, height));
     graphics_client = std::make_unique<Headless::Client>(sdlrdp_port(backend.get()), true);
     graphics_client->EnableGraphics(avc);
     if (!avc)
@@ -124,9 +115,7 @@ protected:
   auto ThenReported(Headless::Client& client, sdlrdp_codec codec) -> void {
     bool reported = false;
     ASSERT_TRUE(client.Until([&] {
-      std::array<sdlrdp_event, 32> events { };
-      auto                         count  = sdlrdp_poll(backend.get(), events.data(), events.size());
-      reported |= std::ranges::any_of(std::span(events).first(count), [=](auto const& event) {
+      reported |= std::ranges::any_of(backend.Poll(), [=](auto const& event) {
         return (event.type == SDLRDP_CONNECTED && event.connected.codec == codec)
                || (event.type == SDLRDP_CODEC_CHANGED && event.codec_changed.codec == codec);
       });
@@ -143,12 +132,11 @@ protected:
   }
 
   auto Frame(std::vector<std::uint32_t> const& pixels, Backend::Extent size, sdlrdp_rect damage) -> void {
-    auto&      client     = ClientSession();
-    auto&      observer   = ObserverSession();
-    auto       before     { observer.Observed().frames.size()   };
-    auto       avc_before { observer.Observed().avc_nals.size() };
-    auto const pitch      = static_cast<int>(size.width * Backend::PixelBytes);
-    ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), pitch, size.width, size.height, &damage, 1), 0);
+    auto& client     = ClientSession();
+    auto& observer   = ObserverSession();
+    auto  before     { observer.Observed().frames.size()   };
+    auto  avc_before { observer.Observed().avc_nals.size() };
+    ASSERT_EQ(backend.Present(pixels, size.width, size.height, damage), 0);
     ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() > before; })) << logs.Text(true);
     auto reference = observer.Observed().avc_nals.size() > avc_before ? Yuv420Reference(pixels, size) : pixels;
     auto error     = client.MaxError(pixels, &reference);
@@ -163,12 +151,11 @@ protected:
   }
 
   auto ThenCodecChanged() -> void {
-    std::array<sdlrdp_event, 32> events  { };
-    bool                         changed = false;
+    bool changed = false;
     ASSERT_TRUE(ClientSession().Until([&] {
-      auto count = sdlrdp_poll(backend.get(), events.data(), events.size());
-      for (unsigned i = 0; i < count; ++i)
-        changed |= events[i].type == SDLRDP_CODEC_CHANGED && events[i].codec_changed.codec == SDLRDP_CODEC_PROGRESSIVE;
+      changed |= std::ranges::any_of(backend.Poll(), [](auto const& event) {
+        return event.type == SDLRDP_CODEC_CHANGED && event.codec_changed.codec == SDLRDP_CODEC_PROGRESSIVE;
+      });
       return changed;
     }));
   }
@@ -178,17 +165,14 @@ protected:
 class AvcGraphics : public AvcSession {
 protected:
   auto GivenSmallSurface(sdlrdp_codec codec, std::vector<UINT32> const& pixels) -> void {
-    GivenGraphics(codec, 32, 32);
-    if (::testing::Test::HasFatalFailure()) return;
-    PresentFrame(pixels, 32, 32);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(GivenGraphics(codec, 32, 32));
+    ASSERT_NO_FATAL_FAILURE(PresentFrame(pixels, 32, 32));
     ThenProgressiveOnly();
   }
   auto WhenProgressiveSwitchesToAvc(std::vector<UINT32> const& pixels) -> void {
     auto commands = ObserverSession().Observed().commands;
     ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_AVC420), 0);
-    Frame(pixels, { .width = 320, .height = 200 }, { 18, 20, 8, 6 });
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(Frame(pixels, { .width = 320, .height = 200 }, { 18, 20, 8, 6 }));
     EXPECT_EQ(ObserverSession().Observed().commands, commands + 1);
     ASSERT_EQ(ObserverSession().Observed().avc_nals.size(), 1u);
     EXPECT_TRUE(ObserverSession().Observed().avc_nals.back() & (1u << 5));
@@ -201,22 +185,18 @@ protected:
     EXPECT_EQ(ObserverSession().Observed().avc_rects.back().bottom, 200);
   }
   auto WhenSmallAvcRequested(std::vector<UINT32> const& pixels) -> void {
-    std::array<sdlrdp_event, 32> events{ };
-    while (sdlrdp_poll(backend.get(), events.data(), events.size())) {
+    while (!backend.Poll().empty()) {
     }
     ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_AVC420), 0);
-    PresentFrame(pixels, 32, 32);
-    if (::testing::Test::HasFatalFailure()) return;
-    ThenProgressiveOnly();
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(PresentFrame(pixels, 32, 32));
+    ASSERT_NO_FATAL_FAILURE(ThenProgressiveOnly());
     EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "surface below NVENC minimum"), 1u);
     EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "falls back"), 1u);
     ThenCodecChanged();
   }
   auto ThenAvcResizes(std::vector<UINT32>& pixels) -> void {
     pixels.assign(354uz * 226, 0x335577);
-    PresentFrame(pixels, 354, 226);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(PresentFrame(pixels, 354, 226));
     ThenResizedIdr();
   }
   auto ThenPFrameRegion() -> void {
@@ -232,7 +212,7 @@ protected:
     ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0) == 1; }));
     ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_AVC420), 0);
     auto avc_before = observer.Observed().avc_nals.size();
-    ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &full, 1), 0);
+    ASSERT_EQ(backend.Present(pixels, 320, 200, full), 0);
     ASSERT_TRUE(client.Until([&] { return observer.Observed().avc_nals.size() > avc_before; }));
     ThenScaledError(client, scaled, reference);
     EXPECT_TRUE(observer.Observed().avc_nals.back() & (1u << 5));
@@ -254,11 +234,10 @@ protected:
     ASSERT_EQ(sdlrdp_set_aspect(backend.get(), { 3, 2 }), 0);
     auto              before{ observer.Observed().frames.size() };
     sdlrdp_rect const full  { 0, 0, 320, 200                    };
-    ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &full, 1), 0);
+    ASSERT_EQ(backend.Present(pixels, 320, 200, full), 0);
     ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() > before; }));
     std::vector<UINT32> scaled(321uz * 214);
-    ReadScaledPixels(client, scaled);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(ReadScaledPixels(client, scaled));
     ThenScaledAvc(client, observer, pixels, scaled, full);
   }
   auto ThenPFrameDamage() -> void {
@@ -270,112 +249,89 @@ protected:
     ThenPFrameRegion();
   }
 };
+class AvcAvailable : public AvcGraphics {
+protected:
+  auto SetUp() -> void override {
+    ASSERT_NO_FATAL_FAILURE(AvcGraphics::SetUp());
+    if (!Backend::Avc::Encoder::Available()) GTEST_SKIP() << Backend::Avc::Encoder::UnavailableReason();
+  }
+};
 
-TEST_F(AvcGraphics, AutoWithAvcStartsWithIdr) {
-  RequireAvc();
-  if (::testing::Test::IsSkipped()) return;
-  GivenAutoFrame();
-  if (::testing::Test::HasFatalFailure()) return;
-  ThenReported(ClientSession(), SDLRDP_CODEC_AVC420);
-  if (::testing::Test::HasFatalFailure()) return;
+TEST_F(AvcAvailable, AutoWithAvcStartsWithIdr) {
+  ASSERT_NO_FATAL_FAILURE(GivenAutoFrame());
+  ASSERT_NO_FATAL_FAILURE(ThenReported(ClientSession(), SDLRDP_CODEC_AVC420));
   ASSERT_EQ(ObserverSession().Observed().avc_nals.size(), 1u);
   EXPECT_TRUE(ObserverSession().Observed().avc_nals.front() & (1u << 5));
   EXPECT_EQ(ObserverSession().Observed().progressive_headers, 0u);
   EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "falls back"), 0u);
 }
 TEST_F(AvcGraphics, AutoWithoutAvcUsesProgressiveSilently) {
-  GivenAutoFrame(false);
-  if (::testing::Test::HasFatalFailure()) return;
-  ThenReported(ClientSession(), SDLRDP_CODEC_PROGRESSIVE);
-  if (::testing::Test::HasFatalFailure()) return;
-  ThenProgressiveOnly();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenAutoFrame(false));
+  ASSERT_NO_FATAL_FAILURE(ThenReported(ClientSession(), SDLRDP_CODEC_PROGRESSIVE));
+  ASSERT_NO_FATAL_FAILURE(ThenProgressiveOnly());
   EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "falls back"), 0u);
 }
-TEST_F(AvcGraphics, DecodesPFrameAndResize) {
-  GivenAvc();
-  if (::testing::Test::IsSkipped() || ::testing::Test::HasFatalFailure()) return;
+TEST_F(AvcAvailable, DecodesPFrameAndResize) {
+  ASSERT_NO_FATAL_FAILURE(GivenGraphics(SDLRDP_CODEC_AVC420));
   std::vector<UINT32>             pixels(320uz * 200);
   constexpr std::array<UINT32, 4> colors{ 0xff0000, 0x00ff00, 0x0000ff, 0x55aaff };
   std::ranges::transform(std::views::iota(0uz, pixels.size()), pixels.begin(),
                          [&](size_t i) { return colors[(i % 320) / 80]; });
-  PresentFrame(pixels);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(PresentFrame(pixels));
   sdlrdp_rect const damage{ 18, 20, 8, 6 };
   std::ranges::for_each(std::views::iota(20, 26),
                         [&](int y) { std::ranges::fill(std::span(pixels).subspan((y * 320) + 18, 8), 0x55aaffu); });
-  Frame(pixels, { .width = 320, .height = 200 }, damage);
-  if (::testing::Test::HasFatalFailure()) return;
-  ThenPFrameDamage();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(Frame(pixels, { .width = 320, .height = 200 }, damage));
+  ASSERT_NO_FATAL_FAILURE(ThenPFrameDamage());
   ThenAvcResizes(pixels);
 }
 TEST_F(AvcGraphics, ClientWithoutAvcFallsBackAndReportsChange) {
-  GivenGraphics(SDLRDP_CODEC_AVC420, 320, 200, false);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenGraphics(SDLRDP_CODEC_AVC420, 320, 200, false));
   std::vector<UINT32> const pixels(320uz * 200, 0x55aaff);
-  PresentFrame(pixels);
-  if (::testing::Test::HasFatalFailure()) return;
-  ThenCodecChanged();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(PresentFrame(pixels));
+  ASSERT_NO_FATAL_FAILURE(ThenCodecChanged());
   EXPECT_EQ(ObserverSession().Observed().progressive_headers, 1u);
   EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "AVC420 falls back"), 1u);
 }
 }
 
 namespace {
-TEST_F(AvcGraphics, SmallSurfaceFallsBack) {
-  RequireAvc();
-  if (::testing::Test::IsSkipped()) return;
+TEST_F(AvcAvailable, SmallSurfaceFallsBack) {
   std::vector<UINT32> const pixels(32uz * 32, 0x55aaff);
-  GivenSmallSurface(SDLRDP_CODEC_AVC420, pixels);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenSmallSurface(SDLRDP_CODEC_AVC420, pixels));
   EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "surface below NVENC minimum"), 1u);
 }
-TEST_F(AvcGraphics, AutoSmallSurfaceLogsFallbackWhenAvcRequested) {
-  RequireAvc();
-  if (::testing::Test::IsSkipped()) return;
+TEST_F(AvcAvailable, AutoSmallSurfaceLogsFallbackWhenAvcRequested) {
   std::vector<UINT32> const pixels(32uz * 32, 0x55aaff);
-  GivenSmallSurface(SDLRDP_CODEC_AUTO, pixels);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenSmallSurface(SDLRDP_CODEC_AUTO, pixels));
   EXPECT_FALSE(logs.Contains("falls back"));
   EXPECT_FALSE(logs.Contains("surface below NVENC minimum"));
   WhenSmallAvcRequested(pixels);
 }
-TEST_F(AvcGraphics, ProgressiveConnectionSwitchesToAvcWithIdr) {
-  RequireAvc();
-  if (::testing::Test::IsSkipped()) return;
-  GivenGraphics(SDLRDP_CODEC_PROGRESSIVE);
-  if (::testing::Test::HasFatalFailure()) return;
+TEST_F(AvcAvailable, ProgressiveConnectionSwitchesToAvcWithIdr) {
+  ASSERT_NO_FATAL_FAILURE(GivenGraphics(SDLRDP_CODEC_PROGRESSIVE));
   std::vector<UINT32> const pixels(320uz * 200, 0x335577);
-  PresentFrame(pixels);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(PresentFrame(pixels));
   EXPECT_EQ(ObserverSession().Observed().progressive_headers, 1u);
   EXPECT_TRUE(ObserverSession().Observed().avc_nals.empty());
   WhenProgressiveSwitchesToAvc(pixels);
 }
-TEST_F(AvcGraphics, CodecSwitchRestoresFullSurfaceAndIdr) {
-  GivenAvc();
-  if (::testing::Test::IsSkipped() || ::testing::Test::HasFatalFailure()) return;
+TEST_F(AvcAvailable, CodecSwitchRestoresFullSurfaceAndIdr) {
+  ASSERT_NO_FATAL_FAILURE(GivenGraphics(SDLRDP_CODEC_AVC420));
   std::vector<UINT32> pixels(320uz * 200, 0xff0000);
-  PresentFrame(pixels);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(PresentFrame(pixels));
   ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_RAW), 0);
   pixels.assign(pixels.size(), 0x335577);
-  PresentFrame(pixels);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(PresentFrame(pixels));
   ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_AVC420), 0);
-  Frame(pixels, { .width = 320, .height = 200 }, { 18, 20, 8, 6 });
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(Frame(pixels, { .width = 320, .height = 200 }, { 18, 20, 8, 6 }));
   ThenFullSurfaceIdr();
 }
-TEST_F(AvcGraphics, KnownPatternColours) {
-  GivenAvc();
-  if (::testing::Test::IsSkipped() || ::testing::Test::HasFatalFailure()) return;
+TEST_F(AvcAvailable, KnownPatternColours) {
+  ASSERT_NO_FATAL_FAILURE(GivenGraphics(SDLRDP_CODEC_AVC420));
   std::vector<UINT32> pixels(320uz * 200);
   Headless::MovingTilePattern(pixels, 320, 200, 0);
-  PresentFrame(pixels);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(PresentFrame(pixels));
   EXPECT_EQ(ObserverSession().Observed().avc_nals.size(), 1u);
   ScaledPattern(ClientSession(), ObserverSession(), pixels);
 }

@@ -1,3 +1,4 @@
+#include <sdl-rdp/headless-client.test/backend-instance.hpp>
 #include <sdl-rdp/headless-client.test/graphics-backend.hpp>
 #include <sdl-rdp/headless-client.test/graphics-cost.hpp>
 #include <sdl-rdp/headless-client.test/graphics-observer.hpp>
@@ -25,12 +26,10 @@ protected:
     certificates = path.data();
     sdlrdp_config config{ "127.0.0.1", 0, certificates.c_str(), 640, 480, 0, Headless::Logs::Collect, &logs };
     config.codec = SDLRDP_CODEC_PROGRESSIVE;
-    sdlrdp_handle* handle = nullptr;
-    ASSERT_EQ(sdlrdp_open(&config, &handle), 0);
-    backend.reset(handle);
+    ASSERT_NO_FATAL_FAILURE(backend.Open(config));
   }
   auto TearDown() -> void override {
-    backend.reset();
+    backend.Close();
     if (!certificates.empty()) std::filesystem::remove_all(certificates);
   }
   auto PresentProgressivePixel(Headless::Client& client, Headless::GraphicsObserver& observer,
@@ -39,15 +38,14 @@ protected:
     auto              frames = observer.Observed().frames.size();
     sdlrdp_rect const damage = { .x = 0, .y = 0, .w = 1, .h = 1 };
     pixels.front() ^= 0x222222;
-    auto const pitch = static_cast<int>(size.width * Backend::PixelBytes);
-    ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), pitch, size.width, size.height, &damage, 1), 0);
+    ASSERT_EQ(backend.Present(pixels, size.width, size.height, damage), 0);
     ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() > frames; })) << logs.Text(true);
     EXPECT_LE(client.MaxError(pixels), client.Tolerance());
     EXPECT_EQ(observer.Observed().progressive_headers, generations);
   }
-  std::filesystem::path                                   certificates;
-  Headless::Logs                                          logs;
-  std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> backend     { nullptr, sdlrdp_close };
+  std::filesystem::path     certificates;
+  Headless::Logs            logs;
+  Headless::BackendInstance backend;
 };
 auto Blend(std::uint32_t top, std::uint32_t bottom, float weight) -> std::uint32_t {
   std::uint32_t blended = 0;
@@ -78,8 +76,7 @@ auto ThenBilinearRow(rdpGdi const& gdi, std::vector<std::uint32_t> const& pixels
 }
 auto ThenBilinearPixels(rdpGdi const& gdi, std::vector<std::uint32_t> const& pixels) -> void {
   for (std::size_t y = 0; y < 240; ++y) {
-    ThenBilinearRow(gdi, pixels, y);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(ThenBilinearRow(gdi, pixels, y));
   }
 }
 auto ThenProgressiveGeneration(Headless::GraphicsObserver const& observer, unsigned generations, unsigned w, unsigned h)
@@ -97,12 +94,12 @@ TEST_F(GraphicsResize, RawAspectMatchesBilinear) {
   Headless::Client client(sdlrdp_port(backend.get()), true, 320, 240);
   client.EnableGraphics();
   Headless::GraphicsObserver observer(client);
-  ASSERT_TRUE(freerdp_connect(client.Instance().get()));
+  ASSERT_TRUE(client.Connect());
   std::vector<UINT32> pixels(320uz * 200);
   std::mt19937        random(17);           // NOLINT(cert-msc32-c, cert-msc51-cpp): Reproducible codec input.
   std::ranges::generate(pixels, [&] { return random() & 0x00ffffff; });
   sdlrdp_rect const full{ 0, 0, 320, 200 };
-  ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &full, 1), 0);
+  ASSERT_EQ(backend.Present(pixels, 320, 200, full), 0);
   ASSERT_TRUE(client.Until([&] { return !observer.Observed().frames.empty(); })) << logs.Text(true);
   auto* gdi = client.Instance()->context->gdi;
   ASSERT_EQ(gdi->width, 320);
@@ -115,19 +112,18 @@ TEST_F(GraphicsResize, ProgressiveContextAndFullDamage) {
   client.EnableGraphics();
   client.Tolerance(24);
   Headless::GraphicsObserver observer(client);
-  ASSERT_TRUE(freerdp_connect(client.Instance().get()));
+  ASSERT_TRUE(client.Connect());
   unsigned generations = 0;
   for (auto [w, h] : ResizeSequence) {
     std::vector<UINT32> pixels(static_cast<std::size_t>(w) * h, 0x335577 + (generations * 0x221100));
     SCOPED_TRACE(std::to_string(w) + "x" + std::to_string(h));
     sdlrdp_rect const damage{ 0, 0, int(w), int(h) };
-    ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), w * 4, w, h, &damage, 1), 0);
+    ASSERT_EQ(backend.Present(pixels, w, h, damage), 0);
     ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text(true);
     ++generations;
-    ThenProgressiveGeneration(observer, generations, w, h);
-    if (::testing::Test::HasFatalFailure()) return;
-    PresentProgressivePixel(client, observer, pixels, { .width = w, .height = h }, generations);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(ThenProgressiveGeneration(observer, generations, w, h));
+    ASSERT_NO_FATAL_FAILURE(
+        PresentProgressivePixel(client, observer, pixels, { .width = w, .height = h }, generations));
   }
 }
 }
@@ -144,25 +140,23 @@ auto ApplyPlanarDamage(std::vector<UINT32>& pixels, std::vector<UINT32>& expecte
   pixels.back()  ^= 0x00ffffff;
 }
 TEST_F(GraphicsCost, PlanarPartialMatchesFull) {
-  Open(354, 226, SDLRDP_CODEC_PLANAR);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(Open(354, 226, SDLRDP_CODEC_PLANAR));
   Headless::Client client(sdlrdp_port(backend.get()), true, 354, 226);
   client.EnableGraphics();
   Headless::GraphicsObserver observer(client);
-  ConnectGraphics(client);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ConnectGraphics(client));
   std::vector<UINT32> pixels(354uz * 226);
   Headless::MovingTilePattern(pixels, 354, 226, 0);
   sdlrdp_rect const full     { 0, 0, 354, 226   };
   sdlrdp_rect const part     { 17, 19, 177, 113 };
   auto              expected = pixels;
-  PresentPlanar(client, observer, pixels, expected, full);
+  ASSERT_NO_FATAL_FAILURE(PresentPlanar(client, observer, pixels, expected, full));
   ApplyPlanarDamage(pixels, expected, part);
-  PresentPlanar(client, observer, pixels, expected, part);
+  ASSERT_NO_FATAL_FAILURE(PresentPlanar(client, observer, pixels, expected, part));
   pixels = expected;
   auto*             gdi     = client.Instance()->context->gdi;
   std::vector<BYTE> partial(gdi->primary_buffer, gdi->primary_buffer + (std::size_t(gdi->stride) * gdi->height));
-  PresentPlanar(client, observer, pixels, expected, full);
+  ASSERT_NO_FATAL_FAILURE(PresentPlanar(client, observer, pixels, expected, full));
   EXPECT_TRUE(std::ranges::equal(partial, std::span(gdi->primary_buffer, partial.size())));
 }
 }

@@ -1,17 +1,12 @@
 #pragma once
+#include <sdl-rdp/utilities/generational.hpp>
 #include <sdl-rdp/video/pointer-shape.hpp>
 
-#include <cstdint>
-
 namespace Backend {
-class PointerStore {
+class PointerStore : private Generational<PointerShape> {
 public:
-  auto Replace(PointerShape next)  -> void;
-  auto Generation() const noexcept -> uint64_t;
-  auto Send(rdpContext& context)   -> PointerDelivery;
-
-private:
-  PointerShape _shape;
-  uint64_t     _generation{ };
+  using Generational::Generation;
+  using Generational::Replace;
+  auto Send(rdpContext& context) const -> PointerDelivery;
 };
 }

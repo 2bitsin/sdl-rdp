@@ -1,30 +1,26 @@
 #include "SDL_rdpdrive.hpp"
+#include "SDL_rdpowneddriver.hpp"
 #include "boundary.hpp"
 #include <span>
 namespace rdp {
 namespace {
 constexpr std::size_t DirectoryBatch = 32;
 constexpr std::size_t CopyChunkBytes = 65536;
-class Storage {
+class Storage : private OwnedDriver<Driver const> {
 public:
+  using OwnedDriver<Driver const>::Backend;
+  using OwnedDriver<Driver const>::Owner;
        Storage(std::shared_ptr<Driver const> driver, std::optional<std::string> name)
-      : _driver{ std::move(driver) }, _name{ std::move(name) } { }
-  auto Backend() const -> Driver const& {
-    return *_driver;
-  }
-  auto Owner() const -> std::shared_ptr<Driver const> const& {
-    return _driver;
-  }
+      : OwnedDriver<Driver const>{ std::move(driver) }, _name{ std::move(name) } { }
   auto Drive() const -> unsigned {
     return _drive;
   }
   auto Resolve() -> void {
-    _drive = DriveId(*_driver, _name);
+    _drive = DriveId(Backend(), _name);
   }
 private:
-  std::shared_ptr<Driver const> _driver;
-  std::optional<std::string>    _name;
-  unsigned                      _drive { };
+  std::optional<std::string> _name;
+  std::uint32_t              _drive{ };
 };
 // SDL storage callbacks carry the Storage through an opaque context pointer.
 auto Opened(void* context) -> Storage& {

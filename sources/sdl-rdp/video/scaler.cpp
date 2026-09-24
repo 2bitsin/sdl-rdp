@@ -4,6 +4,7 @@
 #include <sdl-rdp/core/frame-snapshot.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/copy-rows.hpp>
+#include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/video/peer-frames.hpp>
 
 #include <algorithm>
@@ -33,8 +34,7 @@ auto BlendRow(std::span<Tap const> columns, std::span<BYTE const> top, std::span
           std::floor(Blend(Sample(top, column, channel), Sample(bottom, column, channel), weight) + 0.5F));
 }
 auto CheckArea(sdlrdp_rect area, sdlrdp_rect desktop) -> void {
-  Expects(area.w > 0, "band width is positive");
-  Expects(area.h > 0, "band height is positive");
+  ExpectsBand(area);
   Expects(area.x >= 0, "band left edge is nonnegative");
   Expects(area.y >= 0, "band top edge is nonnegative");
   Expects(area.x + area.w <= desktop.w, "band right edge fits the desktop");

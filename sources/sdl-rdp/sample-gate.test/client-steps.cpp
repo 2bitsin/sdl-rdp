@@ -9,9 +9,7 @@
 namespace SampleGate {
 auto ChangeMonitor(Headless::Client& client) -> void {
   ASSERT_TRUE(client.Until([] { return Headless::DisplayClient::Ready(); }));
-  auto monitor = Headless::DisplayClient::Monitor(1920, 1080, 500);
-  ASSERT_EQ(Headless::DisplayClient::Channel()->SendMonitorLayout(Headless::DisplayClient::Channel(), 1, &monitor),
-            CHANNEL_RC_OK);
+  ASSERT_TRUE(Headless::DisplayClient::Layout(1920, 1080, 500));
 }
 
 auto ThenAdvanced(Headless::Client& client) -> void {
@@ -23,6 +21,6 @@ auto ThenAdvanced(Headless::Client& client) -> void {
 
 auto ConnectDrive(Headless::Client& client, std::filesystem::path const& share) -> void {
   Headless::ShareDrive(client, share.c_str());
-  ASSERT_TRUE(freerdp_connect(client.Instance().get()));
+  ASSERT_TRUE(client.Connect());
 }
 }

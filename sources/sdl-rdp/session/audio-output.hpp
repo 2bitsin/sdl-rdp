@@ -1,5 +1,6 @@
 #pragma once
 #include <sdl-rdp/session/session.hpp>
+#include <sdl-rdp/utilities/deadline.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
 #include <cstdint>
@@ -14,7 +15,7 @@ public:
        AudioOutput(Session& session, Presenter& presenter, Configuration const& configuration) noexcept;
   auto Open()                                  -> void;
   auto Rate()                                  -> unsigned;
-  auto Wait(int timeout)                       -> int;
+  auto Wait(Deadline deadline)                 -> int;
   auto Write(std::span<int16_t const> samples) -> int;
   auto Close()                                 -> void;
 

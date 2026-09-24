@@ -28,19 +28,14 @@ protected:
     ASSERT_TRUE(SDL_RenderPresent(renderer));
   }
   auto GivenRendererHints() -> void {
-    for (auto [key, value] : { std::pair{ SDL_HINT_VIDEO_DRIVER, "rdp" },
-                               { "SDL_RDP_PORT"  , "0"         },
-                               { "SDL_RDP_BIND"  , "127.0.0.1" },
-                               { "SDL_RDP_CODEC" , "raw"       },
-                               { "SDL_RDP_WIDTH" , "640"       },
-                               { "SDL_RDP_HEIGHT", "480"       },
-                               { "SDL_RDP_VSYNC" , "0"         } })
-      ASSERT_TRUE(SDL_SetHint(key, value));
-    ASSERT_TRUE(SetBackendHints(certificates.Path()));
+    ASSERT_TRUE(SetLoopbackHints(certificates.Path(), { { "SDL_RDP_CODEC" , "raw" },
+                                                        { "SDL_RDP_WIDTH" , "640" },
+                                                        { "SDL_RDP_HEIGHT", "480" },
+                                                        { "SDL_RDP_VSYNC" , "0"   } }));
   }
   auto SetUp() -> void override {
     Expects(window == nullptr, "fixture has no window");
-    Sample::SetUp();
+    ASSERT_NO_FATAL_FAILURE(Sample::SetUp());
     if (auto* value = std::getenv("SDL_RDP_TRACE")) previous_trace = value;
     ASSERT_EQ(setenv("SDL_RDP_TRACE", "1", 1), 0);
     priority = SDL_GetLogPriority(SDL_LOG_CATEGORY_VIDEO);
@@ -54,8 +49,7 @@ protected:
   }
   auto CreateRenderer() -> void {
     Expects(window == nullptr, "window has not been created");
-    GivenRendererHints();
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(GivenRendererHints());
     ASSERT_TRUE(SDL_Init(SDL_INIT_VIDEO));
     window = SDL_CreateWindow("vsync recovery", 640, 480, SDL_WINDOW_FULLSCREEN);
     ASSERT_NE(window, nullptr);
@@ -67,15 +61,12 @@ protected:
     Expects(renderer != nullptr, "vsync renderer exists");
     unsigned frame = 0;
     while (client.wait_for(0ms) != std::future_status::ready) {
-      WhenFrameRendered(frame);
-      if (::testing::Test::HasFatalFailure()) return;
+      ASSERT_NO_FATAL_FAILURE(WhenFrameRendered(frame));
     }
   }
   auto Run(RateRecovery recovery) -> void {
     Expects(renderer != nullptr, "vsync renderer exists");
-    auto port   = SDL_GetNumberProperty(SDL_GetDisplayProperties(SDL_GetPrimaryDisplay()),
-                                        SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0);
-    auto client = std::async(std::launch::async, ExerciseRate, unsigned(port), std::ref(logs), GetParam().mode,
+    auto client = std::async(std::launch::async, ExerciseRate, PrimaryDisplayPort(), std::ref(logs), GetParam().mode,
                              recovery);
     ASSERT_NO_FATAL_FAILURE(RenderWhile(client));
     client.get();

@@ -47,7 +47,7 @@ auto ThenSafeAuthenticationLog(sdlrdp_log_level level, std::string const& text, 
 }
 }
 auto Authentication::TearDown() -> void {
-  handle.reset();
+  handle.Close();
 }
 auto Authentication::Open(sdlrdp_auth mode, bool fixed) -> void {
   auto directory = certificates.Path().string();
@@ -64,9 +64,7 @@ auto Authentication::Open(sdlrdp_auth mode, bool fixed) -> void {
     config.password = "correct-secret";
     config.domain   = "LAB";
   }
-  sdlrdp_handle* raw = nullptr;
-  ASSERT_EQ(sdlrdp_open(&config, &raw), 0) << sdlrdp_last_error();
-  handle.reset(raw);
+  ASSERT_NO_FATAL_FAILURE(handle.Open(config));
 }
 auto Authentication::Log(void* raw, sdlrdp_log_level level, char const* text) -> void {
   auto& self = *static_cast<Authentication*>(raw);
@@ -95,7 +93,7 @@ auto Authentication::Attempt(char const* user, char const* password, char const*
     -> void {
   Headless::Client client(sdlrdp_port(handle.get()), false);
   client.Credentials(user, password, domain, nla);
-  ASSERT_EQ(bool(freerdp_connect(client.Instance().get())), accepted);
+  ASSERT_EQ(client.Connect(), accepted);
   if (!accepted)
     rejections.push_back(
         std::format("Authentication rejected: user \"{}\" from 127.0.0.1", Backend::QualifiedName(domain, user)));
@@ -122,7 +120,7 @@ auto Authentication::ThenRejection(sdlrdp_log_level level, std::string const& te
   if (rejected < rejections.size()) EXPECT_EQ(text, rejections[rejected]);
 }
 auto Authentication::RejectionLogs(char const* password, unsigned expected) -> void {
-  handle.reset();
+  handle.Close();
   std::scoped_lock const lock(guard);
   unsigned               rejected = 0;
   unsigned               warnings = 0;

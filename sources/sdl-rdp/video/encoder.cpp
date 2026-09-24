@@ -2,6 +2,7 @@
 
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/extent.hpp>
+#include <sdl-rdp/utilities/stopwatch.hpp>
 
 #include <freerdp/constants.h>
 #include <algorithm>
@@ -78,9 +79,9 @@ auto Encoder::Select(rdpSettings const* settings, sdlrdp_codec preference) -> bo
   return InitializeCodec(settings);
 }
 auto Encoder::Encode(std::span<BYTE const> pixels, unsigned width, unsigned height) -> bool {
-  auto start  = std::chrono::steady_clock::now();
-  auto result = EncodePayload(pixels, width, height);
-  Charge(std::chrono::steady_clock::now() - start);
+  Stopwatch const watch;
+  auto const      result = EncodePayload(pixels, width, height);
+  Charge(watch.Elapsed());
   return result;
 }
 auto Encoder::ResetRemoteFx(unsigned width, unsigned height) -> bool {

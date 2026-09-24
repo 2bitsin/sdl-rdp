@@ -4,22 +4,24 @@
 
 #include <freerdp/channels/channels.h>
 #include <freerdp/channels/rdpdr.h>
+#include <oxbox/utilities/span.hpp>
+#include <cstdint>
 #include <span>
 
 namespace Headless {
 namespace {
 auto ObserveDrive(DriveCapture& capture, std::span<BYTE const> bytes) -> void {
   Backend::DrivePacket packet;
-  packet.Append(bytes);
-  if (packet.Get(2) == RDPDR_CTYP_CORE) {
-    auto type = packet.Get(2);
+  packet.Append(std::as_bytes(bytes));
+  if (packet.Read<uint16_t>() == RDPDR_CTYP_CORE) {
+    auto type = packet.Read<uint16_t>();
     if (type == PAKID_CORE_DEVICE_IOREQUEST) {
       ++capture.requests;
       capture.io.push_back(packet);
     }
     if (type == PAKID_CORE_DEVICE_REPLY) {
-      auto device = packet.Get(4);
-      auto status = packet.Get(4);
+      auto device = packet.Read<uint32_t>();
+      auto status = packet.Read<uint32_t>();
       capture.replies.emplace_back(device, status);
     }
   }
@@ -37,7 +39,8 @@ DriveObserver::~DriveObserver() {
   active                       = nullptr;
 }
 auto DriveObserver::Send(Backend::DrivePacket const& packet) const -> bool {
-  return SendStaticChannel(instance, RDPDR_CHANNEL_NAME, packet.Bytes());
+  return SendStaticChannel(instance, RDPDR_CHANNEL_NAME,
+                           oxbox::utilities::SpanCast<std::uint8_t const>(std::span(packet.Bytes())));
 }
 auto DriveObserver::Observed() -> DriveCapture& {
   return observed;

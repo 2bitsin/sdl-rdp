@@ -46,7 +46,7 @@ TEST(WakeEvent, ConcurrentPendingAndIdle) {
   std::atomic<unsigned> consumed { 0                                          };
   ASSERT_TRUE(wake);
   std::jthread producer([&](std::stop_token const& stop) { ProducePending(wake, published, consumed, stop); });
-  ConsumePublished(wake, published, consumed);
+  ASSERT_NO_FATAL_FAILURE(ConsumePublished(wake, published, consumed));
   producer.request_stop();
   producer.join();
   wake.Transition(Phase::Idle);

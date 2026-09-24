@@ -54,25 +54,19 @@ protected:
     for (;;) {
       auto count = sdlrdp_drive_enumerate(handle.get(), drive, "many", offset, entries.data(), 32);
       ASSERT_GE(count, 0) << sdlrdp_last_error();
-      ThenUniquePage(std::span(entries).first(count), actual);
-      if (::testing::Test::HasFatalFailure()) return;
+      ASSERT_NO_FATAL_FAILURE(ThenUniquePage(std::span(entries).first(count), actual));
       offset += count;
       if (count < 32) break;
       ASSERT_LE(offset, 200u);
     }
   }
-  auto ThenRemovedEvent(std::array<sdlrdp_event, 32>& events, unsigned old) -> void {
+  auto ThenRemovedEvent(std::uint32_t old) -> void {
     auto         deadline = Headless::Clock::now() + 2s;
     sdlrdp_drive value    { };
     while (sdlrdp_drive_list(handle.get(), &value, 1) && Headless::Clock::now() < deadline)
       std::this_thread::sleep_for(1ms);
     EXPECT_EQ(sdlrdp_drive_list(handle.get(), &value, 1), 0);
-    auto count   = sdlrdp_poll(handle.get(), events.data(), 32);
-    auto removed = std::ranges::find_if(std::span(events.data(), count), [&](auto const& event) {
-      return event.type == SDLRDP_DRIVE && !event.drive.added && event.drive.id == old;
-    });
-    ASSERT_NE(removed, std::span(events.data(), count).end());
-    EXPECT_STREQ(removed->drive.name, "share");
+    EXPECT_EQ(PolledDriveName(false, old), "share");
   }
   auto ThenFileMetadata(std::string const& source) -> void {
     sdlrdp_stat info{ };
@@ -101,8 +95,7 @@ protected:
     EXPECT_EQ(sdlrdp_drive_flush(handle.get(), file), 0);
     EXPECT_EQ(sdlrdp_drive_read(handle.get(), file, 0, &byte, size_t(INT_MAX) + 1), -1);
     EXPECT_NE(std::string(sdlrdp_last_error()).find("Invalid drive transfer"), std::string::npos);
-    ThenNoDriveRequests(observer);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(ThenNoDriveRequests(observer));
   }
   auto ThenClientFailure(Headless::DriveObserver& observer, uint32_t status, char const* text) -> void {
     SCOPED_TRACE(text);
@@ -147,12 +140,9 @@ TEST_F(Drive, ReadWriteMetadataAndDirectories) {
   Write("disk.img", source);
   auto* file = Open("disk.img", SDLRDP_FILE_READ | SDLRDP_FILE_WRITE);
   ASSERT_NE(file, nullptr);
-  ThenReadRanges(file, source);
-  if (::testing::Test::HasFatalFailure()) return;
-  WhenFileRewritten(file, source);
-  if (::testing::Test::HasFatalFailure()) return;
-  ThenFileMetadata(source);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ThenReadRanges(file, source));
+  ASSERT_NO_FATAL_FAILURE(WhenFileRewritten(file, source));
+  ASSERT_NO_FATAL_FAILURE(ThenFileMetadata(source));
 }
 TEST_F(Drive, EnumerateAndMutate) {
   ASSERT_EQ(sdlrdp_drive_mkdir(handle.get(), drive, "folder"), 0) << sdlrdp_last_error();
@@ -181,8 +171,7 @@ TEST_F(Drive, ConcurrentReadsAndReconnect) {
     readers.push_back(std::async(std::launch::async,
                                  [&, name, source] { return ReadSharedFile(handle.get(), drive, name, source); }));
   }
-  ThenReaders(readers);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ThenReaders(readers));
   auto* file = Open("0");
   auto  old  = drive;
   Disconnect();
@@ -190,7 +179,7 @@ TEST_F(Drive, ConcurrentReadsAndReconnect) {
   EXPECT_EQ(sdlrdp_drive_read(handle.get(), file, 0, bytes.data(), bytes.size()), -1);
   EXPECT_NE(std::string(sdlrdp_last_error()).find("disconnect"), std::string::npos);
   EXPECT_EQ(sdlrdp_drive_close(handle.get(), file), -1);
-  Connect();
+  ASSERT_NO_FATAL_FAILURE(Connect());
   EXPECT_NE(drive, old);
 }
 TEST_F(Drive, DisconnectDuringRead) {
@@ -226,18 +215,11 @@ TEST_F(Drive, SparseOffsetAboveFourGiB) {
 }
 
 TEST_F(Drive, AnnounceAndRemoveEvents) {
-  std::array<sdlrdp_event, 32> events { };
-  auto                         count  = sdlrdp_poll(handle.get(), events.data(), 32);
-  auto                         added  = std::ranges::find_if(std::span(events.data(), count), [&](auto const& event) {
-    return event.type == SDLRDP_DRIVE && event.drive.added && event.drive.id == drive;
-  });
-  ASSERT_NE(added, std::span(events.data(), count).end());
-  EXPECT_STREQ(added->drive.name, "share");
+  EXPECT_EQ(PolledDriveName(true, drive), "share");
   auto old = drive;
   Disconnect();
-  ThenRemovedEvent(events, old);
-  if (::testing::Test::HasFatalFailure()) return;
-  Connect();
+  ASSERT_NO_FATAL_FAILURE(ThenRemovedEvent(old));
+  ASSERT_NO_FATAL_FAILURE(Connect());
   EXPECT_NE(drive, old);
 }
 
@@ -251,12 +233,10 @@ TEST_F(Drive, RejectsFileDirectoryMismatchWithClientStatus) {
   ThenDirectoryOpenRejected(file);
 }
 TEST_F(Drive, ClientFailureStatusNames) {
-  HoldRequests();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(HoldRequests());
   auto& observer = *this->observer;
   for (auto [status, text] : FailureStatusNames) {
-    ThenClientFailure(observer, status, text);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(ThenClientFailure(observer, status, text));
   }
 }
 TEST_F(Drive, OversizedReadSendsNoRequest) {
@@ -267,18 +247,14 @@ TEST_F(Drive, OversizedReadSendsNoRequest) {
   pump.join();
   {
     Headless::DriveObserver const observer(*client);
-    ThenOversizedRead(file, observer);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(ThenOversizedRead(file, observer));
   }
-  pump = std::jthread([&](std::stop_token const& stop) {
-    while (!stop.stop_requested() && client->Pump()) {
-    }
-  });
+  pump = PumpInBackground(*client);
   EXPECT_EQ(sdlrdp_drive_close(handle.get(), file), 0);
 }
 TEST_F(Drive, TwoSharesIncludingUnicodeName) {
   Disconnect();
-  Connect("żółw", true);
+  ASSERT_NO_FATAL_FAILURE(Connect("żółw", true));
   Write("file", "data");
   std::array<sdlrdp_drive, 2> drives   { };
   auto                        deadline = Headless::Clock::now() + 2s;
@@ -288,8 +264,7 @@ TEST_F(Drive, TwoSharesIncludingUnicodeName) {
   EXPECT_EQ((std::set<std::string>{ drives[0].name, drives[1].name }), (std::set<std::string>{ "żółw", "second" }));
   EXPECT_NE(drives[0].id, drives[1].id);
   for (auto const& entry : drives) {
-    ThenSharedFile(entry);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(ThenSharedFile(entry));
   }
 }
 TEST_F(Drive, TwoHundredEntriesInPagesOfThirtyTwo) {
@@ -298,8 +273,7 @@ TEST_F(Drive, TwoHundredEntriesInPagesOfThirtyTwo) {
   std::set<std::string>         actual;
   std::array<sdlrdp_dirent, 32> entries  { };
   unsigned                      offset   = 0;
-  WhenDirectoryPaged(entries, actual, offset);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(WhenDirectoryPaged(entries, actual, offset));
   EXPECT_EQ(offset, 200u);
   EXPECT_EQ(actual, expected);
 }

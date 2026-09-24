@@ -1,3 +1,4 @@
+#include <sdl-rdp/headless-client.test/backend-instance.hpp>
 #include <sdl-rdp/headless-client.test/peer-status.hpp>
 #include <sdl-rdp/headless-client.test/round-five.hpp>
 
@@ -26,9 +27,9 @@ protected:
   auto PrepareMeasurement(Client& client, sdlrdp_codec codec, bool noise) -> void {
     if (codec == SDLRDP_CODEC_PROGRESSIVE) client.EnableGraphics();
     ASSERT_TRUE(freerdp_settings_set_bool(client.Instance()->context->settings, FreeRDP_GfxSendQoeAck, TRUE));
-    Connect(client);
+    ASSERT_NO_FATAL_FAILURE(Connect(client));
     if (codec == SDLRDP_CODEC_PROGRESSIVE) ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
-    Present(GraphicsScene(0, noise), 640, 480);
+    ASSERT_NO_FATAL_FAILURE(Present(GraphicsScene(0, noise), 640, 480));
     ASSERT_TRUE(client.Until([&] { return Acknowledged(); }));
   }
   auto MeasureFrames(Client& client, bool noise, unsigned& maximum_error, double& latency) -> void {
@@ -36,7 +37,7 @@ protected:
       auto              pixels    = GraphicsScene(frame, noise);
       auto              presented = Clock::now();
       sdlrdp_rect const damage    = noise ? sdlrdp_rect{ 0, 0, 640, 480 } : sdlrdp_rect{ int(frame - 1), 40, 33, 32 };
-      ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 640 * 4, 640, 480, &damage, 1), 0);
+      ASSERT_EQ(backend.Present(pixels, 640, 480, damage), 0);
       ASSERT_TRUE(client.Until([&] { return Acknowledged(); })) << logs.Text(true);
       latency       += std::chrono::duration<double, std::milli>(Clock::now() - presented).count();
       maximum_error =  std::max(maximum_error, client.MaxError(pixels));
@@ -51,22 +52,20 @@ protected:
     RecordProperty("maximum_channel_error", maximum_error);
   }
   auto Measure(sdlrdp_codec codec, bool noise) -> void {
-    Open(640, 480, { }, codec);
+    ASSERT_NO_FATAL_FAILURE(Open(640, 480, { }, codec));
     Client client(sdlrdp_port(backend.get()), true, 640, 480);
-    PrepareMeasurement(client, codec, noise);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(PrepareMeasurement(client, codec, noise));
     auto     initial_encode = EncodeDuration();
     auto     initial_bytes  = client.Received();
     auto     start          = Clock::now();
     unsigned maximum_error  = 0;
     double   latency        = 0;
-    MeasureFrames(client, noise, maximum_error, latency);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(MeasureFrames(client, noise, maximum_error, latency));
     auto elapsed      = std::chrono::duration<double>(Clock::now() - start).count();
     auto bytes        = client.Received() - initial_bytes;
     auto milliseconds = std::chrono::duration<double, std::milli>(EncodeDuration() - initial_encode).count();
     RecordMeasurement(bytes, elapsed, milliseconds, latency, maximum_error);
-    RecordGraphicsTiming(client, codec);
+    ASSERT_NO_FATAL_FAILURE(RecordGraphicsTiming(client, codec));
     EXPECT_LE(maximum_error, noise ? 48u : 24u);
   }
 };

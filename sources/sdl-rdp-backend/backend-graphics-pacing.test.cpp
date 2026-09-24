@@ -4,22 +4,25 @@
 #include <regex>
 
 namespace BackendGate {
+class PipelinedGraphics : public RoundFive {
+protected:
+  auto SetUp() -> void override {
+    ASSERT_NO_FATAL_FAILURE(RoundFive::SetUp());
+    ASSERT_NO_FATAL_FAILURE(GivenPipelinedGraphics());
+  }
+  std::vector<std::uint32_t> const pixels = std::vector<std::uint32_t>(320uz * 200, 0x123456);
+};
 TEST_F(RoundFive, PipelinedLegacyPresent) {
-  Open(320, 200);
+  ASSERT_NO_FATAL_FAILURE(Open(320, 200));
   Client client(sdlrdp_port(backend.get()), true);
-  Connect(client);
+  ASSERT_NO_FATAL_FAILURE(Connect(client));
   FrameObserver const       observer(client);
   std::vector<UINT32> const pixels(320uz * 200, 0x123456);
-  ThenPipelinedWindow(client, observer.Frames(), pixels);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ThenPipelinedWindow(client, observer.Frames(), pixels));
   ThenLegacyWindowReleases(client, observer, pixels);
 }
-TEST_F(RoundFive, PipelinedGraphicsPresent) {
-  GivenPipelinedGraphics();
-  if (::testing::Test::HasFatalFailure()) return;
-  std::vector<UINT32> const pixels(320uz * 200, 0x123456);
-  ThenPipelinedWindow(GraphicsClient(), GraphicsObserver().Observed().frames, pixels);
-  if (::testing::Test::HasFatalFailure()) return;
+TEST_F(PipelinedGraphics, PipelinedGraphicsPresent) {
+  ASSERT_NO_FATAL_FAILURE(ThenPipelinedWindow(GraphicsClient(), GraphicsObserver().Observed().frames, pixels));
   ThenGraphicsWindowReleases(pixels);
 }
 
@@ -34,33 +37,22 @@ auto ThenFrameStatistics(Logs& logs) -> void {
   testing::Test::RecordProperty("statistics", text);
 }
 }
-TEST_F(RoundFive, GraphicsFrameStatistics) {
-  GivenPipelinedGraphics();
-  if (::testing::Test::HasFatalFailure()) return;
-  std::vector<UINT32> const pixels(320uz * 200, 0x123456);
-  PresentGraphicsFrames(GraphicsClient(), GraphicsObserver(), pixels, 1, 2);
-  if (::testing::Test::HasFatalFailure()) return;
+TEST_F(PipelinedGraphics, GraphicsFrameStatistics) {
+  ASSERT_NO_FATAL_FAILURE(PresentGraphicsFrames(GraphicsClient(), GraphicsObserver(), pixels, 1, 2));
   for (unsigned count = 0; count < 3; ++count) Present(pixels, 320, 200);
   EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 1), 0);
   ASSERT_TRUE(GraphicsObserver().AckFrame(0, 0));
-  AwaitFrames(GraphicsClient(), GraphicsObserver().Observed().frames, 3);
-  if (::testing::Test::HasFatalFailure()) return;
-  ThenGraphicsAcknowledgementsCounted();
-  if (::testing::Test::HasFatalFailure()) return;
-  freerdp_disconnect(GraphicsClient().Instance().get());
-  backend.reset();
+  ASSERT_NO_FATAL_FAILURE(AwaitFrames(GraphicsClient(), GraphicsObserver().Observed().frames, 3));
+  ASSERT_NO_FATAL_FAILURE(ThenGraphicsAcknowledgementsCounted());
+  GraphicsClient().Disconnect();
+  backend.Close();
   ThenFrameStatistics(logs);
 }
-TEST_F(RoundFive, GraphicsAcknowledgementsAgeOutAndResume) {
-  GivenPipelinedGraphics();
-  if (::testing::Test::HasFatalFailure()) return;
-  std::vector<UINT32> const pixels(320uz * 200, 0x123456);
-  PresentGraphicsFrames(GraphicsClient(), GraphicsObserver(), pixels, 1, 4);
-  if (::testing::Test::HasFatalFailure()) return;
+TEST_F(PipelinedGraphics, GraphicsAcknowledgementsAgeOutAndResume) {
+  ASSERT_NO_FATAL_FAILURE(PresentGraphicsFrames(GraphicsClient(), GraphicsObserver(), pixels, 1, 4));
   ASSERT_TRUE(GraphicsObserver().AckFrame(3, 0));
   ASSERT_TRUE(GraphicsClient().Until([&] { return sdlrdp_wait_frame(backend.get(), 0) != 0; }));
-  PresentGraphicsFrames(GraphicsClient(), GraphicsObserver(), pixels, 5, 6);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(PresentGraphicsFrames(GraphicsClient(), GraphicsObserver(), pixels, 5, 6));
   ThenAgedWindowResumes(pixels);
 }
 }

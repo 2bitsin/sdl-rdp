@@ -1,5 +1,7 @@
 #include <sdl-rdp/headless-client.test/audio-session.hpp>
 
+#include <sdl-rdp/headless-client.test/tone-measurements.hpp>
+
 #include <freerdp/input.h>
 #include <oxbox/utilities/number-text.hpp>
 #include <algorithm>
@@ -36,13 +38,9 @@ auto ConfirmDue(SoundClient& audio, std::chrono::milliseconds delay) -> void {
 }
 auto ThenAudioCadence(SoundClient const& audio) -> void {
   ASSERT_GT(audio.CaptureState().received.size(), 1u);
-  double maximum_gap = 0;
-  for (std::size_t i = 1; i < audio.CaptureState().received.size(); ++i)
-    maximum_gap = std::max(maximum_gap, std::chrono::duration<double, std::milli>(
-                                            audio.CaptureState().received[i] - audio.CaptureState().received[i - 1])
-                                            .count());
-  auto block_ms = 1000.0 * double(audio.CaptureState().samples.size()) / 2
-                  / double(audio.CaptureState().received.size()) / audio.CaptureState().rate;
+  auto const maximum_gap = Headless::MaximumGapMs(audio.CaptureState().received);
+  auto       block_ms    = 1000.0 * double(audio.CaptureState().samples.size()) / 2
+                           / double(audio.CaptureState().received.size()) / audio.CaptureState().rate;
   testing::Test::RecordProperty("maximum_block_gap_ms", std::to_string(maximum_gap));
   EXPECT_LE(maximum_gap, (2 * block_ms) + 10);
 }
@@ -56,13 +54,9 @@ auto AudioSession::ConfirmDelayedAudio(Client& client, SoundClient& audio, Confi
 }
 auto AudioSession::ThenLiveInput(Client& client) -> void {
   ASSERT_TRUE(freerdp_input_send_keyboard_event(client.Instance()->context->input, KBD_FLAGS_DOWN, 0x1e));
-  auto events = EventsUntil(
-      [](auto const& events) {
-        return std::ranges::any_of(events, [](auto const& e) { return e.type == SDLRDP_KEY; });
-      },
-      true, &client);
-  EXPECT_NE(std::ranges::find(events, SDLRDP_KEY, &sdlrdp_event::type), events.end());
-  EXPECT_EQ(std::ranges::find(events, SDLRDP_DISCONNECTED, &sdlrdp_event::type), events.end());
+  auto const events = UntilEvent(client, SDLRDP_KEY);
+  EXPECT_TRUE(std::ranges::contains(events, SDLRDP_KEY, &sdlrdp_event::type));
+  EXPECT_FALSE(std::ranges::contains(events, SDLRDP_DISCONNECTED, &sdlrdp_event::type));
 }
 auto AudioSession::ThenRealtimeCounts(SoundClient const& audio) -> void {
   EXPECT_EQ(audio.CaptureState().received.size(), 100u);
@@ -70,7 +64,7 @@ auto AudioSession::ThenRealtimeCounts(SoundClient const& audio) -> void {
   EXPECT_EQ(audio.CaptureState().confirmed_frames, 96000u);
 }
 auto AudioSession::GivenAudioServer() -> void {
-  Open(320, 200);
+  ASSERT_NO_FATAL_FAILURE(Open(320, 200));
   ASSERT_EQ(sdlrdp_audio_open(backend.get()), 0);
 }
 auto AudioSession::ThenAudioFormats(SoundClient const& audio) -> void {
@@ -84,17 +78,13 @@ auto AudioSession::GivenUnconfirmedAudio(Client& client, SoundClient& audio) -> 
   ConnectAudio(client, audio);
 }
 auto AudioSession::ConnectAudio(Client& client, SoundClient& audio) -> void {
-  Connect(client);
+  ASSERT_NO_FATAL_FAILURE(Connect(client));
   ASSERT_TRUE(client.Until([&] { return audio.CaptureState().opened; }));
-  auto events = EventsUntil(
-      [](auto const& events) {
-        return std::ranges::any_of(
-            events, [](auto const& event) { return event.type == SDLRDP_AUDIO && event.audio.connected; });
-      },
-      true, &client);
-  ASSERT_TRUE(std::ranges::any_of(events, [](auto const& event) {
-    return event.type == SDLRDP_AUDIO && event.audio.connected;
-  })) << logs.Text();
+  auto const audio_connected = [](auto const& events) {
+    return std::ranges::any_of(events,
+                               [](auto const& event) { return event.type == SDLRDP_AUDIO && event.audio.connected; });
+  };
+  ASSERT_TRUE(audio_connected(EventsUntil(audio_connected, true, [&client] { return client.Pump(); }))) << logs.Text();
 }
 auto AudioSession::RunRealtimeAudio(Client& client, SoundClient& audio) -> void {
   Expects(backend != nullptr, "backend exists");
@@ -105,8 +95,7 @@ auto AudioSession::RunRealtimeAudio(Client& client, SoundClient& audio) -> void 
   sdlrdp_audio_close(backend.get());
   EXPECT_EQ(writing.get(), 96000);
   EXPECT_EQ(audio.CaptureState().samples.size() / 2, 96000u);
-  ThenAudioCadence(audio);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ThenAudioCadence(audio));
   ThenRealtimeCounts(audio);
 }
 auto AudioSession::CheckAudioStatistics(SoundClient const& audio) -> void {
@@ -139,11 +128,7 @@ auto AudioSession::EstablishConfirmations(Client& client, SoundClient& audio) ->
   audio.CaptureState().confirmed_frames = audio.CaptureState().maximum_pending_frames = 0;
 }
 auto AudioSession::ThenUnavailableAudio(Client& client, bool unmatched) -> void {
-  auto events = EventsUntil(
-      [](auto const& events) {
-        return std::ranges::any_of(events, [](auto const& e) { return e.type == SDLRDP_AUDIO; });
-      },
-      true, &client);
+  auto events = UntilEvent(client, SDLRDP_AUDIO);
   auto event  = std::ranges::find(events, SDLRDP_AUDIO, &sdlrdp_event::type);
   ASSERT_NE(event, events.end()) << logs.Text();
   EXPECT_EQ(event->audio.connected, 0u);
@@ -153,7 +138,7 @@ auto AudioSession::ThenUnavailableAudio(Client& client, bool unmatched) -> void 
 }
 auto AudioSession::ThenLiveVideoAndInput(Client& client) -> void {
   FrameObserver observer(client);
-  Present(std::vector<UINT32>(320uz * 200, 0x123456), 320, 200);
+  ASSERT_NO_FATAL_FAILURE(Present(std::vector<std::uint32_t>(320uz * 200, 0x123456), 320, 200));
   ASSERT_TRUE(client.Until([&] { return !observer.Frames().empty(); }));
   ASSERT_TRUE(observer.Ack());
   ASSERT_EQ(sdlrdp_wait_frame(backend.get(), 10000), 1);

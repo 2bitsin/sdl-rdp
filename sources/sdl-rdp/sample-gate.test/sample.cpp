@@ -18,11 +18,10 @@ auto Sample::ThenIgnoredWarpMotion(Client& client, rdpInput* input, UINT16 x, UI
   EXPECT_TRUE(line.contains(delta)) << line;
   if (x == 630) ASSERT_TRUE(client.Until([&] { return Position().Count() > 0; }));
 }
-auto Sample::GivenRelativeOrigin(rdpInput* input) -> void {
-  ASSERT_TRUE(freerdp_input_send_mouse_event(input, PTR_FLAGS_MOVE, 200, 150));
+auto Sample::GivenRelativeOrigin(Client const& client) -> void {
+  ASSERT_TRUE(freerdp_input_send_mouse_event(client.Instance()->context->input, PTR_FLAGS_MOVE, 200, 150));
   ASSERT_TRUE(Read("event MOUSE_MOTION "));
-  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x3d));
-  ASSERT_TRUE(Read("event RELATIVE_MODE active=1"));
+  ASSERT_NO_FATAL_FAILURE(WhenRelative(client));
 }
 auto Sample::WhenUnicodeControl(rdpInput* input, int code) -> void {
   ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(input, KBD_FLAGS_DOWN, code));
@@ -38,20 +37,17 @@ auto Sample::ThenStoppedScancodeText(std::size_t stopped) -> void {
   SDL_Log("gate SCANCODE_TEXT a=1 A=1 stopped_text=0");
 }
 auto Sample::WhenAspectRelative(Client& client) -> void {
-  ASSERT_TRUE(freerdp_input_send_keyboard_event(client.Instance()->context->input, KBD_FLAGS_DOWN, 0x3d));
-  ASSERT_TRUE(Read("event RELATIVE_MODE active=1"));
-  auto* advanced = SampleGate::InputClient::Advanced().load();
-  ASSERT_EQ(advanced->AInputSendInputEvent(advanced, AINPUT_FLAGS_MOVE | AINPUT_FLAGS_REL, -10, 48), CHANNEL_RC_OK);
-  ASSERT_TRUE(ReadInput(client, "event MOUSE_MOTION "));
-  EXPECT_TRUE(line.contains(" xrel=-10 yrel=35 ")) << line;
+  WhenRelativeAdvanced(client, -10, 48, " xrel=-10 yrel=35 ");
 }
-auto Sample::WhenAdvancedMotion(Client& client, rdpInput* input) -> void {
-  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x3d));
-  ASSERT_TRUE(Read("event RELATIVE_MODE active=1"));
+auto Sample::WhenAdvancedMotion(Client& client) -> void {
+  WhenRelativeAdvanced(client, 17, -9, " xrel=17 yrel=-9 ");
+}
+auto Sample::WhenRelativeAdvanced(Client& client, int32_t x, int32_t y, std::string_view expected) -> void {
+  ASSERT_NO_FATAL_FAILURE(WhenRelative(client));
   auto* advanced = SampleGate::InputClient::Advanced().load();
-  ASSERT_EQ(advanced->AInputSendInputEvent(advanced, AINPUT_FLAGS_MOVE | AINPUT_FLAGS_REL, 17, -9), CHANNEL_RC_OK);
+  ASSERT_EQ(advanced->AInputSendInputEvent(advanced, AINPUT_FLAGS_MOVE | AINPUT_FLAGS_REL, x, y), CHANNEL_RC_OK);
   ASSERT_TRUE(ReadInput(client, "event MOUSE_MOTION "));
-  EXPECT_TRUE(line.contains(" xrel=17 yrel=-9 ")) << line;
+  EXPECT_TRUE(line.contains(expected)) << line;
 }
 auto Sample::ThenWarpEchoIgnored(rdpInput* input) -> void {
   auto initial = Position().Count();
@@ -85,7 +81,7 @@ auto Sample::ThenStoppedUnicode(rdpInput* input) -> void {
 }
 auto Sample::GivenFrenchKeyboard(Client const& client) -> void {
   ASSERT_TRUE(freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_KeyboardLayout, 0x40c));
-  ASSERT_TRUE(freerdp_connect(client.Instance().get()));
+  ASSERT_TRUE(client.Connect());
   ASSERT_TRUE(Read("event EXPOSED "));
   EXPECT_TRUE(line.contains(" keyboard_layout=1036 ")) << line;
   ASSERT_TRUE(Read("event FOCUS_GAINED "));

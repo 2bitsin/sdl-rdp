@@ -1,4 +1,5 @@
 #include "support.test/counting-heap.hpp"
+#include <sdl-rdp/headless-client.test/backend-instance.hpp>
 #include <sdl-rdp/headless-client.test/graphics-backend.hpp>
 #include <sdl-rdp/headless-client.test/graphics-observer.hpp>
 #include <sdl-rdp/headless-client.test/pattern.hpp>
@@ -8,6 +9,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -65,30 +67,28 @@ auto Report(Scenario const& scenario, std::pair<Tally, Tally> const& counted) ->
 
 class Allocations : public Headless::GraphicsBackend, public testing::WithParamInterface<Scenario> {
 protected:
-  auto Serve(Scenario const& scenario) -> std::pair<Tally, Tally> {
-    Headless::Client client(sdlrdp_port(backend.get()), true, Width, Height);
-    client.EnableGraphics(scenario.codec == SDLRDP_CODEC_AVC420);
-    Headless::GraphicsObserver observer(client);
-    ConnectGraphics(client);
-    Present(client, observer, scenario, 0, WarmFrames);
-    auto const before = CountingHeap::Shared().Current();
-    Present(client, observer, scenario, WarmFrames, WarmFrames + MeasuredFrames);
-    return { before, CountingHeap::Shared().Current() };
+  auto Connect(Scenario const& scenario) -> void {
+    _client = std::make_unique<Headless::Client>(sdlrdp_port(backend.get()), true, Width, Height);
+    _client->EnableGraphics(scenario.codec == SDLRDP_CODEC_AVC420);
+    _observer = std::make_unique<Headless::GraphicsObserver>(*_client);
+    ConnectGraphics(*_client);
+  }
+  auto Present(Scenario const& scenario, std::size_t first, std::size_t last) -> void {
+    for (auto frame = first; frame < last; ++frame)
+      ASSERT_NO_FATAL_FAILURE(PresentOne(Damage(scenario.partial), frame));
   }
 
 private:
-  auto Present(Headless::Client& client, Headless::GraphicsObserver& observer, Scenario const& scenario,
-               std::size_t first, std::size_t last) -> void {
-    auto const area = Damage(scenario.partial);
-    for (auto frame = first; frame < last && !HasFatalFailure(); ++frame) {
-      Headless::MovingTilePattern(pixels, Width, Height, frame);
-      auto const received = observer.Observed().frames.size();
-      ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), Width * 4, Width, Height, &area, 1), 0);
-      HeapCount::Uncounted const client_side;
-      ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() > received; })) << logs.Text(true);
-    }
+  auto PresentOne(sdlrdp_rect const& area, std::size_t frame) -> void {
+    Headless::MovingTilePattern(_pixels, Width, Height, frame);
+    auto const received = _observer->Observed().frames.size();
+    ASSERT_EQ(backend.Present(_pixels, Width, Height, area), 0);
+    HeapCount::Uncounted const client_side;
+    ASSERT_TRUE(_client->Until([&] { return _observer->Observed().frames.size() > received; })) << logs.Text(true);
   }
-  std::vector<std::uint32_t> pixels = std::vector<std::uint32_t>(std::size_t{ Width } * Height);
+  std::vector<std::uint32_t>                  _pixels   = std::vector<std::uint32_t>(std::size_t{ Width } * Height);
+  std::unique_ptr<Headless::Client>           _client;
+  std::unique_ptr<Headless::GraphicsObserver> _observer;
 };
 
 TEST_P(Allocations, PerPresentedFrame) {
@@ -96,11 +96,12 @@ TEST_P(Allocations, PerPresentedFrame) {
   if (scenario.codec == SDLRDP_CODEC_AVC420 && !Backend::Avc::Encoder::Available())
     GTEST_SKIP() << Backend::Avc::Encoder::UnavailableReason();
   auto pattern = std::to_array("/tmp/sdlrdp-allocations-XXXXXX");
-  OpenGraphics(pattern.data(), Width, Height, scenario.codec);
-  ASSERT_FALSE(HasFatalFailure());
-  auto const counted = Serve(scenario);
-  ASSERT_FALSE(HasFatalFailure());
-  Report(scenario, counted);
+  ASSERT_NO_FATAL_FAILURE(OpenGraphics(pattern.data(), Width, Height, scenario.codec));
+  ASSERT_NO_FATAL_FAILURE(Connect(scenario));
+  ASSERT_NO_FATAL_FAILURE(Present(scenario, 0, WarmFrames));
+  auto const before = CountingHeap::Shared().Current();
+  ASSERT_NO_FATAL_FAILURE(Present(scenario, WarmFrames, WarmFrames + MeasuredFrames));
+  Report(scenario, { before, CountingHeap::Shared().Current() });
 }
 INSTANTIATE_TEST_SUITE_P(Codecs, Allocations, testing::ValuesIn(Scenarios),
                          [](auto const& info) { return std::string(info.param.name); });

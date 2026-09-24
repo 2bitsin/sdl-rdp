@@ -7,11 +7,11 @@
 #include <sdl-rdp/core/peer-link.hpp>
 #include <sdl-rdp/core/session-access.hpp>
 #include <sdl-rdp/utilities/extent.hpp>
+#include <sdl-rdp/utilities/terminated-copy.hpp>
 #include <sdl-rdp/video/frame-pacing.hpp>
 #include <sdl-rdp/video/peer-frames.hpp>
 
 #include <freerdp/settings.h>
-#include <cstring>
 #include <format>
 
 namespace Backend {
@@ -23,7 +23,7 @@ auto Connected(rdpSettings const& settings) -> sdlrdp_event {
   event.connected.keyboard_layout = freerdp_settings_get_uint32(&settings, FreeRDP_KeyboardLayout);
   event.connected.bpp             = freerdp_settings_get_uint32(&settings, FreeRDP_ColorDepth);
   auto const* name = freerdp_settings_get_string(&settings, FreeRDP_ClientHostname);
-  if (name) std::strncpy(event.connected.client_name, name, sizeof(event.connected.client_name) - 1);
+  if (name) CopyTerminated(event.connected.client_name, name);
   return event;
 }
 auto Acknowledging(rdpSettings const& settings) -> AcknowledgementMode {

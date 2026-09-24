@@ -1,6 +1,7 @@
 #include <sdl-rdp/core/picture-geometry.hpp>
 #include <sdl-rdp/session/handle.hpp>
 #include <sdl-rdp/session/peer.hpp>
+#include <sdl-rdp/utilities/deadline.hpp>
 
 #include <algorithm>
 #include <climits>
@@ -79,7 +80,7 @@ auto sdlrdp_open(sdlrdp_config const* config, sdlrdp_handle** out) -> int {
     if (!config) throw std::runtime_error("Open failed: configuration is null.");
     ValidateConfiguration(*config);
     auto handle = std::make_unique<sdlrdp_handle>(*config, Tracing());
-    if (config->wait_for_client) handle->Events().Wait(-1);
+    if (config->wait_for_client) handle->Events().Wait(Backend::Deadline::max());
     *out = handle.release();
     return 0;
   } catch (std::exception const& error) {
@@ -113,7 +114,7 @@ auto sdlrdp_poll(sdlrdp_handle* handle, sdlrdp_event* out, unsigned max) -> unsi
 }
 auto sdlrdp_wait(sdlrdp_handle* handle, int timeout) -> int {
   Backend::Expects(handle != nullptr, "backend is open");
-  return Guarded(handle, -1, [&] { return handle->Events().Wait(timeout); });
+  return Guarded(handle, -1, [&] { return handle->Events().Wait(Backend::AbiDeadline(timeout)); });
 }
 auto sdlrdp_wakeup(sdlrdp_handle* handle) -> void {
   Backend::Expects(handle != nullptr, "backend is open");
@@ -141,7 +142,9 @@ auto sdlrdp_set_aspect(sdlrdp_handle* handle, sdlrdp_aspect aspect) -> int {
   });
 }
 auto sdlrdp_wait_frame(sdlrdp_handle* handle, int timeout) -> int {
-  return Guarded(handle, -1, [&] { return Opened(handle, "Invalid handle.").Presentation().WaitFrame(timeout); });
+  return Guarded(handle, -1, [&] {
+    return Opened(handle, "Invalid handle.").Presentation().WaitFrame(Backend::AbiDeadline(timeout));
+  });
 }
 auto sdlrdp_set_pointer(sdlrdp_handle* handle, unsigned w, unsigned h, unsigned x, unsigned y, void const* argb)
     -> int {
@@ -166,7 +169,7 @@ auto sdlrdp_get_clipboard_text(sdlrdp_handle* handle) -> char const* {
   return Guarded(handle, static_cast<char const*>(nullptr), [&] {
     auto&      opened = Opened(handle, "Invalid clipboard handle.");
     auto const held   = opened.Session().Lock();
-    return opened.Clipboard().Export();
+    return opened.Clipboard().Export().c_str();
   });
 }
 auto sdlrdp_has_clipboard_text(sdlrdp_handle* handle) -> int {
@@ -194,7 +197,8 @@ auto sdlrdp_audio_write(sdlrdp_handle* handle, void const* frames, unsigned coun
   });
 }
 auto sdlrdp_audio_wait(sdlrdp_handle* handle, int timeout) -> int {
-  return Guarded(handle, -1, [&] { return Opened(handle, "Invalid audio handle.").Audio().Wait(timeout); });
+  return Guarded(handle, -1,
+                 [&] { return Opened(handle, "Invalid audio handle.").Audio().Wait(Backend::AbiDeadline(timeout)); });
 }
 auto sdlrdp_audio_close(sdlrdp_handle* handle) -> void {
   if (!handle) return;

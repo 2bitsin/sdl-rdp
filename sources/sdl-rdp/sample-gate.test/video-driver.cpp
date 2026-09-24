@@ -5,9 +5,9 @@
 #include <utility>
 
 namespace SampleGate {
-auto VideoDriver::ThenResizeEvents(Headless::DisplayClient& display) -> void {
-  EXPECT_EQ(display.Observed().desktops, 1u);
-  EXPECT_EQ(display.Observed().echoes, 1u);
+auto VideoDriver::ThenDesktopPicture(Client const& client, Headless::DisplayClient& display) -> void {
+  EXPECT_EQ(client.Instance()->context->gdi->width, 1280);
+  EXPECT_EQ(client.Instance()->context->gdi->height, 800);
   EXPECT_FALSE(logs.Contains("Unexpected client message")) << logs.Text(true);
   RecordProperty("DesktopResize_calls", display.Observed().desktops);
 }
@@ -26,17 +26,12 @@ auto VideoDriver::GivenFullscreen() -> void {
   ASSERT_TRUE(SDL_SetWindowFullscreen(window, true));
 }
 auto VideoDriver::GivenVideoHints() -> void {
-  for (auto [name, value] : { std::pair{ SDL_HINT_VIDEO_DRIVER, "rdp" },
-                              { "SDL_RDP_PORT"  , "0"         },
-                              { "SDL_RDP_BIND"  , "127.0.0.1" },
-                              { "SDL_RDP_CODEC" , "planar"    },
-                              { "SDL_RDP_WIDTH" , "1280"      },
-                              { "SDL_RDP_HEIGHT", "800"       } })
-    ASSERT_TRUE(SDL_SetHint(name, value));
-  ASSERT_TRUE(SetBackendHints(certificates.Path()));
+  ASSERT_TRUE(
+      SetLoopbackHints(certificates.Path(),
+                       { { "SDL_RDP_CODEC", "planar" }, { "SDL_RDP_WIDTH", "1280" }, { "SDL_RDP_HEIGHT", "800" } }));
 }
 auto VideoDriver::SetUp() -> void {
-  Sample::SetUp();
+  ASSERT_NO_FATAL_FAILURE(Sample::SetUp());
   SDL_GetLogOutputFunction(&log_output, &log_userdata);
   SDL_SetLogOutputFunction(
       [](void* user, int, SDL_LogPriority priority, char const* message) {
@@ -47,8 +42,7 @@ auto VideoDriver::SetUp() -> void {
                                 message);
       },
       &logs);
-  GivenVideoHints();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenVideoHints());
   ASSERT_TRUE(SDL_Init(SDL_INIT_VIDEO)) << SDL_GetError();
   window = SDL_CreateWindow("desktop mode", 1280, 800, 0);
   ASSERT_NE(window, nullptr) << SDL_GetError();
@@ -77,18 +71,15 @@ auto VideoDriver::TearDown() -> void {
 }
 auto VideoDriver::ThenResizeStorm(Client& client, Headless::DisplayClient& display) -> void {
   EXPECT_FALSE(freerdp_shall_disconnect_context(client.Instance()->context));
-  EXPECT_EQ(client.Instance()->context->gdi->width, 1280);
-  EXPECT_EQ(client.Instance()->context->gdi->height, 800);
-  ThenResizeEvents(display);
+  EXPECT_EQ(display.Observed().desktops, 1u);
+  EXPECT_EQ(display.Observed().echoes, 1u);
+  ThenDesktopPicture(client, display);
 }
 auto VideoDriver::ThenExclusivePicture(Client& client, Headless::DisplayClient& display,
                                        FullDesktopFrames const& frames) -> void {
   EXPECT_EQ(frames.Deliveries(), 0u);
   EXPECT_EQ(display.Observed().desktops, 0u);
-  EXPECT_EQ(client.Instance()->context->gdi->width, 1280);
-  EXPECT_EQ(client.Instance()->context->gdi->height, 800);
-  EXPECT_FALSE(logs.Contains("Unexpected client message")) << logs.Text(true);
-  RecordProperty("DesktopResize_calls", display.Observed().desktops);
+  ThenDesktopPicture(client, display);
   RecordProperty("changed_layout_picture_resizes", 0);
 }
 }

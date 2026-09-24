@@ -3,6 +3,7 @@
 #include <sdl-rdp/storage/malformed-response.hpp>
 #include <sdl-rdp/storage/sdlrdp-file.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 
 #include <freerdp/channels/rdpdr.h>
 #include <winpr/nt.h>
@@ -18,8 +19,8 @@ template <class Byte> auto Submit(sdlrdp_file& file, uint64_t offset, std::span<
   constexpr bool     write                = std::is_const_v<Byte>;
   DrivePacket        packet;
   constexpr unsigned padding_after_offset = 20;
-  packet.Put(bytes.size());
-  packet.Put(offset, 8);
+  packet.Write(Narrowed<std::uint32_t>(bytes.size()));
+  packet.Write(std::uint64_t{ offset });
   packet.Zero(padding_after_offset);
   if constexpr (write) packet.Append(bytes);
   return file.Channel()->Send(file.Drive(), file.Id(), write ? IRP_MJ_WRITE : IRP_MJ_READ, packet);
@@ -28,7 +29,7 @@ template <class Byte>
 auto Finish(sdlrdp_file& file, std::shared_ptr<DriveRequest> const& request, std::span<Byte> bytes) -> size_t {
   constexpr bool write    = std::is_const_v<Byte>;
   auto           response = file.Channel()->Wait(request, file.Path(), !write);
-  auto           received = response.Get(4);
+  auto           received = response.Read<uint32_t>();
   if (received > bytes.size()) response.Invalid("Drive returned oversized transfer.");
   if constexpr (!write) {
     if (received > response.Bytes().size() - response.Position()) response.Invalid("Truncated drive read.");

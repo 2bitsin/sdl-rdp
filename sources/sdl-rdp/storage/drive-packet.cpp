@@ -7,69 +7,60 @@
 #include <utility>
 
 namespace Backend {
-namespace {
-auto RequireRemaining(DrivePacket const& packet, size_t count, std::string const& cause) -> void {
-  utilities::Expects(packet.Position() <= packet.Bytes().size(), "packet cursor is bounded");
-  if (count > packet.Bytes().size() - packet.Position()) packet.Invalid(cause);
-}
-}
 auto DrivePacket::Invalid(std::string const& cause) const -> void {
   throw MalformedResponse(cause, origin);
 }
-auto DrivePacket::Get(unsigned count) -> uint64_t {
-  utilities::Expects(count <= 8, "integer fits uint64");
-  RequireRemaining(*this, count, "Truncated drive response.");
-  uint64_t value{ };
-  for (unsigned i = 0; i < count; ++i) value |= uint64_t(bytes[position++]) << (i * 8);
-  return value;
+auto DrivePacket::Remaining() const -> oxbox::utilities::BoundedReader {
+  utilities::Expects(position <= bytes.size(), "packet cursor is bounded");
+  return oxbox::utilities::BoundedReader{ std::span(bytes).subspan(position) };
 }
-auto DrivePacket::Put(uint64_t value, unsigned count) -> void {
-  utilities::Expects(count <= 8, "integer fits uint64");
-  for (unsigned i = 0; i < count; ++i) bytes.push_back(uint8_t(value >> (i * 8)));
+auto DrivePacket::Consumed(oxbox::utilities::BoundedReader const& reader, std::string const& cause) -> void {
+  if (!reader.Sound()) Invalid(cause);
+  position += reader.At();
 }
-auto DrivePacket::Zero(size_t count) -> void {
-  bytes.resize(bytes.size() + count);
+auto DrivePacket::Zero(std::size_t count) -> void {
+  Writer{ bytes }.Zero(count);
 }
-auto DrivePacket::Append(std::span<uint8_t const> data) -> void {
-  bytes.insert(bytes.end(), data.begin(), data.end());
+auto DrivePacket::Append(std::span<std::byte const> data) -> void {
+  Writer{ bytes }.Append(data);
 }
-auto DrivePacket::Skip(size_t count) -> void {
-  RequireRemaining(*this, count, "Truncated drive response.");
-  position += count;
+auto DrivePacket::Skip(std::size_t count) -> void {
+  auto reader = Remaining();
+  std::ignore = reader.Take(count);
+  Consumed(reader, "Truncated drive response.");
 }
-auto DrivePacket::Text(size_t count) -> std::string {
-  RequireRemaining(*this, count, "Truncated drive name.");
+auto DrivePacket::Text(std::size_t count) -> std::string {
+  auto       reader = Remaining();
+  auto const taken  = reader.Take(count);
+  Consumed(reader, "Truncated drive name.");
   try {
-    auto result = TranscodeRange<std::string>(std::as_bytes(std::span(bytes).subspan(position, count)), Utf16Little,
-                                              { });
-    position += count;
-    return result;
+    return TranscodeRange<std::string>(taken, Utf16Little, { });
   } catch (std::exception const& error) {
     Invalid(error.what());
   }
 }
-auto DrivePacket::Bytes() -> std::vector<uint8_t>& {
+auto DrivePacket::Bytes() -> std::vector<std::byte>& {
   return bytes;
 }
-auto DrivePacket::Bytes() const -> std::vector<uint8_t> const& {
+auto DrivePacket::Bytes() const -> std::vector<std::byte> const& {
   return bytes;
 }
-auto DrivePacket::Position() const -> size_t {
+auto DrivePacket::Position() const -> std::size_t {
   return position;
 }
-auto DrivePacket::Seek(size_t offset) -> void {
+auto DrivePacket::Seek(std::size_t offset) -> void {
   utilities::Expects(offset <= bytes.size(), "packet cursor is bounded");
   position = offset;
 }
 auto DrivePacket::Origin(std::weak_ptr<DriveChannel> channel) -> void {
   origin = std::move(channel);
 }
-auto DrivePath(char const* path) -> std::vector<uint8_t> {
+auto DrivePath(char const* path) -> std::vector<std::byte> {
   if (!path) throw std::runtime_error("Drive path is null.");
   std::string text(path);
   if (text.empty() || text.front() != '/') text.insert(text.begin(), '/');
-  auto encoded = TranscodeRange<std::vector<uint8_t>>(std::as_bytes(std::span(text)), { }, Utf16Little,
-                                                      [](char32_t point) { return point == U'/' ? U'\\' : point; });
+  auto encoded = TranscodeRange<std::vector<std::byte>>(std::as_bytes(std::span(text)), { }, Utf16Little,
+                                                        [](char32_t point) { return point == U'/' ? U'\\' : point; });
   encoded.resize(encoded.size() + 2);
   return encoded;
 }

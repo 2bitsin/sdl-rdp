@@ -7,6 +7,7 @@
 
 #include <SDL3/SDL.h>
 #include <oxbox/utilities/number-text.hpp>
+#include <oxbox/utilities/text.hpp>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -204,10 +205,8 @@ auto CreateCursor() -> SDL_Cursor* {
 
 auto ConfigureVideo() -> void {
   SDL_Log("SDL_GetVersion() %d", SDL_GetVersion());
-  std::string drivers = "drivers";
-  std::ranges::for_each(std::views::iota(0, SDL_GetNumVideoDrivers()),
-                        [&](int index) { drivers += std::format(" {}", SDL_GetVideoDriver(index)); });
-  SDL_Log("%s", drivers.c_str());
+  auto const drivers = oxbox::utilities::Joined(std::views::iota(0, SDL_GetNumVideoDrivers()), " ", SDL_GetVideoDriver);
+  SDL_Log("drivers %s", drivers.c_str());
   if (char const* codec = SDL_getenv("SDL_RDP_CODEC")) {
     std::string const requested(codec);
     Check(SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SDL_RDP_CODEC"));

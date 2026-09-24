@@ -13,35 +13,28 @@ protected:
   auto ThenWrongPassword(unsigned port) -> void {
     Client const wrong(port, true);
     wrong.Credentials("alice", "wrong-secret", "LAB", true);
-    ASSERT_FALSE(freerdp_connect(wrong.Instance().get()));
+    ASSERT_FALSE(wrong.Connect());
     ASSERT_TRUE(Read("event AUTH_REJECTED user=alice"));
   }
 };
 TEST_F(AuthenticationSample, AuthenticationPair) {
-  auto arguments = Arguments(certificates.Path(), false);
-  arguments.insert(arguments.end(), { "--user", "alice", "--password", "sample-secret", "--domain", "LAB" });
-  GivenProcess(arguments);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenProcess({ }, { "--user", "alice", "--password", "sample-secret", "--domain", "LAB" }));
   auto port = AnnouncedPort(line);
-  ThenWrongPassword(port);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ThenWrongPassword(port));
   Client const right(port, true);
   right.Credentials("alice", "sample-secret", "LAB", true);
-  ASSERT_TRUE(freerdp_connect(right.Instance().get()));
+  ASSERT_TRUE(right.Connect());
   ASSERT_TRUE(Read("event CONNECTED user=alice domain=LAB authenticated=1"));
   EXPECT_FALSE(process->Transcript().contains("sample-secret"));
   EXPECT_FALSE(process->Transcript().contains("wrong-secret"));
   Escape(right);
 }
 TEST_F(AuthenticationSample, AuthenticationPropertyDenies) {
-  auto arguments = Arguments(certificates.Path(), false);
-  arguments.insert(arguments.end(),
-                   { "--user", "alice", "--password", "sample-secret", "--auth", "tls", "--verify-deny" });
-  GivenProcess(arguments);
-  if (::testing::Test::HasFatalFailure()) return;
-  Client const client(AnnouncedPort(line), true);
+  ASSERT_NO_FATAL_FAILURE(
+      GivenProcess({ }, { "--user", "alice", "--password", "sample-secret", "--auth", "tls", "--verify-deny" }));
+  auto const client = AnnouncedClient(320, 200);
   client.Credentials("alice", "sample-secret", "", false);
-  ASSERT_FALSE(freerdp_connect(client.Instance().get()));
+  ASSERT_FALSE(client.Connect());
   ASSERT_TRUE(Read("event AUTH_REJECTED user=alice"));
   EXPECT_FALSE(process->Transcript().contains("event CONNECTED"));
 }
@@ -109,28 +102,25 @@ auto ConnectPropertyCredentials(unsigned port) -> void {
   {
     Client const client(port, true);
     client.Credentials("alice", "property-secret", "LAB", false);
-    ASSERT_TRUE(freerdp_connect(client.Instance().get()));
+    ASSERT_TRUE(client.Connect());
   }
   {
     Client const client(port, true);
     client.Credentials("alice", "property-secret", "LAB", true);
-    ASSERT_TRUE(freerdp_connect(client.Instance().get()));
+    ASSERT_TRUE(client.Connect());
   }
 }
 }
 TEST(DriverAuthentication, PropertiesReadAtCallTime) {
   oxbox::platform::ScratchArea const certificates{ "driver-auth", "sdl-rdp" };
-  GivenAuthenticationHints(certificates.Path());
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenAuthenticationHints(certificates.Path()));
   PropertyCredentials credentials;
   ASSERT_TRUE(SDL_Init(SDL_INIT_VIDEO));
   Quit const quit;
   auto       properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
-  auto       port       = SDL_GetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0);
-  GivenPropertyCredentials(properties, credentials);
-  if (::testing::Test::HasFatalFailure()) return;
-  ConnectPropertyCredentials(port);
-  if (::testing::Test::HasFatalFailure()) return;
+  auto       port       = PrimaryDisplayPort();
+  ASSERT_NO_FATAL_FAILURE(GivenPropertyCredentials(properties, credentials));
+  ASSERT_NO_FATAL_FAILURE(ConnectPropertyCredentials(port));
   SDL_Quit();
   SDL_ResetHints();
   EXPECT_EQ(credentials.Verified(), 2u);

@@ -22,7 +22,7 @@ SoundClient::SoundClient(Client& target) : client(target), previous_load(client.
   };
 }
 SoundClient::~SoundClient() {
-  freerdp_disconnect(client.Instance().get());
+  client.Disconnect();
   client.Instance()->LoadChannels = previous_load;
   active                          = nullptr;
 }

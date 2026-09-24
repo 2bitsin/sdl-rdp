@@ -7,6 +7,7 @@
 
 #include <winpr/synch.h>
 #include <stdexcept>
+#include <utility>
 
 namespace Backend {
 namespace {
@@ -16,7 +17,7 @@ auto ReapSignal() -> EventHandle {
   return signal;
 }
 auto AnnounceDeparture(Session& session, EventQueue& events, Peer const& peer) -> void {
-  auto const* sound = peer.Audio();
+  auto const* sound = peer.Redirected().Audio();
   events.Push({ .type = SDLRDP_DISCONNECTED });
   if (sound && sound->Rate()) session.AudioGone();
 }
@@ -26,8 +27,8 @@ Session::Session(FrameStore& frames, EventQueue& events)
 auto Session::Lock() -> SessionLock {
   return SessionLock{ _guard };
 }
-auto Session::LockPeers() -> PeersLock {
-  return _peers.Lock();
+auto Session::LockPeersAndFrame() -> PeerFrame {
+  return { _peers, _frames };
 }
 auto Session::Add(std::unique_ptr<Peer> peer) -> void {
   _peers.Add(std::move(peer));
@@ -41,23 +42,20 @@ auto Session::ReapEvent() const noexcept -> HANDLE {
 }
 auto Session::Takeover(PeerLink const& self) -> FrameLock {
   std::scoped_lock const session(_guard);
-  auto const             held    = LockPeers();
-  auto                   frame   = _frames.Lock();
-  ForEach(held, [&](Peer& peer) {
+  auto                   peers   = LockPeersAndFrame();
+  peers.ForEach([&](Peer& peer) {
     if (peer.Owns(self))
       _current = &peer;
     else if (peer.Evict())
       AnnounceDeparture(*this, _events, peer);
   });
   Ensures(_current != nullptr, "the arriving peer is current");
-  return frame;
+  return std::move(peers).ReleaseFrame();
 }
 auto Session::Depart(PeerLink const& self, Activation& activation) -> void {
   {
     std::scoped_lock const session(_guard);
-    auto const             held    = LockPeers();
-    auto const             frame   = _frames.Lock();
-    ForEach(held, [&](Peer& peer) {
+    LockPeersAndFrame().ForEach([&](Peer& peer) {
       if (!peer.Owns(self)) return;
       if (_current == &peer) _current = nullptr;
       if (activation.Deactivate()) AnnounceDeparture(*this, _events, peer);
@@ -76,7 +74,7 @@ auto Session::Current(FrameLock const& held) const -> Peer* {
   Expects(_frames.Holds(held), "reading the current peer holds the frame lock");
   return _current;
 }
-auto Session::NextDrive() noexcept -> unsigned {
+auto Session::NextDrive() noexcept -> std::uint32_t {
   return _next_drive.fetch_add(1);
 }
 auto Session::AudioChanged() -> void {

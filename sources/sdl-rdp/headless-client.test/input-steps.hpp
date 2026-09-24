@@ -3,6 +3,7 @@
 #include <sdl-rdp-abi/sdl-rdp-backend.h>
 
 #include <gtest/gtest.h>
+#include <cstdint>
 namespace Headless {
 inline auto SendMouse(Client const& client, UINT16 x, UINT16 y) -> void {
   auto* input = client.Instance()->context->input;
@@ -12,9 +13,7 @@ inline auto SendMouse(Client const& client, UINT16 x, UINT16 y) -> void {
   ASSERT_TRUE(freerdp_input_send_mouse_event(input, PTR_FLAGS_WHEEL | 120, 0, 0)) << "send wheel";
 }
 inline auto SendKeyboardAndMouse(Client const& client, UINT16 x, UINT16 y) -> void {
-  auto* input = client.Instance()->context->input;
-  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x1e)) << "send A down";
-  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x1e)) << "send A up";
+  ASSERT_NO_FATAL_FAILURE(client.Tap(0x1e));
   SendMouse(client, x, y);
 }
 inline auto ThenKey(sdlrdp_event const& event, bool down) -> void {

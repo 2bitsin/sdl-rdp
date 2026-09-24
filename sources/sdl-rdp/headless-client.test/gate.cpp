@@ -1,4 +1,5 @@
 #include <sdl-rdp/headless-client.test/gate.hpp>
+#include <sdl-rdp/headless-client.test/backend-instance.hpp>
 
 #include <sdl-rdp/headless-client.test/frame-counter.hpp>
 #include <sdl-rdp/headless-client.test/has-cookie.hpp>
@@ -33,7 +34,7 @@ auto Gate::WhenBurstPictures(Client& client, sdlrdp_rect area) -> void {
   auto before = ResidentBytes();
   for (unsigned frame = 0; frame < 200; ++frame) {
     std::ranges::fill(pixels, 0x00010101u * (frame + 1));
-    ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &area, 1), 0);
+    ASSERT_EQ(backend.Present(pixels, 320, 200, area), 0);
   }
   auto after = ResidentBytes();
   RecordProperty("burst_rss_growth", std::to_string(std::int64_t(after) - std::int64_t(before)));
@@ -53,7 +54,7 @@ auto Gate::ThenResizedConnection() -> void {
   ThenInitialScreen(events[1]);
 }
 auto Gate::ThenCleanDisconnect() -> void {
-  backend.reset();
+  backend.Close();
   EXPECT_TRUE(logs.Contains("accepted"));
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, "disconnected"));
   EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, "Peer transport failed")) << logs.Text();
@@ -62,8 +63,7 @@ auto Gate::PresentMeasuredFrame(Client& client) -> void {
   ASSERT_TRUE(client.Until([&] { return HasCookie(client); }));
   FrameCounter const counter(client);
   auto               bytes   = client.Received();
-  Frame(client, { 0, 0, 320, 200 });
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(Frame(client, { 0, 0, 320, 200 }));
   if (GetParam().codec == SDLRDP_CODEC_PLANAR)
     EXPECT_LE(counter.BitmapPdus(), 1 + ((client.Received() - bytes) / 0xFFFF));
   RecordFrameCost(client, bytes);
@@ -78,9 +78,8 @@ auto Gate::WhenDamagedBlock(Client& client) -> void {
   Frame(client, block);
 }
 auto Gate::ThenClientDisconnects(Client& client) -> void {
-  ASSERT_TRUE(freerdp_disconnect(client.Instance().get()));
-  ThenDisconnected();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_TRUE(client.Disconnect());
+  ASSERT_NO_FATAL_FAILURE(ThenDisconnected());
   ThenCleanDisconnect();
 }
 }

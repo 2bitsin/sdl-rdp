@@ -1,4 +1,5 @@
 #include "SDL_rdpdrive.hpp"
+#include "SDL_rdpowneddriver.hpp"
 #include "boundary.hpp"
 #include <oxbox/utilities/text.hpp>
 #include <algorithm>
@@ -51,13 +52,11 @@ using DriveFileState = PointerState<std::pair<std::reference_wrapper<Driver cons
                                     &std::pair<std::reference_wrapper<Driver const>, sdlrdp_file*>::second>;
 using DriveFile = utilities::RAIIWrap<std::pair<std::reference_wrapper<Driver const>, sdlrdp_file*>, OpenHandle,
                                       CloseHandle, DriveFileState::IsNull, DriveFileState::MakeNull>;
-class File {
+class File : private OwnedDriver<Driver const> {
 public:
-       File(std::shared_ptr<Driver const> driver, unsigned drive, std::string const& path, FileMode mode)
-      : _driver{ std::move(driver) }, _file{ *_driver, drive, path, mode.Flags() }, _mode{ mode } { }
-  auto Backend() const -> Driver const& {
-    return *_driver;
-  }
+  using OwnedDriver<Driver const>::Backend;
+       File(std::shared_ptr<Driver const> driver, std::uint32_t drive, std::string const& path, FileMode mode)
+      : OwnedDriver<Driver const>{ std::move(driver) }, _file{ Backend(), drive, path, mode.Flags() }, _mode{ mode } { }
   auto Handle() const -> sdlrdp_file* {
     return _file.Get().second;
   }
@@ -74,10 +73,9 @@ public:
     return _file.Close();
   }
 private:
-  std::shared_ptr<Driver const> _driver;
-  DriveFile                     _file;
-  FileMode                      _mode;
-  Sint64                        _position{ };
+  DriveFile _file;
+  FileMode  _mode;
+  Sint64    _position{ };
 };
 auto Size(File const& file) -> Sint64 {
   sdlrdp_stat info{ };
@@ -174,7 +172,7 @@ auto DriveId(Driver const& driver, std::optional<std::string> const& name) -> un
   auto const drives = Drives(driver);
   return name ? NamedDrive(drives, *name) : FirstDrive(drives);
 }
-auto OpenDriveFile(std::shared_ptr<Driver const> driver, unsigned drive, std::string const& path, FileMode mode)
+auto OpenDriveFile(std::shared_ptr<Driver const> driver, std::uint32_t drive, std::string const& path, FileMode mode)
     -> Stream {
   auto       file      = std::make_unique<File>(std::move(driver), drive, path, mode);
   auto const interface = FileInterface(mode);

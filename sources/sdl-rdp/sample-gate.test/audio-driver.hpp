@@ -5,17 +5,17 @@
 #include <chrono>
 #include <cstddef>
 #include <memory>
+#include <span>
 
 namespace SampleGate {
+auto ThenLead(Client& client, Headless::SoundClient& audio, std::size_t after, std::size_t milliseconds) -> void;
+
 class AudioDriver : public AudioSample {
 protected:
-  auto        ThenAudioSurvivesVideoQuit(Client& client, Headless::SoundClient& audio)           -> void;
-  static auto ThenRefilledLead(Client& client, Headless::SoundClient& audio, std::size_t frames) -> void;
-  static auto ThenInitialLead(Client& client, Headless::SoundClient& audio)                      -> void;
-  auto        ReceiveLead()                                                                      -> void;
-  auto        RefillLead(auto then_refilled)                                                     -> void {
-    ReceiveLead();
-    if (::testing::Test::HasFatalFailure()) return;
+  auto ThenAudioSurvivesVideoQuit(Client& client, Headless::SoundClient& audio) -> void;
+  auto ReceiveLead()                                                            -> void;
+  auto RefillLead(auto then_refilled)                                           -> void {
+    ASSERT_NO_FATAL_FAILURE(ReceiveLead());
     auto& client = *sound_client;
     auto& audio  = *sound;
     {
@@ -27,14 +27,15 @@ protected:
     }
     auto frames  = audio.CaptureState().samples.size() / 2;
     auto resumed = Clock::now();
-    ThenRefilledLead(client, audio, frames);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(ThenLead(client, audio, frames, 150));
     then_refilled(audio, resumed);
   }
   auto GivenAudioBackend()                                        -> void;
   auto GivenAudioHints()                                          -> void;
   auto GivenSoundClient()                                         -> void;
   auto PlayPcm(std::size_t count)                                 -> void;
+  auto PlayFlushed(std::span<Sint16 const> pcm)                   -> Clock::time_point;
+  auto OpenStream()                                               -> void;
   auto ConnectAudio(Client& client, Headless::SoundClient& audio) -> void;
   auto ThenPcm(Client& client, Headless::SoundClient& audio)      -> void;
   auto CaptureLogs()                                              -> void;

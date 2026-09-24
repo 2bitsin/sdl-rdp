@@ -8,59 +8,46 @@
 
 namespace BackendGate {
 TEST_F(AudioGate, AudioAbsentDiscards) {
-  ThenMissingAudioHandle();
-  if (::testing::Test::HasFatalFailure()) return;
-  GivenAudioServer();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ThenMissingAudioHandle());
+  ASSERT_NO_FATAL_FAILURE(GivenAudioServer());
   std::vector<INT16> frames(static_cast<std::ptrdiff_t>(48000 * 10) * 2, 1234);
   EXPECT_EQ(sdlrdp_audio_write(backend.get(), frames.data(), 480000), 480000);
   EXPECT_EQ(sdlrdp_audio_wait(backend.get(), 0), 1);
   sdlrdp_audio_close(backend.get());
 }
 TEST_F(AudioGate, AudioPcmAndReconnect) {
-  GivenAudioServer();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenAudioServer());
   for (unsigned connection = 0; connection < 2; ++connection) {
-    Client      client(sdlrdp_port(backend.get()), true);
-    SoundClient audio(client);
-    ConnectAudioFormats(client, audio);
-    if (::testing::Test::HasFatalFailure()) return;
+    auto [client, audio] = NewSession();
+    ASSERT_NO_FATAL_FAILURE(ConnectAudioFormats(client, audio));
     auto               frames = audio.CaptureState().rate / 50;
     std::vector<INT16> pcm(static_cast<std::size_t>(frames) * 2);
     std::ranges::iota(pcm, -480);
     ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), frames), frames);
     ASSERT_TRUE(client.Until([&] { return audio.CaptureState().samples.size() >= pcm.size(); }));
-    ThenCapturedPcm(audio, pcm);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(ThenCapturedPcm(audio, pcm));
   }
   RecordProperty("audio_diagnostics", logs.Text(true));
 }
 TEST_F(AudioGate, AudioFormatMissKeepsSessionAndReconnects) {
-  GivenAudioServer();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenAudioServer());
   for (bool const unmatched : { false, true }) {
-    Client      client(sdlrdp_port(backend.get()), true);
-    SoundClient audio(client);
+    auto [client, audio] = NewSession();
     audio.CaptureState().rate                = 22050;
     audio.CaptureState().advertise_unmatched = unmatched;
-    Connect(client);
-    ThenUnavailableAudio(client, unmatched);
-    ThenLiveVideoAndInput(client);
+    ASSERT_NO_FATAL_FAILURE(Connect(client));
+    ASSERT_NO_FATAL_FAILURE(ThenUnavailableAudio(client, unmatched));
+    ASSERT_NO_FATAL_FAILURE(ThenLiveVideoAndInput(client));
   }
-  Client      client(sdlrdp_port(backend.get()), true);
-  SoundClient audio(client);
-  ConnectAudio(client, audio);
-  if (::testing::Test::HasFatalFailure()) return;
+  auto [client, audio] = NewSession();
+  ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
   EXPECT_EQ(sdlrdp_audio_rate(backend.get()), 44100u);
 }
 TEST_F(AudioGate, AudioBothRatesPrefer44100) {
-  GivenAudioServer();
-  if (::testing::Test::HasFatalFailure()) return;
-  Client      client(sdlrdp_port(backend.get()), true);
-  SoundClient audio(client);
+  ASSERT_NO_FATAL_FAILURE(GivenAudioServer());
+  auto [client, audio] = NewSession();
   audio.CaptureState().advertise_both_rates = true;
-  ConnectAudioFormats(client, audio);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ConnectAudioFormats(client, audio));
   EXPECT_EQ(sdlrdp_audio_rate(backend.get()), 44100u);
   auto               frames = audio.CaptureState().rate / 50;
   std::vector<INT16> pcm(static_cast<std::size_t>(frames) * 2, 1234);
@@ -69,20 +56,16 @@ TEST_F(AudioGate, AudioBothRatesPrefer44100) {
   EXPECT_EQ(audio.CaptureState().samples, pcm);
 }
 TEST_F(AudioGate, AudioInitialVolume) {
-  GivenAudioServer();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenAudioServer());
   EXPECT_EQ(sdlrdp_audio_rate(backend.get()), 0u);
-  Client      client(sdlrdp_port(backend.get()), true);
-  SoundClient audio(client);
+  auto [client, audio] = NewSession();
   audio.CaptureState().rate   = 44100;
   audio.CaptureState().volume = 0x8000ffffu;
-  ConnectAudio(client, audio);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
   ThenInitialVolume(client, audio);
 }
 TEST_F(AudioGate, AudioSlowConfirmsBoundTenSeconds) {
-  GivenConfirmingSession();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenConfirmingSession());
   std::vector<std::int16_t> pcm(480000uz * 2, 1234);
   ConfirmationPace const    pace{ .frames  = 480000,
                                   .delay   = std::chrono::milliseconds(80),
@@ -92,61 +75,48 @@ TEST_F(AudioGate, AudioSlowConfirmsBoundTenSeconds) {
   ThenSlowAudioConfirms(writing);
 }
 TEST_F(AudioGate, AudioDisconnectDuringBlockedWrite) {
-  GivenAudioServer();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenAudioServer());
   for (bool const reconnect : { false, true }) {
-    Client      client(sdlrdp_port(backend.get()), true);
-    SoundClient audio(client);
+    auto [client, audio] = NewSession();
     audio.CaptureState().rate         = 48000;
     audio.CaptureState().auto_confirm = reconnect;
-    ConnectAudio(client, audio);
-    if (::testing::Test::HasFatalFailure()) return;
-    EstablishConfirmations(client, audio);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
+    ASSERT_NO_FATAL_FAILURE(EstablishConfirmations(client, audio));
     unsigned           frames  = reconnect ? 960 : 480000;
     std::vector<INT16> pcm(static_cast<std::size_t>(frames) * 2, 1234);
     auto               writing = std::async(std::launch::async,
                                             [&] { return sdlrdp_audio_write(backend.get(), pcm.data(), frames); });
-    ThenDisconnectedWriter(client, audio, writing, reconnect, frames);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(ThenDisconnectedWriter(client, audio, writing, reconnect, frames));
   }
 }
 TEST_F(AudioGate, AudioOneMillisecondPartialBlock) {
-  Open(320, 200, { }, SDLRDP_CODEC_RAW, 1);
+  ASSERT_NO_FATAL_FAILURE(Open(320, 200, { }, SDLRDP_CODEC_RAW, 1));
   ASSERT_EQ(sdlrdp_audio_open(backend.get()), 0);
-  Client      client(sdlrdp_port(backend.get()), true);
-  SoundClient audio(client);
+  auto [client, audio] = NewSession();
   audio.CaptureState().rate = 48000;
-  ConnectAudio(client, audio);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
   std::array<INT16, 1920> pcm{ };
   ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 48), 48);
-  auto writing  = std::async(std::launch::async,
-                             [&] { return sdlrdp_audio_write(backend.get(), pcm.data() + 96, 912); });
-  auto captured = client.Until([&] { return audio.CaptureState().samples.size() == pcm.size(); });
-  if (!captured) sdlrdp_audio_close(backend.get());
-  EXPECT_TRUE(captured);
+  auto writing = std::async(std::launch::async,
+                            [&] { return sdlrdp_audio_write(backend.get(), pcm.data() + 96, 912); });
+  EXPECT_TRUE(UntilCaptured(pcm.size()));
   EXPECT_EQ(writing.get(), 912);
 }
 TEST_F(AudioGate, AudioFallbackIdleDoesNotAccumulateCredit) {
-  GivenUnconfirmedSession();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenUnconfirmedSession());
   std::vector<INT16> const pcm(48000uz * 2, 1234);
-  for (unsigned burst = 1; burst <= 2; ++burst) {
-    WhenIdleAudioBurst(pcm, burst);
-    if (::testing::Test::HasFatalFailure()) return;
+  for (std::size_t burst = 1; burst <= 2; ++burst) {
+    ASSERT_NO_FATAL_FAILURE(WhenIdleAudioBurst(pcm, burst));
   }
 }
 
 TEST_F(AudioGate, AudioReorderedConfirmsCreditOnlyTheirBlock) {
-  GivenConfirmingSession();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenConfirmingSession());
   std::vector<INT16> const pcm(24000uz * 2, 1234);
   ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 24000), 24000);
   ASSERT_TRUE(ClientSession().Until([&] { return AudioSession().CaptureState().pending.size() == 25; }));
   EXPECT_EQ(sdlrdp_audio_wait(backend.get(), 0), 0);
-  WhenLastAudioBlockConfirms(pcm);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(WhenLastAudioBlockConfirms(pcm));
   ThenFirstAudioBlockConfirms();
 }
 }

@@ -4,7 +4,9 @@
 #include <sdl-rdp/core/diagnostics.hpp>
 #include <sdl-rdp/core/peer-link.hpp>
 #include <sdl-rdp/core/picture-geometry.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/utilities/rect.hpp>
+#include <sdl-rdp/utilities/stopwatch.hpp>
 #include <sdl-rdp/video/encoder.hpp>
 #include <sdl-rdp/video/frame-pacing.hpp>
 #include <sdl-rdp/video/gfx.hpp>
@@ -110,14 +112,14 @@ auto GfxChannel::AvcFailure() -> std::string {
   auto const   opened  = _avc.Open(size, Avc::Bitrate(size, _configuration.AvcBitrate()), _avc_rate);
   return opened ? std::string{ } : _avc.Error();
 }
-auto GfxChannel::CompressProgressive(REGION16& damage, std::chrono::steady_clock::time_point start) -> bool {
+auto GfxChannel::CompressProgressive(REGION16& damage, Stopwatch const& watch) -> bool {
   BYTE*  data    = nullptr;
   UINT32 size    = 0;
   auto   picture { Picture()               };
   auto   stride  { SurfaceStride(_surface) };
   auto   result  = progressive_compress(_progressive.get(), picture.data(), picture.size(), PIXEL_FORMAT_BGRX32,
                                         _surface.width, _surface.height, stride, &damage, &data, &size);
-  _sources.encoder.get().Charge(std::chrono::steady_clock::now() - start);
+  _sources.encoder.get().Charge(watch.Elapsed());
   return result >= 0 && data && ProgressivePayload({ data, size });
 }
 auto GfxChannel::ProgressiveDamage(REGION16& damage) const -> bool {
@@ -186,13 +188,13 @@ auto GfxChannel::Picture() -> std::span<BYTE const> {
 auto GfxChannel::Avc420() -> bool {
   Expects(_confirmed, "graphics capability confirmed");
   Expects(_avc.IsOpen(), "AVC encoder is open");
-  auto start = std::chrono::steady_clock::now();
+  Stopwatch const watch;
   _regions.Clear();
   std::ranges::for_each(_sources.scaler.get().Areas(), [&](sdlrdp_rect area) { _regions.Add(area); });
   auto picture{ Picture()                                          };
   auto stride { SurfaceStride(_surface)                            };
   auto data   { _avc.Encode(picture, stride, _force_idr, _payload) };
-  _sources.encoder.get().Charge(std::chrono::steady_clock::now() - start);
+  _sources.encoder.get().Charge(watch.Elapsed());
   if (data.empty()) return false;
   _force_idr   =  false;
   _frame_bytes += data.size() + WireToSurfaceHeaderBytes + _regions.Bytes();
@@ -213,7 +215,7 @@ auto GfxChannel::WriteCommand(Packet const& packet) -> bool {
   ExpectInside(packet.area, _surface);
   auto const                  data    = std::span(_payload).subspan(packet.offset, packet.length);
   auto                        command = SurfaceCommand(packet.area, data, packet.codec);
-  RDPGFX_AVC420_BITMAP_STREAM stream  { { UINT32(_regions.Rects().size()), _regions.Rects().data(),
+  RDPGFX_AVC420_BITMAP_STREAM stream  { { Narrowed<std::uint32_t>(_regions.Areas().size()), _regions.Areas().data(),
                                           _regions.Quality().data() },
                                         UINT32(data.size()),
                                         data.data() };
@@ -222,13 +224,13 @@ auto GfxChannel::WriteCommand(Packet const& packet) -> bool {
 }
 auto GfxChannel::Progressive() -> bool {
   ExpectSurface(_confirmed, _surface);
-  auto start = std::chrono::steady_clock::now();
+  Stopwatch const watch;
   if (!_progressive) _progressive.reset(progressive_context_new_ex(TRUE, THREADING_FLAGS_DISABLE_THREADS));
   if (!_progressive) return false;
   REGION16 damage;
   region16_init(&damage);
   InitializedRegion const owned{ &damage };
-  return ProgressiveDamage(damage) && CompressProgressive(damage, start);
+  return ProgressiveDamage(damage) && CompressProgressive(damage, watch);
 }
 auto GfxChannel::ProgressivePayload(std::span<BYTE> data) -> bool {
   if (!ProgressiveHeaders(data)) return false;

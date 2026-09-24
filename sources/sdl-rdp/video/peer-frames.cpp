@@ -10,7 +10,7 @@ auto PeerFrames::Post(FrameLock const& held, sdlrdp_rect area) -> void {
 }
 auto PeerFrames::Repaint(FrameLock const& held, sdlrdp_rect area) -> void {
   Expects(_store.Holds(held), "repainting holds the frame lock");
-  _dirty.clear();
+  _dirty.Clear();
   _dirty.Add(area);
 }
 auto PeerFrames::Refresh() -> void {
@@ -23,7 +23,7 @@ auto PeerFrames::CountPresent(FrameLock const& held) -> void {
 }
 auto PeerFrames::Dirty(FrameLock const& held) const -> bool {
   Expects(_store.Holds(held), "reading damage holds the frame lock");
-  return !_dirty.empty();
+  return !_dirty.Rects().empty();
 }
 auto PeerFrames::Pending(FrameLock const& held) const -> bool {
   return Dirty(held) || _snapshot;
@@ -33,7 +33,7 @@ auto PeerFrames::Capture(FrameLock const& held) -> uint64_t {
   ExpectCaptured(*this);
   _sequence = _store.Presented(held);
   _sending.Swap(_dirty);
-  _dirty.clear();
+  _dirty.Clear();
   return std::exchange(_presents, 0);
 }
 auto PeerFrames::Invalidate(FrameLock const& held) -> void {
@@ -46,14 +46,14 @@ auto PeerFrames::Include() -> void {
   _sending.Add(_snapshot.Bounds());
 }
 auto PeerFrames::Resend() -> void {
-  _sending.clear();
+  _sending.Clear();
   Include();
 }
 auto PeerFrames::Complete(FrameLock const& held) -> void {
   Expects(_store.Holds(held), "completing a frame holds the frame lock");
   ExpectCaptured(*this);
   _snapshot.Release();
-  _sending.clear();
+  _sending.Clear();
 }
 auto PeerFrames::Snapshot() const noexcept -> FrameSnapshot const& {
   return _snapshot;

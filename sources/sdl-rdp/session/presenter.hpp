@@ -1,5 +1,6 @@
 #pragma once
 #include <sdl-rdp/core/refresh.hpp>
+#include <sdl-rdp/utilities/deadline.hpp>
 #include <sdl-rdp/utilities/extent.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 #include <sdl-rdp/video/pointer-shape.hpp>
@@ -27,7 +28,7 @@ public:
   auto SetRefresh(RefreshMode mode, unsigned ceiling)                                                          -> void;
   auto SetCodec(sdlrdp_codec codec)                                                                            -> void;
   auto SetPointer(PointerShape shape)                                                                          -> void;
-  auto WaitFrame(int timeout)                                                                                  -> int;
+  auto WaitFrame(Deadline deadline)                                                                            -> int;
 
 private:
   auto Acquire(Extent size) -> std::shared_ptr<std::vector<BYTE>>;

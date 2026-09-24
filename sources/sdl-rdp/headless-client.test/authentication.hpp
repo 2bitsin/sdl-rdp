@@ -1,4 +1,5 @@
 #pragma once
+#include "backend-instance.hpp"
 #include "peer-status.hpp"
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp-abi/sdl-rdp-backend.h>
@@ -45,15 +46,15 @@ protected:
   auto        ThenSecurityWarning(bool nla)                                                                -> void;
   auto        ThenCertificateDisconnect(std::string_view closed)                                           -> void;
   auto        ThenPendingDisconnect(UINT32 code)                                                           -> void;
-  oxbox::platform::ScratchArea                            certificates  { "auth", "sdl-rdp"     };
-  std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> handle        { nullptr, sdlrdp_close };
-  sdlrdp_config                                           config        { };
-  std::mutex                                              guard;
-  std::condition_variable                                 logged;
-  std::vector<std::pair<sdlrdp_log_level, std::string>>   logs;
-  CallbackRecord                                          seen;
-  std::vector<std::string>                                rejections;
-  bool                                                    permit        = true;
-  std::thread::id                                         client_thread = std::this_thread::get_id();
+  oxbox::platform::ScratchArea                          certificates  { "auth", "sdl-rdp" };
+  Headless::BackendInstance                             handle;
+  sdlrdp_config                                         config        { };
+  std::mutex                                            guard;
+  std::condition_variable                               logged;
+  std::vector<std::pair<sdlrdp_log_level, std::string>> logs;
+  CallbackRecord                                        seen;
+  std::vector<std::string>                              rejections;
+  bool                                                  permit        = true;
+  std::thread::id                                       client_thread = std::this_thread::get_id();
 };
 }

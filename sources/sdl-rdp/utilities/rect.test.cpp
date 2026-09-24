@@ -3,6 +3,7 @@
 
 #include <gtest/gtest.h>
 #include <limits>
+#include <tuple>
 
 namespace {
 auto ThenOverlapBounds(sdlrdp_rect const& bounds) -> void {
@@ -49,7 +50,7 @@ auto ThenBridge(Backend::Region& region) -> void {
   EXPECT_EQ(region.Rects()[0].w, 24);
 }
 auto ThenRegionCap(Backend::Region& region) -> void {
-  region.clear();
+  region.Clear();
   for (int i = 0; i < 16; ++i) region.Add({ i * 20, i * 20, 8, 8 });
   ASSERT_EQ(region.Rects().size(), 16u);
   region.Add({ 320, 320, 8, 8 });
@@ -59,17 +60,25 @@ auto ThenRegionCap(Backend::Region& region) -> void {
 }
 }
 TEST(Intersect, OverlapContainmentAndEmpty) {
-  ThenOverlap();
-  if (::testing::Test::HasFatalFailure()) return;
-  ThenContainment();
-  if (::testing::Test::HasFatalFailure()) return;
-  ThenEmptyIntersections();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ThenOverlap());
+  ASSERT_NO_FATAL_FAILURE(ThenContainment());
+  ASSERT_NO_FATAL_FAILURE(ThenEmptyIntersections());
   ThenMaximumCoordinate();
 }
 TEST(Region, BridgeAndCap) {
   Backend::Region region;
-  ThenBridge(region);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ThenBridge(region));
   ThenRegionCap(region);
+}
+TEST(Rect, UnionCoversBoth) {
+  EXPECT_TRUE(Backend::SameSize(Backend::Union({ 0, 0, 10, 10 }, { 20, 5, 5, 20 }), { 0, 0, 25, 25 }));
+  EXPECT_EQ(Backend::Union({ 5, 5, 1, 1 }, { 0, 0, 2, 2 }).x, 0);
+}
+TEST(Rect, TouchesIncludesSharedEdges) {
+  EXPECT_TRUE(Backend::Touches({ 0, 0, 10, 10 }, { 10, 0, 5, 5 }));
+  EXPECT_FALSE(Backend::Touches({ 0, 0, 10, 10 }, { 11, 0, 5, 5 }));
+}
+TEST(RectDeathTest, UnionAndTouchesRejectANegativeExtent) {
+  EXPECT_DEATH(std::ignore = Backend::Union({ 0, 0, -1, 1 }, { 0, 0, 1, 1 }), "rectangle width is nonnegative");
+  EXPECT_DEATH(std::ignore = Backend::Touches({ 0, 0, 1, 1 }, { 0, 0, 1, -1 }), "rectangle height is nonnegative");
 }

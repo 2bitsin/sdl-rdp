@@ -10,8 +10,7 @@
 
 namespace SampleGate {
 auto SampleDesktopSteps::GivenAdvancedSession() -> void {
-  GivenInputSession(true);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenInputSession(true));
   ThenAdvanced(SessionClient());
 }
 auto SampleDesktopSteps::PressFullscreenKey(Client& client) -> void {
@@ -47,10 +46,7 @@ auto SampleDesktopSteps::ThenDesktopMode(Client& client, unsigned w, unsigned h)
                                     + std::to_string(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED)
                                     + std::format(" width={} height={}", w, h)));
   ASSERT_TRUE(Read(std::format("event GEOMETRY window={}x{} desktop={}x{}", w, h, w, h)));
-  ASSERT_TRUE(client.Until([&] {
-    auto* gdi = client.Instance()->context->gdi;
-    return std::cmp_equal(gdi->width, w) && std::cmp_equal(gdi->height, h);
-  }));
+  ASSERT_TRUE(client.UntilDesktop(w, h));
 }
 auto SampleDesktopSteps::ThenWaitingPort(unsigned port) -> void {
   ASSERT_TRUE(Read("port ")) << "port after connection: " << process->Transcript();
@@ -67,7 +63,7 @@ auto SampleDesktopSteps::GivenSwitchableCodec(Client const& client) -> void {
   auto* settings = client.Instance()->context->settings;
   ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_RemoteFxCodec, TRUE));
   ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_NSCodec, TRUE));
-  ASSERT_TRUE(freerdp_connect(client.Instance().get())) << ConnectLogs();
+  ASSERT_NO_FATAL_FAILURE(Connect(client));
 }
 auto SampleDesktopSteps::ThenTakeoverEvent(char const* expected) -> void {
   do {
@@ -76,24 +72,19 @@ auto SampleDesktopSteps::ThenTakeoverEvent(char const* expected) -> void {
   EXPECT_TRUE(line.starts_with("event " + std::string(expected) + " ")) << line;
 }
 auto SampleDesktopSteps::WhenSmallerDesktop(Client& first) -> void {
-  ASSERT_TRUE(freerdp_connect(first.Instance().get())) << ConnectLogs();
+  ASSERT_NO_FATAL_FAILURE(Connect(first));
   ASSERT_TRUE(Read("event GEOMETRY window=640x480 desktop=320x200"));
   ASSERT_TRUE(first.Until([&] { return Pattern(first, false); }));
-  ASSERT_TRUE(freerdp_disconnect(first.Instance().get()));
+  ASSERT_TRUE(first.Disconnect());
   ASSERT_TRUE(Read("event FOCUS_LOST "));
 }
 auto SampleDesktopSteps::WhenWholeSampleReconnects(Client const& client, unsigned port) -> void {
-  ASSERT_TRUE(freerdp_disconnect(client.Instance().get())) << "disconnect";
+  ASSERT_TRUE(client.Disconnect()) << "disconnect";
   ASSERT_TRUE(Read("event OCCLUDED ")) << "OCCLUDED: " << process->Transcript();
   ASSERT_TRUE(Read("event FOCUS_LOST ")) << "FOCUS_LOST: " << process->Transcript();
   Client const second(port, true, 640, 480);
-  ASSERT_TRUE(freerdp_connect(second.Instance().get())) << ConnectLogs() << "second session connects";
-  Exposed();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(Connect(second));
+  ASSERT_NO_FATAL_FAILURE(Exposed());
   Escape(second);
-}
-auto SampleDesktopSteps::GivenWholeSample() -> void {
-  process = std::make_unique<Process>(Arguments(certificates.Path(), false));
-  ASSERT_TRUE(Read("port ")) << "port <n>: " << process->Transcript();
 }
 }

@@ -13,6 +13,7 @@
 #include <sdl-rdp/video/scaler.hpp>
 
 #include <freerdp/channels/wtsvc.h>
+#include <oxbox/utilities/text.hpp>
 #include <array>
 #include <cstddef>
 #include <format>
@@ -70,9 +71,10 @@ auto GfxChannel::Check(UINT result, char const* operation) const -> bool {
 }
 auto GfxChannel::LogCapabilities(std::span<RDPGFX_CAPSET const> advertised) const -> void {
   if (_logged) return;
-  std::string sets;
-  for (auto const& cap : advertised) sets += std::format(" version=0x{:08x} flags=0x{:08x};", cap.version, cap.flags);
-  _diagnostics.Log(SDLRDP_LOG_INFO, "GFX advertised sets:" + sets);
+  auto const sets = oxbox::utilities::Joined(advertised, " ", [](RDPGFX_CAPSET const& cap) {
+    return std::format("version=0x{:08x} flags=0x{:08x};", cap.version, cap.flags);
+  });
+  _diagnostics.Log(SDLRDP_LOG_INFO, "GFX advertised sets: " + sets);
 }
 auto GfxChannel::ActivateCapabilities(RDPGFX_CAPSET const& selected, bool wanted) -> UINT {
   auto const codec      = _sources.encoder.get().Codec();
@@ -111,8 +113,7 @@ auto GfxChannel::Caps(RdpgfxServerContext* context, RDPGFX_CAPS_ADVERTISE_PDU co
   auto  advertised = std::span(caps->capsSets, caps->capsSetCount);
   self.LogCapabilities(advertised);
   bool const wanted   = self._configuration.Codec() == SDLRDP_CODEC_AVC420;
-  auto       selected = SelectCapability(advertised, true);
-  if (AllowsAvc(selected) && !Avc::Encoder::Available()) selected = SelectCapability(advertised);
+  auto       selected = SelectCapability(advertised, Avc::Encoder::Available());
   if (!selected.version) return ERROR_NOT_SUPPORTED;
   RDPGFX_CAPS_CONFIRM_PDU const confirm{ &selected };
   if (!self.Check(context->CapsConfirm(context, &confirm), "confirm")) return ERROR_INTERNAL_ERROR;
@@ -127,10 +128,7 @@ auto GfxChannel::ResetAvc() -> void {
 }
 auto GfxChannel::ConfirmedCapability(RDPGFX_CAPSET const& cap) -> void {
   Expects(cap.version, "supported capabilities confirmed");
-  _avc_allowed = cap.version == RDPGFX_CAPVERSION_81
-                     ? (cap.flags & RDPGFX_CAPS_FLAG_AVC420_ENABLED) != 0
-                     : cap.version >= RDPGFX_CAPVERSION_10 && !(cap.flags & RDPGFX_CAPS_FLAG_AVC_DISABLED)
-                           && Avc::Encoder::Available();
+  _avc_allowed = AllowsAvc(cap);
   ResetAvc();
   _confirmed = true;
   _timing.Ready(Activation::Clock::now() - _activation.ActivatedAt());

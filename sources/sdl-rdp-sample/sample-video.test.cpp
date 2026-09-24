@@ -32,8 +32,7 @@ namespace {
 auto ThenEqualLayout(Client& client, Headless::DisplayClient& display) -> void {
   FullDesktopFrames const frames(client);
   ASSERT_TRUE(display.Layout(1280, 800));
-  PumpDesktop(client);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(PumpDesktop(client));
   ThenUnchangedPicture(display, frames);
 }
 }
@@ -69,7 +68,7 @@ auto PresentDesktop(Client& client, SDL_Window* window) -> void {
 auto ConnectDesktop(Client& client, Headless::Logs& logs) -> void {
   Expects(client.Instance() != nullptr, "desktop client exists");
   ASSERT_TRUE(freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_FrameAcknowledge, 0));
-  ASSERT_TRUE(freerdp_connect(client.Instance().get())) << logs.Text(true);
+  ASSERT_TRUE(client.Connect()) << logs.Text(true);
   ASSERT_TRUE(client.Until([&] {
     SDL_PumpEvents();
     return Headless::DisplayClient::Ready();
@@ -78,22 +77,18 @@ auto ConnectDesktop(Client& client, Headless::Logs& logs) -> void {
 }
 TEST_F(VideoDriver, ResizeStormWithLayoutEcho) {
   ASSERT_TRUE(SDL_SetWindowSize(window, 640, 480));
-  auto                    properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
-  Client client(SDL_GetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0), true, 640, 480);
+  Client                  client(PrimaryDisplayPort(), true, 640, 480);
   Headless::DisplayClient display(client);
   display.Observed().echo_resize = true;
-  ConnectDesktop(client, logs);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ConnectDesktop(client, logs));
   display.Observed().finalizing = [&] {
     if (display.Observed().desktops == 1) {
-      StormSizes();
+      ASSERT_NO_FATAL_FAILURE(StormSizes());
     }
   };
   ASSERT_TRUE(SDL_SetWindowSize(window, 1280, 800));
-  AwaitResizedPicture(client, display);
-  if (::testing::Test::HasFatalFailure()) return;
-  PumpDesktop(client);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(AwaitResizedPicture(client, display));
+  ASSERT_NO_FATAL_FAILURE(PumpDesktop(client));
   ThenResizeStorm(client, display);
   SDL_FlushEvents(SDL_EVENT_FIRST, SDL_EVENT_LAST);
   ThenEqualLayout(client, display);
@@ -101,11 +96,9 @@ TEST_F(VideoDriver, ResizeStormWithLayoutEcho) {
 
 TEST_F(VideoDriver, ExclusiveScreenChangeDoesNotResizePicture) {
   ASSERT_NO_FATAL_FAILURE(GivenFullscreen());
-  auto                    properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
-  Client client(SDL_GetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0), true, 1280, 800);
+  Client                  client(PrimaryDisplayPort(), true, 1280, 800);
   Headless::DisplayClient display(client);
-  ConnectDesktop(client, logs);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ConnectDesktop(client, logs));
   ASSERT_NO_FATAL_FAILURE(PresentDesktop(client, window));
   FullDesktopFrames const frames(client);
   SDL_FlushEvents(SDL_EVENT_FIRST, SDL_EVENT_LAST);
@@ -114,8 +107,7 @@ TEST_F(VideoDriver, ExclusiveScreenChangeDoesNotResizePicture) {
     SDL_PumpEvents();
     return SDL_HasEvent(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED);
   }));
-  PumpDesktop(client);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(PumpDesktop(client));
   ThenExclusivePicture(client, display, frames);
 }
 
@@ -130,10 +122,10 @@ TEST_F(VideoDriver, FullscreenModeMovesDesktopMode) {
   mode.h = 1080;
   ASSERT_TRUE(SDL_SetWindowFullscreenMode(window, &mode));
   ASSERT_TRUE(SDL_SetWindowFullscreen(window, true));
-  Desktop(1920, 1080);
+  ASSERT_NO_FATAL_FAILURE(Desktop(1920, 1080));
   EXPECT_TRUE(SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN);
   ASSERT_TRUE(SDL_SetWindowFullscreen(window, false));
-  Desktop(1280, 800);
+  ASSERT_NO_FATAL_FAILURE(Desktop(1280, 800));
   ASSERT_TRUE(SDL_SetWindowFullscreen(window, true));
   Desktop(1920, 1080);
 }
@@ -163,14 +155,12 @@ TEST_F(VideoDriver, AudioEventChangesOpenDeviceFormat) {
     SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr), SDL_DestroyAudioStream
   };
   ASSERT_TRUE(stream) << SDL_GetError();
-  auto                  properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
-  Client                client(SDL_GetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0), true, 1280, 800);
+  Client                client(PrimaryDisplayPort(), true, 1280, 800);
   Headless::SoundClient audio(client);
   audio.CaptureState().rate = 48000;
-  ASSERT_TRUE(freerdp_connect(client.Instance().get()));
+  ASSERT_TRUE(client.Connect());
   ASSERT_TRUE(client.Until([&] { return audio.CaptureState().ready; }));
-  ThenAudioDeviceChanges(client, stream.get());
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ThenAudioDeviceChanges(client, stream.get()));
   SDL_ResetHint(SDL_HINT_AUDIO_DRIVER);
 }
 }

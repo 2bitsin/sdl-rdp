@@ -4,6 +4,7 @@
 #include <freerdp/client/disp.h>
 #include <freerdp/event.h>
 #include <atomic>
+#include <cstdint>
 #include <functional>
 
 namespace Headless {
@@ -22,7 +23,7 @@ public:
   auto        operator=(DisplayClient const&)                                      -> DisplayClient& = delete;
   auto        operator=(DisplayClient&&)                                           -> DisplayClient& = delete;
   static auto Monitor(unsigned width, unsigned height, unsigned millimetres = 400) -> DISPLAY_CONTROL_MONITOR_LAYOUT;
-  static auto Layout(unsigned width, unsigned height)                              -> bool;
+  static auto Layout(std::uint32_t width, std::uint32_t height, std::uint32_t millimetres = 400) -> bool;
   auto        Observed()                                                           -> DisplayCapture&;
   static auto Ready()                                                              -> bool;
   static auto Channel()                                                            -> DispClientContext*;

@@ -35,7 +35,7 @@ ClipboardClient::ClipboardClient(Client& value, std::vector<BYTE> initial)
   };
 }
 ClipboardClient::~ClipboardClient() {
-  freerdp_disconnect(client.Instance().get());
+  client.Disconnect();
   PubSub_UnsubscribeChannelConnected(client.Instance()->context->pubSub, Connected);
   attaching = nullptr;
 }

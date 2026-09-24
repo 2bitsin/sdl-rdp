@@ -1,5 +1,6 @@
 #include <sdl-rdp/headless-client.test/round-five.hpp>
 
+#include <sdl-rdp/headless-client.test/pattern.hpp>
 #include <sdl-rdp/headless-client.test/peer-status.hpp>
 
 #include <freerdp/input.h>
@@ -14,14 +15,14 @@
 namespace BackendGate {
 auto RoundFive::ThenAcknowledgementTimeout(std::vector<UINT32> const& pixels) -> void {
   EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 10000), 1);
-  Present(pixels, 320, 200);
+  ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
   EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 10000), 1);
   EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 1);
   EXPECT_EQ(RequiredStatus(*backend).acknowledgements, 0u);
   ThenTimedOutFrames("[0-9]+", 1);
 }
 auto RoundFive::ThenTimedOutFrames(std::string_view sent, unsigned minimum) -> void {
-  backend.reset();
+  backend.Close();
   auto        text  = logs.Text(true);
   std::smatch match;
   ASSERT_TRUE(
@@ -37,22 +38,21 @@ auto RoundFive::ThenAspectMouse(Client& client) -> void {
   EXPECT_EQ(events[0].mouse_move.y, 349);
 }
 auto RoundFive::ThenAgedWindowResumes(std::vector<UINT32> const& pixels) -> void {
-  Present(pixels, 320, 200);
+  ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
   EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 0);
   ASSERT_TRUE(GraphicsObserver().AckFrame(4, 0));
-  AwaitFrames(GraphicsClient(), GraphicsObserver().Observed().frames, 7);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(AwaitFrames(GraphicsClient(), GraphicsObserver().Observed().frames, 7));
   ThenGraphicsTimeoutStatistics();
 }
 auto RoundFive::ThenColourDepth(unsigned depth) -> void {
   Client client(sdlrdp_port(backend.get()), false);
   ASSERT_TRUE(freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_ColorDepth, depth));
-  Connect(client, false);
+  ASSERT_NO_FATAL_FAILURE(Connect(client, false));
   client.Tolerance(depth == 16 ? 7 : 0);
   EXPECT_EQ(freerdp_settings_get_uint32(client.Instance()->context->settings, FreeRDP_ColorDepth), depth);
   std::vector<UINT32> pixels(320uz * 200);
-  std::ranges::generate(pixels, [i = 0u]() mutable { return (i++ * 2654435761u) & 0xffffff; });
-  Present(pixels, 320, 200);
+  Headless::HashPattern(pixels);
+  ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
   ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text();
 }
 auto RoundFive::ThenProgressiveDamageCost(Client& client, Headless::GraphicsObserver& observer, uint64_t before)
@@ -65,16 +65,16 @@ auto RoundFive::ThenProgressiveDamageCost(Client& client, Headless::GraphicsObse
 auto RoundFive::ThenAutoChangesToRaw(Client& client, std::vector<UINT32>& pixels) -> void {
   ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_RAW), 0);
   pixels = GraphicsScene(4, false);
-  Present(pixels, 640, 480);
+  ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
   ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0) && client.Matches(pixels); }));
-  auto events  = Events();
+  auto events  = backend.Poll();
   auto changed = std::ranges::find(events, SDLRDP_CODEC_CHANGED, &sdlrdp_event::type);
   ASSERT_NE(changed, events.end());
   EXPECT_EQ(changed->codec_changed.codec, SDLRDP_CODEC_RAW);
   RecordProperty("trace", "auto connects as progressive; live raw preference produces exact RGB and CODEC_CHANGED raw");
 }
 auto RoundFive::ThenGraphicsTimeoutStatistics() -> void {
-  ThenTimedOutFrames("7", 2);
+  ASSERT_NO_FATAL_FAILURE(ThenTimedOutFrames("7", 2));
   EXPECT_EQ(GraphicsObserver().Observed().frames.size(), 7u);
 }
 auto RoundFive::ThenGraphicsAcknowledgementsCounted() -> void {
@@ -85,7 +85,7 @@ auto RoundFive::ThenGraphicsAcknowledgementsCounted() -> void {
 auto RoundFive::ThenGraphicsWindowReleases(std::vector<UINT32> const& pixels) -> void {
   ASSERT_TRUE(GraphicsObserver().AckFrame(0, 0));
   ASSERT_TRUE(GraphicsClient().Until([&] { return sdlrdp_wait_frame(backend.get(), 0) == 1; }));
-  Present(pixels, 320, 200);
+  ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
   EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 1), 0);
 }
 auto RoundFive::ThenLegacyWindowReleases(Client& client, FrameObserver const& observer,
@@ -93,21 +93,20 @@ auto RoundFive::ThenLegacyWindowReleases(Client& client, FrameObserver const& ob
   auto* update = client.Instance()->context->update;
   ASSERT_TRUE(update->SurfaceFrameAcknowledge(update->context, observer.Frames().front()));
   EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 10000), 1);
-  Present(pixels, 320, 200);
+  ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
   EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 1), 0);
 }
 auto RoundFive::RunPictureSizes(bool graphics) -> void {
-  Open();
+  ASSERT_NO_FATAL_FAILURE(Open());
   Client client(sdlrdp_port(backend.get()), true, 640, 480);
   if (graphics) client.EnableGraphics();
   Headless::GraphicsObserver observer(client);
-  Connect(client, false);
+  ASSERT_NO_FATAL_FAILURE(Connect(client, false));
   std::vector<std::uint32_t> pixels(640uz * 480, 0x123456);
-  Present(pixels, 640, 480);
+  ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
   ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text(true);
   for (auto size : { Backend::Extent{ .width = 320, .height = 200 }, Backend::Extent{ .width = 640, .height = 480 } }) {
-    ResizePicture(client, observer, pixels, size, graphics);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(ResizePicture(client, observer, pixels, size, graphics));
   }
 }
 }

@@ -4,6 +4,7 @@
 #include <sdl-rdp/sample-gate.test/sample.hpp>
 
 #include <SDL3/SDL.h>
+#include <sdl-rdp/headless-client.test/input-steps.hpp>
 #include <array>
 #include <string>
 #include <utility>
@@ -33,151 +34,115 @@ auto TouchChannel(Client& client) -> auto* {
 }
 
 TEST_F(Sample, UnicodeTextAndStopped) {
-  GivenProcess();
-  if (::testing::Test::HasFatalFailure()) return;
-  Client const client(AnnouncedPort(line), true, 640, 480);
-  GivenFrenchKeyboard(client);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenProcess());
+  auto const client = AnnouncedClient(640, 480);
+  ASSERT_NO_FATAL_FAILURE(GivenFrenchKeyboard(client));
   auto* input = InputOf(client);
-  WhenUnicodeText(input);
-  if (::testing::Test::HasFatalFailure()) return;
-  WhenTextStops(input);
-  if (::testing::Test::HasFatalFailure()) return;
-  ThenStoppedUnicode(input);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(WhenUnicodeText(input));
+  ASSERT_NO_FATAL_FAILURE(WhenTextStops(client));
+  ASSERT_NO_FATAL_FAILURE(ThenStoppedUnicode(input));
   Escape(client);
 }
 
 TEST_F(Sample, WheelBothAxesPrecise) {
-  GivenInputSession();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenInputSession());
   auto* input = InputOf(SessionClient());
   for (auto [flags, expected] : std::array<std::pair<UINT16, char const*>, 4>{
            { { PTR_FLAGS_WHEEL | 30                                      , " x=0 y=0.25"  },
              { PTR_FLAGS_WHEEL | PTR_FLAGS_WHEEL_NEGATIVE | (0x200 - 60) , " x=0 y=-0.5"  },
              { PTR_FLAGS_HWHEEL | 120                                    , " x=1 y=0"     },
              { PTR_FLAGS_HWHEEL | PTR_FLAGS_WHEEL_NEGATIVE | (0x200 - 30), " x=-0.25 y=0" } } }) {
-    WhenPreciseWheel(input, flags, expected);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(WhenPreciseWheel(input, flags, expected));
   }
   Escape(SessionClient());
 }
 
 TEST_F(Sample, RelativeWarpFallback) {
-  GivenPositionSession();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenPositionSession());
   auto& client = SessionClient();
   auto* input  = InputOf(client);
-  WhenRelative(input);
-  if (::testing::Test::HasFatalFailure()) return;
-  WhenRelativeWarp(client, input);
-  if (::testing::Test::HasFatalFailure()) return;
-  ThenWarpEchoIgnored(input);
-  if (::testing::Test::HasFatalFailure()) return;
-  ThenAbsoluteMouse(input);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(WhenRelative(client));
+  ASSERT_NO_FATAL_FAILURE(WhenRelativeWarp(client, input));
+  ASSERT_NO_FATAL_FAILURE(ThenWarpEchoIgnored(input));
+  ASSERT_NO_FATAL_FAILURE(ThenAbsoluteMouse(input));
   Escape(client);
 }
 
 TEST_F(Sample, AdvancedRelative) {
-  GivenAdvancedSession();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenAdvancedSession());
   auto& client = SessionClient();
-  auto* input  = InputOf(client);
-  WhenAdvancedMotion(client, input);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(WhenAdvancedMotion(client));
   Escape(client);
 }
 
 TEST_F(Sample, TouchContacts) {
-  GivenInputSession(true);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenInputSession(true));
   auto& client = SessionClient();
   auto* touch  = TouchChannel(client);
   ASSERT_NE(touch, nullptr);
   INT32 id = 0;
   ASSERT_EQ(touch->TouchBegin(touch, 7, 160, 120, &id), CHANNEL_RC_OK);
-  ThenTouchEvent(client, "event FINGER_DOWN ", " x=0.250 y=0.250 ");
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ThenTouchEvent(client, "event FINGER_DOWN ", " x=0.250 y=0.250 "));
   ASSERT_EQ(touch->TouchUpdate(touch, 7, 320, 240, &id), CHANNEL_RC_OK);
-  ThenTouchEvent(client, "event FINGER_MOTION ", " x=0.500 y=0.500 ");
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ThenTouchEvent(client, "event FINGER_MOTION ", " x=0.500 y=0.500 "));
   ASSERT_EQ(touch->TouchEnd(touch, 7, 320, 240, &id), CHANNEL_RC_OK);
-  ThenTouchEvent(client, "event FINGER_UP ", "window_x=320 window_y=240");
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ThenTouchEvent(client, "event FINGER_UP ", "window_x=320 window_y=240"));
   Escape(client);
 }
 
 TEST_F(Sample, TouchPressureCancel) {
-  GivenProcess();
-  if (::testing::Test::HasFatalFailure()) return;
-  Client            client(AnnouncedPort(line), true, 640, 480);
+  ASSERT_NO_FATAL_FAILURE(GivenProcess());
+  auto              client   = AnnouncedClient(640, 480);
   InputClient const channels(client);
-  ASSERT_TRUE(freerdp_connect(client.Instance().get()));
+  ASSERT_TRUE(client.Connect());
   auto* touch = TouchChannel(client);
   ASSERT_NE(touch, nullptr);
   INT32 id = 0;
-  WhenPressureContact(touch, id);
-  if (::testing::Test::HasFatalFailure()) return;
-  ThenTouchEvent(client, "event FINGER_DOWN ", "pressure=0.500");
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(WhenPressureContact(touch, id));
+  ASSERT_NO_FATAL_FAILURE(ThenTouchEvent(client, "event FINGER_DOWN ", "pressure=0.500"));
   ASSERT_EQ(touch->TouchCancel(touch, 3, 160, 120, &id), CHANNEL_RC_OK);
   ASSERT_TRUE(ReadInput(client, "event FINGER_CANCELED "));
   Escape(client);
 }
 TEST_F(Sample, AdvancedAspectRelative) {
-  GivenAspect();
-  if (::testing::Test::HasFatalFailure()) return;
-  Client            client(AnnouncedPort(line), true, 640, 480);
+  ASSERT_NO_FATAL_FAILURE(GivenProcess({ }, AspectOptions()));
+  auto              client   = AnnouncedClient(640, 480);
   InputClient const channels(client);
-  GivenFocus(client);
-  if (::testing::Test::HasFatalFailure()) return;
-  ThenAdvanced(client);
-  if (::testing::Test::HasFatalFailure()) return;
-  WhenAspectRelative(client);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenFocus(client));
+  ASSERT_NO_FATAL_FAILURE(ThenAdvanced(client));
+  ASSERT_NO_FATAL_FAILURE(WhenAspectRelative(client));
   Escape(client);
 }
 
 TEST_F(Sample, AdvancedWheelBothAxesPrecise) {
-  GivenAdvancedSession();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenAdvancedSession());
   auto& client   = SessionClient();
   auto* advanced = SampleGate::InputClient::Advanced().load();
   ASSERT_EQ(advanced->AInputSendInputEvent(advanced, AINPUT_FLAGS_WHEEL, 30 * 65536, -60 * 65536), CHANNEL_RC_OK);
   ASSERT_TRUE(ReadInput(client, "event MOUSE_WHEEL "));
   EXPECT_TRUE(line.ends_with(" x=0.25 y=-0.5")) << line;
-  WhenReverseWheel(client, advanced);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(WhenReverseWheel(client, advanced));
   Escape(client);
 }
 TEST_F(Sample, ScancodeTextAndStopped) {
-  GivenInputSession();
-  if (::testing::Test::HasFatalFailure()) return;
-  auto* input = InputOf(SessionClient());
-  WhenScancodeText(input);
-  if (::testing::Test::HasFatalFailure()) return;
-  WhenTextStops(input);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenInputSession());
+  auto const& client = SessionClient();
+  ASSERT_NO_FATAL_FAILURE(WhenScancodeText(client));
+  ASSERT_NO_FATAL_FAILURE(WhenTextStops(client));
   auto stopped = process->Transcript().size();
-  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x1e));
-  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x1e));
+  ASSERT_NO_FATAL_FAILURE(client.Tap(0x1e));
   ASSERT_TRUE(Read("event KEY_UP type=769 scancode=4 key=97 down=0"));
-  Escape(SessionClient());
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(Escape(client));
   ThenStoppedScancodeText(stopped);
 }
 
 TEST_F(Sample, UnicodeKeysAndEscape) {
-  GivenInputSession();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenInputSession());
   auto* input = InputOf(SessionClient());
-  WhenUnicodeKeys(input);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(WhenUnicodeKeys(input));
   auto controls = process->Transcript().size();
   for (auto code : { 8, 9, 13, 127, 27 }) {
-    WhenUnicodeControl(input, code);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(WhenUnicodeControl(input, code));
   }
   EXPECT_TRUE(process->Exit());
   EXPECT_EQ(process->Transcript().find("event TEXT_INPUT", controls), std::string::npos);
@@ -185,19 +150,16 @@ TEST_F(Sample, UnicodeKeysAndEscape) {
 }
 
 TEST_F(Sample, RelativeIgnoredWarp) {
-  GivenPositionSession();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenPositionSession());
   auto& client = SessionClient();
   auto* input  = InputOf(client);
-  GivenRelativeOrigin(input);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenRelativeOrigin(client));
   for (auto [x, y, delta] :
        std::array<std::tuple<UINT16, UINT16, char const*>, 4>{ { { 250, 200, " xrel=50 yrel=50 "   },
                                                                  { 300, 260, " xrel=50 yrel=60 "   },
                                                                  { 630, 260, " xrel=330 yrel=0 "   },
                                                                  { 580, 200, " xrel=-50 yrel=-60 " } } }) {
-    ThenIgnoredWarpMotion(client, input, x, y, delta);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(ThenIgnoredWarpMotion(client, input, x, y, delta));
   }
   SDL_Log("gate IGNORED_WARP deltas=50,50;50,60;330,0;-50,-60");
   Escape(client);

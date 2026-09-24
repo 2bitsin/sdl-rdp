@@ -3,6 +3,7 @@
 #include <sdl-rdp/auth/tls-accept-refused.hpp>
 #include <sdl-rdp/auth/tls-rehearsal.hpp>
 #include <sdl-rdp/core/certificate.hpp>
+#include <sdl-rdp/headless-client.test/backend-instance.hpp>
 #include <sdl-rdp/headless-client.test/child-process.hpp>
 #include <sdl-rdp/headless-client.test/client.hpp>
 #include <sdl-rdp/headless-client.test/config.hpp>
@@ -126,18 +127,17 @@ auto RaceTwoPeerContexts(Backend::Credentials const& credentials) -> int {
   return RaceTwice([&] { [[maybe_unused]] Backend::TlsRehearsal const built{ credentials }; }, Race::SocketMethod,
                    Setter::Create);
 }
-auto OpenedBackend(std::string const& certificates) -> std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> {
-  auto const     config = Headless::LoopbackConfig(certificates);
-  sdlrdp_handle* opened = nullptr;
-  std::ignore = sdlrdp_open(&config, &opened);
-  return { opened, sdlrdp_close };
+auto OpenedBackend(std::string const& certificates) -> Headless::BackendInstance {
+  Headless::BackendInstance backend;
+  std::ignore = backend.TryOpen(Headless::LoopbackConfig(certificates));
+  return backend;
 }
 auto ConnectToOpenedBackend(std::string const& certificates) -> int {
   auto const backend = OpenedBackend(certificates);
   if (!backend) return FailedOtherwise;
   MethodFill::Shared().Arm(Race::TlsMethod, Setter::Write);
   Headless::Client const client(sdlrdp_port(backend.get()), false);
-  auto const             connected = freerdp_connect(client.Instance().get()) == TRUE;
+  auto const             connected = client.Connect();
   return (connected ? 0 : FailedOtherwise) | (MethodFill::Shared().Fills() != 0 ? MethodFilledLate : 0);
 }
 auto OpenFailsWithMessage(std::string const& certificates) -> int {

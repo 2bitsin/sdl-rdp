@@ -71,8 +71,7 @@ TEST_F(AudioDriver, AudioBeforeVideoSurvivesVideoQuit) {
   EXPECT_EQ(SDL_WasInit(SDL_INIT_VIDEO), 0u);
   Client                client(port, true);
   Headless::SoundClient audio(client);
-  ThenAudioSurvivesVideoQuit(client, audio);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ThenAudioSurvivesVideoQuit(client, audio));
   ASSERT_TRUE(SDL_InitSubSystem(SDL_INIT_VIDEO)) << SDL_GetError();
   EXPECT_EQ(SDL_GetNumberProperty(SDL_GetDisplayProperties(SDL_GetPrimaryDisplay()), "SDL.display.rdp.port", 0), port);
 }
@@ -83,13 +82,11 @@ TEST_F(AudioDriver, AudioOnlyPlaysBlackDesktop) {
   ASSERT_GT(port, 0u);
   Client                client(port, true);
   Headless::SoundClient audio(client);
-  ConnectAudio(client, audio);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
   auto*               gdi   = client.Instance()->context->gdi;
   std::vector<UINT32> black(std::size_t(gdi->width) * gdi->height);
   ASSERT_TRUE(client.Until([&] { return client.Matches(black); }));
-  ThenPcm(client, audio);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ThenPcm(client, audio));
   EXPECT_EQ(SDL_WasInit(SDL_INIT_VIDEO), 0u);
 }
 }

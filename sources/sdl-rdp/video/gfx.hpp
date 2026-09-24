@@ -23,6 +23,7 @@ class Activation;
 class Configuration;
 class Diagnostics;
 class PeerLink;
+class Stopwatch;
 class GfxChannel {
 public:
        GfxChannel(GfxChannel const&)               = delete;
@@ -49,7 +50,7 @@ private:
     std::size_t length{ };
     UINT32      codec { };
   };
-  auto CompressProgressive(REGION16& damage, std::chrono::steady_clock::time_point start) -> bool;
+  auto        CompressProgressive(REGION16& damage, Stopwatch const& watch)                  -> bool;
   auto        CodecChoice()                                                                  -> sdlrdp_codec;
   auto        AvcFailure()                                                                   -> std::string;
   auto        ProgressiveDamage(REGION16& damage) const                                      -> bool;

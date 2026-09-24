@@ -1,3 +1,5 @@
+#include <sdl-rdp/headless-client.test/backend-instance.hpp>
+#include <sdl-rdp/headless-client.test/pattern.hpp>
 #include <sdl-rdp/headless-client.test/round-five.hpp>
 #include <sdl-rdp/session/peer.hpp>
 
@@ -15,18 +17,17 @@ auto ThenSuppressed(Client& client, FrameObserver const& observer, uint64_t byte
 }
 }
 TEST_F(RoundFive, DelayedAcknowledgements) {
-  Open();
+  ASSERT_NO_FATAL_FAILURE(Open());
   Client client(sdlrdp_port(backend.get()), true, 1024, 768);
-  Connect(client);
+  ASSERT_NO_FATAL_FAILURE(Connect(client));
   FrameObserver       observer(client);
   std::vector<UINT32> pixels(640uz * 480, 0x112233);
-  Present(pixels, 640, 480);
+  ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
   ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == 1; }));
   ASSERT_TRUE(observer.Ack());
   ASSERT_EQ(sdlrdp_wait_frame(backend.get(), 10000), 1);
   observer.Clear(); // Test the negotiated window after ACK support is established.
-  FillLegacyWindow(client, observer, pixels);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(FillLegacyWindow(client, observer, pixels));
   ASSERT_TRUE(observer.Ack());
   ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == 3; }));
   EXPECT_TRUE(client.Matches(pixels));
@@ -35,60 +36,55 @@ TEST_F(RoundFive, DelayedAcknowledgements) {
   EXPECT_TRUE(observer.Coherent());
 }
 TEST_F(RoundFive, SuppressOutput) {
-  Open();
+  ASSERT_NO_FATAL_FAILURE(Open());
   Client client(sdlrdp_port(backend.get()), true);
-  Connect(client, false);
+  ASSERT_NO_FATAL_FAILURE(Connect(client, false));
   FrameObserver observer(client);
   auto*         update   = client.Instance()->context->update;
-  SuppressAndCheckInput(client);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(SuppressAndCheckInput(client));
   auto                bytes  = client.Received();
   std::vector<UINT32> pixels(640uz * 480, 0x123456);
-  Present(pixels, 640, 480);
+  ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
   std::ranges::fill(pixels, 0x654321);
-  Present(pixels, 640, 480);
-  ThenSuppressed(client, observer, bytes);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
+  ASSERT_NO_FATAL_FAILURE(ThenSuppressed(client, observer, bytes));
   RECTANGLE_16 const area{ 0, 0, 639, 479 };
   ASSERT_TRUE(update->SuppressOutput(client.Instance()->context, 1, &area));
   ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == 1; }));
   EXPECT_TRUE(client.Matches(pixels));
 }
 TEST_F(RoundFive, AspectAndMouse) {
-  Open(640, 350, { 4, 3 });
+  ASSERT_NO_FATAL_FAILURE(Open(640, 350, { 4, 3 }));
   Client client(sdlrdp_port(backend.get()), true, 1024, 768);
-  Connect(client, false);
-  ThenAspectGeometry(client);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(Connect(client, false));
+  ASSERT_NO_FATAL_FAILURE(ThenAspectGeometry(client));
   FrameObserver       observer(client);
   std::vector<UINT32> pixels(640uz * 350);
   std::fill_n(pixels.begin() + 175uz * 640, 640, 0xffffff);
-  Present(pixels, 640, 350);
+  ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 350));
   ASSERT_TRUE(client.Until([&] { return !observer.Frames().empty(); }));
   ThenScaledHighlight(client);
-  ThenAspectMouse(client);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ThenAspectMouse(client));
   ASSERT_EQ(sdlrdp_set_aspect(backend.get(), { 0, 0 }), 0);
   ASSERT_TRUE(client.Until([&] { return client.Instance()->context->gdi->height == 350 && client.Matches(pixels); }));
   EXPECT_EQ(client.Instance()->context->gdi->width, 640);
 }
 TEST_F(RoundFive, SparseRegions) {
   for (auto codec : { SDLRDP_CODEC_RAW, SDLRDP_CODEC_PLANAR, SDLRDP_CODEC_REMOTEFX, SDLRDP_CODEC_NSCODEC }) {
-    Open(1024, 768, { }, codec);
+    ASSERT_NO_FATAL_FAILURE(Open(1024, 768, { }, codec));
     Client client(sdlrdp_port(backend.get()), true, 1024, 768);
-    Connect(client, false);
+    ASSERT_NO_FATAL_FAILURE(Connect(client, false));
     FrameObserver       observer(client);
     std::vector<UINT32> pixels(1024uz * 768);
-    std::ranges::generate(pixels, [i = 0u]() mutable { return (i++ * 2654435761u) & 0xffffff; });
-    Present(pixels, 1024, 768);
+    Headless::HashPattern(pixels);
+    ASSERT_NO_FATAL_FAILURE(Present(pixels, 1024, 768));
     ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == 1; }));
     auto bytes = client.Received();
-    Present(pixels, 1024, 768);
+    ASSERT_NO_FATAL_FAILURE(Present(pixels, 1024, 768));
     ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == 2; }));
     auto bounding = client.Received() - bytes;
     RecordProperty("bounding_bytes_" + std::to_string(codec), std::to_string(bounding));
-    ThenSparseDamage(client, observer, pixels, bounding, codec);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(ThenSparseDamage(client, observer, pixels, bounding, codec));
   }
 }
 
@@ -97,7 +93,7 @@ auto WaitForAcknowledgement(sdlrdp_handle& handle) -> bool {
   auto& frames = handle.Frames();
   auto  lock   = frames.Lock();
   Expects(handle.Session().Current(lock) != nullptr, "active peer owns the pending frame");
-  return frames.WaitFor(lock, 10000, [&] {
+  return frames.WaitFor(lock, Backend::DeadlineAfter(std::chrono::seconds(10)), [&] {
     auto const* current = handle.Session().Current(lock);
     return current != nullptr && current->Status(lock).acknowledged >= frames.Presented(lock);
   });
@@ -105,37 +101,36 @@ auto WaitForAcknowledgement(sdlrdp_handle& handle) -> bool {
 }
 TEST_F(RoundFive, WaitWithoutRefreshFeedback) {
   Expects(backend == nullptr, "backend has not opened");
-  Open(320, 200);
+  ASSERT_NO_FATAL_FAILURE(Open(320, 200));
   Client client(sdlrdp_port(backend.get()), true);
-  Connect(client);
+  ASSERT_NO_FATAL_FAILURE(Connect(client));
   ASSERT_EQ(Events(2).size(), 2u);
   FrameObserver             observer(client);
   std::vector<UINT32> const pixels(320uz * 200, 0x445566);
   for (unsigned i = 1; i <= 20; ++i) {
-    WhenAcknowledgedFrame(client, observer, pixels, i, WaitForAcknowledgement);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(WhenAcknowledgedFrame(client, observer, pixels, i, WaitForAcknowledgement));
   }
 }
 TEST_F(RoundFive, NeverAcknowledges) {
   ThenNeverAcknowledges([](auto run) { run(); });
 }
 TEST_F(RoundFive, ColourDepths) {
-  Open(320, 200);
+  ASSERT_NO_FATAL_FAILURE(Open(320, 200));
   for (auto depth : { 16u, 24u }) {
-    ThenColourDepth(depth);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(ThenColourDepth(depth));
   }
 }
 
 namespace {
-auto ProduceFrames(sdlrdp_handle* backend, std::atomic<unsigned>& presents, std::stop_token const& stop) -> void {
+auto ProduceFrames(Headless::BackendInstance const& backend, std::atomic<std::size_t>& presents,
+                   std::stop_token const& stop) -> void {
   std::vector<UINT32> pixels(1024uz * 768);
   sdlrdp_rect const   area  { 0, 0, 1024, 768 };
   while (!stop.stop_requested()) {
     auto sequence = presents.load() + 1;
     std::fill_n(pixels.begin(), 1024, sequence);
     std::fill_n(pixels.end() - 1024, 1024, sequence);
-    auto result = sdlrdp_present(backend, pixels.data(), 4096, 1024, 768, &area, 1);
+    auto result = backend.Present(pixels, 1024, 768, area);
     Expects(result == 0, "concurrent present accepted");
     presents = sequence;
     std::this_thread::yield();
@@ -143,12 +138,12 @@ auto ProduceFrames(sdlrdp_handle* backend, std::atomic<unsigned>& presents, std:
 }
 }
 TEST_F(RoundFive, ProducerDoesNotStarveOrTear) {
-  Open(1024, 768);
+  ASSERT_NO_FATAL_FAILURE(Open(1024, 768));
   Client client(sdlrdp_port(backend.get()), true, 1024, 768);
-  Connect(client);
-  FrameObserver         observer(client);
-  std::atomic<unsigned> presents = 0;
-  std::jthread          producer([&](std::stop_token const& stop) { ProduceFrames(backend.get(), presents, stop); });
+  ASSERT_NO_FATAL_FAILURE(Connect(client));
+  FrameObserver            observer(client);
+  std::atomic<std::size_t> presents = 0;
+  std::jthread             producer([&](std::stop_token const& stop) { ProduceFrames(backend, presents, stop); });
   for (unsigned i = 0; i < 20; ++i) {
     auto before       = presents.load();
     auto acknowledged = observer.Frames().size();
@@ -162,15 +157,10 @@ TEST_F(RoundFive, ProducerDoesNotStarveOrTear) {
 }
 
 TEST_F(RoundFive, AutoPrefersRemoteFX) {
-  Open(320, 200, { }, SDLRDP_CODEC_AUTO);
+  ASSERT_NO_FATAL_FAILURE(Open(320, 200, { }, SDLRDP_CODEC_AUTO));
   Client const client(sdlrdp_port(backend.get()), true);
-  ASSERT_TRUE(freerdp_connect(client.Instance().get())) << logs.Text(true);
-  auto events    = EventsUntil([](auto const& events) {
-    return std::ranges::any_of(events, [](auto const& event) { return event.type == SDLRDP_CONNECTED; });
-  });
-  auto connected = std::ranges::find(events, SDLRDP_CONNECTED, &sdlrdp_event::type);
-  ASSERT_NE(connected, events.end());
-  EXPECT_EQ(connected->connected.codec, SDLRDP_CODEC_REMOTEFX);
+  ASSERT_TRUE(client.Connect()) << logs.Text(true);
+  ThenConnectedCodec(client, SDLRDP_CODEC_REMOTEFX);
 }
 namespace {
 constexpr auto ExpectedTransportMessages = std::array<std::pair<char const*, char const*>, 9>{
@@ -209,7 +199,7 @@ auto ThenExpectedTransportLogs(Logs& logs) -> void {
 }
 }
 TEST_F(RoundFive, ExpectedDisconnectLogLevels) {
-  Open();
+  ASSERT_NO_FATAL_FAILURE(Open());
   ThenExpectedTransportLogs(logs);
   auto*       peer    = WLog_Get("com.freerdp.core.peer");
   auto const* failure = "BIO_write returned a system error 5: Input/output error";
@@ -228,20 +218,16 @@ TEST_F(RoundFive, ExpectedDisconnectLogLevels) {
 
 TEST_F(RoundFive, GraphicsDisconnectDuringWrite) {
   constexpr unsigned side = 2048;
-  Open(side, side, { }, SDLRDP_CODEC_PROGRESSIVE);
+  ASSERT_NO_FATAL_FAILURE(Open(side, side, { }, SDLRDP_CODEC_PROGRESSIVE));
   Client client(sdlrdp_port(backend.get()), true, side, side);
-  ConnectPipeline(client);
-  if (::testing::Test::HasFatalFailure()) return;
-  Events();
+  ASSERT_NO_FATAL_FAILURE(ConnectPipeline(client));
+  std::ignore = backend.Poll();
   std::vector<UINT32> pixels(static_cast<std::size_t>(side) * side);
-  Present(pixels, side, side);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(Present(pixels, side, side));
   ASSERT_TRUE(client.Until([&] { return Acknowledged(); }));
   Headless::NoisePattern(pixels, 1);
-  Present(pixels, side, side);
-  if (::testing::Test::HasFatalFailure()) return;
-  ThenReadable(client);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(Present(pixels, side, side));
+  ASSERT_NO_FATAL_FAILURE(ThenReadable(client));
   ThenWriteDisconnect(client);
 }
 }

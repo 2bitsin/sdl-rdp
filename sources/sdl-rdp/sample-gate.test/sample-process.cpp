@@ -1,43 +1,28 @@
 #include <sdl-rdp/sample-gate.test/sample-process.hpp>
 
-#include <sdl-rdp/sample-gate.test/next-frame.hpp>
 #include <sdl-rdp/sample-gate.test/sample-launch.hpp>
 
 #include <SDL3/SDL.h>
 #include <freerdp/input.h>
-#include <oxbox/utilities/number-text.hpp>
-#include <sdl-rdp/headless-client.test/input-steps.hpp>
-#include <array>
-#include <utility>
+#include <freerdp/settings.h>
 
 namespace SampleGate {
-auto SampleProcess::ThenInputEvent(std::string_view event, std::string_view text, unsigned& motion_frame) -> void {
-  ASSERT_TRUE(Read("event " + std::string(event) + " ")) << event << text << ": " << process->Transcript();
-  ASSERT_TRUE(line.contains(text)) << "expected " << event << text << ", actual: " << line;
-  if (event == "MOUSE_MOTION") {
-    motion_frame = utilities::Required(oxbox::utilities::ParseNumberAfter<unsigned>(line, " frame="),
-                                       "motion events carry a frame identifier");
-  }
+auto SampleProcess::GivenProcess(Words const& environment, Words const& options) -> void {
+  Launch(Arguments(certificates.Path(), environment, options));
 }
-auto SampleProcess::GivenProcess(std::vector<std::string> arguments) -> void {
-  if (arguments.empty()) arguments = Arguments(certificates.Path(), false);
+auto SampleProcess::Launch(Words const& arguments) -> void {
   process = std::make_unique<Process>(arguments);
-  ASSERT_TRUE(Read("port "));
+  ASSERT_TRUE(Read("port ")) << process->Transcript();
 }
-auto SampleProcess::GivenFocus(Client& client) -> void {
-  ASSERT_TRUE(freerdp_connect(client.Instance().get()));
-  ASSERT_TRUE(Read("event FOCUS_GAINED "));
+auto SampleProcess::AnnouncedClient(std::uint32_t width, std::uint32_t height) -> Client {
+  return Client(AnnouncedPort(line), true, width, height);
 }
-auto SampleProcess::WhenTextStops(rdpInput* input) -> void {
-  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x3c));
-  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x3c));
-  ASSERT_TRUE(Read("event TEXT_MODE active=0"));
+auto SampleProcess::Connect(Client const& client) -> void {
+  ASSERT_TRUE(client.Connect()) << ConnectLogs();
 }
-
-auto SampleProcess::WhenRelative(rdpInput* input) -> void {
-  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x3d));
-  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x3d));
-  ASSERT_TRUE(Read("event RELATIVE_MODE active=1"));
+auto SampleProcess::ConnectAcknowledging(Client const& client) -> void {
+  ASSERT_TRUE(freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_FrameAcknowledge, 2));
+  Connect(client);
 }
 auto SampleProcess::SetUp() -> void {
   std::scoped_lock const lock(log_guard);
@@ -66,35 +51,12 @@ auto SampleProcess::Read(std::string_view expected, std::chrono::milliseconds ti
     if (line.starts_with(expected)) return true;
   return false;
 }
-auto SampleProcess::ReadInput(Client& client, std::string_view expected, std::chrono::milliseconds timeout) -> bool {
-  Expects(!expected.empty(), "expected input event supplied");
-  bool received = false;
-  return client.Until([&] { return received || (received = Read(expected, 1ms)); }, timeout);
-}
 
 auto SampleProcess::Exposed() -> void {
   ASSERT_TRUE(Read("event EXPOSED ")) << "EXPOSED missing: " << process->Transcript();
   auto name = line.find(" client_name=");
   ASSERT_NE(name, std::string::npos) << line;
   ASSERT_LT(name + 13, line.size()) << "non-empty client_name required: " << line;
-}
-auto SampleProcess::Input(Client& client) -> void {
-  unsigned motion_frame = 0;
-  Headless::SendKeyboardAndMouse(client, 100, 120);
-  if (::testing::Test::HasFatalFailure()) return;
-  for (auto [event, text] :
-       std::array<std::pair<std::string_view, std::string_view>, 6>{ { { "KEY_DOWN"         , " scancode=4 " },
-                                                                       { "KEY_UP"           , " scancode=4 " },
-                                                                       { "MOUSE_MOTION"     , " x=100 y=120" },
-                                                                       { "MOUSE_BUTTON_DOWN", " button=1 "   },
-                                                                       { "MOUSE_BUTTON_UP"  , " button=1 "   },
-                                                                       { "MOUSE_WHEEL"      , " y=1"         } } }) {
-    ThenInputEvent(event, text, motion_frame);
-    if (::testing::Test::HasFatalFailure()) return;
-  }
-  NextFrame frame(client, motion_frame);
-  ASSERT_TRUE(client.Until([&] { return frame.Received(); })) << "next complete frame after motion";
-  ASSERT_TRUE(frame.Matches()) << "frame excludes pointer: " << frame.Matches().message();
 }
 auto SampleProcess::TearDown() -> void {
   {

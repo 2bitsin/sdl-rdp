@@ -7,26 +7,19 @@
 #include <vector>
 
 namespace SampleGate {
+auto ThenLead(Client& client, Headless::SoundClient& audio, std::size_t after, std::size_t milliseconds) -> void {
+  ASSERT_TRUE(client.Until([&] {
+    return (audio.CaptureState().samples.size() / 2) - after >= audio.CaptureState().rate * milliseconds / 1000;
+  }));
+}
 auto AudioDriver::ThenAudioSurvivesVideoQuit(Client& client, Headless::SoundClient& audio) -> void {
-  ConnectAudio(client, audio);
-  if (::testing::Test::HasFatalFailure()) return;
-  ThenPcm(client, audio);
-  if (::testing::Test::HasFatalFailure()) return;
-}
-auto AudioDriver::ThenRefilledLead(Client& client, Headless::SoundClient& audio, std::size_t frames) -> void {
-  ASSERT_TRUE(client.Until(
-      [&] { return (audio.CaptureState().samples.size() / 2) - frames >= audio.CaptureState().rate * 150 / 1000; }));
-}
-auto AudioDriver::ThenInitialLead(Client& client, Headless::SoundClient& audio) -> void {
-  ASSERT_TRUE(
-      client.Until([&] { return audio.CaptureState().samples.size() / 2 >= audio.CaptureState().rate * 140 / 1000; }));
+  ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
+  ASSERT_NO_FATAL_FAILURE(ThenPcm(client, audio));
 }
 auto AudioDriver::ReceiveLead() -> void {
-  PlayPcm(48000uz * 5 * 2);
-  if (::testing::Test::HasFatalFailure()) return;
-  GivenSoundClient();
-  if (::testing::Test::HasFatalFailure()) return;
-  ThenInitialLead(*sound_client, *sound);
+  ASSERT_NO_FATAL_FAILURE(PlayPcm(48000uz * 5 * 2));
+  ASSERT_NO_FATAL_FAILURE(GivenSoundClient());
+  ThenLead(*sound_client, *sound, 0, 140);
 }
 auto AudioDriver::GivenAudioBackend() -> void {
   ASSERT_TRUE(SetBackendHints(certificates.Path()));
@@ -42,20 +35,31 @@ auto AudioDriver::GivenAudioHints() -> void {
 auto AudioDriver::GivenSoundClient() -> void {
   sound_client = std::make_unique<Client>(ListeningPort(ProcfsSelf()), true);
   sound        = std::make_unique<Headless::SoundClient>(*sound_client);
-  ASSERT_TRUE(freerdp_connect(sound_client->Instance().get())) << ConnectLogs();
+  ASSERT_NO_FATAL_FAILURE(Connect(*sound_client));
 }
 auto AudioDriver::PlayPcm(std::size_t count) -> void {
   std::vector<Sint16> pcm(count, 1234);
   ASSERT_TRUE(SDL_PutAudioStreamData(stream.get(), pcm.data(), pcm.size() * sizeof(Sint16)));
   ASSERT_TRUE(SDL_ResumeAudioStreamDevice(stream.get()));
 }
+auto AudioDriver::PlayFlushed(std::span<Sint16 const> pcm) -> Clock::time_point {
+  EXPECT_TRUE(SDL_PutAudioStreamData(stream.get(), pcm.data(), static_cast<int>(pcm.size_bytes())));
+  EXPECT_TRUE(SDL_FlushAudioStream(stream.get()));
+  auto const started = Clock::now();
+  EXPECT_TRUE(SDL_ResumeAudioStreamDevice(stream.get()));
+  return started;
+}
+auto AudioDriver::OpenStream() -> void {
+  SDL_AudioSpec const spec{ SDL_AUDIO_S16, 2, 48000 };
+  stream.reset(SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr));
+  ASSERT_TRUE(stream) << SDL_GetError();
+}
 auto AudioDriver::ConnectAudio(Client& client, Headless::SoundClient& audio) -> void {
-  ASSERT_TRUE(freerdp_connect(client.Instance().get())) << ConnectLogs();
+  ASSERT_NO_FATAL_FAILURE(Connect(client));
   ASSERT_TRUE(client.Until([&] { return audio.CaptureState().ready; }));
 }
 auto AudioDriver::ThenPcm(Client& client, Headless::SoundClient& audio) -> void {
-  PlayPcm(4800uz * 2);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(PlayPcm(4800uz * 2));
   ASSERT_TRUE(client.Until([&] { return std::ranges::count(audio.CaptureState().samples, 1234) >= 960; }));
 }
 auto AudioDriver::CaptureLogs() -> void {
@@ -73,12 +77,9 @@ auto AudioDriver::CaptureLogs() -> void {
 }
 auto AudioDriver::SetUp() -> void {
   CaptureLogs();
-  GivenAudioHints();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenAudioHints());
   ASSERT_TRUE(SDL_Init(SDL_INIT_AUDIO)) << SDL_GetError();
-  SDL_AudioSpec const spec{ SDL_AUDIO_S16, 2, 48000 };
-  stream.reset(SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr));
-  ASSERT_TRUE(stream) << SDL_GetError();
+  ASSERT_NO_FATAL_FAILURE(OpenStream());
   auto port = ListeningPort(ProcfsSelf());
   ASSERT_GT(port, 0u);
 }

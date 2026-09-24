@@ -1,6 +1,7 @@
 #include <sdl-rdp/video/avc-encoder.hpp>
 #include <sdl-rdp/core/picture-geometry.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
+#include <sdl-rdp/utilities/stopwatch.hpp>
 #include <sdl-rdp/video/avc.hpp>
 
 #include <winpr/wlog.h>
@@ -190,19 +191,16 @@ auto ConvertInput(NV_ENC_LOCK_INPUT_BUFFER const& lock, prim_size_t const& size,
 auto Encoder::Impl::Fill(std::span<BYTE const> bgrx, unsigned stride, Encoder& timing) -> bool {
   Expects(handles.session != nullptr, "encoder session exists");
   Expects(handles.input != nullptr, "encoder input buffer exists");
-  using Clock = std::chrono::steady_clock;
-  auto                     start = Clock::now();
-  NV_ENC_LOCK_INPUT_BUFFER lock  { };
+  Stopwatch                watch;
+  NV_ENC_LOCK_INPUT_BUFFER lock { };
   lock.version     = NV_ENC_LOCK_INPUT_BUFFER_VER;
   lock.inputBuffer = handles.input;
   if (!Check(driver.api.nvEncLockInputBuffer(handles.session, &lock), "lock input")) return false;
-  timing.times.upload = Clock::now() - start;
-  start               = Clock::now();
+  timing.times.upload = watch.Lap();
   auto status = ConvertInput(lock, { aligned.width, aligned.height }, bgrx, stride);
-  timing.times.convert = Clock::now() - start;
-  start                = Clock::now();
+  timing.times.convert = watch.Lap();
   auto unlocked = Check(driver.api.nvEncUnlockInputBuffer(handles.session, handles.input), "unlock input");
-  timing.times.upload += Clock::now() - start;
+  timing.times.upload += watch.Lap();
   return Check(status, "BT.709 conversion") && unlocked;
 }
 auto Encoder::Impl::Close() -> void {
@@ -302,12 +300,12 @@ auto Encoder::Encode(std::span<BYTE const> bgrx, unsigned stride, bool force_idr
           "source covers aligned height");
   times.convert = times.upload = times.encode = { };
   if (!impl->Fill(bgrx, stride, *this)) return { };
-  auto pic   = impl->Picture(force_idr);
-  auto start = std::chrono::steady_clock::now();
+  auto            pic   = impl->Picture(force_idr);
+  Stopwatch const watch;
   if (!impl->Check(impl->driver.api.nvEncEncodePicture(impl->handles.session, &pic), "encode picture")) return { };
   NV_ENC_LOCK_BITSTREAM lock{ .version = NV_ENC_LOCK_BITSTREAM_VER, .outputBitstream = impl->handles.output };
   if (!impl->Check(impl->driver.api.nvEncLockBitstream(impl->handles.session, &lock), "lock bitstream")) return { };
-  times.encode = std::chrono::steady_clock::now() - start;
+  times.encode = watch.Elapsed();
   auto const* data = static_cast<BYTE const*>(lock.bitstreamBufferPtr);
   encoded.assign(data, data + lock.bitstreamSizeInBytes);
   if (!impl->Check(impl->driver.api.nvEncUnlockBitstream(impl->handles.session, impl->handles.output),

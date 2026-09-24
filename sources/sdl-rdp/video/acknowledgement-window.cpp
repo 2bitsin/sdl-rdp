@@ -33,7 +33,7 @@ auto AcknowledgementWindow::Record(uint64_t sequence, Clock::time_point now) -> 
 auto AcknowledgementWindow::Accept(UINT32 id) -> std::vector<SentFrame> {
   auto found = std::ranges::find(_pending, id, &SentFrame::Id);
   if (found == _pending.end()) return { };
-  _acknowledged = found->Sequence();
+  _acknowledged = found->Presented();
   std::vector<SentFrame> settled(std::make_move_iterator(_pending.begin()), std::make_move_iterator(found + 1));
   _pending.erase(_pending.begin(), found + 1);
   return settled;
@@ -41,7 +41,7 @@ auto AcknowledgementWindow::Accept(UINT32 id) -> std::vector<SentFrame> {
 auto AcknowledgementWindow::Expire(Clock::time_point now) -> unsigned {
   unsigned expired = 0;
   for (; !_pending.empty() && _pending.front().Age(now) >= AcknowledgementTimeout; ++expired) {
-    _acknowledged = _pending.front().Sequence();
+    _acknowledged = _pending.front().Presented();
     _pending.pop_front();
   }
   return expired;

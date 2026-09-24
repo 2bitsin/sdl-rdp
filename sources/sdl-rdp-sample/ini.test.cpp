@@ -35,8 +35,9 @@ auto AvailablePort() -> unsigned {
   close(socket_fd);
   return ntohs(address.sin_port);
 }
-auto IniArguments(fs::path const& directory, fs::path const& certificates) -> std::vector<std::string> {
-  auto args = Arguments(certificates, false);
+auto IniArguments(fs::path const& directory, fs::path const& certificates, Words const& environment = { },
+                  Words const& options = { }) -> Words {
+  auto args = Arguments(certificates, environment, options);
   std::erase_if(
       args, [](auto const& arg) { return arg.starts_with("SDL_RDP_PORT=") || arg.starts_with("SDL_RDP_BACKEND="); });
   args.insert(args.begin() + 1, { "-u", "SDL_RDP_PORT", "-u", "SDL_RDP_BACKEND", "-u", "SDL_RDP_INI", "-u",
@@ -68,14 +69,8 @@ TEST_P(IniSample, WorkingDirectoryPortAndBackend) {
   oxbox::platform::ScratchArea const directory { "ini", "sdl-rdp" };
   auto                               port      = AvailablePort();
   WriteIni(directory.Path() / "libSDL3.ini", port);
-  auto args = IniArguments(directory.Path(), certificates.Path());
-  if (GetParam()) args.insert(args.end() - 1, { "SDL_RDP_PORT=1", "SDL_RDP_BACKEND=/missing/backend" });
-  GivenIniProcess(args, port);
-  if (::testing::Test::HasFatalFailure()) return;
-  Client client(port, true, 640, 480);
-  ASSERT_TRUE(freerdp_connect(client.Instance().get())) << ConnectLogs();
-  ASSERT_TRUE(client.Until([&] { return Pattern(client, false); }));
-  Escape(client);
+  auto const overridden = GetParam() ? Words{ "SDL_RDP_PORT=1", "SDL_RDP_BACKEND=/missing/backend" } : Words{ };
+  ThenIniConnects(IniArguments(directory.Path(), certificates.Path(), overridden), port);
 }
 INSTANTIATE_TEST_SUITE_P(IniPrecedence, IniSample, testing::Bool());
 
@@ -84,17 +79,14 @@ TEST_F(Sample, IniExplicitPathWinsAsWholeFile) {
   auto                               port      = AvailablePort();
   WriteIni(directory.Path() / "chosen.ini", port);
   WriteInvalidIni(directory.Path());
-  auto args = IniArguments(directory.Path(), certificates.Path());
-  args.insert(args.end() - 1, "SDL_RDP_INI=chosen.ini");
-  ThenIniConnects(args, port);
+  ThenIniConnects(IniArguments(directory.Path(), certificates.Path(), { "SDL_RDP_INI=chosen.ini" }), port);
 }
 
 TEST_F(Sample, IniUnreadableExplicitPathFailsStartup) {
   oxbox::platform::ScratchArea const directory{ "ini-missing", "sdl-rdp" };
   WriteIni(directory.Path() / "libSDL3.ini", 0);
-  auto args = IniArguments(directory.Path(), certificates.Path());
-  args.insert(args.end() - 1, "SDL_RDP_INI=missing.ini");
-  process = std::make_unique<Process>(args);
+  process = std::make_unique<Process>(
+      IniArguments(directory.Path(), certificates.Path(), { "SDL_RDP_INI=missing.ini" }));
   ASSERT_TRUE(Read("ERROR: Could not read RDP settings file missing.ini")) << process->Transcript();
   EXPECT_TRUE(process->Transcript().contains("Could not read RDP settings file missing.ini"));
   EXPECT_FALSE(process->Transcript().contains("port "));
@@ -105,12 +97,9 @@ namespace SampleGate {
 TEST_F(Sample, IniApplicationHintWins) {
   oxbox::platform::ScratchArea const directory{ "ini-hint", "sdl-rdp" };
   WriteIni(directory.Path() / "libSDL3.ini", 0);
-  auto args = IniArguments(directory.Path(), certificates.Path());
-  args.insert(args.end(), { "--aspect", "2:1" });
-  process = std::make_unique<Process>(args);
-  ASSERT_TRUE(Read("port ")) << process->Transcript();
-  Client client(AnnouncedPort(line), true, 640, 480);
-  ASSERT_TRUE(freerdp_connect(client.Instance().get())) << ConnectLogs();
+  ASSERT_NO_FATAL_FAILURE(Launch(IniArguments(directory.Path(), certificates.Path(), { }, { "--aspect", "2:1" })));
+  auto client = AnnouncedClient(640, 480);
+  ASSERT_NO_FATAL_FAILURE(Connect(client));
   ASSERT_TRUE(client.Until([&] { return client.Instance()->context->gdi->width == 960; }));
   EXPECT_EQ(client.Instance()->context->gdi->height, 480);
   Escape(client);
@@ -124,9 +113,7 @@ TEST_F(Sample, IniLibraryDirectoryWinsOverWorkingDirectory) {
   auto port = AvailablePort();
   WriteIni(library / "libSDL3.ini", port);
   WriteInvalidIni(directory.Path());
-  auto args = IniArguments(directory.Path(), certificates.Path());
-  args.insert(args.end() - 1, "LD_LIBRARY_PATH=" + library.string());
-  ThenIniConnects(args, port);
+  ThenIniConnects(IniArguments(directory.Path(), certificates.Path(), { "LD_LIBRARY_PATH=" + library.string() }), port);
 }
 }
 
@@ -135,14 +122,11 @@ TEST_F(Sample, IniCodeHintsCacheAndLiveReset) {
   oxbox::platform::ScratchArea const directory { "ini-cache", "sdl-rdp" };
   auto                               file      = directory.Path() / "libSDL3.ini";
   WriteIni(file, 1);
-  GivenIniHints(file);
-  if (::testing::Test::HasFatalFailure()) return;
-  auto display = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
-  EXPECT_GT(SDL_GetNumberProperty(display, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0), 2);
+  ASSERT_NO_FATAL_FAILURE(GivenIniHints(file));
+  EXPECT_GT(PrimaryDisplayPort(), 2u);
   auto* window = SDL_CreateWindow("ini", 640, 480, 0);
   ASSERT_NE(window, nullptr) << SDL_GetError();
-  ThenLiveAspect(window);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ThenLiveAspect(window));
   SDL_DestroyWindow(window);
   SDL_Quit();
   WriteIni(file, 1);
@@ -169,9 +153,6 @@ private:
   oxbox::platform::ScratchArea const _directory;
   fs::path const                     _path;
 };
-auto RdpPort() -> Sint64 {
-  return SDL_GetNumberProperty(SDL_GetDisplayProperties(SDL_GetPrimaryDisplay()), SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0);
-}
 auto RdpTitleStorage() -> Storage {
   EXPECT_TRUE(SDL_SetHint(SDL_HINT_STORAGE_TITLE_DRIVER, "rdp"));
   return { SDL_OpenTitleStorage("", 0), SDL_CloseStorage };
@@ -180,11 +161,11 @@ auto WindowAspect(Window const& window) -> std::string {
   return SDL_GetStringProperty(SDL_GetWindowProperties(window.get()), SDL_PROP_WINDOW_RDP_ASPECT_STRING, "");
 }
 auto ThenVideoRejoinsDriver(fs::path const& ini) -> void {
-  auto const port = RdpPort();
+  auto const port = PrimaryDisplayPort();
   SDL_QuitSubSystem(SDL_INIT_VIDEO);
   std::ofstream{ ini, std::ios::app } << "SDL_RDP_ASPECT=2:1\n";
   ASSERT_TRUE(SDL_InitSubSystem(SDL_INIT_VIDEO)) << SDL_GetError();
-  EXPECT_EQ(RdpPort(), port);
+  EXPECT_EQ(PrimaryDisplayPort(), port);
 }
 auto ThenWindowAspect(char const* expected) -> void {
   Window const window{ SDL_CreateWindow("aspect", 640, 480, 0), SDL_DestroyWindow };
@@ -236,7 +217,7 @@ auto WhenInitializedWith(std::pair<char const*, char const*> const& setting) -> 
 class IniSession : public Sample {
 protected:
   auto SetUp() -> void override {
-    Sample::SetUp();
+    ASSERT_NO_FATAL_FAILURE(Sample::SetUp());
     _sdl.emplace([this] {
       GivenIniHints(_ini.Path());
       return true;
@@ -250,21 +231,17 @@ private:
   std::optional<InitializedSdl> _sdl;
 };
 TEST_F(IniSession, PartialVideoQuitKeepsDriverAndIniSnapshot) {
-  if (HasFatalFailure()) return;
   Storage const storage = RdpTitleStorage();
   ASSERT_TRUE(storage) << SDL_GetError();
-  ThenVideoRejoinsDriver(IniPath());
-  if (HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ThenVideoRejoinsDriver(IniPath()));
   ThenWindowAspect("4:3");
 }
 TEST_F(IniSession, InvalidAspectHintFailsWindowCreationAndCanRecover) {
-  if (HasFatalFailure()) return;
   for (auto const* aspect : { "1:0", "4:3:2", "4:x", "4 : 3" }) ThenInvalidAspectFailsWindow(aspect);
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_ASPECT, "4:3"));
   ThenWindowAspect("4:3");
 }
 TEST_F(IniSession, StorageSpaceDiagnosesUnsupportedBackendOperation) {
-  if (HasFatalFailure()) return;
   Storage const storage = RdpTitleStorage();
   ASSERT_TRUE(storage) << SDL_GetError();
   ThenStorageSpaceIsNotImplemented(storage);

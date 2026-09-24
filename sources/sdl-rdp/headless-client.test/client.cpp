@@ -11,6 +11,7 @@
 #include <freerdp/gdi/gdi.h>
 #include <freerdp/gdi/gfx.h>
 #include <freerdp/settings.h>
+#include <gtest/gtest.h>
 #include <winpr/synch.h>
 #include <algorithm>
 #include <array>
@@ -110,11 +111,28 @@ auto Client::Credentials(char const* user, char const* password, char const* dom
   Expects(freerdp_settings_set_string(settings, FreeRDP_AuthenticationPackageList, "!kerberos"),
           "client credentials configured");
 }
+auto Client::Connect() const -> bool {
+  return freerdp_connect(instance.get()) == TRUE;
+}
+auto Client::Tap(std::uint16_t scancode) const -> void {
+  auto* input = instance->context->input;
+  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, scancode)) << "send key down " << scancode;
+  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, scancode)) << "send key up " << scancode;
+}
+auto Client::Disconnect() const -> bool {
+  return freerdp_disconnect(instance.get()) == TRUE;
+}
 auto Client::Pump(unsigned timeout) const -> bool {
   std::array<HANDLE, 64> handles { };
   auto                   count   = freerdp_get_event_handles(instance->context, handles.data(), handles.size());
   return count && WaitForMultipleObjects(count, handles.data(), FALSE, timeout) != WAIT_FAILED
          && freerdp_check_event_handles(instance->context);
+}
+auto PumpInBackground(Client const& client) -> std::jthread {
+  return std::jthread([&client](std::stop_token const& stop) {
+    while (!stop.stop_requested() && client.Pump()) {
+    }
+  });
 }
 auto Client::Matches(std::vector<UINT32> const& pixels) -> bool {
   auto* gdi = instance->context->gdi;
@@ -148,5 +166,11 @@ auto Client::Tolerance() const -> unsigned {
 }
 auto Client::Tolerance(unsigned value) -> void {
   tolerance = value;
+}
+auto Client::UntilDesktop(std::uint32_t width, std::uint32_t height) -> bool {
+  return Until([&] {
+    auto const& gdi = *instance->context->gdi;
+    return std::cmp_equal(gdi.width, width) && std::cmp_equal(gdi.height, height);
+  });
 }
 }

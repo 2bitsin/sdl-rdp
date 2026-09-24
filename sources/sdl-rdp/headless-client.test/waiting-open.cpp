@@ -26,12 +26,11 @@ auto PublishListeningPort(void* user, sdlrdp_log_level level, char const* text) 
   SendOpeningResult(*static_cast<int*>(user), port);
 }
 auto OpenedWithClient(sdlrdp_config const& config) -> bool {
-  sdlrdp_handle* handle = nullptr;
-  auto           opened = sdlrdp_open(&config, &handle);
-  std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> const backend(handle, sdlrdp_close);
-  sdlrdp_event event{ };
-  return opened == 0 && sdlrdp_wait(handle, 0) == 1 && sdlrdp_poll(handle, &event, 1) == 1
-         && event.type == SDLRDP_CONNECTED;
+  Headless::BackendInstance backend;
+  if (backend.TryOpen(config) != 0) return false;
+  if (sdlrdp_wait(backend.get(), 0) != 1) return false;
+  auto const events = backend.Poll();
+  return !events.empty() && events.front().type == SDLRDP_CONNECTED;
 }
 auto RunOpeningProcess(sdlrdp_config config, int socket) -> int {
   config.log      = PublishListeningPort;

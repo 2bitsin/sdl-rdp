@@ -1,4 +1,5 @@
 #pragma once
+#include "backend-instance.hpp"
 #include "client.hpp"
 #include "logs.hpp"
 #include <sdl-rdp/session/handle.hpp>
@@ -14,8 +15,8 @@ protected:
   auto OpenGraphics(char* pattern, unsigned width, unsigned height, sdlrdp_codec codec) -> void;
   auto TearDown()                                                                       -> void override;
   auto ConnectGraphics(Client& client)                                                  -> void;
-  Logs                                                    logs;
-  std::filesystem::path                                   directory;
-  std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> backend  { nullptr, sdlrdp_close };
+  Logs                      logs;
+  std::filesystem::path     directory;
+  Headless::BackendInstance backend;
 };
 }

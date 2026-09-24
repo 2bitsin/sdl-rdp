@@ -5,6 +5,7 @@
 #include <sdl-rdp/core/trace-queue.hpp>
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
 
+#include <oxbox/utilities/text.hpp>
 #include <algorithm>
 #include <format>
 
@@ -22,10 +23,11 @@ auto Supported(RdpsndServerContext const& context) -> bool {
          && (selected.nSamplesPerSec == NativeRate || selected.nSamplesPerSec == CompatibleRate);
 }
 auto Formats(RdpsndServerContext const& context) -> std::string {
-  std::string formats;
-  for (auto const& format : std::span(context.client_formats, context.num_client_formats))
-    formats += std::format("{}tag={} channels={} rate={} bits={}", formats.empty() ? "" : "; ", format.wFormatTag,
-                           format.nChannels, format.nSamplesPerSec, format.wBitsPerSample);
+  auto const formats = oxbox::utilities::Joined(
+      std::span(context.client_formats, context.num_client_formats), "; ", [](AUDIO_FORMAT const& format) {
+        return std::format("tag={} channels={} rate={} bits={}", format.wFormatTag, format.nChannels,
+                           format.nSamplesPerSec, format.wBitsPerSample);
+      });
   return formats.empty() ? "none" : formats;
 }
 auto Behind(uint64_t sent, uint64_t credit, unsigned rate) -> double {

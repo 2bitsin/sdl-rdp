@@ -40,13 +40,7 @@ auto Present(SDL_Window& window) -> void {
   ASSERT_TRUE(SDL_UpdateWindowSurfaceRects(&window, Damage.data(), static_cast<int>(Damage.size()))) << SDL_GetError();
 }
 auto PresentRepeatedly(SDL_Window& window, std::size_t presents) -> void {
-  for (std::size_t present = 0; present < presents && !testing::Test::HasFatalFailure(); ++present) Present(window);
-}
-auto PresentMeasured(SDL_Window& window) -> std::pair<Tally, Tally> {
-  PresentRepeatedly(window, WarmPresents);
-  auto const before = CountingHeap::Shared().Current();
-  PresentRepeatedly(window, MeasuredPresents);
-  return { before, CountingHeap::Shared().Current() };
+  for (std::size_t present = 0; present < presents; ++present) ASSERT_NO_FATAL_FAILURE(Present(window));
 }
 auto ExpectNoneBetween(Tally const& before, Tally const& after) -> void {
   EXPECT_EQ(after.news - before.news, 0U) << "operator new calls in " << MeasuredPresents << " presents";
@@ -62,7 +56,8 @@ TEST(DriverAllocations, NonePerPresentOnceWarm) {
   Window const window{ SDL_CreateWindow("driver allocations", Width, Height, 0), SDL_DestroyWindow };
   ASSERT_TRUE(window) << SDL_GetError();
   ASSERT_NE(SDL_GetWindowSurface(window.get()), nullptr) << SDL_GetError();
-  auto const [before, after] = PresentMeasured(*window);
-  ASSERT_FALSE(testing::Test::HasFatalFailure());
-  ExpectNoneBetween(before, after);
+  ASSERT_NO_FATAL_FAILURE(PresentRepeatedly(*window, WarmPresents));
+  auto const before = CountingHeap::Shared().Current();
+  ASSERT_NO_FATAL_FAILURE(PresentRepeatedly(*window, MeasuredPresents));
+  ExpectNoneBetween(before, CountingHeap::Shared().Current());
 }

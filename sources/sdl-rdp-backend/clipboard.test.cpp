@@ -1,3 +1,4 @@
+#include <sdl-rdp/headless-client.test/backend-instance.hpp>
 #include <sdl-rdp/headless-client.test/clipboard-client.hpp>
 #include <sdl-rdp/headless-client.test/config.hpp>
 #include <sdl-rdp/headless-client.test/logs.hpp>
@@ -50,7 +51,7 @@ protected:
     ConnectClipboard(*client, *clipboard);
   }
   auto ConnectClipboard(Headless::Client& client, Headless::ClipboardClient& clipboard) -> void {
-    ASSERT_TRUE(freerdp_connect(client.Instance().get())) << logs.Text(true);
+    ASSERT_TRUE(client.Connect()) << logs.Text(true);
     ASSERT_TRUE(client.Until([&] { return clipboard.Observed().accepted.load() == 1; }));
   }
   auto SetUp() -> void override {
@@ -58,15 +59,13 @@ protected:
     auto config    = Headless::LoopbackConfig(directory);
     config.log      = Headless::Logs::Collect;
     config.log_user = &logs;
-    sdlrdp_handle* opened = nullptr;
-    ASSERT_EQ(sdlrdp_open(&config, &opened), 0) << sdlrdp_last_error();
-    handle.reset(opened);
+    ASSERT_NO_FATAL_FAILURE(handle.Open(config));
   }
-  Headless::Logs                                          logs;
-  oxbox::platform::ScratchArea                            certificates{ "clipboard", "sdl-rdp" };
-  std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> handle      { nullptr, sdlrdp_close  };
-  std::unique_ptr<Headless::Client>                       client;
-  std::unique_ptr<Headless::ClipboardClient>              clipboard;
+  Headless::Logs                             logs;
+  oxbox::platform::ScratchArea               certificates{ "clipboard", "sdl-rdp" };
+  Headless::BackendInstance                  handle;
+  std::unique_ptr<Headless::Client>          client;
+  std::unique_ptr<Headless::ClipboardClient> clipboard;
 };
 auto OfferMalformedText(Headless::Client& client, Headless::ClipboardClient& clipboard) -> void {
   for (auto const& bytes : { std::vector<BYTE>{ 0x7c }, { 0, 0xdc, 0, 0 }, { 'x', 0 } }) {
@@ -76,8 +75,7 @@ auto OfferMalformedText(Headless::Client& client, Headless::ClipboardClient& cli
   }
 }
 TEST_F(Clipboard, EmptyConnectUnchanged) {
-  GivenClipboard();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenClipboard());
   std::array<sdlrdp_event, 32> events{ };
   for (auto polled = Poll(events); !polled.empty(); polled = Poll(events)) EXPECT_FALSE(HasClipboardEvent(polled));
   EXPECT_STREQ(sdlrdp_get_clipboard_text(handle.get()), "");
@@ -100,14 +98,12 @@ TEST_F(Clipboard, LocalTextAndErrors) {
   EXPECT_EQ(sdlrdp_has_clipboard_text(handle.get()), 0);
 }
 TEST_F(Clipboard, LiveSetAndMalformedResponse) {
-  GivenClipboard();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenClipboard());
   ASSERT_EQ(sdlrdp_set_clipboard_text(handle.get(), "hello"), 0);
   ASSERT_TRUE(client->Until([&] { return clipboard->Received({ 'h', 0, 'e', 0, 'l', 0, 'l', 0, 'o', 0, 0, 0 }); }));
   Drain();
   auto const* retained = sdlrdp_get_clipboard_text(handle.get());
-  OfferMalformedText(*client, *clipboard);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(OfferMalformedText(*client, *clipboard));
   ASSERT_EQ(clipboard->Offer({ 'w', 0, 'o', 0, 'r', 0, 'l', 0, 'd', 0, 0, 0 }), CHANNEL_RC_OK);
   ASSERT_TRUE(UntilClipboardEvent());
   ThenReplacedText(retained);
@@ -116,15 +112,14 @@ TEST_F(Clipboard, FirstOfferRetainsAppText) {
   ASSERT_EQ(sdlrdp_set_clipboard_text(handle.get(), "app"), 0);
   Headless::Client          client(sdlrdp_port(handle.get()), false);
   Headless::ClipboardClient clipboard(client, { 'c', 0, 'l', 0, 'i', 0, 'e', 0, 'n', 0, 't', 0, 0, 0 });
-  ASSERT_TRUE(freerdp_connect(client.Instance().get())) << logs.Text(true);
+  ASSERT_TRUE(client.Connect()) << logs.Text(true);
   ASSERT_TRUE(client.Until([&] { return clipboard.Received({ 'a', 0, 'p', 0, 'p', 0, 0, 0 }); }));
   EXPECT_EQ(clipboard.Observed().accepted.load(), 1u);
   EXPECT_EQ(clipboard.Observed().requests.load(), 0u);
   EXPECT_STREQ(sdlrdp_get_clipboard_text(handle.get()), "app");
 }
 TEST_F(Clipboard, NonTextOfferClearsText) {
-  GivenClipboard();
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenClipboard());
   ASSERT_EQ(sdlrdp_set_clipboard_text(handle.get(), "app"), 0);
   ASSERT_TRUE(client->Until([&] { return clipboard->Received({ 'a', 0, 'p', 0, 'p', 0, 0, 0 }); }));
   Drain();

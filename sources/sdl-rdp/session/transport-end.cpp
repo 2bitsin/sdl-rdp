@@ -8,11 +8,14 @@
 #include <sdl-rdp/video/peer-frames.hpp>
 
 #include <freerdp/settings.h>
+#include <oxbox/utilities/text.hpp>
 #include <array>
 #include <format>
 #include <ranges>
 #include <string>
+#include <string_view>
 #include <utility>
+#include <vector>
 
 namespace Backend {
 namespace {
@@ -22,12 +25,11 @@ constexpr std::array<std::pair<UINT32, char const*>, 5> ProtocolFlags{ { { Secur
                                                                          { SecurityRdstls, "RDSTLS"  },
                                                                          { SecurityRdsaad, "RDSAAD"  } } };
 auto ProtocolNames(UINT32 mask, bool rdp) -> std::string {
-  std::string names = rdp ? "RDP" : "";
-  for (auto const& entry : ProtocolFlags | std::views::filter([mask](auto entry) { return mask & entry.first; })) {
-    if (!names.empty()) names += '|';
-    names += entry.second;
-  }
-  return names;
+  std::vector<std::string_view> names;
+  if (rdp) names.emplace_back("RDP");
+  names.append_range(ProtocolFlags | std::views::filter([mask](auto entry) { return mask & entry.first; })
+                     | std::views::values);
+  return oxbox::utilities::Joined(names, "|");
 }
 auto Refusal(rdpSettings const& settings, std::string const& protocols) -> std::string {
   auto const offered = (freerdp_settings_get_bool(&settings, FreeRDP_TlsSecurity) ? SecurityTls : 0)

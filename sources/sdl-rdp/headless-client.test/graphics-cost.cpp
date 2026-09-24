@@ -1,4 +1,5 @@
 #include <sdl-rdp/headless-client.test/graphics-cost.hpp>
+#include <sdl-rdp/headless-client.test/backend-instance.hpp>
 
 #include <sdl-rdp/headless-client.test/pattern.hpp>
 #include <sdl-rdp/headless-client.test/peer-status.hpp>
@@ -16,11 +17,10 @@ auto MatchCostStatistics(std::string const& text, std::smatch& match, char const
 auto RecordProgressiveCost(Logs& logs) -> void {
   auto        text  = logs.Text(true);
   std::smatch match;
-  MatchCostStatistics(
+  ASSERT_NO_FATAL_FAILURE(MatchCostStatistics(
       text, match,
       R"(Frames: 1 sent, 0 coalesced; encode ([0-9.]+) ms mean, ([0-9.]+) ms max; )"
-      R"(acknowledgement ([0-9.]+) ms mean, ([0-9.]+) ms max, ([0-9]+) over 100 ms, [0-9]+ timed out\.)");
-  if (::testing::Test::HasFatalFailure()) return;
+      R"(acknowledgement ([0-9.]+) ms mean, ([0-9.]+) ms max, ([0-9]+) over 100 ms, [0-9]+ timed out\.)"));
   auto milliseconds = std::stod(match[1]);
   testing::Test::RecordProperty("encode_ms", milliseconds);
   testing::Test::RecordProperty("statistics", match.str());
@@ -32,8 +32,8 @@ auto RecordProgressiveCost(Logs& logs) -> void {
 }
 auto GraphicsCost::ThenProgressiveCost(Client& client, GraphicsObserver& observer) -> void {
   ASSERT_EQ(observer.Observed().frames.size(), 1u);
-  freerdp_disconnect(client.Instance().get());
-  backend.reset();
+  client.Disconnect();
+  backend.Close();
   RecordProgressiveCost(logs);
 }
 auto GraphicsCost::AwaitAcknowledgement(Client& client, uint64_t sequence) -> void {
@@ -51,25 +51,24 @@ auto GraphicsCost::PresentMovingTiles(Client& client, std::uint32_t frames) -> v
   sdlrdp_rect const          full  { 0, 0, 1920, 1080 };
   for (std::uint32_t frame = 0; frame < frames; ++frame) {
     MovingTilePattern(pixels, 1920, 1080, frame);
-    ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 7680, 1920, 1080, &full, 1), 0);
-    AwaitAcknowledgement(client, frame + 1);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_EQ(backend.Present(pixels, 1920, 1080, full), 0);
+    ASSERT_NO_FATAL_FAILURE(AwaitAcknowledgement(client, frame + 1));
   }
 }
 auto GraphicsCost::PresentPlanar(Client& client, GraphicsObserver& observer, std::vector<std::uint32_t> const& pixels,
                                  std::vector<std::uint32_t> const& expected, sdlrdp_rect area) -> void {
   auto count = observer.Observed().frames.size();
-  EXPECT_EQ(sdlrdp_present(backend.get(), pixels.data(), 354 * 4, 354, 226, &area, 1), 0);
+  EXPECT_EQ(backend.Present(pixels, 354, 226, area), 0);
   EXPECT_TRUE(client.Until([&] { return observer.Observed().frames.size() > count; }));
   EXPECT_EQ(client.MaxError(expected, &expected), 0u);
 }
 auto GraphicsCost::RecordAvcCost(Logs& logs) -> void {
   auto        text  = logs.Text(true);
   std::smatch match;
-  MatchCostStatistics(text, match,
-                      R"(Frames: 10 sent, 0 coalesced; encode ([0-9.]+) ms mean, ([0-9.]+) ms max )"
-                      R"(\(convert ([0-9.]+), upload ([0-9.]+), nvenc ([0-9.]+)\); acknowledgement)");
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(
+      MatchCostStatistics(text, match,
+                          R"(Frames: 10 sent, 0 coalesced; encode ([0-9.]+) ms mean, ([0-9.]+) ms max )"
+                          R"(\(convert ([0-9.]+), upload ([0-9.]+), nvenc ([0-9.]+)\); acknowledgement)"));
   for (auto [name, index] : { std::pair{ "encode_ms", 1 }, { "convert_ms", 3 }, { "upload_ms", 4 }, { "nvenc_ms", 5 } })
     testing::Test::RecordProperty(name, match[index].str());
   testing::Test::RecordProperty("statistics", match.str());

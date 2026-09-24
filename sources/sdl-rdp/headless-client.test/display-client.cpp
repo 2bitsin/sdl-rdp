@@ -31,7 +31,7 @@ DisplayClient::DisplayClient(Client& client)
   client.Instance()->LoadChannels = LoadDisplayChannel;
 }
 DisplayClient::~DisplayClient() {
-  freerdp_disconnect(client.Instance().get());
+  client.Disconnect();
   client.Instance()->context->update->DesktopResize = desktop_resize;
   PubSub_UnsubscribeChannelConnected(client.Instance()->context->pubSub, Connected);
   active  = nullptr;
@@ -48,11 +48,11 @@ auto DisplayClient::Monitor(unsigned width, unsigned height, unsigned millimetre
   monitor.DesktopScaleFactor = monitor.DeviceScaleFactor = 100;
   return monitor;
 }
-auto DisplayClient::Layout(unsigned width, unsigned height) -> bool {
+auto DisplayClient::Layout(std::uint32_t width, std::uint32_t height, std::uint32_t millimetres) -> bool {
   Expects(active, "observer is installed");
   Expects(ready, "channel handshake is complete");
   Expects(channel, "channel is installed");
-  auto monitor = Monitor(width, height);
+  auto monitor = Monitor(width, height, millimetres);
   return channel.load()->SendMonitorLayout(channel.load(), 1, &monitor) == CHANNEL_RC_OK;
 }
 auto DisplayClient::Observed() -> DisplayCapture& {

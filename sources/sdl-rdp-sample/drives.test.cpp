@@ -31,19 +31,13 @@ TEST_F(Sample, DriveCommands) {
   oxbox::platform::ScratchArea const share    { "sample-drive", "sdl-rdp" };
   std::string                        original = "client disk contents\n";
   oxbox::platform::WriteBinaryFile(share.Path() / "source", std::as_bytes(std::span(original)));
-  auto arguments = Arguments(certificates.Path(), false);
-  arguments.insert(arguments.end(), { "--ls", "share", "--cat", "share/source", "--write", "share/output" });
-  GivenDriveProcess(arguments, share.Path());
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(
+      GivenDriveProcess({ "--ls", "share", "--cat", "share/source", "--write", "share/output" }, share.Path()));
   auto& client = SessionClient();
-  std::jthread pump([&](std::stop_token const& quit) {
-    while (!quit.stop_requested() && client.Pump()) {
-    }
-  });
+  auto  pump   = PumpInBackground(client);
   ASSERT_TRUE(Read("entry name=source size=21 dir=0")) << process->Transcript();
   ASSERT_TRUE(Read("ls done")) << process->Transcript();
-  ThenDriveOutput(share.Path(), original);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ThenDriveOutput(share.Path(), original));
   SDL_Log("%s", process->Transcript().c_str());
   pump.request_stop();
   pump.join();
@@ -72,10 +66,8 @@ auto VerifyStorage() -> void {
   auto* storage = SDL_OpenTitleStorage("share", 0);
   ASSERT_NE(storage, nullptr) << SDL_GetError();
   ASSERT_TRUE(SDL_StorageReady(storage));
-  ThenStorageContents(storage);
-  if (::testing::Test::HasFatalFailure()) return;
-  ThenStorageEntries(storage);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ThenStorageContents(storage));
+  ASSERT_NO_FATAL_FAILURE(ThenStorageEntries(storage));
   EXPECT_TRUE(SDL_CloseStorage(storage));
 }
 auto ThenStreamRead(SDL_IOStream* stream) -> void {
@@ -109,7 +101,7 @@ auto VerifyAppendAndDefaultDrive(SDL_PropertiesID properties) -> void {
   auto const open = reinterpret_cast<OpenFile>(
       SDL_GetPointerProperty(properties, SDL_PROP_DISPLAY_RDP_OPEN_FILE_POINTER, nullptr));
   ASSERT_NE(open, nullptr);
-  ThenAppendExtends(open);
+  ASSERT_NO_FATAL_FAILURE(ThenAppendExtends(open));
   ThenEmptyNameSelectsFirstDrive(open);
 }
 auto VerifyStream(SDL_PropertiesID properties, fs::path const& path) -> void {
@@ -119,10 +111,8 @@ auto VerifyStream(SDL_PropertiesID properties, fs::path const& path) -> void {
   ASSERT_NE(open, nullptr);
   auto* stream = open("share", "whole", "r+b");
   ASSERT_NE(stream, nullptr) << SDL_GetError();
-  ThenStreamRead(stream);
-  if (::testing::Test::HasFatalFailure()) return;
-  ThenStreamWrite(stream);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ThenStreamRead(stream));
+  ASSERT_NO_FATAL_FAILURE(ThenStreamWrite(stream));
   EXPECT_TRUE(SDL_CloseIO(stream));
   EXPECT_EQ(Headless::ReadText((path / "whole").c_str()), "content!");
 }
@@ -136,22 +126,16 @@ auto InitializeRdpVideo(fs::path const& certificates) -> void {
 }
 }
 TEST_F(Sample, DriveStorageAndStream) {
-  InitializeRdpVideo(certificates.Path());
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(InitializeRdpVideo(certificates.Path()));
   auto quit = std::unique_ptr<void, auto (*)(void*)->void>(reinterpret_cast<void*>(1), [](void*) { SDL_Quit(); });
-  auto   properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
-  Client client(SDL_GetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0), false);
-  oxbox::platform::ScratchArea const share{ "storage-drive", "sdl-rdp" };
-  ConnectDrive(client, share.Path());
-  if (::testing::Test::HasFatalFailure()) return;
-  std::jthread const pump([&](std::stop_token const& stop) {
-    while (!stop.stop_requested() && client.Pump()) {
-    }
-  });
-  ThenDriveStorage(properties);
-  if (::testing::Test::HasFatalFailure()) return;
-  VerifyStorage();
-  VerifyStream(properties, share.Path());
+  auto                               properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
+  Client                             client(PrimaryDisplayPort(), false);
+  oxbox::platform::ScratchArea const share      { "storage-drive", "sdl-rdp" };
+  ASSERT_NO_FATAL_FAILURE(ConnectDrive(client, share.Path()));
+  auto const pump = PumpInBackground(client);
+  ASSERT_NO_FATAL_FAILURE(ThenDriveStorage(properties));
+  ASSERT_NO_FATAL_FAILURE(VerifyStorage());
+  ASSERT_NO_FATAL_FAILURE(VerifyStream(properties, share.Path()));
   VerifyAppendAndDefaultDrive(properties);
 }
 }

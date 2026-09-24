@@ -4,6 +4,7 @@
 #include <sdl-rdp/core/configuration.hpp>
 #include <sdl-rdp/session/peer.hpp>
 #include <sdl-rdp/session/presenter.hpp>
+#include <sdl-rdp/utilities/deadline.hpp>
 
 #include <algorithm>
 #include <stdexcept>
@@ -17,7 +18,7 @@ AudioOutput::AudioOutput(Session& session, Presenter& presenter, Configuration c
     : _session{ session }, _presenter{ presenter }, _configuration{ configuration } { }
 auto AudioOutput::Channel(SessionLock const& held) const -> AudioChannel* {
   auto* const current = _session.Current(held);
-  return current ? current->Audio() : nullptr;
+  return current ? current->Redirected().Audio() : nullptr;
 }
 auto AudioOutput::Open() -> void {
   auto const held = _session.Lock();
@@ -30,9 +31,8 @@ auto AudioOutput::Rate() -> unsigned {
   auto const* channel = Channel(held);
   return channel ? channel->Rate() : 0;
 }
-auto AudioOutput::Wait(int timeout) -> int {
-  auto held     = _session.Lock();
-  auto deadline = timeout < 0 ? Clock::time_point::max() : Clock::now() + std::chrono::milliseconds(timeout);
+auto AudioOutput::Wait(Deadline deadline) -> int {
+  auto held = _session.Lock();
   for (;;) {
     if (!_open || !Rate()) return 1;
     auto& channel = *Channel(held);
@@ -46,7 +46,7 @@ auto AudioOutput::Wait(int timeout) -> int {
 auto AudioOutput::Write(std::span<int16_t const> samples) -> int {
   auto const count = int(samples.size() / 2);
   while (!samples.empty()) {
-    Wait(-1);
+    Wait(Deadline::max());
     auto const held = _session.Lock();
     if (!_open) throw std::runtime_error("Audio device is not open.");
     if (!Rate()) return count;

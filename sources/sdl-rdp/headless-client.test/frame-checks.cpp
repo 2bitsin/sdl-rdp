@@ -1,4 +1,5 @@
 #include <sdl-rdp/headless-client.test/frame-checks.hpp>
+#include <sdl-rdp/headless-client.test/backend-instance.hpp>
 
 #include <sdl-rdp/headless-client.test/peer-status.hpp>
 
@@ -53,17 +54,17 @@ auto ThenGraphicsReset(Headless::GraphicsObserver const& observer, GraphicsCount
 }
 auto FrameChecks::Present(std::vector<UINT32> const& pixels, unsigned w, unsigned h) -> void {
   sdlrdp_rect const full{ 0, 0, int(w), int(h) };
-  ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), w * 4, w, h, &full, 1), 0);
+  ASSERT_EQ(backend.Present(pixels, w, h, full), 0);
 }
 auto FrameChecks::FillLegacyWindow(Client& client, FrameObserver& observer, std::vector<UINT32>& pixels) -> void {
-  Present(pixels, 640, 480);
+  ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
   ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == 1; }));
   std::ranges::fill(pixels, 0x223344);
-  Present(pixels, 640, 480);
+  ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
   ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == 2; }));
   for (unsigned i = 0; i < 10; ++i) {
     std::ranges::fill(pixels, 0x334455 + i);
-    Present(pixels, 640, 480);
+    ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
   }
   EXPECT_EQ(observer.Frames().size(), 2u);
   EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 0);
@@ -107,7 +108,7 @@ auto FrameChecks::ThenSparseDamage(Client& client, FrameObserver& observer, std:
   testing::Test::RecordProperty("region_bytes_" + std::to_string(codec), std::to_string(used));
   EXPECT_LT(used, bounding / 100);
 }
-auto FrameChecks::ThenProducerFrame(Client& client, FrameObserver& observer, std::atomic<unsigned> const& presents)
+auto FrameChecks::ThenProducerFrame(Client& client, FrameObserver& observer, std::atomic<std::size_t> const& presents)
     -> void {
   std::vector<UINT32> final(1024uz * 768);
   std::fill_n(final.begin(), 1024, presents.load());
@@ -141,7 +142,7 @@ auto FrameChecks::ResizePicture(Client& client, Headless::GraphicsObserver& obse
                                 std::vector<std::uint32_t>& pixels, Backend::Extent size, bool graphics) -> void {
   auto const before = CountsOf(observer);
   pixels.assign(static_cast<std::size_t>(size.width) * size.height, 0x654321);
-  Present(pixels, size.width, size.height);
+  ASSERT_NO_FATAL_FAILURE(Present(pixels, size.width, size.height));
   ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text(true);
   ASSERT_GT(observer.Observed().desktops.size(), before.desktops);
   EXPECT_EQ(observer.Observed().desktops.back(), (std::pair{ size.width, size.height }));

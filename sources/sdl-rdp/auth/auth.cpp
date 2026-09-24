@@ -5,6 +5,7 @@
 #include <sdl-rdp/core/diagnostics.hpp>
 #include <sdl-rdp/core/logging.hpp>
 #include <sdl-rdp/core/peer-link.hpp>
+#include <sdl-rdp/utilities/terminated-copy.hpp>
 
 #include <freerdp/settings.h>
 #include <openssl/crypto.h>
@@ -183,8 +184,8 @@ auto AuthenticationIdentity(freerdp_peer const& client, sdlrdp_event& event) -> 
   Expects(event.type == SDLRDP_CONNECTED, "identity is attached to a connection event");
   auto const& identity = client.identity;
   auto const  names    = ClientNames(identity);
-  std::strncpy(event.connected.user, names.user.c_str(), sizeof(event.connected.user) - 1);
-  std::strncpy(event.connected.domain, names.domain.c_str(), sizeof(event.connected.domain) - 1);
+  CopyTerminated(event.connected.user, names.user);
+  CopyTerminated(event.connected.domain, names.domain);
   event.connected.authenticated = client.authenticated != FALSE;
 }
 }

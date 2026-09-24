@@ -72,10 +72,10 @@ auto Presenter::Present(std::span<BYTE const> pixels, unsigned pitch, Extent siz
 }
 auto Presenter::Publish(std::shared_ptr<std::vector<BYTE> const> next, Extent size, std::span<sdlrdp_rect const> damage)
     -> void {
-  auto const held    = _session.LockPeers();
-  auto const frame   = _frames.Lock();
-  auto const resized = _frames.Publish(frame, std::move(next), size);
-  _session.ForEach(held, [&](Peer& peer) {
+  auto const  locked  = _session.LockPeersAndFrame();
+  auto const& frame   = locked.Frame();
+  auto const  resized = _frames.Publish(frame, std::move(next), size);
+  locked.ForEach([&](Peer& peer) {
     if (resized) {
       peer.Present(frame, { });
       peer.Repaint(frame, Whole(size));
@@ -100,37 +100,35 @@ auto Presenter::Resize(Extent size) -> void {
   Expects(size.height > 0, "picture height is positive");
   std::scoped_lock const lock(_producer);
   auto const             session = _session.Lock();
-  auto const             held    = _session.LockPeers();
-  auto const             frame   = _frames.Lock();
+  auto const             locked  = _session.LockPeersAndFrame();
+  auto const&            frame   = locked.Frame();
   if (!_frames.Resize(frame, size)) return;
   if (auto* const current = _session.Current(session)) current->RestartPacing(frame);
-  _session.ForEach(held, [&](Peer& peer) { peer.Repaint(frame, Whole(size)); });
+  locked.ForEach([&](Peer& peer) { peer.Repaint(frame, Whole(size)); });
 }
 auto Presenter::SetAspect(sdlrdp_aspect value) -> void {
-  auto const held  = _session.LockPeers();
-  auto const frame = _frames.Lock();
+  auto const  locked = _session.LockPeersAndFrame();
+  auto const& frame  = locked.Frame();
   _frames.SetAspect(frame, value);
-  _session.ForEach(held, [&](Peer& peer) { peer.Repaint(frame, _frames.Bounds(frame)); });
+  locked.ForEach([&](Peer& peer) { peer.Repaint(frame, _frames.Bounds(frame)); });
 }
 auto Presenter::SetRefresh(RefreshMode mode, unsigned ceiling) -> void {
-  auto const held  = _session.LockPeers();
-  auto const frame = _frames.Lock();
+  auto const locked = _session.LockPeersAndFrame();
   _configuration.SetRefresh(mode, ceiling);
-  _session.ForEach(held, [&](Peer& peer) { peer.RestartPacing(frame); });
+  locked.ForEach([&](Peer& peer) { peer.RestartPacing(locked.Frame()); });
 }
 auto Presenter::SetCodec(sdlrdp_codec codec) -> void {
   _configuration.SetCodec(codec);
 }
 auto Presenter::SetPointer(PointerShape shape) -> void {
   auto const session = _session.Lock();
-  auto const held    = _session.LockPeers();
   _pointer.Replace(std::move(shape));
-  _session.ForEach(held, [](Peer& peer) { peer.Signal(); });
+  _session.ForEachPeer([](Peer& peer) { peer.Signal(); });
 }
-auto Presenter::WaitFrame(int timeout) -> int {
+auto Presenter::WaitFrame(Deadline deadline) -> int {
   auto       frame  = _frames.Lock();
   auto const target = _frames.Presented(frame);
-  return _frames.WaitFor(frame, timeout, [&] {
+  return _frames.WaitFor(frame, deadline, [&] {
     auto* const current = _session.Current(frame);
     return !current || current->Settled(frame, target);
   });

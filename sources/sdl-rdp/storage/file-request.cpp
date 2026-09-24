@@ -1,5 +1,6 @@
 #include <sdl-rdp/storage/file-request.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 
 #include <sdl-rdp-abi/sdl-rdp-backend.h>
 
@@ -38,15 +39,15 @@ auto CreateOptions(FileKind kind) -> unsigned {
 }
 FileRequest::FileRequest(unsigned flags, FileKind file_kind, unsigned extra_access)
     : _access{ Access(Validated(flags), extra_access) }, _disposition{ Disposition(flags) }, _kind{ file_kind } { }
-auto FileRequest::Create(std::span<uint8_t const> name) const -> DrivePacket {
+auto FileRequest::Create(std::span<std::byte const> name) const -> DrivePacket {
   DrivePacket packet;
-  packet.Put(_access);
-  packet.Put(0, 8);
-  packet.Put(0);
-  packet.Put(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE);
-  packet.Put(_disposition);
-  packet.Put(CreateOptions(_kind));
-  packet.Put(name.size());
+  packet.Write(std::uint32_t{ _access });
+  packet.Write(std::uint64_t{ 0 });
+  packet.Write(std::uint32_t{ 0 });
+  packet.Write(std::uint32_t{ FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE });
+  packet.Write(std::uint32_t{ _disposition });
+  packet.Write(std::uint32_t{ CreateOptions(_kind) });
+  packet.Write(Narrowed<std::uint32_t>(name.size()));
   packet.Append(name);
   return packet;
 }

@@ -1,5 +1,6 @@
 #include "SDL_rdpaudio.hpp"
 #include "SDL_rdpdrive.hpp"
+#include "SDL_rdpowneddriver.hpp"
 #include "boundary.hpp"
 namespace rdp {
 namespace {
@@ -27,15 +28,13 @@ using AudioSession = utilities::RAIIWrap<std::reference_wrapper<Driver const>, O
 }
 }
 // SDL declares this tag as a struct; the members stay private.
-struct SDL_PrivateAudioData {
+struct SDL_PrivateAudioData : private rdp::OwnedDriver<rdp::Driver const> {
 public:
+  using rdp::OwnedDriver<rdp::Driver const>::Backend;
   explicit SDL_PrivateAudioData(std::shared_ptr<rdp::Driver const> driver)
-      : _driver{ std::move(driver) }, _lead{ rdp::AudioLead(*_driver) },
-        _rate{ _driver->Call<rdp::Operation::AUDIO_RATE>() }, _session{ *_driver } { }
-  auto     Backend() const -> rdp::Driver const& {
-    return *_driver;
-  }
-  auto Buffer() -> std::vector<Uint8>& {
+      : rdp::OwnedDriver<rdp::Driver const>{ std::move(driver) }, _lead{ rdp::AudioLead(Backend()) },
+        _rate{ Backend().Call<rdp::Operation::AUDIO_RATE>() }, _session{ Backend() } { }
+  auto     Buffer() -> std::vector<Uint8>& {
     return _buffer;
   }
   auto Rate() const -> unsigned {
@@ -53,12 +52,11 @@ public:
     return delay;
   }
 private:
-  std::shared_ptr<rdp::Driver const> _driver;
-  std::vector<Uint8>                 _buffer;
-  Uint64                             _next   { SDL_GetTicksNS() };
-  Uint64                             _lead;
-  unsigned                           _rate;
-  rdp::AudioSession const            _session;
+  std::vector<Uint8>      _buffer;
+  Uint64                  _next   { SDL_GetTicksNS() };
+  Uint64                  _lead;
+  std::uint32_t           _rate;
+  rdp::AudioSession const _session;
 };
 namespace rdp {
 namespace {

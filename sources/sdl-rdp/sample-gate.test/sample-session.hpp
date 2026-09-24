@@ -9,17 +9,16 @@
 namespace SampleGate {
 class SampleSession : public SampleChecks {
 protected:
-  auto GivenDesktopProcess(std::vector<std::string> const& arguments)       -> void;
-  auto GivenDriveProcess(std::vector<std::string> const& arguments, fs::path const& share) -> void;
+  auto GivenDesktopProcess(Words const& environment, Words const& options)  -> void;
+  auto GivenDriveProcess(Words const& options, fs::path const& share)       -> void;
   auto ConnectExposed(Client& client)                                       -> void;
   auto GivenInputSession(bool advanced = false)                             -> void;
   auto SessionClient()                                                      -> Client&;
   auto GivenPositionSession()                                               -> void;
   auto Position()                                                           -> PositionObserver&;
   auto GivenFullscreen()                                                    -> void;
-  auto GivenAspect()                                                        -> void;
   auto ThenExplicitGeometry(Client& client, unsigned height = 200)          -> void;
-  auto GivenAudioProcess(std::vector<std::string> const& arguments)         -> void;
+  auto GivenAudioProcess(Words const& environment, Words const& options)    -> void;
   auto ThenIniConnects(std::vector<std::string> const& args, unsigned port) -> void;
   auto ClipboardSession()                                                   -> Headless::ClipboardClient&;
   auto GivenClipboard(std::string const& text)                              -> void;
@@ -27,6 +26,8 @@ protected:
   unsigned audio_port = 0;
 
 private:
+  auto GivenSession(Words const& environment = { }, Words const& options = { }, std::uint32_t width = 640,
+                    std::uint32_t height = 480) -> void;
   std::unique_ptr<Client>                    session;
   std::unique_ptr<Headless::ClipboardClient> clipboard;
   std::unique_ptr<InputClient>               channels;

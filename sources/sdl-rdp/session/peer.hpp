@@ -59,8 +59,7 @@ public:
   auto RestartPacing(FrameLock const& held)                                -> void;
   auto Signal()                                                            -> void;
   auto Settled(FrameLock const& held, uint64_t target) const               -> bool;
-  auto Audio() const noexcept                                              -> AudioChannel*;
-  auto Drive() const                                                       -> std::shared_ptr<DriveChannel>;
+  auto Redirected() const noexcept                                         -> Redirection const&;
   auto Point(MouseMode mode)                                               -> void;
   auto Status(FrameLock const& held) const                                 -> PeerStatus;
 

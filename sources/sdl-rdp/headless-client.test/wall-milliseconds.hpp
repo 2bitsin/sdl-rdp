@@ -1,6 +1,6 @@
 #pragma once
 #include <cstdint>
 
-namespace SampleGate {
+namespace Headless {
 auto WallMilliseconds() -> int64_t;
 }

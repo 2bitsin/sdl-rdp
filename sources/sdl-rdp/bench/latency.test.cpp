@@ -2,12 +2,12 @@
 #include <sdl-rdp/sample-gate.test/sample-launch.hpp>
 #include <sdl-rdp/sample-gate.test/sample.hpp>
 #include <sdl-rdp/sample-gate.test/trace-number.hpp>
-#include <sdl-rdp/sample-gate.test/wall-milliseconds.hpp>
 
 #include <SDL3/SDL.h>
 #include <sdl-rdp/headless-client.test/clipboard-client.hpp>
 #include <sdl-rdp/headless-client.test/frame-observer.hpp>
 #include <sdl-rdp/headless-client.test/sound-client.hpp>
+#include <sdl-rdp/headless-client.test/wall-milliseconds.hpp>
 #include <algorithm>
 #include <filesystem>
 #include <format>
@@ -29,7 +29,7 @@ auto RecordSample(std::string_view line, std::string_view prefix, std::span<int6
 }
 auto SendTime(Client const& client) -> int64_t {
   Expects(client.Instance() != nullptr, "latency client exists");
-  return WallMilliseconds();
+  return Headless::WallMilliseconds();
 }
 
 auto ReportLatency(std::vector<int64_t>& latency, std::string_view event) -> void {
@@ -49,8 +49,7 @@ auto CheckLatency(std::string const& trace, std::string_view event, std::span<in
   for (std::string line; std::getline(lines, line);) {
     if (!line.contains(prefix)) continue;
     if (event == "key" && !line.contains(" code=30 ")) continue;
-    RecordSample(line, prefix, sent, latency);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(RecordSample(line, prefix, sent, latency));
   }
   ASSERT_EQ(latency.size(), sent.size()) << event;
   ReportLatency(latency, event);
@@ -67,8 +66,7 @@ auto PumpUntil(Client& client, Headless::FrameObserver& frames, Clock::time_poin
 auto SampleLatency(Client& client, Headless::FrameObserver& frames, Headless::ClipboardClient& clipboard,
                    std::vector<int64_t>& keys, std::vector<int64_t>& clips, Clock::time_point start) -> void {
   for (unsigned i = 0; i < 60; ++i) {
-    PumpUntil(client, frames, start + i * 50ms);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(PumpUntil(client, frames, start + i * 50ms));
     keys.push_back(SendTime(client));
     ASSERT_TRUE(freerdp_input_send_keyboard_event(client.Instance()->context->input,
                                                   i % 2 ? KBD_FLAGS_RELEASE : KBD_FLAGS_DOWN, 0x1e));
@@ -76,14 +74,6 @@ auto SampleLatency(Client& client, Headless::FrameObserver& frames, Headless::Cl
     ASSERT_EQ(clipboard.Offer({ BYTE('A' + i), 0, 0, 0 }), CHANNEL_RC_OK);
   }
   PumpUntil(client, frames, start + 3s);
-}
-}
-namespace {
-auto TightAudioArguments(fs::path const& certificates) -> std::vector<std::string> {
-  auto arguments = Arguments(certificates, false);
-  arguments.insert(arguments.begin() + 1, { "SDL_AUDIO_DRIVER=rdp", "SDL_RDP_TRACE=1", "SDL_LOGGING=video=info" });
-  arguments.insert(arguments.end(), { "--tone", "--tight" });
-  return arguments;
 }
 }
 namespace {
@@ -106,31 +96,28 @@ auto FinishLatency(std::jthread& drain, Process const& process, std::span<int64_
                    std::span<int64_t const> clips) -> void {
   drain.request_stop();
   drain.join();
-  CheckLatency(process.Transcript(), "key", keys);
+  ASSERT_NO_FATAL_FAILURE(CheckLatency(process.Transcript(), "key", keys));
   CheckLatency(process.Transcript(), "clipboard", clips);
 }
 }
 TEST_F(Sample, InputAndClipboardUnderTightVideo) {
   Expects(process == nullptr, "sample has not started");
-  GivenAudioProcess(TightAudioArguments(certificates.Path()));
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenAudioProcess({ "SDL_AUDIO_DRIVER=rdp", "SDL_RDP_TRACE=1", "SDL_LOGGING=video=info" },
+                                            { "--tone", "--tight" }));
   std::jthread              drain([&](std::stop_token const& stop) { DrainTrace(*process, stop); });
   Client                    client(audio_port, true, 640, 480);
   Headless::ClipboardClient clipboard(client);
   Headless::SoundClient     audio(client);
-  ASSERT_TRUE(freerdp_connect(client.Instance().get()));
+  ASSERT_NO_FATAL_FAILURE(Connect(client));
   Headless::FrameObserver frames(client);
-  ThenMediaReady(client, frames, audio, clipboard);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ThenMediaReady(client, frames, audio, clipboard));
   std::vector<int64_t> keys;
   std::vector<int64_t> clips;
   auto                 start  = Clock::now();
   auto                 before = frames.Frames().size();
-  SampleLatency(client, frames, clipboard, keys, clips, start);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(SampleLatency(client, frames, clipboard, keys, clips, start));
   EXPECT_GE(frames.Frames().size() - before, 60u);
-  Escape(client);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(Escape(client));
   FinishLatency(drain, *process, keys, clips);
 }
 }

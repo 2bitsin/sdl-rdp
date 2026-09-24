@@ -24,4 +24,6 @@ CheckOptions:
   readability-function-size.ParameterThreshold: 8
   readability-function-size.NestingThreshold: 4
   readability-function-cognitive-complexity.Threshold: 20
+  # gtest macros expand to switch/if blockers, not the test's own flow; per-lane config is buildutil #154
+  readability-function-cognitive-complexity.IgnoreMacros: true
   cppcoreguidelines-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic: true

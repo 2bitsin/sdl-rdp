@@ -1,4 +1,5 @@
 #include <sdl-rdp/headless-client.test/drive-session.hpp>
+#include <sdl-rdp/headless-client.test/backend-instance.hpp>
 
 #include <sdl-rdp/headless-client.test/config.hpp>
 #include <sdl-rdp/headless-client.test/share-drive.hpp>
@@ -24,9 +25,7 @@ auto DriveSession::SetUp() -> void {
   auto config = Headless::LoopbackConfig(path);
   config.log_user = &logs;
   config.log      = Headless::Logs::Collect;
-  sdlrdp_handle* opened = nullptr;
-  ASSERT_EQ(sdlrdp_open(&config, &opened), 0) << sdlrdp_last_error();
-  handle.reset(opened);
+  ASSERT_NO_FATAL_FAILURE(handle.Open(config));
   Connect();
 }
 auto DriveSession::Connect(char const* name, bool second) -> void {
@@ -34,7 +33,7 @@ auto DriveSession::Connect(char const* name, bool second) -> void {
   auto path = scratch.Path().string();
   Headless::ShareDrive(*client, path.c_str(), name);
   if (second) Headless::ShareDrive(*client, path.c_str(), "second");
-  ASSERT_TRUE(freerdp_connect(client->Instance().get())) << logs.Text(true);
+  ASSERT_TRUE(client->Connect()) << logs.Text(true);
   ASSERT_TRUE(client->Until([&] {
     sdlrdp_drive value{ };
     if (sdlrdp_drive_list(handle.get(), &value, 1) != 1) return false;
@@ -42,10 +41,7 @@ auto DriveSession::Connect(char const* name, bool second) -> void {
     drive = value.id;
     return true;
   }));
-  pump = std::jthread([&](std::stop_token const& stop) {
-    while (!stop.stop_requested() && client->Pump()) {
-    }
-  });
+  pump = PumpInBackground(*client);
 }
 auto DriveSession::GivenHeldFile() -> void {
   Write("file", "data");
@@ -62,26 +58,26 @@ auto DriveSession::HoldRequests() -> void {
 auto DriveSession::ThenVideoMatches() -> void {
   std::vector<UINT32> pixels(320uz * 200uz, 0x00446688);
   sdlrdp_rect const   damage{ 0, 0, 320, 200 };
-  ASSERT_EQ(sdlrdp_present(handle.get(), pixels.data(), 1280, 320, 200, &damage, 1), 0);
+  ASSERT_EQ(handle.Present(pixels, 320, 200, damage), 0);
   ASSERT_TRUE(client->Until([&] { return client->Matches(pixels); }));
 }
 auto DriveSession::Disconnect() -> void {
   pump.request_stop();
   if (pump.joinable()) pump.join();
-  if (client) freerdp_disconnect(client->Instance().get());
+  if (client) client->Disconnect();
   client.reset();
 }
 auto DriveSession::TearDown() -> void {
   observer.reset();
   Disconnect();
 }
-auto DriveSession::Logged(sdlrdp_log_level level, std::string_view text) -> unsigned {
+auto DriveSession::Logged(sdlrdp_log_level level, std::string_view text) -> std::size_t {
   return logs.Count(level, text);
 }
-auto DriveSession::Pattern(size_t size, unsigned seed) -> std::string {
+auto Pattern(std::size_t size, std::uint32_t seed) -> std::string {
   std::string bytes(size, '\0');
   std::ranges::transform(std::views::iota(0uz, size), bytes.begin(),
-                         [=](size_t i) { return char((i * 31 + i / 251 + seed) & 255); });
+                         [=](std::size_t i) { return char((i * 31 + i / 251 + seed) & 255); });
   return bytes;
 }
 auto DriveSession::Write(std::string const& name, std::string const& bytes) -> void {
@@ -93,13 +89,16 @@ auto DriveSession::Open(char const* name, unsigned flags) -> sdlrdp_file* {
   return file;
 }
 auto DriveSession::ThenRemovedDrive() -> void {
-  std::array<sdlrdp_event, 32> events { };
-  auto                         count  = sdlrdp_poll(handle.get(), events.data(), 32);
-  EXPECT_TRUE(std::ranges::any_of(std::span(events.data(), count), [&](auto const& event) {
-    return event.type == SDLRDP_DRIVE && !event.drive.added && event.drive.id == drive;
-  }));
+  EXPECT_TRUE(PolledDriveName(false, drive).has_value());
 }
-auto DriveSession::ThenDriveFailure(sdlrdp_file* file, unsigned warnings) -> void {
+auto DriveSession::PolledDriveName(bool added, std::uint32_t id) -> std::optional<std::string> {
+  auto const events = handle.Poll();
+  auto const found  = std::ranges::find_if(events, [&](auto const& event) {
+    return event.type == SDLRDP_DRIVE && event.drive.added == added && event.drive.id == id;
+  });
+  return found == events.end() ? std::nullopt : std::optional<std::string>(found->drive.name);
+}
+auto DriveSession::ThenDriveFailure(sdlrdp_file* file, std::size_t warnings) -> void {
   sdlrdp_drive value{ };
   EXPECT_EQ(sdlrdp_drive_list(handle.get(), &value, 1), 0);
   EXPECT_EQ(sdlrdp_drive_close(handle.get(), file), -1);

@@ -34,8 +34,8 @@ TEST(GraphicsCapability, Version101ReservedLength) {
 TEST(GraphicsCapability, MasksFlagsAndDisablesAvc) {
   constexpr auto handled = RDPGFX_CAPS_FLAG_THINCLIENT | RDPGFX_CAPS_FLAG_SMALL_CACHE
                            | RDPGFX_CAPS_FLAG_SCALEDMAP_DISABLE;
-  for (UINT32 const version : { RDPGFX_CAPVERSION_8, RDPGFX_CAPVERSION_81, RDPGFX_CAPVERSION_10, RDPGFX_CAPVERSION_102,
-                                RDPGFX_CAPVERSION_107 }) {
+  for (std::uint32_t const version : { RDPGFX_CAPVERSION_8, RDPGFX_CAPVERSION_81, RDPGFX_CAPVERSION_10,
+                                       RDPGFX_CAPVERSION_102, RDPGFX_CAPVERSION_107 }) {
     RDPGFX_CAPSET cap      { version, 4, 0xffffffff };
     auto          selected = Backend::SelectCapability({ &cap, 1 });
     EXPECT_EQ(selected.flags, handled | (version >= RDPGFX_CAPVERSION_10 ? RDPGFX_CAPS_FLAG_AVC_DISABLED : 0));
@@ -102,8 +102,8 @@ TEST(Avc, RegionMetablock) {
   regions.Add({ 2, 3, 4, 6 });
   EXPECT_EQ(regions.Bytes(), 24u);
   ThenRegionBounds(regions);
-  EXPECT_EQ(regions.Rects()[0].right, 24);
-  EXPECT_EQ(regions.Rects()[0].bottom, 24);
+  EXPECT_EQ(regions.Areas()[0].right, 24);
+  EXPECT_EQ(regions.Areas()[0].bottom, 24);
   for (auto q : regions.Quality()) {
     ThenRegionQuality(q);
   }
@@ -119,14 +119,21 @@ auto ThenAvailableCapability(RDPGFX_CAPSET const& cap, UINT32 version) -> void {
   }
 }
 TEST(GraphicsCapability, AllowsAvcWhenOfferedAndAvailable) {
-  for (UINT32 const version : { RDPGFX_CAPVERSION_8, RDPGFX_CAPVERSION_81, RDPGFX_CAPVERSION_10, RDPGFX_CAPVERSION_101,
-                                RDPGFX_CAPVERSION_102, RDPGFX_CAPVERSION_107 }) {
+  for (std::uint32_t const version : { RDPGFX_CAPVERSION_8, RDPGFX_CAPVERSION_81, RDPGFX_CAPVERSION_10,
+                                       RDPGFX_CAPVERSION_101, RDPGFX_CAPVERSION_102, RDPGFX_CAPVERSION_107 }) {
     RDPGFX_CAPSET cap{ version, version == RDPGFX_CAPVERSION_101 ? 16u : 4u, RDPGFX_CAPS_FLAG_AVC420_ENABLED };
     ThenAvailableCapability(cap, version);
     cap.flags = version >= RDPGFX_CAPVERSION_10 ? RDPGFX_CAPS_FLAG_AVC_DISABLED : 0;
     auto selected = Backend::SelectCapability({ &cap, 1 }, true);
     EXPECT_EQ(selected.flags,
               version >= RDPGFX_CAPVERSION_10 && version != RDPGFX_CAPVERSION_101 ? RDPGFX_CAPS_FLAG_AVC_DISABLED : 0u);
+  }
+}
+TEST(GraphicsCapability, WithoutEncoderTheConfirmedSetNeverAllowsAvc) {
+  for (std::uint32_t const version : { RDPGFX_CAPVERSION_81, RDPGFX_CAPVERSION_10, RDPGFX_CAPVERSION_107 }) {
+    RDPGFX_CAPSET const offered{ version, 4u, RDPGFX_CAPS_FLAG_AVC420_ENABLED };
+    EXPECT_TRUE(Backend::AllowsAvc(offered)) << version;
+    EXPECT_FALSE(Backend::AllowsAvc(Backend::SelectCapability({ &offered, 1 }, false))) << version;
   }
 }
 }

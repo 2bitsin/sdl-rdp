@@ -1,4 +1,5 @@
 #pragma once
+#include <sdl-rdp/utilities/deadline.hpp>
 #include <sdl-rdp-abi/sdl-rdp-backend.h>
 
 #include <concepts>
@@ -12,7 +13,7 @@ class EventQueue {
 public:
   auto Push(sdlrdp_event event)          -> void;
   auto Poll(std::span<sdlrdp_event> out) -> unsigned;
-  auto Wait(int timeout)                 -> int;
+  auto Wait(Deadline deadline)           -> int;
   auto Wakeup()                          -> void;
 
 private:

@@ -10,16 +10,14 @@ auto GraphicsBackend::OpenGraphics(char* pattern, unsigned width, unsigned heigh
   directory = path;
   sdlrdp_config config{ "127.0.0.1", 0, directory.c_str(), width, height, 0, Logs::Collect, &logs };
   config.codec = codec;
-  sdlrdp_handle* handle = nullptr;
-  ASSERT_EQ(sdlrdp_open(&config, &handle), 0) << sdlrdp_last_error();
-  backend.reset(handle);
+  ASSERT_NO_FATAL_FAILURE(backend.Open(config));
 }
 auto GraphicsBackend::TearDown() -> void {
-  backend.reset();
+  backend.Close();
   if (!directory.empty()) std::filesystem::remove_all(directory);
 }
 auto GraphicsBackend::ConnectGraphics(Client& client) -> void {
-  ASSERT_TRUE(freerdp_connect(client.Instance().get()));
+  ASSERT_TRUE(client.Connect());
   ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }, std::chrono::seconds(20)))
       << logs.Text(true);
 }

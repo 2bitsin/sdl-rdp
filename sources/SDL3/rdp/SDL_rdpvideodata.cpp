@@ -1,17 +1,14 @@
 #include "SDL_rdpvideodata.hpp"
 SDL_VideoData::SDL_VideoData(std::shared_ptr<rdp::Driver> driver, SDL_HintCallback codec, SDL_HintCallback aspect)
-    : _driver{ std::move(driver) }, _codec{ SDL_HINT_RDP_CODEC, codec, this },
+    : rdp::OwnedDriver<rdp::Driver>{ std::move(driver) }, _codec{ SDL_HINT_RDP_CODEC, codec, this },
       _aspect{ SDL_HINT_RDP_ASPECT, aspect, this } { }
-auto SDL_VideoData::Backend() const -> rdp::Driver const& {
-  return *_driver;
-}
 auto SDL_VideoData::Display() const -> SDL_DisplayID {
   return _display;
 }
 auto SDL_VideoData::Display(SDL_DisplayID display) -> void {
   _authentication.reset();
   _display = display;
-  if (display) _authentication.emplace(*_driver, SDL_GetDisplayProperties(display));
+  if (display) _authentication.emplace(Backend(), SDL_GetDisplayProperties(display));
 }
 auto SDL_VideoData::AttachTouch(SDL_TouchID touch) -> void {
   _touch.emplace(touch);

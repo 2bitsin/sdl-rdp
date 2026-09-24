@@ -18,7 +18,7 @@ public:
   [[nodiscard]] virtual auto Lock()                                               -> SessionLock    = 0;
   [[nodiscard]] virtual auto Takeover(PeerLink const& self)                       -> FrameLock      = 0;
   virtual auto               Depart(PeerLink const& self, Activation& activation) -> void           = 0;
-  virtual auto               NextDrive() noexcept                                 -> unsigned       = 0;
+  virtual auto               NextDrive() noexcept                                 -> std::uint32_t  = 0;
   virtual auto               AudioChanged()                                       -> void           = 0;
   virtual auto               AudioGone()                                          -> void           = 0;
 };

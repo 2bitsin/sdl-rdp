@@ -1,11 +1,12 @@
 #pragma once
 #include "SDL_rdpdrive.hpp"
 #include "SDL_rdpframebuffer.hpp"
+#include "SDL_rdpowneddriver.hpp"
 // SDL declares this tag as a struct; the members stay private.
-struct SDL_VideoData {
+struct SDL_VideoData : private rdp::OwnedDriver<rdp::Driver> {
 public:
+  using rdp::OwnedDriver<rdp::Driver>::Backend;
        SDL_VideoData(std::shared_ptr<rdp::Driver> driver, SDL_HintCallback codec, SDL_HintCallback aspect);
-  auto Backend() const                             -> rdp::Driver const&;
   auto Display() const                             -> SDL_DisplayID;
   auto Display(SDL_DisplayID display)              -> void;
   auto AttachTouch(SDL_TouchID touch)              -> void;
@@ -20,7 +21,6 @@ public:
   auto Attach(rdp::Surface surface) noexcept       -> void;
   auto Detach() noexcept                           -> void;
 private:
-  std::shared_ptr<rdp::Driver>                      _driver;
   SDL_DisplayID                                     _display       { };
   std::optional<rdp::AuthenticationDisplay>         _authentication;
   std::optional<std::reference_wrapper<SDL_Window>> _window;

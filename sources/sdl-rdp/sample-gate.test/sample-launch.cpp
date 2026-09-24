@@ -1,8 +1,11 @@
 #include <sdl-rdp/sample-gate.test/sample-launch.hpp>
 
 #include <SDL3/SDL_hints.h>
+#include <SDL3/SDL_video.h>
 #include <oxbox/utilities/number-text.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
+#include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <ranges>
 
@@ -32,23 +35,40 @@ auto SetBackendHints(fs::path const& certificates) -> bool {
          && SDL_SetHint("SDL_RDP_BACKEND", BackendLibrary().c_str());
 }
 
-auto Arguments(fs::path const& certificates, bool wait) -> std::vector<std::string> {
-  Expects(fs::is_directory(certificates), "certificate directory exists");
-  auto root    = BuildRoot();
-  auto backend = BackendLibrary();
-  return { "env",
-           "SDL_VIDEO_DRIVER=rdp",
-           "SDL_RDP_PORT=0",
-           "SDL_RDP_BIND=127.0.0.1",
-           "SDL_RDP_CERT_DIR=" + certificates.string(),
-           "SDL_RDP_BACKEND=" + backend.string(),
-           "SDL_RDP_CODEC=planar",
-           "SDL_RDP_WAIT_FOR_CLIENT=" + std::to_string(wait),
-           (root / "bin/sdl-rdp-sample").string() };
+// env applies its assignments in order, so an environment entry overrides the defaults before it.
+auto SetLoopbackHints(fs::path const& certificates, std::initializer_list<Hint> hints) -> bool {
+  constexpr std::array loopback { Hint{ SDL_HINT_VIDEO_DRIVER, "rdp" }, Hint{ "SDL_RDP_PORT", "0" },
+                                  Hint{ "SDL_RDP_BIND", "127.0.0.1" } };
+  auto const           set      = [](Hint const& hint) { return SDL_SetHint(hint.first, hint.second); };
+  return std::ranges::all_of(loopback, set) && std::ranges::all_of(hints, set) && SetBackendHints(certificates);
 }
 
-auto AnnouncedPort(std::string_view line) -> unsigned {
+auto Arguments(fs::path const& certificates, Words const& environment, Words const& options) -> Words {
+  Expects(fs::is_directory(certificates), "certificate directory exists");
+  Words arguments{ "env",
+                   "SDL_VIDEO_DRIVER=rdp",
+                   "SDL_RDP_PORT=0",
+                   "SDL_RDP_BIND=127.0.0.1",
+                   "SDL_RDP_CERT_DIR=" + certificates.string(),
+                   "SDL_RDP_BACKEND=" + BackendLibrary().string(),
+                   "SDL_RDP_CODEC=planar",
+                   "SDL_RDP_WAIT_FOR_CLIENT=0" };
+  arguments.append_range(environment);
+  arguments.push_back((BuildRoot() / "bin/sdl-rdp-sample").string());
+  arguments.append_range(options);
+  return arguments;
+}
+
+auto AnnouncedPort(std::string_view line) -> std::uint32_t {
   return utilities::Required(oxbox::utilities::ParseNumberAfter<unsigned>(line, "port "),
                              "the sample announces its port as a whole number");
+}
+auto PrimaryDisplayPort() -> std::uint32_t {
+  auto const port = SDL_GetNumberProperty(SDL_GetDisplayProperties(SDL_GetPrimaryDisplay()),
+                                          SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0);
+  return static_cast<std::uint32_t>(port);
+}
+auto AspectOptions() -> Words {
+  return { "--size", "640x350", "--aspect", "4:3" };
 }
 }

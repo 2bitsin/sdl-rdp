@@ -47,41 +47,31 @@ auto ThenCatNotRepeated(Process const& process, Headless::DriveObserver const& o
 TEST_F(DriveSample, DriveDisconnectDuringCat) {
   oxbox::platform::ScratchArea const share{ "sample-disconnect", "sdl-rdp" };
   CreateHugeFile(share.Path());
-  auto arguments = Arguments(certificates.Path(), false);
-  arguments.insert(arguments.end(), { "--cat", "share/huge.bin" });
-  GivenProcess(arguments);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(GivenProcess({ }, { "--cat", "share/huge.bin" }));
   auto port = AnnouncedPort(line);
-  DisconnectReading(port, share.Path());
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(DisconnectReading(port, share.Path()));
   ASSERT_TRUE(Read("cat failed: ")) << process->Transcript();
   SDL_Log("trace DRIVE disconnected after read request: %s", line.c_str());
   Client second(port, true, 640, 480);
   Headless::ShareDrive(second, share.Path().c_str());
-  ASSERT_TRUE(freerdp_connect(second.Instance().get())) << ConnectLogs();
+  ASSERT_NO_FATAL_FAILURE(Connect(second));
   Headless::DriveObserver observer(second);
   ASSERT_TRUE(second.Until([&] { return !observer.Observed().replies.empty() && Pattern(second, false); }));
-  Escape(second);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(Escape(second));
   while (process->Line(line, Clock::now() + 1s)) {
   }
   ThenCatNotRepeated(*process, observer);
 }
 
 TEST_F(DriveSample, DriveMissingCatKeepsServing) {
-  oxbox::platform::ScratchArea const share     { "sample-missing", "sdl-rdp" };
-  auto                               arguments = Arguments(certificates.Path(), false);
-  arguments.insert(arguments.end(), { "--cat", "share/missing.bin" });
-  GivenDriveProcess(arguments, share.Path());
-  if (::testing::Test::HasFatalFailure()) return;
+  oxbox::platform::ScratchArea const share{ "sample-missing", "sdl-rdp" };
+  ASSERT_NO_FATAL_FAILURE(GivenDriveProcess({ "--cat", "share/missing.bin" }, share.Path()));
   auto& client = SessionClient();
-  ThenMissingCat(client);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ThenMissingCat(client));
   // Observe a new frame after the failure, rather than inspecting an old framebuffer.
   Headless::FrameObserver observer(client);
   ASSERT_TRUE(client.Until([&] { return !observer.Frames().empty() && Pattern(client, false); }));
-  Escape(client);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(Escape(client));
   while (process->Line(line, Clock::now() + 1s)) {
   }
   auto failure = process->Transcript().find("cat failed:");

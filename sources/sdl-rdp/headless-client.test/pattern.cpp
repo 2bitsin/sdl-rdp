@@ -20,6 +20,10 @@ auto NoisePattern(std::span<std::uint32_t> pixels, std::uint32_t value) -> void 
     return value & 0xffffff;
   });
 }
+// Knuth's multiplicative hash: every pixel differs from its neighbours, so no codec finds runs.
+auto HashPattern(std::span<std::uint32_t> pixels, std::uint32_t first) -> void {
+  std::ranges::generate(pixels, [index = first]() mutable { return (index++ * 2654435761u) & 0xffffff; });
+}
 auto GraphicsScene(std::uint32_t frame, bool noise) -> std::vector<std::uint32_t> {
   std::vector<std::uint32_t> pixels(640uz * 480, 0x00010101);
   auto const                 left   = std::size_t{ frame % 640 };

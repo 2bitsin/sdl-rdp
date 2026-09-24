@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <optional>
 #include <ranges>
+#include <source_location>
 
 namespace Backend {
 using utilities::Expects;
@@ -16,24 +17,32 @@ inline auto Rows(sdlrdp_rect area) {
 constexpr auto SameSize(sdlrdp_rect left, sdlrdp_rect right) noexcept -> bool {
   return left.w == right.w && left.h == right.h;
 }
-inline auto Merge(std::optional<sdlrdp_rect>& region, sdlrdp_rect area) -> void {
-  Expects(area.w > 0, "band width is positive");
-  Expects(area.h > 0, "band height is positive");
-  if (!region) {
-    region = area;
-    return;
-  }
-  auto x      = std::min(region->x, area.x);
-  auto y      = std::min(region->y, area.y);
-  auto right  = std::max(region->x + region->w, area.x + area.w);
-  auto bottom = std::max(region->y + region->h, area.y + area.h);
-  region = sdlrdp_rect{ x, y, right - x, bottom - y };
+inline auto ExpectsArea(sdlrdp_rect area, std::source_location where = std::source_location::current()) -> void {
+  Expects(area.w >= 0, "rectangle width is nonnegative", where);
+  Expects(area.h >= 0, "rectangle height is nonnegative", where);
+}
+inline auto Union(sdlrdp_rect left, sdlrdp_rect right) -> sdlrdp_rect {
+  ExpectsArea(left);
+  ExpectsArea(right);
+  auto const x     = std::min(left.x, right.x);
+  auto const y     = std::min(left.y, right.y);
+  auto const end_x = std::max(left.x + left.w, right.x + right.w);
+  auto const end_y = std::max(left.y + left.h, right.y + right.h);
+  return { x, y, end_x - x, end_y - y };
+}
+inline auto Touches(sdlrdp_rect left, sdlrdp_rect right) -> bool {
+  ExpectsArea(left);
+  ExpectsArea(right);
+  return left.x <= right.x + right.w && right.x <= left.x + left.w && left.y <= right.y + right.h
+         && right.y <= left.y + left.h;
+}
+inline auto ExpectsBand(sdlrdp_rect area, std::source_location where = std::source_location::current()) -> void {
+  Expects(area.w > 0, "band width is positive", where);
+  Expects(area.h > 0, "band height is positive", where);
 }
 inline auto Intersect(sdlrdp_rect left, sdlrdp_rect right) -> std::optional<sdlrdp_rect> {
-  Expects(left.w >= 0, "left rectangle width is nonnegative");
-  Expects(left.h >= 0, "left rectangle height is nonnegative");
-  Expects(right.w >= 0, "right rectangle width is nonnegative");
-  Expects(right.h >= 0, "right rectangle height is nonnegative");
+  ExpectsArea(left);
+  ExpectsArea(right);
   auto x     = std::max(left.x, right.x);
   auto y     = std::max(left.y, right.y);
   auto end_x = std::min(std::int64_t(left.x) + left.w, std::int64_t(right.x) + right.w);

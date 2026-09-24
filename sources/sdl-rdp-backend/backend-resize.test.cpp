@@ -7,6 +7,7 @@
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
+#include <tuple>
 #include <vector>
 
 namespace BackendGate {
@@ -90,13 +91,13 @@ private:
 class ResizeStorm : public RoundFive {
 protected:
   auto ConnectDisplay(Client& client) -> void {
-    Connect(client, false);
+    ASSERT_NO_FATAL_FAILURE(Connect(client, false));
     ASSERT_TRUE(client.Until([&] { return Headless::DisplayClient::Ready(); }));
-    Events();
+    std::ignore = backend.Poll();
   }
   auto ThenQuietResize(ResizeProbe& probe) -> void {
     EXPECT_FALSE(logs.Contains("Unexpected client message")) << logs.Text(true);
-    EXPECT_FALSE(std::ranges::any_of(Events(), [](auto event) { return event.type == SDLRDP_SCREEN; }));
+    EXPECT_FALSE(std::ranges::any_of(backend.Poll(), [](auto event) { return event.type == SDLRDP_SCREEN; }));
     RecordProperty("DesktopResize_calls", probe.Calls());
     RecordProperty("SDLRDP_SCREEN_events", 0);
   }
@@ -121,9 +122,8 @@ protected:
   }
   auto DuringFinalization(ResizeProbe& probe, Backend::Extent last) -> void {
     ASSERT_TRUE(probe.AwaitFinalizing());
-    probe.ConfirmActiveCallback();
-    WhenResizeBurst(probe, last);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(probe.ConfirmActiveCallback());
+    ASSERT_NO_FATAL_FAILURE(WhenResizeBurst(probe, last));
     probe.MatchingLayout();
     EXPECT_TRUE(probe.Finalizing());
   }
@@ -135,19 +135,16 @@ protected:
         << " GDI=" << client.Instance()->context->gdi->width << "x" << client.Instance()->context->gdi->height << "\n"
         << logs.Text(true);
     for (unsigned i = 0; i < 20; ++i) ASSERT_TRUE(client.Pump(5));
-    ThenFinalDesktop(client, last);
-    if (::testing::Test::HasFatalFailure()) return;
-    ThenResizeCounts(display, probe, expected);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(ThenFinalDesktop(client, last));
+    ASSERT_NO_FATAL_FAILURE(ThenResizeCounts(display, probe, expected));
     ThenQuietResize(probe);
   }
   auto Run(Backend::Extent last, std::size_t expected) -> void {
-    Open(640, 480, { }, SDLRDP_CODEC_PLANAR);
+    ASSERT_NO_FATAL_FAILURE(Open(640, 480, { }, SDLRDP_CODEC_PLANAR));
     Client                  client(sdlrdp_port(backend.get()), true, 640, 480);
     Headless::DisplayClient display(client);
     display.Observed().echo_resize = expected == 1;
-    ConnectDisplay(client);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(ConnectDisplay(client));
     ResizeProbe probe(*backend);
     display.Observed().finalizing = [&] {
       if (display.Observed().desktops == 1) DuringFinalization(probe, last);
@@ -175,62 +172,54 @@ TEST_F(ResizeStorm, AlternatingAppSizesWithLayoutEcho) {
   Run({ .width = 1280, .height = 800 }, 1);
 }
 TEST_F(ResizeStorm, EqualLayoutDoesNotChangePicture) {
-  Open();
+  ASSERT_NO_FATAL_FAILURE(Open());
   Client                        client(sdlrdp_port(backend.get()), true, 640, 480);
   Headless::DisplayClient const display(client);
-  ConnectDisplay(client);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(ConnectDisplay(client));
   auto presented = Presented(*backend);
   ASSERT_TRUE(display.Layout(640, 480));
   ASSERT_TRUE(display.Layout(800, 600));
-  auto events = EventsUntil(
-      [](auto const& events) {
-        return std::ranges::any_of(events, [](auto event) { return event.type == SDLRDP_SCREEN; });
-      },
-      false, &client);
-  ThenSingleScreen(events, 800, 600);
+  auto events = UntilEvent(client, SDLRDP_SCREEN, false);
+  ASSERT_NO_FATAL_FAILURE(ThenSingleScreen(events, 800, 600));
   EXPECT_EQ(Presented(*backend), presented);
   RecordProperty("equal_layout_screen_events", 0);
   RecordProperty("equal_layout_picture_resizes", 0);
 }
 TEST_F(RoundFive, ResizeDesktop) {
-  Open();
+  ASSERT_NO_FATAL_FAILURE(Open());
   Client client(sdlrdp_port(backend.get()), true, 1024, 768);
   client.Instance()->context->update->DesktopResize = [](rdpContext* context) -> BOOL {
     return gdi_resize(context->gdi, freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopWidth),
                       freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopHeight));
   };
-  Connect(client, false);
+  ASSERT_NO_FATAL_FAILURE(Connect(client, false));
   EXPECT_EQ(client.Instance()->context->gdi->width, 640);
   ASSERT_EQ(sdlrdp_resize(backend.get(), 800, 600), 0);
   std::vector<UINT32> pixels(800uz * 600, 0x123456);
-  Present(pixels, 800, 600);
+  ASSERT_NO_FATAL_FAILURE(Present(pixels, 800, 600));
   ASSERT_TRUE(client.Until([&] { return client.Instance()->context->gdi->width == 800 && client.Matches(pixels); }))
       << logs.Text();
   EXPECT_EQ(client.Instance()->context->gdi->height, 600);
 }
 TEST_F(RoundFive, PictureSizeReactivatesDesktop) {
   for (bool const graphics : { false, true }) {
-    RunPictureSizes(graphics);
-    if (::testing::Test::HasFatalFailure()) return;
+    ASSERT_NO_FATAL_FAILURE(RunPictureSizes(graphics));
   }
 }
 
 TEST_F(RoundFive, ClientScreenNeverResizesPicture) {
-  Open();
+  ASSERT_NO_FATAL_FAILURE(Open());
   Client              client(sdlrdp_port(backend.get()), true, 1024, 768);
   DisplayClient const display(client);
-  Connect(client, false);
+  ASSERT_NO_FATAL_FAILURE(Connect(client, false));
   auto events = Events(2);
   ASSERT_EQ(events.size(), 2u);
   EXPECT_EQ(events[1].screen.width, 1024u);
   EXPECT_EQ(events[1].screen.height, 768u);
   ASSERT_TRUE(client.Until([&] { return Headless::DisplayClient::Ready(); })) << logs.Text();
-  auto monitor = Headless::DisplayClient::Monitor(1920, 1080, 500);
-  ASSERT_EQ(Headless::DisplayClient::Channel()->SendMonitorLayout(Headless::DisplayClient::Channel(), 1, &monitor),
-            CHANNEL_RC_OK);
+  ASSERT_TRUE(Headless::DisplayClient::Layout(1920, 1080, 500));
   ASSERT_TRUE(client.Until([&] { return sdlrdp_wait(backend.get(), 0) == 1; })) << logs.Text();
-  events = Events();
+  events = backend.Poll();
   ASSERT_EQ(events.size(), 1u);
   EXPECT_EQ(events[0].type, SDLRDP_SCREEN);
   EXPECT_EQ(events[0].screen.width, 1920u);

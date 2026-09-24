@@ -1,16 +1,16 @@
 #pragma once
-#include <sdl-rdp/sample-gate.test/sample-process.hpp>
+#include <sdl-rdp/sample-gate.test/sample-input.hpp>
 
 #include <sdl-rdp/headless-client.test/clipboard-client.hpp>
 
 namespace SampleGate {
-class SampleChecks : public SampleProcess {
+class SampleChecks : public SampleInput {
 protected:
   auto        WhenSurrogateText(rdpInput* input)                                         -> void;
   auto        WhenUnicodeText(rdpInput* input)                                           -> void;
   auto        ThenAbsoluteMouse(rdpInput* input)                                         -> void;
-  auto        WhenShiftedText(rdpInput* input)                                           -> void;
-  auto        WhenScancodeText(rdpInput* input)                                          -> void;
+  auto        WhenShiftedText(Client const& client)                                      -> void;
+  auto        WhenScancodeText(Client const& client)                                     -> void;
   auto        WhenNonAsciiKey(rdpInput* input)                                           -> void;
   auto        ThenUnicodeKeyEvents()                                                     -> void;
   auto        WhenUnicodeKeys(rdpInput* input)                                           -> void;

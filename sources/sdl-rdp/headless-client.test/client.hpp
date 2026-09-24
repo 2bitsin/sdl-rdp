@@ -5,8 +5,10 @@
 #include <freerdp/freerdp.h>
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <memory>
 #include <ranges>
+#include <thread>
 #include <vector>
 
 namespace Headless {
@@ -17,10 +19,13 @@ public:
   explicit Client(unsigned port, bool surface, unsigned width = 320, unsigned height = 200);
   auto     EnableGraphics(bool h264 = false) const                                                         -> void;
   auto     Credentials(char const* user, char const* password, char const* domain, bool nla = false) const -> void;
-  auto     Pump(unsigned timeout = 10) const                                                               -> bool;
-  auto     Matches(std::vector<UINT32> const& pixels)                                                      -> bool;
+  auto     Connect() const                                                                                 -> bool;
+  auto     Tap(std::uint16_t scancode) const                                                               -> void;
+  auto     Disconnect() const                                                                              -> bool;
+  auto     Pump(std::uint32_t timeout = 10) const                                                          -> bool;
+  auto     Matches(std::vector<std::uint32_t> const& pixels)                                               -> bool;
   auto MaxError(std::vector<UINT32> const& pixels, std::vector<UINT32> const* reference = nullptr) const -> unsigned;
-  auto     Received() const                                                                                -> UINT64;
+  auto Received() const -> std::uint64_t;
   auto     Until(auto ready, std::chrono::milliseconds timeout = std::chrono::seconds(10))                 -> bool {
     Expects(timeout.count() > 0, "event deadline is positive");
     auto deadline = Clock::now() + timeout;
@@ -29,12 +34,14 @@ public:
         return false;
     return ready();
   }
-  auto Instance() const          -> std::unique_ptr<freerdp, ReleaseClient> const&;
-  auto Tolerance() const         -> unsigned;
-  auto Tolerance(unsigned value) -> void;
+  auto UntilDesktop(std::uint32_t width, std::uint32_t height) -> bool;
+  auto Instance() const                                        -> std::unique_ptr<freerdp, ReleaseClient> const&;
+  auto Tolerance() const                                       -> std::uint32_t;
+  auto Tolerance(std::uint32_t value)                          -> void;
 
 private:
   std::unique_ptr<freerdp, ReleaseClient> instance  { freerdp_new() };
   unsigned                                tolerance = 0;
 };
+auto PumpInBackground(Client const& client) -> std::jthread;
 }

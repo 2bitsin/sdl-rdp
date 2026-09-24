@@ -1,4 +1,5 @@
 #include <sdl-rdp/headless-client.test/codec-session.hpp>
+#include <sdl-rdp/headless-client.test/backend-instance.hpp>
 
 #include <sdl-rdp/headless-client.test/input-steps.hpp>
 
@@ -12,10 +13,8 @@ auto CodecSession::SetUp() -> void {
   sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), 320, 200, 0, Logs::Collect, &logs };
   config.codec = GetParam().codec;
   std::filesystem::remove_all(certificates.Path());
-  sdlrdp_handle* handle = nullptr;
-  ASSERT_EQ(sdlrdp_open(&config, &handle), 0);
-  backend.reset(handle);
-  ASSERT_NE(sdlrdp_port(handle), 0u);
+  ASSERT_NO_FATAL_FAILURE(backend.Open(config));
+  ASSERT_NE(sdlrdp_port(backend.get()), 0u);
   std::array<UINT32, 8> bars{ 0x00ffffff, 0x00ffff00, 0x0000ffff, 0x0000ff00, 0x00ff00ff, 0x00ff0000, 0x000000ff, 0 };
   std::ranges::generate(pixels, [&, index = 0u]() mutable {
     auto x = index % 320;
@@ -24,19 +23,17 @@ auto CodecSession::SetUp() -> void {
   });
 }
 auto CodecSession::ConnectCodec(Client& client) -> void {
-  client.Tolerance(GetParam().codec == SDLRDP_CODEC_REMOTEFX ? 40 : GetParam().codec == SDLRDP_CODEC_NSCODEC ? 3 : 0);
-  ASSERT_TRUE(freerdp_connect(client.Instance().get())) << logs.Text(true);
+  client.Tolerance(CodecTolerance(GetParam().codec, GetParam().surface));
+  ASSERT_TRUE(client.Connect()) << logs.Text(true);
 }
 auto CodecSession::Reopen(unsigned width, unsigned height) -> void {
-  backend.reset();
+  backend.Close();
   sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), width, height, 0 };
   config.codec = GetParam().codec;
-  sdlrdp_handle* handle = nullptr;
-  ASSERT_EQ(sdlrdp_open(&config, &handle), 0);
-  backend.reset(handle);
+  ASSERT_NO_FATAL_FAILURE(backend.Open(config));
 }
 auto CodecSession::Frame(Client& client, sdlrdp_rect area) -> void {
-  ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &area, 1), 0);
+  ASSERT_EQ(backend.Present(pixels, 320, 200, area), 0);
   ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0) && client.Matches(pixels); }))
       << logs.Text();
 }
@@ -53,31 +50,23 @@ auto CodecSession::ThenPointerEvents(std::span<sdlrdp_event const> events) -> vo
   EXPECT_EQ(events[5].mouse_wheel.dy, 1);
 }
 auto CodecSession::Input(Client& client) -> void {
-  Headless::SendKeyboardAndMouse(client, 10, 20);
-  if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(Headless::SendKeyboardAndMouse(client, 10, 20));
   auto events = Events(6);
   ASSERT_EQ(events.size(), 6u);
   Headless::ThenKeyboard(events);
   ThenPointerEvents(events);
 }
 auto CodecSession::ThenChangedCodec(sdlrdp_codec expected) -> void {
-  auto events = EventsUntil(
-      [](auto const& events) {
-        return std::ranges::any_of(events, [](auto const& event) { return event.type == SDLRDP_CODEC_CHANGED; });
-      },
-      false);
+  auto events = UntilEvent(SDLRDP_CODEC_CHANGED, false);
   ASSERT_EQ(events.size(), 1u);
   EXPECT_EQ(events[0].type, SDLRDP_CODEC_CHANGED);
   EXPECT_EQ(events[0].codec_changed.codec, expected);
 }
 auto CodecSession::ThenCodecChange(sdlrdp_codec expected, sdlrdp_codec previous) -> void {
   if (expected != previous) {
-    ThenChangedCodec(expected);
+    ASSERT_NO_FATAL_FAILURE(ThenChangedCodec(expected));
   } else {
-    std::array<sdlrdp_event, 4> events { };
-    auto                        count  = sdlrdp_poll(backend.get(), events.data(), events.size());
-    EXPECT_TRUE(std::ranges::all_of(std::span(events).first(count),
-                                    [](auto const& event) { return event.type == SDLRDP_REFRESH; }));
+    EXPECT_TRUE(std::ranges::all_of(backend.Poll(), [](auto const& event) { return event.type == SDLRDP_REFRESH; }));
   }
 }
 auto CodecSession::ThenConnected() -> void {

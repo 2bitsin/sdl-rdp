@@ -2,6 +2,7 @@
 #include <sdl-rdp/core/frame-store.hpp>
 #include <sdl-rdp/core/session-access.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/session/peer-frame.hpp>
 #include <sdl-rdp/session/peer-set.hpp>
 
 #include <atomic>
@@ -17,19 +18,19 @@ class EventQueue;
 class Session final : public SessionAccess {
 public:
                      Session(FrameStore& frames, EventQueue& events);
-  [[nodiscard]] auto Lock()                                                           -> SessionLock override;
-  [[nodiscard]] auto LockPeers()                                                      -> PeersLock;
-  auto               ForEach(PeersLock const& held, std::invocable<Peer&> auto visit) -> void;
-  auto               Add(std::unique_ptr<Peer> peer)                                  -> void;
-  auto               Reap()                                                           -> void;
-  auto               ReapEvent() const noexcept                                       -> HANDLE;
-  [[nodiscard]] auto Takeover(PeerLink const& self)                                   -> FrameLock   override;
-  auto               Depart(PeerLink const& self, Activation& activation)             -> void        override;
-  auto               Current(SessionLock const& held) const                           -> Peer*;
-  auto               Current(FrameLock const& held) const                             -> Peer*;
-  auto               NextDrive() noexcept                                             -> unsigned    override;
-  auto               AudioChanged()                                                   -> void        override;
-  auto               AudioGone()                                                      -> void        override;
+  [[nodiscard]] auto Lock()                                               -> SessionLock   override;
+  auto               ForEachPeer(std::invocable<Peer&> auto visit)        -> void;
+  [[nodiscard]] auto LockPeersAndFrame()                                  -> PeerFrame;
+  auto               Add(std::unique_ptr<Peer> peer)                      -> void;
+  auto               Reap()                                               -> void;
+  auto               ReapEvent() const noexcept                           -> HANDLE;
+  [[nodiscard]] auto Takeover(PeerLink const& self)                       -> FrameLock     override;
+  auto               Depart(PeerLink const& self, Activation& activation) -> void          override;
+  auto               Current(SessionLock const& held) const               -> Peer*;
+  auto               Current(FrameLock const& held) const                 -> Peer*;
+  auto               NextDrive() noexcept                                 -> std::uint32_t override;
+  auto               AudioChanged()                                       -> void          override;
+  auto               AudioGone()                                          -> void          override;
   auto WaitAudio(SessionLock& held, std::chrono::steady_clock::time_point deadline) -> void;
 
 private:
@@ -42,7 +43,9 @@ private:
   EventQueue&                 _events;
   PeerSet                     _peers;
 };
-auto Session::ForEach(PeersLock const& held, std::invocable<Peer&> auto visit) -> void {
+auto Session::ForEachPeer(std::invocable<Peer&> auto visit) -> void {
+  auto const session = Lock();
+  auto const held    = _peers.Lock();
   _peers.ForEach(held, visit);
 }
 template <std::invocable<Peer&> Act> auto OnCurrent(Session& session, Act act) -> decltype(auto) {

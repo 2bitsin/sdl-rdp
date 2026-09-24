@@ -2,6 +2,7 @@
 #include <sdl-rdp/core/frame-snapshot.hpp>
 #include <sdl-rdp/core/picture-geometry.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
+#include <sdl-rdp/utilities/deadline.hpp>
 #include <sdl-rdp/utilities/extent.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
@@ -20,16 +21,12 @@ using FrameLock = std::unique_lock<std::mutex>;
 class FrameStore : private Pinned {
 public:
                      FrameStore(Extent size, sdlrdp_aspect aspect);
-  [[nodiscard]] auto Lock()                                                           -> FrameLock;
-  auto               Holds(FrameLock const& held) const noexcept                      -> bool;
-  auto               Notify()                                                         -> void;
-  auto               WaitFor(FrameLock& held, int timeout, std::predicate auto ready) -> bool {
+  [[nodiscard]] auto Lock()                                                                 -> FrameLock;
+  auto               Holds(FrameLock const& held) const noexcept                            -> bool;
+  auto               Notify()                                                               -> void;
+  auto               WaitFor(FrameLock& held, Deadline deadline, std::predicate auto ready) -> bool {
     Expects(Holds(held), "waiting holds the frame lock");
-    if (timeout < 0)
-      _changed.wait(held, ready);
-    else
-      _changed.wait_for(held, std::chrono::milliseconds(timeout), ready);
-    return ready();
+    return _changed.wait_until(held, deadline, ready);
   }
   auto Read(std::invocable<FrameStore const&, FrameLock const&> auto query) -> decltype(auto) {
     auto const held = Lock();

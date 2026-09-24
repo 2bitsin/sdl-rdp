@@ -1,5 +1,7 @@
 #include <sdl-rdp/core/event-queue.hpp>
 
+#include <sdl-rdp/utilities/deadline.hpp>
+
 #include <algorithm>
 #include <chrono>
 
@@ -14,14 +16,11 @@ auto EventQueue::Poll(std::span<sdlrdp_event> out) -> unsigned {
   _events.erase(_events.begin(), _events.begin() + std::ptrdiff_t(count));
   return unsigned(count);
 }
-auto EventQueue::Wait(int timeout) -> int {
+auto EventQueue::Wait(Deadline deadline) -> int {
   std::unique_lock lock(_guard);
   auto const       since = _generation;
   auto const       ready = [&] { return !_events.empty() || since != _generation; };
-  if (timeout < 0)
-    _changed.wait(lock, ready);
-  else
-    _changed.wait_for(lock, std::chrono::milliseconds(timeout), ready);
+  _changed.wait_until(lock, deadline, ready);
   return !_events.empty();
 }
 auto EventQueue::Wakeup() -> void {
