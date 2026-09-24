@@ -126,11 +126,24 @@ def _in_graph(conanfile, entry: dict) -> bool:
   return present
 
 
-def _host_targets(conanfile) -> dict[str, str]:
-  """Each host target the direct wrappers declare, as <conan>::<component>."""
+def _dependency_targets(dependency) -> dict[str, str]:
+  """One dependency's cmake targets, defaults and declared, as <conan>::<component>."""
+  name, info = dependency.ref.name, dependency.cpp_info
+  infos = [(name, info), *info.components.items()]
+  targets = {f"{name}::{component}": f"{name}::{component}"
+             for component, _ in infos}
+  targets.update({part.get_property("cmake_target_name"): f"{name}::{component}"
+                  for component, part in infos
+                  if part.get_property("cmake_target_name")})
+  targets.update(info.get_property("buildutil_host_targets") or {})
+  return targets
+
+
+def _linked_targets(conanfile) -> dict[str, str]:
+  """Every cmake target the direct dependencies declare, conan-spelled."""
   targets = {}
-  for wrapper in conanfile.dependencies.direct_host.values():
-    targets.update(wrapper.cpp_info.get_property("buildutil_host_targets") or {})
+  for dependency in conanfile.dependencies.direct_host.values():
+    targets.update(_dependency_targets(dependency))
   return targets
 
 
@@ -462,7 +475,7 @@ class ProjectRecipe(ConanFile):
     by_path = {c["path"]: _component_name(c["path"], self.name)
                for c in components}
     linked = any(c.get("external") or c.get("host") for c in components)
-    hosts = _host_targets(self) if linked else {}
+    targets = _linked_targets(self) if linked else {}
     for c in components:
       component = self.cpp_info.components[by_path[c["path"]]]
       component.libs = [c["lib"]] if c["lib"] in libs else []
@@ -470,25 +483,37 @@ class ProjectRecipe(ConanFile):
       component.includedirs = incdirs
       external = c.get("external", [])
       component.requires = [by_path[n] for n in c.get("needs", [])
-                            if n in by_path] + [
-        hosts.get(item, item) for item in external
-        if item in hosts or "::" in item] + self._host_requires(c, hosts)
-      # a conan target is pkg::comp; anything else is a system lib
+                            if n in by_path] + self._external_requires(
+        c, targets) + self._host_requires(c, targets)
       component.system_libs = [item for item in external
-                               if item not in hosts and "::" not in item]
+                               if item not in targets and "::" not in item]
 
-  def _host_requires(self, component: dict, hosts: dict[str, str]) -> list[str]:
+  def _external_requires(self, component: dict,
+                         targets: dict[str, str]) -> list[str]:
+    """A component's namespaced links as the dependency components they are."""
+    namespaced = [t for t in component.get("external", [])
+                  if t in targets or "::" in t]
+    unresolved = [t for t in namespaced if t not in targets]
+    if unresolved:
+      raise ConanException(
+        f"{self.name}: module {component['path']} links {unresolved}, which "
+        "no direct dependency of this package declares as a cmake target; "
+        "Require the package that provides it.")
+    return [targets[t] for t in namespaced]
+
+  def _host_requires(self, component: dict,
+                     targets: dict[str, str]) -> list[str]:
     """A component's host targets as the wrapper components declaring them;
     a cross build forces no wrapper, so its targets are the target's own."""
     if cross_building(self):
       return []
-    unresolved = [t for t in component.get("host", []) if t not in hosts]
+    unresolved = [t for t in component.get("host", []) if t not in targets]
     if unresolved:
       raise ConanException(
         f"{self.name}: module {component['path']} links {unresolved}, which a "
         "SYSTEM find imported and no host wrapper this package requires "
         "declares; link the target of the package's own SYSTEM Require.")
-    return [hosts[t] for t in component.get("host", [])]
+    return [targets[t] for t in component.get("host", [])]
 
 
 def _shipped_libraries(root: Path) -> tuple[set[str], list[str]]:
