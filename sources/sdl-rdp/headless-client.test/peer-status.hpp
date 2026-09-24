@@ -32,8 +32,7 @@ inline auto AllAcknowledged(sdlrdp_handle& handle, Backend::FrameLock const& hel
   return current != nullptr && current->Status(held).acknowledged >= handle.Frames().Presented(held);
 }
 inline auto AllAcknowledged(sdlrdp_handle& handle) -> bool {
-  auto const session = handle.Session().Lock();
-  auto const frame   = handle.Frames().Lock();
+  auto const frame = handle.Frames().Lock();
   return AllAcknowledged(handle, frame);
 }
 }
