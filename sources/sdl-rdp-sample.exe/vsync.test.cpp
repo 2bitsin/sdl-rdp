@@ -15,19 +15,19 @@ struct RefreshCase {
   char const*          hint;
   Backend::RefreshMode mode;
 };
-void PrintTo(RefreshCase const& value, std::ostream* output) {
+auto PrintTo(RefreshCase const& value, std::ostream* output) -> void {
   *output << '"' << value.hint << '"';
 }
 }
 class VsyncRecovery : public Sample, public testing::WithParamInterface<RefreshCase> {
 protected:
-  void WhenFrameRendered(unsigned& frame) {
+  auto WhenFrameRendered(unsigned& frame) -> void {
     SDL_PumpEvents();
     ASSERT_TRUE(SDL_SetRenderDrawColor(renderer, ++frame % 256, 0, 0, 255));
     ASSERT_TRUE(SDL_RenderClear(renderer));
     ASSERT_TRUE(SDL_RenderPresent(renderer));
   }
-  void GivenRendererHints() {
+  auto GivenRendererHints() -> void {
     for (auto [key, value] : { std::pair{ SDL_HINT_VIDEO_DRIVER, "rdp" },
                                { "SDL_RDP_PORT"  , "0"         },
                                { "SDL_RDP_BIND"  , "127.0.0.1" },
@@ -40,7 +40,7 @@ protected:
     ASSERT_TRUE(
         SDL_SetHint("SDL_RDP_BACKEND", (BuildRoot() / "sources/sdl-rdp-backend.so/libsdl-rdp-backend.so").c_str()));
   }
-  void SetUp() override {
+  auto SetUp() -> void override {
     Expects(window == nullptr, "fixture has no window");
     Sample::SetUp();
     if (auto* value = std::getenv("SDL_RDP_TRACE")) previous_trace = value;
@@ -54,7 +54,7 @@ protected:
     ASSERT_TRUE(SDL_SetHint("SDL_RDP_REFRESH", GetParam().hint));
     CreateRenderer();
   }
-  void CreateRenderer() {
+  auto CreateRenderer() -> void {
     Expects(window == nullptr, "window has not been created");
     GivenRendererHints();
     if (::testing::Test::HasFatalFailure()) return;
@@ -65,7 +65,7 @@ protected:
     ASSERT_NE(renderer, nullptr);
     ASSERT_TRUE(SDL_SetRenderVSync(renderer, 1));
   }
-  void RenderWhile(std::future<void>& client) {
+  auto RenderWhile(std::future<void>& client) -> void {
     Expects(renderer != nullptr, "vsync renderer exists");
     unsigned frame = 0;
     while (client.wait_for(0ms) != std::future_status::ready) {
@@ -73,7 +73,7 @@ protected:
       if (::testing::Test::HasFatalFailure()) return;
     }
   }
-  void Run(RateRecovery recovery) {
+  auto Run(RateRecovery recovery) -> void {
     Expects(renderer != nullptr, "vsync renderer exists");
     auto port   = SDL_GetNumberProperty(SDL_GetDisplayProperties(SDL_GetPrimaryDisplay()),
                                      SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0);
@@ -82,7 +82,7 @@ protected:
     ASSERT_NO_FATAL_FAILURE(RenderWhile(client));
     client.get();
   }
-  void TearDown() override {
+  auto TearDown() -> void override {
     Expects(output != nullptr, "previous log callback was saved");
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);

@@ -4,14 +4,14 @@
 #include <atomic>
 
 namespace Backend {
-bool Signalled(HANDLE event);
+auto Signalled(HANDLE event) -> bool;
 class WakeEvent {
 public:
   enum class Phase{ Idle, Pending };
   explicit WakeEvent(HANDLE value);
-  HANDLE   get() const;
+  auto     get() const            -> HANDLE;
   explicit operator bool() const;
-  void     Transition(Phase next);
+  auto     Transition(Phase next) -> void;
 
 private:
   EventHandle        handle;

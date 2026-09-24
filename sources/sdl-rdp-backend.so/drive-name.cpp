@@ -6,7 +6,7 @@
 
 namespace Backend {
 namespace {
-std::string DecodeDriveName(std::span<uint8_t const> bytes, unsigned drive_version, char const* dos) {
+auto DecodeDriveName(std::span<uint8_t const> bytes, unsigned drive_version, char const* dos) -> std::string {
   if (!bytes.empty()) {
     if (bytes.back()) throw std::runtime_error("Unterminated drive name.");
     // FreeRDP 3.15 sends UTF-8 despite advertising drive capability v2.
@@ -22,7 +22,7 @@ std::string DecodeDriveName(std::span<uint8_t const> bytes, unsigned drive_versi
   return dos;
 }
 }
-std::string DriveChannel::Name(std::span<uint8_t const> bytes, char const* dos) const {
+auto DriveChannel::Name(std::span<uint8_t const> bytes, char const* dos) const -> std::string {
   std::string label(dos);
   try {
     label = DecodeDriveName(bytes, drive_version, dos);

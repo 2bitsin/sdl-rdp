@@ -44,7 +44,7 @@ TEST(RefreshEstimator, SenderUsesQueueAndSegments) {
   EXPECT_EQ(value.Rate(), 50u);
 }
 namespace {
-void ThenBlockedIntervals(Refresh& value, Refresh::Clock::time_point now) {
+auto ThenBlockedIntervals(Refresh& value, Refresh::Clock::time_point now) -> void {
   value.Blocked(now);
   EXPECT_EQ(value.Rate(), 50u);
   value.Blocked(now + 19ms);

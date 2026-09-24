@@ -12,12 +12,12 @@ class EventQueue;
 class PeerLink;
 class DisplayControl : private Pinned {
 public:
-                      DisplayControl(PeerLink& link, Activation const& activation, DesktopLayout const& desktop,
-                                     EventQueue& events) noexcept;
-  bool                Open();
-  DispServerContext*  Opened() const noexcept;
-  std::optional<BOOL> Activate(UINT32 channel_id);
-  UINT                Layout(DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const& pdu);
+       DisplayControl(PeerLink& link, Activation const& activation, DesktopLayout const& desktop,
+                      EventQueue& events) noexcept;
+  auto Open()                                                -> bool;
+  auto Opened() const noexcept                               -> DispServerContext*;
+  auto Activate(UINT32 channel_id)                           -> std::optional<BOOL>;
+  auto Layout(DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const& pdu) -> UINT;
 
 private:
   using DisplayContext = std::unique_ptr<DispServerContext, Releases<disp_server_context_free>>;

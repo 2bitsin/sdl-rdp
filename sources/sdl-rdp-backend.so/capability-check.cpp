@@ -20,7 +20,7 @@ CapabilityCheck::CapabilityCheck(PeerLink& link, Authenticator& authenticator, A
                                  Diagnostics const& diagnostics) noexcept
     : _link { link }, _authenticator{ authenticator }, _activation{ activation }, _pacing{ pacing },
       _desktop{ desktop }, _store{ store }, _diagnostics{ diagnostics } { }
-BOOL CapabilityCheck::Accept() {
+auto CapabilityCheck::Accept() -> BOOL {
   if (!_authenticator.VerifySettings()) return FALSE;
   auto&      settings = _link.Settings();
   auto const frame    = _store.Lock();

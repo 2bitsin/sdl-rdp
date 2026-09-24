@@ -9,17 +9,17 @@ class OutputControl;
 class PeerLink;
 class PeerCallbacks {
 public:
-                 PeerCallbacks(PeerCallbacks const&) = delete;
-                 PeerCallbacks(PeerCallbacks&&)      = delete;
-  PeerCallbacks(PeerLink& link, Authenticator& authenticator, Activator& activator, CapabilityCheck& capabilities,
-                OutputControl& output, InputEvents& input);
-                 ~PeerCallbacks();
-  PeerCallbacks& operator = (PeerCallbacks const&)   = delete;
-  PeerCallbacks& operator = (PeerCallbacks&&)        = delete;
+       PeerCallbacks(PeerCallbacks const&)                 = delete;
+       PeerCallbacks(PeerCallbacks&&)                      = delete;
+       PeerCallbacks(PeerLink& link, Authenticator& authenticator, Activator& activator, CapabilityCheck& capabilities,
+                     OutputControl& output, InputEvents& input);
+       ~PeerCallbacks();
+  auto operator = (PeerCallbacks const&) -> PeerCallbacks& = delete;
+  auto operator = (PeerCallbacks&&)      -> PeerCallbacks& = delete;
 
 private:
-  void InstallClient();
-  void InstallUpdates();
+  auto InstallClient()  -> void;
+  auto InstallUpdates() -> void;
   PeerLink&        _link;
   Authenticator&   _authenticator;
   Activator&       _activator;

@@ -7,9 +7,9 @@
 namespace Backend {
 class PixelBand {
 public:
-                  PixelBand(sdlrdp_rect value, std::span<BYTE> bytes) noexcept;
-  sdlrdp_rect     Area() const                                        noexcept;
-  std::span<BYTE> Pixels() const                                      noexcept;
+       PixelBand(sdlrdp_rect value, std::span<BYTE> bytes) noexcept;
+  auto Area() const noexcept   -> sdlrdp_rect;
+  auto Pixels() const noexcept -> std::span<BYTE>;
 
 private:
   sdlrdp_rect     _area;

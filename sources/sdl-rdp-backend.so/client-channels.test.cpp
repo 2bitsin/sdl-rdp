@@ -7,7 +7,7 @@
 
 namespace Headless {
 namespace {
-BOOL LoadAddin(freerdp* instance, char const* name, std::span<char const* const> dynamic) {
+auto LoadAddin(freerdp* instance, char const* name, std::span<char const* const> dynamic) -> BOOL {
   auto* settings = instance->context->settings;
   auto  entry    = reinterpret_cast<PVIRTUALCHANNELENTRYEX>(freerdp_load_channel_addin_entry(
       name, nullptr, nullptr, FREERDP_ADDIN_CHANNEL_STATIC | FREERDP_ADDIN_CHANNEL_ENTRYEX));
@@ -16,14 +16,14 @@ BOOL LoadAddin(freerdp* instance, char const* name, std::span<char const* const>
 }
 }
 
-BOOL LoadStaticChannel(freerdp* instance, char const* name) {
+auto LoadStaticChannel(freerdp* instance, char const* name) -> BOOL {
   return LoadAddin(instance, name, { });
 }
-BOOL LoadDynamicChannel(freerdp* instance, char const* name) {
+auto LoadDynamicChannel(freerdp* instance, char const* name) -> BOOL {
   std::array const channel{ name };
   return LoadAddin(instance, "drdynvc", channel);
 }
-bool SendStaticChannel(freerdp* instance, char const* name, std::span<BYTE const> bytes) {
+auto SendStaticChannel(freerdp* instance, char const* name, std::span<BYTE const> bytes) -> bool {
   auto id = freerdp_channels_get_id_by_name(instance, name);
   return id && instance->SendChannelData(instance, id, bytes.data(), bytes.size());
 }

@@ -15,8 +15,8 @@ auto Present(Driver const& driver, SDL_Surface const& surface, std::span<sdlrdp_
   return driver.Call<Operation::WAIT_FRAME>(FrameAcknowledgementWaitMs) >= 0 || driver.Fail();
 }
 // SDL returns a framebuffer through format, pixels and pitch output parameters.
-bool CreateFramebuffer(SDL_VideoDevice* device, SDL_Window* window, SDL_PixelFormat* format, void** pixels,
-                       int* pitch) {
+auto CreateFramebuffer(SDL_VideoDevice* device, SDL_Window* window, SDL_PixelFormat* format, void** pixels,
+                       int* pitch) -> bool {
   utilities::Expects(device != nullptr, "framebuffer has a device");
   utilities::Expects(window != nullptr, "framebuffer has a window");
   utilities::Expects(format != nullptr, "framebuffer format output exists");
@@ -35,8 +35,8 @@ bool CreateFramebuffer(SDL_VideoDevice* device, SDL_Window* window, SDL_PixelFor
   });
 }
 // SDL supplies a borrowed device, window and counted rectangle buffer.
-bool UpdateFramebuffer(SDL_VideoDevice* device, [[maybe_unused]] SDL_Window* unused_window, SDL_Rect const* rects,
-                       int count) {
+auto UpdateFramebuffer(SDL_VideoDevice* device, [[maybe_unused]] SDL_Window* unused_window, SDL_Rect const* rects,
+                       int count) -> bool {
   utilities::Expects(device != nullptr, "frame update has a device");
   utilities::Expects(count >= 0, "rectangle count is nonnegative");
   auto const& data    = *device->internal;
@@ -48,12 +48,12 @@ bool UpdateFramebuffer(SDL_VideoDevice* device, [[maybe_unused]] SDL_Window* unu
   });
 }
 // SDL's framebuffer destruction callback borrows its device and window.
-void DestroyFramebuffer(SDL_VideoDevice* device, [[maybe_unused]] SDL_Window* unused_window) {
+auto DestroyFramebuffer(SDL_VideoDevice* device, [[maybe_unused]] SDL_Window* unused_window) -> void {
   utilities::Expects(device != nullptr, "framebuffer destruction has a device");
   device->internal->Framebuffer(std::nullopt);
 }
 }
-void InitFramebuffer(SDL_VideoDevice& device) {
+auto InitFramebuffer(SDL_VideoDevice& device) -> void {
   device.CreateWindowFramebuffer  = CreateFramebuffer;
   device.UpdateWindowFramebuffer  = UpdateFramebuffer;
   device.DestroyWindowFramebuffer = DestroyFramebuffer;

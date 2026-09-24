@@ -1,7 +1,7 @@
 #pragma once
 #include "_detail/check.hpp"
 
-inline char const* TouchName(Uint32 type) {
+inline auto TouchName(Uint32 type) -> char const* {
   switch (type) {
   case SDL_EVENT_FINGER_DOWN:
     return "FINGER_DOWN";
@@ -15,7 +15,7 @@ inline char const* TouchName(Uint32 type) {
     return nullptr;
   }
 }
-inline bool PrintInput(SDL_Event const& event, SDL_Window* window) {
+inline auto PrintInput(SDL_Event const& event, SDL_Window* window) -> bool {
   if (event.type == SDL_EVENT_TEXT_INPUT) {
     SDL_Log("event TEXT_INPUT text=%s", event.text.text);
     return true;
@@ -31,7 +31,7 @@ inline bool PrintInput(SDL_Event const& event, SDL_Window* window) {
   return true;
 }
 
-inline void InputMode(SDL_Event const& event, SDL_Window* window) {
+inline auto InputMode(SDL_Event const& event, SDL_Window* window) -> void {
   if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat) return;
   switch (event.key.scancode) {
   case SDL_SCANCODE_F6:

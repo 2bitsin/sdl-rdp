@@ -8,8 +8,8 @@ namespace Backend {
 enum class FileKind{ File, Directory, Any };
 class FileRequest {
 public:
-              FileRequest(unsigned flags, FileKind kind, unsigned extra_access = 0);
-  DrivePacket Create(std::span<uint8_t const> name) const;
+       FileRequest(unsigned flags, FileKind kind, unsigned extra_access = 0);
+  auto Create(std::span<uint8_t const> name) const -> DrivePacket;
 
 private:
   unsigned _access;

@@ -16,20 +16,20 @@ namespace SampleGate {
 namespace {
 class DriveSample : public SampleGate::Sample {
 protected:
-  void ThenMissingCat(Client& client) {
+  auto ThenMissingCat(Client& client) -> void {
     ASSERT_TRUE(ReadInput(client, "cat failed: ")) << process->Transcript();
     EXPECT_NE(line.find("Drive 'missing.bin' failed: STATUS_NO_SUCH_FILE (0xc000000f)"), std::string::npos) << line;
   }
 };
 namespace {
-void ThenCatFailure(Process const& process) {
+auto ThenCatFailure(Process const& process) -> void {
   auto failure = process.Transcript().find("cat failed:");
   EXPECT_EQ(process.Transcript().find("cat failed:", failure + 1), std::string::npos);
   EXPECT_EQ(process.Transcript().find("cat bytes="), std::string::npos);
 }
 }
 namespace {
-void CreateHugeFile(fs::path const& share) {
+auto CreateHugeFile(fs::path const& share) -> void {
   auto path = share / "huge.bin";
   {
     std::ofstream const file(path);
@@ -38,7 +38,7 @@ void CreateHugeFile(fs::path const& share) {
 }
 }
 namespace {
-void ThenCatNotRepeated(Process const& process, Headless::DriveObserver const& observer) {
+auto ThenCatNotRepeated(Process const& process, Headless::DriveObserver const& observer) -> void {
   EXPECT_EQ(observer.Observed().requests, 0u);
   ThenCatFailure(process);
   SDL_Log("trace DRIVE second client connected, frame received, cat not repeated, sample exited 0");

@@ -54,18 +54,18 @@ auto Adopt(rdpSettings& settings, std::unique_ptr<VTy, Releases<RELEASE>> owned)
     throw std::runtime_error("FreeRDP refused a server credential.");
   std::ignore = owned.release();
 }
-std::string Hostname() {
+auto Hostname() -> std::string {
   std::array<char, 256> name{ };
   if (gethostname(name.data(), name.size() - 1)) throw std::runtime_error("Hostname unavailable.");
   return name.data();
 }
-bool Stamp(X509& cert) {
+auto Stamp(X509& cert) -> bool {
   constexpr long X509Version3 = 2;
   constexpr auto Validity     = std::chrono::seconds(std::chrono::days(3650));
   return X509_set_version(&cert, X509Version3) && ASN1_INTEGER_set(X509_get_serialNumber(&cert), 1) &&
          X509_gmtime_adj(X509_getm_notBefore(&cert), 0) && X509_gmtime_adj(X509_getm_notAfter(&cert), Validity.count());
 }
-bool Identify(X509& cert, EVP_PKEY* key, std::string const& host) {
+auto Identify(X509& cert, EVP_PKEY* key, std::string const& host) -> bool {
   auto* const     name      = X509_get_subject_name(&cert);
   auto const      san       = "DNS:" + host;
   Extension const extension(
@@ -76,7 +76,7 @@ bool Identify(X509& cert, EVP_PKEY* key, std::string const& host) {
                                     0) &&
          X509_set_issuer_name(&cert, name) && extension && X509_add_ext(&cert, extension.get(), -1);
 }
-Certificate SelfSigned(EVP_PKEY* key) {
+auto SelfSigned(EVP_PKEY* key) -> Certificate {
   Expects(key != nullptr, "RSA key exists");
   Certificate cert(X509_new());
   if (!cert) throw std::runtime_error("Certificate allocation failed.");
@@ -84,7 +84,7 @@ Certificate SelfSigned(EVP_PKEY* key) {
     throw std::runtime_error("Certificate signing failed.");
   return cert;
 }
-void Generate(Credentials const& paths) {
+auto Generate(Credentials const& paths) -> void {
   Key const key(EVP_RSA_gen(2048));
   if (!key) throw std::runtime_error("RSA key generation failed.");
   auto      cert     = SelfSigned(key.get());
@@ -99,7 +99,7 @@ void Generate(Credentials const& paths) {
     throw std::runtime_error("Credential writing failed.");
 }
 }
-std::filesystem::path DefaultCertificateDirectory() {
+auto DefaultCertificateDirectory() -> std::filesystem::path {
   if (auto* data = std::getenv("XDG_DATA_HOME"); data && *data) return std::filesystem::path(data) / "sdl-rdp";
   if (auto* home = std::getenv("HOME"); home && *home) return std::filesystem::path(home) / ".local/share/sdl-rdp";
   std::array<char, 16384> buffer { };
@@ -109,7 +109,7 @@ std::filesystem::path DefaultCertificateDirectory() {
     throw std::runtime_error("User home directory unavailable.");
   return std::filesystem::path(entry.pw_dir) / ".local/share/sdl-rdp";
 }
-Credentials EnsureCertificate(std::filesystem::path const& directory) {
+auto EnsureCertificate(std::filesystem::path const& directory) -> Credentials {
   Expects(!directory.empty(), "certificate directory is nonempty");
   static std::mutex      generation_guard;
   std::scoped_lock const lock(generation_guard);

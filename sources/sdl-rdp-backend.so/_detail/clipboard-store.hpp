@@ -8,11 +8,11 @@
 namespace Backend {
 class ClipboardStore {
 public:
-  uint64_t              Replace(std::string value);
-  std::string const&    Text() const       noexcept;
-  std::span<BYTE const> Unicode() const    noexcept;
-  uint64_t              Generation() const noexcept;
-  char const*           Export();
+  auto Replace(std::string value)  -> uint64_t;
+  auto Text() const noexcept       -> std::string const&;
+  auto Unicode() const noexcept    -> std::span<BYTE const>;
+  auto Generation() const noexcept -> uint64_t;
+  auto Export()                    -> char const*;
 
 private:
   std::string       _text;

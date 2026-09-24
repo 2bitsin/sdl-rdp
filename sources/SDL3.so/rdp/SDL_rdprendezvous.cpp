@@ -3,7 +3,7 @@ namespace rdp {
 namespace {
 constexpr auto RendezvousProperty = "SDL.rdp.internal.driver";
 }
-void SDLCALL Rendezvous::_Cleanup([[maybe_unused]] void* unused, void* value) {
+auto SDLCALL Rendezvous::_Cleanup([[maybe_unused]] void* unused, void* value) -> void {
   utilities::Expects(value != nullptr, "rendezvous property owns its value");
   std::unique_ptr<Rendezvous> const owner{ static_cast<Rendezvous*>(value) };
 }

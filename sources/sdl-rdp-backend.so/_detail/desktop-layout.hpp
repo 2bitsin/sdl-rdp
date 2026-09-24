@@ -4,19 +4,19 @@
 #include <freerdp/settings.h>
 
 namespace Backend {
-bool ApplyDesktopSize(rdpSettings& settings, sdlrdp_rect picture);
+auto ApplyDesktopSize(rdpSettings& settings, sdlrdp_rect picture) -> bool;
 class DesktopLayout {
 public:
-  sdlrdp_rect  Rect() const                       noexcept;
-  void         Assign(sdlrdp_rect value)          noexcept;
-  void         RecordScreen(rdpSettings const& settings);
-  sdlrdp_event ScreenEvent() const                noexcept;
-  bool         Resizing() const                   noexcept;
-  void         BeginResize(sdlrdp_rect picture)   noexcept;
-  bool         EndResize()                        noexcept;
-  bool         Matches(sdlrdp_rect picture) const noexcept;
-  sdlrdp_rect  Offer(sdlrdp_rect picture) const   noexcept;
-  int          Scale(int value, unsigned target, int sdlrdp_rect::* extent) const;
+  auto Rect() const noexcept                                              -> sdlrdp_rect;
+  auto Assign(sdlrdp_rect value) noexcept                                 -> void;
+  auto RecordScreen(rdpSettings const& settings)                          -> void;
+  auto ScreenEvent() const noexcept                                       -> sdlrdp_event;
+  auto Resizing() const noexcept                                          -> bool;
+  auto BeginResize(sdlrdp_rect picture) noexcept                          -> void;
+  auto EndResize() noexcept                                               -> bool;
+  auto Matches(sdlrdp_rect picture) const noexcept                        -> bool;
+  auto Offer(sdlrdp_rect picture) const noexcept                          -> sdlrdp_rect;
+  auto Scale(int value, unsigned target, int sdlrdp_rect::* extent) const -> int;
 
 private:
   sdlrdp_rect _desktop      { };

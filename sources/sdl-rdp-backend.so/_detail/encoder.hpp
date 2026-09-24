@@ -17,23 +17,23 @@ using RemoteFxContext = std::unique_ptr<RFX_CONTEXT, Releases<rfx_context_free>>
 using NsCodecContext  = std::unique_ptr<NSC_CONTEXT, Releases<nsc_context_free>>;
 class Encoder {
 public:
-  bool                     SetupPlanar(rdpSettings const* settings, bool xrgb = false);
-  bool                     Select(rdpSettings const* settings, sdlrdp_codec preference);
-  bool                     EncodePlanar(std::span<BYTE const> pixels, unsigned width);
-  bool                     Encode(std::span<BYTE const> pixels, unsigned width, unsigned height);
-  bool                     EncodePayload(std::span<BYTE const> pixels, unsigned width, unsigned height);
-  unsigned                 Id(rdpSettings const* settings) const;
-  sdlrdp_codec             Codec() const                            noexcept;
-  void                     Use(sdlrdp_codec value)                  noexcept;
-  std::span<BYTE const>    Payload() const                          noexcept;
-  std::chrono::nanoseconds EncodeTime() const                       noexcept;
-  void                     Charge(std::chrono::nanoseconds elapsed) noexcept;
-  std::span<BYTE>          Scratch(std::size_t size);
+  auto SetupPlanar(rdpSettings const* settings, bool xrgb = false)                  -> bool;
+  auto Select(rdpSettings const* settings, sdlrdp_codec preference)                 -> bool;
+  auto EncodePlanar(std::span<BYTE const> pixels, unsigned width)                   -> bool;
+  auto Encode(std::span<BYTE const> pixels, unsigned width, unsigned height)        -> bool;
+  auto EncodePayload(std::span<BYTE const> pixels, unsigned width, unsigned height) -> bool;
+  auto Id(rdpSettings const* settings) const                                        -> unsigned;
+  auto Codec() const noexcept                                                       -> sdlrdp_codec;
+  auto Use(sdlrdp_codec value) noexcept                                             -> void;
+  auto Payload() const noexcept                                                     -> std::span<BYTE const>;
+  auto EncodeTime() const noexcept                                                  -> std::chrono::nanoseconds;
+  auto Charge(std::chrono::nanoseconds elapsed) noexcept                            -> void;
+  auto Scratch(std::size_t size)                                                    -> std::span<BYTE>;
 
 private:
-  bool EncodeRemoteFx(std::span<BYTE const> pixels, unsigned width, unsigned height);
-  bool InitializeCodec(rdpSettings const* settings);
-  auto ResetRemoteFx(unsigned width, unsigned height) -> bool;
+  auto EncodeRemoteFx(std::span<BYTE const> pixels, unsigned width, unsigned height) -> bool;
+  auto InitializeCodec(rdpSettings const* settings)                                  -> bool;
+  auto ResetRemoteFx(unsigned width, unsigned height)                                -> bool;
   using PlanarContext = std::unique_ptr<BITMAP_PLANAR_CONTEXT, Releases<freerdp_bitmap_planar_context_free>>;
   struct PlanarState {
     PlanarContext        context;

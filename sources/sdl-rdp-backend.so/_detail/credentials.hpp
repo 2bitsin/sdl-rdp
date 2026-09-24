@@ -4,10 +4,10 @@
 namespace Backend {
 class Credentials {
 public:
-  explicit                     Credentials(std::filesystem::path const& directory);
-  std::filesystem::path const& Certificate() const noexcept;
-  std::filesystem::path const& Key() const         noexcept;
-  bool                         Exist() const;
+  explicit Credentials(std::filesystem::path const& directory);
+  auto     Certificate() const noexcept -> std::filesystem::path const&;
+  auto     Key() const noexcept         -> std::filesystem::path const&;
+  auto     Exist() const                -> bool;
 
 private:
   std::filesystem::path _certificate;

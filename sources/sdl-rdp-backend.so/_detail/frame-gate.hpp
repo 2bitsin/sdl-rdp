@@ -13,10 +13,10 @@ class FrameGate : private Pinned {
 public:
        FrameGate(PeerLink& link, FrameStore& store, PeerFrames& frames, DesktopLayout& desktop, FramePacing& pacing,
                  Activation const& activation, GraphicsLink const& graphics) noexcept;
-  bool Admit();
+  auto Admit() -> bool;
 
 private:
-  bool Settle();
+  auto Settle() -> bool;
   PeerLink&           _link;
   FrameStore&         _store;
   PeerFrames&         _frames;

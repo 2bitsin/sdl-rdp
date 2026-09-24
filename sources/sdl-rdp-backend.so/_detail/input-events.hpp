@@ -27,20 +27,20 @@ class InputEvents : private Pinned {
 public:
        InputEvents(PeerLink& link, Activation const& activation, DesktopLayout const& desktop, EventQueue& events,
                    FrameStore& store, Diagnostics const& diagnostics, SessionAccess& session) noexcept;
-  void Install(rdpInput& input);
-  BOOL Key(UINT16 flags, UINT8 code);
-  BOOL Text(UINT16 flags, UINT16 code);
-  BOOL Mouse(UINT16 flags, UINT16 x, UINT16 y);
-  BOOL ExtendedMouse(UINT16 flags);
-  UINT Pointer(UINT64 flags, INT32 x, INT32 y);
-  UINT Touch(RDPINPUT_TOUCH_EVENT const& event);
-  void Point(MouseMode mode) noexcept;
+  auto Install(rdpInput& input)                 -> void;
+  auto Key(UINT16 flags, UINT8 code)            -> BOOL;
+  auto Text(UINT16 flags, UINT16 code)          -> BOOL;
+  auto Mouse(UINT16 flags, UINT16 x, UINT16 y)  -> BOOL;
+  auto ExtendedMouse(UINT16 flags)              -> BOOL;
+  auto Pointer(UINT64 flags, INT32 x, INT32 y)  -> UINT;
+  auto Touch(RDPINPUT_TOUCH_EVENT const& event) -> UINT;
+  auto Point(MouseMode mode) noexcept           -> void;
 
 private:
-  template <class Result> Result WhenActive(Result idle, std::invocable auto action);
-  bool                           Motion(int x, int y);
-  bool                           Center();
-  void                           Scaled(int x, int y, std::invocable<int, int, sdlrdp_rect> auto build);
+  template <class Result> auto WhenActive(Result idle, std::invocable auto action)                    -> Result;
+  auto                         Motion(int x, int y)                                                   -> bool;
+  auto                         Center()                                                               -> bool;
+  auto                         Scaled(int x, int y, std::invocable<int, int, sdlrdp_rect> auto build) -> void;
   PeerLink&                                       _link;
   Activation const&                               _activation;
   DesktopLayout const&                            _desktop;

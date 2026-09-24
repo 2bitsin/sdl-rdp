@@ -8,20 +8,20 @@
 namespace Backend {
 namespace {
 constexpr UINT32 PressureScale = 1024;
-sdlrdp_touch_phase Phase(UINT32 flags) {
+auto Phase(UINT32 flags) -> sdlrdp_touch_phase {
   if (flags & RDPINPUT_CONTACT_FLAG_CANCELED) return SDLRDP_TOUCH_CANCEL;
   if (flags & RDPINPUT_CONTACT_FLAG_UP) return SDLRDP_TOUCH_UP;
   if (flags & RDPINPUT_CONTACT_FLAG_DOWN) return SDLRDP_TOUCH_DOWN;
   return SDLRDP_TOUCH_MOVE;
 }
-float Pressure(RDPINPUT_CONTACT_DATA const& contact) {
+auto Pressure(RDPINPUT_CONTACT_DATA const& contact) -> float {
   if (!(contact.fieldsPresent & CONTACT_DATA_PRESSURE_PRESENT)) return 1.0F;
   return float(std::min(contact.pressure, PressureScale)) / float(PressureScale);
 }
-float Unit(INT32 value, int extent) {
+auto Unit(INT32 value, int extent) -> float {
   return std::clamp(float(value) / float(extent), 0.0F, 1.0F);
 }
-sdlrdp_event Contact(sdlrdp_rect desktop, RDPINPUT_CONTACT_DATA const& contact) {
+auto Contact(sdlrdp_rect desktop, RDPINPUT_CONTACT_DATA const& contact) -> sdlrdp_event {
   Expects(desktop.w > 0, "desktop width is positive");
   Expects(desktop.h > 0, "desktop height is positive");
   return { .type  = SDLRDP_TOUCH,
@@ -38,7 +38,7 @@ auto Contacts(RDPINPUT_TOUCH_EVENT const& event) {
          std::views::join;
 }
 }
-UINT InputEvents::Touch(RDPINPUT_TOUCH_EVENT const& event) {
+auto InputEvents::Touch(RDPINPUT_TOUCH_EVENT const& event) -> UINT {
   return WhenActive(UINT{ CHANNEL_RC_OK }, [&] {
     for (auto const& contact : Contacts(event))
       _events.Push(Contact(_desktop.Rect(), contact));

@@ -19,19 +19,19 @@ namespace {
 constexpr UINT32 MonitorLimit      = 16;
 constexpr UINT32 MonitorAreaFactor = 8192;
 using Monitor = DISPLAY_CONTROL_MONITOR_LAYOUT;
-DisplayControl& Held(DispServerContext* context) {
+auto Held(DispServerContext* context) -> DisplayControl& {
   Expects(context != nullptr, "callback context exists");
   return CallbackOwner<DisplayControl>(context->custom);
 }
-UINT Layout(DispServerContext* context, DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const* pdu) {
+auto Layout(DispServerContext* context, DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const* pdu) -> UINT {
   Expects(pdu, "display layout PDU is supplied");
   return Held(context).Layout(*pdu);
 }
-int64_t Edge(std::span<Monitor const> monitors, std::regular_invocable<Monitor const&> auto edge,
-             std::regular_invocable<int64_t, int64_t> auto pick) {
+auto Edge(std::span<Monitor const> monitors, std::regular_invocable<Monitor const&> auto edge,
+          std::regular_invocable<int64_t, int64_t> auto pick) -> int64_t {
   return std::ranges::fold_left(monitors | std::views::transform(edge), int64_t{ 0 }, pick);
 }
-sdlrdp_rect Covering(std::span<Monitor const> monitors) {
+auto Covering(std::span<Monitor const> monitors) -> sdlrdp_rect {
   auto const lower  = [](int64_t a, int64_t b) { return std::min(a, b); };
   auto const upper  = [](int64_t a, int64_t b) { return std::max(a, b); };
   auto const left   = Edge(monitors, [](auto const& m) { return int64_t(m.Left); }, lower);
@@ -44,7 +44,7 @@ sdlrdp_rect Covering(std::span<Monitor const> monitors) {
 DisplayControl::DisplayControl(PeerLink& link, Activation const& activation, DesktopLayout const& desktop,
                                EventQueue& events) noexcept
     : _link { link }, _activation{ activation }, _desktop{ desktop }, _events{ events } { }
-bool DisplayControl::Open() {
+auto DisplayControl::Open() -> bool {
   if (_open || !freerdp_settings_get_bool(&_link.Settings(), FreeRDP_SupportDisplayControl) ||
       !DynamicChannelsReady(_link))
     return true;
@@ -60,14 +60,14 @@ bool DisplayControl::Open() {
   _open                           = _context->Open(_context.get()) == CHANNEL_RC_OK;
   return _open;
 }
-DispServerContext* DisplayControl::Opened() const noexcept {
+auto DisplayControl::Opened() const noexcept -> DispServerContext* {
   return _open ? _context.get() : nullptr;
 }
-std::optional<BOOL> DisplayControl::Activate(UINT32 channel_id) {
+auto DisplayControl::Activate(UINT32 channel_id) -> std::optional<BOOL> {
   if (_id != channel_id) return std::nullopt;
   return _context->DisplayControlCaps(_context.get()) == CHANNEL_RC_OK;
 }
-UINT DisplayControl::Layout(DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const& pdu) {
+auto DisplayControl::Layout(DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const& pdu) -> UINT {
   if (!pdu.NumMonitors || !_activation.Active()) return CHANNEL_RC_OK;
   auto const extent = Covering({ pdu.Monitors, pdu.NumMonitors });
   if (_desktop.Matches(extent)) return CHANNEL_RC_OK;

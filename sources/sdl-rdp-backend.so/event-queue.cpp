@@ -4,17 +4,17 @@
 #include <chrono>
 
 namespace Backend {
-void EventQueue::Push(sdlrdp_event event) {
+auto EventQueue::Push(sdlrdp_event event) -> void {
   Notify([&] { _events.push_back(event); });
 }
-unsigned EventQueue::Poll(std::span<sdlrdp_event> out) {
+auto EventQueue::Poll(std::span<sdlrdp_event> out) -> unsigned {
   std::scoped_lock const lock(_guard);
   auto const             count = std::min(out.size(), _events.size());
   std::copy_n(_events.begin(), count, out.begin());
   _events.erase(_events.begin(), _events.begin() + std::ptrdiff_t(count));
   return unsigned(count);
 }
-int EventQueue::Wait(int timeout) {
+auto EventQueue::Wait(int timeout) -> int {
   std::unique_lock lock(_guard);
   auto const       since = _generation;
   auto const       ready = [&] { return !_events.empty() || since != _generation; };
@@ -24,7 +24,7 @@ int EventQueue::Wait(int timeout) {
     _changed.wait_for(lock, std::chrono::milliseconds(timeout), ready);
   return !_events.empty();
 }
-void EventQueue::Wakeup() {
+auto EventQueue::Wakeup() -> void {
   Notify([&] { ++_generation; });
 }
 }

@@ -6,9 +6,9 @@
 namespace Backend {
 class PointerStore {
 public:
-  void            Replace(PointerShape next);
-  uint64_t        Generation() const noexcept;
-  PointerDelivery Send(rdpContext& context);
+  auto Replace(PointerShape next)  -> void;
+  auto Generation() const noexcept -> uint64_t;
+  auto Send(rdpContext& context)   -> PointerDelivery;
 
 private:
   PointerShape _shape;

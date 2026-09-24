@@ -12,14 +12,14 @@
 
 namespace Backend {
 namespace {
-std::string Levels(std::span<int16_t const> samples) {
+auto Levels(std::span<int16_t const> samples) -> std::string {
   Expects(!samples.empty(), "audio block has samples");
   auto squares =
       std::ranges::fold_left(samples, 0.0, [](double sum, int16_t sample) { return sum + (double(sample) * sample); });
   auto peak = std::ranges::max(samples | std::views::transform([](int16_t sample) { return std::abs(int(sample)); }));
   return std::format("rms={} peak={}", int(std::sqrt(squares / double(samples.size()))), peak);
 }
-void ApplyVolume(std::span<int16_t> stereo, UINT32 volume) {
+auto ApplyVolume(std::span<int16_t> stereo, UINT32 volume) -> void {
   Expects(stereo.size() % 2 == 0, "stereo frames are complete");
   auto left  = int32_t(volume & 0xffff);
   auto right = int32_t(volume >> 16);
@@ -29,7 +29,7 @@ void ApplyVolume(std::span<int16_t> stereo, UINT32 volume) {
   });
 }
 constexpr UINT16 StereoFrame = 4;
-AUDIO_FORMAT StereoPcm(UINT32 rate) {
+auto StereoPcm(UINT32 rate) -> AUDIO_FORMAT {
   return { .wFormatTag      = WAVE_FORMAT_PCM,
            .nChannels       = 2,
            .nSamplesPerSec  = rate,
@@ -81,29 +81,29 @@ AudioChannel::~AudioChannel() {
     WTSVirtualChannelOpen(_link.Channels(), WTS_CURRENT_SESSION, name.data())
   };
 }
-bool AudioChannel::Initialize() {
+auto AudioChannel::Initialize() -> bool {
   Expects(_sound != nullptr, "sound context exists");
   return _sound->Initialize(_sound.get(), FALSE) == CHANNEL_RC_OK;
 }
-bool AudioChannel::Pump() {
+auto AudioChannel::Pump() -> bool {
   Expects(_sound != nullptr, "sound context exists");
   auto result = rdpsnd_server_handle_messages(_sound.get());
   if (result == ERROR_INTERNAL_ERROR && !_ready && !_rejected && !_sound->num_client_formats)
     RejectFormats();
   return !_rejected && SoundHandled(result);
 }
-HANDLE AudioChannel::Event() const {
+auto AudioChannel::Event() const -> HANDLE {
   Expects(_sound != nullptr, "sound context exists");
   return rdpsnd_server_get_event_handle(_sound.get());
 }
-unsigned AudioChannel::Rate() const {
+auto AudioChannel::Rate() const -> unsigned {
   return _ready ? _selected.nSamplesPerSec : 0;
 }
-unsigned AudioChannel::Remaining() const {
+auto AudioChannel::Remaining() const -> unsigned {
   Expects(_ready, "audio has a selected format");
   return (_selected.nSamplesPerSec / 50) - unsigned(_buffer.size() / 2);
 }
-void AudioChannel::Reset() {
+auto AudioChannel::Reset() -> void {
   _sent         = _confirmed = _clock_frames = 0;
   _first        = _clock_start = { };
   _server_clock = _has_confirmation = false;
@@ -111,7 +111,7 @@ void AudioChannel::Reset() {
   _buffer.clear();
 }
 
-void AudioChannel::AdoptServerClock() {
+auto AudioChannel::AdoptServerClock() -> void {
   Expects(_ready, "audio has a selected format");
   auto const now      = Clock::now();
   auto const settling = _first == Clock::time_point{ } || now - _first < std::chrono::milliseconds(500);
@@ -123,7 +123,7 @@ void AudioChannel::AdoptServerClock() {
   _diagnostics.Log(SDLRDP_LOG_WARN, "No audio confirmation after 500 ms; using server-clock pacing.");
 }
 
-bool AudioChannel::Send(std::span<int16_t const> samples) {
+auto AudioChannel::Send(std::span<int16_t const> samples) -> bool {
   Expects(_ready, "channel handshake is complete");
   Expects(samples.size() % 2 == 0, "stereo samples contain complete frames");
   Expects(samples.size() / 2 <= Remaining(), "audio frames fit the pending block");
@@ -133,7 +133,7 @@ bool AudioChannel::Send(std::span<int16_t const> samples) {
   return SendBlock();
 }
 
-bool AudioChannel::SendBlock() {
+auto AudioChannel::SendBlock() -> bool {
   if (_sound->capsFlags & TSSNDCAPS_VOLUME) ApplyVolume(_buffer, _sound->initialVolume);
   auto now       = Clock::now();
   auto block     = _sound->block_no;
@@ -152,7 +152,7 @@ bool AudioChannel::SendBlock() {
   _link.Signal();
   return true;
 }
-void AudioChannel::LogAudio() const {
+auto AudioChannel::LogAudio() const -> void {
   Expects(_sound != nullptr, "audio statistics have a channel");
   using Milliseconds = std::chrono::duration<double, std::milli>;
   _diagnostics.Log(SDLRDP_LOG_INFO,

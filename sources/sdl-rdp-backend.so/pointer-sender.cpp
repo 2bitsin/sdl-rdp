@@ -8,7 +8,7 @@
 namespace Backend {
 PointerSender::PointerSender(PointerStore& pointer, PeerLink& link, Diagnostics const& diagnostics) noexcept
     : _pointer { pointer }, _link{ link }, _diagnostics{ diagnostics } { }
-bool PointerSender::Send() {
+auto PointerSender::Send() -> bool {
   if (_generation == _pointer.Generation()) return true;
   auto const delivery = _pointer.Send(_link.Context());
   switch (delivery) {

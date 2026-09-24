@@ -20,19 +20,19 @@
 
 namespace SampleGate {
 namespace {
-void RecordSample(std::string_view line, std::string_view prefix, std::span<int64_t const> sent,
-                  std::vector<int64_t>& latency) {
+auto RecordSample(std::string_view line, std::string_view prefix, std::span<int64_t const> sent,
+                  std::vector<int64_t>& latency) -> void {
   ASSERT_LT(latency.size(), sent.size());
   auto elapsed = TraceNumber(line, prefix) - sent[latency.size()];
   EXPECT_GE(elapsed, 0);
   latency.push_back(elapsed);
 }
-int64_t SendTime(Client const& client) {
+auto SendTime(Client const& client) -> int64_t {
   Expects(client.Instance() != nullptr, "latency client exists");
   return WallMilliseconds();
 }
 
-void ReportLatency(std::vector<int64_t>& latency, std::string_view event) {
+auto ReportLatency(std::vector<int64_t>& latency, std::string_view event) -> void {
   std::ranges::sort(latency);
   auto p95 = latency[((latency.size() * 95 + 99) / 100) - 1];
   testing::Test::RecordProperty(std::string(event) + "_p95_ms", p95);
@@ -40,7 +40,7 @@ void ReportLatency(std::vector<int64_t>& latency, std::string_view event) {
           static_cast<long long>(p95));
   EXPECT_LT(p95, 40) << event;
 }
-void CheckLatency(std::string const& trace, std::string_view event, std::span<int64_t const> sent) {
+auto CheckLatency(std::string const& trace, std::string_view event, std::span<int64_t const> sent) -> void {
   Expects(!event.empty(), "trace event is named");
   Expects(!sent.empty(), "client sent measured events");
   auto                 prefix  = std::format("trace {} t=", event);
@@ -58,14 +58,14 @@ void CheckLatency(std::string const& trace, std::string_view event, std::span<in
 }
 
 namespace {
-void PumpUntil(Client& client, Headless::FrameObserver& frames, Clock::time_point deadline) {
+auto PumpUntil(Client& client, Headless::FrameObserver& frames, Clock::time_point deadline) -> void {
   while (Clock::now() < deadline) {
     ASSERT_TRUE(client.Pump(1));
     if (!frames.Frames().empty()) ASSERT_TRUE(frames.Ack());
   }
 }
-void SampleLatency(Client& client, Headless::FrameObserver& frames, Headless::ClipboardClient& clipboard,
-                   std::vector<int64_t>& keys, std::vector<int64_t>& clips, Clock::time_point start) {
+auto SampleLatency(Client& client, Headless::FrameObserver& frames, Headless::ClipboardClient& clipboard,
+                   std::vector<int64_t>& keys, std::vector<int64_t>& clips, Clock::time_point start) -> void {
   for (unsigned i = 0; i < 60; ++i) {
     PumpUntil(client, frames, start + i * 50ms);
     if (::testing::Test::HasFatalFailure()) return;
@@ -79,7 +79,7 @@ void SampleLatency(Client& client, Headless::FrameObserver& frames, Headless::Cl
 }
 }
 namespace {
-std::vector<std::string> TightAudioArguments(fs::path const& certificates) {
+auto TightAudioArguments(fs::path const& certificates) -> std::vector<std::string> {
   auto arguments = Arguments(certificates, false);
   arguments.insert(arguments.begin() + 1, { "SDL_AUDIO_DRIVER=rdp", "SDL_RDP_TRACE=1", "SDL_LOGGING=video=info" });
   arguments.insert(arguments.end(), { "--tone", "--tight" });
@@ -87,15 +87,15 @@ std::vector<std::string> TightAudioArguments(fs::path const& certificates) {
 }
 }
 namespace {
-void DrainTrace(Process& process, std::stop_token const& stop) {
+auto DrainTrace(Process& process, std::stop_token const& stop) -> void {
   std::string output;
   while (!stop.stop_requested())
     process.Line(output, Clock::now() + 10ms);
 }
 }
 namespace {
-void ThenMediaReady(Client& client, Headless::FrameObserver& frames, Headless::SoundClient& audio,
-                    Headless::ClipboardClient& clipboard) {
+auto ThenMediaReady(Client& client, Headless::FrameObserver& frames, Headless::SoundClient& audio,
+                    Headless::ClipboardClient& clipboard) -> void {
   ASSERT_TRUE(client.Until([&] {
     if (!frames.Frames().empty()) frames.Ack();
     return !audio.CaptureState().received.empty() && clipboard.Observed().accepted.load() > 0;
@@ -103,8 +103,8 @@ void ThenMediaReady(Client& client, Headless::FrameObserver& frames, Headless::S
 }
 }
 namespace {
-void FinishLatency(std::jthread& drain, Process const& process, std::span<int64_t const> keys,
-                   std::span<int64_t const> clips) {
+auto FinishLatency(std::jthread& drain, Process const& process, std::span<int64_t const> keys,
+                   std::span<int64_t const> clips) -> void {
   drain.request_stop();
   drain.join();
   CheckLatency(process.Transcript(), "key", keys);

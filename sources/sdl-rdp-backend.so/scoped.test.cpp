@@ -12,12 +12,12 @@ auto Close(int* count) noexcept -> bool {
   return true;
 }
 auto IsNull(int const* count) noexcept -> bool { return count == nullptr; }
-void MakeNull(int*& count) noexcept { count = nullptr; }
+auto MakeNull(int*& count) noexcept    -> void { count = nullptr; }
 auto Enter(int& count)                 -> int& {
   ++count;
   return count;
 }
-void Leave(int& count) noexcept { --count; }
+auto Leave(int& count) noexcept -> void { --count; }
 using Counted = utilities::RAIIWrap<int*, Open, Close, IsNull, MakeNull>;
 using Entered = utilities::RAIIWrap<int&, Enter, Leave>;
 static_assert(!std::copy_constructible<Counted>);
@@ -25,13 +25,13 @@ static_assert(std::is_nothrow_move_constructible_v<Counted>);
 static_assert(std::is_nothrow_move_assignable_v<Counted>);
 static_assert(!std::move_constructible<Entered>);
 static_assert(!std::move_constructible<utilities::RAIIWrap<int*, Open, Close, IsNull>>);
-void MoveTwiceIntoOccupied(int* first, int* second) {
+auto MoveTwiceIntoOccupied(int* first, int* second) -> void {
   Counted source     { first             };
   Counted destination{ second            };
   Counted moved      { std::move(source) };
   destination = std::move(moved);
 }
-void EnterAndThrow(int& active) {
+auto EnterAndThrow(int& active) -> void {
   Entered const scope{ active };
   throw std::runtime_error("unwind");
 }

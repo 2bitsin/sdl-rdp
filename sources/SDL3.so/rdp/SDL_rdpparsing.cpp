@@ -9,7 +9,7 @@ namespace {
 constexpr auto CodecNames = std::to_array<std::string_view>({"auto", "planar", "remotefx", "nscodec", "raw",
                                                              "progressive", "avc420"});
 }
-[[noreturn]] void InvalidSetting(std::string const& message) {
+[[noreturn]] auto InvalidSetting(std::string const& message) -> void {
   SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "%s", message.c_str());
   throw std::runtime_error(message);
 }

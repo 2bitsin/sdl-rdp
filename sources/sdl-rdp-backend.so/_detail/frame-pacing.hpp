@@ -22,13 +22,13 @@ public:
        FramePacing(Diagnostics const& diagnostics, EventQueue& events, Configuration const& configuration,
                    FrameStore& store, PeerLink& link, Activation const& activation, TraceQueue& traces,
                    FrameStatistics& statistics) noexcept;
-  void Restart(FrameLock const& held);
-  void Blocked();
-  void Drained();
-  void Sent(PeerFrames& frames, FrameCost const& cost);
-  void Accept(UINT32 id);
-  void Acknowledgements(AcknowledgementMode mode);
-  bool Admit(std::invocable auto capacity) {
+  auto Restart(FrameLock const& held)                  -> void;
+  auto Blocked()                                       -> void;
+  auto Drained()                                       -> void;
+  auto Sent(PeerFrames& frames, FrameCost const& cost) -> void;
+  auto Accept(UINT32 id)                               -> void;
+  auto Acknowledgements(AcknowledgementMode mode)      -> void;
+  auto Admit(std::invocable auto capacity)             -> bool {
     auto const held = _store.Lock();
     if (auto const expired = _window.Expire(AcknowledgementWindow::Clock::now())) {
       _diagnostics.Line("ack-timeout", [&] { return std::format("frames={}", expired); });
@@ -37,15 +37,15 @@ public:
     }
     return !_window.Enabled() || _window.Open(capacity());
   }
-  DWORD    Timeout();
-  unsigned Effective() const noexcept;
-  UINT32   Frame() const     noexcept;
-  void     Begin()           noexcept;
-  bool     Settled(FrameLock const& held, uint64_t target) const;
-  uint64_t Acknowledged(FrameLock const& held) const;
+  auto Timeout()                                             -> DWORD;
+  auto Effective() const noexcept                            -> unsigned;
+  auto Frame() const noexcept                                -> UINT32;
+  auto Begin() noexcept                                      -> void;
+  auto Settled(FrameLock const& held, uint64_t target) const -> bool;
+  auto Acknowledged(FrameLock const& held) const             -> uint64_t;
 
 private:
-  void Adjust(std::invocable<Refresh&> auto step);
+  auto Adjust(std::invocable<Refresh&> auto step) -> void;
   Diagnostics const&    _diagnostics;
   EventQueue&           _events;
   Configuration const&  _configuration;

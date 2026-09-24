@@ -6,11 +6,12 @@
 #include <array>
 #include <string>
 
-bool SDLCALL Authenticator::Deny(void* /*unused*/, char const* /*unused*/, char const* /*unused*/,
-                                 char const* /*unused*/) {
+auto SDLCALL Authenticator::Deny(void* /*unused*/, char const* /*unused*/, char const* /*unused*/,
+                                 char const* /*unused*/) -> bool {
   return false;
 }
-void SDLCALL Authenticator::AuthenticationLog(void* user, int category, SDL_LogPriority priority, char const* message) {
+auto SDLCALL Authenticator::AuthenticationLog(void* user, int category, SDL_LogPriority priority,
+                                              char const* message) -> void {
   auto&                      self   = *static_cast<Authenticator*>(user);
   std::string_view           text(message);
   constexpr std::string_view prefix = "Authentication rejected: user \"";
@@ -24,7 +25,7 @@ void SDLCALL Authenticator::AuthenticationLog(void* user, int category, SDL_LogP
   auto line = std::string("event AUTH_REJECTED user=") + std::string(name);
   self.previous(self.previous_user, category, SDL_LOG_PRIORITY_INFO, line.c_str());
 }
-bool Authenticator::Option(std::string_view option, int& index, int argc, char** argv) {
+auto Authenticator::Option(std::string_view option, int& index, int argc, char** argv) -> bool {
   if (option == "--verify-deny") {
     deny = true;
     return true;
@@ -39,11 +40,11 @@ bool Authenticator::Option(std::string_view option, int& index, int argc, char**
   Check(SDL_SetHint(found->second, argv[++index]));
   return true;
 }
-void Authenticator::Defaults() const {
+auto Authenticator::Defaults() const -> void {
   if (deny && !SDL_GetHint(SDL_HINT_RDP_AUTH) && !SDL_GetHint(SDL_HINT_RDP_PASSWORD))
     Check(SDL_SetHint(SDL_HINT_RDP_AUTH, "tls"));
 }
-void Authenticator::Install() {
+auto Authenticator::Install() -> void {
   SDL_SetLogPriority(SDL_LOG_CATEGORY_VIDEO, SDL_LOG_PRIORITY_INFO);
   SDL_GetLogOutputFunction(&previous, &previous_user);
   SDL_SetLogOutputFunction(AuthenticationLog, this);
@@ -54,7 +55,7 @@ void Authenticator::Install() {
 Authenticator::~Authenticator() {
   if (previous) SDL_SetLogOutputFunction(previous, previous_user);
 }
-void PrintAuthentication(SDL_Window* window) {
+auto PrintAuthentication(SDL_Window* window) -> void {
   auto properties = SDL_GetWindowProperties(window);
   SDL_Log("event CONNECTED user=%s domain=%s authenticated=%d",
           SDL_GetStringProperty(properties, SDL_PROP_WINDOW_RDP_USER_STRING, ""),

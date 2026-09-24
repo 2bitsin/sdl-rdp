@@ -18,21 +18,21 @@ namespace DriveGate {
 using namespace std::chrono_literals;
 class DriveSession : public testing::Test {
 protected:
-  void                  ThenPartialReads(sdlrdp_file* file, std::string const& source, std::string& result);
-  void                  SetUp()    override;
-  void                  Connect(char const* name = "share", bool second = false);
-  void                  GivenHeldFile();
-  void                  HoldRequests();
-  void                  ThenVideoMatches();
-  void                  Disconnect();
-  void                  TearDown() override;
-  unsigned              Logged(sdlrdp_log_level level, std::string_view text);
-  static std::string    Pattern(size_t size, unsigned seed = 17);
-  void                  Write(std::string const& name, std::string const& bytes);
-  sdlrdp_file*          Open(char const* name, unsigned flags = SDLRDP_FILE_READ);
-  void                  ThenRemovedDrive();
-  void                  ThenDriveFailure(sdlrdp_file* file, unsigned warnings);
-  std::set<std::string> GivenDirectoryEntries();
+  auto ThenPartialReads(sdlrdp_file* file, std::string const& source, std::string& result) -> void;
+  auto        SetUp()                                                   -> void override;
+  auto        Connect(char const* name = "share", bool second = false)  -> void;
+  auto        GivenHeldFile()                                           -> void;
+  auto        HoldRequests()                                            -> void;
+  auto        ThenVideoMatches()                                        -> void;
+  auto        Disconnect()                                              -> void;
+  auto        TearDown()                                                -> void override;
+  auto        Logged(sdlrdp_log_level level, std::string_view text)     -> unsigned;
+  static auto Pattern(size_t size, unsigned seed = 17)                  -> std::string;
+  auto        Write(std::string const& name, std::string const& bytes)  -> void;
+  auto        Open(char const* name, unsigned flags = SDLRDP_FILE_READ) -> sdlrdp_file*;
+  auto        ThenRemovedDrive()                                        -> void;
+  auto        ThenDriveFailure(sdlrdp_file* file, unsigned warnings)    -> void;
+  auto        GivenDirectoryEntries()                                   -> std::set<std::string>;
   sdlrdp_file*                                            held_file = nullptr;
   Headless::Logs                                          logs;
   oxbox::platform::ScratchArea                            scratch   { "drive", "sdl-rdp"    };

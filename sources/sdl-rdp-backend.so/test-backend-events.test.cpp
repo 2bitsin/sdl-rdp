@@ -7,17 +7,17 @@
 #include <iterator>
 
 namespace BackendGate {
-bool BackendEvents::Acknowledged() const {
+auto BackendEvents::Acknowledged() const -> bool {
   Expects(backend != nullptr, "backend exists");
   auto const status = CurrentStatus(*backend);
   return status && status->acknowledged >= Presented(*backend);
 }
-std::vector<sdlrdp_event> BackendEvents::Events() const {
+auto BackendEvents::Events() const -> std::vector<sdlrdp_event> {
   std::array<sdlrdp_event, 256> batch { };
   auto                          count = sdlrdp_poll(backend.get(), batch.data(), batch.size());
   return { batch.begin(), batch.begin() + count };
 }
-std::vector<sdlrdp_event> BackendEvents::Events(unsigned wanted) {
+auto BackendEvents::Events(unsigned wanted) -> std::vector<sdlrdp_event> {
   return EventsUntil([=](auto const& events) { return events.size() >= wanted; }, false);
 }
 auto BackendEvents::Accumulate(std::vector<sdlrdp_event>& result, bool include_refresh) const -> void {

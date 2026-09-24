@@ -9,7 +9,7 @@ struct Extent {
   unsigned width { };
   unsigned height{ };
 };
-constexpr sdlrdp_rect Whole(Extent size) noexcept {
+constexpr auto Whole(Extent size) noexcept -> sdlrdp_rect {
   return { 0, 0, int(size.width), int(size.height) };
 }
 }

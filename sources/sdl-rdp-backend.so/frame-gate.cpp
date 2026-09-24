@@ -14,7 +14,7 @@ FrameGate::FrameGate(PeerLink& link, FrameStore& store, PeerFrames& frames, Desk
                      FramePacing& pacing, Activation const& activation, GraphicsLink const& graphics) noexcept
     : _link { link }, _store{ store }, _frames{ frames }, _desktop{ desktop }, _pacing{ pacing },
       _activation{ activation }, _graphics{ graphics } { }
-bool FrameGate::Settle() {
+auto FrameGate::Settle() -> bool {
   auto const frame = _store.Lock();
   _link.Settle();
   if (_link.WriteBlocked()) {
@@ -29,7 +29,7 @@ bool FrameGate::Settle() {
   _pacing.Drained();
   return true;
 }
-bool FrameGate::Admit() {
+auto FrameGate::Admit() -> bool {
   return Settle() && _pacing.Admit([this] { return _graphics.Capacity(); }) && !_activation.Suppressed();
 }
 }

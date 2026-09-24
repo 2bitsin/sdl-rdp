@@ -21,7 +21,7 @@ private:
   auto _Read(std::filesystem::path const& path) -> bool;
   SettingValues _values{ };
 };
-[[noreturn]] void InvalidSetting(std::string const& message);
+[[noreturn]] auto InvalidSetting(std::string const& message)     -> void;
 auto              Codec(std::optional<std::string> const& text)  -> sdlrdp_codec;
 auto              CodecName(sdlrdp_codec codec)                  -> std::string;
 auto              Aspect(std::optional<std::string> const& text) -> sdlrdp_aspect;

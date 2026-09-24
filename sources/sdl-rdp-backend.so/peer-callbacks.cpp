@@ -12,11 +12,11 @@
 
 namespace Backend {
 namespace {
-PeerCallbacks& Router(freerdp_peer* client) {
+auto Router(freerdp_peer* client) -> PeerCallbacks& {
   Expects(client != nullptr, "client transport exists");
   return CallbackOwner<PeerCallbacks>(client->ContextExtra);
 }
-PeerCallbacks& Router(rdpContext* context) {
+auto Router(rdpContext* context) -> PeerCallbacks& {
   Expects(context != nullptr, "callback context exists");
   return Router(context->peer);
 }
@@ -30,7 +30,7 @@ PeerCallbacks::PeerCallbacks(PeerLink& link, Authenticator& authenticator, Activ
   InstallUpdates();
   input.Install(*_link.Context().input);
 }
-void PeerCallbacks::InstallClient() {
+auto PeerCallbacks::InstallClient() -> void {
   auto& client = _link.Client();
   client.Activate             = [](freerdp_peer* peer) { return Router(peer)._activator.Activate(); };
   client.Capabilities         = [](freerdp_peer* peer) { return Router(peer)._capabilities.Accept(); };
@@ -45,7 +45,7 @@ void PeerCallbacks::InstallClient() {
     return Router(static_cast<freerdp_peer*>(peer))._authenticator.Hash(*identity, response) ? 1 : 0;
   };
 }
-void PeerCallbacks::InstallUpdates() {
+auto PeerCallbacks::InstallUpdates() -> void {
   auto& update = *_link.Context().update;
   update.SurfaceFrameAcknowledge = [](rdpContext* context, UINT32 id) -> BOOL {
     Router(context)._output.Acknowledge(id);

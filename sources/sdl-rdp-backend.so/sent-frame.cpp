@@ -3,13 +3,13 @@
 namespace Backend {
 SentFrame::SentFrame(UINT32 frame, uint64_t presented, Clock::time_point at) noexcept
     : _id { frame }, _sequence{ presented }, _sent{ at } { }
-UINT32 SentFrame::Id() const noexcept {
+auto SentFrame::Id() const noexcept -> UINT32 {
   return _id;
 }
-uint64_t SentFrame::Sequence() const noexcept {
+auto SentFrame::Sequence() const noexcept -> uint64_t {
   return _sequence;
 }
-SentFrame::Clock::duration SentFrame::Age(Clock::time_point now) const noexcept {
+auto SentFrame::Age(Clock::time_point now) const noexcept -> SentFrame::Clock::duration {
   return now - _sent;
 }
 }

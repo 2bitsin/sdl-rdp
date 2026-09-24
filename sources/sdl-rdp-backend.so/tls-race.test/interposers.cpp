@@ -6,7 +6,7 @@
 #include <openssl/ssl.h>
 
 namespace {
-using Write = int (*)(BIO*, char const*, int);
+using Write = auto (*)(BIO*, char const*, int) -> int;
 constexpr int SslFailure = -1;
 constexpr int SslRefused = 0;
 
@@ -34,7 +34,8 @@ extern "C" [[gnu::visibility("default")]] auto BIO_meth_set_write(BIO_METHOD* bi
   Race::MethodFill::Shared().Filling(biom, Race::Setter::Write);
   return next(biom, WriteFor(biom, write));
 }
-extern "C" [[gnu::visibility("default")]] auto BIO_meth_set_create(BIO_METHOD* biom, int (*create)(BIO*)) -> int {
+extern "C" [[gnu::visibility("default")]] auto BIO_meth_set_create(BIO_METHOD* biom,
+                                                                    auto (*create)(BIO*) -> int) -> int {
   static auto* const next = Next<decltype(BIO_meth_set_create)>("BIO_meth_set_create");
   Race::MethodFill::Shared().Filling(biom, Race::Setter::Create);
   return next(biom, create);

@@ -12,19 +12,19 @@ class Peer;
 using PeersLock = std::unique_lock<std::mutex>;
 class PeerSet {
 public:
-                          PeerSet(PeerSet const&)     = delete;
-                          PeerSet(PeerSet&&)          = delete;
-                          PeerSet()                   = default;
-                          ~PeerSet();
-  PeerSet&                operator = (PeerSet const&) = delete;
-  PeerSet&                operator = (PeerSet&&)      = delete;
-  [[nodiscard]] PeersLock Lock();
-  void                    ForEach(PeersLock const& held, std::invocable<Peer&> auto visit) {
+                     PeerSet(PeerSet const&)                                                      = delete;
+                     PeerSet(PeerSet&&)                                                           = delete;
+                     PeerSet()                                                                    = default;
+                     ~PeerSet();
+  auto               operator = (PeerSet const&)                                      -> PeerSet& = delete;
+  auto               operator = (PeerSet&&)                                           -> PeerSet& = delete;
+  [[nodiscard]] auto Lock()                                                           -> PeersLock;
+  auto               ForEach(PeersLock const& held, std::invocable<Peer&> auto visit) -> void {
     Expects(held.mutex() == &_guard, "visiting peers holds the peer lock");
     std::ranges::for_each(_peers, [&visit](auto const& peer) { visit(*peer); });
   }
-  void Add(std::unique_ptr<Peer> peer);
-  void Reap();
+  auto Add(std::unique_ptr<Peer> peer) -> void;
+  auto Reap()                          -> void;
 
 private:
   std::mutex                         _guard;

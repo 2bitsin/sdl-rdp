@@ -9,11 +9,11 @@
 
 namespace Backend {
 namespace {
-PeerHandle Accepted(PeerHandle accepted) {
+auto Accepted(PeerHandle accepted) -> PeerHandle {
   Expects(accepted != nullptr, "accepted peer exists");
   return accepted;
 }
-ChannelManager OpenChannelManager(rdpContext* context) {
+auto OpenChannelManager(rdpContext* context) -> ChannelManager {
   // FreeRDP 3.15 WTSOpenServerA takes the peer's rdpContext through its server-name parameter.
   auto* opened = WTSOpenServerA(reinterpret_cast<char*>(context));
   if (!opened || opened == INVALID_HANDLE_VALUE) throw std::runtime_error("Channel manager allocation failed.");
@@ -27,47 +27,47 @@ PeerLink::PeerLink(PeerHandle accepted)
   if (!freerdp_peer_context_new(_client.get())) throw std::runtime_error("peer context failed");
   _channels = OpenChannelManager(_client->context);
 }
-freerdp_peer& PeerLink::Client() const noexcept {
+auto PeerLink::Client() const noexcept -> freerdp_peer& {
   return *_client;
 }
-rdpContext& PeerLink::Context() const noexcept {
+auto PeerLink::Context() const noexcept -> rdpContext& {
   return *_client->context;
 }
-rdpSettings& PeerLink::Settings() const noexcept {
+auto PeerLink::Settings() const noexcept -> rdpSettings& {
   return *_client->context->settings;
 }
-HANDLE PeerLink::Channels() const noexcept {
+auto PeerLink::Channels() const noexcept -> HANDLE {
   return _channels.get();
 }
-int PeerLink::Socket() const noexcept {
+auto PeerLink::Socket() const noexcept -> int {
   return _socket;
 }
-bool PeerLink::WriteBlocked() const {
+auto PeerLink::WriteBlocked() const -> bool {
   return _client->IsWriteBlocked(_client.get());
 }
-void PeerLink::Signal() {
+auto PeerLink::Signal() -> void {
   _wake.Transition(WakeEvent::Phase::Pending);
 }
-void PeerLink::Settle() {
+auto PeerLink::Settle() -> void {
   _wake.Transition(WakeEvent::Phase::Idle);
 }
-HANDLE PeerLink::Wake() const noexcept {
+auto PeerLink::Wake() const noexcept -> HANDLE {
   return _wake.get();
 }
-void PeerLink::Invalidate() noexcept {
+auto PeerLink::Invalidate() noexcept -> void {
   _handle_count = 0;
 }
-void PeerLink::Refuse(UINT32 reason) {
+auto PeerLink::Refuse(UINT32 reason) -> void {
   freerdp_set_error_info(_client->context->rdp, reason);
   freerdp_send_error_info(_client->context->rdp);
 }
-void PeerLink::Close() {
+auto PeerLink::Close() -> void {
   _client->Close(_client.get());
 }
-bool DynamicChannelsReady(PeerLink const& link) {
+auto DynamicChannelsReady(PeerLink const& link) -> bool {
   return WTSVirtualChannelManagerGetDrdynvcState(link.Channels()) == DRDYNVC_STATE_READY;
 }
-bool Joined(PeerLink const& link, char const* name) {
+auto Joined(PeerLink const& link, char const* name) -> bool {
   return WTSVirtualChannelManagerIsChannelJoined(link.Channels(), name);
 }
 }

@@ -7,13 +7,13 @@ Credentials::Credentials(std::filesystem::path const& directory)
     : _certificate{ directory / "server.crt" }, _key{ directory / "server.key" } {
   Expects(!directory.empty(), "certificate directory is nonempty");
 }
-std::filesystem::path const& Credentials::Certificate() const noexcept {
+auto Credentials::Certificate() const noexcept -> std::filesystem::path const& {
   return _certificate;
 }
-std::filesystem::path const& Credentials::Key() const noexcept {
+auto Credentials::Key() const noexcept -> std::filesystem::path const& {
   return _key;
 }
-bool Credentials::Exist() const {
+auto Credentials::Exist() const -> bool {
   return exists(_certificate) && exists(_key);
 }
 }

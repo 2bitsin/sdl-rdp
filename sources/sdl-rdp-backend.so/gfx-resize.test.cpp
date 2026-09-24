@@ -20,7 +20,7 @@
 namespace {
 class GraphicsResize : public testing::Test {
 protected:
-  void SetUp() override {
+  auto SetUp() -> void override {
     auto path = std::to_array("/tmp/sdlrdp-gfx-resize-XXXXXX");
     ASSERT_NE(mkdtemp(path.data()), nullptr);
     certificates = path.data();
@@ -30,7 +30,7 @@ protected:
     ASSERT_EQ(sdlrdp_open(&config, &handle), 0);
     backend.reset(handle);
   }
-  void TearDown() override {
+  auto TearDown() -> void override {
     backend.reset();
     if (!certificates.empty()) std::filesystem::remove_all(certificates);
   }
@@ -84,8 +84,8 @@ auto ThenBilinearPixels(rdpGdi const& gdi, std::vector<std::uint32_t> const& pix
     if (::testing::Test::HasFatalFailure()) return;
   }
 }
-void ThenProgressiveGeneration(Headless::GraphicsObserver const& observer, unsigned generations, unsigned w,
-                               unsigned h) {
+auto ThenProgressiveGeneration(Headless::GraphicsObserver const& observer, unsigned generations, unsigned w,
+                               unsigned h) -> void {
   EXPECT_EQ(observer.Observed().progressive_headers, generations);
   EXPECT_EQ(observer.Observed().deleted, generations - 1);
   ASSERT_EQ(observer.Observed().surfaces.size(), generations);
@@ -93,10 +93,10 @@ void ThenProgressiveGeneration(Headless::GraphicsObserver const& observer, unsig
   EXPECT_EQ(observer.Observed().surfaces.back().height, h);
 }
 constexpr std::array ResizeSequence{ std::pair{ 640u, 480u }, std::pair{ 320u, 200u }, std::pair{ 640u, 480u } };
-void MatchCostStatistics(std::string const& text, std::smatch& match, char const* expression) {
+auto MatchCostStatistics(std::string const& text, std::smatch& match, char const* expression) -> void {
   ASSERT_TRUE(std::regex_search(text, match, std::regex(expression))) << text;
 }
-void RecordProgressiveCost(Headless::Logs& logs) {
+auto RecordProgressiveCost(Headless::Logs& logs) -> void {
   auto        text  = logs.Text(true);
   std::smatch match;
   MatchCostStatistics(
@@ -156,20 +156,20 @@ TEST_F(GraphicsResize, ProgressiveContextAndFullDamage) {
 namespace {
 class GraphicsCost : public Headless::GraphicsBackend {
 protected:
-  void ThenProgressiveCost(Headless::Client& client, Headless::GraphicsObserver& observer) {
+  auto ThenProgressiveCost(Headless::Client& client, Headless::GraphicsObserver& observer) -> void {
     ASSERT_EQ(observer.Observed().frames.size(), 1u);
     freerdp_disconnect(client.Instance().get());
     backend.reset();
     RecordProgressiveCost(logs);
   }
-  void AwaitAcknowledgement(Headless::Client& client, uint64_t sequence) {
+  auto AwaitAcknowledgement(Headless::Client& client, uint64_t sequence) -> void {
     ASSERT_TRUE(client.Until([&] {
       auto const status = BackendGate::CurrentStatus(*backend);
       return status && status->acknowledged == sequence;
     })) << logs.Text(true);
   }
 
-  void Open(unsigned width = 1280, unsigned height = 800, sdlrdp_codec codec = SDLRDP_CODEC_PROGRESSIVE) {
+  auto Open(unsigned width = 1280, unsigned height = 800, sdlrdp_codec codec = SDLRDP_CODEC_PROGRESSIVE) -> void {
     auto pattern = std::to_array("/tmp/sdlrdp-cost-XXXXXX");
     OpenGraphics(pattern.data(), width, height, codec);
   }
@@ -214,7 +214,7 @@ TEST_F(GraphicsCost, FullRandomFrame) {
   if (::testing::Test::HasFatalFailure()) return;
   ThenProgressiveCost(client, observer);
 }
-void RecordAvcCost(Headless::Logs& logs) {
+auto RecordAvcCost(Headless::Logs& logs) -> void {
   auto        text  = logs.Text(true);
   std::smatch match;
   MatchCostStatistics(
@@ -246,7 +246,7 @@ TEST_F(GraphicsCost, AvcFullFrame) {
   RecordAvcCost(logs);
 }
 
-void ApplyPlanarDamage(std::vector<UINT32>& pixels, std::vector<UINT32>& expected, sdlrdp_rect part) {
+auto ApplyPlanarDamage(std::vector<UINT32>& pixels, std::vector<UINT32>& expected, sdlrdp_rect part) -> void {
   std::ranges::for_each(std::views::iota(part.y, part.y + part.h), [&](int row) {
     std::ranges::fill(std::span(pixels).subspan((row * 354) + part.x, part.w), 0x55aaffu);
   });

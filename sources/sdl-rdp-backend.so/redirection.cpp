@@ -21,55 +21,55 @@ Redirection::Redirection(PeerLink& link, Activation const& activation, SessionAc
 Redirection::~Redirection() {
   Disconnect();
 }
-bool Redirection::OpenClipboard() {
+auto Redirection::OpenClipboard() -> bool {
   if (_clipboard || !Joined(_link, CLIPRDR_SVC_CHANNEL_NAME)) return true;
   _link.Invalidate();
   _clipboard = _make_clipboard();
   return _clipboard->Open();
 }
-void Redirection::OpenDrive() {
+auto Redirection::OpenDrive() -> void {
   if (_drive || !Joined(_link, RDPDR_SVC_CHANNEL_NAME)) return;
   _link.Invalidate();
   _drive = _make_drive();
   _drive->Open();
 }
-bool Redirection::OpenStatic(std::span<HANDLE const> ready) {
+auto Redirection::OpenStatic(std::span<HANDLE const> ready) -> bool {
   if (!OpenClipboard()) return false;
   OpenDrive();
   if (_drive) _drive->Pump(ready);
   return !_clipboard || _clipboard->Pump(ready);
 }
-bool Redirection::OpenSound() {
+auto Redirection::OpenSound() -> bool {
   if (std::exchange(_sound_attempted, true) || !Joined(_link, RDPSND_CHANNEL_NAME)) return true;
   _link.Invalidate();
   _sound = _make_sound();
   return _sound->Initialize();
 }
-void Redirection::Sound(std::span<HANDLE const> ready) {
+auto Redirection::Sound(std::span<HANDLE const> ready) -> void {
   if (!_activation.Active()) return;
   auto healthy = OpenSound();
   if (!_sound) return;
   if (healthy && std::ranges::contains(ready, _sound->Event())) healthy = _sound->Pump();
   if (!healthy) EndAudio();
 }
-void Redirection::EndAudio() {
+auto Redirection::EndAudio() -> void {
   _link.Invalidate();
   _sound.reset();
   _session.AudioGone();
 }
-AudioChannel* Redirection::Audio() const noexcept {
+auto Redirection::Audio() const noexcept -> AudioChannel* {
   return _sound.get();
 }
-std::shared_ptr<DriveChannel> Redirection::Drive() const {
+auto Redirection::Drive() const -> std::shared_ptr<DriveChannel> {
   return _drive;
 }
-void Redirection::LogAudio() const {
+auto Redirection::LogAudio() const -> void {
   if (_sound) _sound->LogAudio();
 }
-void Redirection::Disconnect() {
+auto Redirection::Disconnect() -> void {
   if (_drive) _drive->Disconnect();
 }
-std::span<HANDLE> Redirection::Handles(std::span<HANDLE> out) const {
+auto Redirection::Handles(std::span<HANDLE> out) const -> std::span<HANDLE> {
   Expects(out.size() >= RedirectionHandleLimit, "handle span has room for the redirection channels");
   auto next = out.begin();
   if (_drive && _drive->Event()) *next++ = _drive->Event();

@@ -4,7 +4,7 @@
 namespace BackendGate {
 class GraphicsMeasurement : public RoundFive {
 protected:
-  void RecordGraphicsTiming(Client& client, sdlrdp_codec codec) {
+  auto RecordGraphicsTiming(Client& client, sdlrdp_codec codec) -> void {
     if (codec != SDLRDP_CODEC_PROGRESSIVE) return;
     ASSERT_TRUE(client.Until([&] {
       auto const status = CurrentStatus(*backend);
@@ -20,10 +20,10 @@ protected:
     RecordProperty("client_qoe_frame", timing.Qoe().frameId);
     EXPECT_FALSE(logs.Contains("GFX QoE"));
   }
-  auto EncodeDuration() {
+  auto EncodeDuration() -> std::chrono::nanoseconds {
     return RequiredStatus(*backend).encode_time;
   }
-  void PrepareMeasurement(Client& client, sdlrdp_codec codec, bool noise) {
+  auto PrepareMeasurement(Client& client, sdlrdp_codec codec, bool noise) -> void {
     if (codec == SDLRDP_CODEC_PROGRESSIVE) client.EnableGraphics();
     ASSERT_TRUE(freerdp_settings_set_bool(client.Instance()->context->settings, FreeRDP_GfxSendQoeAck, TRUE));
     Connect(client);
@@ -31,7 +31,7 @@ protected:
     Present(GraphicsScene(0, noise), 640, 480);
     ASSERT_TRUE(client.Until([&] { return Acknowledged(); }));
   }
-  void MeasureFrames(Client& client, bool noise, unsigned& maximum_error, double& latency) {
+  auto MeasureFrames(Client& client, bool noise, unsigned& maximum_error, double& latency) -> void {
     for (unsigned frame = 1; frame <= 20; ++frame) {
       auto              pixels    = GraphicsScene(frame, noise);
       auto              presented = Clock::now();
@@ -42,15 +42,15 @@ protected:
       maximum_error =  std::max(maximum_error, client.MaxError(pixels));
     }
   }
-  static void RecordMeasurement(std::size_t bytes, double elapsed, double milliseconds, double latency,
-                                unsigned maximum_error) {
+  static auto RecordMeasurement(std::size_t bytes, double elapsed, double milliseconds, double latency,
+                                unsigned maximum_error) -> void {
     RecordProperty("wire_MB_per_second", std::to_string(double(bytes) / elapsed / 1000000));
     RecordProperty("wire_MB_per_second_at_60fps", std::to_string(double(bytes) * 3.0 / 1000000));
     RecordProperty("encode_ms_per_frame", std::to_string(milliseconds / 20));
     RecordProperty("present_ack_ms_per_frame", std::to_string(latency / 20));
     RecordProperty("maximum_channel_error", maximum_error);
   }
-  void Measure(sdlrdp_codec codec, bool noise) {
+  auto Measure(sdlrdp_codec codec, bool noise) -> void {
     Open(640, 480, { }, codec);
     Client client(sdlrdp_port(backend.get()), true, 640, 480);
     PrepareMeasurement(client, codec, noise);

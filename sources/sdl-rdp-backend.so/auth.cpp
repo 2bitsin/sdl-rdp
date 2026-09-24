@@ -16,13 +16,13 @@ namespace Backend {
 namespace {
 struct NtHash {
 public:
-          NtHash(NtHash const&)      = delete;
-          NtHash(NtHash&&)           = delete;
-          NtHash()                   = default;
-          ~NtHash() { OPENSSL_cleanse(bytes.data(), bytes.size()); }
-  NtHash& operator = (NtHash const&) = delete;
-  NtHash& operator = (NtHash&&)      = delete;
-  BYTE*   Data() { return bytes.data(); }
+       NtHash(NtHash const&)                 = delete;
+       NtHash(NtHash&&)                      = delete;
+       NtHash()                              = default;
+       ~NtHash() { OPENSSL_cleanse(bytes.data(), bytes.size()); }
+  auto operator = (NtHash const&) -> NtHash& = delete;
+  auto operator = (NtHash&&)      -> NtHash& = delete;
+  auto Data()                     -> BYTE* { return bytes.data(); }
 
 private:
   std::array<BYTE, 16> bytes{ };
@@ -38,33 +38,33 @@ public:
     // FreeRDP 3.15 include/freerdp/settings.h: set_string copies input; NULL removes the old entry.
     Ensures(freerdp_settings_set_string(settings, FreeRDP_Password, nullptr), "password cleared");
   }
-  SettingsPassword& operator = (SettingsPassword const&) = delete;
-  SettingsPassword& operator = (SettingsPassword&&)      = delete;
+  auto operator = (SettingsPassword const&) -> SettingsPassword& = delete;
+  auto operator = (SettingsPassword&&)      -> SettingsPassword& = delete;
 
 private:
   rdpSettings* settings;
 };
 struct PlainPassword {
 public:
-                 PlainPassword(PlainPassword const&) = delete;
-                 PlainPassword(PlainPassword&&)      = delete;
-  explicit       PlainPassword(char const* text) : value{ text } { }
-                 ~PlainPassword() { OPENSSL_cleanse(value.data(), value.size()); }
-  PlainPassword& operator = (PlainPassword const&)   = delete;
-  PlainPassword& operator = (PlainPassword&&)        = delete;
-  char const*    Text() const { return value.c_str(); }
+           PlainPassword(PlainPassword const&)                 = delete;
+           PlainPassword(PlainPassword&&)                      = delete;
+  explicit PlainPassword(char const* text) : value{ text } { }
+           ~PlainPassword() { OPENSSL_cleanse(value.data(), value.size()); }
+  auto     operator = (PlainPassword const&) -> PlainPassword& = delete;
+  auto     operator = (PlainPassword&&)      -> PlainPassword& = delete;
+  auto     Text() const                      -> char const* { return value.c_str(); }
 
 private:
   std::string value;
 };
-char const* Setting(freerdp_peer const& client, FreeRDP_Settings_Keys_String key) {
+auto Setting(freerdp_peer const& client, FreeRDP_Settings_Keys_String key) -> char const* {
   auto const* value = freerdp_settings_get_string(client.context->settings, key);
   return value ? value : "";
 }
-std::vector<BYTE> Utf16(std::string const& text) {
+auto Utf16(std::string const& text) -> std::vector<BYTE> {
   return TranscodeRange<std::vector<BYTE>>(std::as_bytes(std::span(text)), { }, Utf16Little);
 }
-bool NtlmResponseKey(AuthenticationState const& identity, BYTE* nt_hash_v1, BYTE* response) {
+auto NtlmResponseKey(AuthenticationState const& identity, BYTE* nt_hash_v1, BYTE* response) -> bool {
   // FreeRDP 3.15's NTLM callback consumes a response key and treats nonzero as success.
   auto user          = Utf16(identity.User());
   auto domain        = Utf16(identity.Domain());
@@ -80,7 +80,7 @@ bool NtlmResponseKey(AuthenticationState const& identity, BYTE* nt_hash_v1, BYTE
 Authenticator::Authenticator(PeerLink& link, Configuration const& configuration,
                              Diagnostics const& diagnostics) noexcept
     : _link { link }, _configuration{ configuration }, _diagnostics{ diagnostics } { }
-void Authenticator::Reject() {
+auto Authenticator::Reject() -> void {
   if (_state.TestAndSetRejected()) return;
   _link.Client().authenticated = FALSE;
   AuthenticationRejectedLogging();
@@ -88,7 +88,7 @@ void Authenticator::Reject() {
   _diagnostics.Log(SDLRDP_LOG_WARN,
                    std::format("Authentication rejected: user \"{}\" from {}", user, _link.Client().hostname));
 }
-bool Authenticator::Verify(char const* domain, char const* user, char const* password) {
+auto Authenticator::Verify(char const* domain, char const* user, char const* password) -> bool {
   SettingsPassword const clear  { &_link.Settings() };
   auto const&            config = _configuration.Config();
   auto&                  client = _link.Client();
@@ -105,11 +105,11 @@ bool Authenticator::Verify(char const* domain, char const* user, char const* pas
   client.authenticated = accepted;
   return accepted;
 }
-bool Authenticator::Denied() {
+auto Authenticator::Denied() -> bool {
   _link.Refuse(ERRINFO_SERVER_DENIED_CONNECTION);
   return false;
 }
-BOOL Authenticator::Logon(BOOL automatic) {
+auto Authenticator::Logon(BOOL automatic) -> BOOL {
   if (!automatic || _configuration.Config().auth == SDLRDP_AUTH_NONE) return FALSE;
   // FreeRDP 3.15 stores delegated credentials in settings, not nla_get_identity().
   std::ignore = _state.TestAndSetChecked();
@@ -122,7 +122,7 @@ BOOL Authenticator::Logon(BOOL automatic) {
     return FALSE;
   }
 }
-bool Authenticator::VerifySettings() {
+auto Authenticator::VerifySettings() -> bool {
   auto&                  client = _link.Client();
   SettingsPassword const clear  { client.context->settings };
   if (_state.TestAndSetChecked()) return _state.Rejected() ? Denied() : true;
@@ -137,7 +137,7 @@ bool Authenticator::VerifySettings() {
     return Denied();
   }
 }
-bool Authenticator::ResponseKey(SEC_WINNT_AUTH_IDENTITY const& identity, BYTE* response) {
+auto Authenticator::ResponseKey(SEC_WINNT_AUTH_IDENTITY const& identity, BYTE* response) -> bool {
   auto const names = ClientNames(identity);
   _state.Identify(names.user, names.domain);
   auto const& config = _configuration.Config();
@@ -148,7 +148,7 @@ bool Authenticator::ResponseKey(SEC_WINNT_AUTH_IDENTITY const& identity, BYTE* r
                                      : sdlrdp_lookup_pair(&config, domain, user, hash.Data()) != 0;
   return known && NtlmResponseKey(_state, hash.Data(), response);
 }
-bool Authenticator::Hash(SEC_WINNT_AUTH_IDENTITY const& identity, BYTE* response) {
+auto Authenticator::Hash(SEC_WINNT_AUTH_IDENTITY const& identity, BYTE* response) -> bool {
   _state.AttemptHash();
   try {
     bool const result = ResponseKey(identity, response);
@@ -159,10 +159,10 @@ bool Authenticator::Hash(SEC_WINNT_AUTH_IDENTITY const& identity, BYTE* response
     return false;
   }
 }
-void Authenticator::End() {
+auto Authenticator::End() -> void {
   if (_state.Abandoned()) Reject();
 }
-void AuthenticationIdentity(freerdp_peer const& client, sdlrdp_event& event) {
+auto AuthenticationIdentity(freerdp_peer const& client, sdlrdp_event& event) -> void {
   Expects(event.type == SDLRDP_CONNECTED, "identity is attached to a connection event");
   auto const& identity = client.identity;
   auto const  names    = ClientNames(identity);

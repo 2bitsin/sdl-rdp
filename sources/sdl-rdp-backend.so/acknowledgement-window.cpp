@@ -5,32 +5,32 @@
 #include <winpr/synch.h>
 
 namespace Backend {
-DWORD WaitMilliseconds(std::chrono::nanoseconds remaining, int64_t floor) {
+auto WaitMilliseconds(std::chrono::nanoseconds remaining, int64_t floor) -> DWORD {
   return DWORD(std::max(floor, std::chrono::ceil<std::chrono::milliseconds>(remaining).count()));
 }
-bool AcknowledgementWindow::Enabled() const noexcept {
+auto AcknowledgementWindow::Enabled() const noexcept -> bool {
   return _enabled;
 }
-void AcknowledgementWindow::Enable() noexcept {
+auto AcknowledgementWindow::Enable() noexcept -> void {
   _enabled = true;
 }
-void AcknowledgementWindow::Disable() noexcept {
+auto AcknowledgementWindow::Disable() noexcept -> void {
   _enabled = false;
   Clear();
 }
-void AcknowledgementWindow::Clear() noexcept {
+auto AcknowledgementWindow::Clear() noexcept -> void {
   _pending.clear();
 }
-UINT32 AcknowledgementWindow::Next() noexcept {
+auto AcknowledgementWindow::Next() noexcept -> UINT32 {
   return ++_frame_id;
 }
-UINT32 AcknowledgementWindow::Frame() const noexcept {
+auto AcknowledgementWindow::Frame() const noexcept -> UINT32 {
   return _frame_id;
 }
-void AcknowledgementWindow::Record(uint64_t sequence, Clock::time_point now) {
+auto AcknowledgementWindow::Record(uint64_t sequence, Clock::time_point now) -> void {
   if (_enabled) _pending.emplace_back(_frame_id, sequence, now);
 }
-std::vector<SentFrame> AcknowledgementWindow::Accept(UINT32 id) {
+auto AcknowledgementWindow::Accept(UINT32 id) -> std::vector<SentFrame> {
   auto found = std::ranges::find(_pending, id, &SentFrame::Id);
   if (found == _pending.end()) return { };
   _acknowledged = found->Sequence();
@@ -38,7 +38,7 @@ std::vector<SentFrame> AcknowledgementWindow::Accept(UINT32 id) {
   _pending.erase(_pending.begin(), found + 1);
   return settled;
 }
-unsigned AcknowledgementWindow::Expire(Clock::time_point now) {
+auto AcknowledgementWindow::Expire(Clock::time_point now) -> unsigned {
   unsigned expired = 0;
   for (; !_pending.empty() && _pending.front().Age(now) >= AcknowledgementTimeout; ++expired) {
     _acknowledged = _pending.front().Sequence();
@@ -46,17 +46,17 @@ unsigned AcknowledgementWindow::Expire(Clock::time_point now) {
   }
   return expired;
 }
-bool AcknowledgementWindow::Open(unsigned window) const noexcept {
+auto AcknowledgementWindow::Open(unsigned window) const noexcept -> bool {
   return _pending.size() < window;
 }
-DWORD AcknowledgementWindow::Remaining(Clock::time_point now) const {
+auto AcknowledgementWindow::Remaining(Clock::time_point now) const -> DWORD {
   if (_pending.empty()) return INFINITE;
   return WaitMilliseconds(AcknowledgementTimeout - _pending.front().Age(now), 1);
 }
-bool AcknowledgementWindow::Settled(uint64_t target) const noexcept {
+auto AcknowledgementWindow::Settled(uint64_t target) const noexcept -> bool {
   return !_enabled || _acknowledged + 1 >= target;
 }
-uint64_t AcknowledgementWindow::Acknowledged() const noexcept {
+auto AcknowledgementWindow::Acknowledged() const noexcept -> uint64_t {
   return _acknowledged;
 }
 }

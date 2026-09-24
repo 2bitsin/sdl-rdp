@@ -15,33 +15,33 @@ constexpr int                   EdgeFraction = 8;
 constexpr float                 WheelUnit    = 120.0F * 65536;
 constexpr std::array<UINT64, 5> Buttons      { AINPUT_FLAGS_BUTTON1, AINPUT_FLAGS_BUTTON3, AINPUT_FLAGS_BUTTON2,
                                                AINPUT_XFLAGS_BUTTON1, AINPUT_XFLAGS_BUTTON2 };
-bool Outside(int value, int extent) {
+auto Outside(int value, int extent) -> bool {
   return value < extent / EdgeFraction || value >= extent * (EdgeFraction - 1) / EdgeFraction;
 }
-bool NearEdge(sdlrdp_rect desktop, int x, int y) {
+auto NearEdge(sdlrdp_rect desktop, int x, int y) -> bool {
   return Outside(x, desktop.w) || Outside(y, desktop.h);
 }
-bool AtCenter(sdlrdp_rect desktop, int x, int y) {
+auto AtCenter(sdlrdp_rect desktop, int x, int y) -> bool {
   return x == desktop.w / 2 && y == desktop.h / 2;
 }
-sdlrdp_event RelativeMotion(int dx, int dy, sdlrdp_rect /*bounds*/) {
+auto RelativeMotion(int dx, int dy, sdlrdp_rect /*bounds*/) -> sdlrdp_event {
   return { .type = SDLRDP_MOUSE_RELATIVE, .mouse_relative = { .dx = dx, .dy = dy } };
 }
-sdlrdp_event AbsoluteMotion(int x, int y, sdlrdp_rect bounds) {
+auto AbsoluteMotion(int x, int y, sdlrdp_rect bounds) -> sdlrdp_event {
   return { .type       = SDLRDP_MOUSE_MOVE,
            .mouse_move = { .x = std::clamp(x, 0, bounds.w - 1), .y = std::clamp(y, 0, bounds.h - 1) } };
 }
 }
-void InputEvents::Scaled(int x, int y, std::invocable<int, int, sdlrdp_rect> auto build) {
+auto InputEvents::Scaled(int x, int y, std::invocable<int, int, sdlrdp_rect> auto build) -> void {
   auto const bounds = _store.Read([](FrameStore const& store, FrameLock const& held) { return store.Bounds(held); });
   _events.Push(build(_desktop.Scale(x, bounds.w, &sdlrdp_rect::w), _desktop.Scale(y, bounds.h, &sdlrdp_rect::h),
                      bounds));
 }
-void InputEvents::Point(MouseMode mode) noexcept {
+auto InputEvents::Point(MouseMode mode) noexcept -> void {
   _mouse.mode           = mode;
   _mouse.warp_requested = false;
 }
-bool InputEvents::Center() {
+auto InputEvents::Center() -> bool {
   Expects(_activation.Active(), "active peer has a desktop");
   auto const                    desktop  = _desktop.Rect();
   auto&                         context  = _link.Context();
@@ -49,7 +49,7 @@ bool InputEvents::Center() {
   _mouse.warp_requested = context.update->pointer->PointerPosition(&context, &position);
   return _mouse.warp_requested;
 }
-bool InputEvents::Motion(int x, int y) {
+auto InputEvents::Motion(int x, int y) -> bool {
   auto const desktop = _desktop.Rect();
   Expects(desktop.w > 0, "desktop width is positive");
   Expects(desktop.h > 0, "desktop height is positive");
@@ -64,7 +64,7 @@ bool InputEvents::Motion(int x, int y) {
   if (!warped && (dx || dy)) Scaled(dx, dy, RelativeMotion);
   return NearEdge(desktop, x, y) ? Center() : true;
 }
-UINT InputEvents::Pointer(UINT64 flags, INT32 x, INT32 y) {
+auto InputEvents::Pointer(UINT64 flags, INT32 x, INT32 y) -> UINT {
   return WhenActive(UINT{ CHANNEL_RC_OK }, [&] {
     bool const moved   = flags & AINPUT_FLAGS_MOVE;
     bool const shifted = moved && (flags & AINPUT_FLAGS_REL);

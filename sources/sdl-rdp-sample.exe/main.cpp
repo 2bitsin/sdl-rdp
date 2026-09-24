@@ -20,7 +20,7 @@
 
 namespace {
 
-void Draw(SDL_Window* window, unsigned frame, bool full) {
+auto Draw(SDL_Window* window, unsigned frame, bool full) -> void {
   auto* surface = SDL_GetWindowSurface(window);
   Check(surface != nullptr);
   Check(SDL_FillSurfaceRect(surface, nullptr, 0x00010101));
@@ -30,7 +30,7 @@ void Draw(SDL_Window* window, unsigned frame, bool full) {
   Check(full ? SDL_UpdateWindowSurface(window) : SDL_UpdateWindowSurfaceRects(window, &damage, 1));
 }
 
-void CycleCodec() {
+auto CycleCodec() -> void {
   static constexpr std::array codecs  { "auto", "planar", "remotefx", "nscodec", "raw", "progressive" };
   char const*                 hint    = SDL_GetHint(SDL_HINT_RDP_CODEC);
   auto const*                 current = std::ranges::find(codecs, std::string_view(hint ? hint : "auto"));
@@ -38,7 +38,7 @@ void CycleCodec() {
   Check(SDL_SetHint(SDL_HINT_RDP_CODEC, codecs[next]));
 }
 
-void PrintCodecChange(SDL_Window* window, std::string& previous) {
+auto PrintCodecChange(SDL_Window* window, std::string& previous) -> void {
   std::string codec = SDL_GetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_CODEC_STRING, "");
   if (codec != previous) {
     SDL_Log("event CODEC_CHANGED codec=%s", codec.c_str());
@@ -46,13 +46,13 @@ void PrintCodecChange(SDL_Window* window, std::string& previous) {
   }
 }
 
-void WindowShortcut(SDL_Event const& event, SDL_Window* window) {
+auto WindowShortcut(SDL_Event const& event, SDL_Window* window) -> void {
   if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat) return;
   if (event.key.scancode == SDL_SCANCODE_F4)
     Check(SDL_SetWindowFullscreen(window, !(SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN)));
   if (event.key.scancode == SDL_SCANCODE_F1) CycleCodec();
 }
-bool ProcessEvent(SDL_Event const& event, SDL_Window* window, unsigned frame, bool& full, bool partial) {
+auto ProcessEvent(SDL_Event const& event, SDL_Window* window, unsigned frame, bool& full, bool partial) -> bool {
   PrintEvent(event, window, frame);
   InputMode(event, window);
   if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED || event.type == SDL_EVENT_WINDOW_EXPOSED) full = true;
@@ -65,13 +65,13 @@ bool ProcessEvent(SDL_Event const& event, SDL_Window* window, unsigned frame, bo
   }
   return true;
 }
-void DrawScheduled(SDL_Window* window, unsigned& frame, bool& full, Uint64& next, bool tight, bool partial) {
+auto DrawScheduled(SDL_Window* window, unsigned& frame, bool& full, Uint64& next, bool tight, bool partial) -> void {
   if (SDL_GetTicks() < next) return;
   Draw(window, frame++, full || !partial);
   full = false;
   next = SDL_GetTicks() + (tight ? 0 : 100);
 }
-void Run(SDL_Window* window, bool tight, bool partial, DriveOptions drives) {
+auto Run(SDL_Window* window, bool tight, bool partial, DriveOptions drives) -> void {
   std::string codec;
   bool        full  = true;
   unsigned    frame = 0;
@@ -85,7 +85,7 @@ void Run(SDL_Window* window, bool tight, bool partial, DriveOptions drives) {
   }
 }
 
-void SDLCALL FeedTone(void* userdata, SDL_AudioStream* stream, int additional, int /*unused*/) {
+auto SDLCALL FeedTone(void* userdata, SDL_AudioStream* stream, int additional, int /*unused*/) -> void {
   auto&                   frame   = *static_cast<Uint64*>(userdata);
   std::array<Sint16, 960> samples { };
   while (additional > 0) {
@@ -101,7 +101,7 @@ void SDLCALL FeedTone(void* userdata, SDL_AudioStream* stream, int additional, i
   }
 }
 
-SDL_AudioStream* OpenTone(Uint64& frame) {
+auto OpenTone(Uint64& frame) -> SDL_AudioStream* {
   SDL_AudioSpec const spec   { SDL_AUDIO_S16, 2, 48000 };
   auto*               stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, FeedTone, &frame);
   Check(stream != nullptr);
@@ -127,7 +127,7 @@ struct Options {
   bool         partial    = false;
 };
 
-Extent ParseSize(std::string_view size) {
+auto ParseSize(std::string_view size) -> Extent {
   auto const sides = oxbox::utilities::ParseNumbers<int, 2>(size, 'x').value_or(std::array{ 0, 0 });
   if (std::ranges::any_of(sides, [](int side) { return side <= 0; })) {
     SDL_SetError("Invalid size '%.*s': expected WxH with positive sides", int(size.size()), size.data());
@@ -136,7 +136,7 @@ Extent ParseSize(std::string_view size) {
   return { .width = sides[0], .height = sides[1] };
 }
 
-void Fullscreen(SDL_Window* window, Options const& options) {
+auto Fullscreen(SDL_Window* window, Options const& options) -> void {
   if (options.mode.width) {
     auto mode = *SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
     mode.w = options.mode.width;
@@ -146,7 +146,7 @@ void Fullscreen(SDL_Window* window, Options const& options) {
   if (options.fullscreen) Check(SDL_SetWindowFullscreen(window, true));
 }
 
-bool FlagOption(std::string_view name, Options& options) {
+auto FlagOption(std::string_view name, Options& options) -> bool {
   constexpr std::array<std::pair<std::string_view, bool Options::*>, 4> flags{ { { "--tone"   , &Options::tone    },
                                                                                  { "--tight"  , &Options::tight   },
                                                                                  { "--partial", &Options::partial },
@@ -157,7 +157,7 @@ bool FlagOption(std::string_view name, Options& options) {
   options.*found->second = true;
   return true;
 }
-bool ValueOption(std::string_view name, char const* value, Options& options) {
+auto ValueOption(std::string_view name, char const* value, Options& options) -> bool {
   if (name == "--clip")
     options.clip = value;
   else if (name == "--ls")
@@ -176,7 +176,7 @@ bool ValueOption(std::string_view name, char const* value, Options& options) {
     return false;
   return true;
 }
-Options ParseOptions(int argc, char** argv, Authenticator& authentication) {
+auto ParseOptions(int argc, char** argv, Authenticator& authentication) -> Options {
   Options options;
   for (int i = 1; i < argc; ++i) {
     std::string_view const arg(argv[i]);
@@ -191,7 +191,7 @@ Options ParseOptions(int argc, char** argv, Authenticator& authentication) {
   return options;
 }
 
-SDL_Cursor* CreateCursor() {
+auto CreateCursor() -> SDL_Cursor* {
   auto* surface = SDL_CreateSurface(8, 8, SDL_PIXELFORMAT_ARGB8888);
   Check(surface != nullptr);
   Check(SDL_FillSurfaceRect(surface, nullptr, 0xffff0000));
@@ -202,7 +202,7 @@ SDL_Cursor* CreateCursor() {
   return cursor;
 }
 
-void ConfigureVideo() {
+auto ConfigureVideo() -> void {
   SDL_Log("SDL_GetVersion() %d", SDL_GetVersion());
   std::string drivers = "drivers";
   std::ranges::for_each(std::views::iota(0, SDL_GetNumVideoDrivers()),
@@ -214,7 +214,7 @@ void ConfigureVideo() {
     Check(SDL_SetHint(SDL_HINT_RDP_CODEC, requested.c_str()));
   }
 }
-void RunWindow(Options const& options) {
+auto RunWindow(Options const& options) -> void {
   std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)> const window(
       SDL_CreateWindow("SDL RDP sample", options.size.width, options.size.height, 0), SDL_DestroyWindow);
   Check(window != nullptr);
@@ -228,8 +228,8 @@ void RunWindow(Options const& options) {
 }
 
 }
-int main(int argc,
-         char** argv) { // NOLINT(bugprone-exception-escape): Allocation failure terminates the sample.
+auto main(int argc,
+          char** argv) -> int { // NOLINT(bugprone-exception-escape): Allocation failure terminates the sample.
   Authenticator authentication;
   auto          options        = ParseOptions(argc, argv, authentication);
   authentication.Defaults();

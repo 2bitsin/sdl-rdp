@@ -15,16 +15,16 @@ struct ConfirmationPace {
 class AudioSession : public RoundFive {
 protected:
   static auto ConfirmDelayedAudio(Client& client, SoundClient& audio, ConfirmationPace pace) -> void;
-  void        ThenLiveInput(Client& client);
-  void        ThenRealtimeCounts(SoundClient const& audio);
-  void        GivenAudioServer();
-  static void ThenAudioFormats(SoundClient const& audio);
-  void        GivenUnconfirmedAudio(Client& client, SoundClient& audio);
-  void        ConnectAudio(Client& client, SoundClient& audio);
-  void        RunRealtimeAudio(Client& client, SoundClient& audio);
-  void        CheckAudioStatistics(SoundClient const& audio);
-  void        EstablishConfirmations(Client& client, SoundClient& audio);
-  void        ThenUnavailableAudio(Client& client, bool unmatched);
-  void        ThenLiveVideoAndInput(Client& client);
+  auto        ThenLiveInput(Client& client)                                                  -> void;
+  auto        ThenRealtimeCounts(SoundClient const& audio)                                   -> void;
+  auto        GivenAudioServer()                                                             -> void;
+  static auto ThenAudioFormats(SoundClient const& audio)                                     -> void;
+  auto        GivenUnconfirmedAudio(Client& client, SoundClient& audio)                      -> void;
+  auto        ConnectAudio(Client& client, SoundClient& audio)                               -> void;
+  auto        RunRealtimeAudio(Client& client, SoundClient& audio)                           -> void;
+  auto        CheckAudioStatistics(SoundClient const& audio)                                 -> void;
+  auto        EstablishConfirmations(Client& client, SoundClient& audio)                     -> void;
+  auto        ThenUnavailableAudio(Client& client, bool unmatched)                           -> void;
+  auto        ThenLiveVideoAndInput(Client& client)                                          -> void;
 };
 }

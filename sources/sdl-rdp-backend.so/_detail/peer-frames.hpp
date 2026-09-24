@@ -10,21 +10,21 @@
 namespace Backend {
 class PeerFrames : private Pinned {
 public:
-  explicit                        PeerFrames(FrameStore& store) noexcept;
-  void                            Post(FrameLock const& held, sdlrdp_rect area);
-  void                            Repaint(FrameLock const& held, sdlrdp_rect area);
-  void                            Refresh();
-  void                            CountPresent(FrameLock const& held);
-  bool                            Dirty(FrameLock const& held) const;
-  bool                            Pending(FrameLock const& held) const;
-  uint64_t                        Capture(FrameLock const& held);
-  void                            Invalidate(FrameLock const& held);
-  void                            Include();
-  void                            Resend();
-  void                            Complete(FrameLock const& held);
-  FrameSnapshot const&            Snapshot() const              noexcept;
-  std::vector<sdlrdp_rect> const& Sending() const               noexcept;
-  uint64_t                        Sequence() const              noexcept;
+  explicit PeerFrames(FrameStore& store) noexcept;
+  auto     Post(FrameLock const& held, sdlrdp_rect area)    -> void;
+  auto     Repaint(FrameLock const& held, sdlrdp_rect area) -> void;
+  auto     Refresh()                                        -> void;
+  auto     CountPresent(FrameLock const& held)              -> void;
+  auto     Dirty(FrameLock const& held) const               -> bool;
+  auto     Pending(FrameLock const& held) const             -> bool;
+  auto     Capture(FrameLock const& held)                   -> uint64_t;
+  auto     Invalidate(FrameLock const& held)                -> void;
+  auto     Include()                                        -> void;
+  auto     Resend()                                         -> void;
+  auto     Complete(FrameLock const& held)                  -> void;
+  auto     Snapshot() const noexcept                        -> FrameSnapshot const&;
+  auto     Sending() const noexcept                         -> std::vector<sdlrdp_rect> const&;
+  auto     Sequence() const noexcept                        -> uint64_t;
 
 private:
   FrameStore&   _store;
@@ -34,5 +34,5 @@ private:
   uint64_t      _sequence{ };
   uint64_t      _presents{ };
 };
-void ExpectCaptured(PeerFrames const& frames);
+auto ExpectCaptured(PeerFrames const& frames) -> void;
 }

@@ -18,7 +18,7 @@
 
 namespace SampleGate {
 namespace {
-void ThenDriveStorage(SDL_PropertiesID properties) {
+auto ThenDriveStorage(SDL_PropertiesID properties) -> void {
   auto deadline = Clock::now() + 3s;
   while (!*SDL_GetStringProperty(properties, SDL_PROP_DISPLAY_RDP_DRIVES_STRING, "") && Clock::now() < deadline) {
     SDL_PumpEvents();
@@ -50,7 +50,7 @@ TEST_F(Sample, DriveCommands) {
   Escape(client);
 }
 namespace {
-void ThenStorageEntries(SDL_Storage* storage) {
+auto ThenStorageEntries(SDL_Storage* storage) -> void {
   unsigned entries = 0;
   EXPECT_TRUE(SDL_EnumerateStorageDirectory(
       storage, "",
@@ -61,13 +61,13 @@ void ThenStorageEntries(SDL_Storage* storage) {
       &entries));
   EXPECT_EQ(entries, 1u);
 }
-void ThenStorageContents(SDL_Storage* storage) {
+auto ThenStorageContents(SDL_Storage* storage) -> void {
   ASSERT_TRUE(SDL_WriteStorageFile(storage, "whole", "contents", 8)) << SDL_GetError();
   std::array<char, 8> buffer{ };
   ASSERT_TRUE(SDL_ReadStorageFile(storage, "whole", buffer.data(), sizeof(buffer)));
   EXPECT_EQ(std::string(buffer.data(), 8), "contents");
 }
-void VerifyStorage() {
+auto VerifyStorage() -> void {
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_STORAGE_TITLE_DRIVER, "rdp"));
   auto* storage = SDL_OpenTitleStorage("share", 0);
   ASSERT_NE(storage, nullptr) << SDL_GetError();
@@ -78,14 +78,14 @@ void VerifyStorage() {
   if (::testing::Test::HasFatalFailure()) return;
   EXPECT_TRUE(SDL_CloseStorage(storage));
 }
-void ThenStreamRead(SDL_IOStream* stream) {
+auto ThenStreamRead(SDL_IOStream* stream) -> void {
   std::array<char, 8> buffer{ };
   EXPECT_EQ(SDL_GetIOSize(stream), 8);
   EXPECT_EQ(SDL_SeekIO(stream, 2, SDL_IO_SEEK_SET), 2);
   EXPECT_EQ(SDL_ReadIO(stream, buffer.data(), 3), 3u);
   EXPECT_EQ(std::string(buffer.data(), 3), "nte");
 }
-void ThenStreamWrite(SDL_IOStream* stream) {
+auto ThenStreamWrite(SDL_IOStream* stream) -> void {
   EXPECT_EQ(SDL_SeekIO(stream, -1, SDL_IO_SEEK_END), 7);
   EXPECT_EQ(SDL_WriteIO(stream, "!", 1), 1u);
   EXPECT_EQ(SDL_GetIOSize(stream), 8);
@@ -93,7 +93,7 @@ void ThenStreamWrite(SDL_IOStream* stream) {
 }
 using OpenFile = SDL_IOStream*(SDLCALL*)(char const*, char const*, char const*);
 using Stream   = std::unique_ptr<SDL_IOStream, decltype(&SDL_CloseIO)>;
-void ThenAppendExtends(OpenFile open) {
+auto ThenAppendExtends(OpenFile open) -> void {
   Stream const append{ open(nullptr, "whole", "a+b"), SDL_CloseIO };
   ASSERT_TRUE(append) << SDL_GetError();
   auto const before = SDL_GetIOSize(append.get());
@@ -101,18 +101,18 @@ void ThenAppendExtends(OpenFile open) {
   EXPECT_EQ(SDL_WriteIO(append.get(), "+", 1), 1u);
   EXPECT_EQ(SDL_GetIOSize(append.get()), before + 1);
 }
-void ThenEmptyNameSelectsFirstDrive(OpenFile open) {
+auto ThenEmptyNameSelectsFirstDrive(OpenFile open) -> void {
   EXPECT_TRUE(Stream(open("", "whole", "rb"), SDL_CloseIO)) << SDL_GetError();
   EXPECT_FALSE(Stream(open("missing-drive", "whole", "rb"), SDL_CloseIO));
 }
-void VerifyAppendAndDefaultDrive(SDL_PropertiesID properties) {
+auto VerifyAppendAndDefaultDrive(SDL_PropertiesID properties) -> void {
   auto const open = reinterpret_cast<OpenFile>(SDL_GetPointerProperty(properties,
                                                                       SDL_PROP_DISPLAY_RDP_OPEN_FILE_POINTER, nullptr));
   ASSERT_NE(open, nullptr);
   ThenAppendExtends(open);
   ThenEmptyNameSelectsFirstDrive(open);
 }
-void VerifyStream(SDL_PropertiesID properties, fs::path const& path) {
+auto VerifyStream(SDL_PropertiesID properties, fs::path const& path) -> void {
   using Open = SDL_IOStream*(SDLCALL*)(char const*, char const*, char const*);
   auto open =
       reinterpret_cast<Open>(SDL_GetPointerProperty(properties, SDL_PROP_DISPLAY_RDP_OPEN_FILE_POINTER, nullptr));
@@ -126,7 +126,7 @@ void VerifyStream(SDL_PropertiesID properties, fs::path const& path) {
   EXPECT_TRUE(SDL_CloseIO(stream));
   EXPECT_EQ(Headless::ReadText((path / "whole").c_str()), "content!");
 }
-void InitializeRdpVideo(fs::path const& certificates) {
+auto InitializeRdpVideo(fs::path const& certificates) -> void {
   auto backend = BuildRoot() / "sources/sdl-rdp-backend.so/libsdl-rdp-backend.so";
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_BACKEND, backend.c_str()));
@@ -138,10 +138,11 @@ void InitializeRdpVideo(fs::path const& certificates) {
 TEST_F(Sample, DriveStorageAndStream) {
   InitializeRdpVideo(certificates.Path());
   if (::testing::Test::HasFatalFailure()) return;
-  auto quit = std::unique_ptr<void, void (*)(void*)>(reinterpret_cast<void*>(1), [](void*) { SDL_Quit(); });
-  auto                               properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
+  auto   quit       = std::unique_ptr<void, auto (*)(void*) -> void>(reinterpret_cast<void*>(1),
+                                                                    [](void*) { SDL_Quit(); });
+  auto   properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
   Client client(SDL_GetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0), false);
-  oxbox::platform::ScratchArea const share      { "storage-drive", "sdl-rdp" };
+  oxbox::platform::ScratchArea const share { "storage-drive", "sdl-rdp" };
   ConnectDrive(client, share.Path());
   if (::testing::Test::HasFatalFailure()) return;
   std::jthread const pump([&](std::stop_token const& stop) {

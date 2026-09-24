@@ -13,18 +13,18 @@ class PeerFrames;
 enum class RowOrder{ TopDown, BottomUp };
 class Scaler : private Pinned {
 public:
-                           Scaler(PeerFrames const& source, DesktopLayout const& layout) noexcept;
-  std::vector<sdlrdp_rect> Areas() const;
-  sdlrdp_rect              Target() const                                                noexcept;
-  PixelBand                Copy(sdlrdp_rect area, std::span<BYTE> buffer, RowOrder order);
-  PixelBand                Place(sdlrdp_rect area, std::span<BYTE> buffer, std::size_t pitch);
+       Scaler(PeerFrames const& source, DesktopLayout const& layout) noexcept;
+  auto Areas() const                                                      -> std::vector<sdlrdp_rect>;
+  auto Target() const noexcept                                            -> sdlrdp_rect;
+  auto Copy(sdlrdp_rect area, std::span<BYTE> buffer, RowOrder order)     -> PixelBand;
+  auto Place(sdlrdp_rect area, std::span<BYTE> buffer, std::size_t pitch) -> PixelBand;
 
 private:
-  sdlrdp_rect Area(sdlrdp_rect damage) const;
-  bool        Scaled() const;
-  PixelBand   Fill(sdlrdp_rect area, std::span<BYTE> buffer, std::size_t pitch, RowOrder order);
-  void        Resample(sdlrdp_rect area, std::span<BYTE> buffer, std::size_t pitch, RowOrder order);
-  void        Columns(sdlrdp_rect area);
+  auto Area(sdlrdp_rect damage) const                                                        -> sdlrdp_rect;
+  auto Scaled() const                                                                        -> bool;
+  auto Fill(sdlrdp_rect area, std::span<BYTE> buffer, std::size_t pitch, RowOrder order)     -> PixelBand;
+  auto Resample(sdlrdp_rect area, std::span<BYTE> buffer, std::size_t pitch, RowOrder order) -> void;
+  auto Columns(sdlrdp_rect area)                                                             -> void;
   PeerFrames const&    _frames;
   DesktopLayout const& _desktop;
   std::vector<Tap>     _columns;

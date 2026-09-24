@@ -23,17 +23,17 @@ using utilities::Ensures;
 using utilities::Expects;
 struct Encoder::Impl {
 public:
-  bool                     Check(int status, char const* operation);
-  bool                     Load();
-  bool                     Session();
-  bool                     Initialize(unsigned bitrate, unsigned fps);
-  NV_ENC_INITIALIZE_PARAMS Parameters(unsigned fps, NV_ENC_CONFIG* config) const;
-  bool                     Buffers();
-  auto                     Capability(NV_ENC_CAPS query, int& value, char const* operation) -> bool;
-  auto                     MinimumSize()                                                    -> bool;
-  NV_ENC_PIC_PARAMS        Picture(bool force_idr) const;
-  bool                     Fill(std::span<BYTE const> bgrx, unsigned stride, Encoder& timing);
-  void                     Close();
+  auto Check(int status, char const* operation)                           -> bool;
+  auto Load()                                                             -> bool;
+  auto Session()                                                          -> bool;
+  auto Initialize(unsigned bitrate, unsigned fps)                         -> bool;
+  auto Parameters(unsigned fps, NV_ENC_CONFIG* config) const              -> NV_ENC_INITIALIZE_PARAMS;
+  auto Buffers()                                                          -> bool;
+  auto Capability(NV_ENC_CAPS query, int& value, char const* operation)   -> bool;
+  auto MinimumSize()                                                      -> bool;
+  auto Picture(bool force_idr) const                                      -> NV_ENC_PIC_PARAMS;
+  auto Fill(std::span<BYTE const> bgrx, unsigned stride, Encoder& timing) -> bool;
+  auto Close()                                                            -> void;
 
 private:
   friend class Encoder;
@@ -57,19 +57,19 @@ private:
   bool        first   = true;
   std::string error;
 };
-bool Encoder::Impl::Check(int status, char const* operation) {
+auto Encoder::Impl::Check(int status, char const* operation) -> bool {
   Expects(operation, "operation name exists");
   if (!status) return true;
   error = std::format("AVC420 {} failed: {}", operation, status);
   WLog_ERR("sdlrdp.avc", "%s", error.c_str());
   return false;
 }
-bool Encoder::Impl::Load() {
+auto Encoder::Impl::Load() -> bool {
   return Check(cuda_load_functions(&driver.cuda, nullptr), "load libcuda.so.1") &&
          Check(nvenc_load_functions(&driver.loader, nullptr), "load libnvidia-encode.so.1") &&
          Check(driver.cuda->cuInit(0), "cuInit");
 }
-bool Encoder::Impl::Session() {
+auto Encoder::Impl::Session() -> bool {
   Expects(driver.cuda != nullptr, "CUDA library is loaded");
   Expects(driver.loader != nullptr, "NVENC library is loaded");
   Expects(handles.session == nullptr, "encoder session is fresh");
@@ -87,7 +87,7 @@ bool Encoder::Impl::Session() {
   return Check(driver.api.nvEncOpenEncodeSessionEx(&open, &handles.session), "open session");
 }
 namespace {
-void ConfigureRate(NV_ENC_RC_PARAMS& rc, unsigned bitrate, unsigned fps) {
+auto ConfigureRate(NV_ENC_RC_PARAMS& rc, unsigned bitrate, unsigned fps) -> void {
   rc.enableLookahead  = 0;
   rc.lookaheadDepth   = 0;
   rc.rateControlMode  = NV_ENC_PARAMS_RC_CBR;
@@ -96,7 +96,7 @@ void ConfigureRate(NV_ENC_RC_PARAMS& rc, unsigned bitrate, unsigned fps) {
   rc.vbvInitialDelay  = rc.vbvBufferSize;
   rc.zeroReorderDelay = 1;
 }
-void ConfigureColour(NV_ENC_CONFIG_H264_VUI_PARAMETERS& vui) {
+auto ConfigureColour(NV_ENC_CONFIG_H264_VUI_PARAMETERS& vui) -> void {
   vui.videoSignalTypePresentFlag   = 1;
   vui.videoFullRangeFlag           = 1;
   vui.colourDescriptionPresentFlag = 1;
@@ -104,7 +104,7 @@ void ConfigureColour(NV_ENC_CONFIG_H264_VUI_PARAMETERS& vui) {
   vui.transferCharacteristics      = NV_ENC_VUI_TRANSFER_CHARACTERISTIC_BT709;
   vui.colourMatrix                 = NV_ENC_VUI_MATRIX_COEFFS_BT709;
 }
-void ConfigureH264(NV_ENC_CONFIG_H264& h264, unsigned fps) {
+auto ConfigureH264(NV_ENC_CONFIG_H264& h264, unsigned fps) -> void {
   h264.chromaFormatIDC = 1;
   h264.level           = NV_ENC_LEVEL_AUTOSELECT;
   h264.idrPeriod       = NVENC_INFINITE_GOPLENGTH;
@@ -115,7 +115,7 @@ void ConfigureH264(NV_ENC_CONFIG_H264& h264, unsigned fps) {
   h264.intraRefreshCnt    = refresh.count;
   ConfigureColour(h264.h264VUIParameters);
 }
-void ConfigurePreset(NV_ENC_CONFIG& config, unsigned bitrate, unsigned fps) {
+auto ConfigurePreset(NV_ENC_CONFIG& config, unsigned bitrate, unsigned fps) -> void {
   config.profileGUID    = NV_ENC_H264_PROFILE_HIGH_GUID;
   config.gopLength      = NVENC_INFINITE_GOPLENGTH;
   config.frameIntervalP = 1;
@@ -123,7 +123,7 @@ void ConfigurePreset(NV_ENC_CONFIG& config, unsigned bitrate, unsigned fps) {
   ConfigureH264(config.encodeCodecConfig.h264Config, fps);
 }
 }
-NV_ENC_INITIALIZE_PARAMS Encoder::Impl::Parameters(unsigned fps, NV_ENC_CONFIG* config) const {
+auto Encoder::Impl::Parameters(unsigned fps, NV_ENC_CONFIG* config) const -> NV_ENC_INITIALIZE_PARAMS {
   NV_ENC_INITIALIZE_PARAMS init{ };
   init.version           = NV_ENC_INITIALIZE_PARAMS_VER;
   init.encodeGUID        = NV_ENC_CODEC_H264_GUID;
@@ -140,7 +140,7 @@ NV_ENC_INITIALIZE_PARAMS Encoder::Impl::Parameters(unsigned fps, NV_ENC_CONFIG* 
   init.encodeConfig      = config;
   return init;
 }
-bool Encoder::Impl::Initialize(unsigned bitrate, unsigned fps) {
+auto Encoder::Impl::Initialize(unsigned bitrate, unsigned fps) -> bool {
   Expects(handles.session != nullptr, "encoder session exists");
   Expects(bitrate > 0, "encoder bitrate is positive");
   Expects(fps > 0, "encoder frame rate is positive");
@@ -156,7 +156,7 @@ bool Encoder::Impl::Initialize(unsigned bitrate, unsigned fps) {
   auto init = Parameters(fps, &config);
   return Check(driver.api.nvEncInitializeEncoder(handles.session, &init), "initialize encoder");
 }
-bool Encoder::Impl::Buffers() {
+auto Encoder::Impl::Buffers() -> bool {
   Expects(handles.session != nullptr, "encoder session exists");
   Expects(aligned.width % 16 == 0, "encoder width is aligned");
   Expects(aligned.height % 16 == 0, "encoder height is aligned");
@@ -174,8 +174,8 @@ bool Encoder::Impl::Buffers() {
   return true;
 }
 namespace {
-int ConvertInput(NV_ENC_LOCK_INPUT_BUFFER const& lock, prim_size_t const& size, std::span<BYTE const> bgrx,
-                 unsigned stride) {
+auto ConvertInput(NV_ENC_LOCK_INPUT_BUFFER const& lock, prim_size_t const& size, std::span<BYTE const> bgrx,
+                  unsigned stride) -> int {
   Expects(lock.pitch >= size.width, "I420 pitch covers aligned width");
   Expects(lock.pitch % 2 == 0, "I420 pitch is even");
   auto*                 y      { static_cast<BYTE*>(lock.bufferDataPtr)     };
@@ -186,7 +186,7 @@ int ConvertInput(NV_ENC_LOCK_INPUT_BUFFER const& lock, prim_size_t const& size, 
                                                  pitches.data(), &size);
 }
 }
-bool Encoder::Impl::Fill(std::span<BYTE const> bgrx, unsigned stride, Encoder& timing) {
+auto Encoder::Impl::Fill(std::span<BYTE const> bgrx, unsigned stride, Encoder& timing) -> bool {
   Expects(handles.session != nullptr, "encoder session exists");
   Expects(handles.input != nullptr, "encoder input buffer exists");
   using Clock = std::chrono::steady_clock;
@@ -204,7 +204,7 @@ bool Encoder::Impl::Fill(std::span<BYTE const> bgrx, unsigned stride, Encoder& t
   timing.times.upload += Clock::now() - start;
   return Check(status, "BT.709 conversion") && unlocked;
 }
-void Encoder::Impl::Close() {
+auto Encoder::Impl::Close() -> void {
   if (handles.input) Check(driver.api.nvEncDestroyInputBuffer(handles.session, handles.input), "destroy input");
   if (handles.output)
     Check(driver.api.nvEncDestroyBitstreamBuffer(handles.session, handles.output), "destroy bitstream");
@@ -222,20 +222,20 @@ Encoder::Encoder() : impl(std::make_unique<Impl>()) { }
 Encoder::~Encoder() {
   Close();
 }
-void Encoder::Close() {
+auto Encoder::Close() -> void {
   impl->Close();
 }
-bool Encoder::IsOpen() const {
+auto Encoder::IsOpen() const -> bool {
   return impl->handles.output != nullptr;
 }
-EncodingTimes const& Encoder::Timing() const { return times; }
-bool Encoder::TooSmall() const {
+auto Encoder::Timing() const -> EncodingTimes const& { return times; }
+auto Encoder::TooSmall() const -> bool {
   return impl->small;
 }
-std::string const& Encoder::Error() const {
+auto Encoder::Error() const -> std::string const& {
   return impl->error;
 }
-std::string Encoder::UnavailableReason() {
+auto Encoder::UnavailableReason() -> std::string {
   static std::string const reason = [] {
     Impl probe;
     auto available = probe.Load();
@@ -245,7 +245,7 @@ std::string Encoder::UnavailableReason() {
   }();
   return reason;
 }
-bool Encoder::Available() {
+auto Encoder::Available() -> bool {
   return UnavailableReason().empty();
 }
 auto Encoder::Impl::Capability(NV_ENC_CAPS query, int& value, char const* operation) -> bool {
@@ -261,7 +261,7 @@ auto Encoder::Impl::MinimumSize() -> bool {
   if (small) error = "surface below NVENC minimum picture size";
   return ok;
 }
-bool Encoder::Open(Extent size, unsigned bitrate, unsigned fps) {
+auto Encoder::Open(Extent size, unsigned bitrate, unsigned fps) -> bool {
   auto const [width, height] = size;
   Expects(width > 0, "picture width is positive");
   Expects(height > 0, "picture height is positive");
@@ -279,7 +279,7 @@ bool Encoder::Open(Extent size, unsigned bitrate, unsigned fps) {
   }
   return true;
 }
-NV_ENC_PIC_PARAMS Encoder::Impl::Picture(bool force_idr) const {
+auto Encoder::Impl::Picture(bool force_idr) const -> NV_ENC_PIC_PARAMS {
   NV_ENC_PIC_PARAMS pic{ };
   pic.version         = NV_ENC_PIC_PARAMS_VER;
   pic.inputBuffer     = handles.input;
@@ -291,8 +291,8 @@ NV_ENC_PIC_PARAMS Encoder::Impl::Picture(bool force_idr) const {
   if (force_idr || first) pic.encodePicFlags = NV_ENC_PIC_FLAG_FORCEIDR | NV_ENC_PIC_FLAG_OUTPUT_SPSPPS;
   return pic;
 }
-std::span<BYTE const> Encoder::Encode(std::span<BYTE const> bgrx, unsigned stride, bool force_idr,
-                                      std::vector<BYTE>& encoded) {
+auto Encoder::Encode(std::span<BYTE const> bgrx, unsigned stride, bool force_idr,
+                     std::vector<BYTE>& encoded) -> std::span<BYTE const> {
   Expects(IsOpen(), "encoder is open");
   Expects(stride >= impl->aligned.width * 4, "source stride covers aligned width");
   Expects(bgrx.size() >= (std::size_t(impl->aligned.height - 1) * stride) + (std::size_t(impl->aligned.width) * 4),

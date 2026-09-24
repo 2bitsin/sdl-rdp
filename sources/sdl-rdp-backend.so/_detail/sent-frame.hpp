@@ -7,10 +7,10 @@ namespace Backend {
 class SentFrame {
 public:
   using Clock = std::chrono::steady_clock;
-                  SentFrame(UINT32 frame, uint64_t presented, Clock::time_point at) noexcept;
-  UINT32          Id() const                                                        noexcept;
-  uint64_t        Sequence() const                                                  noexcept;
-  Clock::duration Age(Clock::time_point now) const                                  noexcept;
+       SentFrame(UINT32 frame, uint64_t presented, Clock::time_point at) noexcept;
+  auto Id() const noexcept                       -> UINT32;
+  auto Sequence() const noexcept                 -> uint64_t;
+  auto Age(Clock::time_point now) const noexcept -> Clock::duration;
 
 private:
   UINT32            _id;

@@ -8,7 +8,7 @@
 #include <sys/socket.h>
 
 namespace Backend {
-WireSample SampleWire(int descriptor) {
+auto SampleWire(int descriptor) -> WireSample {
   utilities::Expects(descriptor >= 0, "peer socket is open");
   tcp_info  info   { };
   socklen_t length = sizeof(info);

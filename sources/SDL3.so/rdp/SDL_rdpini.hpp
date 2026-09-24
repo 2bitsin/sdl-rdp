@@ -36,7 +36,7 @@ auto IniValue(SettingValues const& values, std::string_view name) -> std::option
 auto ParseEntry(std::string_view line, unsigned number)           -> IniEntry;
 auto IsIniEntry(std::string_view line)                            -> bool;
 template<typename _Accept> requires std::invocable<_Accept const&, IniEntry>
-void ParseIni(std::string_view text, _Accept const& accept) {
+auto ParseIni(std::string_view text, _Accept const& accept) -> void {
   for (auto const [index, part] : text | std::views::split('\n') | std::views::enumerate) {
     auto const line = oxbox::utilities::Trimmed(std::string_view{part});
     if (IsIniEntry(line)) std::invoke(accept, ParseEntry(line, static_cast<unsigned>(index) + 1));

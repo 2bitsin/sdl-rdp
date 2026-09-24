@@ -18,13 +18,13 @@ struct WaitPlan {
 };
 class PeerWait : private Pinned {
 public:
-           PeerWait(PeerLink& link, ChannelSet const& channels, Activation const& activation, FramePacing& pacing,
-                    GraphicsLink& graphics) noexcept;
-  WaitPlan Plan(std::span<HANDLE> handles);
+       PeerWait(PeerLink& link, ChannelSet const& channels, Activation const& activation, FramePacing& pacing,
+                GraphicsLink& graphics) noexcept;
+  auto Plan(std::span<HANDLE> handles) -> WaitPlan;
 
 private:
-  DWORD Collect(std::span<HANDLE> handles);
-  DWORD Timeout() const;
+  auto Collect(std::span<HANDLE> handles) -> DWORD;
+  auto Timeout() const                    -> DWORD;
   PeerLink&         _link;
   ChannelSet const& _channels;
   Activation const& _activation;

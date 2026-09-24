@@ -21,10 +21,10 @@ ClipboardChannel::ClipboardChannel(PeerLink& link, Activation const& activation,
 ClipboardChannel::~ClipboardChannel() {
   if (_context) _context->Close(_context.get());
 }
-HANDLE ClipboardChannel::Event() const {
+auto ClipboardChannel::Event() const -> HANDLE {
   return _opened ? _context->GetEventHandle(_context.get()) : nullptr;
 }
-bool ClipboardChannel::Open() {
+auto ClipboardChannel::Open() -> bool {
   Expects(!_context, "clipboard opens once");
   _context.reset(cliprdr_server_context_new(_link.Channels()));
   if (!BindContext(_context.get(), this, _link.Context())) return false;
@@ -41,14 +41,14 @@ bool ClipboardChannel::Open() {
          }) == CHANNEL_RC_OK &&
          _context->MonitorReady(_context.get(), &monitor) == CHANNEL_RC_OK;
 }
-bool ClipboardChannel::Pump(std::span<HANDLE const> signaled) {
+auto ClipboardChannel::Pump(std::span<HANDLE const> signaled) -> bool {
   Expects(_opened, "clipboard channel open");
   if (std::ranges::contains(signaled, Event()) && _context->CheckEventHandle(_context.get()) != CHANNEL_RC_OK)
     return false;
   if (!_ready || _announced == _store.Generation()) return true;
   return Announce() == CHANNEL_RC_OK;
 }
-UINT ClipboardChannel::Announce() {
+auto ClipboardChannel::Announce() -> UINT {
   Expects(_opened, "clipboard channel open");
   std::array<CLIPRDR_FORMAT, 2> formats{ { { .formatId = CF_UNICODETEXT, .formatName = nullptr },
                                            { .formatId = CF_TEXT       , .formatName = nullptr } } };
@@ -59,7 +59,7 @@ UINT ClipboardChannel::Announce() {
   if (result == CHANNEL_RC_OK) _announced = _store.Generation();
   return result;
 }
-UINT ClipboardChannel::Request() {
+auto ClipboardChannel::Request() -> UINT {
   Expects(!_pending, "no clipboard request is pending");
   Expects(_has_unicode, "peer offers Unicode clipboard text");
   CLIPRDR_FORMAT_DATA_REQUEST request{ .common = { .msgType = CB_FORMAT_DATA_REQUEST } };
@@ -70,7 +70,7 @@ UINT ClipboardChannel::Request() {
   _pending = result == CHANNEL_RC_OK;
   return result;
 }
-void ClipboardChannel::Changed(std::string text) {
+auto ClipboardChannel::Changed(std::string text) -> void {
   Expects(_activation.Active(), "clipboard sender is active");
   if (_store.Text() == text) return;
   _announced = _store.Replace(std::move(text));
@@ -78,7 +78,7 @@ void ClipboardChannel::Changed(std::string text) {
                     [&] { return std::format("generation={} bytes={}", _store.Generation(), _store.Text().size()); });
   _events.Push({ .type = SDLRDP_CLIPBOARD });
 }
-UINT ClipboardChannel::RespondToList() {
+auto ClipboardChannel::RespondToList() -> UINT {
   CLIPRDR_FORMAT_LIST_RESPONSE response{ .common = { .msgType = CB_FORMAT_LIST_RESPONSE } };
   response.common.msgFlags = CB_RESPONSE_OK;
   auto result = _context->ServerFormatListResponse(_context.get(), &response);
@@ -89,10 +89,10 @@ UINT ClipboardChannel::RespondToList() {
   }
   return result;
 }
-bool ClipboardChannel::FirstOfferWhileAppHoldsText() const {
+auto ClipboardChannel::FirstOfferWhileAppHoldsText() const -> bool {
   return _offered == 1 && !_store.Text().empty();
 }
-UINT ClipboardChannel::Formats(CliprdrServerContext* context, CLIPRDR_FORMAT_LIST const* list) {
+auto ClipboardChannel::Formats(CliprdrServerContext* context, CLIPRDR_FORMAT_LIST const* list) -> UINT {
   Expects(context, "callback context exists");
   Expects(list, "clipboard format list is supplied");
   auto& self = CallbackOwner<ClipboardChannel>(context->custom);
@@ -103,7 +103,7 @@ UINT ClipboardChannel::Formats(CliprdrServerContext* context, CLIPRDR_FORMAT_LIS
     return ERROR_INTERNAL_ERROR;
   }
 }
-UINT ClipboardChannel::RequestOfferedText(CLIPRDR_FORMAT_LIST const& list) {
+auto ClipboardChannel::RequestOfferedText(CLIPRDR_FORMAT_LIST const& list) -> UINT {
   if (FirstOfferWhileAppHoldsText()) return CHANNEL_RC_OK;
   _has_unicode = std::ranges::any_of(std::span(list.formats, list.numFormats),
                                     [](auto const& format) { return format.formatId == CF_UNICODETEXT; });
@@ -113,7 +113,7 @@ UINT ClipboardChannel::RequestOfferedText(CLIPRDR_FORMAT_LIST const& list) {
   return _has_unicode && !_pending ? Request() : CHANNEL_RC_OK;
 }
 namespace {
-UINT SendClipboardText(CliprdrServerContext* context, ClipboardStore const& clipboard, UINT32 format) {
+auto SendClipboardText(CliprdrServerContext* context, ClipboardStore const& clipboard, UINT32 format) -> UINT {
   std::string                  ansi;
   CLIPRDR_FORMAT_DATA_RESPONSE response{ .common = { .msgType = CB_FORMAT_DATA_RESPONSE } };
   response.common.msgFlags = CB_RESPONSE_OK;
@@ -129,7 +129,7 @@ UINT SendClipboardText(CliprdrServerContext* context, ClipboardStore const& clip
   return context->ServerFormatDataResponse(context, &response);
 }
 }
-UINT ClipboardChannel::DataRequest(CliprdrServerContext* context, CLIPRDR_FORMAT_DATA_REQUEST const* request) {
+auto ClipboardChannel::DataRequest(CliprdrServerContext* context, CLIPRDR_FORMAT_DATA_REQUEST const* request) -> UINT {
   Expects(context, "callback context exists");
   Expects(request, "clipboard request is supplied");
   auto& self = CallbackOwner<ClipboardChannel>(context->custom);
@@ -139,7 +139,8 @@ UINT ClipboardChannel::DataRequest(CliprdrServerContext* context, CLIPRDR_FORMAT
     return ERROR_INTERNAL_ERROR;
   }
 }
-UINT ClipboardChannel::DataResponse(CliprdrServerContext* context, CLIPRDR_FORMAT_DATA_RESPONSE const* response) {
+auto ClipboardChannel::DataResponse(CliprdrServerContext* context,
+                                    CLIPRDR_FORMAT_DATA_RESPONSE const* response) -> UINT {
   Expects(context, "callback context exists");
   Expects(response, "callback response is supplied");
   auto& self = CallbackOwner<ClipboardChannel>(context->custom);

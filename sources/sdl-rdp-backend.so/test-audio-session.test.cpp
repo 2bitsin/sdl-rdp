@@ -14,7 +14,7 @@
 
 namespace BackendGate {
 namespace {
-int WriteRealtimeAudio(sdlrdp_handle* backend) {
+auto WriteRealtimeAudio(sdlrdp_handle* backend) -> int {
   std::array<INT16, 480uz * 2> pcm     { };
   auto                         start   = Clock::now();
   int                          written = 0;
@@ -34,7 +34,7 @@ auto ConfirmDue(SoundClient& audio, std::chrono::milliseconds delay) -> void {
   while (Due(audio, delay))
     if (!audio.Confirm()) return;
 }
-void ThenAudioCadence(SoundClient const& audio) {
+auto ThenAudioCadence(SoundClient const& audio) -> void {
   ASSERT_GT(audio.CaptureState().received.size(), 1u);
   double maximum_gap = 0;
   for (std::size_t i = 1; i < audio.CaptureState().received.size(); ++i)
@@ -54,7 +54,7 @@ auto AudioSession::ConfirmDelayedAudio(Client& client, SoundClient& audio, Confi
     ConfirmDue(audio, pace.delay);
   }
 }
-void AudioSession::ThenLiveInput(Client& client) {
+auto AudioSession::ThenLiveInput(Client& client) -> void {
   ASSERT_TRUE(freerdp_input_send_keyboard_event(client.Instance()->context->input, KBD_FLAGS_DOWN, 0x1e));
   auto events = EventsUntil(
       [](auto const& events) {
@@ -64,26 +64,26 @@ void AudioSession::ThenLiveInput(Client& client) {
   EXPECT_NE(std::ranges::find(events, SDLRDP_KEY, &sdlrdp_event::type), events.end());
   EXPECT_EQ(std::ranges::find(events, SDLRDP_DISCONNECTED, &sdlrdp_event::type), events.end());
 }
-void AudioSession::ThenRealtimeCounts(SoundClient const& audio) {
+auto AudioSession::ThenRealtimeCounts(SoundClient const& audio) -> void {
   EXPECT_EQ(audio.CaptureState().received.size(), 100u);
   EXPECT_FALSE(logs.Contains("Audio confirmation gate waiting"));
   EXPECT_EQ(audio.CaptureState().confirmed_frames, 96000u);
 }
-void AudioSession::GivenAudioServer() {
+auto AudioSession::GivenAudioServer() -> void {
   Open(320, 200);
   ASSERT_EQ(sdlrdp_audio_open(backend.get()), 0);
 }
-void AudioSession::ThenAudioFormats(SoundClient const& audio) {
+auto AudioSession::ThenAudioFormats(SoundClient const& audio) -> void {
   ASSERT_EQ(audio.CaptureState().server_formats.size(), 2u);
   EXPECT_EQ(audio.CaptureState().server_formats[0].nSamplesPerSec, 44100u);
   EXPECT_EQ(audio.CaptureState().server_formats[1].nSamplesPerSec, 48000u);
 }
-void AudioSession::GivenUnconfirmedAudio(Client& client, SoundClient& audio) {
+auto AudioSession::GivenUnconfirmedAudio(Client& client, SoundClient& audio) -> void {
   audio.CaptureState().rate         = 48000;
   audio.CaptureState().auto_confirm = false;
   ConnectAudio(client, audio);
 }
-void AudioSession::ConnectAudio(Client& client, SoundClient& audio) {
+auto AudioSession::ConnectAudio(Client& client, SoundClient& audio) -> void {
   Connect(client);
   ASSERT_TRUE(client.Until([&] { return audio.CaptureState().opened; }));
   auto events = EventsUntil(
@@ -96,7 +96,7 @@ void AudioSession::ConnectAudio(Client& client, SoundClient& audio) {
     return event.type == SDLRDP_AUDIO && event.audio.connected;
   })) << logs.Text();
 }
-void AudioSession::RunRealtimeAudio(Client& client, SoundClient& audio) {
+auto AudioSession::RunRealtimeAudio(Client& client, SoundClient& audio) -> void {
   Expects(backend != nullptr, "backend exists");
   Expects(audio.CaptureState().opened, "client audio channel is open");
   auto writing = std::async(std::launch::async, [&] { return WriteRealtimeAudio(backend.get()); });
@@ -109,7 +109,7 @@ void AudioSession::RunRealtimeAudio(Client& client, SoundClient& audio) {
   if (::testing::Test::HasFatalFailure()) return;
   ThenRealtimeCounts(audio);
 }
-void AudioSession::CheckAudioStatistics(SoundClient const& audio) {
+auto AudioSession::CheckAudioStatistics(SoundClient const& audio) -> void {
   Expects(!backend, "connection statistics have been flushed");
   auto        text  = logs.Text(true);
   std::smatch match;
@@ -125,7 +125,7 @@ void AudioSession::CheckAudioStatistics(SoundClient const& audio) {
       text, std::regex(R"(acknowledgement [0-9.]+ ms mean, [0-9.]+ ms max, [0-9]+ over 100 ms, [0-9]+ timed out\.)")))
       << text;
 }
-void AudioSession::EstablishConfirmations(Client& client, SoundClient& audio) {
+auto AudioSession::EstablishConfirmations(Client& client, SoundClient& audio) -> void {
   // Fill one latency window, then return its credit. This distinguishes a
   // slow confirming client from the deliberate no-confirmation fallback.
   std::vector<INT16> pcm(24000uz * 2);
@@ -138,7 +138,7 @@ void AudioSession::EstablishConfirmations(Client& client, SoundClient& audio) {
   audio.CaptureState().samples.clear();
   audio.CaptureState().confirmed_frames = audio.CaptureState().maximum_pending_frames = 0;
 }
-void AudioSession::ThenUnavailableAudio(Client& client, bool unmatched) {
+auto AudioSession::ThenUnavailableAudio(Client& client, bool unmatched) -> void {
   auto events = EventsUntil(
       [](auto const& events) {
         return std::ranges::any_of(events, [](auto const& e) { return e.type == SDLRDP_AUDIO; });
@@ -151,7 +151,7 @@ void AudioSession::ThenUnavailableAudio(Client& client, bool unmatched) {
   EXPECT_EQ(logs.Count(SDLRDP_LOG_WARN, unmatched ? "rate=22050" : "client formats: none"), 1u);
   EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, "client doesn't support any format"));
 }
-void AudioSession::ThenLiveVideoAndInput(Client& client) {
+auto AudioSession::ThenLiveVideoAndInput(Client& client) -> void {
   FrameObserver observer(client);
   Present(std::vector<UINT32>(320uz * 200, 0x123456), 320, 200);
   ASSERT_TRUE(client.Until([&] { return !observer.Frames().empty(); }));

@@ -7,7 +7,7 @@
 #include <winpr/synch.h>
 
 namespace Backend {
-bool Signalled(HANDLE event) {
+auto Signalled(HANDLE event) -> bool {
   utilities::Expects(event != nullptr, "event exists");
   utilities::Expects(event != INVALID_HANDLE_VALUE, "event handle is valid");
   auto result = WaitForSingleObject(event, 0);
@@ -16,13 +16,13 @@ bool Signalled(HANDLE event) {
 }
 
 WakeEvent::WakeEvent(HANDLE value) : handle(value) { }
-HANDLE WakeEvent::get() const {
+auto WakeEvent::get() const -> HANDLE {
   return handle.get();
 }
 WakeEvent::operator bool() const {
   return bool(handle);
 }
-void WakeEvent::Transition(Phase next) {
+auto WakeEvent::Transition(Phase next) -> void {
   switch (next) {
   case Phase::Pending:
     if (phase.exchange(next) == Phase::Idle) SetEvent(get());

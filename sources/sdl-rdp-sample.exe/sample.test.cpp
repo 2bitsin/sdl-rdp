@@ -20,13 +20,13 @@ namespace SampleGate {
 namespace {
 class DesktopSample : public SampleGate::Sample {
 protected:
-  void ThenLegacyClipboard(Client& client) {
+  auto ThenLegacyClipboard(Client& client) -> void {
     ASSERT_EQ(ClipboardSession().RequestFormat(CF_TEXT), CHANNEL_RC_OK);
     ASSERT_TRUE(client.Until([&] { return ClipboardSession().Received({ '?', '?', '?', 'w', 0 }); }));
     SDL_Log("trace CLIPBOARD server request=1 bytes=3f3f3f7700 text=???w");
     ASSERT_TRUE(Read("event CLIPBOARD text=żółw"));
   }
-  void GivenFocusedClient(Client const& first) {
+  auto GivenFocusedClient(Client const& first) -> void {
     ASSERT_TRUE(freerdp_connect(first.Instance().get())) << ConnectLogs();
     ASSERT_TRUE(Read("event FOCUS_GAINED "));
     ASSERT_TRUE(Read("event MOUSE_ENTER "));

@@ -18,12 +18,12 @@ class Session;
 using PeerFactory = std::move_only_function<std::unique_ptr<Peer>(PeerHandle)>;
 class Listener : private Pinned {
 public:
-  Listener(Configuration const& configuration, Diagnostics const& diagnostics, Session& session, PeerFactory make);
-  unsigned Port() const noexcept;
+       Listener(Configuration const& configuration, Diagnostics const& diagnostics, Session& session, PeerFactory make);
+  auto Port() const noexcept -> unsigned;
 
 private:
-  void Accept(freerdp_peer* client);
-  void Listen(std::stop_token const& quit);
+  auto Accept(freerdp_peer* client)        -> void;
+  auto Listen(std::stop_token const& quit) -> void;
   Diagnostics const& _diagnostics;
   Session&           _session;
   PeerFactory        _make;

@@ -21,13 +21,13 @@ auto SetPointer(Driver const& driver, SDL_CursorData const& shape) -> int {
 }
 auto HidePointer(Driver const& driver) -> int { return driver.Call<Operation::SET_POINTER>(0, 0, 0, 0, nullptr); }
 // SDL returns cursor ownership through this destruction callback.
-void FreeCursor(SDL_Cursor* cursor) {
+auto FreeCursor(SDL_Cursor* cursor)    -> void {
   utilities::Expects(cursor != nullptr, "cursor destruction owns a cursor");
   std::unique_ptr<SDL_Cursor> const     owner{ cursor                                  };
   std::unique_ptr<SDL_CursorData> const state{ std::exchange(owner->internal, nullptr) };
 }
 // SDL lends the source surface and takes ownership of the created cursor.
-SDL_Cursor* CreateCursor(SDL_Surface* surface, int hot_x, int hot_y) {
+auto CreateCursor(SDL_Surface* surface, int hot_x, int hot_y) -> SDL_Cursor* {
   utilities::Expects(surface != nullptr, "cursor creation has a surface");
   return Boundary([&] {
     auto cursor = std::make_unique<SDL_Cursor>();
@@ -40,13 +40,13 @@ auto ShowPointer(Driver const& driver, SDL_Cursor const& cursor) -> int {
   utilities::Expects(cursor.internal != nullptr, "a shown cursor has its image");
   return SetPointer(driver, *cursor.internal);
 }
-bool ShowCursor(SDL_Cursor* cursor) {
+auto ShowCursor(SDL_Cursor* cursor) -> bool {
   auto const& driver = CurrentVideo().Backend();
   auto const  result = cursor ? ShowPointer(driver, *cursor) : HidePointer(driver);
   return result == 0 || driver.Fail();
 }
 }
-void InitMouse() {
+auto InitMouse() -> void {
   auto& mouse = *SDL_GetMouse();
   mouse.CreateCursor = CreateCursor;
   mouse.ShowCursor   = ShowCursor;

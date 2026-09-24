@@ -15,7 +15,7 @@ class CapabilityCheck : private Pinned {
 public:
        CapabilityCheck(PeerLink& link, Authenticator& authenticator, Activation const& activation, FramePacing& pacing,
                        DesktopLayout& desktop, FrameStore& store, Diagnostics const& diagnostics) noexcept;
-  BOOL Accept();
+  auto Accept() -> BOOL;
 
 private:
   PeerLink&          _link;

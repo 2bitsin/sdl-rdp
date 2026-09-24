@@ -9,10 +9,10 @@ namespace Backend {
 class TraceQueue : private Pinned {
 public:
   explicit TraceQueue(Diagnostics const& diagnostics) noexcept;
-  void     Defer(std::string_view event, std::invocable auto&&... fields) {
+  auto     Defer(std::string_view event, std::invocable auto&&... fields) -> void {
     if (_diagnostics.Tracing()) _lines.push_back(_diagnostics.Format(event, std::forward<decltype(fields)>(fields)...));
   }
-  void Flush();
+  auto Flush() -> void;
 
 private:
   Diagnostics const&       _diagnostics;

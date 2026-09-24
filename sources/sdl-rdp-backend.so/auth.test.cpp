@@ -3,7 +3,7 @@
 
 namespace AuthenticationGate {
 namespace {
-void RejectCertificate(unsigned port, bool& rejected) {
+auto RejectCertificate(unsigned port, bool& rejected) -> void {
   static thread_local bool verified;
   verified = false;
   Headless::Client const client(port, false);
@@ -144,7 +144,7 @@ TEST_F(Authentication, NlaMissingLookup) {
   RejectionLogs("missing-secret");
 }
 namespace {
-void DisconnectWithPending(sdlrdp_handle& handle, UINT32 code) {
+auto DisconnectWithPending(sdlrdp_handle& handle, UINT32 code) -> void {
   auto const session = handle.Session().Lock();
   auto const frame   = handle.Frames().Lock();
   auto*      current = handle.Session().Current(frame);

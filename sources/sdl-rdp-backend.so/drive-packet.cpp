@@ -8,13 +8,13 @@
 
 namespace Backend {
 namespace {
-void RequireRemaining(DrivePacket const& packet, size_t count, std::string const& cause) {
+auto RequireRemaining(DrivePacket const& packet, size_t count, std::string const& cause) -> void {
   utilities::Expects(packet.Position() <= packet.Bytes().size(), "packet cursor is bounded");
   if (count > packet.Bytes().size() - packet.Position()) packet.Invalid(cause);
 }
 }
-void DrivePacket::Invalid(std::string const& cause) const { throw MalformedResponse(cause, origin); }
-uint64_t DrivePacket::Get(unsigned count) {
+auto DrivePacket::Invalid(std::string const& cause) const -> void { throw MalformedResponse(cause, origin); }
+auto DrivePacket::Get(unsigned count) -> uint64_t {
   utilities::Expects(count <= 8, "integer fits uint64");
   RequireRemaining(*this, count, "Truncated drive response.");
   uint64_t value{ };
@@ -22,18 +22,18 @@ uint64_t DrivePacket::Get(unsigned count) {
     value |= uint64_t(bytes[position++]) << (i * 8);
   return value;
 }
-void DrivePacket::Put(uint64_t value, unsigned count) {
+auto DrivePacket::Put(uint64_t value, unsigned count) -> void {
   utilities::Expects(count <= 8, "integer fits uint64");
   for (unsigned i = 0; i < count; ++i)
     bytes.push_back(uint8_t(value >> (i * 8)));
 }
-void DrivePacket::Zero(size_t count) { bytes.resize(bytes.size() + count); }
-void DrivePacket::Append(std::span<uint8_t const> data) { bytes.insert(bytes.end(), data.begin(), data.end()); }
-void DrivePacket::Skip(size_t count) {
+auto DrivePacket::Zero(size_t count) -> void { bytes.resize(bytes.size() + count); }
+auto DrivePacket::Append(std::span<uint8_t const> data) -> void { bytes.insert(bytes.end(), data.begin(), data.end()); }
+auto DrivePacket::Skip(size_t count) -> void {
   RequireRemaining(*this, count, "Truncated drive response.");
   position += count;
 }
-std::string DrivePacket::Text(size_t count) {
+auto DrivePacket::Text(size_t count) -> std::string {
   RequireRemaining(*this, count, "Truncated drive name.");
   try {
     auto result = TranscodeRange<std::string>(
@@ -45,15 +45,15 @@ std::string DrivePacket::Text(size_t count) {
     Invalid(error.what());
   }
 }
-std::vector<uint8_t>& DrivePacket::Bytes() { return bytes; }
-std::vector<uint8_t> const& DrivePacket::Bytes() const { return bytes; }
-size_t DrivePacket::Position() const { return position; }
-void DrivePacket::Seek(size_t offset) {
+auto DrivePacket::Bytes() -> std::vector<uint8_t>& { return bytes; }
+auto DrivePacket::Bytes() const -> std::vector<uint8_t> const& { return bytes; }
+auto DrivePacket::Position() const -> size_t { return position; }
+auto DrivePacket::Seek(size_t offset) -> void {
   utilities::Expects(offset <= bytes.size(), "packet cursor is bounded");
   position = offset;
 }
-void DrivePacket::Origin(std::weak_ptr<DriveChannel> channel) { origin = std::move(channel); }
-std::vector<uint8_t> DrivePath(char const* path) {
+auto DrivePacket::Origin(std::weak_ptr<DriveChannel> channel) -> void { origin = std::move(channel); }
+auto DrivePath(char const* path) -> std::vector<uint8_t> {
   if (!path) throw std::runtime_error("Drive path is null.");
   std::string text(path);
   if (text.empty() || text.front() != '/') text.insert(text.begin(), '/');

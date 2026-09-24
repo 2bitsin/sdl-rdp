@@ -28,7 +28,7 @@ constexpr int         ListenBacklog      = 8;
 constexpr std::size_t WaitHandleCapacity = 32;
 constexpr DWORD       ListenerOwnHandles = 2;
 // Process-wide and idempotent; OpenSSL 3 releases its state at exit, so neither has a release call.
-void InitializeProcess(Credentials const& credentials) {
+auto InitializeProcess(Credentials const& credentials) -> void {
   static std::once_flag once;
   std::call_once(once, [&credentials] {
     WTSRegisterWtsApiFunctionTable(FreeRDP_InitWtsApi());
@@ -37,7 +37,7 @@ void InitializeProcess(Credentials const& credentials) {
     TlsRehearsal{ credentials }.Perform();
   });
 }
-sockaddr_in Address(sdlrdp_config const& config) {
+auto Address(sdlrdp_config const& config) -> sockaddr_in {
   sockaddr_in address{ };
   address.sin_family = AF_INET;
   address.sin_port   = htons(config.port);
@@ -49,7 +49,7 @@ auto Generic(sockaddr_in& address) -> sockaddr* {
   // POSIX socket calls take an IPv4 address through the generic sockaddr it begins with.
   return reinterpret_cast<sockaddr*>(&address);
 }
-void StartListening(Descriptor const& socket, sockaddr_in& address) {
+auto StartListening(Descriptor const& socket, sockaddr_in& address) -> void {
   int reuse = 1;
   SystemCall(setsockopt(socket.Get(), SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)), "Socket options");
   SystemCall(::bind(socket.Get(), Generic(address), sizeof(address)), "Listener bind");
@@ -57,25 +57,25 @@ void StartListening(Descriptor const& socket, sockaddr_in& address) {
   socklen_t size = sizeof(address);
   SystemCall(getsockname(socket.Get(), Generic(address), &size), "Listener socket name");
 }
-void AdoptListenerSocket(freerdp_listener& listener, Descriptor socket) {
+auto AdoptListenerSocket(freerdp_listener& listener, Descriptor socket) -> void {
   if (!listener.OpenFromSocket(&listener, socket.Get()))
     throw std::runtime_error("FreeRDP listener socket adoption failed.");
   std::ignore = socket.Release();
 }
-unsigned Bind(freerdp_listener& listener, sdlrdp_config const& config) {
+auto Bind(freerdp_listener& listener, sdlrdp_config const& config) -> unsigned {
   Descriptor socket  { SystemCall(::socket(AF_INET, SOCK_STREAM, 0), "Socket creation") };
   auto       address = Address(config);
   StartListening(socket, address);
   AdoptListenerSocket(listener, std::move(socket));
   return ntohs(address.sin_port);
 }
-ListenerHandle NewListener(Credentials const& credentials) {
+auto NewListener(Credentials const& credentials) -> ListenerHandle {
   InitializeProcess(credentials);
   ListenerHandle listener{ freerdp_listener_new() };
   if (!listener) throw std::runtime_error("listener allocation failed");
   return listener;
 }
-EventHandle NewStopEvent() {
+auto NewStopEvent() -> EventHandle {
   EventHandle stop{ CreateEvent(nullptr, TRUE, FALSE, nullptr) };
   if (!stop) throw std::runtime_error("listener stop event allocation failed");
   return stop;
@@ -96,10 +96,10 @@ Listener::Listener(Configuration const& configuration, Diagnostics const& diagno
   _thread = std::jthread([this](std::stop_token const& quit) { Listen(quit); });
   Ensures(_port != 0, "bound port is available");
 }
-unsigned Listener::Port() const noexcept {
+auto Listener::Port() const noexcept -> unsigned {
   return _port;
 }
-void Listener::Accept(freerdp_peer* client) {
+auto Listener::Accept(freerdp_peer* client) -> void {
   PeerHandle accepted{ client };
   try {
     _diagnostics.Log(SDLRDP_LOG_INFO, std::format("Peer accepted: {}.", client->hostname));
@@ -108,7 +108,7 @@ void Listener::Accept(freerdp_peer* client) {
     _diagnostics.Log(SDLRDP_LOG_ERROR, std::format("Peer construction failed: {}.", error.what()));
   }
 }
-void Listener::Listen(std::stop_token const& quit) {
+auto Listener::Listen(std::stop_token const& quit) -> void {
   std::stop_callback const               wake(quit, [this] { SetEvent(_stop.get()); });
   std::array<HANDLE, WaitHandleCapacity> handles{ };
   while (!quit.stop_requested()) {

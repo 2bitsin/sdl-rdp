@@ -30,5 +30,7 @@ auto OpenSession(Backend const& backend, sdlrdp_config const& config) -> Session
     throw std::runtime_error(backend.Call<Operation::LAST_ERROR>());
   return {backend, handle};
 }
-void CloseSession(SessionValue const& session) noexcept { session.first.get().Call<Operation::CLOSE>(session.second); }
+auto CloseSession(SessionValue const& session) noexcept -> void {
+  session.first.get().Call<Operation::CLOSE>(session.second);
+}
 }

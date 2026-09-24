@@ -5,6 +5,6 @@
 namespace Headless {
 struct ReleaseClient {
 public:
-  void operator()(freerdp* instance) const;
+  auto operator()(freerdp* instance) const -> void;
 };
 }

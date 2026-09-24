@@ -15,7 +15,7 @@ FrameSender::FrameSender(PeerLink& link, Activation const& activation, SessionAc
                          LegacyFrame& legacy) noexcept
     : _link { link }, _activation{ activation }, _session{ session }, _gate{ gate }, _capture{ capture },
       _pointer{ pointer }, _graphics{ graphics }, _legacy{ legacy } { }
-bool FrameSender::Drain() {
+auto FrameSender::Drain() -> bool {
   if (!_activation.Active()) return true;
   auto& client = _link.Client();
   if (client.DrainOutputBuffer(&client) < 0) return false;
@@ -33,7 +33,7 @@ bool FrameSender::Drain() {
     utilities::Unreachable(captured);
   }
 }
-Delivery FrameSender::Encode(std::stop_token const& quit) {
+auto FrameSender::Encode(std::stop_token const& quit) -> Delivery {
   auto const kind = _state;
   if (kind == EncodeState::Idle || kind == EncodeState::LegacyReady) return Delivery::Healthy;
   auto const encoded = kind == EncodeState::Legacy ? _legacy.Encode() : _graphics.Channel().Encode();
@@ -43,22 +43,22 @@ Delivery FrameSender::Encode(std::stop_token const& quit) {
   if (!_activation.Active()) return Delivery::Healthy;
   return encoded && Transmit(kind) ? Delivery::Healthy : Delivery::Failed;
 }
-bool FrameSender::Transmit(EncodeState kind) {
+auto FrameSender::Transmit(EncodeState kind) -> bool {
   return kind == EncodeState::Legacy ? SendLegacy() : _graphics.Channel().Send();
 }
-bool FrameSender::Prepare() {
+auto FrameSender::Prepare() -> bool {
   if (_state == EncodeState::LegacyReady) return SendLegacy();
   auto const confirmed = _graphics.Confirmed();
   if (!(confirmed ? _graphics.Channel().Prepare() : _legacy.Prepare())) return false;
   Transition(confirmed ? EncodeState::Graphics : EncodeState::Legacy);
   return true;
 }
-bool FrameSender::SendLegacy() {
+auto FrameSender::SendLegacy() -> bool {
   if (!_legacy.Send()) return false;
   if (_legacy.Delivered()) Transition(EncodeState::Idle);
   return true;
 }
-void FrameSender::Transition(EncodeState next) {
+auto FrameSender::Transition(EncodeState next) -> void {
   switch (_state) {
   case EncodeState::Idle:
     Expects(next != EncodeState::LegacyReady, "encoding precedes legacy writes");

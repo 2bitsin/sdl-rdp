@@ -5,22 +5,22 @@
 #include <utility>
 
 namespace Backend {
-uint64_t ClipboardStore::Replace(std::string value) {
+auto ClipboardStore::Replace(std::string value) -> uint64_t {
   auto encoded = ClipboardUnicode(value);
   _text    = std::move(value);
   _unicode = std::move(encoded);
   return ++_generation;
 }
-std::string const& ClipboardStore::Text() const noexcept {
+auto ClipboardStore::Text() const noexcept -> std::string const& {
   return _text;
 }
-std::span<BYTE const> ClipboardStore::Unicode() const noexcept {
+auto ClipboardStore::Unicode() const noexcept -> std::span<BYTE const> {
   return _unicode;
 }
-uint64_t ClipboardStore::Generation() const noexcept {
+auto ClipboardStore::Generation() const noexcept -> uint64_t {
   return _generation;
 }
-char const* ClipboardStore::Export() {
+auto ClipboardStore::Export() -> char const* {
   _exported = _text;
   return _exported.c_str();
 }

@@ -8,10 +8,10 @@ namespace Backend {
 Refresh::Refresh(RefreshMode selected, unsigned limit) : mode(selected), ceiling(limit) {
   utilities::Expects(limit > 0, "refresh ceiling is positive");
 }
-unsigned Refresh::Rate() const { return rate; }
-RefreshMode Refresh::Mode() const { return mode; }
-bool Refresh::AwaitingEmpty() const { return awaiting_empty != 0; }
-void Refresh::Restart() {
+auto Refresh::Rate() const -> unsigned { return rate; }
+auto Refresh::Mode() const -> RefreshMode { return mode; }
+auto Refresh::AwaitingEmpty() const -> bool { return awaiting_empty != 0; }
+auto Refresh::Restart() -> void {
   utilities::Expects(ceiling > 0, "declared refresh is positive");
   rate           = ceiling;
   average        = 1.0 / ceiling;
@@ -19,7 +19,7 @@ void Refresh::Restart() {
   last_blocked   = { };
   awaiting_empty = 0;
 }
-void Refresh::Step(Direction direction) {
+auto Refresh::Step(Direction direction) -> void {
   utilities::Expects(ceiling >= 10, "adaptive ceiling reaches the floor");
   switch (direction) {
   case Direction::Down:
@@ -34,21 +34,21 @@ void Refresh::Step(Direction direction) {
     utilities::Unreachable(direction);
   }
 }
-Direction Refresh::FromLatency(Clock::duration latency) const {
+auto Refresh::FromLatency(Clock::duration latency) const -> Direction {
   utilities::Expects(latency >= Clock::duration::zero(), "acknowledgement follows send");
   utilities::Expects(ceiling >= 10, "adaptive ceiling reaches the floor");
   auto seconds = std::chrono::duration<double>(latency).count();
   if (seconds > 2.0 / ceiling) return Direction::Down;
   return seconds < 1.0 / ceiling ? Direction::Up : Direction::Hold;
 }
-Direction Refresh::FromWire(WireSample const& wire, std::size_t bytes) {
+auto Refresh::FromWire(WireSample const& wire, std::size_t bytes) -> Direction {
   utilities::Expects(bytes > 0, "a frame was written");
   if (!wire.available) return Direction::Hold;
   auto segments = wire.mss ? (bytes + wire.mss - 1) / wire.mss : 0;
   if (wire.outq > bytes || (segments && wire.unacked > segments)) return Direction::Down;
   return wire.outq == 0 ? Direction::Up : Direction::Hold;
 }
-void Refresh::Blocked(Clock::time_point now) {
+auto Refresh::Blocked(Clock::time_point now) -> void {
   utilities::Expects(rate > 0, "effective refresh is positive");
   if (mode != RefreshMode::Sender) return;
   awaiting_empty = 0;
@@ -70,7 +70,7 @@ auto Refresh::Estimate(Clock::duration interval) -> void {
   auto estimate = unsigned(std::clamp(std::round(1.0 / average), 10.0, double(ceiling)));
   if (std::abs(double(estimate) - rate) > rate * 0.05) rate = estimate;
 }
-void Refresh::Written(WireSample const& wire, std::size_t bytes) {
+auto Refresh::Written(WireSample const& wire, std::size_t bytes) -> void {
   utilities::Expects(bytes > 0, "a frame was written");
   awaiting_empty = 0;
   if (mode != RefreshMode::Sender || !wire.available) return;
@@ -79,7 +79,7 @@ void Refresh::Written(WireSample const& wire, std::size_t bytes) {
   // A write can finish before its tail leaves the kernel queue; observe that completion once.
   if (direction == Direction::Hold) awaiting_empty = bytes;
 }
-void Refresh::Drained(WireSample const& wire) {
+auto Refresh::Drained(WireSample const& wire) -> void {
   utilities::Expects(rate > 0, "effective refresh is positive");
   if (!awaiting_empty || FromWire(wire, awaiting_empty) != Direction::Up) return;
   awaiting_empty = 0;

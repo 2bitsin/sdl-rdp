@@ -10,7 +10,7 @@
 
 namespace Headless {
 using Backend::Descriptor;
-inline std::string ReadText(int descriptor) {
+inline auto ReadText(int descriptor) -> std::string {
   utilities::Expects(descriptor >= 0, "input descriptor exists");
   std::string            result;
   std::array<char, 4096> buffer{ };
@@ -22,7 +22,7 @@ inline std::string ReadText(int descriptor) {
     result.append(buffer.data(), count);
   }
 }
-inline std::string ReadText(char const* path) {
+inline auto ReadText(char const* path) -> std::string {
   utilities::Expects(path != nullptr, "input path exists");
   Descriptor const file{ open(path, O_RDONLY) };
   return ReadText(file.Get());

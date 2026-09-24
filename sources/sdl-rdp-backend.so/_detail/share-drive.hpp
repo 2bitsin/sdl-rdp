@@ -2,5 +2,5 @@
 #include "client.hpp"
 
 namespace Headless {
-void ShareDrive(Client& client, char const* path, char const* name = "share");
+auto ShareDrive(Client& client, char const* path, char const* name = "share") -> void;
 }

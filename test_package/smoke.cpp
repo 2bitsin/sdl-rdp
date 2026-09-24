@@ -1,7 +1,7 @@
 #include <SDL3/SDL.h>
 #include <cstdlib>
 
-int main()
+auto main() -> int
 {
     if (!SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp") ||
         !SDL_SetHint(SDL_HINT_RDP_PORT, "0") || !SDL_Init(SDL_INIT_VIDEO)) {

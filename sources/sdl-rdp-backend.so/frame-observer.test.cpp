@@ -14,35 +14,35 @@ FrameObserver::~FrameObserver() {
   update->SurfaceFrameMarker = original;
   active                     = nullptr;
 }
-bool FrameObserver::Ack() {
+auto FrameObserver::Ack() -> bool {
   if (ids.empty()) return false;
   auto sent = Clock::now();
   if (!update->SurfaceFrameAcknowledge(update->context, ids.back())) return false;
   ack_times.push_back(sent);
   return true;
 }
-std::vector<UINT32> const& FrameObserver::Frames() const {
+auto FrameObserver::Frames() const -> std::vector<UINT32> const& {
   return ids;
 }
-std::vector<Clock::time_point> const& FrameObserver::ReceivedAt() const {
+auto FrameObserver::ReceivedAt() const -> std::vector<Clock::time_point> const& {
   return received;
 }
-bool FrameObserver::AckFrame(UINT32 id) {
+auto FrameObserver::AckFrame(UINT32 id) -> bool {
   return update->SurfaceFrameAcknowledge(update->context, id);
 }
-std::vector<Clock::time_point> const& FrameObserver::Acknowledgements() const {
+auto FrameObserver::Acknowledgements() const -> std::vector<Clock::time_point> const& {
   return ack_times;
 }
-bool FrameObserver::Coherent() const {
+auto FrameObserver::Coherent() const -> bool {
   return coherent;
 }
-bool FrameObserver::Installed() const {
+auto FrameObserver::Installed() const -> bool {
   return update != nullptr;
 }
-void FrameObserver::Clear() {
+auto FrameObserver::Clear() -> void {
   ids.clear();
 }
-BOOL FrameObserver::Receive(rdpContext* context, SURFACE_FRAME_MARKER const* marker) {
+auto FrameObserver::Receive(rdpContext* context, SURFACE_FRAME_MARKER const* marker) -> BOOL {
   if (marker->frameAction != SURFACECMD_FRAMEACTION_END) return TRUE;
   active->ids.push_back(marker->frameId);
   active->received.push_back(Clock::now());

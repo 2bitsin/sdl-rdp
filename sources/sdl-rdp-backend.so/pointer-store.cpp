@@ -3,14 +3,14 @@
 #include <utility>
 
 namespace Backend {
-void PointerStore::Replace(PointerShape next) {
+auto PointerStore::Replace(PointerShape next) -> void {
   _shape = std::move(next);
   ++_generation;
 }
-uint64_t PointerStore::Generation() const noexcept {
+auto PointerStore::Generation() const noexcept -> uint64_t {
   return _generation;
 }
-PointerDelivery PointerStore::Send(rdpContext& context) {
+auto PointerStore::Send(rdpContext& context) -> PointerDelivery {
   return _shape.Send(context);
 }
 }

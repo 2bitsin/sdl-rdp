@@ -13,16 +13,16 @@ PeerPump::PeerPump(PeerLink& link, SessionAccess& session, ChannelSet& channels,
                    FrameSender& sender, TransportEnd& end, TraceQueue& traces) noexcept
     : _link { link }, _session{ session }, _channels{ channels }, _redirection{ redirection }, _sender{ sender },
       _end{ end }, _traces{ traces } { }
-bool PeerPump::Service(std::stop_token const& quit, std::span<HANDLE const> ready) {
+auto PeerPump::Service(std::stop_token const& quit, std::span<HANDLE const> ready) -> bool {
   auto const healthy = Exchange(quit, ready) && Deliver(quit);
   _traces.Flush();
   return healthy;
 }
-bool PeerPump::Ended() {
+auto PeerPump::Ended() -> bool {
   _end.Report();
   return false;
 }
-bool PeerPump::Exchange(std::stop_token const& quit, std::span<HANDLE const> ready) {
+auto PeerPump::Exchange(std::stop_token const& quit, std::span<HANDLE const> ready) -> bool {
   auto const session = _session.Lock();
   if (quit.stop_requested()) return false;
   auto& client = _link.Client();
@@ -30,7 +30,7 @@ bool PeerPump::Exchange(std::stop_token const& quit, std::span<HANDLE const> rea
   _redirection.Sound(ready);
   return _sender.Drain() || Ended();
 }
-bool PeerPump::Deliver(std::stop_token const& quit) {
+auto PeerPump::Deliver(std::stop_token const& quit) -> bool {
   auto const delivery = _sender.Encode(quit);
   switch (delivery) {
   case Delivery::Healthy:

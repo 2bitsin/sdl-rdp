@@ -25,10 +25,10 @@
 namespace Backend {
 namespace {
 using SecurityFlags = std::array<std::pair<FreeRDP_Settings_Keys_Bool, bool>, 11>;
-bool Apply(rdpSettings& settings, std::ranges::input_range auto const& entries, auto set) {
+auto Apply(rdpSettings& settings, std::ranges::input_range auto const& entries, auto set) -> bool {
   return std::ranges::all_of(entries, [&](auto const& entry) { return set(&settings, entry.first, entry.second); });
 }
-SecurityFlags Flags(sdlrdp_auth auth) {
+auto Flags(sdlrdp_auth auth) -> SecurityFlags {
   return { {
     { FreeRDP_NlaSecurity              , auth == SDLRDP_AUTH_NLA  },
     { FreeRDP_TlsSecurity              , true                     },
@@ -43,7 +43,7 @@ SecurityFlags Flags(sdlrdp_auth auth) {
     { FreeRDP_SuppressOutput           , true                     },
   } };
 }
-bool ApplySettings(rdpSettings& settings, sdlrdp_auth auth, sdlrdp_rect picture) {
+auto ApplySettings(rdpSettings& settings, sdlrdp_auth auth, sdlrdp_rect picture) -> bool {
   std::array const numbers{
     std::pair{ FreeRDP_EncryptionLevel, UINT32(ENCRYPTION_LEVEL_CLIENT_COMPATIBLE) },
     std::pair{ FreeRDP_FrameAcknowledge, UINT32(AcknowledgedFrameWindow) },
@@ -73,14 +73,14 @@ PeerLoop::PeerLoop(PeerLink& link, SessionAccess& session, Diagnostics const& di
                    Departure& departure) noexcept
     : _link { link }, _session{ session }, _diagnostics{ diagnostics }, _configuration{ configuration },
       _store{ store }, _wait{ wait }, _pump{ pump }, _departure{ departure } { }
-void PeerLoop::Start() {
+auto PeerLoop::Start() -> void {
   Expects(!_thread.joinable(), "peer starts once");
   _thread = std::jthread([this](std::stop_token const& quit) { Serve(quit); });
 }
-void PeerLoop::Stop() {
+auto PeerLoop::Stop() -> void {
   _thread.request_stop();
 }
-void PeerLoop::Serve(std::stop_token const& quit) {
+auto PeerLoop::Serve(std::stop_token const& quit) -> void {
   std::stop_callback const wake(quit, [this] { _link.Signal(); });
   auto const               logging = NegotiationLogging(_link.Settings());
   if (!Configure() || !Run(quit))
@@ -89,7 +89,7 @@ void PeerLoop::Serve(std::stop_token const& quit) {
                                  freerdp_get_last_error_name(freerdp_get_last_error(&_link.Context()))));
   _departure.Depart();
 }
-bool PeerLoop::Run(std::stop_token const& quit) {
+auto PeerLoop::Run(std::stop_token const& quit) -> bool {
   auto const connection = Connection(_link, _session);
   if (!connection) return false;
   std::array<HANDLE, MAXIMUM_WAIT_OBJECTS> handles{ };
@@ -97,19 +97,19 @@ bool PeerLoop::Run(std::stop_token const& quit) {
   }
   return true;
 }
-bool PeerLoop::Configure() {
+auto PeerLoop::Configure() -> bool {
   auto const picture  = _store.Read([](FrameStore const& store, FrameLock const& held) { return store.Picture(held); });
   auto&      settings = _link.Settings();
   return _configuration.InstallCredentials(settings) && ApplySettings(settings, _configuration.Auth(), picture);
 }
-bool PeerLoop::Step(std::stop_token const& quit, std::span<HANDLE> handles) {
+auto PeerLoop::Step(std::stop_token const& quit, std::span<HANDLE> handles) -> bool {
   auto const plan = [&] {
     auto const session = _session.Lock();
     return _wait.Plan(handles);
   }();
   return plan.count && Dispatch(quit, handles.first(plan.count), plan.timeout);
 }
-bool PeerLoop::Dispatch(std::stop_token const& quit, std::span<HANDLE> handles, DWORD timeout) {
+auto PeerLoop::Dispatch(std::stop_token const& quit, std::span<HANDLE> handles, DWORD timeout) -> bool {
   auto const result = WaitForMultipleObjects(DWORD(handles.size()), handles.data(), FALSE, timeout);
   if (result == WAIT_FAILED || quit.stop_requested()) return false;
   std::array<HANDLE, MAXIMUM_WAIT_OBJECTS> signalled{ };

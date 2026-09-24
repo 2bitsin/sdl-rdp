@@ -5,4 +5,4 @@ struct DriveOptions {
   char const* cat   = nullptr;
   char const* write = nullptr;
 };
-bool RunDrives(DriveOptions const& /*options*/);
+auto RunDrives(DriveOptions const& /*options*/) -> bool;

@@ -9,7 +9,7 @@
 #include <freerdp/client/cmdline.h>
 
 namespace Headless {
-void ShareDrive(Client& client, char const* path, char const* name) {
+auto ShareDrive(Client& client, char const* path, char const* name) -> void {
   Expects(path != nullptr, "shared directory supplied");
   freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
   Expects(freerdp_settings_set_bool(client.Instance()->context->settings, FreeRDP_AudioPlayback, FALSE),

@@ -15,23 +15,23 @@ struct ClipboardCapture {
 };
 class ClipboardClient {
 public:
-                          ClipboardClient(ClipboardClient const&) = delete;
-                          ClipboardClient(ClipboardClient&&)      = delete;
-  explicit                ClipboardClient(Client& value, std::vector<BYTE> initial = { });
-                          ~ClipboardClient();
-  ClipboardClient&        operator = (ClipboardClient const&)     = delete;
-  ClipboardClient&        operator = (ClipboardClient&&)          = delete;
-  bool                    Received(std::vector<BYTE> const& bytes);
-  UINT                    RequestFormat(UINT32 format);
-  UINT                    Offer(std::vector<BYTE> bytes, bool unicode = true);
-  ClipboardCapture const& Observed() const;
+           ClipboardClient(ClipboardClient const&)                                 = delete;
+           ClipboardClient(ClipboardClient&&)                                      = delete;
+  explicit ClipboardClient(Client& value, std::vector<BYTE> initial = { });
+           ~ClipboardClient();
+  auto     operator = (ClipboardClient const&)                 -> ClipboardClient& = delete;
+  auto     operator = (ClipboardClient&&)                      -> ClipboardClient& = delete;
+  auto     Received(std::vector<BYTE> const& bytes)            -> bool;
+  auto     RequestFormat(UINT32 format)                        -> UINT;
+  auto     Offer(std::vector<BYTE> bytes, bool unicode = true) -> UINT;
+  auto     Observed() const                                    -> ClipboardCapture const&;
 
 private:
-  static void Connected(void* /*unused*/, ChannelConnectedEventArgs const* event);
-  static UINT Ready(CliprdrClientContext* context, CLIPRDR_MONITOR_READY const* /*unused*/);
-  static UINT Formats(CliprdrClientContext* context, CLIPRDR_FORMAT_LIST const* list);
-  static UINT Request(CliprdrClientContext* context, CLIPRDR_FORMAT_DATA_REQUEST const* request);
-  static UINT Response(CliprdrClientContext* context, CLIPRDR_FORMAT_DATA_RESPONSE const* response);
+  static auto Connected(void* /*unused*/, ChannelConnectedEventArgs const* event)                   -> void;
+  static auto Ready(CliprdrClientContext* context, CLIPRDR_MONITOR_READY const* /*unused*/)         -> UINT;
+  static auto Formats(CliprdrClientContext* context, CLIPRDR_FORMAT_LIST const* list)               -> UINT;
+  static auto Request(CliprdrClientContext* context, CLIPRDR_FORMAT_DATA_REQUEST const* request)    -> UINT;
+  static auto Response(CliprdrClientContext* context, CLIPRDR_FORMAT_DATA_RESPONSE const* response) -> UINT;
   ClipboardCapture                            observed;
   inline static thread_local ClipboardClient* attaching = nullptr;
   Client&                                     client;

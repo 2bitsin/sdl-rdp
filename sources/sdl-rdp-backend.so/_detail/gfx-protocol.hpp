@@ -15,7 +15,7 @@ inline constexpr std::array versions             { RDPGFX_CAPVERSION_8, RDPGFX_C
                                                    RDPGFX_CAPVERSION_106_ERR, RDPGFX_CAPVERSION_107 };
 inline constexpr UINT32     Version101DataLength = 16;
 inline constexpr UINT32     FlagsDataLength      = 4;
-inline bool AllowsAvc(RDPGFX_CAPSET const& cap) {
+inline auto AllowsAvc(RDPGFX_CAPSET const& cap) -> bool {
   return cap.version == RDPGFX_CAPVERSION_81
              ? (cap.flags & RDPGFX_CAPS_FLAG_AVC420_ENABLED) != 0
              : cap.version >= RDPGFX_CAPVERSION_10 && !(cap.flags & RDPGFX_CAPS_FLAG_AVC_DISABLED);
@@ -45,7 +45,7 @@ inline auto SelectCapability(std::span<RDPGFX_CAPSET const> caps, bool avc_avail
   selected.flags  = AnsweredFlags(selected, avc_available && AllowsAvc(selected));
   return selected;
 }
-inline UINT32 FrameTimestamp(SYSTEMTIME const& time) {
+inline auto FrameTimestamp(SYSTEMTIME const& time) -> UINT32 {
   constexpr unsigned HourShift       = 22;
   constexpr unsigned MinuteShift     = 16;
   constexpr unsigned SecondShift     = 10;

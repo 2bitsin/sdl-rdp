@@ -10,7 +10,8 @@
 #include <winpr/synch.h>
 
 namespace {
-void ConsumePublished(Backend::WakeEvent& wake, std::atomic<unsigned>& published, std::atomic<unsigned>& consumed) {
+auto ConsumePublished(Backend::WakeEvent& wake, std::atomic<unsigned>& published,
+                      std::atomic<unsigned>& consumed) -> void {
   for (int iteration = 0; iteration < 4096; ++iteration) {
     wake.Transition(Backend::WakeEvent::Phase::Idle);
     if (published.load() == consumed.load()) ASSERT_EQ(WaitForSingleObject(wake.get(), 10000), WAIT_OBJECT_0);
@@ -18,8 +19,8 @@ void ConsumePublished(Backend::WakeEvent& wake, std::atomic<unsigned>& published
   }
 }
 namespace {
-void ProducePending(Backend::WakeEvent& wake, std::atomic<unsigned>& published, std::atomic<unsigned> const& consumed,
-                    std::stop_token const& stop) {
+auto ProducePending(Backend::WakeEvent& wake, std::atomic<unsigned>& published, std::atomic<unsigned> const& consumed,
+                    std::stop_token const& stop) -> void {
   while (!stop.stop_requested()) {
     published.store(consumed.load() + 1);
     wake.Transition(Backend::WakeEvent::Phase::Pending);

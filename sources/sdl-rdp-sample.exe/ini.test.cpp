@@ -17,12 +17,12 @@
 
 namespace SampleGate {
 namespace {
-void ThenAspectReset(SDL_PropertiesID properties) {
+auto ThenAspectReset(SDL_PropertiesID properties) -> void {
   ASSERT_TRUE(SDL_SetEnvironmentVariable(SDL_GetEnvironment(), SDL_HINT_RDP_ASPECT, "3:1", true));
   ASSERT_TRUE(SDL_ResetHint(SDL_HINT_RDP_ASPECT));
   EXPECT_STREQ(SDL_GetStringProperty(properties, SDL_PROP_WINDOW_RDP_ASPECT_STRING, ""), "4:3");
 }
-unsigned AvailablePort() {
+auto AvailablePort() -> unsigned {
   int const socket_fd = socket(AF_INET, SOCK_STREAM, 0);
   Expects(socket_fd >= 0, "port reservation socket created");
   sockaddr_in address{ };
@@ -34,7 +34,7 @@ unsigned AvailablePort() {
   close(socket_fd);
   return ntohs(address.sin_port);
 }
-std::vector<std::string> IniArguments(fs::path const& directory, fs::path const& certificates) {
+auto IniArguments(fs::path const& directory, fs::path const& certificates) -> std::vector<std::string> {
   auto args = Arguments(certificates, false);
   std::erase_if(
       args, [](auto const& arg) { return arg.starts_with("SDL_RDP_PORT=") || arg.starts_with("SDL_RDP_BACKEND="); });
@@ -42,11 +42,11 @@ std::vector<std::string> IniArguments(fs::path const& directory, fs::path const&
                                   "SDL_RDP_ASPECT", "-C", directory.string() });
   return args;
 }
-void WriteInvalidIni(fs::path const& directory) {
+auto WriteInvalidIni(fs::path const& directory) -> void {
   std::ofstream out(directory / "libSDL3.ini");
   out << "SDL_RDP_PORT=1\nSDL_RDP_AUTH=invalid\n";
 }
-void WriteIni(fs::path const& file, unsigned port) {
+auto WriteIni(fs::path const& file, unsigned port) -> void {
   std::ofstream out(file);
   out << "[server]\nSDL_RDP_PORT = " << port << "\nSDL_RDP_BACKEND = \""
       << (BuildRoot() / "sources/sdl-rdp-backend.so/libsdl-rdp-backend.so").string() << "\"\nSDL_RDP_ASPECT = 4:3\n";
@@ -55,7 +55,7 @@ void WriteIni(fs::path const& file, unsigned port) {
 }
 class IniSample : public Sample, public testing::WithParamInterface<bool> { };
 namespace {
-void ThenLiveAspect(SDL_Window* window) {
+auto ThenLiveAspect(SDL_Window* window) -> void {
   auto properties = SDL_GetWindowProperties(window);
   EXPECT_STREQ(SDL_GetStringProperty(properties, SDL_PROP_WINDOW_RDP_ASPECT_STRING, ""), "4:3");
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_ASPECT, "2:1"));
@@ -159,7 +159,7 @@ auto Initialize(std::function<void()> const& initialize) -> bool {
   initialize();
   return true;
 }
-void Quit([[maybe_unused]] bool initialized) noexcept { SDL_Quit(); }
+auto Quit([[maybe_unused]] bool initialized) noexcept -> void { SDL_Quit(); }
 // In-process tests end with SDL_Quit even when an assertion returns early.
 using InitializedSdl = utilities::RAIIWrap<bool, Initialize, Quit>;
 using Storage        = std::unique_ptr<SDL_Storage, decltype(&SDL_CloseStorage)>;
@@ -184,19 +184,19 @@ auto RdpTitleStorage() -> Storage {
 auto WindowAspect(Window const& window) -> std::string {
   return SDL_GetStringProperty(SDL_GetWindowProperties(window.get()), SDL_PROP_WINDOW_RDP_ASPECT_STRING, "");
 }
-void ThenVideoRejoinsDriver(fs::path const& ini) {
+auto ThenVideoRejoinsDriver(fs::path const& ini) -> void {
   auto const port = RdpPort();
   SDL_QuitSubSystem(SDL_INIT_VIDEO);
   std::ofstream{ini, std::ios::app} << "SDL_RDP_ASPECT=2:1\n";
   ASSERT_TRUE(SDL_InitSubSystem(SDL_INIT_VIDEO)) << SDL_GetError();
   EXPECT_EQ(RdpPort(), port);
 }
-void ThenWindowAspect(char const* expected) {
+auto ThenWindowAspect(char const* expected) -> void {
   Window const window{ SDL_CreateWindow("aspect", 640, 480, 0), SDL_DestroyWindow };
   ASSERT_TRUE(window) << SDL_GetError();
   EXPECT_EQ(WindowAspect(window), expected);
 }
-void ThenInvalidAspectFailsWindow(char const* aspect) {
+auto ThenInvalidAspectFailsWindow(char const* aspect) -> void {
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_ASPECT, aspect));
   EXPECT_EQ(Window(SDL_CreateWindow("invalid aspect", 640, 480, 0), SDL_DestroyWindow), nullptr);
   EXPECT_TRUE(std::string_view(SDL_GetError()).contains("aspect")) << SDL_GetError();
@@ -210,13 +210,13 @@ auto RerunInChild() -> Process {
   return Process{ { "env", std::string(StorageSpaceChild) + "=1", fs::read_symlink("/proc/self/exe").string(),
                     "--gtest_filter=" + CurrentTest() } };
 }
-void ThenChildStops(Process& child) {
+auto ThenChildStops(Process& child) -> void {
   std::string line;
   while (child.Line(line, Clock::now() + 10s)) { }
   EXPECT_FALSE(child.Exit());
   EXPECT_TRUE(child.Transcript().contains("free-space query")) << child.Transcript();
 }
-void ThenStorageSpaceStops(Storage const& storage) {
+auto ThenStorageSpaceStops(Storage const& storage) -> void {
   if (std::getenv(StorageSpaceChild) != nullptr) {
     std::ignore = SDL_GetStorageSpaceRemaining(storage.get());
     return;
@@ -224,12 +224,12 @@ void ThenStorageSpaceStops(Storage const& storage) {
   auto child = RerunInChild();
   ThenChildStops(child);
 }
-void ThenStorageSpaceIsNotImplemented(Storage const& storage) {
+auto ThenStorageSpaceIsNotImplemented(Storage const& storage) -> void {
   if constexpr (utilities::detail::contract::Mode() == oxbox::platform::ContractMode::STOP)
     ThenStorageSpaceStops(storage);
   else EXPECT_EQ(SDL_GetStorageSpaceRemaining(storage.get()), 0);
 }
-void WhenInitializedWith(std::pair<char const*, char const*> const& setting) {
+auto WhenInitializedWith(std::pair<char const*, char const*> const& setting) -> void {
   EXPECT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));
   EXPECT_TRUE(SDL_SetHint(SDL_HINT_RDP_BACKEND, "/missing/backend"));
   EXPECT_TRUE(SDL_SetHint(setting.first, setting.second));
@@ -238,7 +238,7 @@ void WhenInitializedWith(std::pair<char const*, char const*> const& setting) {
 }
 class IniSession : public Sample {
 protected:
-  void SetUp() override {
+  auto SetUp() -> void override {
     Sample::SetUp();
     _sdl.emplace([this] { GivenIniHints(_ini.Path()); });
   }

@@ -26,10 +26,10 @@ class LegacyFrame : private Pinned {
 public:
        LegacyFrame(PeerLink& link, Configuration const& configuration, Activation& activation, PeerFrames& frames,
                    FramePacing& pacing, Encoder& encoder, Scaler& scaler) noexcept;
-  bool Prepare();
-  bool Encode();
-  bool Send();
-  bool Delivered() const noexcept;
+  auto Prepare()                  -> bool;
+  auto Encode()                   -> bool;
+  auto Send()                     -> bool;
+  auto Delivered() const noexcept -> bool;
 
 private:
   struct Band {
@@ -40,15 +40,15 @@ private:
     std::vector<Band>        bands;
     std::vector<BITMAP_DATA> rectangles;
   };
-  bool SelectEncoder();
-  void AppendPlanar(Packet& packet, std::size_t& wire_size, sdlrdp_rect area, std::span<BYTE const> payload);
-  bool AppendBand(PixelBand band);
-  bool Finish();
-  bool Marker(UINT16 action);
-  bool Planar(sdlrdp_rect area);
-  bool Bands(sdlrdp_rect area);
-  void Describe(Packet& packet) const;
-  bool Write(Packet& packet);
+  auto SelectEncoder()                                                                                       -> bool;
+  auto AppendPlanar(Packet& packet, std::size_t& wire_size, sdlrdp_rect area, std::span<BYTE const> payload) -> void;
+  auto AppendBand(PixelBand band)                                                                            -> bool;
+  auto Finish()                                                                                              -> bool;
+  auto Marker(UINT16 action)                                                                                 -> bool;
+  auto Planar(sdlrdp_rect area)                                                                              -> bool;
+  auto Bands(sdlrdp_rect area)                                                                               -> bool;
+  auto Describe(Packet& packet) const                                                                        -> void;
+  auto Write(Packet& packet)                                                                                 -> bool;
   PeerLink&                  _link;
   Configuration const&       _configuration;
   Activation&                _activation;

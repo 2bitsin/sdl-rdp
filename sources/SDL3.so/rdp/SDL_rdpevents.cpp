@@ -18,16 +18,16 @@ auto Finger(unsigned id)       -> SDL_FingerID { return SDL_FingerID{id} + 1; }
 auto IsCodePoint(Uint32 value) -> bool {
   return oxbox::utilities::CodepointTriage(value) != oxbox::utilities::CodepointType::OUT_OF_RANGE;
 }
-void CopyRefresh(SDL_DisplayMode& target, SDL_DisplayMode const& source) {
+auto CopyRefresh(SDL_DisplayMode& target, SDL_DisplayMode const& source) -> void {
   target.refresh_rate             = source.refresh_rate;
   target.refresh_rate_numerator   = source.refresh_rate_numerator;
   target.refresh_rate_denominator = source.refresh_rate_denominator;
 }
-void FullscreenMode(SDL_Window& window, SDL_DisplayMode const& mode) {
+auto FullscreenMode(SDL_Window& window, SDL_DisplayMode const& mode) -> void {
   bool const accepted = SDL_SetWindowFullscreenMode(&window, &mode);
   utilities::Ensures(accepted, "SDL accepts a desktop-sized fullscreen mode");
 }
-void ScreenMode(SDL_VideoData& data, int width, int height) {
+auto ScreenMode(SDL_VideoData& data, int width, int height) -> void {
   auto&           display   = *SDL_GetVideoDisplay(data.Display());
   SDL_DisplayMode requested = BoundWindow(data).requested_fullscreen_mode;
   DesktopMode(data, width, height);
@@ -41,7 +41,7 @@ auto FollowsDesktop(SDL_VideoData const& data, int width, int height) -> bool {
   auto const  picture = std::pair{width, height};
   return (window.flags & SDL_WINDOW_FULLSCREEN) && !window.requested_fullscreen_mode.w && data.Picture() != picture;
 }
-void Resize(SDL_VideoData& data, unsigned screen_width, unsigned screen_height) {
+auto Resize(SDL_VideoData& data, unsigned screen_width, unsigned screen_height) -> void {
   if (!screen_width || !screen_height || screen_width > SDL_MAX_SINT32 || screen_height > SDL_MAX_SINT32) return;
   auto const  width   = static_cast<int>(screen_width);
   auto const  height  = static_cast<int>(screen_height);
@@ -50,7 +50,7 @@ void Resize(SDL_VideoData& data, unsigned screen_width, unsigned screen_height) 
   if (FollowsDesktop(data, width, height) && ResizePicture(data, width, height))
     SDL_SendWindowEvent(&BoundWindow(data), SDL_EVENT_WINDOW_RESIZED, width, height);
 }
-void ApplyRefresh(SDL_VideoData& data, unsigned millihertz) {
+auto ApplyRefresh(SDL_VideoData& data, unsigned millihertz) -> void {
   utilities::Expects(millihertz > 0, "refresh event specifies positive millihertz");
   auto& display = *SDL_GetVideoDisplay(data.Display());
   if (SameRefresh(static_cast<unsigned>(display.current_mode->refresh_rate_numerator),
@@ -62,13 +62,13 @@ void ApplyRefresh(SDL_VideoData& data, unsigned millihertz) {
   mode.refresh_rate_denominator = static_cast<int>(MillihertzPerHertz);
   SDL_SetCurrentDisplayMode(&display, &mode);
 }
-void RestoreRefresh(SDL_VideoData& data) {
+auto RestoreRefresh(SDL_VideoData& data) -> void {
   auto const& desktop = SDL_GetVideoDisplay(data.Display())->desktop_mode;
   if (desktop.refresh_rate_denominator <= 0) return;
   ApplyRefresh(data, static_cast<unsigned>(static_cast<Uint64>(desktop.refresh_rate_numerator) * MillihertzPerHertz /
                                            static_cast<Uint64>(desktop.refresh_rate_denominator)));
 }
-void PublishClient(SDL_Window& window, decltype(sdlrdp_event::connected) const& client) {
+auto PublishClient(SDL_Window& window, decltype(sdlrdp_event::connected) const& client) -> void {
   auto const properties = SDL_GetWindowProperties(&window);
   auto const codec      = CodecName(client.codec);
   auto const strings    = std::to_array<std::pair<char const*, char const*>>({
@@ -80,7 +80,7 @@ void PublishClient(SDL_Window& window, decltype(sdlrdp_event::connected) const& 
   SDL_SetBooleanProperty(properties, SDL_PROP_WINDOW_RDP_AUTHENTICATED_BOOLEAN, client.authenticated != 0);
   SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_RDP_KEYBOARD_LAYOUT_NUMBER, client.keyboard_layout);
 }
-void Connected(SDL_VideoData& data, sdlrdp_event const& event) {
+auto Connected(SDL_VideoData& data, sdlrdp_event const& event) -> void {
   utilities::Expects(event.type == SDLRDP_CONNECTED, "connection event has connection data");
   auto const& client = event.connected;
   auto&       window = BoundWindow(data);
@@ -93,20 +93,20 @@ void Connected(SDL_VideoData& data, sdlrdp_event const& event) {
   SDL_SetKeyboardFocus(&window);
   SDL_SetMouseFocus(&window);
 }
-void Disconnected(SDL_VideoData& data) {
+auto Disconnected(SDL_VideoData& data) -> void {
   RestoreRefresh(data);
   SDL_SendWindowEvent(&BoundWindow(data), SDL_EVENT_WINDOW_OCCLUDED, 0, 0);
   SDL_SetKeyboardFocus(nullptr);
   SDL_SetMouseFocus(nullptr);
   data.DetachTouch();
 }
-void SendText(SDL_Window& window, Uint32 codepoint) {
+auto SendText(SDL_Window& window, Uint32 codepoint) -> void {
   utilities::Expects(IsCodePoint(codepoint), "text is a Unicode code point");
   if (!SDL_TextInputActive(&window)) return;
   auto const [length, bytes] = oxbox::utilities::UtfEncode<char>(codepoint);
   SDL_SendKeyboardText(std::string(bytes.data(), length).c_str());
 }
-void Text(SDL_Window& window, sdlrdp_event const& event) {
+auto Text(SDL_Window& window, sdlrdp_event const& event) -> void {
   utilities::Expects(event.type == SDLRDP_TEXT, "text event carries text");
   if (!event.text.down) return;
   SDL_SendKeyboardUnicodeKey(0, event.text.codepoint);
@@ -116,7 +116,7 @@ auto Scancode(sdlrdp_event const& event) -> SDL_Scancode {
   auto const index = static_cast<std::uint8_t>(event.key.scancode) | (event.key.extended ? ExtendedScanCodes : 0);
   return std::span(windows_scancode_table)[index];
 }
-void Key(SDL_Window& window, sdlrdp_event const& event) {
+auto Key(SDL_Window& window, sdlrdp_event const& event) -> void {
   utilities::Expects(event.type == SDLRDP_KEY, "key event carries a key");
   auto const scancode = Scancode(event);
   SDL_SendKeyboardKey(0, SDL_DEFAULT_KEYBOARD_ID, static_cast<int>(event.key.scancode), scancode, event.key.down != 0);
@@ -132,7 +132,7 @@ auto FingerEvent(sdlrdp_touch_phase phase) -> SDL_EventType {
   default: utilities::Unreachable(phase);
   }
 }
-void Touch(SDL_Window& window, sdlrdp_event const& event) {
+auto Touch(SDL_Window& window, sdlrdp_event const& event) -> void {
   utilities::Expects(event.type == SDLRDP_TOUCH, "touch event has touch data");
   auto const& touch = event.touch;
   if (touch.phase == SDLRDP_TOUCH_MOVE)
@@ -140,7 +140,7 @@ void Touch(SDL_Window& window, sdlrdp_event const& event) {
   else SDL_SendTouch(0, TouchDevice, Finger(touch.id), &window, FingerEvent(touch.phase), touch.x, touch.y,
                      touch.pressure);
 }
-void MouseButton(SDL_Window& window, sdlrdp_event const& event) {
+auto MouseButton(SDL_Window& window, sdlrdp_event const& event) -> void {
   utilities::Expects(event.type == SDLRDP_MOUSE_BUTTON, "button event has button data");
   constexpr auto buttons = std::to_array<Uint8>({SDL_BUTTON_LEFT, SDL_BUTTON_MIDDLE, SDL_BUTTON_RIGHT, SDL_BUTTON_X1,
                                                  SDL_BUTTON_X2});
@@ -148,40 +148,46 @@ void MouseButton(SDL_Window& window, sdlrdp_event const& event) {
   if (button > 0 && button <= buttons.size())
     SDL_SendMouseButton(0, &window, SDL_DEFAULT_MOUSE_ID, buttons.at(button - 1), event.mouse_button.down != 0);
 }
-void MouseMove(SDL_Window& window, sdlrdp_event const& event) {
+auto MouseMove(SDL_Window& window, sdlrdp_event const& event) -> void {
   SDL_SendMouseMotion(0, &window, SDL_DEFAULT_MOUSE_ID, false, static_cast<float>(event.mouse_move.x),
                       static_cast<float>(event.mouse_move.y));
 }
-void MouseRelative(SDL_Window& window, sdlrdp_event const& event) {
+auto MouseRelative(SDL_Window& window, sdlrdp_event const& event) -> void {
   SDL_SendMouseMotion(0, &window, SDL_DEFAULT_MOUSE_ID, true, static_cast<float>(event.mouse_relative.dx),
                       static_cast<float>(event.mouse_relative.dy));
 }
-void MouseWheel(SDL_Window& window, sdlrdp_event const& event) {
+auto MouseWheel(SDL_Window& window, sdlrdp_event const& event) -> void {
   SDL_SendMouseWheel(0, &window, SDL_DEFAULT_MOUSE_ID, event.mouse_wheel.dx, event.mouse_wheel.dy,
                      SDL_MOUSEWHEEL_NORMAL);
 }
-void CodecChanged(SDL_Window& window, sdlrdp_event const& event) {
+auto CodecChanged(SDL_Window& window, sdlrdp_event const& event) -> void {
   SDL_SetStringProperty(SDL_GetWindowProperties(&window), SDL_PROP_WINDOW_RDP_CODEC_STRING,
                         CodecName(event.codec_changed.codec).c_str());
 }
-void ClientLeft(SDL_VideoData& data, [[maybe_unused]] sdlrdp_event const& event) { Disconnected(data); }
-void RefreshChanged(SDL_VideoData& data, sdlrdp_event const& event) { ApplyRefresh(data, event.refresh.millihertz); }
-void ScreenChanged(SDL_VideoData& data, sdlrdp_event const& event) {
+auto ClientLeft(SDL_VideoData& data, [[maybe_unused]] sdlrdp_event const& event) -> void { Disconnected(data); }
+auto RefreshChanged(SDL_VideoData& data, sdlrdp_event const& event)              -> void {
+  ApplyRefresh(data, event.refresh.millihertz);
+}
+auto ScreenChanged(SDL_VideoData& data, sdlrdp_event const& event) -> void {
   Resize(data, event.screen.width, event.screen.height);
 }
-void PictureResized([[maybe_unused]] SDL_VideoData& data, [[maybe_unused]] sdlrdp_event const& event) { }
-void DrivesChanged(SDL_VideoData& data, [[maybe_unused]] sdlrdp_event const& event) {
+auto PictureResized([[maybe_unused]] SDL_VideoData& data, [[maybe_unused]] sdlrdp_event const& event) -> void { }
+auto DrivesChanged(SDL_VideoData& data, [[maybe_unused]] sdlrdp_event const& event)                   -> void {
   UpdateDrives(data.Backend(), SDL_GetDisplayProperties(data.Display()));
 }
-void ClipboardChanged(SDL_VideoData& data, [[maybe_unused]] sdlrdp_event const& event) { ClipboardUpdate(data); }
-void AudioChanged([[maybe_unused]] SDL_VideoData& data, sdlrdp_event const& event) { AudioRate(event.audio.freq); }
-using Handler = void (*)(SDL_VideoData&, sdlrdp_event const&);
+auto ClipboardChanged(SDL_VideoData& data, [[maybe_unused]] sdlrdp_event const& event) -> void {
+  ClipboardUpdate(data);
+}
+auto AudioChanged([[maybe_unused]] SDL_VideoData& data, sdlrdp_event const& event) -> void {
+  AudioRate(event.audio.freq);
+}
+using Handler = auto (*)(SDL_VideoData&, sdlrdp_event const&) -> void;
 template<Handler _Handle>
-void WhenBound(SDL_VideoData& data, sdlrdp_event const& event) {
+auto WhenBound(SDL_VideoData& data, sdlrdp_event const& event) -> void {
   if (data.Window()) _Handle(data, event);
 }
-template<void (*_Handle)(SDL_Window&, sdlrdp_event const&)>
-void ToWindow(SDL_VideoData& data, sdlrdp_event const& event) {
+template<auto (*_Handle)(SDL_Window&, sdlrdp_event const&) -> void>
+auto ToWindow(SDL_VideoData& data, sdlrdp_event const& event) -> void {
   if (auto const window = data.Window()) _Handle(*window, event);
 }
 constexpr auto Handlers = [] {
@@ -206,18 +212,18 @@ constexpr auto Handlers = [] {
 }();
 static_assert(std::ranges::none_of(Handlers, [](Handler handler) { return handler == nullptr; }),
               "every backend event type has a handler");
-void Dispatch(SDL_VideoData& data, sdlrdp_event const& event) {
+auto Dispatch(SDL_VideoData& data, sdlrdp_event const& event) -> void {
   utilities::Expects(std::cmp_less(std::to_underlying(event.type), Handlers.size()), "backend event type is known");
   Handlers.at(static_cast<std::size_t>(event.type))(data, event);
 }
 // SDL event callbacks borrow their device and optional wakeup window.
-void PumpEvents(SDL_VideoDevice* device) {
+auto PumpEvents(SDL_VideoDevice* device) -> void {
   utilities::Expects(device != nullptr, "event pump has a device");
   auto& data = *device->internal;
   Boundary([&] { data.Backend().Poll([&](sdlrdp_event const& event) { Dispatch(data, event); }); });
 }
 // SDL specifies nanoseconds and a borrowed device in its wait callback.
-int WaitEvent(SDL_VideoDevice* device, Sint64 timeout) {
+auto WaitEvent(SDL_VideoDevice* device, Sint64 timeout) -> int {
   utilities::Expects(device != nullptr, "event wait has a device");
   auto const milliseconds = timeout < 0 ? -1
       : std::chrono::ceil<std::chrono::milliseconds>(std::chrono::nanoseconds{timeout}).count();
@@ -225,12 +231,12 @@ int WaitEvent(SDL_VideoDevice* device, Sint64 timeout) {
       static_cast<int>(std::min<std::int64_t>(milliseconds, SDL_MAX_SINT32)));
 }
 // SDL's wake callback receives a borrowed device and window.
-void Wakeup(SDL_VideoDevice* device, [[maybe_unused]] SDL_Window* unused_window) {
+auto Wakeup(SDL_VideoDevice* device, [[maybe_unused]] SDL_Window* unused_window) -> void {
   utilities::Expects(device != nullptr, "event wakeup has a device");
   device->internal->Backend().Call<Operation::WAKEUP>();
 }
 }
-void InitEvents(SDL_VideoDevice& device) {
+auto InitEvents(SDL_VideoDevice& device) -> void {
   device.PumpEvents       = PumpEvents;
   device.WaitEventTimeout = WaitEvent;
   device.SendWakeupEvent  = Wakeup;

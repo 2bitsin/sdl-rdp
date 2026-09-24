@@ -1,16 +1,16 @@
 #include "_detail/graphics-timing.hpp"
 
 namespace Backend {
-void GraphicsTiming::Ready(std::chrono::nanoseconds elapsed) noexcept {
+auto GraphicsTiming::Ready(std::chrono::nanoseconds elapsed) noexcept -> void {
   _ready_time = elapsed;
 }
-void GraphicsTiming::Record(RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU const& value) noexcept {
+auto GraphicsTiming::Record(RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU const& value) noexcept -> void {
   _qoe = value;
 }
-std::chrono::nanoseconds GraphicsTiming::ReadyTime() const noexcept {
+auto GraphicsTiming::ReadyTime() const noexcept -> std::chrono::nanoseconds {
   return _ready_time;
 }
-RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU const& GraphicsTiming::Qoe() const noexcept {
+auto GraphicsTiming::Qoe() const noexcept -> RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU const& {
   return _qoe;
 }
 }

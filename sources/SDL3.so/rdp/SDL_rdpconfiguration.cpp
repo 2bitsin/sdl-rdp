@@ -15,7 +15,7 @@ class IntegerSetting {
 public:
        IntegerSetting(unsigned sdlrdp_config::* field, std::string_view hint, int fallback, int minimum, int maximum)
       : _field{field}, _hint{hint}, _fallback{fallback}, _minimum{minimum}, _maximum{maximum} { }
-  void Apply(Settings const& settings, sdlrdp_config& config) const {
+  auto Apply(Settings const& settings, sdlrdp_config& config) const -> void {
     config.*_field = static_cast<unsigned>(settings.Integer(std::string{_hint}, _fallback, _minimum, _maximum));
   }
 private:
@@ -37,7 +37,7 @@ auto Integers(Settings const& settings) -> sdlrdp_config {
   return config;
 }
 // The backend log callback carries an opaque context and a borrowed C string.
-void Log([[maybe_unused]] void* unused, sdlrdp_log_level level, char const* text) {
+auto Log([[maybe_unused]] void* unused, sdlrdp_log_level level, char const* text) -> void {
   constexpr std::array priorities{ SDL_LOG_PRIORITY_ERROR, SDL_LOG_PRIORITY_WARN, SDL_LOG_PRIORITY_INFO };
   utilities::Expects(std::cmp_less(std::to_underlying(level), priorities.size()), "backend log level is known");
   utilities::Expects(text != nullptr, "backend log has text");

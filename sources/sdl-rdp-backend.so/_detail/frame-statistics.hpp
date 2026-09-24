@@ -15,15 +15,15 @@ struct FrameCost {
 };
 class FrameStatistics {
 public:
-  void        Begin(std::chrono::nanoseconds encoded, uint64_t presents) noexcept;
-  void        Sent(FrameCost const& cost, unsigned queued);
-  void        Acknowledged(std::chrono::nanoseconds latency);
-  void        TimedOut(unsigned count)                                   noexcept;
-  std::string Summary() const;
-  uint64_t    Acknowledgements() const                                   noexcept;
+  auto Begin(std::chrono::nanoseconds encoded, uint64_t presents) noexcept -> void;
+  auto Sent(FrameCost const& cost, unsigned queued)                        -> void;
+  auto Acknowledged(std::chrono::nanoseconds latency)                      -> void;
+  auto TimedOut(unsigned count) noexcept                                   -> void;
+  auto Summary() const                                                     -> std::string;
+  auto Acknowledgements() const noexcept                                   -> uint64_t;
 
 private:
-  std::string AvcPhases() const;
+  auto AvcPhases() const -> std::string;
   RunningStatistics<std::chrono::nanoseconds> _encode;
   RunningStatistics<std::chrono::nanoseconds> _acknowledgement;
   RunningStatistics<uint64_t>                 _outq;

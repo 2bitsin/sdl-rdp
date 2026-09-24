@@ -22,12 +22,12 @@ auto PrepareNsCodec(NsCodecContext& nsc) -> bool {
          nsc_context_set_parameters(nsc.get(), NSC_COLOR_LOSS_LEVEL, 1) &&
          nsc_context_set_parameters(nsc.get(), NSC_ALLOW_SUBSAMPLING, 0);
 }
-BYTE* CompressRow(BITMAP_PLANAR_CONTEXT& context, std::span<BYTE const> pixels, unsigned width, std::span<BYTE> out,
-                  UINT32& size) {
+auto CompressRow(BITMAP_PLANAR_CONTEXT& context, std::span<BYTE const> pixels, unsigned width, std::span<BYTE> out,
+                 UINT32& size) -> BYTE* {
   return freerdp_bitmap_compress_planar(&context, pixels.data(), PIXEL_FORMAT_BGRA32, width, 1, width * PixelBytes,
                                         out.data(), &size);
 }
-bool Available(rdpSettings const* settings, sdlrdp_codec codec) {
+auto Available(rdpSettings const* settings, sdlrdp_codec codec) -> bool {
   utilities::Expects(settings != nullptr, "negotiated settings exist");
   auto surface = freerdp_settings_get_bool(settings, FreeRDP_SurfaceCommandsEnabled);
   switch (codec) {
@@ -48,7 +48,7 @@ bool Available(rdpSettings const* settings, sdlrdp_codec codec) {
   }
 }
 }
-bool Encoder::SetupPlanar(rdpSettings const* settings, bool xrgb) {
+auto Encoder::SetupPlanar(rdpSettings const* settings, bool xrgb) -> bool {
   utilities::Expects(settings != nullptr, "negotiated settings exist");
   auto alpha = xrgb || freerdp_settings_get_bool(settings, FreeRDP_DrawAllowSkipAlpha);
   if (planar.skip_alpha != alpha) {
@@ -63,7 +63,7 @@ bool Encoder::SetupPlanar(rdpSettings const* settings, bool xrgb) {
         PLANAR_FORMAT_HEADER_RLE | (planar.skip_alpha ? PLANAR_FORMAT_HEADER_NA : 0), 1, 1));
   return stream && planar.context;
 }
-bool Encoder::InitializeCodec(rdpSettings const* settings) {
+auto Encoder::InitializeCodec(rdpSettings const* settings) -> bool {
   switch (codec) {
   case SDLRDP_CODEC_PLANAR:
     return SetupPlanar(settings);
@@ -77,7 +77,7 @@ bool Encoder::InitializeCodec(rdpSettings const* settings) {
     utilities::Unreachable(codec);
   }
 }
-bool Encoder::Select(rdpSettings const* settings, sdlrdp_codec preference) {
+auto Encoder::Select(rdpSettings const* settings, sdlrdp_codec preference) -> bool {
   utilities::Expects(settings != nullptr, "negotiated settings exist");
   if (freerdp_settings_get_uint32(settings, FreeRDP_ColorDepth) != 32) preference = SDLRDP_CODEC_RAW;
   constexpr std::array choices{ SDLRDP_CODEC_REMOTEFX, SDLRDP_CODEC_NSCODEC, SDLRDP_CODEC_PLANAR, SDLRDP_CODEC_RAW };
@@ -88,7 +88,7 @@ bool Encoder::Select(rdpSettings const* settings, sdlrdp_codec preference) {
   if (!stream) return false;
   return InitializeCodec(settings);
 }
-bool Encoder::Encode(std::span<BYTE const> pixels, unsigned width, unsigned height) {
+auto Encoder::Encode(std::span<BYTE const> pixels, unsigned width, unsigned height) -> bool {
   auto start  = std::chrono::steady_clock::now();
   auto result = EncodePayload(pixels, width, height);
   Charge(std::chrono::steady_clock::now() - start);
@@ -100,12 +100,12 @@ auto Encoder::ResetRemoteFx(unsigned width, unsigned height) -> bool {
   remote_fx.size = { .width = width, .height = height };
   return true;
 }
-bool Encoder::EncodeRemoteFx(std::span<BYTE const> pixels, unsigned width, unsigned height) {
+auto Encoder::EncodeRemoteFx(std::span<BYTE const> pixels, unsigned width, unsigned height) -> bool {
   if (!ResetRemoteFx(width, height)) return false;
   RFX_RECT const rect{ 0, 0, UINT16(width), UINT16(height) };
   return rfx_compose_message(remote_fx.context.get(), stream.get(), &rect, 1, pixels.data(), width, height, width * 4);
 }
-bool Encoder::EncodePayload(std::span<BYTE const> pixels, unsigned width, unsigned height) {
+auto Encoder::EncodePayload(std::span<BYTE const> pixels, unsigned width, unsigned height) -> bool {
   utilities::Expects(width, "encoder input is a packed band");
   utilities::Expects(height, "encoder input is a packed band");
   utilities::Expects(pixels.size() == std::size_t(width) * height * 4, "encoder input is a packed band");
@@ -124,7 +124,7 @@ bool Encoder::EncodePayload(std::span<BYTE const> pixels, unsigned width, unsign
   payload = { Stream_Buffer(stream.get()), Stream_GetPosition(stream.get()) };
   return result;
 }
-bool Encoder::EncodePlanar(std::span<BYTE const> pixels, unsigned width) {
+auto Encoder::EncodePlanar(std::span<BYTE const> pixels, unsigned width) -> bool {
   utilities::Expects(planar.context != nullptr, "planar context exists");
   utilities::Expects(pixels.size() == std::size_t{ width } * PixelBytes, "planar input is one row");
   if (width > planar.width) {
@@ -145,7 +145,7 @@ bool Encoder::EncodePlanar(std::span<BYTE const> pixels, unsigned width) {
   if (result) utilities::Ensures(payload.size() <= pixels.size() + 2, "planar row fits bitmap length");
   return result != nullptr;
 }
-unsigned Encoder::Id(rdpSettings const* settings) const {
+auto Encoder::Id(rdpSettings const* settings) const -> unsigned {
   utilities::Expects(settings != nullptr, "codec IDs were negotiated");
   switch (codec) {
   case SDLRDP_CODEC_REMOTEFX:
@@ -158,22 +158,22 @@ unsigned Encoder::Id(rdpSettings const* settings) const {
     utilities::Unreachable(codec);
   }
 }
-sdlrdp_codec Encoder::Codec() const noexcept {
+auto Encoder::Codec() const noexcept -> sdlrdp_codec {
   return codec;
 }
-void Encoder::Use(sdlrdp_codec value) noexcept {
+auto Encoder::Use(sdlrdp_codec value) noexcept -> void {
   codec = value;
 }
-std::span<BYTE const> Encoder::Payload() const noexcept {
+auto Encoder::Payload() const noexcept -> std::span<BYTE const> {
   return payload;
 }
-std::chrono::nanoseconds Encoder::EncodeTime() const noexcept {
+auto Encoder::EncodeTime() const noexcept -> std::chrono::nanoseconds {
   return encode_time;
 }
-void Encoder::Charge(std::chrono::nanoseconds elapsed) noexcept {
+auto Encoder::Charge(std::chrono::nanoseconds elapsed) noexcept -> void {
   encode_time += elapsed;
 }
-std::span<BYTE> Encoder::Scratch(std::size_t size) {
+auto Encoder::Scratch(std::size_t size) -> std::span<BYTE> {
   scratch.resize(size);
   return scratch;
 }

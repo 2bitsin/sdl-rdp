@@ -13,26 +13,26 @@
 
 namespace Backend {
 namespace {
-std::size_t Destination(RowOrder order, int row, int rows) {
+auto Destination(RowOrder order, int row, int rows) -> std::size_t {
   return std::size_t(order == RowOrder::BottomUp ? rows - row - 1 : row);
 }
-float Blend(float left, float right, float weight) {
+auto Blend(float left, float right, float weight) -> float {
   return left + ((right - left) * weight);
 }
-float Sample(std::span<BYTE const> row, Tap column, std::size_t channel) {
+auto Sample(std::span<BYTE const> row, Tap column, std::size_t channel) -> float {
   auto const first  = float(row[(column.First() * PixelBytes) + channel]);
   auto const second = float(row[(column.Second() * PixelBytes) + channel]);
   return Blend(first, second, column.Weight());
 }
-void BlendRow(std::span<Tap const> columns, std::span<BYTE const> top, std::span<BYTE const> bottom, float weight,
-              std::span<BYTE> out) {
+auto BlendRow(std::span<Tap const> columns, std::span<BYTE const> top, std::span<BYTE const> bottom, float weight,
+              std::span<BYTE> out) -> void {
   auto channels = std::views::iota(std::size_t{ 0 }, PixelBytes);
   for (auto [index, column] : std::views::enumerate(columns))
     for (auto channel : channels)
       out[(std::size_t(index) * PixelBytes) + channel] =
           BYTE(std::floor(Blend(Sample(top, column, channel), Sample(bottom, column, channel), weight) + 0.5F));
 }
-void CheckArea(sdlrdp_rect area, sdlrdp_rect desktop) {
+auto CheckArea(sdlrdp_rect area, sdlrdp_rect desktop) -> void {
   Expects(area.w > 0, "band width is positive");
   Expects(area.h > 0, "band height is positive");
   Expects(area.x >= 0, "band left edge is nonnegative");
@@ -43,20 +43,20 @@ void CheckArea(sdlrdp_rect area, sdlrdp_rect desktop) {
 }
 Scaler::Scaler(PeerFrames const& source, DesktopLayout const& layout) noexcept
     : _frames { source }, _desktop{ layout } { }
-std::vector<sdlrdp_rect> Scaler::Areas() const {
+auto Scaler::Areas() const -> std::vector<sdlrdp_rect> {
   return _frames.Sending() | std::views::transform([this](sdlrdp_rect rect) { return Area(rect); }) |
          std::ranges::to<std::vector>();
 }
-sdlrdp_rect Scaler::Target() const noexcept {
+auto Scaler::Target() const noexcept -> sdlrdp_rect {
   return _desktop.Rect();
 }
-PixelBand Scaler::Copy(sdlrdp_rect area, std::span<BYTE> buffer, RowOrder order) {
+auto Scaler::Copy(sdlrdp_rect area, std::span<BYTE> buffer, RowOrder order) -> PixelBand {
   return Fill(area, buffer, std::size_t(area.w) * PixelBytes, order);
 }
-PixelBand Scaler::Place(sdlrdp_rect area, std::span<BYTE> buffer, std::size_t pitch) {
+auto Scaler::Place(sdlrdp_rect area, std::span<BYTE> buffer, std::size_t pitch) -> PixelBand {
   return Fill(area, buffer, pitch, RowOrder::TopDown);
 }
-sdlrdp_rect Scaler::Area(sdlrdp_rect damage) const {
+auto Scaler::Area(sdlrdp_rect damage) const -> sdlrdp_rect {
   auto const& snapshot = _frames.Snapshot();
   auto const  target   = _desktop.Rect();
   Expects(snapshot.Width() > 0, "snapshot width is positive");
@@ -70,12 +70,12 @@ sdlrdp_rect Scaler::Area(sdlrdp_rect damage) const {
   int const  bottom = std::min(target.h, int(std::ceil((damage.y + damage.h + 1) * sy)));
   return { x, y, right - x, bottom - y };
 }
-bool Scaler::Scaled() const {
+auto Scaler::Scaled() const -> bool {
   auto const& snapshot = _frames.Snapshot();
   return std::cmp_not_equal(_desktop.Rect().w, snapshot.Width()) ||
          std::cmp_not_equal(_desktop.Rect().h, snapshot.Height());
 }
-PixelBand Scaler::Fill(sdlrdp_rect area, std::span<BYTE> buffer, std::size_t pitch, RowOrder order) {
+auto Scaler::Fill(sdlrdp_rect area, std::span<BYTE> buffer, std::size_t pitch, RowOrder order) -> PixelBand {
   auto const& snapshot = _frames.Snapshot();
   auto const  stride   = std::size_t(area.w) * PixelBytes;
   auto const  size     = (std::size_t(area.h - 1) * pitch) + stride;
@@ -92,7 +92,7 @@ PixelBand Scaler::Fill(sdlrdp_rect area, std::span<BYTE> buffer, std::size_t pit
              order == RowOrder::BottomUp);
   return { area, buffer.first(size) };
 }
-void Scaler::Resample(sdlrdp_rect area, std::span<BYTE> buffer, std::size_t pitch, RowOrder order) {
+auto Scaler::Resample(sdlrdp_rect area, std::span<BYTE> buffer, std::size_t pitch, RowOrder order) -> void {
   auto const& snapshot = _frames.Snapshot();
   auto const  ratio    = double(snapshot.Height()) / _desktop.Rect().h;
   Columns(area);
@@ -102,7 +102,7 @@ void Scaler::Resample(sdlrdp_rect area, std::span<BYTE> buffer, std::size_t pitc
              buffer.subspan(Destination(order, row, area.h) * pitch, std::size_t(area.w) * PixelBytes));
   }
 }
-void Scaler::Columns(sdlrdp_rect area) {
+auto Scaler::Columns(sdlrdp_rect area) -> void {
   auto const source = _frames.Snapshot().Width();
   auto const width  = _desktop.Rect().w;
   if (_column_x == area.x && _column_width == width && _column_source == source &&

@@ -34,19 +34,19 @@ struct SoundCapture {
 class SoundClient {
 public:
   using Confirmation = SoundCapture::Confirmation;
-  explicit     SoundClient(Client& target);
-               SoundClient(SoundClient const&) = delete;
-               SoundClient(SoundClient&&)      = delete;
-               ~SoundClient();
-  SoundClient& operator = (SoundClient const&) = delete;
-  SoundClient& operator = (SoundClient&&)      = delete;
+  explicit SoundClient(Client& target);
+           SoundClient(SoundClient const&)                 = delete;
+           SoundClient(SoundClient&&)                      = delete;
+           ~SoundClient();
+  auto     operator = (SoundClient const&) -> SoundClient& = delete;
+  auto     operator = (SoundClient&&)      -> SoundClient& = delete;
 
-  bool Send(std::span<BYTE const> bytes) const;
-  void Capture(std::span<BYTE const> bytes);
-  bool Confirm(std::size_t index = 0);
+  auto Send(std::span<BYTE const> bytes) const -> bool;
+  auto Capture(std::span<BYTE const> bytes)    -> void;
+  auto Confirm(std::size_t index = 0)          -> bool;
 
-  SoundCapture&       CaptureState();
-  SoundCapture const& CaptureState() const;
+  auto CaptureState()       -> SoundCapture&;
+  auto CaptureState() const -> SoundCapture const&;
 
 private:
   friend struct                           SoundProtocol;

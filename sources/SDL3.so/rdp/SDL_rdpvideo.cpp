@@ -4,10 +4,10 @@
 #include <oxbox/utilities/hash.hpp>
 namespace rdp {
 using namespace oxbox::utilities::literals;
-void SetAspect(Driver const& driver, std::optional<std::string> const& value) {
+auto SetAspect(Driver const& driver, std::optional<std::string> const& value) -> void {
   if (driver.Call<Operation::SET_ASPECT>(Aspect(value)) != 0) driver.Throw();
 }
-void PublishAspect(SDL_Window& window, std::optional<std::string> const& value) {
+auto PublishAspect(SDL_Window& window, std::optional<std::string> const& value) -> void {
   auto const aspect = value.value_or("");
   SDL_SetStringProperty(SDL_GetWindowProperties(&window), SDL_PROP_WINDOW_RDP_ASPECT_STRING, aspect.c_str());
 }
@@ -16,16 +16,16 @@ constexpr int DefaultRefreshHz = 60;
 constexpr int MaximumRefreshHz = SDL_MAX_SINT32 / MillihertzPerHertz;
 // Values are the frozen backend set_refresh mode argument.
 enum class    RefreshMode      : unsigned { FIXED = 0, CLIENT = 1, CLIENT_AVERAGE = 2, SENDER = 3 };
-void ApplyCodec(SDL_VideoData& data, std::optional<std::string> const& value) {
+auto ApplyCodec(SDL_VideoData& data, std::optional<std::string> const& value) -> void {
   if (data.Backend().Call<Operation::SET_CODEC>(Codec(value)) != 0) data.Backend().Throw();
 }
-void ApplyAspect(SDL_VideoData& data, std::optional<std::string> const& value) {
+auto ApplyAspect(SDL_VideoData& data, std::optional<std::string> const& value) -> void {
   SetAspect(data.Backend(), value);
   if (auto const window = data.Window()) PublishAspect(*window, value);
 }
 // SDL hint observers receive an opaque context and nullable C strings.
 template<auto _Apply>
-void SDLCALL HintChanged(void* context, char const* name, char const* old_value, char const* new_value) {
+auto SDLCALL HintChanged(void* context, char const* name, char const* old_value, char const* new_value) -> void {
   utilities::Expects(context != nullptr, "hint observer has video state");
   utilities::Expects(name != nullptr, "hint observer has a name");
   auto& data = *static_cast<SDL_VideoData*>(context);
@@ -56,7 +56,7 @@ auto DesktopDisplayMode(Driver const& driver) -> SDL_DisplayMode {
   mode.refresh_rate             = static_cast<float>(mode.refresh_rate_numerator);
   return mode;
 }
-void InitDisplay(SDL_VideoData& data) {
+auto InitDisplay(SDL_VideoData& data) -> void {
   auto const mode = DesktopDisplayMode(data.Backend());
   data.Display(SDL_AddBasicVideoDisplay(&mode));
   if (!data.Display()) throw std::runtime_error(SDL_GetError());
@@ -66,7 +66,7 @@ void InitDisplay(SDL_VideoData& data) {
     throw std::runtime_error(SDL_GetError());
 }
 // SDL's video callback table supplies a borrowed device and display.
-bool DisplayModes([[maybe_unused]] SDL_VideoDevice* unused_device, SDL_VideoDisplay* display) {
+auto DisplayModes([[maybe_unused]] SDL_VideoDevice* unused_device, SDL_VideoDisplay* display) -> bool {
   utilities::Expects(display != nullptr, "mode enumeration has a display");
   constexpr auto standard_modes = std::to_array<std::pair<int, int>>({
       {320, 200}, {320, 240}, {320, 256}, {400, 300}, {512, 384}, {640, 350}, {640, 400}, {640, 480}, {720, 400},
@@ -82,17 +82,18 @@ bool DisplayModes([[maybe_unused]] SDL_VideoDevice* unused_device, SDL_VideoDisp
   return true;
 }
 // SDL's video callback table supplies borrowed device, display and mode pointers.
-bool DisplayMode(SDL_VideoDevice* device, [[maybe_unused]] SDL_VideoDisplay* unused_display, SDL_DisplayMode* mode) {
+auto DisplayMode(SDL_VideoDevice* device, [[maybe_unused]] SDL_VideoDisplay* unused_display,
+                 SDL_DisplayMode* mode) -> bool {
   utilities::Expects(device != nullptr, "mode change has a device");
   utilities::Expects(mode != nullptr, "mode change has a mode");
   return ResizePicture(*device->internal, mode->w, mode->h);
 }
-bool RelativeMouse(bool enabled) {
+auto RelativeMouse(bool enabled) -> bool {
   auto const& driver = CurrentVideo().Backend();
   return driver.Call<Operation::SET_RELATIVE_MOUSE>(enabled) == 0 || driver.Fail();
 }
 // SDL's video initialization callback borrows its device.
-bool VideoInit(SDL_VideoDevice* device) {
+auto VideoInit(SDL_VideoDevice* device) -> bool {
   utilities::Expects(device != nullptr, "video initialization has a device");
   return Boundary([&] {
     InitDisplay(*device->internal);
@@ -104,12 +105,12 @@ bool VideoInit(SDL_VideoDevice* device) {
   });
 }
 // SDL's video shutdown callback borrows its device.
-void VideoQuit(SDL_VideoDevice* device) {
+auto VideoQuit(SDL_VideoDevice* device) -> void {
   utilities::Expects(device != nullptr, "video shutdown has a device");
   device->internal->Display(0);
 }
 // SDL returns ownership of the device and its opaque internal state to this callback.
-void DeleteDevice(SDL_VideoDevice* device) {
+auto DeleteDevice(SDL_VideoDevice* device) -> void {
   utilities::Expects(device != nullptr, "device destruction owns a device");
   std::unique_ptr<SDL_VideoDevice> const owner{ device                                  };
   std::unique_ptr<SDL_VideoData> const   state{ std::exchange(owner->internal, nullptr) };
@@ -119,7 +120,7 @@ auto RequestsRdp() -> bool {
   return hint && hint->contains("rdp");
 }
 // SDL's bootstrap takes ownership of the returned video device.
-SDL_VideoDevice* CreateDevice() {
+auto CreateDevice() -> SDL_VideoDevice* {
   return Boundary([&]() -> SDL_VideoDevice* {
     if (!RequestsRdp()) return nullptr;
     auto device = std::make_unique<SDL_VideoDevice>();

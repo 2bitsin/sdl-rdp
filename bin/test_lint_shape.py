@@ -347,3 +347,28 @@ def test_fixture_helpers_live_in_test_directories(tmp_path, directory, expected)
     helper  = write(tmp_path, 'class Steps {\nprotected:\n  void Given();\n};\n', f'{directory}/steps.hpp')
     fixture = write(tmp_path, 'class Suite : public Steps, public Test { };\n', 'suite.cpp')
     assert LINT.fixture_classes([LINT.Source(helper), LINT.Source(fixture)]) == LINT.FIXTURE_ROOTS | expected
+
+
+def leading(tmp_path, source):
+    return LINT.leading_returns(LINT.Source(write(tmp_path, source)))
+
+
+@pytest.mark.parametrize(('source', 'expected'), [
+    pytest.param('void Run(int a);\n', [1], id='void_declaration'),
+    pytest.param('class A {\npublic:\n  static bool Ready() const;\n};\n', [3], id='static_member'),
+    pytest.param('std::string A::Name() const { return { }; }\n', [1], id='qualified_definition'),
+    pytest.param('auto Run(int a) -> void;\n', [], id='trailing_declaration'),
+    pytest.param('class Foo {\npublic:\n  explicit Foo(int a);\n  ~Foo();\n};\nFoo::Foo(int a) { }\nFoo::~Foo() { }\n',
+                 [], id='constructor_and_destructor'),
+    pytest.param('template <typename T>\n  requires std::integral<T>\nexplicit Foo(T a);\n', [],
+                 id='constrained_constructor'),
+    pytest.param('auto Run() -> void {\n  Stop(1);\n  int x = Get();\n}\n', [], id='call_on_its_own_line'),
+    pytest.param('extern "C" auto sdlrdp_open(int a) -> int { return a; }\nextern "C" {\nauto F() -> int;\n}\n',
+                 [], id='extern_c_trailing_definition'),
+    pytest.param('using Callback = void (*)(int);\nauto Set(int (*create)(char*)) -> void;\n', [1, 2],
+                 id='function_pointer_result_first'),
+    pytest.param('using Callback = auto (*)(int) -> void;\nauto Call() -> int {\n  return (*next)(1);\n}\n', [],
+                 id='function_pointer_trailing_and_call'),
+])
+def test_leading_return_types(tmp_path, source, expected):
+    assert leading(tmp_path, source) == expected

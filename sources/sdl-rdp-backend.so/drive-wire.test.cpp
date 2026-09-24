@@ -11,11 +11,11 @@
 #include <utility>
 namespace DriveGate {
 namespace {
-void SendMalformedDrivePacket(Headless::Client& client) {
+auto SendMalformedDrivePacket(Headless::Client& client) -> void {
   std::array<BYTE, 4> const malformed{ 0x72, 0x44, 0x41, 0x44 };
   ASSERT_TRUE(Headless::SendStaticChannel(client.Instance().get(), RDPDR_CHANNEL_NAME, malformed));
 }
-Backend::DrivePacket EmptyBasicInformation(Headless::DriveObserver& observer) {
+auto EmptyBasicInformation(Headless::DriveObserver& observer) -> Backend::DrivePacket {
   auto request = observer.Observed().io.front();
   auto device  = request.Get(4);
   request.Skip(4);
@@ -27,14 +27,14 @@ Backend::DrivePacket EmptyBasicInformation(Headless::DriveObserver& observer) {
   response.Put(0);
   return response;
 }
-void CompleteRead(Headless::DriveObserver& observer, size_t index) {
+auto CompleteRead(Headless::DriveObserver& observer, size_t index) -> void {
 
   auto response = ReplyTo(observer.Observed().io[index], STATUS_SUCCESS);
   response.Put(65536);
   response.Bytes().resize(response.Bytes().size() + 65536, 'x');
   EXPECT_TRUE(observer.Send(response));
 }
-void AnnounceDriveNames(Headless::DriveObserver& observer) {
+auto AnnounceDriveNames(Headless::DriveObserver& observer) -> void {
   std::string_view const label = "żółw";
   auto                   wide  = Backend::TranscodeRange<std::vector<uint8_t>>(
       std::as_bytes(std::span(label)), { },
@@ -50,7 +50,7 @@ void AnnounceDriveNames(Headless::DriveObserver& observer) {
 }
 
 namespace {
-int ReadLargeFile(sdlrdp_handle* handle, sdlrdp_file* file) {
+auto ReadLargeFile(sdlrdp_handle* handle, sdlrdp_file* file) -> int {
   std::string bytes(static_cast<std::ptrdiff_t>(3 * 1024) * 1024, '\0');
   return sdlrdp_drive_read(handle, file, 0, bytes.data(), bytes.size());
 }
@@ -63,7 +63,7 @@ auto StatWithError(sdlrdp_handle* handle, sdlrdp_file* file) -> std::pair<int, s
 namespace {
 class DriveWire : public DriveChecks {
 protected:
-  void ThenRecoverableAnnouncements(Headless::DriveObserver& observer) {
+  auto ThenRecoverableAnnouncements(Headless::DriveObserver& observer) -> void {
     auto rejected = std::ranges::find(observer.Observed().replies, 103u, &std::pair<unsigned, unsigned>::first);
     ASSERT_NE(rejected, observer.Observed().replies.end());
     EXPECT_EQ(rejected->second, STATUS_NOT_SUPPORTED);
@@ -71,20 +71,20 @@ protected:
     EXPECT_EQ(Logged(SDLRDP_LOG_WARN, "Using DOS name"), 1u);
     EXPECT_EQ(Logged(SDLRDP_LOG_INFO, "extended PDU"), 1u);
   }
-  void ThenDriveNames() {
+  auto ThenDriveNames() -> void {
     std::array<sdlrdp_drive, 8> drives{ };
     ASSERT_EQ(sdlrdp_drive_list(handle.get(), drives.data(), 8), 4);
     EXPECT_STREQ(drives[1].name, "żółw");
     EXPECT_EQ(std::string(drives[2].name), std::string(511, 'x'));
     EXPECT_STREQ(drives[3].name, "dos");
   }
-  void ThenHeldFileClosed(Headless::DriveObserver& observer, sdlrdp_file* file) {
+  auto ThenHeldFileClosed(Headless::DriveObserver& observer, sdlrdp_file* file) -> void {
     observer.Observed().hold = false;
     auto close = std::async(std::launch::async, [&] { return sdlrdp_drive_close(handle.get(), file); });
     ASSERT_TRUE(client->Until([&] { return close.wait_for(0s) == std::future_status::ready; }));
     EXPECT_EQ(close.get(), 0);
   }
-  void WhenReadWindowRefilled(Headless::DriveObserver& observer) {
+  auto WhenReadWindowRefilled(Headless::DriveObserver& observer) -> void {
     ASSERT_TRUE(client->Until([&] { return observer.Observed().requests == 8; }));
     CompleteRead(observer, 7);
     ASSERT_TRUE(client->Until([&] { return observer.Observed().requests == 9; }));
@@ -93,12 +93,12 @@ protected:
     std::ranges::for_each(std::views::iota(1uz, 10uz) | std::views::filter([](size_t index) { return index != 7; }),
                           [&](size_t index) { CompleteRead(observer, index); });
   }
-  void ThenTruncatedInformation(auto& stat) {
+  auto ThenTruncatedInformation(auto& stat) -> void {
     auto [result, error] = stat.get();
     EXPECT_EQ(result, -1);
     EXPECT_EQ(error, "Truncated drive response.");
   }
-  void ThenAbortedRead(std::future<int>& read, sdlrdp_file* file) {
+  auto ThenAbortedRead(std::future<int>& read, sdlrdp_file* file) -> void {
     ASSERT_EQ(read.wait_for(2s), std::future_status::ready);
     EXPECT_EQ(read.get(), -1);
     EXPECT_EQ(Logged(SDLRDP_LOG_WARN, "Drive channel ended: Truncated drive response."), 1u);

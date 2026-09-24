@@ -15,13 +15,13 @@
 
 namespace Backend {
 namespace {
-DrivePacket Header(unsigned type) {
+auto Header(unsigned type) -> DrivePacket {
   DrivePacket packet;
   packet.Put(RDPDR_CTYP_CORE, 2);
   packet.Put(type, 2);
   return packet;
 }
-HANDLE ChannelEvent(HANDLE channel) {
+auto ChannelEvent(HANDLE channel) -> HANDLE {
   void* data = nullptr;
   DWORD size = 0;
   if (!WTSVirtualChannelQuery(channel, WTSVirtualEventHandle, &data, &size))
@@ -30,20 +30,20 @@ HANDLE ChannelEvent(HANDLE channel) {
   WTSFreeMemory(data);
   return event;
 }
-DrivePacket Announcement(unsigned type, unsigned client_id) {
+auto Announcement(unsigned type, unsigned client_id) -> DrivePacket {
   auto packet = Header(type);
   packet.Put(RDPDR_VERSION_MAJOR, 2);
   packet.Put(RDPDR_VERSION_MINOR_RDP6X, 2);
   packet.Put(client_id);
   return packet;
 }
-DrivePacket IoRequest(std::span<unsigned const> header, DrivePacket const& body) {
+auto IoRequest(std::span<unsigned const> header, DrivePacket const& body) -> DrivePacket {
   auto packet = Header(PAKID_CORE_DEVICE_IOREQUEST);
   std::ranges::for_each(header, [&packet](unsigned field) { packet.Put(field); });
   packet.Append(body.Bytes());
   return packet;
 }
-void Capability(DrivePacket& packet, unsigned type, unsigned version, DrivePacket const& body) {
+auto Capability(DrivePacket& packet, unsigned type, unsigned version, DrivePacket const& body) -> void {
   constexpr unsigned header_size = (sizeof(uint16_t) * 2) + sizeof(uint32_t);
   Expects(body.Bytes().size() <= UINT16_MAX - header_size, "capability length fits its header");
   packet.Put(type, 2);
@@ -51,7 +51,7 @@ void Capability(DrivePacket& packet, unsigned type, unsigned version, DrivePacke
   packet.Put(version);
   packet.Append(body.Bytes());
 }
-void GeneralCapability(DrivePacket& packet) {
+auto GeneralCapability(DrivePacket& packet) -> void {
   DrivePacket body;
   body.Put(0);
   body.Put(0);
@@ -71,11 +71,11 @@ void GeneralCapability(DrivePacket& packet) {
   body.Put(0);
   Capability(packet, CAP_GENERAL_TYPE, GENERAL_CAPABILITY_VERSION_02, body);
 }
-void DriveCapability(DrivePacket& packet) {
+auto DriveCapability(DrivePacket& packet) -> void {
   Capability(packet, CAP_DRIVE_TYPE, DRIVE_CAPABILITY_VERSION_02, { });
 }
 } // namespace
-void DriveChannel::Abort(std::string const& cause) {
+auto DriveChannel::Abort(std::string const& cause) -> void {
   std::scoped_lock const lock(mutex);
   Fail(cause);
 }
@@ -85,8 +85,8 @@ DriveChannel::DriveChannel(PeerLink& link, EventQueue& events, Diagnostics const
 DriveChannel::~DriveChannel() {
   Disconnect();
 }
-HANDLE DriveChannel::Event() const { return event; }
-bool DriveChannel::Open() {
+auto DriveChannel::Event() const -> HANDLE { return event; }
+auto DriveChannel::Open() -> bool {
   Expects(!channel, "drive channel opens once");
   try {
     auto name = std::to_array(RDPDR_CHANNEL_NAME);
@@ -101,7 +101,7 @@ bool DriveChannel::Open() {
     return false;
   }
 }
-void DriveChannel::Write(DrivePacket& packet) {
+auto DriveChannel::Write(DrivePacket& packet) -> void {
   Expects(channel != nullptr, "drive transport exists");
   ULONG written = 0;
   if (!WTSVirtualChannelWrite(channel.get(), oxbox::utilities::SpanCast<char>(std::span(packet.Bytes())).data(),
@@ -110,7 +110,7 @@ void DriveChannel::Write(DrivePacket& packet) {
     throw std::runtime_error("Drive transport disconnected.");
   _link.Signal();
 }
-void DriveChannel::Capabilities() {
+auto DriveChannel::Capabilities() -> void {
   auto               packet           = Header(PAKID_CORE_SERVER_CAPABILITY);
   constexpr unsigned capability_count = 2;
   packet.Put(capability_count, 2);
@@ -123,7 +123,7 @@ void DriveChannel::Capabilities() {
   auto logged_on = Header(PAKID_CORE_USER_LOGGEDON);
   Write(logged_on);
 }
-void DriveChannel::Announce(DrivePacket& packet) {
+auto DriveChannel::Announce(DrivePacket& packet) -> void {
   auto count = packet.Get(4);
   while (count--) {
     auto                type = packet.Get(4);
@@ -143,7 +143,7 @@ void DriveChannel::Announce(DrivePacket& packet) {
     AnnounceDevice(unsigned(wire), label);
   }
 }
-void DriveChannel::ClientCapabilities(DrivePacket& packet) {
+auto DriveChannel::ClientCapabilities(DrivePacket& packet) -> void {
   constexpr unsigned capability_header_size = 8;
   auto               count                  = packet.Get(2);
   packet.Skip(2);
@@ -162,15 +162,15 @@ void DriveChannel::ClientCapabilities(DrivePacket& packet) {
     packet.Seek(end);
   }
 }
-void DriveChannel::Warn(std::string const& cause) const {
+auto DriveChannel::Warn(std::string const& cause) const -> void {
   if (connected) _diagnostics.Log(SDLRDP_LOG_WARN, cause);
 }
-void DriveChannel::Fail(std::string const& cause) {
+auto DriveChannel::Fail(std::string const& cause) -> void {
   if (!connected) return;
   Warn("Drive channel ended: " + cause);
   Shutdown();
 }
-void DriveChannel::Remove(unsigned wire) {
+auto DriveChannel::Remove(unsigned wire) -> void {
   for (auto it = devices.begin(); it != devices.end();) {
     if (it->second.wire != wire) {
       ++it;
@@ -187,7 +187,7 @@ void DriveChannel::Remove(unsigned wire) {
     it = devices.erase(it);
   }
 }
-void DriveChannel::Complete(DrivePacket& packet) {
+auto DriveChannel::Complete(DrivePacket& packet) -> void {
   packet.Get(4);
   auto id     = packet.Get(4);
   auto status = packet.Get(4);
@@ -203,7 +203,7 @@ void DriveChannel::Complete(DrivePacket& packet) {
   pending.erase(found);
   changed.notify_all();
 }
-void DriveChannel::Receive(DrivePacket& packet) {
+auto DriveChannel::Receive(DrivePacket& packet) -> void {
   if (packet.Get(2) != RDPDR_CTYP_CORE) return;
   auto type = packet.Get(2);
   if (type == PAKID_CORE_CLIENTID_CONFIRM) {
@@ -223,7 +223,7 @@ void DriveChannel::Receive(DrivePacket& packet) {
       Remove(packet.Get(4));
   }
 }
-bool DriveChannel::Pump(std::span<HANDLE const> signaled) {
+auto DriveChannel::Pump(std::span<HANDLE const> signaled) -> bool {
   std::scoped_lock const lock(mutex);
   if (!connected) {
     CloseTransport();
@@ -237,8 +237,8 @@ bool DriveChannel::Pump(std::span<HANDLE const> signaled) {
     return true;
   }
 }
-std::shared_ptr<DriveRequest> DriveChannel::Send(unsigned drive, unsigned file, unsigned major, DrivePacket const& body,
-                                                 unsigned minor) {
+auto DriveChannel::Send(unsigned drive, unsigned file, unsigned major, DrivePacket const& body,
+                        unsigned minor) -> std::shared_ptr<DriveRequest> {
   std::scoped_lock const lock(mutex);
   if (!connected) throw std::runtime_error("Drive channel ended.");
   auto wire = Device(drive);
@@ -256,7 +256,7 @@ std::shared_ptr<DriveRequest> DriveChannel::Send(unsigned drive, unsigned file, 
   }
   return request;
 }
-void DriveChannel::AnnounceDevice(unsigned wire, std::string const& label) {
+auto DriveChannel::AnnounceDevice(unsigned wire, std::string const& label) -> void {
   auto        id    = _session.NextDrive();
   DeviceEntry entry { .wire = wire, .drive = { id, { } } };
   std::strncpy(entry.drive.name, label.c_str(), sizeof(entry.drive.name) - 1);
@@ -265,8 +265,8 @@ void DriveChannel::AnnounceDevice(unsigned wire, std::string const& label) {
   std::strncpy(added.drive.name, label.c_str(), sizeof(added.drive.name) - 1);
   _events.Push(added);
 }
-void DriveChannel::GeneralClientCapability(DrivePacket& packet, std::size_t start, std::size_t length,
-                                           unsigned version) const {
+auto DriveChannel::GeneralClientCapability(DrivePacket& packet, std::size_t start, std::size_t length,
+                                           unsigned version) const -> void {
   constexpr unsigned general_caps_v1_size          = 40;
   constexpr unsigned protocol_major_version_offset = 16;
   constexpr unsigned io_code_fields_size           = 8;
@@ -281,7 +281,7 @@ void DriveChannel::GeneralClientCapability(DrivePacket& packet, std::size_t star
       std::format("Drive client version {}.{}, general capability {}, extended PDU 0x{:08x}, device removal {}.", major,
                   minor, version, flags, bool(flags & RDPDR_DEVICE_REMOVE_PDUS)));
 }
-bool DriveChannel::PumpAvailable() {
+auto DriveChannel::PumpAvailable() -> bool {
   for (;;) {
     if (!Signalled(event)) return true;
     ULONG length = 0;

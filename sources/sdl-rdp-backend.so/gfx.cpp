@@ -22,14 +22,14 @@
 namespace Backend {
 namespace {
 constexpr int MaximumSurfaceDimension = 32766;
-GfxChannel& Held(RdpgfxServerContext* context) {
+auto Held(RdpgfxServerContext* context) -> GfxChannel& {
   Expects(context != nullptr, "callback context exists");
   return CallbackOwner<GfxChannel>(context->custom);
 }
-AcknowledgementMode Mode(UINT32 queue_depth) {
+auto Mode(UINT32 queue_depth) -> AcknowledgementMode {
   return queue_depth == SUSPEND_FRAME_ACKNOWLEDGEMENT ? AcknowledgementMode::Suspended : AcknowledgementMode::Tracking;
 }
-bool FitsProtocol(sdlrdp_rect desktop) {
+auto FitsProtocol(sdlrdp_rect desktop) -> bool {
   return desktop.w <= MaximumSurfaceDimension && desktop.h <= MaximumSurfaceDimension;
 }
 }
@@ -40,7 +40,7 @@ GfxChannel::GfxChannel(PeerLink& link, Diagnostics const& diagnostics, Configura
       _frames{ frames }, _pacing{ pacing }, _encoder{ encoder }, _scaler{ scaler },
       _context{ rdpgfx_server_context_new(link.Channels()) } { }
 GfxChannel::~GfxChannel() = default;
-bool GfxChannel::Open() {
+auto GfxChannel::Open() -> bool {
   if (!BindContext(_context.get(), this, _link.Context())) return false;
   _context->ChannelIdAssigned   = [](RdpgfxServerContext* assigned, UINT32 id) -> BOOL {
     Held(assigned)._id = id;
@@ -51,35 +51,35 @@ bool GfxChannel::Open() {
   _context->QoeFrameAcknowledge = Qoe;
   return _context->Initialize(_context.get(), TRUE) && _context->Open(_context.get());
 }
-HANDLE GfxChannel::Event() const {
+auto GfxChannel::Event() const -> HANDLE {
   return rdpgfx_server_get_event_handle(_context.get());
 }
-bool GfxChannel::Pump() {
+auto GfxChannel::Pump() -> bool {
   auto result = rdpgfx_server_handle_messages(_context.get());
   return result == ERROR_NO_DATA || Check(result, "receive");
 }
-bool GfxChannel::Confirmed() const noexcept {
+auto GfxChannel::Confirmed() const noexcept -> bool {
   return _confirmed;
 }
-bool GfxChannel::Assigned(UINT32 channel_id) const noexcept {
+auto GfxChannel::Assigned(UINT32 channel_id) const noexcept -> bool {
   return _id == channel_id;
 }
-GraphicsTiming const& GfxChannel::Timing() const noexcept {
+auto GfxChannel::Timing() const noexcept -> GraphicsTiming const& {
   return _timing;
 }
-bool GfxChannel::Check(UINT result, char const* operation) const {
+auto GfxChannel::Check(UINT result, char const* operation) const -> bool {
   if (result == CHANNEL_RC_OK) return true;
   _diagnostics.Log(SDLRDP_LOG_ERROR, std::format("GFX {} failed: {}.", operation, result));
   return false;
 }
-void GfxChannel::LogCapabilities(std::span<RDPGFX_CAPSET const> advertised) const {
+auto GfxChannel::LogCapabilities(std::span<RDPGFX_CAPSET const> advertised) const -> void {
   if (_logged) return;
   std::string sets;
   for (auto const& cap : advertised)
     sets += std::format(" version=0x{:08x} flags=0x{:08x};", cap.version, cap.flags);
   _diagnostics.Log(SDLRDP_LOG_INFO, "GFX advertised sets:" + sets);
 }
-UINT GfxChannel::ActivateCapabilities(RDPGFX_CAPSET const& selected, bool wanted) {
+auto GfxChannel::ActivateCapabilities(RDPGFX_CAPSET const& selected, bool wanted) -> UINT {
   auto const codec      = _encoder.Codec();
   bool const announcing = _activation.Holding();
   _activation.Announce(codec, _pacing.Effective());
@@ -92,7 +92,7 @@ UINT GfxChannel::ActivateCapabilities(RDPGFX_CAPSET const& selected, bool wanted
   _logged = true;
   return CHANNEL_RC_OK;
 }
-bool GfxChannel::ResetSurface() {
+auto GfxChannel::ResetSurface() -> bool {
   RDPGFX_DELETE_ENCODING_CONTEXT_PDU const encoding{ GraphicsSurfaceId, GraphicsContextId };
   if (_headers && !Check(_context->DeleteEncodingContext(_context.get(), &encoding), "delete encoding context"))
     return false;
@@ -110,7 +110,7 @@ bool GfxChannel::ResetSurface() {
          Check(_context->CreateSurface(_context.get(), &create), "create surface") &&
          Check(_context->MapSurfaceToOutput(_context.get(), &map), "map surface");
 }
-UINT GfxChannel::Caps(RdpgfxServerContext* context, RDPGFX_CAPS_ADVERTISE_PDU const* caps) {
+auto GfxChannel::Caps(RdpgfxServerContext* context, RDPGFX_CAPS_ADVERTISE_PDU const* caps) -> UINT {
   Expects(caps, "graphics capabilities are supplied");
   auto& self       = Held(context);
   auto  advertised = std::span(caps->capsSets, caps->capsSetCount);
@@ -125,12 +125,12 @@ UINT GfxChannel::Caps(RdpgfxServerContext* context, RDPGFX_CAPS_ADVERTISE_PDU co
   if (!self.Select()) return ERROR_INTERNAL_ERROR;
   return self.ActivateCapabilities(selected, wanted);
 }
-void GfxChannel::ResetAvc() {
+auto GfxChannel::ResetAvc() -> void {
   _avc.Close();
   _force_idr    = true;
   _avc_rejected = false;
 }
-void GfxChannel::ConfirmedCapability(RDPGFX_CAPSET const& cap) {
+auto GfxChannel::ConfirmedCapability(RDPGFX_CAPSET const& cap) -> void {
   Expects(cap.version, "supported capabilities confirmed");
   _avc_allowed = cap.version == RDPGFX_CAPVERSION_81
                      ? (cap.flags & RDPGFX_CAPS_FLAG_AVC420_ENABLED) != 0
@@ -143,7 +143,7 @@ void GfxChannel::ConfirmedCapability(RDPGFX_CAPSET const& cap) {
   _headers = false;
   _prepared.clear();
 }
-UINT GfxChannel::Ack(RdpgfxServerContext* context, RDPGFX_FRAME_ACKNOWLEDGE_PDU const* ack) {
+auto GfxChannel::Ack(RdpgfxServerContext* context, RDPGFX_FRAME_ACKNOWLEDGE_PDU const* ack) -> UINT {
   Expects(ack, "acknowledgement is supplied");
   auto& self = Held(context);
   self._pacing.Accept(ack->frameId);
@@ -151,17 +151,17 @@ UINT GfxChannel::Ack(RdpgfxServerContext* context, RDPGFX_FRAME_ACKNOWLEDGE_PDU 
   self._pacing.Acknowledgements(Mode(ack->queueDepth));
   return CHANNEL_RC_OK;
 }
-UINT GfxChannel::Qoe(RdpgfxServerContext* context, RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU const* ack) {
+auto GfxChannel::Qoe(RdpgfxServerContext* context, RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU const* ack) -> UINT {
   Expects(ack, "acknowledgement is supplied");
   Held(context)._timing.Record(*ack);
   return CHANNEL_RC_OK;
 }
-unsigned GfxChannel::FrameWindow() const {
+auto GfxChannel::FrameWindow() const -> unsigned {
   Expects(_queue_depth != SUSPEND_FRAME_ACKNOWLEDGEMENT, "acknowledgements are enabled");
   // MS-RDPEGFX 2.2.2.13 reports bytes, not frames; reserve at most one slot for that backlog.
   return _queue_depth && _queue_depth >= _last_bytes ? AcknowledgedFrameWindow - 1 : AcknowledgedFrameWindow;
 }
-bool GfxChannel::Surface() {
+auto GfxChannel::Surface() -> bool {
   Expects(_confirmed, "surface follows capability confirmation");
   auto const desktop = _scaler.Target();
   if (SameSize(Whole(_surface), desktop)) return true;

@@ -10,8 +10,8 @@ namespace Backend {
 inline constexpr oxbox::utilities::TextFormat Utf16Little { .encoding = oxbox::utilities::Encoding::UTF16,
                                                           .order = std::endian::little };
 template <class Output, class Map = std::identity>
-Output TranscodeRange(std::span<std::byte const> input, oxbox::utilities::TextFormat source,
-                      oxbox::utilities::TextFormat target, Map map = { }) {
+auto TranscodeRange(std::span<std::byte const> input, oxbox::utilities::TextFormat source,
+                    oxbox::utilities::TextFormat target, Map map = { }) -> Output {
   using namespace oxbox::utilities;
   static_assert(sizeof(typename Output::value_type) == sizeof(std::byte));
   std::vector<std::byte> encoded;

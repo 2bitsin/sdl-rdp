@@ -10,7 +10,7 @@
 
 namespace Headless {
 namespace {
-BOOL LoadDisplayChannel(freerdp* instance) {
+auto LoadDisplayChannel(freerdp* instance) -> BOOL {
   return LoadDynamicChannel(instance, "disp");
 }
 }
@@ -38,7 +38,7 @@ DisplayClient::~DisplayClient() {
   channel = nullptr;
   ready   = false;
 }
-DISPLAY_CONTROL_MONITOR_LAYOUT DisplayClient::Monitor(unsigned width, unsigned height, unsigned millimetres) {
+auto DisplayClient::Monitor(unsigned width, unsigned height, unsigned millimetres) -> DISPLAY_CONTROL_MONITOR_LAYOUT {
   DISPLAY_CONTROL_MONITOR_LAYOUT monitor{ };
   monitor.Flags              = DISPLAY_CONTROL_MONITOR_PRIMARY;
   monitor.Width              = width;
@@ -48,23 +48,23 @@ DISPLAY_CONTROL_MONITOR_LAYOUT DisplayClient::Monitor(unsigned width, unsigned h
   monitor.DesktopScaleFactor = monitor.DeviceScaleFactor = 100;
   return monitor;
 }
-bool DisplayClient::Layout(unsigned width, unsigned height) {
+auto DisplayClient::Layout(unsigned width, unsigned height) -> bool {
   Expects(active, "observer is installed");
   Expects(ready, "channel handshake is complete");
   Expects(channel, "channel is installed");
   auto monitor = Monitor(width, height);
   return channel.load()->SendMonitorLayout(channel.load(), 1, &monitor) == CHANNEL_RC_OK;
 }
-DisplayCapture& DisplayClient::Observed() {
+auto DisplayClient::Observed() -> DisplayCapture& {
   return observed;
 }
-bool DisplayClient::Ready() {
+auto DisplayClient::Ready() -> bool {
   return ready.load();
 }
-DispClientContext* DisplayClient::Channel() {
+auto DisplayClient::Channel() -> DispClientContext* {
   return channel.load();
 }
-BOOL DisplayClient::Resize(rdpContext* context) {
+auto DisplayClient::Resize(rdpContext* context) -> BOOL {
   Expects(active != nullptr, "display observer exists");
   ++active->observed.desktops;
   if (!active->desktop_resize(context)) return FALSE;
@@ -75,7 +75,7 @@ BOOL DisplayClient::Resize(rdpContext* context) {
   if (active->observed.finalizing) active->observed.finalizing();
   return TRUE;
 }
-void DisplayClient::Connected(void* /*unused*/, ChannelConnectedEventArgs const* event) {
+auto DisplayClient::Connected(void* /*unused*/, ChannelConnectedEventArgs const* event) -> void {
   if (std::string_view(event->name) != DISP_DVC_CHANNEL_NAME) return;
   channel                            = static_cast<DispClientContext*>(event->pInterface);
   channel.load()->DisplayControlCaps = [](DispClientContext*, UINT32, UINT32, UINT32) -> UINT {

@@ -23,28 +23,28 @@ GraphicsObserver::~GraphicsObserver() {
   client.Instance()->context->update->DesktopResize = desktop_resize;
   active                                            = nullptr;
 }
-bool GraphicsObserver::Ack(UINT32 depth) {
+auto GraphicsObserver::Ack(UINT32 depth) -> bool {
   Expects(channel, "channel is installed");
   Expects(!observed.frames.empty(), "observer has received a frame");
   return AckFrame(observed.frames.size() - 1, depth);
 }
-bool GraphicsObserver::AckFrame(std::size_t index, UINT32 depth) {
+auto GraphicsObserver::AckFrame(std::size_t index, UINT32 depth) -> bool {
   Expects(channel, "channel is installed");
   Expects(index < observed.frames.size(), "frame index is in range");
   auto ack = observed.frames[index];
   ack.queueDepth = depth;
   return original(channel, &ack) == CHANNEL_RC_OK;
 }
-RdpgfxClientContext* GraphicsObserver::Channel() const {
+auto GraphicsObserver::Channel() const -> RdpgfxClientContext* {
   return channel;
 }
-GraphicsCapture& GraphicsObserver::Observed() {
+auto GraphicsObserver::Observed() -> GraphicsCapture& {
   return observed;
 }
-GraphicsCapture const& GraphicsObserver::Observed() const {
+auto GraphicsObserver::Observed() const -> GraphicsCapture const& {
   return observed;
 }
-void GraphicsObserver::Connected(void* /*unused*/, ChannelConnectedEventArgs const* event) {
+auto GraphicsObserver::Connected(void* /*unused*/, ChannelConnectedEventArgs const* event) -> void {
   if (std::string_view(event->name) != RDPGFX_DVC_CHANNEL_NAME) return;
   active->channel                = static_cast<RdpgfxClientContext*>(event->pInterface);
   active->create                 = active->channel->CreateSurface;
@@ -59,7 +59,7 @@ void GraphicsObserver::Connected(void* /*unused*/, ChannelConnectedEventArgs con
   };
   active->ObserveFrameLifecycle();
 }
-void GraphicsObserver::ObserveAvc(RDPGFX_SURFACE_COMMAND const& command) {
+auto GraphicsObserver::ObserveAvc(RDPGFX_SURFACE_COMMAND const& command) -> void {
   Expects(command.extra, "AVC command has a parsed bitmap stream");
   auto const& stream = *static_cast<RDPGFX_AVC420_BITMAP_STREAM const*>(command.extra);
   observed.avc_rects.assign(stream.meta.regionRects, stream.meta.regionRects + stream.meta.numRegionRects);
@@ -69,7 +69,7 @@ void GraphicsObserver::ObserveAvc(RDPGFX_SURFACE_COMMAND const& command) {
     if (!stream.data[i] && !stream.data[i + 1] && stream.data[i + 2] == 1) types |= 1u << (stream.data[i + 3] & 31);
   observed.avc_nals.push_back(types);
 }
-void GraphicsObserver::ObserveFrameLifecycle() {
+auto GraphicsObserver::ObserveFrameLifecycle() -> void {
   Expects(channel != nullptr, "graphics channel connected");
   surface                 = channel->SurfaceCommand;
   channel->SurfaceCommand = [](RdpgfxClientContext* channel, RDPGFX_SURFACE_COMMAND const* command) -> UINT {
@@ -91,7 +91,7 @@ void GraphicsObserver::ObserveFrameLifecycle() {
   };
   ObserveFrames();
 }
-void GraphicsObserver::ObserveFrames() {
+auto GraphicsObserver::ObserveFrames() -> void {
   original          = channel->FrameAcknowledge;
   end               = channel->EndFrame;
   channel->OnOpen   = [](RdpgfxClientContext*, BOOL* send_caps, BOOL* send_acks) -> UINT {

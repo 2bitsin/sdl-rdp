@@ -5,5 +5,5 @@
 #include <winpr/wtypes.h>
 
 namespace Headless {
-std::pair<double, double> ToneMeasurements(std::vector<INT16> const& samples, unsigned rate);
+auto ToneMeasurements(std::vector<INT16> const& samples, unsigned rate) -> std::pair<double, double>;
 }

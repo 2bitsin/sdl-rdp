@@ -11,12 +11,12 @@ inline constexpr unsigned MaximumPictureWidth  = std::numeric_limits<uint16_t>::
 inline constexpr unsigned MaximumPictureHeight = std::numeric_limits<uint16_t>::max();
 class PictureGeometry {
 public:
-              PictureGeometry(Extent size, sdlrdp_aspect aspect);
-  sdlrdp_rect Desktop() const;
-  sdlrdp_rect Desktop(Extent size) const;
-  sdlrdp_rect Bounds() const noexcept;
-  bool        Resize(Extent size);
-  void        SetAspect(sdlrdp_aspect value);
+       PictureGeometry(Extent size, sdlrdp_aspect aspect);
+  auto Desktop() const                -> sdlrdp_rect;
+  auto Desktop(Extent size) const     -> sdlrdp_rect;
+  auto Bounds() const noexcept        -> sdlrdp_rect;
+  auto Resize(Extent size)            -> bool;
+  auto SetAspect(sdlrdp_aspect value) -> void;
 
 private:
   Extent        _size;

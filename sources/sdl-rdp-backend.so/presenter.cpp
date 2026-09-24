@@ -15,10 +15,11 @@
 
 namespace Backend {
 namespace {
-bool Spans(int start, int length, int value) {
+auto Spans(int start, int length, int value) -> bool {
   return start <= value && value < start + length;
 }
-void ComposeRow(std::span<BYTE const> source, std::span<BYTE const> former, std::span<BYTE> target, auto damage) {
+auto ComposeRow(std::span<BYTE const> source, std::span<BYTE const> former, std::span<BYTE> target,
+                auto damage) -> void {
   auto const width = int(target.size() / PixelBytes);
   for (int x = 0; x < width;) {
     auto covered{ std::ranges::find_if(damage, [x](auto rect) { return Spans(rect.x, rect.w, x); })               };
@@ -34,8 +35,8 @@ void ComposeRow(std::span<BYTE const> source, std::span<BYTE const> former, std:
     x = end;
   }
 }
-void ComposePicture(std::span<BYTE const> source, unsigned pitch, FrameSnapshot const& former, std::span<BYTE> target,
-                    std::span<sdlrdp_rect const> damage) {
+auto ComposePicture(std::span<BYTE const> source, unsigned pitch, FrameSnapshot const& former, std::span<BYTE> target,
+                    std::span<sdlrdp_rect const> damage) -> void {
   auto const width  = former.Width();
   auto const stride = former.Stride();
   auto const row    = std::size_t(width) * PixelBytes;
@@ -51,8 +52,8 @@ Presenter::Presenter(Diagnostics const& diagnostics, FrameStore& frames, Session
                      Configuration& configuration)
     : _diagnostics { diagnostics }, _frames{ frames }, _session{ session }, _pointer{ pointer },
       _configuration{ configuration } { }
-void Presenter::Present(std::span<BYTE const> pixels, unsigned pitch, Extent size,
-                        std::span<sdlrdp_rect const> damage) {
+auto Presenter::Present(std::span<BYTE const> pixels, unsigned pitch, Extent size,
+                        std::span<sdlrdp_rect const> damage) -> void {
   Expects(pitch >= size.width * PixelBytes, "source pitch covers framebuffer rows");
   Expects(pixels.size() >= std::size_t(pitch) * size.height, "source framebuffer covers every row");
   _diagnostics.Line("present", [&] { return std::format("dirty={}", damage.size()); });
@@ -66,8 +67,8 @@ void Presenter::Present(std::span<BYTE const> pixels, unsigned pitch, Extent siz
   Avc::ReplicateEdges(*next, size);
   Publish(std::move(next), size, damage);
 }
-void Presenter::Publish(std::shared_ptr<std::vector<BYTE> const> next, Extent size,
-                        std::span<sdlrdp_rect const> damage) {
+auto Presenter::Publish(std::shared_ptr<std::vector<BYTE> const> next, Extent size,
+                        std::span<sdlrdp_rect const> damage) -> void {
   auto const held    = _session.LockPeers();
   auto const frame   = _frames.Lock();
   auto const resized = _frames.Publish(frame, std::move(next), size);
@@ -79,19 +80,19 @@ void Presenter::Publish(std::shared_ptr<std::vector<BYTE> const> next, Extent si
       peer.Present(frame, damage);
   });
 }
-std::shared_ptr<std::vector<BYTE>> Presenter::Acquire(Extent size) {
+auto Presenter::Acquire(Extent size) -> std::shared_ptr<std::vector<BYTE>> {
   auto unused = std::ranges::find_if(_pool, [](auto const& buffer) { return buffer.use_count() == 1; });
   if (unused == _pool.end()) unused = _pool.insert(_pool.end(), std::make_shared<std::vector<BYTE>>());
   (*unused)->resize(FrameBytes(size));
   return *unused;
 }
-void Presenter::EnsurePicture() {
+auto Presenter::EnsurePicture() -> void {
   auto const session = _session.Lock();
   auto const frame   = _frames.Lock();
   if (!_frames.Ensure(frame)) return;
   if (auto* const current = _session.Current(session)) current->Repaint(frame, _frames.Bounds(frame));
 }
-void Presenter::Resize(Extent size) {
+auto Presenter::Resize(Extent size) -> void {
   Expects(size.width > 0, "picture width is positive");
   Expects(size.height > 0, "picture height is positive");
   std::scoped_lock const lock(_producer);
@@ -102,28 +103,28 @@ void Presenter::Resize(Extent size) {
   if (auto* const current = _session.Current(session)) current->RestartPacing(frame);
   _session.ForEach(held, [&](Peer& peer) { peer.Repaint(frame, Whole(size)); });
 }
-void Presenter::SetAspect(sdlrdp_aspect value) {
+auto Presenter::SetAspect(sdlrdp_aspect value) -> void {
   auto const held  = _session.LockPeers();
   auto const frame = _frames.Lock();
   _frames.SetAspect(frame, value);
   _session.ForEach(held, [&](Peer& peer) { peer.Repaint(frame, _frames.Bounds(frame)); });
 }
-void Presenter::SetRefresh(RefreshMode mode, unsigned ceiling) {
+auto Presenter::SetRefresh(RefreshMode mode, unsigned ceiling) -> void {
   auto const held  = _session.LockPeers();
   auto const frame = _frames.Lock();
   _configuration.SetRefresh(mode, ceiling);
   _session.ForEach(held, [&](Peer& peer) { peer.RestartPacing(frame); });
 }
-void Presenter::SetCodec(sdlrdp_codec codec) {
+auto Presenter::SetCodec(sdlrdp_codec codec) -> void {
   _configuration.SetCodec(codec);
 }
-void Presenter::SetPointer(PointerShape shape) {
+auto Presenter::SetPointer(PointerShape shape) -> void {
   auto const session = _session.Lock();
   auto const held    = _session.LockPeers();
   _pointer.Replace(std::move(shape));
   _session.ForEach(held, [](Peer& peer) { peer.Signal(); });
 }
-int Presenter::WaitFrame(int timeout) {
+auto Presenter::WaitFrame(int timeout) -> int {
   auto       frame  = _frames.Lock();
   auto const target = _frames.Presented(frame);
   return _frames.WaitFor(frame, timeout, [&] {

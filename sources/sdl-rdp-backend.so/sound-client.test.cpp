@@ -25,11 +25,11 @@ SoundClient::~SoundClient() {
   client.Instance()->LoadChannels = previous_load;
   active                          = nullptr;
 }
-bool SoundClient::Send(std::span<BYTE const> bytes) const {
+auto SoundClient::Send(std::span<BYTE const> bytes) const -> bool {
   Expects(!bytes.empty(), "sound PDU is nonempty");
   return SendStaticChannel(client.Instance().get(), "rdpsnd", bytes);
 }
-void SoundClient::Capture(std::span<BYTE const> bytes) {
+auto SoundClient::Capture(std::span<BYTE const> bytes) -> void {
   Expects(bytes.size() % 4 == 0, "PCM stereo frames complete");
   auto start = capture.samples.size();
   capture.samples.resize(start + (bytes.size() / 2));
@@ -40,7 +40,7 @@ void SoundClient::Capture(std::span<BYTE const> bytes) {
       std::max(capture.maximum_pending_frames, (capture.samples.size() / 2) - capture.confirmed_frames);
   if (capture.auto_confirm) Expects(Confirm(), "wave confirmation sent");
 }
-bool SoundClient::Confirm(std::size_t index) {
+auto SoundClient::Confirm(std::size_t index) -> bool {
   if (capture.pending.empty()) return true;
   Expects(index < capture.pending.size(), "confirmation identifies a received block");
   auto                confirmation = capture.pending[index];
@@ -52,10 +52,10 @@ bool SoundClient::Confirm(std::size_t index) {
   capture.pending.erase(capture.pending.begin() + std::ptrdiff_t(index));
   return true;
 }
-SoundCapture& SoundClient::CaptureState() {
+auto SoundClient::CaptureState() -> SoundCapture& {
   return capture;
 }
-SoundCapture const& SoundClient::CaptureState() const {
+auto SoundClient::CaptureState() const -> SoundCapture const& {
   return capture;
 }
 }

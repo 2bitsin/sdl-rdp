@@ -7,10 +7,12 @@ using FullscreenState = std::pair<std::reference_wrapper<SDL_VideoDisplay>, bool
 auto SuspendFullscreen(SDL_VideoDisplay& display) -> FullscreenState {
   return {display, std::exchange(display.fullscreen_active, false)};
 }
-void RestoreFullscreen(FullscreenState const& state) noexcept { state.first.get().fullscreen_active = state.second; }
+auto RestoreFullscreen(FullscreenState const& state) noexcept -> void {
+  state.first.get().fullscreen_active = state.second;
+}
 using FullscreenSuspension = utilities::RAIIWrap<FullscreenState, SuspendFullscreen, RestoreFullscreen>;
 }
-void DesktopMode(SDL_VideoData const& data, int width, int height) {
+auto DesktopMode(SDL_VideoData const& data, int width, int height) -> void {
   utilities::Expects(width > 0, "desktop has width");
   utilities::Expects(height > 0, "desktop has height");
   auto& display = *SDL_GetVideoDisplay(data.Display());
@@ -30,12 +32,13 @@ auto ResizePicture(SDL_VideoData& data, int width, int height) -> bool {
   return true;
 }
 namespace {
-void PlaceAtOrigin(SDL_Window& window) {
+auto PlaceAtOrigin(SDL_Window& window) -> void {
   window.x = window.windowed.x = window.floating.x = 0;
   window.y = window.windowed.y = window.floating.y = 0;
 }
 // SDL's video callback table supplies borrowed device and window pointers.
-bool CreateWindow(SDL_VideoDevice* device, SDL_Window* window, [[maybe_unused]] SDL_PropertiesID unused_properties) {
+auto CreateWindow(SDL_VideoDevice* device, SDL_Window* window,
+                  [[maybe_unused]] SDL_PropertiesID unused_properties) -> bool {
   utilities::Expects(device != nullptr, "window creation has a device");
   utilities::Expects(window != nullptr, "window creation has a window");
   return Boundary([&] {
@@ -52,13 +55,13 @@ bool CreateWindow(SDL_VideoDevice* device, SDL_Window* window, [[maybe_unused]] 
   });
 }
 // SDL's video callback table supplies borrowed device and window pointers.
-void DestroyWindow(SDL_VideoDevice* device, SDL_Window* window) {
+auto DestroyWindow(SDL_VideoDevice* device, SDL_Window* window) -> void {
   utilities::Expects(device != nullptr, "window destruction has a device");
   auto& data = *device->internal;
   if (data.Window() && &BoundWindow(data) == window) data.Unbind();
 }
 // SDL's video callback table supplies borrowed device and window pointers.
-void SetWindowSize(SDL_VideoDevice* device, SDL_Window* window) {
+auto SetWindowSize(SDL_VideoDevice* device, SDL_Window* window) -> void {
   utilities::Expects(device != nullptr, "resize has a device");
   utilities::Expects(window != nullptr, "resize has a window");
   if (ResizePicture(*device->internal, window->pending.w, window->pending.h))
@@ -66,10 +69,10 @@ void SetWindowSize(SDL_VideoDevice* device, SDL_Window* window) {
   window->last_size_pending = false;
 }
 // SDL's video callback table requires a show callback even for a headless window.
-void ShowWindow([[maybe_unused]] SDL_VideoDevice* unused_device, [[maybe_unused]] SDL_Window* unused_window) { }
+auto ShowWindow([[maybe_unused]] SDL_VideoDevice* unused_device, [[maybe_unused]] SDL_Window* unused_window) -> void { }
 // SDL's fullscreen callback supplies borrowed device, window and display pointers.
-SDL_FullscreenResult Fullscreen(SDL_VideoDevice* device, SDL_Window* window, SDL_VideoDisplay* display,
-                                SDL_FullscreenOp operation) {
+auto Fullscreen(SDL_VideoDevice* device, SDL_Window* window, SDL_VideoDisplay* display,
+                SDL_FullscreenOp operation) -> SDL_FullscreenResult {
   utilities::Expects(device != nullptr, "fullscreen has a device");
   utilities::Expects(window != nullptr, "fullscreen has a window");
   utilities::Expects(display != nullptr, "fullscreen has a display");
@@ -82,7 +85,7 @@ SDL_FullscreenResult Fullscreen(SDL_VideoDevice* device, SDL_Window* window, SDL
   return SDL_FULLSCREEN_SUCCEEDED;
 }
 }
-void InitWindow(SDL_VideoDevice& device) {
+auto InitWindow(SDL_VideoDevice& device) -> void {
   device.CreateSDLWindow     = CreateWindow;
   device.DestroyWindow       = DestroyWindow;
   device.SetWindowSize       = SetWindowSize;

@@ -12,10 +12,10 @@ class Departure : private Pinned {
 public:
        Departure(PeerLink& link, SessionAccess& session, Activation& activation, Redirection& redirection,
                  FrameStatistics const& statistics, Diagnostics const& diagnostics) noexcept;
-  void Depart();
+  auto Depart() -> void;
 
 private:
-  void Log() const;
+  auto Log() const -> void;
   PeerLink&              _link;
   SessionAccess&         _session;
   Activation&            _activation;

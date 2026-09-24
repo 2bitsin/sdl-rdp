@@ -6,7 +6,7 @@
 
 namespace BackendGate {
 namespace {
-void ThenSuppressed(Client& client, FrameObserver const& observer, uint64_t bytes) {
+auto ThenSuppressed(Client& client, FrameObserver const& observer, uint64_t bytes) -> void {
   // Probe for forbidden output after the ordered suppression barrier. No
   // required event or minimum amount of work depends on this observation span.
   for (unsigned i = 0; i < 10; ++i)
@@ -94,7 +94,7 @@ TEST_F(RoundFive, SparseRegions) {
 }
 
 namespace {
-bool WaitForAcknowledgement(sdlrdp_handle& handle) {
+auto WaitForAcknowledgement(sdlrdp_handle& handle) -> bool {
   auto& frames = handle.Frames();
   auto  lock   = frames.Lock();
   Expects(handle.Session().Current(lock) != nullptr, "active peer owns the pending frame");
@@ -136,7 +136,7 @@ TEST_F(RoundFive, ColourDepths) {
 }
 
 namespace {
-void ProduceFrames(sdlrdp_handle* backend, std::atomic<unsigned>& presents, std::stop_token const& stop) {
+auto ProduceFrames(sdlrdp_handle* backend, std::atomic<unsigned>& presents, std::stop_token const& stop) -> void {
   std::vector<UINT32> pixels(1024uz * 768);
   sdlrdp_rect const   area  { 0, 0, 1024, 768 };
   while (!stop.stop_requested()) {
@@ -195,17 +195,17 @@ constexpr auto ExpectedTransportMessages = std::array<std::pair<char const*, cha
 };
 }
 namespace {
-void ThenDisconnectReason(Logs& logs, wLog* peer, char const* name) {
+auto ThenDisconnectReason(Logs& logs, wLog* peer, char const* name) -> void {
   WLog_Print(peer, WLOG_ERROR, "%s [0x00010000]", name);
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, name));
   EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, name));
 }
-void ThenTransportMessage(Logs& logs, char const* category, char const* message) {
+auto ThenTransportMessage(Logs& logs, char const* category, char const* message) -> void {
   WLog_Print(WLog_Get(category), WLOG_ERROR, "%s", message);
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, message));
   EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, message));
 }
-void ThenExpectedTransportLogs(Logs& logs) {
+auto ThenExpectedTransportLogs(Logs& logs) -> void {
   auto* peer = WLog_Get("com.freerdp.core.peer");
   for (auto const* name :
        { "ERRINFO_LOGOFF_BY_USER", "ERRINFO_DISCONNECTED_BY_OTHER_CONNECTION", "ERRINFO_RPC_INITIATED_DISCONNECT" }) {

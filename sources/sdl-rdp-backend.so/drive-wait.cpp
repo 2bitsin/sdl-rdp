@@ -9,12 +9,12 @@
 #include <winpr/nt.h>
 
 namespace Backend {
-void DriveChannel::Disconnect() {
+auto DriveChannel::Disconnect() -> void {
   std::scoped_lock const lock(mutex);
   Shutdown();
   CloseTransport();
 }
-void DriveChannel::Shutdown() {
+auto DriveChannel::Shutdown() -> void {
   if (!connected) return;
   connected = false;
   while (!devices.empty())
@@ -23,19 +23,19 @@ void DriveChannel::Shutdown() {
   changed.notify_all();
   _link.Signal();
 }
-void DriveChannel::CloseTransport() {
+auto DriveChannel::CloseTransport() -> void {
   if (channel) _link.Invalidate();
   channel.reset();
   event = nullptr;
 }
-unsigned DriveChannel::Device(unsigned id) {
+auto DriveChannel::Device(unsigned id) -> unsigned {
 
   if (!connected) throw std::runtime_error("Drive peer disconnected.");
   auto found = devices.find(id);
   if (found == devices.end()) throw std::runtime_error("Drive removed or peer disconnected.");
   return found->second.wire;
 }
-int DriveChannel::List(sdlrdp_drive* out, unsigned max) {
+auto DriveChannel::List(sdlrdp_drive* out, unsigned max) -> int {
   std::scoped_lock const lock(mutex);
   unsigned               count = 0;
   for (auto const& [id, device] : devices) {
@@ -44,7 +44,7 @@ int DriveChannel::List(sdlrdp_drive* out, unsigned max) {
   }
   return int(count);
 }
-size_t DriveChannel::WaitAny(std::span<Slot const> slots) {
+auto DriveChannel::WaitAny(std::span<Slot const> slots) -> size_t {
   Expects(std::ranges::any_of(slots, [](auto const& slot) { return bool(slot.request); }),
           "transfer has outstanding requests");
   std::unique_lock lock(mutex);
@@ -58,7 +58,8 @@ size_t DriveChannel::WaitAny(std::span<Slot const> slots) {
   });
   return ready;
 }
-DrivePacket DriveChannel::Wait(std::shared_ptr<DriveRequest> const& request, std::string const& path, bool end) {
+auto DriveChannel::Wait(std::shared_ptr<DriveRequest> const& request, std::string const& path,
+                        bool end) -> DrivePacket {
   std::unique_lock lock(mutex);
   changed.wait(lock, [&] { return request->done || request->removed || !connected; });
   if (!connected) throw std::runtime_error("Drive peer disconnected: " + path);

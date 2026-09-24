@@ -10,7 +10,7 @@ namespace SampleGate {
 namespace {
 class AuthenticationSample : public SampleGate::Sample {
 protected:
-  void ThenWrongPassword(unsigned port) {
+  auto ThenWrongPassword(unsigned port) -> void {
     Client const wrong(port, true);
     wrong.Credentials("alice", "wrong-secret", "LAB", true);
     ASSERT_FALSE(freerdp_connect(wrong.Instance().get()));
@@ -48,23 +48,23 @@ TEST_F(AuthenticationSample, AuthenticationPropertyDenies) {
 namespace {
 struct PropertyCredentials {
 public:
-  static bool SDLCALL Verify(void* raw, char const* domain, char const* user, char const* password) {
+  static auto SDLCALL Verify(void* raw, char const* domain, char const* user, char const* password) -> bool {
     auto& self = *static_cast<PropertyCredentials*>(raw);
     self.arguments = self.arguments && std::string_view(domain) == "LAB" && std::string_view(user) == "alice" &&
                      std::string_view(password) == "property-secret";
     ++self.verified;
     return true;
   }
-  static bool SDLCALL Lookup(void* raw, char const* domain, char const* user, Uint8* hash) {
+  static auto SDLCALL Lookup(void* raw, char const* domain, char const* user, Uint8* hash) -> bool {
     auto& self = *static_cast<PropertyCredentials*>(raw);
     self.arguments = self.arguments && std::string_view(domain) == "LAB" && std::string_view(user) == "alice";
     ++self.looked_up;
     auto secret = std::to_array("property-secret");
     return NTOWFv1A(secret.data(), secret.size() - 1, hash);
   }
-  unsigned Verified() const { return verified.load(); }
-  unsigned LookedUp() const { return looked_up.load(); }
-  bool     Arguments() const { return arguments.load(); }
+  auto Verified() const  -> unsigned { return verified.load(); }
+  auto LookedUp() const  -> unsigned { return looked_up.load(); }
+  auto Arguments() const -> bool { return arguments.load(); }
 
 private:
   std::atomic<unsigned> verified  = 0;
@@ -82,10 +82,10 @@ public:
     SDL_Quit();
     SDL_ResetHints();
   }
-  Quit& operator = (Quit const&) = delete;
-  Quit& operator = (Quit&&)      = delete;
+  auto operator = (Quit const&) -> Quit& = delete;
+  auto operator = (Quit&&)      -> Quit& = delete;
 };
-void GivenAuthenticationHints(fs::path const& certificates) {
+auto GivenAuthenticationHints(fs::path const& certificates) -> void {
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_PORT, "0"));
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_CERT_DIR, certificates.c_str()));
@@ -93,14 +93,14 @@ void GivenAuthenticationHints(fs::path const& certificates) {
   ASSERT_TRUE(
       SDL_SetHint(SDL_HINT_RDP_BACKEND, (BuildRoot() / "sources/sdl-rdp-backend.so/libsdl-rdp-backend.so").c_str()));
 }
-void GivenPropertyCredentials(SDL_PropertiesID properties, PropertyCredentials& credentials) {
+auto GivenPropertyCredentials(SDL_PropertiesID properties, PropertyCredentials& credentials) -> void {
   ASSERT_TRUE(SDL_SetPointerProperty(properties, SDL_PROP_DISPLAY_RDP_AUTH_USERDATA_POINTER, &credentials));
   ASSERT_TRUE(SDL_SetPointerProperty(properties, SDL_PROP_DISPLAY_RDP_VERIFY_POINTER,
                                      reinterpret_cast<void*>(PropertyCredentials::Verify)));
   ASSERT_TRUE(SDL_SetPointerProperty(properties, SDL_PROP_DISPLAY_RDP_LOOKUP_POINTER,
                                      reinterpret_cast<void*>(PropertyCredentials::Lookup)));
 }
-void ConnectPropertyCredentials(unsigned port) {
+auto ConnectPropertyCredentials(unsigned port) -> void {
   {
     Client const client(port, true);
     client.Credentials("alice", "property-secret", "LAB", false);

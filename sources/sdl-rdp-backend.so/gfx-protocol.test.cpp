@@ -84,13 +84,13 @@ TEST(Avc, ReplicatesPadding) {
   for (auto [y, x, c] : std::views::cartesian_product(axis, axis, channel))
     EXPECT_EQ(padded[(((y * 16) + x) * 4) + c], source[(std::min(y, 1uz) * 16) + (std::min(x, 2uz) * 4) + c]);
 }
-void ThenRegionBounds(Backend::Avc::Regions const& regions) {
+auto ThenRegionBounds(Backend::Avc::Regions const& regions) -> void {
   EXPECT_EQ(regions.Bounds().x, 2);
   EXPECT_EQ(regions.Bounds().y, 3);
   EXPECT_EQ(regions.Bounds().w, 22);
   EXPECT_EQ(regions.Bounds().h, 21);
 }
-void ThenRegionQuality(auto const& q) {
+auto ThenRegionQuality(auto const& q) -> void {
   EXPECT_EQ(q.qpVal, 0x9a);
   EXPECT_EQ(q.qualityVal, 100);
   EXPECT_EQ(q.p, 1);
@@ -108,7 +108,7 @@ TEST(Avc, RegionMetablock) {
     ThenRegionQuality(q);
   }
 }
-void ThenAvailableCapability(RDPGFX_CAPSET const& cap, UINT32 version) {
+auto ThenAvailableCapability(RDPGFX_CAPSET const& cap, UINT32 version) -> void {
   for (bool const available : { false, true }) {
     auto   selected = Backend::SelectCapability({ &cap, 1 }, available);
     UINT32 expected = 0;

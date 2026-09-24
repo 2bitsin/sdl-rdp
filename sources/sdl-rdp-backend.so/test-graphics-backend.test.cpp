@@ -4,7 +4,7 @@
 #include <cstdlib>
 
 namespace Headless {
-void GraphicsBackend::OpenGraphics(char* pattern, unsigned width, unsigned height, sdlrdp_codec codec) {
+auto GraphicsBackend::OpenGraphics(char* pattern, unsigned width, unsigned height, sdlrdp_codec codec) -> void {
   auto* path = mkdtemp(pattern);
   ASSERT_NE(path, nullptr);
   directory = path;
@@ -14,11 +14,11 @@ void GraphicsBackend::OpenGraphics(char* pattern, unsigned width, unsigned heigh
   ASSERT_EQ(sdlrdp_open(&config, &handle), 0) << sdlrdp_last_error();
   backend.reset(handle);
 }
-void GraphicsBackend::TearDown() {
+auto GraphicsBackend::TearDown() -> void {
   backend.reset();
   if (!directory.empty()) std::filesystem::remove_all(directory);
 }
-void GraphicsBackend::ConnectGraphics(Client& client) {
+auto GraphicsBackend::ConnectGraphics(Client& client) -> void {
   ASSERT_TRUE(freerdp_connect(client.Instance().get()));
   ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }, std::chrono::seconds(20)))
       << logs.Text(true);

@@ -15,13 +15,13 @@ namespace Backend {
 class Diagnostics : private Pinned {
 public:
        Diagnostics(sdlrdp_config const& config, bool tracing);
-  void Log(sdlrdp_log_level level, std::string const& text) const;
-  bool Tracing() const noexcept;
-  void Emit(std::string const& text) const;
-  void Line(std::string_view event, std::invocable auto&&... fields) const {
+  auto Log(sdlrdp_log_level level, std::string const& text) const          -> void;
+  auto Tracing() const noexcept                                            -> bool;
+  auto Emit(std::string const& text) const                                 -> void;
+  auto Line(std::string_view event, std::invocable auto&&... fields) const -> void {
     if (_tracing) Emit(Format(event, std::forward<decltype(fields)>(fields)...));
   }
-  std::string Format(std::string_view event, std::invocable auto&&... fields) const {
+  auto Format(std::string_view event, std::invocable auto&&... fields) const -> std::string {
     if (!_tracing) return { };
     auto const since = std::chrono::system_clock::now().time_since_epoch();
     auto const stamp = std::chrono::floor<std::chrono::milliseconds>(since).count();
@@ -29,7 +29,7 @@ public:
     ((text += std::format(" {}", std::forward<decltype(fields)>(fields)())), ...);
     return text;
   }
-  void Fail(std::string text);
+  auto Fail(std::string text) -> void;
 
 private:
   Logger     _logger;

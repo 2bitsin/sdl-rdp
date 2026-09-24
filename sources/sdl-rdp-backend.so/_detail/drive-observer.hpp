@@ -14,18 +14,18 @@ struct DriveCapture {
 };
 struct DriveObserver {
 public:
-                      DriveObserver(DriveObserver const&) = delete;
-                      DriveObserver(DriveObserver&&)      = delete;
-  explicit            DriveObserver(Client& client);
-                      ~DriveObserver();
-  DriveObserver&      operator = (DriveObserver const&)   = delete;
-  DriveObserver&      operator = (DriveObserver&&)        = delete;
-  bool                Send(Backend::DrivePacket const& packet) const;
-  DriveCapture&       Observed();
-  DriveCapture const& Observed() const;
+           DriveObserver(DriveObserver const&)                              = delete;
+           DriveObserver(DriveObserver&&)                                   = delete;
+  explicit DriveObserver(Client& client);
+           ~DriveObserver();
+  auto     operator = (DriveObserver const&)              -> DriveObserver& = delete;
+  auto     operator = (DriveObserver&&)                   -> DriveObserver& = delete;
+  auto     Send(Backend::DrivePacket const& packet) const -> bool;
+  auto     Observed()                                     -> DriveCapture&;
+  auto     Observed() const                               -> DriveCapture const&;
 
 private:
-  static BOOL Receive(freerdp* instance, UINT16 id, BYTE const* data, size_t size, UINT32 flags, size_t total);
+  static auto Receive(freerdp* instance, UINT16 id, BYTE const* data, size_t size, UINT32 flags, size_t total) -> BOOL;
   DriveCapture                              observed;
   inline static thread_local DriveObserver* active   = nullptr;
   freerdp*                                  instance;

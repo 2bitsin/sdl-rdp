@@ -8,19 +8,19 @@
 namespace BackendGate {
 class GraphicsGate : public Gate {
 protected:
-  void ThenFullGraphicsWindow(Headless::GraphicsObserver& observer, sdlrdp_rect full) {
+  auto ThenFullGraphicsWindow(Headless::GraphicsObserver& observer, sdlrdp_rect full) -> void {
     ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &full, 1), 0);
     EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 1), 0);
     EXPECT_EQ(observer.Observed().frames.size(), 2u);
   }
-  void ThenCumulativeAcknowledgement(Client& client, Headless::GraphicsObserver& observer) {
+  auto ThenCumulativeAcknowledgement(Client& client, Headless::GraphicsObserver& observer) -> void {
     EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 0);
     ASSERT_TRUE(observer.Ack());
     ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0) == 1; }));
     RecordProperty("trace", "two unacknowledged frames exhaust the window; suspend releases third; resume waits; "
                             "cumulative ack releases wait");
   }
-  void ThenGraphicsTakeover(Client& graphics) {
+  auto ThenGraphicsTakeover(Client& graphics) -> void {
     Client next(sdlrdp_port(backend.get()), true);
     next.EnableGraphics();
     next.Tolerance(graphics.Tolerance());
@@ -28,7 +28,7 @@ protected:
     ASSERT_TRUE(next.Until([&] { return next.Matches(pixels); })) << logs.Text(true);
     RecordProperty("trace", "pipeline frame -> legacy takeover frame -> fresh pipeline takeover frame");
   }
-  void ThenLegacyAndGraphicsTakeover(Client& graphics) {
+  auto ThenLegacyAndGraphicsTakeover(Client& graphics) -> void {
     Client legacy(sdlrdp_port(backend.get()), true);
     legacy.Tolerance(GetParam().codec == SDLRDP_CODEC_PROGRESSIVE ? 24 : 0);
     ASSERT_TRUE(freerdp_connect(legacy.Instance().get()));
@@ -36,7 +36,7 @@ protected:
     EXPECT_FALSE(freerdp_settings_get_bool(legacy.Instance()->context->settings, FreeRDP_SupportGraphicsPipeline));
     ThenGraphicsTakeover(graphics);
   }
-  void WhenQueuedGraphics(Client& client, Headless::GraphicsObserver& observer, sdlrdp_rect full) {
+  auto WhenQueuedGraphics(Client& client, Headless::GraphicsObserver& observer, sdlrdp_rect full) -> void {
     ASSERT_TRUE(observer.AckFrame(0, 10000000));
     ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &full, 1), 0);
     auto deadline = Clock::now() + std::chrono::milliseconds(80);
@@ -44,7 +44,7 @@ protected:
       ASSERT_TRUE(client.Pump());
     EXPECT_EQ(observer.Observed().frames.size(), 2u);
   }
-  void ThenDecodedGraphics(Client& client, Headless::GraphicsObserver& observer) {
+  auto ThenDecodedGraphics(Client& client, Headless::GraphicsObserver& observer) -> void {
     Frame(client, { 0, 0, 320, 200 });
     RecordProperty("maximum_channel_error", client.MaxError(pixels));
     EXPECT_LE(client.MaxError(pixels), client.Tolerance());
@@ -57,37 +57,37 @@ protected:
     if (::testing::Test::HasFatalFailure()) return;
     RecordProperty("trace", logs.Text(true));
   }
-  void ThenSuspensionAcknowledged(Client& client, Headless::GraphicsObserver& observer) {
+  auto ThenSuspensionAcknowledged(Client& client, Headless::GraphicsObserver& observer) -> void {
     EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 1);
     ASSERT_TRUE(observer.Ack());
     ASSERT_TRUE(client.Pump(20));
   }
-  static void ThenResizedSurface(Headless::GraphicsObserver const& observer) {
+  static auto ThenResizedSurface(Headless::GraphicsObserver const& observer) -> void {
     ASSERT_EQ(observer.Observed().surfaces.size(), 2u);
     EXPECT_EQ(observer.Observed().deleted, 1u);
     EXPECT_EQ(observer.Observed().surfaces.back().width, 352);
     EXPECT_EQ(observer.Observed().surfaces.back().height, 224);
     EXPECT_EQ(observer.Observed().progressive_headers, GetParam().codec == SDLRDP_CODEC_PROGRESSIVE ? 2u : 0u);
   }
-  void GivenUnacknowledged() {
+  auto GivenUnacknowledged() -> void {
     graphics_client = std::make_unique<Client>(sdlrdp_port(backend.get()), true);
     graphics_client->EnableGraphics();
     graphics_observer = std::make_unique<Headless::GraphicsObserver>(*graphics_client);
     ConnectUnacknowledged(*graphics_client, *graphics_observer);
   }
-  void ConnectUnacknowledged(Client& client, Headless::GraphicsObserver& observer) {
+  auto ConnectUnacknowledged(Client& client, Headless::GraphicsObserver& observer) -> void {
     observer.Observed().automatic = false;
     ASSERT_TRUE(freerdp_connect(client.Instance().get()));
     ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
   }
-  void PresentFrames(Client& client, Headless::GraphicsObserver& observer, unsigned first, unsigned last) {
+  auto PresentFrames(Client& client, Headless::GraphicsObserver& observer, unsigned first, unsigned last) -> void {
     sdlrdp_rect const full{ 0, 0, 320, 200 };
     std::ranges::for_each(std::views::iota(first, last + 1), [&](unsigned count) {
       ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &full, 1), 0);
       ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() == count; }));
     });
   }
-  void ThenResized(Client& client, Headless::GraphicsObserver& observer) {
+  auto ThenResized(Client& client, Headless::GraphicsObserver& observer) -> void {
     std::vector<UINT32> resized(352uz * 224, 0x0055aaff);
     sdlrdp_rect const   full   { 0, 0, 352, 224 };
     ASSERT_EQ(sdlrdp_present(backend.get(), resized.data(), 352 * 4, 352, 224, &full, 1), 0);
@@ -95,14 +95,14 @@ protected:
     EXPECT_EQ(client.Instance()->context->gdi->width, 352);
     ThenResizedSurface(observer);
   }
-  void FillGraphicsWindow(Client& client, Headless::GraphicsObserver& observer, sdlrdp_rect full) {
+  auto FillGraphicsWindow(Client& client, Headless::GraphicsObserver& observer, sdlrdp_rect full) -> void {
     for (unsigned count = 1; count <= 2; ++count) {
       std::ranges::fill(pixels, count * 0x00202020u);
       ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &full, 1), 0);
       ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() == count; })) << logs.Text(true);
     }
   }
-  void ThenSuspendedWindow(Client& client, Headless::GraphicsObserver& observer) {
+  auto ThenSuspendedWindow(Client& client, Headless::GraphicsObserver& observer) -> void {
     EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 0);
     ASSERT_TRUE(observer.Ack(SUSPEND_FRAME_ACKNOWLEDGEMENT));
     ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() == 3; }));
@@ -112,7 +112,7 @@ protected:
   std::unique_ptr<Headless::GraphicsObserver> graphics_observer;
 };
 namespace {
-void RecordDamageCost(Client& client, std::vector<UINT32> const& pixels, uint64_t before) {
+auto RecordDamageCost(Client& client, std::vector<UINT32> const& pixels, uint64_t before) -> void {
   testing::Test::RecordProperty("damage_wire_bytes", std::to_string(client.Received() - before));
   testing::Test::RecordProperty("maximum_channel_error", client.MaxError(pixels));
   testing::Test::RecordProperty("trace", "7x5 damage at 17,19; one progressive header over two frames; "

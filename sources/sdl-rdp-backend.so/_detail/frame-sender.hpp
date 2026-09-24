@@ -16,16 +16,16 @@ enum class EncodeState{ Idle, Legacy, Graphics, LegacyReady };
 enum class Delivery   { Healthy, Stopped, Failed            };
 class FrameSender : private Pinned {
 public:
-  FrameSender(PeerLink& link, Activation const& activation, SessionAccess& session, FrameGate& gate,
-              FrameCapture& capture, PointerSender& pointer, GraphicsLink& graphics, LegacyFrame& legacy) noexcept;
-  bool     Drain();
-  Delivery Encode(std::stop_token const& quit);
+       FrameSender(PeerLink& link, Activation const& activation, SessionAccess& session, FrameGate& gate,
+                   FrameCapture& capture, PointerSender& pointer, GraphicsLink& graphics, LegacyFrame& legacy) noexcept;
+  auto Drain()                             -> bool;
+  auto Encode(std::stop_token const& quit) -> Delivery;
 
 private:
-  bool Prepare();
-  bool Transmit(EncodeState kind);
-  bool SendLegacy();
-  void Transition(EncodeState next);
+  auto Prepare()                    -> bool;
+  auto Transmit(EncodeState kind)   -> bool;
+  auto SendLegacy()                 -> bool;
+  auto Transition(EncodeState next) -> void;
   PeerLink&         _link;
   Activation const& _activation;
   SessionAccess&    _session;

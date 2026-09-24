@@ -12,11 +12,11 @@ class TransportEnd : private Pinned {
 public:
   TransportEnd(PeerLink& link, Activation const& activation, Authenticator& authenticator, PeerFrames const& frames,
                FrameStore& store, Diagnostics const& diagnostics) noexcept;
-  void Report();
+  auto Report() -> void;
 
 private:
-  bool SecurityEnded() const;
-  bool PendingOutput() const;
+  auto SecurityEnded() const -> bool;
+  auto PendingOutput() const -> bool;
   PeerLink&          _link;
   Activation const&  _activation;
   Authenticator&     _authenticator;

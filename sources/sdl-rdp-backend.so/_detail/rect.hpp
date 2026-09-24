@@ -13,10 +13,10 @@ inline auto Rows(sdlrdp_rect area) {
   return std::views::iota(area.y, area.y + area.h) |
          std::views::transform([area](int y) { return sdlrdp_rect{ area.x, y, area.w, 1 }; });
 }
-constexpr bool SameSize(sdlrdp_rect left, sdlrdp_rect right) noexcept {
+constexpr auto SameSize(sdlrdp_rect left, sdlrdp_rect right) noexcept -> bool {
   return left.w == right.w && left.h == right.h;
 }
-inline void Merge(std::optional<sdlrdp_rect>& region, sdlrdp_rect area) {
+inline auto Merge(std::optional<sdlrdp_rect>& region, sdlrdp_rect area) -> void {
   Expects(area.w > 0, "band width is positive");
   Expects(area.h > 0, "band height is positive");
   if (!region) {
@@ -29,7 +29,7 @@ inline void Merge(std::optional<sdlrdp_rect>& region, sdlrdp_rect area) {
   auto bottom = std::max(region->y + region->h, area.y + area.h);
   region = sdlrdp_rect{ x, y, right - x, bottom - y };
 }
-inline std::optional<sdlrdp_rect> Intersect(sdlrdp_rect left, sdlrdp_rect right) {
+inline auto Intersect(sdlrdp_rect left, sdlrdp_rect right) -> std::optional<sdlrdp_rect> {
   Expects(left.w >= 0, "left rectangle width is nonnegative");
   Expects(left.h >= 0, "left rectangle height is nonnegative");
   Expects(right.w >= 0, "right rectangle width is nonnegative");

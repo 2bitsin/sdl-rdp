@@ -13,16 +13,16 @@ class InputEvents;
 class PeerLink;
 class Input : private Pinned {
 public:
-                      Input(PeerLink& link, InputEvents& events) noexcept;
-  bool                Channels(std::span<HANDLE const> ready);
-  std::span<HANDLE>   Handles(std::span<HANDLE> out) const;
-  std::optional<BOOL> Activate(UINT32 channel_id);
+       Input(PeerLink& link, InputEvents& events) noexcept;
+  auto Channels(std::span<HANDLE const> ready) -> bool;
+  auto Handles(std::span<HANDLE> out) const    -> std::span<HANDLE>;
+  auto Activate(UINT32 channel_id)             -> std::optional<BOOL>;
 
 private:
-  bool        Open();
-  void        InstallChannels();
-  static UINT Advanced(ainput_server_context* context, UINT64 /*unused*/, UINT64 flags, INT32 x, INT32 y);
-  static UINT Touch(RdpeiServerContext* context, RDPINPUT_TOUCH_EVENT const* event);
+  auto        Open()                                                                                      -> bool;
+  auto        InstallChannels()                                                                           -> void;
+  static auto Advanced(ainput_server_context* context, UINT64 /*unused*/, UINT64 flags, INT32 x, INT32 y) -> UINT;
+  static auto Touch(RdpeiServerContext* context, RDPINPUT_TOUCH_EVENT const* event)                       -> UINT;
   using AdvancedInputContext = std::unique_ptr<ainput_server_context, Releases<ainput_server_context_free>>;
   using TouchContext         = std::unique_ptr<RdpeiServerContext, Releases<rdpei_server_context_free>>;
   PeerLink&             _link;

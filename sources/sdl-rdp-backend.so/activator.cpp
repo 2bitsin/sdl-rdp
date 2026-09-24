@@ -17,7 +17,7 @@ namespace Backend {
 namespace {
 constexpr UINT32 CookieLength   = 28;
 constexpr UINT32 SessionLogonId = 1;
-bool SendCookie(rdpContext& context) {
+auto SendCookie(rdpContext& context) -> bool {
   ARC_SC_PRIVATE_PACKET cookie{ };
   cookie.cbLen   = CookieLength;
   cookie.version = AUTO_RECONNECT_VERSION_1;
@@ -35,7 +35,7 @@ Activator::Activator(PeerLink& link, Authenticator& authenticator, Activation co
                      Configuration const& configuration, Arrival& arrival) noexcept
     : _link { link }, _authenticator{ authenticator }, _activation{ activation }, _encoder{ encoder },
       _configuration{ configuration }, _arrival{ arrival } { }
-BOOL Activator::Activate() {
+auto Activator::Activate() -> BOOL {
   if (_activation.Active()) {
     _link.Signal();
     return TRUE;

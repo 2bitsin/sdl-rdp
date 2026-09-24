@@ -1,4 +1,4 @@
 #pragma once
 namespace rdp {
-void AudioRate(unsigned rate);
+auto AudioRate(unsigned rate) -> void;
 }

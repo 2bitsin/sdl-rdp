@@ -16,12 +16,12 @@
 
 namespace {
 using DriveOpen = SDL_IOStream*(SDLCALL*)(char const*, char const*, char const*);
-std::pair<std::string, std::string> SplitDrive(char const* value) {
+auto SplitDrive(char const* value) -> std::pair<std::string, std::string> {
   std::string const path(value);
   auto              slash = path.find('/');
   return { path.substr(0, slash), slash == std::string::npos ? "" : path.substr(slash + 1) };
 }
-SDL_IOStream* OpenDriveFile(char const* value, char const* mode) {
+auto OpenDriveFile(char const* value, char const* mode) -> SDL_IOStream* {
   auto [drive, path] = SplitDrive(value);
   auto props         = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
   auto open          =
@@ -29,7 +29,7 @@ SDL_IOStream* OpenDriveFile(char const* value, char const* mode) {
   Check(open != nullptr);
   return open(drive.c_str(), path.c_str(), mode);
 }
-SDL_EnumerationResult ListEntry(void* user, char const* directory, char const* name) {
+auto ListEntry(void* user, char const* directory, char const* name) -> SDL_EnumerationResult {
 
   auto*        storage = static_cast<SDL_Storage*>(user);
   SDL_PathInfo info    { };
@@ -37,11 +37,11 @@ SDL_EnumerationResult ListEntry(void* user, char const* directory, char const* n
   SDL_Log("entry name=%s size=%llu dir=%d", name, (unsigned long long)info.size, info.type == SDL_PATHTYPE_DIRECTORY);
   return SDL_ENUM_CONTINUE;
 }
-bool DriveResult(bool result, char const* operation) {
+auto DriveResult(bool result, char const* operation) -> bool {
   if (!result) SDL_Log("%s failed: %s", operation, SDL_GetError());
   return result;
 }
-void ListDrive(char const* value) {
+auto ListDrive(char const* value) -> void {
   auto [drive, path] = SplitDrive(value);
   Check(SDL_SetHint(SDL_HINT_STORAGE_TITLE_DRIVER, "rdp"));
   auto* storage = SDL_OpenTitleStorage(drive.c_str(), 0);
@@ -61,7 +61,7 @@ void ListDrive(char const* value) {
   }
   SDL_Log("ls done");
 }
-bool ReadDigest(SDL_IOStream* file, EVP_MD_CTX* hash, uint64_t& total) {
+auto ReadDigest(SDL_IOStream* file, EVP_MD_CTX* hash, uint64_t& total) -> bool {
   std::vector<unsigned char> buffer(65536);
   for (;;) {
     auto count = SDL_ReadIO(file, buffer.data(), buffer.size());
@@ -77,7 +77,7 @@ bool ReadDigest(SDL_IOStream* file, EVP_MD_CTX* hash, uint64_t& total) {
   }
   return true;
 }
-void LogDigest(EVP_MD_CTX* hash, uint64_t total) {
+auto LogDigest(EVP_MD_CTX* hash, uint64_t total) -> void {
   std::array<unsigned char, EVP_MAX_MD_SIZE> digest { };
   unsigned                                   size   = 0;
   Check(EVP_DigestFinal_ex(hash, digest.data(), &size) == 1);
@@ -86,7 +86,7 @@ void LogDigest(EVP_MD_CTX* hash, uint64_t total) {
       [](std::string const& text, unsigned char byte) { return text + std::format("{:02x}", byte); });
   SDL_Log("cat bytes=%llu sha256=%s", (unsigned long long)total, hex.c_str());
 }
-void CatDrive(char const* value) {
+auto CatDrive(char const* value) -> void {
   auto* file = OpenDriveFile(value, "rb");
   if (!file) {
     SDL_Log("cat failed: %s", SDL_GetError());
@@ -103,7 +103,7 @@ void CatDrive(char const* value) {
   }
   LogDigest(hash.get(), total);
 }
-void WriteDrive(char const* value) {
+auto WriteDrive(char const* value) -> void {
   auto* file = OpenDriveFile(value, "w+b");
   if (!file) {
     SDL_Log("write failed: %s", SDL_GetError());
@@ -124,7 +124,7 @@ void WriteDrive(char const* value) {
   SDL_Log("write done");
 }
 }
-bool RunDrives(DriveOptions const& options) {
+auto RunDrives(DriveOptions const& options) -> bool {
   if (!options.list && !options.cat && !options.write) return false;
   auto props = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
   if (!*SDL_GetStringProperty(props, SDL_PROP_DISPLAY_RDP_DRIVES_STRING, "")) return false;

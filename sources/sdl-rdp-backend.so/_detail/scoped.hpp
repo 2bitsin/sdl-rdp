@@ -50,7 +50,7 @@ private:
     if constexpr (_Checked) return !std::invoke(_IsNull, _value);
     else return true;
   }
-  void _Free() noexcept {
+  auto _Free() noexcept -> void {
     if (_Live()) std::invoke(_Dtor, _value);
   }
   static constexpr bool _Checked = NullableResource<_VTy, _IsNull, _MakeNull>;

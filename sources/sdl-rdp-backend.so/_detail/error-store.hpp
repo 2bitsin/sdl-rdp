@@ -8,14 +8,14 @@
 namespace Backend {
 class ErrorStore {
 public:
-  static char const* Last();
-  static void        Publish(ErrorStore* owner, std::string text);
+  static auto Last()                                       -> char const*;
+  static auto Publish(ErrorStore* owner, std::string text) -> void;
 
 private:
   struct Cursor {
     std::shared_ptr<std::string> text{ std::make_shared<std::string>() };
   };
-  static Cursor& CallingThread();
+  static auto CallingThread() -> Cursor&;
   std::mutex                                              guard;
   std::map<std::thread::id, std::shared_ptr<std::string>> errors;
 };

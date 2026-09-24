@@ -10,17 +10,17 @@
 namespace Backend {
 class Configuration {
 public:
-  explicit             Configuration(sdlrdp_config const& config);
-  sdlrdp_config const& Config() const               noexcept;
-  bool                 InstallCredentials(rdpSettings& settings) const;
-  Credentials const&   ServerCredentials() const    noexcept;
-  sdlrdp_auth          Auth() const                 noexcept;
-  sdlrdp_codec         Codec() const                noexcept;
-  void                 SetCodec(sdlrdp_codec value) noexcept;
-  unsigned             AvcBitrate() const           noexcept;
-  unsigned             AudioLatency() const         noexcept;
-  Refresh const&       RefreshPolicy() const        noexcept;
-  void                 SetRefresh(RefreshMode mode, unsigned ceiling);
+  explicit Configuration(sdlrdp_config const& config);
+  auto     Config() const noexcept                         -> sdlrdp_config const&;
+  auto     InstallCredentials(rdpSettings& settings) const -> bool;
+  auto     ServerCredentials() const noexcept              -> Credentials const&;
+  auto     Auth() const noexcept                           -> sdlrdp_auth;
+  auto     Codec() const noexcept                          -> sdlrdp_codec;
+  auto     SetCodec(sdlrdp_codec value) noexcept           -> void;
+  auto     AvcBitrate() const noexcept                     -> unsigned;
+  auto     AudioLatency() const noexcept                   -> unsigned;
+  auto     RefreshPolicy() const noexcept                  -> Refresh const&;
+  auto     SetRefresh(RefreshMode mode, unsigned ceiling)  -> void;
 
 private:
   Authentication            _authentication;

@@ -9,18 +9,18 @@
 
 namespace BackendGate {
 namespace {
-void ThenUnblockedPresent(std::future<int>& presenting, Client const& client) {
+auto ThenUnblockedPresent(std::future<int>& presenting, Client const& client) -> void {
   auto ready = presenting.wait_for(std::chrono::seconds(10));
   EXPECT_EQ(ready, std::future_status::ready);
   if (ready != std::future_status::ready) freerdp_disconnect(client.Instance().get());
   ASSERT_EQ(presenting.get(), 0);
   ASSERT_EQ(ready, std::future_status::ready);
 }
-void ThenTakeoverGeometry(sdlrdp_event const& event) {
+auto ThenTakeoverGeometry(sdlrdp_event const& event) -> void {
   EXPECT_EQ(event.connected.width, 320u);
   EXPECT_EQ(event.connected.height, 200u);
 }
-void ThenTakeoverEvents(std::span<sdlrdp_event const> events) {
+auto ThenTakeoverEvents(std::span<sdlrdp_event const> events) -> void {
   ASSERT_EQ(events.size(), 3u);
   EXPECT_EQ(events[0].type, SDLRDP_DISCONNECTED);
   EXPECT_EQ(events[1].type, SDLRDP_CONNECTED);

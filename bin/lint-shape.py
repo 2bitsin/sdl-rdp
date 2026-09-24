@@ -28,6 +28,7 @@ NESTING              = 2
 LONG_LINES           = 0
 COMPOUND_CONTRACTS   = 0
 C_FILES              = 0
+LEADING_RETURN       = 0
 HEADER_CLASSES       = 1
 HEADER_BODIES        = 0
 HEADER               = '.hpp'
@@ -59,6 +60,9 @@ LOGICAL              = frozenset(('&&', '||', 'and', 'or'))
 BRANCHES             = LOGICAL | {'if', 'for', 'while', 'case', 'catch', '?'}
 SCOPES               = frozenset(('namespace', 'extern', 'class', 'struct', 'union'))
 EVALUATED            = frozenset(('constexpr', 'consteval'))
+SPECIFIERS           = frozenset(('static', 'virtual', 'inline', 'constexpr', 'consteval', 'explicit', 'friend',
+                                  'extern'))
+POINTER_NOT_RESULTS  = EXPRESSION_KEYWORDS | NOT_DECLARATORS | {'auto'}
 GENERATED            = (['=', 'default'], ['=', 'delete'])
 ACCESS               = frozenset(('public', 'protected', 'private'))
 RANKS                = {'public': 0, 'protected': 1, 'private': 2}
@@ -543,18 +547,25 @@ def exposure(path, name, fixtures):
 
 def definitions(source, start, end):
     """Yield every function defined outside another function body."""
+    return (function_definition(source, first, stop) for first, stop in scope_heads(source, start, end)
+            if source.word(stop) == '{')
+
+
+def scope_heads(source, start, end):
+    """Yield [first, stop) of every declaration and function head outside function bodies; stop is ';' or '{'."""
     first = start
     cursor = start
     while cursor < end:
         word = source.word(cursor)
         if word == ';':
+            yield first, cursor
             first = cursor + 1
         elif word in ACCESS and source.word(cursor + 1) == ':':
             cursor += 1
             first = cursor + 1
         elif word == '{' and cursor in source.pairs:
             kind = brace_kind(source, first, cursor)
-            yield from brace_definitions(source, kind, first, cursor)
+            yield from brace_heads(source, kind, first, cursor)
             first = definition_end(source, kind, cursor) + 1 if kind in DEFINITIONS else first
             cursor = definition_end(source, kind, cursor)
         else:
@@ -562,11 +573,66 @@ def definitions(source, start, end):
         cursor += 1
 
 
-def brace_definitions(source, kind, first, opening):
+def brace_heads(source, kind, first, opening):
     if kind is Brace.FUNCTION:
-        yield function_definition(source, first, opening)
+        yield first, opening
     elif kind is Brace.SCOPE:
-        yield from definitions(source, opening + 1, source.pairs[opening])
+        yield from scope_heads(source, opening + 1, source.pairs[opening])
+
+
+def leading_returns(source):
+    """Return the line of every function declared or defined with its return type before its name."""
+    heads = ((first + (source.word(first) == 'friend'), stop)
+             for first, stop in scope_heads(source, 0, len(source.tokens)))
+    found = ((first, declarator(source, first, stop, '')) for first, stop in heads)
+    lines = [source.tokens[item.parameters].line for first, item in found
+             if item is not None and return_words(source, template_header_end(source, first), item.parameters)]
+    return sorted(lines + pointer_leading_returns(source))
+
+
+def pointer_leading_returns(source):
+    """Return the line of every function pointer type written with its result first, as in `void (*)(int)`."""
+    return [token.line for index, token in enumerate(source.tokens)
+            if token.value == '(' and source.word(index + 1) == '*' and source.pairs.get(index, index) - index <= 3
+            and source.word(source.pairs.get(index, index) + 1) == '(' and pointer_result(source.word(index - 1))]
+
+
+def pointer_result(word):
+    return word in ('>', '*', '&') or (word[:1].isidentifier() and word not in POINTER_NOT_RESULTS)
+
+
+def return_words(source, first, parameters):
+    """Return the leading return-type words of a declarator, empty when the type trails or there is none."""
+    if source.word(source.angle_openers.get(parameters - 1, parameters) - 2) == '~':
+        return []
+    words = []
+    cursor = first
+    while cursor < name_start(source, first, parameters):
+        word = source.word(cursor)
+        if word == 'requires':
+            cursor = constraint_end(source, cursor + 1)
+            continue
+        if word not in SPECIFIERS and word[:1] not in ('[', '"'):
+            words.append(word)
+        cursor = source.skip(cursor) + 1
+    return [] if 'auto' in words else words
+
+
+def constraint_end(source, cursor):
+    """Return the index after a requires-clause: primaries joined by && or ||."""
+    cursor = primary_end(source, cursor)
+    while source.word(cursor) in LOGICAL:
+        cursor = primary_end(source, cursor + 1)
+    return cursor
+
+
+def primary_end(source, cursor):
+    """Return the index after a parenthesised expression or a qualified name with its template arguments."""
+    if source.word(cursor) == '(':
+        return source.skip(cursor) + 1
+    while source.word(cursor + 1) == '::':
+        cursor += 2
+    return source.skip(cursor + 1) + 1 if cursor + 1 in source.angles else cursor + 1
 
 
 def definition_end(source, kind, opening):
@@ -607,11 +673,15 @@ def key_name(source, first, parameters):
     """Return the name as written before the parameter list; a gtest case is Suite.Name."""
     if source.word(parameters - 1) in GTEST_MACROS:
         return '.'.join(word for word in source.words(parameters + 1, source.pairs[parameters]) if word != ',')
+    return ''.join(source.words(name_start(source, first, parameters), parameters))
+
+
+def name_start(source, first, parameters):
     operators = [index for index in range(first, parameters) if source.word(index) == 'operator']
     start = operators[-1] if operators else source.angle_openers.get(parameters - 1, parameters) - 1
     while start - first > 1 and source.word(start - 1) == '::' and source.word(start - 2)[:1].isidentifier():
         start -= 2
-    return ''.join(source.words(start, parameters))
+    return start
 
 
 def lambdas(source, functions):
@@ -838,6 +908,14 @@ def tree_findings(sources):
     return [finding(file_scope('sources'), measure) for measure in over_limits(1, totals)]
 
 
+def leading_return_findings(sources):
+    lines = [(source, line) for source in sources if source.path.suffix in ('.cpp', '.hpp')
+             for line in leading_returns(source) if not source.unmatched]
+    if len(lines) <= LEADING_RETURN:
+        return []
+    return [Finding(f'{file_scope(source.path)}:{line}: leading return type', False) for source, line in lines]
+
+
 def file_measures(source):
     percent = 100 * len(source.comment_lines) / source.nonblank if source.nonblank else 0
     return over_limits(1, (('file lines',      source.nonblank, FILE_LINES),
@@ -973,6 +1051,7 @@ def main():
     fixtures = fixture_classes(sources)
     findings = [finding for source in sources for finding in source_findings(source, fixtures)]
     findings += tree_findings(sources)
+    findings += leading_return_findings(sources)
     findings += [finding for path in sorted(pathlib.Path('bin').glob('*.py')) for finding in python_findings(path)]
     return check_allow(findings, args.allow)
 

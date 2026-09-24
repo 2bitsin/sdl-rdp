@@ -14,7 +14,7 @@ constexpr int                   WheelSignExtension  = 0x200;
 constexpr float                 WheelNotch          = 120.0F;
 constexpr std::array<UINT16, 3> Buttons             { PTR_FLAGS_BUTTON1, PTR_FLAGS_BUTTON3, PTR_FLAGS_BUTTON2 };
 constexpr std::array<UINT16, 2> ExtendedButtons     { PTR_XFLAGS_BUTTON1, PTR_XFLAGS_BUTTON2                  };
-void PushMouseWheel(EventQueue& events, UINT16 flags) {
+auto PushMouseWheel(EventQueue& events, UINT16 flags) -> void {
   if (!(flags & (PTR_FLAGS_WHEEL | PTR_FLAGS_HWHEEL))) return;
   int rotation = flags & WheelRotationMask;
   if (flags & PTR_FLAGS_WHEEL_NEGATIVE) rotation -= WheelSignExtension;
@@ -23,7 +23,7 @@ void PushMouseWheel(EventQueue& events, UINT16 flags) {
                 .mouse_wheel = { .dx = (flags & PTR_FLAGS_HWHEEL) ? notches : 0,
                                  .dy = (flags & PTR_FLAGS_WHEEL) ? notches : 0 } });
 }
-InputEvents& Owner(rdpInput* input) {
+auto Owner(rdpInput* input) -> InputEvents& {
   Expects(input != nullptr, "input object exists");
   return CallbackOwner<InputEvents>(input->param1);
 }
@@ -33,7 +33,7 @@ InputEvents::InputEvents(PeerLink& link, Activation const& activation, DesktopLa
                          SessionAccess& session) noexcept
     : _link { link }, _activation{ activation }, _desktop{ desktop }, _events{ events }, _store{ store },
       _diagnostics{ diagnostics }, _session{ session } { }
-void InputEvents::Install(rdpInput& input) {
+auto InputEvents::Install(rdpInput& input) -> void {
   input.param1               = this;
   input.KeyboardEvent        = [](rdpInput* in, UINT16 flags, UINT8 code) { return Owner(in).Key(flags, code); };
   input.UnicodeKeyboardEvent = [](rdpInput* in, UINT16 flags, UINT16 code) { return Owner(in).Text(flags, code); };
@@ -44,7 +44,7 @@ void InputEvents::Install(rdpInput& input) {
     return Owner(in).ExtendedMouse(flags);
   };
 }
-BOOL InputEvents::Key(UINT16 flags, UINT8 code) {
+auto InputEvents::Key(UINT16 flags, UINT8 code) -> BOOL {
   return WhenActive(BOOL{ TRUE }, [&] {
     bool const extended = flags & KBD_FLAGS_EXTENDED;
     bool const down     = !(flags & KBD_FLAGS_RELEASE);
@@ -54,7 +54,7 @@ BOOL InputEvents::Key(UINT16 flags, UINT8 code) {
     return TRUE;
   });
 }
-BOOL InputEvents::Text(UINT16 flags, UINT16 code) {
+auto InputEvents::Text(UINT16 flags, UINT16 code) -> BOOL {
   return WhenActive(BOOL{ TRUE }, [&] {
     bool const down  = !(flags & KBD_FLAGS_RELEASE);
     auto const point = oxbox::utilities::UtfDecode(_unicode[down], code);
@@ -64,7 +64,7 @@ BOOL InputEvents::Text(UINT16 flags, UINT16 code) {
     return TRUE;
   });
 }
-BOOL InputEvents::Mouse(UINT16 flags, UINT16 x, UINT16 y) {
+auto InputEvents::Mouse(UINT16 flags, UINT16 x, UINT16 y) -> BOOL {
   return WhenActive(BOOL{ TRUE }, [&] {
     if (flags & (PTR_FLAGS_BUTTON1 | PTR_FLAGS_BUTTON2 | PTR_FLAGS_BUTTON3))
       _diagnostics.Line("mouse", [&] { return std::format("flags={} x={} y={}", flags, x, y); });
@@ -74,7 +74,7 @@ BOOL InputEvents::Mouse(UINT16 flags, UINT16 x, UINT16 y) {
     return TRUE;
   });
 }
-BOOL InputEvents::ExtendedMouse(UINT16 flags) {
+auto InputEvents::ExtendedMouse(UINT16 flags) -> BOOL {
   return WhenActive(BOOL{ TRUE }, [&] {
     PushButtons<UINT16>(_events, ExtendedButtons, flags, FirstExtendedButton, flags & PTR_XFLAGS_DOWN);
     return TRUE;

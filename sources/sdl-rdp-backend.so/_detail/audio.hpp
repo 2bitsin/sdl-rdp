@@ -17,24 +17,24 @@ class SessionAccess;
 class TraceQueue;
 class AudioChannel {
 public:
-                AudioChannel(AudioChannel const&) = delete;
-                AudioChannel(AudioChannel&&)      = delete;
+       AudioChannel(AudioChannel const&)                       = delete;
+       AudioChannel(AudioChannel&&)                            = delete;
   using Clock = std::chrono::steady_clock;
-                AudioChannel(PeerLink& link, Diagnostics const& diagnostics, EventQueue& events, SessionAccess& session,
-                             TraceQueue& traces);
-                ~AudioChannel();
-  AudioChannel& operator = (AudioChannel const&)  = delete;
-  AudioChannel& operator = (AudioChannel&&)       = delete;
-  bool          Initialize();
-  bool          Pump();
-  HANDLE        Event() const;
-  unsigned      Rate() const;
-  unsigned      Remaining() const;
-  void          Reset();
-  void          LogAudio() const;
-  void          AdoptServerClock();
-  bool          Ready(unsigned latency_ms);
-  bool          Send(std::span<int16_t const> samples);
+       AudioChannel(PeerLink& link, Diagnostics const& diagnostics, EventQueue& events, SessionAccess& session,
+                    TraceQueue& traces);
+       ~AudioChannel();
+  auto operator = (AudioChannel const&)       -> AudioChannel& = delete;
+  auto operator = (AudioChannel&&)            -> AudioChannel& = delete;
+  auto Initialize()                           -> bool;
+  auto Pump()                                 -> bool;
+  auto Event() const                          -> HANDLE;
+  auto Rate() const                           -> unsigned;
+  auto Remaining() const                      -> unsigned;
+  auto Reset()                                -> void;
+  auto LogAudio() const                       -> void;
+  auto AdoptServerClock()                     -> void;
+  auto Ready(unsigned latency_ms)             -> bool;
+  auto Send(std::span<int16_t const> samples) -> bool;
 
 private:
   struct Block {
@@ -42,16 +42,16 @@ private:
     uint64_t          frames{ };
     Clock::time_point sent;
   };
-  bool        SendBlock();
-  void        RecordBlock(Clock::time_point now, BYTE block);
-  void        TransportEnded();
-  uint64_t    Credit();
-  void        ReportGate(bool available, uint64_t credit);
-  void        Select(unsigned index);
-  void        RejectFormats();
-  void        Confirm(BYTE id, UINT16 timestamp);
-  static void Activated(RdpsndServerContext* context);
-  static UINT Confirmed(RdpsndServerContext* context, BYTE id, UINT16 timestamp);
+  auto        SendBlock()                                                        -> bool;
+  auto        RecordBlock(Clock::time_point now, BYTE block)                     -> void;
+  auto        TransportEnded()                                                   -> void;
+  auto        Credit()                                                           -> uint64_t;
+  auto        ReportGate(bool available, uint64_t credit)                        -> void;
+  auto        Select(unsigned index)                                             -> void;
+  auto        RejectFormats()                                                    -> void;
+  auto        Confirm(BYTE id, UINT16 timestamp)                                 -> void;
+  static auto Activated(RdpsndServerContext* context)                            -> void;
+  static auto Confirmed(RdpsndServerContext* context, BYTE id, UINT16 timestamp) -> UINT;
   using SoundContext = std::unique_ptr<RdpsndServerContext, Releases<rdpsnd_server_context_free>>;
   PeerLink&            _link;
   Diagnostics const&   _diagnostics;

@@ -19,7 +19,7 @@ auto TouchHandled(uint32_t result) -> bool {
 }
 }
 Input::Input(PeerLink& link, InputEvents& events) noexcept : _link{ link }, _events{ events } { }
-void Input::InstallChannels() {
+auto Input::InstallChannels() -> void {
   _advanced->data              = this;
   _advanced->rdpcontext        = &_link.Context();
   _advanced->MouseEvent        = Advanced;
@@ -34,7 +34,7 @@ void Input::InstallChannels() {
     return TRUE;
   };
 }
-bool Input::Open() {
+auto Input::Open() -> bool {
   _opened = true;
   _link.Invalidate();
   _advanced.reset(ainput_server_context_new(_link.Channels()));
@@ -46,7 +46,7 @@ bool Input::Open() {
          _advanced->ChannelHandle(_advanced.get(), &_advanced_event) &&
          rdpei_server_init(_touch.get()) == CHANNEL_RC_OK;
 }
-bool Input::Channels(std::span<HANDLE const> ready) {
+auto Input::Channels(std::span<HANDLE const> ready) -> bool {
   if (!DynamicChannelsReady(_link)) return true;
   if (!_opened) return Open();
   if (_advanced_ready && std::ranges::contains(ready, _advanced_event) &&
@@ -55,14 +55,14 @@ bool Input::Channels(std::span<HANDLE const> ready) {
   if (!_touch_ready || !std::ranges::contains(ready, rdpei_server_get_event_handle(_touch.get()))) return true;
   return TouchHandled(rdpei_server_handle_messages(_touch.get()));
 }
-std::span<HANDLE> Input::Handles(std::span<HANDLE> out) const {
+auto Input::Handles(std::span<HANDLE> out) const -> std::span<HANDLE> {
   Expects(out.size() >= InputHandleLimit, "handle span has room for the input channels");
   auto next = out.begin();
   if (_advanced_ready) *next++ = _advanced_event;
   if (_touch_ready) *next++ = rdpei_server_get_event_handle(_touch.get());
   return { next, out.end() };
 }
-std::optional<BOOL> Input::Activate(UINT32 channel_id) {
+auto Input::Activate(UINT32 channel_id) -> std::optional<BOOL> {
   if (_advanced_id == channel_id) {
     _advanced_ready = true;
     return _advanced->Poll(_advanced.get()) == CHANNEL_RC_OK;
@@ -73,11 +73,11 @@ std::optional<BOOL> Input::Activate(UINT32 channel_id) {
   }
   return std::nullopt;
 }
-UINT Input::Advanced(ainput_server_context* context, UINT64 /*unused*/, UINT64 flags, INT32 x, INT32 y) {
+auto Input::Advanced(ainput_server_context* context, UINT64 /*unused*/, UINT64 flags, INT32 x, INT32 y) -> UINT {
   Expects(context != nullptr, "callback context exists");
   return CallbackOwner<Input>(context->data)._events.Pointer(flags, x, y);
 }
-UINT Input::Touch(RdpeiServerContext* context, RDPINPUT_TOUCH_EVENT const* event) {
+auto Input::Touch(RdpeiServerContext* context, RDPINPUT_TOUCH_EVENT const* event) -> UINT {
   Expects(context != nullptr, "callback context exists");
   Expects(event != nullptr, "event is supplied");
   return CallbackOwner<Input>(context->user_data)._events.Touch(*event);

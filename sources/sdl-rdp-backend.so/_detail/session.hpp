@@ -16,23 +16,23 @@ namespace Backend {
 class EventQueue;
 class Session final : public SessionAccess {
 public:
-                            Session(FrameStore& frames, EventQueue& events);
-  [[nodiscard]] SessionLock Lock() override;
-  [[nodiscard]] PeersLock   LockPeers();
-  void                      ForEach(PeersLock const& held, std::invocable<Peer&> auto visit) {
+                     Session(FrameStore& frames, EventQueue& events);
+  [[nodiscard]] auto Lock()                                                           -> SessionLock override;
+  [[nodiscard]] auto LockPeers()                                                      -> PeersLock;
+  auto               ForEach(PeersLock const& held, std::invocable<Peer&> auto visit) -> void {
     _peers.ForEach(held, visit);
   }
-  void                    Add(std::unique_ptr<Peer> peer);
-  void                    Reap();
-  HANDLE                  ReapEvent() const                                    noexcept;
-  [[nodiscard]] FrameLock Takeover(PeerLink const& self)                       override;
-  void                    Depart(PeerLink const& self, Activation& activation) override;
-  Peer*                   Current(SessionLock const& held) const;
-  Peer*                   Current(FrameLock const& held) const;
-  unsigned                NextDrive() noexcept                                 override;
-  void                    AudioChanged()                                       override;
-  void                    AudioGone()                                          override;
-  void                    WaitAudio(SessionLock& held, std::chrono::steady_clock::time_point deadline);
+  auto               Add(std::unique_ptr<Peer> peer)                                              -> void;
+  auto               Reap()                                                                       -> void;
+  auto               ReapEvent() const noexcept                                                   -> HANDLE;
+  [[nodiscard]] auto Takeover(PeerLink const& self)                                               -> FrameLock override;
+  auto               Depart(PeerLink const& self, Activation& activation)                         -> void      override;
+  auto               Current(SessionLock const& held) const                                       -> Peer*;
+  auto               Current(FrameLock const& held) const                                         -> Peer*;
+  auto               NextDrive() noexcept                                                         -> unsigned  override;
+  auto               AudioChanged()                                                               -> void      override;
+  auto               AudioGone()                                                                  -> void      override;
+  auto               WaitAudio(SessionLock& held, std::chrono::steady_clock::time_point deadline) -> void;
 
 private:
   std::recursive_mutex        _guard;
@@ -44,7 +44,7 @@ private:
   EventQueue&                 _events;
   PeerSet                     _peers;
 };
-template <std::invocable<Peer&> Act> auto OnCurrent(Session& session, Act act) {
+template <std::invocable<Peer&> Act> auto OnCurrent(Session& session, Act act) -> decltype(auto) {
   using Result = std::invoke_result_t<Act, Peer&>;
   auto const held    = session.Lock();
   auto*      current = session.Current(held);

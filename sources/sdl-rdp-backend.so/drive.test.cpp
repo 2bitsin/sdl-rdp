@@ -7,7 +7,7 @@
 #include <utility>
 namespace DriveGate {
 namespace {
-bool ReadSharedFile(sdlrdp_handle* handle, unsigned drive, std::string const& name, std::string const& source) {
+auto ReadSharedFile(sdlrdp_handle* handle, unsigned drive, std::string const& name, std::string const& source) -> bool {
   sdlrdp_file* file = nullptr;
   if (sdlrdp_drive_open(handle, drive, name.c_str(), SDLRDP_FILE_READ, &file) < 0) return false;
   std::string bytes(source.size(), '\0');
@@ -15,7 +15,7 @@ bool ReadSharedFile(sdlrdp_handle* handle, unsigned drive, std::string const& na
   sdlrdp_drive_close(handle, file);
   return std::cmp_equal(count, source.size()) && bytes == source;
 }
-void ThenReaders(std::span<std::future<bool>> readers) {
+auto ThenReaders(std::span<std::future<bool>> readers) -> void {
   for (auto& result : readers) {
     ASSERT_EQ(result.wait_for(10s), std::future_status::ready);
     EXPECT_TRUE(result.get());
@@ -39,7 +39,7 @@ std::array<std::pair<uint32_t, char const*>, 13> constexpr FailureStatusNames{ {
 }
 
 namespace {
-void ThenMissingDriveFile(sdlrdp_handle* handle, unsigned drive) {
+auto ThenMissingDriveFile(sdlrdp_handle* handle, unsigned drive) -> void {
   auto* file = reinterpret_cast<sdlrdp_file*>(1);
   EXPECT_EQ(sdlrdp_drive_open(handle, drive, "missing.img", SDLRDP_FILE_READ, &file), -1);
   EXPECT_EQ(file, nullptr);
@@ -49,7 +49,8 @@ void ThenMissingDriveFile(sdlrdp_handle* handle, unsigned drive) {
 namespace {
 class Drive : public DriveChecks {
 protected:
-  void WhenDirectoryPaged(std::array<sdlrdp_dirent, 32>& entries, std::set<std::string>& actual, unsigned& offset) {
+  auto WhenDirectoryPaged(std::array<sdlrdp_dirent, 32>& entries, std::set<std::string>& actual,
+                          unsigned& offset) -> void {
     for (;;) {
       auto count = sdlrdp_drive_enumerate(handle.get(), drive, "many", offset, entries.data(), 32);
       ASSERT_GE(count, 0) << sdlrdp_last_error();
@@ -60,7 +61,7 @@ protected:
       ASSERT_LE(offset, 200u);
     }
   }
-  void ThenRemovedEvent(std::array<sdlrdp_event, 32>& events, unsigned old) {
+  auto ThenRemovedEvent(std::array<sdlrdp_event, 32>& events, unsigned old) -> void {
     auto         deadline = Headless::Clock::now() + 2s;
     sdlrdp_drive value    { };
     while (sdlrdp_drive_list(handle.get(), &value, 1) && Headless::Clock::now() < deadline)
@@ -73,23 +74,23 @@ protected:
     ASSERT_NE(removed, std::span(events.data(), count).end());
     EXPECT_STREQ(removed->drive.name, "share");
   }
-  void ThenFileMetadata(std::string const& source) {
+  auto ThenFileMetadata(std::string const& source) -> void {
     sdlrdp_stat info{ };
     ASSERT_EQ(sdlrdp_drive_stat(handle.get(), drive, "disk.img", &info), 0) << sdlrdp_last_error();
     EXPECT_EQ(info.size, source.size());
     EXPECT_FALSE(info.directory);
     EXPECT_GT(info.modified, 0);
   }
-  void ThenNoDriveRequests(Headless::DriveObserver const& observer) {
+  auto ThenNoDriveRequests(Headless::DriveObserver const& observer) -> void {
     for (unsigned i = 0; i < 10; ++i)
       ASSERT_TRUE(client->Pump());
     EXPECT_EQ(observer.Observed().requests, 0u);
   }
-  static void ThenUniquePage(std::span<sdlrdp_dirent const> entries, std::set<std::string>& actual) {
+  static auto ThenUniquePage(std::span<sdlrdp_dirent const> entries, std::set<std::string>& actual) -> void {
     for (auto const& entry : entries)
       EXPECT_TRUE(actual.insert(entry.name).second);
   }
-  void ThenSharedFile(sdlrdp_drive const& entry) {
+  auto ThenSharedFile(sdlrdp_drive const& entry) -> void {
     sdlrdp_file* file = nullptr;
     ASSERT_EQ(sdlrdp_drive_open(handle.get(), entry.id, "file", SDLRDP_FILE_READ, &file), 0);
     std::array<char, 4> bytes{ };
@@ -97,7 +98,7 @@ protected:
     EXPECT_EQ(std::string(bytes.data(), bytes.size()), "data");
     EXPECT_EQ(sdlrdp_drive_close(handle.get(), file), 0);
   }
-  void ThenOversizedRead(sdlrdp_file* file, Headless::DriveObserver const& observer) {
+  auto ThenOversizedRead(sdlrdp_file* file, Headless::DriveObserver const& observer) -> void {
     char byte{ };
     EXPECT_EQ(sdlrdp_drive_flush(handle.get(), file), 0);
     EXPECT_EQ(sdlrdp_drive_read(handle.get(), file, 0, &byte, size_t(INT_MAX) + 1), -1);
@@ -105,7 +106,7 @@ protected:
     ThenNoDriveRequests(observer);
     if (::testing::Test::HasFatalFailure()) return;
   }
-  void ThenClientFailure(Headless::DriveObserver& observer, uint32_t status, char const* text) {
+  auto ThenClientFailure(Headless::DriveObserver& observer, uint32_t status, char const* text) -> void {
     SCOPED_TRACE(text);
     observer.Observed().io.clear();
     auto open = std::async(std::launch::async, [&] {
@@ -121,18 +122,18 @@ protected:
     EXPECT_EQ(result, -1);
     EXPECT_EQ(error, std::string("Drive 'missing.bin' failed: ") + text);
   }
-  void ThenDirectoryOpenRejected(sdlrdp_file*& file) {
+  auto ThenDirectoryOpenRejected(sdlrdp_file*& file) -> void {
     EXPECT_EQ(sdlrdp_drive_open(handle.get(), drive, "file", SDLRDP_FILE_DIRECTORY, &file), -1);
     EXPECT_EQ(file, nullptr);
     EXPECT_NE(std::string(sdlrdp_last_error()).find("STATUS_NOT_A_DIRECTORY (0xc0000103)"), std::string::npos);
   }
-  void ThenSparseSize(sdlrdp_file* file, uint64_t offset) {
+  auto ThenSparseSize(sdlrdp_file* file, uint64_t offset) -> void {
     sdlrdp_stat info{ };
     EXPECT_EQ(sdlrdp_drive_fstat(handle.get(), file, &info), 0);
     EXPECT_EQ(info.size, offset + 4);
     EXPECT_EQ(sdlrdp_drive_close(handle.get(), file), 0);
   }
-  void WhenFileRewritten(sdlrdp_file* file, std::string& source) {
+  auto WhenFileRewritten(sdlrdp_file* file, std::string& source) -> void {
     auto pattern = Pattern(1024uz * 1024, 29);
     for (auto offset : { 0uz, 2uz * 1024 * 1024 }) {
       ASSERT_EQ(sdlrdp_drive_write(handle.get(), file, offset, pattern.data(), pattern.size()), pattern.size());

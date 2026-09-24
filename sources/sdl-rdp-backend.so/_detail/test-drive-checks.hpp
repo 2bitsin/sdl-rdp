@@ -6,6 +6,6 @@
 namespace DriveGate {
 class DriveChecks : public DriveSession {
 protected:
-  void ThenReadRanges(sdlrdp_file* file, std::string const& source);
+  auto ThenReadRanges(sdlrdp_file* file, std::string const& source) -> void;
 };
 }

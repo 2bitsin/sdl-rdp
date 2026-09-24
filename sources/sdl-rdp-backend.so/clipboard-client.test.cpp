@@ -15,7 +15,7 @@
 
 namespace Headless {
 namespace {
-ClipboardClient& HeldClipboard(CliprdrClientContext* context) {
+auto HeldClipboard(CliprdrClientContext* context) -> ClipboardClient& {
   Expects(context, "callback context exists");
   Expects(context->custom, "callback context carries its observer");
   return *static_cast<ClipboardClient*>(context->custom);
@@ -39,18 +39,18 @@ ClipboardClient::~ClipboardClient() {
   PubSub_UnsubscribeChannelConnected(client.Instance()->context->pubSub, Connected);
   attaching = nullptr;
 }
-bool ClipboardClient::Received(std::vector<BYTE> const& bytes) {
+auto ClipboardClient::Received(std::vector<BYTE> const& bytes) -> bool {
   std::scoped_lock const lock(guard);
   return incoming == bytes && std::ranges::contains(formats, CF_UNICODETEXT) &&
          std::ranges::contains(formats, CF_TEXT);
 }
-UINT ClipboardClient::RequestFormat(UINT32 format) {
+auto ClipboardClient::RequestFormat(UINT32 format) -> UINT {
   Expects(channel.load(), "clipboard channel connected");
   CLIPRDR_FORMAT_DATA_REQUEST request{ .common = { .msgType = CB_FORMAT_DATA_REQUEST } };
   request.requestedFormatId = format;
   return channel.load()->ClientFormatDataRequest(channel.load(), &request);
 }
-UINT ClipboardClient::Offer(std::vector<BYTE> bytes, bool unicode) {
+auto ClipboardClient::Offer(std::vector<BYTE> bytes, bool unicode) -> UINT {
   Expects(channel.load(), "clipboard channel connected");
   {
     std::scoped_lock const lock(guard);
@@ -62,10 +62,10 @@ UINT ClipboardClient::Offer(std::vector<BYTE> bytes, bool unicode) {
   list.formats    = &format;
   return channel.load()->ClientFormatList(channel.load(), &list);
 }
-ClipboardCapture const& ClipboardClient::Observed() const {
+auto ClipboardClient::Observed() const -> ClipboardCapture const& {
   return observed;
 }
-void ClipboardClient::Connected(void* /*unused*/, ChannelConnectedEventArgs const* event) {
+auto ClipboardClient::Connected(void* /*unused*/, ChannelConnectedEventArgs const* event) -> void {
   if (std::string_view(event->name) != CLIPRDR_SVC_CHANNEL_NAME) return;
   Expects(attaching, "one clipboard attachment per connecting thread");
   auto* context = static_cast<CliprdrClientContext*>(event->pInterface);
@@ -80,7 +80,7 @@ void ClipboardClient::Connected(void* /*unused*/, ChannelConnectedEventArgs cons
   context->ServerFormatDataResponse = Response;
   attaching->channel                = context;
 }
-UINT ClipboardClient::Ready(CliprdrClientContext* context, CLIPRDR_MONITOR_READY const* /*unused*/) {
+auto ClipboardClient::Ready(CliprdrClientContext* context, CLIPRDR_MONITOR_READY const* /*unused*/) -> UINT {
   auto result =
       Backend::SendGeneralCapabilities([&](auto const* caps) { return context->ClientCapabilities(context, caps); });
   if (result != CHANNEL_RC_OK) return result;
@@ -89,7 +89,7 @@ UINT ClipboardClient::Ready(CliprdrClientContext* context, CLIPRDR_MONITOR_READY
   CLIPRDR_FORMAT_LIST const list{ .common = { .msgType = CB_FORMAT_LIST } };
   return context->ClientFormatList(context, &list);
 }
-UINT ClipboardClient::Formats(CliprdrClientContext* context, CLIPRDR_FORMAT_LIST const* list) {
+auto ClipboardClient::Formats(CliprdrClientContext* context, CLIPRDR_FORMAT_LIST const* list) -> UINT {
   auto& self = HeldClipboard(context);
   {
     std::scoped_lock const lock(self.guard);
@@ -104,7 +104,7 @@ UINT ClipboardClient::Formats(CliprdrClientContext* context, CLIPRDR_FORMAT_LIST
   request.requestedFormatId = CF_UNICODETEXT;
   return context->ClientFormatDataRequest(context, &request);
 }
-UINT ClipboardClient::Request(CliprdrClientContext* context, CLIPRDR_FORMAT_DATA_REQUEST const* request) {
+auto ClipboardClient::Request(CliprdrClientContext* context, CLIPRDR_FORMAT_DATA_REQUEST const* request) -> UINT {
   auto&                        self     = HeldClipboard(context);
   std::scoped_lock const       lock(self.guard);
   CLIPRDR_FORMAT_DATA_RESPONSE response { .common = { .msgType = CB_FORMAT_DATA_RESPONSE } };
@@ -114,7 +114,7 @@ UINT ClipboardClient::Request(CliprdrClientContext* context, CLIPRDR_FORMAT_DATA
   ++self.observed.requests;
   return context->ClientFormatDataResponse(context, &response);
 }
-UINT ClipboardClient::Response(CliprdrClientContext* context, CLIPRDR_FORMAT_DATA_RESPONSE const* response) {
+auto ClipboardClient::Response(CliprdrClientContext* context, CLIPRDR_FORMAT_DATA_RESPONSE const* response) -> UINT {
   auto&                  self = HeldClipboard(context);
   std::scoped_lock const lock(self.guard);
   if (response->common.msgFlags & CB_RESPONSE_OK)

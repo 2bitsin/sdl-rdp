@@ -17,7 +17,7 @@ public:
   explicit Backend(std::filesystem::path const& path);
   template<Operation _Operation, typename... _Args>
     requires BackendOperation<_Operation, _Args...>
-  auto Call(_Args&&... args) const {
+  auto Call(_Args&&... args) const -> decltype(auto) {
     return std::get<std::to_underlying(_Operation)>(_symbols)(std::forward<_Args>(args)...);
   }
 private:
@@ -27,7 +27,7 @@ private:
 };
 using SessionValue = std::pair<std::reference_wrapper<Backend const>, sdlrdp_handle*>;
 auto OpenSession(Backend const& backend, sdlrdp_config const& config) -> SessionValue;
-void CloseSession(SessionValue const& session) noexcept;
+auto CloseSession(SessionValue const& session) noexcept               -> void;
 using SessionState = PointerState<SessionValue, &SessionValue::second>;
 using Session = utilities::RAIIWrap<SessionValue, OpenSession, CloseSession, SessionState::IsNull,
                                     SessionState::MakeNull>;

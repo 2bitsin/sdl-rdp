@@ -17,7 +17,7 @@ GraphicsLink::GraphicsLink(PeerLink& link, Diagnostics const& diagnostics, Activ
                            Factory<std::unique_ptr<GfxChannel>> make) noexcept
     : _link { link }, _diagnostics{ diagnostics }, _activation{ activation }, _pacing{ pacing }, _encoder{ encoder },
       _make{ std::move(make) } { }
-bool GraphicsLink::Pump(std::span<HANDLE const> ready) {
+auto GraphicsLink::Pump(std::span<HANDLE const> ready) -> bool {
   if (_channel) return !std::ranges::contains(ready, _channel->Event()) || _channel->Pump();
   if (_attempted || !freerdp_settings_get_bool(&_link.Settings(), FreeRDP_SupportGraphicsPipeline) ||
       !DynamicChannelsReady(_link))
@@ -28,36 +28,36 @@ bool GraphicsLink::Pump(std::span<HANDLE const> ready) {
   if (!_channel->Open()) Abandon("GFX channel open failed; using legacy surface bits.");
   return true;
 }
-void GraphicsLink::ExpireConfirmation() {
+auto GraphicsLink::ExpireConfirmation() -> void {
   if (!_activation.Holding() || Confirmed()) return;
   if (Activation::Clock::now() < _activation.ActivatedAt() + GraphicsConnectionWait) return;
   _link.Invalidate();
   _attempted = true;
   Abandon("GFX confirmation timed out; using legacy surface bits.");
 }
-bool GraphicsLink::Confirmed() const {
+auto GraphicsLink::Confirmed() const -> bool {
   return _channel && _channel->Confirmed();
 }
-unsigned GraphicsLink::Capacity() const {
+auto GraphicsLink::Capacity() const -> unsigned {
   return Confirmed() ? _channel->FrameWindow() : AcknowledgedFrameWindow;
 }
-GfxChannel& GraphicsLink::Channel() const {
+auto GraphicsLink::Channel() const -> GfxChannel& {
   Expects(_channel != nullptr, "graphics channel exists");
   return *_channel;
 }
-std::span<HANDLE> GraphicsLink::Handles(std::span<HANDLE> out) const {
+auto GraphicsLink::Handles(std::span<HANDLE> out) const -> std::span<HANDLE> {
   Expects(out.size() >= GraphicsHandleLimit, "handle span has room for the graphics channel");
   if (!_channel) return out;
   out.front() = _channel->Event();
   return out.subspan(GraphicsHandleLimit);
 }
-void GraphicsLink::Rejected(UINT32 channel_id) {
+auto GraphicsLink::Rejected(UINT32 channel_id) -> void {
   if (_channel && _channel->Assigned(channel_id)) Abandon("GFX channel rejected; using legacy surface bits.");
 }
-GraphicsTiming const* GraphicsLink::Timing() const noexcept {
+auto GraphicsLink::Timing() const noexcept -> GraphicsTiming const* {
   return _channel ? &_channel->Timing() : nullptr;
 }
-void GraphicsLink::Abandon(char const* reason) {
+auto GraphicsLink::Abandon(char const* reason) -> void {
   _channel.reset();
   _diagnostics.Log(SDLRDP_LOG_WARN, reason);
   _activation.Announce(_encoder.Codec(), _pacing.Effective());

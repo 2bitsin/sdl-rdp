@@ -20,29 +20,29 @@
 
 namespace BackendGate {
 namespace {
-void ThenCertificateLifetime(X509* cert) {
+auto ThenCertificateLifetime(X509* cert) -> void {
   int days    = 0;
   int seconds = 0;
   ASSERT_TRUE(ASN1_TIME_diff(&days, &seconds, X509_get0_notBefore(cert), X509_get0_notAfter(cert)));
   EXPECT_EQ(days, 3650);
 }
-void ThenLoggingChild(Headless::ChildProcess& child, std::string const& output) {
+auto ThenLoggingChild(Headless::ChildProcess& child, std::string const& output) -> void {
   EXPECT_TRUE(child.ExitedCleanly()) << output;
   EXPECT_FALSE(output.contains("com.freerdp")) << output;
 }
-void ThenSignedDelta(std::vector<UINT32> const& decoded, std::vector<UINT32> const& pixels) {
+auto ThenSignedDelta(std::vector<UINT32> const& decoded, std::vector<UINT32> const& pixels) -> void {
   EXPECT_EQ(decoded.front(), pixels.front());
   // FreeRDP 3.15 planar.c:1477 tests unsigned s2c >= 0, misencoding negative deltas.
   EXPECT_NE(decoded, pixels);
   EXPECT_NE(decoded[64], pixels[64]);
 }
-void ThenCertificatePermissions(std::filesystem::path const& data) {
+auto ThenCertificatePermissions(std::filesystem::path const& data) -> void {
   using Perm = std::filesystem::perms;
   EXPECT_EQ(std::filesystem::status(data / "sdl-rdp").permissions() & Perm::mask, Perm::owner_all);
   EXPECT_EQ(std::filesystem::status(data / "sdl-rdp/server.key").permissions() & Perm::mask,
             Perm::owner_read | Perm::owner_write);
 }
-void ThenNewestRoute(Logs& first, Logs& second) {
+auto ThenNewestRoute(Logs& first, Logs& second) -> void {
   WLog_Print(WLog_GetRoot(), WLOG_WARN, "latest handle marker");
   EXPECT_FALSE(first.Contains("latest handle marker"));
   EXPECT_TRUE(second.Contains(SDLRDP_LOG_WARN, "latest handle marker"));
@@ -84,7 +84,8 @@ TEST(Errors, WidthAndBind) {
 }
 
 namespace {
-void MeasureFullFrame(sdlrdp_handle* handle, Client& client, std::vector<UINT32> const& pixels, sdlrdp_codec codec) {
+auto MeasureFullFrame(sdlrdp_handle* handle, Client& client, std::vector<UINT32> const& pixels,
+                      sdlrdp_codec codec) -> void {
   FrameCounter      counter(client);
   auto              bytes   = client.Received();
   auto              started = Clock::now();
@@ -98,8 +99,8 @@ void MeasureFullFrame(sdlrdp_handle* handle, Client& client, std::vector<UINT32>
   testing::Test::RecordProperty("codec_" + name + "_ms", std::to_string(elapsed));
   testing::Test::RecordProperty("codec_" + name + "_frames", std::to_string(counter.Frames()));
 }
-void WhenFullFrameMeasured(CertificateDirectory const& certificates, Logs& logs, std::vector<UINT32> const& pixels,
-                           sdlrdp_codec codec) {
+auto WhenFullFrameMeasured(CertificateDirectory const& certificates, Logs& logs, std::vector<UINT32> const& pixels,
+                           sdlrdp_codec codec) -> void {
   sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), 1024, 768, 0, Logs::Collect, &logs };
   config.codec = codec;
   sdlrdp_handle* handle = nullptr;
@@ -111,15 +112,15 @@ void WhenFullFrameMeasured(CertificateDirectory const& certificates, Logs& logs,
   ASSERT_TRUE(client.Until([&] { return HasCookie(client); }));
   MeasureFullFrame(handle, client, pixels, codec);
 }
-void CompressSignedDelta(BITMAP_PLANAR_CONTEXT* encoder, std::vector<UINT32>& pixels, std::vector<BYTE>& compressed,
-                         UINT32& size) {
+auto CompressSignedDelta(BITMAP_PLANAR_CONTEXT* encoder, std::vector<UINT32>& pixels, std::vector<BYTE>& compressed,
+                         UINT32& size) -> void {
   auto const source = oxbox::utilities::SpanCast<std::uint8_t const>(std::span(pixels));
   ASSERT_NE(freerdp_bitmap_compress_planar(encoder, source.data(), PIXEL_FORMAT_BGRA32, 64, 64, 64 * 4,
                                            compressed.data(), &size),
             nullptr);
   ASSERT_NE(compressed.front() & PLANAR_FORMAT_HEADER_RLE, 0);
 }
-void ThenCertificate(std::string const& first, std::filesystem::path const& data) {
+auto ThenCertificate(std::string const& first, std::filesystem::path const& data) -> void {
   std::unique_ptr<BIO, Backend::Releases<BIO_free>> const   bio(BIO_new_mem_buf(first.data(), int(first.size())));
   std::unique_ptr<X509, Backend::Releases<X509_free>> const cert(
       PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
@@ -217,8 +218,8 @@ public:
     else
       unsetenv("XDG_DATA_HOME");
   }
-  ProcessEnvironment& operator = (ProcessEnvironment const&) = delete;
-  ProcessEnvironment& operator = (ProcessEnvironment&&)      = delete;
+  auto operator = (ProcessEnvironment const&) -> ProcessEnvironment& = delete;
+  auto operator = (ProcessEnvironment&&)      -> ProcessEnvironment& = delete;
 
 private:
   std::filesystem::path      cwd  = std::filesystem::current_path();
@@ -252,13 +253,13 @@ TEST(Planar, Noisy640Rows) {
   std::unique_ptr<BITMAP_PLANAR_CONTEXT, Backend::Releases<freerdp_bitmap_planar_context_free>> const encoder(
       freerdp_bitmap_planar_context_new(PLANAR_FORMAT_HEADER_RLE | PLANAR_FORMAT_HEADER_NA, 1, 1));
   ASSERT_TRUE(freerdp_bitmap_planar_context_reset(encoder.get(), 640, 1));
-  std::vector<BYTE> payload((640 * 4) + 1024);
+  std::vector<BYTE>   payload((640 * 4) + 1024);
   std::unique_ptr<BITMAP_PLANAR_CONTEXT, Backend::Releases<freerdp_bitmap_planar_context_free>> const decoder(
       freerdp_bitmap_planar_context_new(0, 640, 1));
-  std::vector<UINT32>                                                                                 pixels(640);
-  std::vector<UINT32>                                                                                 decoded(640);
-  auto const source = oxbox::utilities::SpanCast<std::uint8_t const>(std::span(pixels));
-  auto const target = oxbox::utilities::SpanCast<std::uint8_t>(std::span(decoded));
+  std::vector<UINT32> pixels(640);
+  std::vector<UINT32> decoded(640);
+  auto const          source  = oxbox::utilities::SpanCast<std::uint8_t const>(std::span(pixels));
+  auto const          target  = oxbox::utilities::SpanCast<std::uint8_t>(std::span(decoded));
   for (unsigned y = 0; y < 480; ++y) {
     std::ranges::generate(pixels, [i = y * 640]() mutable { return (i++ * 2654435761u) & 0xffffff; });
     UINT32 size = payload.size();

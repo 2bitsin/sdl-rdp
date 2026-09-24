@@ -17,7 +17,7 @@ Authentication::Authentication(sdlrdp_config const& value)
 Authentication::~Authentication() {
   OPENSSL_cleanse(_password.data(), _password.size());
 }
-sdlrdp_config const& Authentication::Config() const noexcept {
+auto Authentication::Config() const noexcept -> sdlrdp_config const& {
   return _config;
 }
 }

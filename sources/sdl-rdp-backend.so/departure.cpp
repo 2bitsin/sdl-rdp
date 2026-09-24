@@ -15,7 +15,7 @@ Departure::Departure(PeerLink& link, SessionAccess& session, Activation& activat
                      FrameStatistics const& statistics, Diagnostics const& diagnostics) noexcept
     : _link { link }, _session{ session }, _activation{ activation }, _redirection{ redirection },
       _statistics{ statistics }, _diagnostics{ diagnostics } { }
-void Departure::Log() const {
+auto Departure::Log() const -> void {
   if (!_activation.Activated()) return;
   _diagnostics.Log(SDLRDP_LOG_INFO, _statistics.Summary());
   _redirection.LogAudio();
@@ -23,7 +23,7 @@ void Departure::Log() const {
   _diagnostics.Log(SDLRDP_LOG_INFO, std::format("Client {} disconnected.", name ? name : _link.Client().hostname));
   _diagnostics.Line("disconnect");
 }
-void Departure::Depart() {
+auto Departure::Depart() -> void {
   {
     auto const held = _session.Lock();
     _redirection.Disconnect();

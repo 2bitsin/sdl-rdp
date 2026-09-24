@@ -10,5 +10,5 @@ public:
   bool         surface;
   sdlrdp_codec codec;
 };
-std::string ModeName(testing::TestParamInfo<Mode> const& info);
+auto ModeName(testing::TestParamInfo<Mode> const& info) -> std::string;
 }

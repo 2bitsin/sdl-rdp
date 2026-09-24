@@ -11,7 +11,7 @@
 #include <vector>
 
 namespace DriveGate {
-void DriveSession::ThenPartialReads(sdlrdp_file* file, std::string const& source, std::string& result) {
+auto DriveSession::ThenPartialReads(sdlrdp_file* file, std::string const& source, std::string& result) -> void {
   for (size_t const offset : { 13u, 1048577u, 3145697u }) {
     result.resize(65536);
     auto count = sdlrdp_drive_read(handle.get(), file, offset, result.data(), result.size());
@@ -19,7 +19,7 @@ void DriveSession::ThenPartialReads(sdlrdp_file* file, std::string const& source
     EXPECT_EQ(result.substr(0, count), source.substr(offset, result.size()));
   }
 }
-void DriveSession::SetUp() {
+auto DriveSession::SetUp() -> void {
   auto path   = scratch.Path().string();
   auto config = Headless::LoopbackConfig(path);
   config.log_user = &logs;
@@ -29,7 +29,7 @@ void DriveSession::SetUp() {
   handle.reset(opened);
   Connect();
 }
-void DriveSession::Connect(char const* name, bool second) {
+auto DriveSession::Connect(char const* name, bool second) -> void {
   client = std::make_unique<Headless::Client>(sdlrdp_port(handle.get()), false);
   auto path = scratch.Path().string();
   Headless::ShareDrive(*client, path.c_str(), name);
@@ -47,66 +47,66 @@ void DriveSession::Connect(char const* name, bool second) {
     }
   });
 }
-void DriveSession::GivenHeldFile() {
+auto DriveSession::GivenHeldFile() -> void {
   Write("file", "data");
   held_file = Open("file");
   ASSERT_NE(held_file, nullptr);
   HoldRequests();
 }
-void DriveSession::HoldRequests() {
+auto DriveSession::HoldRequests() -> void {
   pump.request_stop();
   pump.join();
   observer                  = std::make_unique<Headless::DriveObserver>(*client);
   observer->Observed().hold = true;
 }
-void DriveSession::ThenVideoMatches() {
+auto DriveSession::ThenVideoMatches() -> void {
   std::vector<UINT32> pixels(320uz * 200uz, 0x00446688);
   sdlrdp_rect const   damage{ 0, 0, 320, 200 };
   ASSERT_EQ(sdlrdp_present(handle.get(), pixels.data(), 1280, 320, 200, &damage, 1), 0);
   ASSERT_TRUE(client->Until([&] { return client->Matches(pixels); }));
 }
-void DriveSession::Disconnect() {
+auto DriveSession::Disconnect() -> void {
   pump.request_stop();
   if (pump.joinable()) pump.join();
   if (client) freerdp_disconnect(client->Instance().get());
   client.reset();
 }
-void DriveSession::TearDown() {
+auto DriveSession::TearDown() -> void {
   observer.reset();
   Disconnect();
 }
-unsigned DriveSession::Logged(sdlrdp_log_level level, std::string_view text) {
+auto DriveSession::Logged(sdlrdp_log_level level, std::string_view text) -> unsigned {
   return logs.Count(level, text);
 }
-std::string DriveSession::Pattern(size_t size, unsigned seed) {
+auto DriveSession::Pattern(size_t size, unsigned seed) -> std::string {
   std::string bytes(size, '\0');
   std::ranges::transform(std::views::iota(0uz, size), bytes.begin(),
                          [=](size_t i) { return char((i * 31 + i / 251 + seed) & 255); });
   return bytes;
 }
-void DriveSession::Write(std::string const& name, std::string const& bytes) {
+auto DriveSession::Write(std::string const& name, std::string const& bytes) -> void {
   oxbox::platform::WriteBinaryFile(scratch.Path() / name, std::as_bytes(std::span(bytes)));
 }
-sdlrdp_file* DriveSession::Open(char const* name, unsigned flags) {
+auto DriveSession::Open(char const* name, unsigned flags) -> sdlrdp_file* {
   sdlrdp_file* file = nullptr;
   EXPECT_EQ(sdlrdp_drive_open(handle.get(), drive, name, flags, &file), 0) << sdlrdp_last_error();
   return file;
 }
-void DriveSession::ThenRemovedDrive() {
+auto DriveSession::ThenRemovedDrive() -> void {
   std::array<sdlrdp_event, 32> events { };
   auto                         count  = sdlrdp_poll(handle.get(), events.data(), 32);
   EXPECT_TRUE(std::ranges::any_of(std::span(events.data(), count), [&](auto const& event) {
     return event.type == SDLRDP_DRIVE && !event.drive.added && event.drive.id == drive;
   }));
 }
-void DriveSession::ThenDriveFailure(sdlrdp_file* file, unsigned warnings) {
+auto DriveSession::ThenDriveFailure(sdlrdp_file* file, unsigned warnings) -> void {
   sdlrdp_drive value{ };
   EXPECT_EQ(sdlrdp_drive_list(handle.get(), &value, 1), 0);
   EXPECT_EQ(sdlrdp_drive_close(handle.get(), file), -1);
   EXPECT_EQ(Logged(SDLRDP_LOG_WARN, "") - warnings, 1u);
   EXPECT_EQ(Logged(SDLRDP_LOG_WARN, "Drive channel ended: Truncated drive response."), 1u);
 }
-std::set<std::string> DriveSession::GivenDirectoryEntries() {
+auto DriveSession::GivenDirectoryEntries() -> std::set<std::string> {
   std::set<std::string> expected;
   for (unsigned i = 0; i < 200; ++i) {
     auto name = std::to_string(i);

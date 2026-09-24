@@ -18,7 +18,9 @@ auto OpenAudio(Driver const& driver) -> std::reference_wrapper<Driver const> {
   if (driver.Call<Operation::AUDIO_OPEN>() < 0) driver.Throw();
   return std::cref(driver);
 }
-void CloseAudio(std::reference_wrapper<Driver const> driver) noexcept { driver.get().Call<Operation::AUDIO_CLOSE>(); }
+auto CloseAudio(std::reference_wrapper<Driver const> driver) noexcept -> void {
+  driver.get().Call<Operation::AUDIO_CLOSE>();
+}
 using AudioSession = utilities::RAIIWrap<std::reference_wrapper<Driver const>, OpenAudio, CloseAudio>;
 }
 }
@@ -28,10 +30,10 @@ public:
   explicit SDL_PrivateAudioData(std::shared_ptr<rdp::Driver const> driver)
       : _driver{std::move(driver)}, _lead{rdp::AudioLead(*_driver)},
         _rate{_driver->Call<rdp::Operation::AUDIO_RATE>()}, _session{*_driver} { }
-  auto     Backend() const -> rdp::Driver const& { return *_driver; }
-  auto     Buffer()        -> std::vector<Uint8>& { return _buffer; }
-  auto     Rate() const    -> unsigned { return _rate; }
-  void     Rate(unsigned rate) {
+  auto     Backend() const     -> rdp::Driver const& { return *_driver; }
+  auto     Buffer()            -> std::vector<Uint8>& { return _buffer; }
+  auto     Rate() const        -> unsigned { return _rate; }
+  auto     Rate(unsigned rate) -> void {
     if (rate && !_rate) _next = SDL_GetTicksNS();
     _rate = rate;
   }
@@ -53,12 +55,12 @@ private:
 namespace rdp {
 namespace {
 // SDL audio discovery returns borrowed device pointers through C out parameters.
-void DetectDevices(SDL_AudioDevice** playback, [[maybe_unused]] SDL_AudioDevice** unused_recording) {
+auto DetectDevices(SDL_AudioDevice** playback, [[maybe_unused]] SDL_AudioDevice** unused_recording) -> void {
   utilities::Expects(playback != nullptr, "audio discovery has a playback output");
   *playback = SDL_AddAudioDevice(false, "RDP client", &PlaybackSpec, reinterpret_cast<void*>(DetectDevices));
 }
 // SDL lends the audio device to the open callback and owns its hidden state until close.
-bool OpenDevice(SDL_AudioDevice* device) {
+auto OpenDevice(SDL_AudioDevice* device) -> bool {
   utilities::Expects(device != nullptr, "audio open has a device");
   return Boundary([&] {
     auto state = std::make_unique<SDL_PrivateAudioData>(Rendezvous::Acquire());
@@ -91,7 +93,7 @@ auto PlaybackDevice() -> std::optional<std::reference_wrapper<SDL_AudioDevice>> 
   return std::ref(*device);
 }
 }
-void AudioRate(unsigned rate) {
+auto AudioRate(unsigned rate) -> void {
   auto const found = PlaybackDevice();
   if (!found) return;
   auto&                 device = found->get();
@@ -107,7 +109,7 @@ auto AwaitBackend(SDL_AudioDevice& device) -> bool {
   return result >= 0 || driver.Fail();
 }
 // Without video nothing else drains the backend's event queue, so rate changes are polled here.
-void PollRateChanges(Driver const& driver) {
+auto PollRateChanges(Driver const& driver) -> void {
   if (SDL_WasInit(SDL_INIT_VIDEO)) return;
   driver.Poll([](sdlrdp_event const& event) {
     if (event.type == SDLRDP_AUDIO) AudioRate(event.audio.freq);
@@ -118,7 +120,7 @@ auto PlaybackDelay(SDL_AudioDevice& device) -> Uint64 {
   return device.hidden->Delay(device);
 }
 // SDL borrows the device while its audio thread waits for playback.
-bool WaitDevice(SDL_AudioDevice* device) {
+auto WaitDevice(SDL_AudioDevice* device) -> bool {
   utilities::Expects(device != nullptr, "audio wait has a device");
   return Boundary([&] {
     if (!AwaitBackend(*device)) return false;
@@ -128,7 +130,7 @@ bool WaitDevice(SDL_AudioDevice* device) {
   });
 }
 // SDL audio playback provides a borrowed device and counted sample buffer.
-bool PlayDevice(SDL_AudioDevice* device, Uint8 const* buffer, int length) {
+auto PlayDevice(SDL_AudioDevice* device, Uint8 const* buffer, int length) -> bool {
   utilities::Expects(device != nullptr, "audio playback has a device");
   utilities::Expects(buffer != nullptr, "audio playback has a buffer");
   utilities::Expects(length >= 0, "audio buffer length is nonnegative");
@@ -137,18 +139,18 @@ bool PlayDevice(SDL_AudioDevice* device, Uint8 const* buffer, int length) {
   return driver.Call<Operation::AUDIO_WRITE>(buffer, frames) == static_cast<int>(frames) || driver.Fail();
 }
 // SDL borrows the returned mixing buffer until its next device callback.
-Uint8* GetDeviceBuffer(SDL_AudioDevice* device, [[maybe_unused]] int* unused_size) {
+auto GetDeviceBuffer(SDL_AudioDevice* device, [[maybe_unused]] int* unused_size) -> Uint8* {
   utilities::Expects(device != nullptr, "audio buffer has a device");
   auto& buffer = device->hidden->Buffer();
   return std::cmp_greater_equal(buffer.size(), device->buffer_size) ? buffer.data() : nullptr;
 }
 // SDL returns ownership of hidden audio state to its close callback.
-void CloseDevice(SDL_AudioDevice* device) {
+auto CloseDevice(SDL_AudioDevice* device) -> void {
   utilities::Expects(device != nullptr, "audio close has a device");
   std::unique_ptr<SDL_PrivateAudioData> const state{ std::exchange(device->hidden, nullptr) };
 }
 // SDL passes its writable audio callback table to bootstrap initialization.
-bool InitAudio(SDL_AudioDriverImpl* implementation) {
+auto InitAudio(SDL_AudioDriverImpl* implementation) -> bool {
   utilities::Expects(implementation != nullptr, "audio initialization has a callback table");
   implementation->DetectDevices = DetectDevices;
   implementation->OpenDevice    = OpenDevice;

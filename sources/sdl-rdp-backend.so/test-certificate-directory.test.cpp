@@ -18,7 +18,7 @@ CertificateDirectory::CertificateDirectory() {
 CertificateDirectory::~CertificateDirectory() {
   std::filesystem::remove_all(path);
 }
-std::filesystem::path const& CertificateDirectory::Path() const {
+auto CertificateDirectory::Path() const -> std::filesystem::path const& {
   return path;
 }
 }

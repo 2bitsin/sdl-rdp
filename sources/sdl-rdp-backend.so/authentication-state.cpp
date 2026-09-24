@@ -3,29 +3,29 @@
 #include <utility>
 
 namespace Backend {
-void AuthenticationState::Identify(std::string user_name, std::string domain_name) {
+auto AuthenticationState::Identify(std::string user_name, std::string domain_name) -> void {
   _user   = std::move(user_name);
   _domain = std::move(domain_name);
 }
-std::string const& AuthenticationState::User() const noexcept {
+auto AuthenticationState::User() const noexcept -> std::string const& {
   return _user;
 }
-std::string const& AuthenticationState::Domain() const noexcept {
+auto AuthenticationState::Domain() const noexcept -> std::string const& {
   return _domain;
 }
-bool AuthenticationState::TestAndSetChecked() noexcept {
+auto AuthenticationState::TestAndSetChecked() noexcept -> bool {
   return std::exchange(_checked, true);
 }
-bool AuthenticationState::TestAndSetRejected() noexcept {
+auto AuthenticationState::TestAndSetRejected() noexcept -> bool {
   return std::exchange(_rejected, true);
 }
-bool AuthenticationState::Rejected() const noexcept {
+auto AuthenticationState::Rejected() const noexcept -> bool {
   return _rejected;
 }
-void AuthenticationState::AttemptHash() noexcept {
+auto AuthenticationState::AttemptHash() noexcept -> void {
   _hash_attempted = true;
 }
-bool AuthenticationState::Abandoned() const noexcept {
+auto AuthenticationState::Abandoned() const noexcept -> bool {
   return _hash_attempted && !_checked;
 }
 }

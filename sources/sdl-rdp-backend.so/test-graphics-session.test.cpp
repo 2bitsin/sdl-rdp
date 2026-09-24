@@ -10,14 +10,14 @@
 
 namespace BackendGate {
 namespace {
-void ConnectConfirmed(Client& client, Logs& logs, std::invocable<Client&> auto connect) {
+auto ConnectConfirmed(Client& client, Logs& logs, std::invocable<Client&> auto connect) -> void {
   connect(client);
   if (::testing::Test::HasFatalFailure()) return;
   ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }, std::chrono::seconds(30)))
       << logs.Text(true);
 }
 }
-void GraphicsSession::ThenWriteDisconnect(Client& client) {
+auto GraphicsSession::ThenWriteDisconnect(Client& client) -> void {
   EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 1);
   ASSERT_TRUE(freerdp_disconnect(client.Instance().get()));
   auto events = EventsUntil([](auto const& events) {
@@ -28,7 +28,8 @@ void GraphicsSession::ThenWriteDisconnect(Client& client) {
   EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, "")) << logs.Text(true);
   RecordProperty("trace", logs.Text(true));
 }
-void GraphicsSession::Open(unsigned w, unsigned h, sdlrdp_aspect aspect, sdlrdp_codec codec, unsigned audio_latency) {
+auto GraphicsSession::Open(unsigned w, unsigned h, sdlrdp_aspect aspect, sdlrdp_codec codec,
+                           unsigned audio_latency) -> void {
   sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), w, h, 0, Logs::Collect, &logs };
   config.aspect           = aspect;
   config.codec            = codec;
@@ -37,33 +38,34 @@ void GraphicsSession::Open(unsigned w, unsigned h, sdlrdp_aspect aspect, sdlrdp_
   ASSERT_EQ(sdlrdp_open(&config, &handle), 0) << sdlrdp_last_error();
   backend.reset(handle);
 }
-Client& GraphicsSession::GraphicsClient() {
+auto GraphicsSession::GraphicsClient() -> Client& {
   return *graphics_client;
 }
-Headless::GraphicsObserver& GraphicsSession::GraphicsObserver() {
+auto GraphicsSession::GraphicsObserver() -> Headless::GraphicsObserver& {
   return *graphics_observer;
 }
-void GraphicsSession::PresentProgressiveDamage(Client& client, std::vector<UINT32> const& pixels, sdlrdp_rect damage) {
+auto GraphicsSession::PresentProgressiveDamage(Client& client, std::vector<UINT32> const& pixels,
+                                               sdlrdp_rect damage) -> void {
   ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 640 * 4, 640, 480, &damage, 1), 0);
   ASSERT_TRUE(client.Until([&] { return Acknowledged(); }));
   EXPECT_LE(client.MaxError(pixels), 24u);
 }
-void GraphicsSession::ConnectPipeline(Client& client) {
+auto GraphicsSession::ConnectPipeline(Client& client) -> void {
   client.EnableGraphics();
   ConnectConfirmed(client, logs, [this](Client& connecting) { Connect(connecting); });
 }
-void GraphicsSession::ThenProgressivePicture(Client& client, std::vector<UINT32> const& pixels) {
+auto GraphicsSession::ThenProgressivePicture(Client& client, std::vector<UINT32> const& pixels) -> void {
   Present(pixels, 640, 480);
   ASSERT_TRUE(client.Until([&] { return Acknowledged(); }));
   EXPECT_LE(client.MaxError(pixels), 24u);
 }
-void GraphicsSession::GivenGraphicsClient(sdlrdp_codec codec) {
+auto GraphicsSession::GivenGraphicsClient(sdlrdp_codec codec) -> void {
   Open(640, 480, { }, codec);
   if (::testing::Test::HasFatalFailure()) return;
   graphics_client = std::make_unique<Client>(sdlrdp_port(backend.get()), true, 640, 480);
   graphics_client->EnableGraphics();
 }
-void GraphicsSession::GivenPipelinedGraphics() {
+auto GraphicsSession::GivenPipelinedGraphics() -> void {
   Open(320, 200, { }, SDLRDP_CODEC_PROGRESSIVE);
   if (::testing::Test::HasFatalFailure()) return;
   graphics_client = std::make_unique<Client>(sdlrdp_port(backend.get()), true);
@@ -71,7 +73,7 @@ void GraphicsSession::GivenPipelinedGraphics() {
   graphics_observer = std::make_unique<Headless::GraphicsObserver>(*graphics_client);
   ConnectGraphics(*graphics_client, *graphics_observer);
 }
-void GraphicsSession::ThenLegacyFallback(Client& client) {
+auto GraphicsSession::ThenLegacyFallback(Client& client) -> void {
   ASSERT_TRUE(freerdp_connect(client.Instance().get()));
   auto events    = EventsUntil(
       [](auto const& events) {
@@ -83,13 +85,13 @@ void GraphicsSession::ThenLegacyFallback(Client& client) {
   EXPECT_EQ(connected->connected.codec, SDLRDP_CODEC_RAW);
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_WARN, "GFX confirmation timed out"));
 }
-void GraphicsSession::PresentMatching(Client& client, std::vector<UINT32> const& pixels) {
+auto GraphicsSession::PresentMatching(Client& client, std::vector<UINT32> const& pixels) -> void {
   Present(pixels, 640, 480);
   if (::testing::Test::HasFatalFailure()) return;
   ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); }));
 }
-void GraphicsSession::PresentGraphicsFrames(Client& client, Headless::GraphicsObserver& observer,
-                                            std::vector<UINT32> const& pixels, unsigned first, unsigned last) {
+auto GraphicsSession::PresentGraphicsFrames(Client& client, Headless::GraphicsObserver& observer,
+                                            std::vector<UINT32> const& pixels, unsigned first, unsigned last) -> void {
   std::ranges::for_each(std::views::iota(first, last + 1), [&](unsigned count) {
     Present(pixels, 320, 200);
     if (::testing::Test::HasFatalFailure()) return;
@@ -97,11 +99,11 @@ void GraphicsSession::PresentGraphicsFrames(Client& client, Headless::GraphicsOb
     if (::testing::Test::HasFatalFailure()) return;
   });
 }
-void GraphicsSession::ConnectGraphics(Client& client, Headless::GraphicsObserver& observer) {
+auto GraphicsSession::ConnectGraphics(Client& client, Headless::GraphicsObserver& observer) -> void {
   observer.Observed().automatic = false;
   ConnectConfirmed(client, logs, [this](Client& connecting) { Connect(connecting); });
 }
-void GraphicsSession::Connect(Client& client, bool ack) {
+auto GraphicsSession::Connect(Client& client, bool ack) -> void {
   ASSERT_TRUE(
       freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_FrameAcknowledge, ack ? 2 : 0));
   ASSERT_TRUE(freerdp_connect(client.Instance().get())) << logs.Text(true);

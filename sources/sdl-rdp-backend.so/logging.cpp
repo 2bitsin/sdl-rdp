@@ -15,19 +15,19 @@
 #include <winpr/wlog.h>
 
 namespace Backend {
-void ResetAuthenticationLogging() {
+auto ResetAuthenticationLogging() -> void {
   LogRoute::WithFilter([](auto& filter) { filter = { }; });
 }
-void PeerNegotiationLogging(rdpSettings const* settings) {
+auto PeerNegotiationLogging(rdpSettings const* settings) -> void {
   LogRoute::WithFilter([=](auto& filter) { filter.peer_settings = settings; });
 }
-bool NegotiationRefused() {
+auto NegotiationRefused() -> bool {
   return LogRoute::WithFilter([](auto const& filter) { return filter.negotiation_failed; });
 }
-bool TlsHandshakeFailed() {
+auto TlsHandshakeFailed() -> bool {
   return LogRoute::WithFilter([](auto const& filter) { return filter.handshake_failed; });
 }
-void AuthenticationRejectedLogging() {
+auto AuthenticationRejectedLogging() -> void {
   LogRoute::WithFilter([](auto& filter) { filter.authentication_failed = true; });
 }
 auto ExpectedDisconnect(unsigned code) -> bool {
@@ -56,7 +56,7 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 9> KnownLibr
     { "com.freerdp.core"                  , "setsockopt() SOL_TCP, TCP_KEEPINTVL"               },
     { "com.freerdp.core"                  , "setsockopt() SOL_TCP, TCP_USER_TIMEOUT"            },
 } };
-bool ExpectedLibraryMessage(std::string_view prefix, std::string_view text) {
+auto ExpectedLibraryMessage(std::string_view prefix, std::string_view text) -> bool {
   if (std::ranges::any_of(KnownLibraryMessages,
                           [&](auto const& entry) { return prefix == entry.first && text == entry.second; }))
     return true;
@@ -90,7 +90,7 @@ auto DetectNegotiationRefusal(LogRoute::Filter& filter, std::string_view prefix,
   filter.negotiation_failed = true;
   return true;
 }
-bool DetectTlsHandshakeFailure(LogRoute::Filter& filter, std::string_view prefix, std::string_view text) {
+auto DetectTlsHandshakeFailure(LogRoute::Filter& filter, std::string_view prefix, std::string_view text) -> bool {
   if (!filter.peer_settings || prefix != "com.freerdp.crypto" || text != "BIO_do_handshake failed") return false;
   if (freerdp_settings_get_uint32(filter.peer_settings, FreeRDP_SelectedProtocol) != SecurityTls) return false;
   filter.handshake_failed = true;
@@ -146,7 +146,7 @@ auto AuthenticationEcho(LogRoute::Filter& filter, std::string_view prefix, std::
   filter.authentication_failed = true;
   return true;
 }
-bool ExpectedPeerMessage(LogRoute::Filter& filter, wLogMessage const& message) {
+auto ExpectedPeerMessage(LogRoute::Filter& filter, wLogMessage const& message) -> bool {
   if (!message.PrefixString || !message.TextString) return false;
   auto prefix = std::string_view(message.PrefixString);
   auto text   = std::string_view(message.TextString);
@@ -180,7 +180,7 @@ auto LogRoute::Forward(wLogMessage const* message) -> BOOL {
 auto LogRoute::Deliver(sdlrdp_log_level level, char const* text) const -> void {
   if (callback && text) callback(user, level, text);
 }
-void LogRoute::Install() {
+auto LogRoute::Install() -> void {
   auto* root = WLog_GetRoot();
   utilities::Expects(root != nullptr, "WLog root exists");
   wLogCallbacks callbacks{ Forward, Forward, Forward, Forward };
@@ -193,7 +193,7 @@ void LogRoute::Install() {
   else
     WLog_SetLogLevel(root, WLOG_WARN);
 }
-LogRoute::Routing& LogRoute::Shared() {
+auto LogRoute::Shared() -> LogRoute::Routing& {
   // WLog has no user pointer; this owner lasts as long as its process-wide callback.
   static Routing routing;
   return routing;

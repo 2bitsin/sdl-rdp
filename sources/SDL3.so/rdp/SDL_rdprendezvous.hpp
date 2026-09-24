@@ -9,9 +9,9 @@ public:
   static auto Acquire() -> std::shared_ptr<Driver>;
 private:
   // SDL property destruction passes the stored pointer and an opaque context.
-  static void SDLCALL _Cleanup(void* unused, void* value);
-  static auto         _Published() -> Rendezvous&;
-  auto                _Driver()    -> std::shared_ptr<Driver>;
+  static auto SDLCALL _Cleanup(void* unused, void* value) -> void;
+  static auto         _Published()                        -> Rendezvous&;
+  auto                _Driver()                           -> std::shared_ptr<Driver>;
   std::mutex            _mutex;
   std::weak_ptr<Driver> _driver;
 };

@@ -24,7 +24,7 @@ TEST_F(RoundFive, PipelinedGraphicsPresent) {
 }
 
 namespace {
-void ThenFrameStatistics(Logs& logs) {
+auto ThenFrameStatistics(Logs& logs) -> void {
   EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "Frames:"), 1u);
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, "Frames: 3 sent, 2 coalesced; encode ")) << logs.Text(true);
   auto text = logs.Text(true);

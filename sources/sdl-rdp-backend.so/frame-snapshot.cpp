@@ -7,7 +7,7 @@
 #include <utility>
 
 namespace Backend {
-std::size_t FrameBytes(Extent size) {
+auto FrameBytes(Extent size) -> std::size_t {
   return std::size_t(Avc::Aligned(size.width)) * Avc::Aligned(size.height) * PixelBytes;
 }
 FrameSnapshot::FrameSnapshot(std::shared_ptr<std::vector<BYTE> const> value, Extent size) noexcept
@@ -15,30 +15,30 @@ FrameSnapshot::FrameSnapshot(std::shared_ptr<std::vector<BYTE> const> value, Ext
 FrameSnapshot::operator bool() const noexcept {
   return _pixels != nullptr;
 }
-std::span<BYTE const> FrameSnapshot::Pixels() const noexcept {
+auto FrameSnapshot::Pixels() const noexcept -> std::span<BYTE const> {
   return _pixels ? std::span<BYTE const>(*_pixels) : std::span<BYTE const>{ };
 }
-std::span<BYTE const> FrameSnapshot::Row(unsigned row) const {
+auto FrameSnapshot::Row(unsigned row) const -> std::span<BYTE const> {
   Expects(_pixels != nullptr, "snapshot storage exists");
   Expects(row < _size.height, "row lies inside the snapshot");
   return Pixels().subspan(std::size_t(row) * Stride());
 }
-std::size_t FrameSnapshot::Stride() const {
+auto FrameSnapshot::Stride() const -> std::size_t {
   return std::size_t(Avc::Aligned(_size.width)) * PixelBytes;
 }
-unsigned FrameSnapshot::Width() const noexcept {
+auto FrameSnapshot::Width() const noexcept -> unsigned {
   return _size.width;
 }
-unsigned FrameSnapshot::Height() const noexcept {
+auto FrameSnapshot::Height() const noexcept -> unsigned {
   return _size.height;
 }
-sdlrdp_rect FrameSnapshot::Bounds() const noexcept {
+auto FrameSnapshot::Bounds() const noexcept -> sdlrdp_rect {
   return Whole(_size);
 }
-FrameSnapshot FrameSnapshot::Matching(Extent size) const {
+auto FrameSnapshot::Matching(Extent size) const -> FrameSnapshot {
   return SameSize(Bounds(), Whole(size)) ? *this : FrameSnapshot{ nullptr, size };
 }
-void FrameSnapshot::Release() noexcept {
+auto FrameSnapshot::Release() noexcept -> void {
   _pixels.reset();
 }
 }

@@ -15,15 +15,15 @@
 
 struct sdlrdp_handle : private Backend::Pinned {
 public:
-                           sdlrdp_handle(sdlrdp_config const& config, bool tracing);
-  unsigned                 Port() const   noexcept;
-  Backend::Diagnostics&    Diagnostics()  noexcept;
-  Backend::EventQueue&     Events()       noexcept;
-  Backend::Presenter&      Presentation() noexcept;
-  Backend::AudioOutput&    Audio()        noexcept;
-  Backend::Session&        Session()      noexcept;
-  Backend::ClipboardStore& Clipboard()    noexcept;
-  Backend::FrameStore&     Frames()       noexcept;
+       sdlrdp_handle(sdlrdp_config const& config, bool tracing);
+  auto Port() const noexcept   -> unsigned;
+  auto Diagnostics() noexcept  -> Backend::Diagnostics&;
+  auto Events() noexcept       -> Backend::EventQueue&;
+  auto Presentation() noexcept -> Backend::Presenter&;
+  auto Audio() noexcept        -> Backend::AudioOutput&;
+  auto Session() noexcept      -> Backend::Session&;
+  auto Clipboard() noexcept    -> Backend::ClipboardStore&;
+  auto Frames() noexcept       -> Backend::FrameStore&;
 
 private:
   Backend::Diagnostics    _diagnostics;
@@ -38,5 +38,5 @@ private:
   Backend::Listener       _listener;
 };
 namespace Backend {
-void SetError(sdlrdp_handle* handle, std::string text);
+auto SetError(sdlrdp_handle* handle, std::string text) -> void;
 }

@@ -11,7 +11,7 @@
 namespace {
 class Clipboard : public testing::Test {
 protected:
-  void ThenNonTextOffer(std::array<sdlrdp_event, 32>& events) {
+  auto ThenNonTextOffer(std::array<sdlrdp_event, 32>& events) -> void {
     ASSERT_EQ(clipboard->Offer({ }, false), CHANNEL_RC_OK);
     bool changed = false;
     ASSERT_TRUE(client->Until([&] {
@@ -23,20 +23,20 @@ protected:
     EXPECT_EQ(sdlrdp_has_clipboard_text(handle.get()), 0);
     EXPECT_STREQ(sdlrdp_get_clipboard_text(handle.get()), "");
   }
-  void ThenReplacedText(char const* retained) {
+  auto ThenReplacedText(char const* retained) -> void {
     EXPECT_STREQ(retained, "hello");
     EXPECT_STREQ(sdlrdp_get_clipboard_text(handle.get()), "world");
   }
-  void GivenClipboard() {
+  auto GivenClipboard() -> void {
     client    = std::make_unique<Headless::Client>(sdlrdp_port(handle.get()), false);
     clipboard = std::make_unique<Headless::ClipboardClient>(*client);
     ConnectClipboard(*client, *clipboard);
   }
-  void ConnectClipboard(Headless::Client& client, Headless::ClipboardClient& clipboard) {
+  auto ConnectClipboard(Headless::Client& client, Headless::ClipboardClient& clipboard) -> void {
     ASSERT_TRUE(freerdp_connect(client.Instance().get())) << logs.Text(true);
     ASSERT_TRUE(client.Until([&] { return clipboard.Observed().accepted.load() == 1; }));
   }
-  void SetUp() override {
+  auto SetUp() -> void override {
     auto directory = certificates.Path().string();
     auto config    = Headless::LoopbackConfig(directory);
     config.log      = Headless::Logs::Collect;
@@ -51,7 +51,7 @@ protected:
   std::unique_ptr<Headless::Client>                       client;
   std::unique_ptr<Headless::ClipboardClient>              clipboard;
 };
-void OfferMalformedText(Headless::Client& client, Headless::ClipboardClient& clipboard) {
+auto OfferMalformedText(Headless::Client& client, Headless::ClipboardClient& clipboard) -> void {
   for (auto const& bytes : { std::vector<BYTE>{ 0x7c }, { 0, 0xdc, 0, 0 }, { 'x', 0 } }) {
     auto count = clipboard.Observed().requests.load();
     ASSERT_EQ(clipboard.Offer(bytes), CHANNEL_RC_OK);

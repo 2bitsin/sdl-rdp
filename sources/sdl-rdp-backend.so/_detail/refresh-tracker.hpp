@@ -9,11 +9,11 @@ namespace Backend {
 inline constexpr unsigned DefaultRefreshRate = 60;
 class RefreshTracker {
 public:
-  unsigned    Effective() const             noexcept;
-  RefreshMode Mode() const                  noexcept;
-  bool        AwaitingEmpty() const         noexcept;
-  bool        TestAndSetUnavailableLogged() noexcept;
-  bool        Adjust(std::invocable<Refresh&> auto step) {
+  auto Effective() const noexcept                 -> unsigned;
+  auto Mode() const noexcept                      -> RefreshMode;
+  auto AwaitingEmpty() const noexcept             -> bool;
+  auto TestAndSetUnavailableLogged() noexcept     -> bool;
+  auto Adjust(std::invocable<Refresh&> auto step) -> bool {
     auto const previous = _refresh.Rate();
     step(_refresh);
     Expects(_refresh.Rate() > 0, "effective refresh is positive");

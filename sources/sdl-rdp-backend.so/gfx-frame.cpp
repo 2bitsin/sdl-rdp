@@ -29,7 +29,7 @@ constexpr auto        ProgressiveHeaderBytes      = ProgressiveSyncBytes + Progr
 constexpr UINT16      ProgressiveSyncBlock        = 0xCCC0;
 constexpr UINT16      ProgressiveContextBlock     = 0xCCC3;
 constexpr std::size_t WireToSurfaceHeaderBytes    = 25;
-RDPGFX_SURFACE_COMMAND SurfaceCommand(sdlrdp_rect area, std::span<BYTE> data, UINT32 codec) {
+auto SurfaceCommand(sdlrdp_rect area, std::span<BYTE> data, UINT32 codec) -> RDPGFX_SURFACE_COMMAND {
   RDPGFX_SURFACE_COMMAND command{ };
   command.surfaceId = GraphicsSurfaceId;
   command.codecId   = codec;
@@ -60,22 +60,22 @@ auto Persistent(sdlrdp_codec codec) -> bool {
     utilities::Unreachable(codec);
   }
 }
-bool FellBack(sdlrdp_codec preference, sdlrdp_codec requested, sdlrdp_codec choice) {
+auto FellBack(sdlrdp_codec preference, sdlrdp_codec requested, sdlrdp_codec choice) -> bool {
   return preference == SDLRDP_CODEC_AVC420 && requested != preference && choice != preference;
 }
-void ExpectSurface(bool confirmed, Extent surface) {
+auto ExpectSurface(bool confirmed, Extent surface) -> void {
   Expects(confirmed, "graphics capability confirmed");
   Expects(surface.width > 0, "surface width is positive");
   Expects(surface.height > 0, "surface height is positive");
 }
-bool EachArea(bool confirmed, Extent surface, Scaler const& scaler, std::predicate<sdlrdp_rect> auto send) {
+auto EachArea(bool confirmed, Extent surface, Scaler const& scaler, std::predicate<sdlrdp_rect> auto send) -> bool {
   ExpectSurface(confirmed, surface);
   return std::ranges::all_of(scaler.Areas(), send);
 }
-unsigned SurfaceStride(Extent surface) {
+auto SurfaceStride(Extent surface) -> unsigned {
   return Avc::Aligned(surface.width) * unsigned{ PixelBytes };
 }
-void ExpectInside(sdlrdp_rect area, Extent surface) {
+auto ExpectInside(sdlrdp_rect area, Extent surface) -> void {
   Expects(area.x >= 0, "command left edge is nonnegative");
   Expects(area.y >= 0, "command top edge is nonnegative");
   Expects(area.w > 0, "command width is positive");
@@ -83,11 +83,11 @@ void ExpectInside(sdlrdp_rect area, Extent surface) {
   Expects(std::cmp_less_equal(area.x + area.w, surface.width), "command right edge fits surface");
   Expects(std::cmp_less_equal(area.y + area.h, surface.height), "command bottom edge fits surface");
 }
-constexpr std::array<BYTE, ProgressiveBlockHeaderBytes> BlockHeader(UINT16 block, std::size_t bytes) {
+constexpr auto BlockHeader(UINT16 block, std::size_t bytes) -> std::array<BYTE, ProgressiveBlockHeaderBytes> {
   return { BYTE(block), BYTE(block >> 8), BYTE(bytes), 0, 0, 0 };
 }
 // FreeRDP 3.15 rfx.c repeats SYNC/CONTEXT; GRD sends them once per surface context.
-bool ProgressiveHeaders(std::span<BYTE const> data) {
+auto ProgressiveHeaders(std::span<BYTE const> data) -> bool {
   if (data.size() < ProgressiveHeaderBytes) return false;
   constexpr auto sync    = BlockHeader(ProgressiveSyncBlock, ProgressiveSyncBytes);
   constexpr auto context = BlockHeader(ProgressiveContextBlock, ProgressiveContextBytes);
@@ -95,7 +95,7 @@ bool ProgressiveHeaders(std::span<BYTE const> data) {
          std::ranges::equal(context, data.subspan(ProgressiveSyncBytes, context.size()));
 }
 }
-sdlrdp_codec GfxChannel::CodecChoice() {
+auto GfxChannel::CodecChoice() -> sdlrdp_codec {
   auto choice = _configuration.Codec();
   if (choice == SDLRDP_CODEC_AUTO) choice = SDLRDP_CODEC_AVC420;
   if (choice == SDLRDP_CODEC_AVC420 && !SelectAvc()) choice = SDLRDP_CODEC_PROGRESSIVE;
@@ -103,7 +103,7 @@ sdlrdp_codec GfxChannel::CodecChoice() {
     choice = SDLRDP_CODEC_PROGRESSIVE;
   return choice;
 }
-std::string GfxChannel::AvcFailure() {
+auto GfxChannel::AvcFailure() -> std::string {
   if (!Avc::Encoder::Available()) return Avc::Encoder::UnavailableReason();
   if (!_avc_allowed) return "confirmed capabilities do not allow AVC420";
   if (_avc.IsOpen()) return { };
@@ -112,7 +112,7 @@ std::string GfxChannel::AvcFailure() {
   auto const   opened  = _avc.Open(size, Avc::Bitrate(size, _configuration.AvcBitrate()), _avc_rate);
   return opened ? std::string{ } : _avc.Error();
 }
-bool GfxChannel::CompressProgressive(REGION16& damage, std::chrono::steady_clock::time_point start) {
+auto GfxChannel::CompressProgressive(REGION16& damage, std::chrono::steady_clock::time_point start) -> bool {
   BYTE*  data    = nullptr;
   UINT32 size    = 0;
   auto   picture { Picture()               };
@@ -122,24 +122,24 @@ bool GfxChannel::CompressProgressive(REGION16& damage, std::chrono::steady_clock
   _encoder.Charge(std::chrono::steady_clock::now() - start);
   return result >= 0 && data && ProgressivePayload({ data, size });
 }
-bool GfxChannel::ProgressiveDamage(REGION16& damage) {
+auto GfxChannel::ProgressiveDamage(REGION16& damage) -> bool {
   return std::ranges::all_of(_scaler.Areas(), [&](sdlrdp_rect area) {
     RECTANGLE_16 const wire{ UINT16(area.x), UINT16(area.y), UINT16(area.x + area.w), UINT16(area.y + area.h) };
     return region16_union_rect(&damage, &damage, &wire);
   });
 }
-std::optional<Avc::EncodingTimes> GfxChannel::AvcTimes() const {
+auto GfxChannel::AvcTimes() const -> std::optional<Avc::EncodingTimes> {
   Expects(!_prepared.empty(), "accounting a prepared frame");
   if (_prepared.front().codec != RDPGFX_CODECID_AVC420) return std::nullopt;
   return _avc.Timing();
 }
-bool GfxChannel::FinishFrame() {
+auto GfxChannel::FinishFrame() -> bool {
   _pacing.Sent(_frames, { .bytes = _frame_bytes, .encoded = _encoder.EncodeTime(), .avc = AvcTimes() });
   _last_bytes = _frame_bytes;
   _prepared.clear();
   return true;
 }
-bool GfxChannel::Select() {
+auto GfxChannel::Select() -> bool {
   Expects(_confirmed, "codec follows capability confirmation");
   auto preference = _configuration.Codec();
   auto choice     = CodecChoice();
@@ -154,7 +154,7 @@ bool GfxChannel::Select() {
   if (changed) _activation.CodecChanged(choice);
   return true;
 }
-bool GfxChannel::SelectAvc() {
+auto GfxChannel::SelectAvc() -> bool {
   Expects(_confirmed, "codec follows capability confirmation");
   auto rate = _pacing.Effective();
   if (_avc.IsOpen() && _avc_rate != rate) {
@@ -172,7 +172,7 @@ bool GfxChannel::SelectAvc() {
   _avc_rejected =  true;
   return false;
 }
-std::span<BYTE const> GfxChannel::Picture() {
+auto GfxChannel::Picture() -> std::span<BYTE const> {
   auto const& snapshot = _frames.Snapshot();
   ExpectCaptured(_frames);
   if (SameSize(snapshot.Bounds(), Whole(_surface))) return snapshot.Pixels();
@@ -184,7 +184,7 @@ std::span<BYTE const> GfxChannel::Picture() {
   Avc::ReplicateEdges(_pixels, _surface);
   return _pixels;
 }
-bool GfxChannel::Avc420() {
+auto GfxChannel::Avc420() -> bool {
   Expects(_confirmed, "graphics capability confirmed");
   Expects(_avc.IsOpen(), "AVC encoder is open");
   auto start = std::chrono::steady_clock::now();
@@ -200,7 +200,7 @@ bool GfxChannel::Avc420() {
   _prepared.push_back({ _regions.Bounds(), 0, data.size(), RDPGFX_CODECID_AVC420 });
   return true;
 }
-bool GfxChannel::Command(sdlrdp_rect area, std::span<BYTE const> data, UINT32 codec) {
+auto GfxChannel::Command(sdlrdp_rect area, std::span<BYTE const> data, UINT32 codec) -> bool {
   Expects(!data.empty(), "encoded graphics payload exists");
   _frame_bytes += data.size() + WireToSurfaceHeaderBytes;
   auto offset = _payload.size();
@@ -208,7 +208,7 @@ bool GfxChannel::Command(sdlrdp_rect area, std::span<BYTE const> data, UINT32 co
   _prepared.push_back({ area, offset, data.size(), codec });
   return true;
 }
-bool GfxChannel::WriteCommand(Packet const& packet) {
+auto GfxChannel::WriteCommand(Packet const& packet) -> bool {
   Expects(_confirmed, "graphics capability confirmed");
   Expects(packet.length > 0, "graphics payload exists");
   ExpectInside(packet.area, _surface);
@@ -221,7 +221,7 @@ bool GfxChannel::WriteCommand(Packet const& packet) {
   if (packet.codec == RDPGFX_CODECID_AVC420) command.extra = &stream;
   return Check(_context->SurfaceCommand(_context.get(), &command), "surface command");
 }
-bool GfxChannel::Progressive() {
+auto GfxChannel::Progressive() -> bool {
   ExpectSurface(_confirmed, _surface);
   auto start = std::chrono::steady_clock::now();
   if (!_progressive) _progressive.reset(progressive_context_new_ex(TRUE, THREADING_FLAGS_DISABLE_THREADS));
@@ -231,39 +231,39 @@ bool GfxChannel::Progressive() {
   InitializedRegion const owned{ &damage };
   return ProgressiveDamage(damage) && CompressProgressive(damage, start);
 }
-bool GfxChannel::ProgressivePayload(std::span<BYTE> data) {
+auto GfxChannel::ProgressivePayload(std::span<BYTE> data) -> bool {
   if (!ProgressiveHeaders(data)) return false;
   auto payload = data.subspan(_headers ? ProgressiveHeaderBytes : 0);
   if (!Command(Whole(_surface), payload, RDPGFX_CODECID_CAPROGRESSIVE)) return false;
   _headers = true;
   return true;
 }
-bool GfxChannel::Raw() {
+auto GfxChannel::Raw() -> bool {
   return EachArea(_confirmed, _surface, _scaler, [&](sdlrdp_rect area) {
     _band.resize(std::size_t(area.w) * area.h * PixelBytes);
     return Command(area, _scaler.Copy(area, _band, RowOrder::TopDown).Pixels(), RDPGFX_CODECID_UNCOMPRESSED);
   });
 }
-bool GfxChannel::Planar() {
+auto GfxChannel::Planar() -> bool {
   return EachArea(_confirmed, _surface, _scaler, [&](sdlrdp_rect area) {
     return EncodePlanarRows(_encoder, _scaler, area, [this](sdlrdp_rect row, std::span<BYTE const> payload) {
       return Command(row, payload, RDPGFX_CODECID_PLANAR);
     });
   });
 }
-bool GfxChannel::Prepare() {
+auto GfxChannel::Prepare() -> bool {
   ExpectCaptured(_frames);
   Expects(_confirmed, "graphics capability confirmed");
   if (!_prepared.empty()) return true;
   return Surface() && Select();
 }
-void GfxChannel::BeginPayload() {
+auto GfxChannel::BeginPayload() -> void {
   constexpr std::size_t StartFrameBytes = 16;
   constexpr std::size_t EndFrameBytes   = 12;
   _frame_bytes = StartFrameBytes + EndFrameBytes;
   _payload.clear();
 }
-bool GfxChannel::Encode() {
+auto GfxChannel::Encode() -> bool {
   ExpectCaptured(_frames);
   ExpectSurface(_confirmed, _surface);
   if (!_prepared.empty()) return true;
@@ -282,7 +282,7 @@ bool GfxChannel::Encode() {
     utilities::Unreachable(codec);
   }
 }
-bool GfxChannel::Send() {
+auto GfxChannel::Send() -> bool {
   ExpectCaptured(_frames);
   Expects(_confirmed, "graphics capability confirmed");
   Expects(!_prepared.empty(), "frame is encoded before transport");

@@ -7,24 +7,24 @@
 namespace Headless {
 struct FrameObserver {
 public:
-                 FrameObserver(FrameObserver const&) = delete;
-                 FrameObserver(FrameObserver&&)      = delete;
-  explicit       FrameObserver(Client& client);
-                 ~FrameObserver();
-  FrameObserver& operator = (FrameObserver const&)   = delete;
-  FrameObserver& operator = (FrameObserver&&)        = delete;
+           FrameObserver(FrameObserver const&)                 = delete;
+           FrameObserver(FrameObserver&&)                      = delete;
+  explicit FrameObserver(Client& client);
+           ~FrameObserver();
+  auto     operator = (FrameObserver const&) -> FrameObserver& = delete;
+  auto     operator = (FrameObserver&&)      -> FrameObserver& = delete;
 
-  bool                                  Ack();
-  std::vector<UINT32> const&            Frames() const;
-  std::vector<Clock::time_point> const& ReceivedAt() const;
-  bool                                  AckFrame(UINT32 id);
-  std::vector<Clock::time_point> const& Acknowledgements() const;
-  bool                                  Coherent() const;
-  bool                                  Installed() const;
-  void                                  Clear();
+  auto Ack()                    -> bool;
+  auto Frames() const           -> std::vector<UINT32> const&;
+  auto ReceivedAt() const       -> std::vector<Clock::time_point> const&;
+  auto AckFrame(UINT32 id)      -> bool;
+  auto Acknowledgements() const -> std::vector<Clock::time_point> const&;
+  auto Coherent() const         -> bool;
+  auto Installed() const        -> bool;
+  auto Clear()                  -> void;
 
 private:
-  static BOOL Receive(rdpContext* context, SURFACE_FRAME_MARKER const* marker);
+  static auto Receive(rdpContext* context, SURFACE_FRAME_MARKER const* marker) -> BOOL;
   inline static thread_local FrameObserver* active    = nullptr;
   rdpUpdate*                                update;
   pSurfaceFrameMarker                       original;

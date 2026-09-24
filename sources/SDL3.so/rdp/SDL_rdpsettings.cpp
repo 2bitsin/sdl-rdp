@@ -39,7 +39,7 @@ auto LibraryIni() -> std::optional<std::filesystem::path> {
   if (!library.has_parent_path()) return std::nullopt;
   return library.parent_path() / IniFileName;
 }
-void WarnIniEntry(std::filesystem::path const& path, IniEntry const& entry) {
+auto WarnIniEntry(std::filesystem::path const& path, IniEntry const& entry) -> void {
   auto const file = path.string();
   if (entry.Status() == IniStatus::MALFORMED)
     SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "%s:%u: malformed ini line (missing '=')", file.c_str(), entry.Line());

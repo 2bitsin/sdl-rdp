@@ -14,7 +14,7 @@ class Activator : private Pinned {
 public:
        Activator(PeerLink& link, Authenticator& authenticator, Activation const& activation, Encoder& encoder,
                  Configuration const& configuration, Arrival& arrival) noexcept;
-  BOOL Activate();
+  auto Activate() -> BOOL;
 
 private:
   PeerLink&            _link;

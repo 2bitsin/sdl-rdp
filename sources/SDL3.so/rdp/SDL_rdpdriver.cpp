@@ -32,15 +32,15 @@ auto Driver::_Poll(std::span<sdlrdp_event> events) const -> std::size_t {
 }
 auto Driver::Options() const -> Settings const& { return _settings; }
 auto Driver::Config() const -> sdlrdp_config const& { return _config.Get(); }
-void Driver::AuthDisplay(SDL_PropertiesID properties) noexcept { _auth_properties.store(properties); }
-void Driver::_ReportError() const { SDL_SetError("%s", _backend.Call<Operation::LAST_ERROR>()); }
-void Driver::Throw() const { throw std::runtime_error(_backend.Call<Operation::LAST_ERROR>()); }
+auto Driver::AuthDisplay(SDL_PropertiesID properties) noexcept -> void { _auth_properties.store(properties); }
+auto Driver::_ReportError() const -> void { SDL_SetError("%s", _backend.Call<Operation::LAST_ERROR>()); }
+auto Driver::Throw() const -> void { throw std::runtime_error(_backend.Call<Operation::LAST_ERROR>()); }
 auto PublishAuthentication(Driver& driver, SDL_PropertiesID properties) -> DisplayAuthentication {
   utilities::Expects(properties != 0, "authentication reports to a display's properties");
   driver.AuthDisplay(properties);
   return {driver, properties};
 }
-void WithdrawAuthentication(DisplayAuthentication const& authentication) noexcept {
+auto WithdrawAuthentication(DisplayAuthentication const& authentication) noexcept -> void {
   authentication.first.get().AuthDisplay(0);
 }
 }

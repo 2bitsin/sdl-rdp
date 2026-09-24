@@ -6,13 +6,13 @@
 namespace BackendGate {
 class TraceGate : public AudioGate {
 protected:
-  void ThenTraceEvents() {
+  auto ThenTraceEvents() -> void {
     for (auto const* event :
          { "key", "audio-block", "audio-confirm", "frame", "ack", "present", "connect", "disconnect" })
       EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, std::format("trace {} t=", event))) << logs.Text(true);
     EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, "rms=1234 peak=1234"));
   }
-  void ThenKeyTraced(Client& client) {
+  auto ThenKeyTraced(Client& client) -> void {
     auto events = EventsUntil(
         [](auto const& events) {
           return std::ranges::any_of(events, [](auto const& event) { return event.type == SDLRDP_KEY; });
@@ -20,13 +20,13 @@ protected:
         true, &client);
     ASSERT_NE(std::ranges::find(events, SDLRDP_KEY, &sdlrdp_event::type), events.end());
   }
-  static void ThenTraceTime(sdlrdp_log_level level, std::string const& line, int64_t now) {
+  static auto ThenTraceTime(sdlrdp_log_level level, std::string const& line, int64_t now) -> void {
     EXPECT_EQ(level, SDLRDP_LOG_INFO);
     auto const time = Backend::Required(oxbox::utilities::ParseNumberAfter<int64_t>(line, " t="),
                                         "trace lines carry a whole-millisecond time");
     EXPECT_LE(std::abs(now - time), 60000) << line;
   }
-  void Exercise() {
+  auto Exercise() -> void {
     ASSERT_EQ(sdlrdp_audio_open(backend.get()), 0);
     Client      client(sdlrdp_port(backend.get()), true);
     SoundClient audio(client);
@@ -40,7 +40,7 @@ protected:
     ASSERT_TRUE(client.Until([&] { return audio.CaptureState().samples.size() == pcm.size() && Acknowledged(); }));
     ThenKeyTraced(client);
   }
-  void CheckTimes() {
+  auto CheckTimes() -> void {
     auto now =
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
             .count();

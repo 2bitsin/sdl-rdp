@@ -6,7 +6,7 @@
 namespace Backend {
 struct ReleasesListener {
 public:
-  void operator()(freerdp_listener* listener) const;
+  auto operator()(freerdp_listener* listener) const -> void;
 };
 
 using ListenerHandle = std::unique_ptr<freerdp_listener, ReleasesListener>;

@@ -13,8 +13,8 @@ class OutputControl : private Pinned {
 public:
        OutputControl(PeerLink& link, GraphicsLink const& graphics, FramePacing& pacing, Activation& activation,
                      PeerFrames& frames) noexcept;
-  void Acknowledge(UINT32 id);
-  void Suppress(bool allow);
+  auto Acknowledge(UINT32 id) -> void;
+  auto Suppress(bool allow)   -> void;
 
 private:
   PeerLink&           _link;

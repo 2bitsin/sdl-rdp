@@ -3,10 +3,10 @@
 namespace Backend {
 class Tap {
 public:
-           Tap(int index, double ratio, unsigned extent);
-  unsigned First() const  noexcept;
-  unsigned Second() const noexcept;
-  float    Weight() const noexcept;
+       Tap(int index, double ratio, unsigned extent);
+  auto First() const noexcept  -> unsigned;
+  auto Second() const noexcept -> unsigned;
+  auto Weight() const noexcept -> float;
 
 private:
   unsigned _first;

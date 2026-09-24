@@ -15,21 +15,21 @@ struct DisplayCapture {
 };
 struct DisplayClient {
 public:
-                                        DisplayClient(DisplayClient const&) = delete;
-                                        DisplayClient(DisplayClient&&)      = delete;
-  explicit                              DisplayClient(Client& client);
-                                        ~DisplayClient();
-  DisplayClient&                        operator = (DisplayClient const&)   = delete;
-  DisplayClient&                        operator = (DisplayClient&&)        = delete;
-  static DISPLAY_CONTROL_MONITOR_LAYOUT Monitor(unsigned width, unsigned height, unsigned millimetres = 400);
-  static bool                           Layout(unsigned width, unsigned height);
-  DisplayCapture&                       Observed();
-  static bool                           Ready();
-  static DispClientContext*             Channel();
+              DisplayClient(DisplayClient const&)                                                    = delete;
+              DisplayClient(DisplayClient&&)                                                         = delete;
+  explicit    DisplayClient(Client& client);
+              ~DisplayClient();
+  auto        operator = (DisplayClient const&)                                    -> DisplayClient& = delete;
+  auto        operator = (DisplayClient&&)                                         -> DisplayClient& = delete;
+  static auto Monitor(unsigned width, unsigned height, unsigned millimetres = 400) -> DISPLAY_CONTROL_MONITOR_LAYOUT;
+  static auto Layout(unsigned width, unsigned height)                              -> bool;
+  auto        Observed()                                                           -> DisplayCapture&;
+  static auto Ready()                                                              -> bool;
+  static auto Channel()                                                            -> DispClientContext*;
 
 private:
-  static BOOL Resize(rdpContext* context);
-  static void Connected(void* /*unused*/, ChannelConnectedEventArgs const* event);
+  static auto Resize(rdpContext* context)                                         -> BOOL;
+  static auto Connected(void* /*unused*/, ChannelConnectedEventArgs const* event) -> void;
   DisplayCapture                                observed;
   inline static thread_local DisplayClient*     active         = nullptr;
   Client&                                       client;

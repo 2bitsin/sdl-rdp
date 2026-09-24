@@ -5,7 +5,7 @@
 #include <freerdp/settings.h>
 
 namespace Backend {
-std::filesystem::path DefaultCertificateDirectory();
-Credentials           EnsureCertificate(std::filesystem::path const& directory);
-auto                  InstallServerCredentials(rdpSettings& settings, Credentials const& credentials) -> void;
+auto DefaultCertificateDirectory()                                                   -> std::filesystem::path;
+auto EnsureCertificate(std::filesystem::path const& directory)                       -> Credentials;
+auto InstallServerCredentials(rdpSettings& settings, Credentials const& credentials) -> void;
 }

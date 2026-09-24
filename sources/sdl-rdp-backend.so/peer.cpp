@@ -45,16 +45,16 @@ Peer::Peer(PeerHandle accepted, Diagnostics const& diagnostics, EventQueue& even
       _pump        { _link, session, _channels, _redirection, _sender, _end, _traces             },
       _departure   { _link, session, _activation, _redirection, _statistics, diagnostics         },
       _loop        { _link, session, diagnostics, configuration, store, _wait, _pump, _departure } { }
-void Peer::Start() {
+auto Peer::Start() -> void {
   _loop.Start();
 }
-void Peer::Stop() {
+auto Peer::Stop() -> void {
   _loop.Stop();
 }
-bool Peer::Owns(PeerLink const& link) const noexcept {
+auto Peer::Owns(PeerLink const& link) const noexcept -> bool {
   return &_link == &link;
 }
-bool Peer::Evict() {
+auto Peer::Evict() -> bool {
   if (!_activation.Deactivate()) return false;
   _redirection.Disconnect();
   _link.Refuse(ERRINFO_DISCONNECTED_BY_OTHER_CONNECTION);
@@ -62,40 +62,40 @@ bool Peer::Evict() {
   Stop();
   return true;
 }
-bool Peer::Finished() const noexcept {
+auto Peer::Finished() const noexcept -> bool {
   return _activation.Finished();
 }
-void Peer::Present(FrameLock const& held, std::span<sdlrdp_rect const> damage) {
+auto Peer::Present(FrameLock const& held, std::span<sdlrdp_rect const> damage) -> void {
   if (!_activation.Active()) return;
   _frames.CountPresent(held);
   std::ranges::for_each(damage, [&](sdlrdp_rect area) { _frames.Post(held, area); });
   _link.Signal();
 }
-void Peer::Repaint(FrameLock const& held, sdlrdp_rect area) {
+auto Peer::Repaint(FrameLock const& held, sdlrdp_rect area) -> void {
   if (!_activation.Active()) return;
   _frames.Repaint(held, area);
   _link.Signal();
 }
-void Peer::RestartPacing(FrameLock const& held) {
+auto Peer::RestartPacing(FrameLock const& held) -> void {
   _pacing.Restart(held);
 }
-void Peer::Signal() {
+auto Peer::Signal() -> void {
   if (_activation.Active()) _link.Signal();
 }
-bool Peer::Settled(FrameLock const& held, uint64_t target) const {
+auto Peer::Settled(FrameLock const& held, uint64_t target) const -> bool {
   return _pacing.Settled(held, target);
 }
-AudioChannel* Peer::Audio() const noexcept {
+auto Peer::Audio() const noexcept -> AudioChannel* {
   return _redirection.Audio();
 }
-std::shared_ptr<DriveChannel> Peer::Drive() const {
+auto Peer::Drive() const -> std::shared_ptr<DriveChannel> {
   return _redirection.Drive();
 }
-void Peer::Point(MouseMode mode) {
+auto Peer::Point(MouseMode mode) -> void {
   _input_events.Point(mode);
   _link.Signal();
 }
-PeerStatus Peer::Status(FrameLock const& held) const {
+auto Peer::Status(FrameLock const& held) const -> PeerStatus {
   auto const* timing = _graphics.Timing();
   return { .client           = &_link.Client(),
            .display          = _display.Opened(),

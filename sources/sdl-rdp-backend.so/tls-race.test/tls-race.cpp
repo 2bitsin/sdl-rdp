@@ -161,7 +161,7 @@ auto ExpectCleanChildren(unsigned count, std::function<int()> const& body) -> vo
 }
 class TlsRehearsalRace : public testing::Test {
 protected:
-  void SetUp() override {
+  auto SetUp() -> void override {
     ASSERT_TRUE(winpr_InitializeSSL(WINPR_SSL_INIT_DEFAULT));
     if (MethodFill::Shared().Seen(Race::SocketMethod) || MethodFill::Shared().Seen(Race::TlsMethod))
       GTEST_SKIP() << "FreeRDP filled its BIO methods earlier in this process.";

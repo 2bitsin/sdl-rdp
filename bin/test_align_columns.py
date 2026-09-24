@@ -1181,6 +1181,23 @@ def test_overflow_setter_is_excluded_and_others_stay_aligned():
     assert result.exceptions == [MODULE.Overflow(2, long_line, 139)]
 
 
+def test_column_setter_within_limit_is_excluded_when_it_pushes_the_run_over():
+    wide   = '  auto Wait(' + 'x' * 90 + ') -> bool;'
+    source = f'  auto operator = (Channel const&) -> Channel& = delete;\n{wide}\n  auto Open() -> bool;\n'
+    result = MODULE.align(source)
+    assert result.text.splitlines() == ['  auto operator = (Channel const&) -> Channel& = delete;', wide,
+                                        '  auto Open()                      -> bool;']
+    assert result.exceptions == [MODULE.ExcludedForColumns(2, wide, len(wide))]
+
+
+def test_one_line_body_counts_toward_the_limit():
+    lines  = ['auto Unlock(Mutex& mutex) noexcept -> void { Release(mutex); }',
+              'auto Observe(' + 'x' * 85 + ') -> Registration;']
+    result = MODULE.align('\n'.join(lines) + '\n')
+    assert result.text.splitlines() == lines
+    assert result.exceptions == [MODULE.ExcludedForColumns(2, lines[1], len(lines[1]))]
+
+
 def without_preprocessor(text):
     return [line for line in text.splitlines() if not line.lstrip().startswith('#')]
 

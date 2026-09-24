@@ -9,39 +9,39 @@
 
 namespace Backend {
 Activation::Activation(EventQueue& events, PeerLink& link) noexcept : _events{ events }, _link{ link } { }
-void Activation::Activate() {
+auto Activation::Activate() -> void {
   _active       = true;
   _activated    = true;
   _activated_at = Clock::now();
 }
-bool Activation::Deactivate() noexcept {
+auto Activation::Deactivate() noexcept -> bool {
   return _active.exchange(false);
 }
-bool Activation::Active() const noexcept {
+auto Activation::Active() const noexcept -> bool {
   return _active.load();
 }
-bool Activation::Activated() const noexcept {
+auto Activation::Activated() const noexcept -> bool {
   return _activated;
 }
-void Activation::Finish() noexcept {
+auto Activation::Finish() noexcept -> void {
   _finished = true;
 }
-bool Activation::Finished() const noexcept {
+auto Activation::Finished() const noexcept -> bool {
   return _finished.load();
 }
-Activation::Clock::time_point Activation::ActivatedAt() const noexcept {
+auto Activation::ActivatedAt() const noexcept -> Activation::Clock::time_point {
   return _activated_at;
 }
-void Activation::Hold(sdlrdp_event connection, sdlrdp_event screen) {
+auto Activation::Hold(sdlrdp_event connection, sdlrdp_event screen) -> void {
   Expects(connection.type == SDLRDP_CONNECTED, "held event announces a connection");
   Expects(screen.type == SDLRDP_SCREEN, "held screen event describes the client screen");
   _connection = connection;
   _screen     = screen;
 }
-bool Activation::Holding() const noexcept {
+auto Activation::Holding() const noexcept -> bool {
   return _connection.has_value();
 }
-void Activation::Announce(sdlrdp_codec codec, unsigned refresh_hz) {
+auto Activation::Announce(sdlrdp_codec codec, unsigned refresh_hz) -> void {
   auto connection = std::exchange(_connection, std::nullopt);
   if (!connection) return;
   connection->connected.codec              = codec;
@@ -50,16 +50,16 @@ void Activation::Announce(sdlrdp_codec codec, unsigned refresh_hz) {
   _events.Push(_screen);
   _link.Signal();
 }
-void Activation::CodecChanged(sdlrdp_codec codec) {
+auto Activation::CodecChanged(sdlrdp_codec codec) -> void {
   if (Active() && !Holding()) _events.Push({ .type = SDLRDP_CODEC_CHANGED, .codec_changed = { codec } });
 }
-void Activation::Suppress() noexcept {
+auto Activation::Suppress() noexcept -> void {
   _suppressed = true;
 }
-void Activation::Resume() noexcept {
+auto Activation::Resume() noexcept -> void {
   _suppressed = false;
 }
-bool Activation::Suppressed() const noexcept {
+auto Activation::Suppressed() const noexcept -> bool {
   return _suppressed;
 }
 }

@@ -1,7 +1,7 @@
 #include "_detail/release-stream.hpp"
 
 namespace Backend {
-void ReleaseStream::operator()(wStream* stream) const {
+auto ReleaseStream::operator()(wStream* stream) const -> void {
   Stream_Free(stream, TRUE);
 }
 }

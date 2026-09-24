@@ -4,7 +4,7 @@
 #include <freerdp/channels/rdpdr.h>
 
 namespace DriveGate {
-Backend::DrivePacket Completion(unsigned device, unsigned id, unsigned status) {
+auto Completion(unsigned device, unsigned id, unsigned status) -> Backend::DrivePacket {
   Backend::DrivePacket response;
   response.Put(RDPDR_CTYP_CORE, 2);
   response.Put(PAKID_CORE_DEVICE_IOCOMPLETION, 2);
@@ -13,12 +13,12 @@ Backend::DrivePacket Completion(unsigned device, unsigned id, unsigned status) {
   response.Put(status);
   return response;
 }
-Backend::DrivePacket ReplyTo(Backend::DrivePacket request, unsigned status) {
+auto ReplyTo(Backend::DrivePacket request, unsigned status) -> Backend::DrivePacket {
   auto device = request.Get(4);
   request.Skip(4);
   return Completion(device, request.Get(4), status);
 }
-Backend::DrivePacket DeviceAnnouncement(unsigned type, unsigned id, std::span<uint8_t const> name) {
+auto DeviceAnnouncement(unsigned type, unsigned id, std::span<uint8_t const> name) -> Backend::DrivePacket {
   Backend::DrivePacket packet;
   packet.Put(RDPDR_CTYP_CORE, 2);
   packet.Put(PAKID_CORE_DEVICELIST_ANNOUNCE, 2);

@@ -7,40 +7,40 @@
 #include <utility>
 
 namespace Backend {
-bool ApplyDesktopSize(rdpSettings& settings, sdlrdp_rect picture) {
+auto ApplyDesktopSize(rdpSettings& settings, sdlrdp_rect picture) -> bool {
   return freerdp_settings_set_uint32(&settings, FreeRDP_DesktopWidth, picture.w) &&
          freerdp_settings_set_uint32(&settings, FreeRDP_DesktopHeight, picture.h);
 }
-sdlrdp_rect DesktopLayout::Rect() const noexcept {
+auto DesktopLayout::Rect() const noexcept -> sdlrdp_rect {
   return _desktop;
 }
-void DesktopLayout::Assign(sdlrdp_rect value) noexcept {
+auto DesktopLayout::Assign(sdlrdp_rect value) noexcept -> void {
   _desktop = value;
 }
-void DesktopLayout::RecordScreen(rdpSettings const& settings) {
+auto DesktopLayout::RecordScreen(rdpSettings const& settings) -> void {
   _screen_width  = freerdp_settings_get_uint32(&settings, FreeRDP_DesktopWidth);
   _screen_height = freerdp_settings_get_uint32(&settings, FreeRDP_DesktopHeight);
 }
-sdlrdp_event DesktopLayout::ScreenEvent() const noexcept {
+auto DesktopLayout::ScreenEvent() const noexcept -> sdlrdp_event {
   return { .type = SDLRDP_SCREEN, .screen = { .width = _screen_width, .height = _screen_height } };
 }
-bool DesktopLayout::Resizing() const noexcept {
+auto DesktopLayout::Resizing() const noexcept -> bool {
   return _resizing;
 }
-void DesktopLayout::BeginResize(sdlrdp_rect picture) noexcept {
+auto DesktopLayout::BeginResize(sdlrdp_rect picture) noexcept -> void {
   _desktop  = picture;
   _resizing = true;
 }
-bool DesktopLayout::EndResize() noexcept {
+auto DesktopLayout::EndResize() noexcept -> bool {
   return std::exchange(_resizing, false);
 }
-bool DesktopLayout::Matches(sdlrdp_rect picture) const noexcept {
+auto DesktopLayout::Matches(sdlrdp_rect picture) const noexcept -> bool {
   return SameSize(picture, _desktop);
 }
-sdlrdp_rect DesktopLayout::Offer(sdlrdp_rect picture) const noexcept {
+auto DesktopLayout::Offer(sdlrdp_rect picture) const noexcept -> sdlrdp_rect {
   return _resizing ? _desktop : picture;
 }
-int DesktopLayout::Scale(int value, unsigned target, int sdlrdp_rect::* extent) const {
+auto DesktopLayout::Scale(int value, unsigned target, int sdlrdp_rect::* extent) const -> int {
   Expects(_desktop.*extent > 0, "desktop extent is positive");
   return int(int64_t(value) * target / (_desktop.*extent));
 }

@@ -11,21 +11,22 @@
 namespace Backend::Avc {
 class Encoder {
 public:
-                        Encoder();
-                        Encoder(Encoder const&)     = delete;
-                        Encoder(Encoder&&)          = delete;
-                        ~Encoder();
-  Encoder&              operator = (Encoder const&) = delete;
-  Encoder&              operator = (Encoder&&)      = delete;
-  static bool           Available();
-  static std::string    UnavailableReason();
-  bool                  Open(Extent size, unsigned bitrate, unsigned fps);
-  std::span<BYTE const> Encode(std::span<BYTE const> bgrx, unsigned stride, bool force_idr, std::vector<BYTE>& encoded);
-  void                  Close();
-  bool                  IsOpen() const;
-  bool                  TooSmall() const;
-  std::string const&    Error() const;
-  EncodingTimes const&  Timing() const;
+              Encoder();
+              Encoder(Encoder const&)                                       = delete;
+              Encoder(Encoder&&)                                            = delete;
+              ~Encoder();
+  auto        operator = (Encoder const&)                       -> Encoder& = delete;
+  auto        operator = (Encoder&&)                            -> Encoder& = delete;
+  static auto Available()                                       -> bool;
+  static auto UnavailableReason()                               -> std::string;
+  auto        Open(Extent size, unsigned bitrate, unsigned fps) -> bool;
+  auto        Encode(std::span<BYTE const> bgrx, unsigned stride, bool force_idr,
+                     std::vector<BYTE>& encoded) -> std::span<BYTE const>;
+  auto        Close()                                           -> void;
+  auto        IsOpen() const                                    -> bool;
+  auto        TooSmall() const                                  -> bool;
+  auto        Error() const                                     -> std::string const&;
+  auto        Timing() const                                    -> EncodingTimes const&;
 
 private:
   EncodingTimes         times;

@@ -15,11 +15,11 @@ class Arrival : private Pinned {
 public:
        Arrival(SessionAccess& session, FrameStore& store, PeerFrames& frames, PeerLink& link, Activation& activation,
                DesktopLayout& desktop, FramePacing& pacing, Diagnostics const& diagnostics) noexcept;
-  void Admit(sdlrdp_codec codec);
+  auto Admit(sdlrdp_codec codec) -> void;
 
 private:
-  sdlrdp_event Connection(sdlrdp_codec codec) const;
-  void         Enter(sdlrdp_event const& connection, sdlrdp_codec codec);
+  auto Connection(sdlrdp_codec codec) const                      -> sdlrdp_event;
+  auto Enter(sdlrdp_event const& connection, sdlrdp_codec codec) -> void;
   SessionAccess&     _session;
   FrameStore&        _store;
   PeerFrames&        _frames;

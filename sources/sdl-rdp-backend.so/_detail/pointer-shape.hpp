@@ -10,12 +10,12 @@ inline constexpr unsigned LargePointerLimit = 384;
 enum class PointerDelivery{ Sent, Failed, Unsupported };
 class PointerShape {
 public:
-                  PointerShape() noexcept = default;
-                  PointerShape(Extent size, unsigned x, unsigned y, std::span<BYTE const> argb);
-  PointerDelivery Send(rdpContext& context);
+       PointerShape() noexcept = default;
+       PointerShape(Extent size, unsigned x, unsigned y, std::span<BYTE const> argb);
+  auto Send(rdpContext& context) -> PointerDelivery;
 
 private:
-  BOOL SendLarge(rdpContext& context);
+  auto SendLarge(rdpContext& context) -> BOOL;
   Extent            _size;
   unsigned          _hot_x { };
   unsigned          _hot_y { };

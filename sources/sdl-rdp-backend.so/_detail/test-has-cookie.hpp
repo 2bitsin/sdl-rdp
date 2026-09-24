@@ -2,5 +2,5 @@
 #include "client.hpp"
 
 namespace BackendGate {
-bool HasCookie(Headless::Client const& client);
+auto HasCookie(Headless::Client const& client) -> bool;
 }

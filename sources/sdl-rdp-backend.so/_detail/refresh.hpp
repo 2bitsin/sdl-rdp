@@ -16,22 +16,22 @@ struct WireSample {
   unsigned mss          { };
   uint64_t delivery_rate{ };
 };
-WireSample SampleWire(int descriptor);
+auto SampleWire(int descriptor) -> WireSample;
 class Refresh {
 public:
   using Clock = std::chrono::steady_clock;
-  explicit         Refresh(RefreshMode selected = RefreshMode::Fixed, unsigned limit = 60);
-  unsigned         Rate() const;
-  RefreshMode      Mode() const;
-  bool             AwaitingEmpty() const;
-  void             Restart();
-  void             Step(Direction direction);
-  Direction        FromLatency(Clock::duration latency) const;
-  static Direction FromWire(WireSample const& wire, std::size_t bytes);
-  void             Blocked(Clock::time_point now);
-  auto             Acknowledge(Clock::time_point now, Clock::duration latency) -> void;
-  void             Written(WireSample const& wire, std::size_t bytes);
-  void             Drained(WireSample const& wire);
+  explicit    Refresh(RefreshMode selected = RefreshMode::Fixed, unsigned limit = 60);
+  auto        Rate() const                                                -> unsigned;
+  auto        Mode() const                                                -> RefreshMode;
+  auto        AwaitingEmpty() const                                       -> bool;
+  auto        Restart()                                                   -> void;
+  auto        Step(Direction direction)                                   -> void;
+  auto        FromLatency(Clock::duration latency) const                  -> Direction;
+  static auto FromWire(WireSample const& wire, std::size_t bytes)         -> Direction;
+  auto        Blocked(Clock::time_point now)                              -> void;
+  auto        Acknowledge(Clock::time_point now, Clock::duration latency) -> void;
+  auto        Written(WireSample const& wire, std::size_t bytes)          -> void;
+  auto        Drained(WireSample const& wire)                             -> void;
 
 private:
   auto Average(Clock::time_point now)     -> void;

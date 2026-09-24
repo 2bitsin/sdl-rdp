@@ -11,14 +11,14 @@
 namespace SampleGate {
 
 namespace {
-void WhenPressureContact(auto* touch, INT32& id) {
+auto WhenPressureContact(auto* touch, INT32& id) -> void {
   ASSERT_EQ(
       touch->TouchRawEvent(touch, 3, 160, 120, &id,
                            RDPINPUT_CONTACT_FLAG_DOWN | RDPINPUT_CONTACT_FLAG_INRANGE | RDPINPUT_CONTACT_FLAG_INCONTACT,
                            CONTACT_DATA_PRESSURE_PRESENT, UINT32(512)),
       CHANNEL_RC_OK);
 }
-auto* TouchChannel(Client& client) {
+auto TouchChannel(Client& client) -> auto* {
   bool const ready = client.Until([&] {
     return InputClient::Touch().load() &&
            InputClient::Touch().load()->GetVersion(InputClient::Touch().load()) == RDPINPUT_PROTOCOL_V10;

@@ -54,12 +54,12 @@ class File {
 public:
        File(std::shared_ptr<Driver const> driver, unsigned drive, std::string const& path, FileMode mode)
       : _driver{std::move(driver)}, _file{*_driver, drive, path, mode.Flags()}, _mode{mode} { }
-  auto Backend() const  -> Driver const& { return *_driver; }
-  auto Handle() const   -> sdlrdp_file* { return _file.Get().second; }
-  auto Mode() const     -> FileMode { return _mode; }
-  auto Position() const -> Sint64 { return _position; }
-  void Seek(Sint64 position) { _position = position; }
-  auto Close()          -> bool { return _file.Close(); }
+  auto Backend() const       -> Driver const& { return *_driver; }
+  auto Handle() const        -> sdlrdp_file* { return _file.Get().second; }
+  auto Mode() const          -> FileMode { return _mode; }
+  auto Position() const      -> Sint64 { return _position; }
+  auto Seek(Sint64 position) -> void { _position = position; }
+  auto Close()               -> bool { return _file.Close(); }
 private:
   std::shared_ptr<Driver const> _driver;
   DriveFile                     _file;
@@ -82,12 +82,12 @@ auto SeekBase(File const& file, SDL_IOWhence origin) -> Sint64 {
   }
 }
 // SDL stream callbacks carry their owned File through an opaque context pointer.
-Sint64 SDLCALL FileSize(void* context) {
+auto SDLCALL FileSize(void* context) -> Sint64 {
   utilities::Expects(context != nullptr, "stream size has state");
   return Size(*static_cast<File*>(context));
 }
 // SDL stream seek borrows its opaque state and supplies a signed offset and origin.
-Sint64 SDLCALL FileSeek(void* context, Sint64 offset, SDL_IOWhence origin) {
+auto SDLCALL FileSeek(void* context, Sint64 offset, SDL_IOWhence origin) -> Sint64 {
   utilities::Expects(context != nullptr, "stream seek has state");
   auto&      file = *static_cast<File*>(context);
   auto const base = SeekBase(file, origin);
@@ -111,7 +111,7 @@ auto Advance(File& file, int count, std::size_t size, SDL_IOStatus short_status)
 // SDL's stream transfer callbacks require raw counted buffers and a status output.
 template<Operation _Operation, typename _Byte>
   requires IoBuffer<_Byte>
-std::size_t SDLCALL Transfer(void* context, _Byte* buffer, std::size_t size, SDL_IOStatus* status) {
+auto SDLCALL Transfer(void* context, _Byte* buffer, std::size_t size, SDL_IOStatus* status) -> std::size_t {
   utilities::Expects(context != nullptr, "stream transfer has state");
   utilities::Expects(status != nullptr, "stream transfer has a status output");
   auto&          file         = *static_cast<File*>(context);
@@ -127,7 +127,7 @@ std::size_t SDLCALL Transfer(void* context, _Byte* buffer, std::size_t size, SDL
   return bytes;
 }
 // SDL stream flush borrows its opaque state and provides a status output.
-bool SDLCALL FileFlush(void* context, SDL_IOStatus* status) {
+auto SDLCALL FileFlush(void* context, SDL_IOStatus* status) -> bool {
   utilities::Expects(context != nullptr, "stream flush has state");
   utilities::Expects(status != nullptr, "stream flush has a status output");
   auto const& file = *static_cast<File*>(context);
@@ -136,7 +136,7 @@ bool SDLCALL FileFlush(void* context, SDL_IOStatus* status) {
   return file.Backend().Fail();
 }
 // SDL returns ownership of stream state to its close callback.
-bool SDLCALL FileClose(void* context) {
+auto SDLCALL FileClose(void* context) -> bool {
   utilities::Expects(context != nullptr, "stream close owns state");
   return std::unique_ptr<File>{static_cast<File*>(context)}->Close();
 }
@@ -170,7 +170,7 @@ auto OpenDriveFile(std::shared_ptr<Driver const> driver, unsigned drive, std::st
   std::ignore = file.release();
   return stream;
 }
-SDL_IOStream* SDLCALL OpenFile(char const* drive, char const* path, char const* mode) {
+auto SDLCALL OpenFile(char const* drive, char const* path, char const* mode) -> SDL_IOStream* {
   return Boundary([&] {
     auto const file_path = Text(path);
     if (!file_path) throw std::invalid_argument("Invalid RDP file path");
@@ -180,7 +180,7 @@ SDL_IOStream* SDLCALL OpenFile(char const* drive, char const* path, char const* 
     return OpenDriveFile(std::move(driver), id, *file_path, file_mode).Release();
   });
 }
-void UpdateDrives(Driver const& driver, SDL_PropertiesID properties) {
+auto UpdateDrives(Driver const& driver, SDL_PropertiesID properties) -> void {
   utilities::Expects(properties != 0, "drive publication has display properties");
   auto const names = oxbox::utilities::Joined(Drives(driver), "\n", &sdlrdp_drive::name);
   SDL_SetStringProperty(properties, SDL_PROP_DISPLAY_RDP_DRIVES_STRING, names.c_str());

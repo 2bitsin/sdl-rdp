@@ -5,7 +5,7 @@
 
 namespace Backend::Avc {
 using utilities::Expects;
-void Regions::Add(sdlrdp_rect area) {
+auto Regions::Add(sdlrdp_rect area) -> void {
   Expects(area.x >= 0, "region left edge is nonnegative");
   Expects(area.y >= 0, "region top edge is nonnegative");
   Expects(area.w > 0, "region width is positive");
@@ -25,14 +25,14 @@ void Regions::Add(sdlrdp_rect area) {
   rects.push_back({ UINT16(area.x), UINT16(area.y), UINT16(area.x + area.w), UINT16(area.y + area.h) });
   quality.push_back({ 0x9a, 100, 26, 0, 1 });
 }
-std::size_t Regions::Bytes() const {
+auto Regions::Bytes() const -> std::size_t {
   Expects(rects.size() == quality.size(), "every region has quantization metadata");
   return 4 + (10 * rects.size());
 }
-std::vector<RECTANGLE_16>& Regions::Rects() { return rects; }
-std::vector<RDPGFX_H264_QUANT_QUALITY>& Regions::Quality() { return quality; }
-sdlrdp_rect Regions::Bounds() const { return bounds; }
-void Regions::Clear() {
+auto Regions::Rects() -> std::vector<RECTANGLE_16>& { return rects; }
+auto Regions::Quality() -> std::vector<RDPGFX_H264_QUANT_QUALITY>& { return quality; }
+auto Regions::Bounds() const -> sdlrdp_rect { return bounds; }
+auto Regions::Clear() -> void {
   rects.clear();
   quality.clear();
 }

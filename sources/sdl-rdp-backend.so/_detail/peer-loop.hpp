@@ -19,15 +19,15 @@ class PeerLoop : private Pinned {
 public:
   PeerLoop(PeerLink& link, SessionAccess& session, Diagnostics const& diagnostics, Configuration const& configuration,
            FrameStore& store, PeerWait& wait, PeerPump& pump, Departure& departure) noexcept;
-  void Start();
-  void Stop();
+  auto Start() -> void;
+  auto Stop()  -> void;
 
 private:
-  void Serve(std::stop_token const& quit);
-  bool Run(std::stop_token const& quit);
-  bool Configure();
-  bool Step(std::stop_token const& quit, std::span<HANDLE> handles);
-  bool Dispatch(std::stop_token const& quit, std::span<HANDLE> handles, DWORD timeout);
+  auto Serve(std::stop_token const& quit)                                              -> void;
+  auto Run(std::stop_token const& quit)                                                -> bool;
+  auto Configure()                                                                     -> bool;
+  auto Step(std::stop_token const& quit, std::span<HANDLE> handles)                    -> bool;
+  auto Dispatch(std::stop_token const& quit, std::span<HANDLE> handles, DWORD timeout) -> bool;
   PeerLink&            _link;
   SessionAccess&       _session;
   Diagnostics const&   _diagnostics;

@@ -38,17 +38,17 @@ public:
     _client.ClientCapabilities             = _capabilities;
     active                                 = nullptr;
   }
-  ResizeProbe& operator = (ResizeProbe const&) = delete;
-  ResizeProbe& operator = (ResizeProbe&&)      = delete;
-  bool         AwaitFinalizing() {
+  auto operator = (ResizeProbe const&) -> ResizeProbe& = delete;
+  auto operator = (ResizeProbe&&)      -> ResizeProbe& = delete;
+  auto AwaitFinalizing()               -> bool {
     auto held = _handle.Session().Lock();
     return _changed.wait_for(held, std::chrono::seconds(10), [&] { return InFinalization(); });
   }
-  bool Finalizing() {
+  auto Finalizing() -> bool {
     auto const held = _handle.Session().Lock();
     return InFinalization();
   }
-  void MatchingLayout() {
+  auto MatchingLayout() -> void {
     auto const held   = _handle.Session().Lock();
     auto const status = RequiredStatus(_handle);
     Expects(status.resizing, "peer has an in-flight resize");
@@ -60,22 +60,22 @@ public:
     DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const layout{ sizeof(monitor), 1, &monitor };
     EXPECT_EQ(status.display->DispMonitorLayout(status.display, &layout), CHANNEL_RC_OK);
   }
-  void ConfirmActiveCallback() {
+  auto ConfirmActiveCallback() -> void {
     auto const held = _handle.Session().Lock();
     ASSERT_FALSE(freerdp_is_active_state(_client.context));
     ASSERT_TRUE(_client.Activate(&_client));
     EXPECT_TRUE(RequiredStatus(_handle).resizing);
   }
-  unsigned Calls() {
+  auto Calls() -> unsigned {
     auto const held = _handle.Session().Lock();
     return _calls;
   }
 
 private:
-  static freerdp_peer& CurrentClient(sdlrdp_handle& handle) {
+  static auto CurrentClient(sdlrdp_handle& handle) -> freerdp_peer& {
     return *RequiredStatus(handle).client;
   }
-  bool InFinalization() const {
+  auto InFinalization() const -> bool {
     auto const current = freerdp_get_state(_client.context);
     return current >= CONNECTION_STATE_FINALIZATION_SYNC && current <= CONNECTION_STATE_FINALIZATION_FONT_LIST;
   }
@@ -89,12 +89,12 @@ private:
 };
 class ResizeStorm : public RoundFive {
 protected:
-  void ConnectDisplay(Client& client) {
+  auto ConnectDisplay(Client& client) -> void {
     Connect(client, false);
     ASSERT_TRUE(client.Until([&] { return Headless::DisplayClient::Ready(); }));
     Events();
   }
-  void ThenQuietResize(ResizeProbe& probe) {
+  auto ThenQuietResize(ResizeProbe& probe) -> void {
     EXPECT_FALSE(logs.Contains("Unexpected client message")) << logs.Text(true);
     EXPECT_FALSE(std::ranges::any_of(Events(), [](auto event) { return event.type == SDLRDP_SCREEN; }));
     RecordProperty("DesktopResize_calls", probe.Calls());
@@ -158,13 +158,13 @@ protected:
   }
 };
 namespace {
-void ThenSingleScreen(std::vector<sdlrdp_event> const& events, unsigned width, unsigned height) {
+auto ThenSingleScreen(std::vector<sdlrdp_event> const& events, unsigned width, unsigned height) -> void {
   auto screens = events | std::views::filter([](auto event) { return event.type == SDLRDP_SCREEN; });
   ASSERT_EQ(std::ranges::distance(screens), 1);
   EXPECT_EQ(screens.front().screen.width, width);
   EXPECT_EQ(screens.front().screen.height, height);
 }
-void ThenOriginalPicture(Client& client) {
+auto ThenOriginalPicture(Client& client) -> void {
   EXPECT_EQ(client.Instance()->context->gdi->width, 640);
   EXPECT_EQ(client.Instance()->context->gdi->height, 480);
 }

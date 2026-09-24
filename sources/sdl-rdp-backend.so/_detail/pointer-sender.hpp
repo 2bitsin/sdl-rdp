@@ -10,7 +10,7 @@ class PointerStore;
 class PointerSender : private Pinned {
 public:
        PointerSender(PointerStore& pointer, PeerLink& link, Diagnostics const& diagnostics) noexcept;
-  bool Send();
+  auto Send() -> bool;
 
 private:
   PointerStore&      _pointer;

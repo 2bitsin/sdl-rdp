@@ -10,13 +10,13 @@
 namespace Backend {
 class EventQueue {
 public:
-  void     Push(sdlrdp_event event);
-  unsigned Poll(std::span<sdlrdp_event> out);
-  int      Wait(int timeout);
-  void     Wakeup();
+  auto Push(sdlrdp_event event)          -> void;
+  auto Poll(std::span<sdlrdp_event> out) -> unsigned;
+  auto Wait(int timeout)                 -> int;
+  auto Wakeup()                          -> void;
 
 private:
-  void Notify(std::invocable auto change) {
+  auto Notify(std::invocable auto change) -> void {
     {
       std::scoped_lock const lock(_guard);
       change();

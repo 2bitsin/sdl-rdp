@@ -2,16 +2,16 @@
 
 namespace Backend {
 Diagnostics::Diagnostics(sdlrdp_config const& config, bool tracing) : _logger{ config }, _tracing{ tracing } { }
-void Diagnostics::Log(sdlrdp_log_level level, std::string const& text) const {
+auto Diagnostics::Log(sdlrdp_log_level level, std::string const& text) const -> void {
   _logger.Log(level, text);
 }
-bool Diagnostics::Tracing() const noexcept {
+auto Diagnostics::Tracing() const noexcept -> bool {
   return _tracing;
 }
-void Diagnostics::Emit(std::string const& text) const {
+auto Diagnostics::Emit(std::string const& text) const -> void {
   _logger.Log(SDLRDP_LOG_INFO, text);
 }
-void Diagnostics::Fail(std::string text) {
+auto Diagnostics::Fail(std::string text) -> void {
   ErrorStore::Publish(&_errors, std::move(text));
 }
 }

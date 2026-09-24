@@ -14,7 +14,7 @@ namespace Backend {
 namespace {
 using Clock        = AcknowledgementWindow::Clock;
 using Milliseconds = std::chrono::duration<double, std::milli>;
-void WarnUnmeasured(RefreshTracker& refresh, Diagnostics const& diagnostics, WireSample const& wire) {
+auto WarnUnmeasured(RefreshTracker& refresh, Diagnostics const& diagnostics, WireSample const& wire) -> void {
   if (wire.available || refresh.Mode() != RefreshMode::Sender || refresh.TestAndSetUnavailableLogged()) return;
   diagnostics.Log(SDLRDP_LOG_WARN, "auto-sender TCP measurements unavailable; adapting only to blocked writes.");
 }
@@ -24,12 +24,12 @@ FramePacing::FramePacing(Diagnostics const& diagnostics, EventQueue& events, Con
                          FrameStatistics& statistics) noexcept
     : _diagnostics { diagnostics }, _events{ events }, _configuration{ configuration }, _store{ store }, _link{ link },
       _activation{ activation }, _traces{ traces }, _statistics{ statistics } { }
-void FramePacing::Adjust(std::invocable<Refresh&> auto step) {
+auto FramePacing::Adjust(std::invocable<Refresh&> auto step) -> void {
   if (!_refresh.Adjust(step) || !_activation.Active()) return;
   _events.Push({ .type = SDLRDP_REFRESH, .refresh = { _refresh.Effective() * MillihertzPerHz } });
   _diagnostics.Line("refresh", [&] { return std::format("hz={}", _refresh.Effective()); });
 }
-void FramePacing::Restart(FrameLock const& held) {
+auto FramePacing::Restart(FrameLock const& held) -> void {
   Expects(_store.Holds(held), "restarting pacing holds the frame lock");
   _window.Clear();
   Adjust([&](Refresh& rate) {
@@ -37,14 +37,14 @@ void FramePacing::Restart(FrameLock const& held) {
     rate.Restart();
   });
 }
-void FramePacing::Blocked() {
+auto FramePacing::Blocked() -> void {
   _diagnostics.Line("wire-blocked");
   Adjust([](Refresh& rate) { rate.Blocked(Clock::now()); });
 }
-void FramePacing::Drained() {
+auto FramePacing::Drained() -> void {
   if (_refresh.AwaitingEmpty()) Adjust([&](Refresh& rate) { rate.Drained(SampleWire(_link.Socket())); });
 }
-void FramePacing::Sent(PeerFrames& frames, FrameCost const& cost) {
+auto FramePacing::Sent(PeerFrames& frames, FrameCost const& cost) -> void {
   auto const held = _store.Lock();
   auto const now  = Clock::now();
   auto const wire = SampleWire(_link.Socket());
@@ -60,7 +60,7 @@ void FramePacing::Sent(PeerFrames& frames, FrameCost const& cost) {
   _statistics.Sent(cost, wire.outq);
   frames.Complete(held);
 }
-void FramePacing::Accept(UINT32 id) {
+auto FramePacing::Accept(UINT32 id) -> void {
   auto const held    = _store.Lock();
   auto const settled = _window.Accept(id);
   if (settled.empty()) return;
@@ -75,7 +75,7 @@ void FramePacing::Accept(UINT32 id) {
   _store.Notify();
   _link.Signal();
 }
-void FramePacing::Acknowledgements(AcknowledgementMode mode) {
+auto FramePacing::Acknowledgements(AcknowledgementMode mode) -> void {
   {
     auto const held = _store.Lock();
     switch (mode) {
@@ -95,24 +95,24 @@ void FramePacing::Acknowledgements(AcknowledgementMode mode) {
   _store.Notify();
   _link.Signal();
 }
-DWORD FramePacing::Timeout() {
+auto FramePacing::Timeout() -> DWORD {
   auto const held = _store.Lock();
   return _window.Remaining(Clock::now());
 }
-unsigned FramePacing::Effective() const noexcept {
+auto FramePacing::Effective() const noexcept -> unsigned {
   return _refresh.Effective();
 }
-UINT32 FramePacing::Frame() const noexcept {
+auto FramePacing::Frame() const noexcept -> UINT32 {
   return _window.Frame();
 }
-void FramePacing::Begin() noexcept {
+auto FramePacing::Begin() noexcept -> void {
   std::ignore = _window.Next();
 }
-bool FramePacing::Settled(FrameLock const& held, uint64_t target) const {
+auto FramePacing::Settled(FrameLock const& held, uint64_t target) const -> bool {
   Expects(_store.Holds(held), "reading acknowledgements holds the frame lock");
   return _window.Settled(target);
 }
-uint64_t FramePacing::Acknowledged(FrameLock const& held) const {
+auto FramePacing::Acknowledged(FrameLock const& held) const -> uint64_t {
   Expects(_store.Holds(held), "reading acknowledgements holds the frame lock");
   return _window.Acknowledged();
 }

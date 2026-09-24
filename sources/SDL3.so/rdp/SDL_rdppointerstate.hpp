@@ -6,6 +6,6 @@ template<typename _Handle, auto _Projection = std::identity{ }>
 class PointerState {
 public:
   static auto IsNull(_Handle const& value) noexcept -> bool { return std::invoke(_Projection, value) == nullptr; }
-  static void MakeNull(_Handle& value) noexcept { std::invoke(_Projection, value) = nullptr; }
+  static auto MakeNull(_Handle& value) noexcept -> void { std::invoke(_Projection, value) = nullptr; }
 };
 }

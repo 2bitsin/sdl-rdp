@@ -9,31 +9,31 @@
 
 namespace Backend {
 namespace {
-BOOL ChannelCreated(void* user, UINT32 channel_id, INT32 status) {
+auto ChannelCreated(void* user, UINT32 channel_id, INT32 status) -> BOOL {
   return CallbackOwner<ChannelSet>(user).Created(channel_id, status);
 }
-CreationRegistration Register(HANDLE manager, ChannelSet& channels) {
+auto Register(HANDLE manager, ChannelSet& channels) -> CreationRegistration {
   WTSVirtualChannelManagerSetDVCCreationCallback(manager, ChannelCreated, &channels);
   return CreationRegistration{ manager };
 }
 }
-void ForgetChannelCreation(HANDLE manager) {
+auto ForgetChannelCreation(HANDLE manager) -> void {
   WTSVirtualChannelManagerSetDVCCreationCallback(manager, nullptr, nullptr);
 }
 ChannelSet::ChannelSet(PeerLink& link, Activation const& activation, GraphicsLink& graphics, DisplayControl& display,
                        Redirection& redirection, Input& input)
     : _link { link }, _activation{ activation }, _graphics{ graphics }, _display{ display },
       _redirection{ redirection }, _input{ input }, _registration{ Register(link.Channels(), *this) } { }
-bool ChannelSet::Pump(std::span<HANDLE const> ready) {
+auto ChannelSet::Pump(std::span<HANDLE const> ready) -> bool {
   if (!_activation.Active()) return true;
   return WTSVirtualChannelManagerCheckFileDescriptor(_link.Channels()) && _input.Channels(ready) &&
          _redirection.OpenStatic(ready) && _display.Open() && _graphics.Pump(ready);
 }
-std::span<HANDLE> ChannelSet::Handles(std::span<HANDLE> out) const {
+auto ChannelSet::Handles(std::span<HANDLE> out) const -> std::span<HANDLE> {
   Expects(out.size() >= ChannelHandleLimit, "handle span has room for every channel");
   return _graphics.Handles(_redirection.Handles(_input.Handles(out)));
 }
-BOOL ChannelSet::Created(UINT32 channel_id, INT32 status) {
+auto ChannelSet::Created(UINT32 channel_id, INT32 status) -> BOOL {
   _link.Invalidate();
   if (status < 0) {
     _graphics.Rejected(channel_id);

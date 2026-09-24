@@ -3,16 +3,16 @@
 #include <utility>
 
 namespace Backend {
-unsigned RefreshTracker::Effective() const noexcept {
+auto RefreshTracker::Effective() const noexcept -> unsigned {
   return _effective.load();
 }
-RefreshMode RefreshTracker::Mode() const noexcept {
+auto RefreshTracker::Mode() const noexcept -> RefreshMode {
   return _refresh.Mode();
 }
-bool RefreshTracker::AwaitingEmpty() const noexcept {
+auto RefreshTracker::AwaitingEmpty() const noexcept -> bool {
   return _refresh.AwaitingEmpty();
 }
-bool RefreshTracker::TestAndSetUnavailableLogged() noexcept {
+auto RefreshTracker::TestAndSetUnavailableLogged() noexcept -> bool {
   return std::exchange(_unavailable_logged, true);
 }
 }

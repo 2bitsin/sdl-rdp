@@ -2,7 +2,7 @@
 #include <SDL3/SDL.h>
 #include <memory>
 
-inline bool PrintClipboardEvent(SDL_Event const& event) {
+inline auto PrintClipboardEvent(SDL_Event const& event) -> bool {
   if (event.type != SDL_EVENT_CLIPBOARD_UPDATE) return false;
   std::unique_ptr<char, decltype(&SDL_free)> const text(SDL_GetClipboardText(), SDL_free);
   if (text)

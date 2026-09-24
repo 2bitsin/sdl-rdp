@@ -9,17 +9,17 @@ class PeerLink;
 using SessionLock = std::unique_lock<std::recursive_mutex>;
 class SessionAccess {
 public:
-                                    SessionAccess()                                      = default;
-                                    SessionAccess(SessionAccess const&)                  = delete;
-                                    SessionAccess(SessionAccess&&)                       = delete;
-  virtual                           ~SessionAccess()                                     = default;
-  SessionAccess&                    operator = (SessionAccess const&)                    = delete;
-  SessionAccess&                    operator = (SessionAccess&&)                         = delete;
-  [[nodiscard]] virtual SessionLock Lock()                                               = 0;
-  [[nodiscard]] virtual FrameLock   Takeover(PeerLink const& self)                       = 0;
-  virtual void                      Depart(PeerLink const& self, Activation& activation) = 0;
-  virtual unsigned                  NextDrive() noexcept                                 = 0;
-  virtual void                      AudioChanged()                                       = 0;
-  virtual void                      AudioGone()                                          = 0;
+                             SessionAccess()                                                        = default;
+                             SessionAccess(SessionAccess const&)                                    = delete;
+                             SessionAccess(SessionAccess&&)                                         = delete;
+  virtual                    ~SessionAccess()                                                       = default;
+  auto                       operator = (SessionAccess const&)                    -> SessionAccess& = delete;
+  auto                       operator = (SessionAccess&&)                         -> SessionAccess& = delete;
+  [[nodiscard]] virtual auto Lock()                                               -> SessionLock    = 0;
+  [[nodiscard]] virtual auto Takeover(PeerLink const& self)                       -> FrameLock      = 0;
+  virtual auto               Depart(PeerLink const& self, Activation& activation) -> void           = 0;
+  virtual auto               NextDrive() noexcept                                 -> unsigned       = 0;
+  virtual auto               AudioChanged()                                       -> void           = 0;
+  virtual auto               AudioGone()                                          -> void           = 0;
 };
 }

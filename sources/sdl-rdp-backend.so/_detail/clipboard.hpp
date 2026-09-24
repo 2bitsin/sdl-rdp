@@ -15,27 +15,27 @@ class EventQueue;
 class PeerLink;
 class ClipboardChannel {
 public:
-                    ClipboardChannel(ClipboardChannel const&) = delete;
-                    ClipboardChannel(ClipboardChannel&&)      = delete;
-  ClipboardChannel(PeerLink& link, Activation const& activation, ClipboardStore& store, EventQueue& events,
-                   Diagnostics const& diagnostics) noexcept;
-                    ~ClipboardChannel();
-  ClipboardChannel& operator = (ClipboardChannel const&)      = delete;
-  ClipboardChannel& operator = (ClipboardChannel&&)           = delete;
-  bool              Open();
-  bool              Pump(std::span<HANDLE const> signaled);
-  HANDLE            Event() const;
+       ClipboardChannel(ClipboardChannel const&)                   = delete;
+       ClipboardChannel(ClipboardChannel&&)                        = delete;
+       ClipboardChannel(PeerLink& link, Activation const& activation, ClipboardStore& store, EventQueue& events,
+                        Diagnostics const& diagnostics) noexcept;
+       ~ClipboardChannel();
+  auto operator = (ClipboardChannel const&)   -> ClipboardChannel& = delete;
+  auto operator = (ClipboardChannel&&)        -> ClipboardChannel& = delete;
+  auto Open()                                 -> bool;
+  auto Pump(std::span<HANDLE const> signaled) -> bool;
+  auto Event() const                          -> HANDLE;
 
 private:
-  UINT        Announce();
-  UINT        Request();
-  UINT        RespondToList();
-  bool        FirstOfferWhileAppHoldsText() const;
-  UINT        RequestOfferedText(CLIPRDR_FORMAT_LIST const& /*list*/);
-  void        Changed(std::string text);
-  static UINT Formats(CliprdrServerContext* /*context*/, CLIPRDR_FORMAT_LIST const* /*list*/);
-  static UINT DataRequest(CliprdrServerContext* /*context*/, CLIPRDR_FORMAT_DATA_REQUEST const* /*request*/);
-  static UINT DataResponse(CliprdrServerContext* /*context*/, CLIPRDR_FORMAT_DATA_RESPONSE const* /*response*/);
+  auto        Announce()                                                                                        -> UINT;
+  auto        Request()                                                                                         -> UINT;
+  auto        RespondToList()                                                                                   -> UINT;
+  auto        FirstOfferWhileAppHoldsText() const                                                               -> bool;
+  auto        RequestOfferedText(CLIPRDR_FORMAT_LIST const& /*list*/)                                           -> UINT;
+  auto        Changed(std::string text)                                                                         -> void;
+  static auto Formats(CliprdrServerContext* /*context*/, CLIPRDR_FORMAT_LIST const* /*list*/)                   -> UINT;
+  static auto DataRequest(CliprdrServerContext* /*context*/, CLIPRDR_FORMAT_DATA_REQUEST const* /*request*/)    -> UINT;
+  static auto DataResponse(CliprdrServerContext* /*context*/, CLIPRDR_FORMAT_DATA_RESPONSE const* /*response*/) -> UINT;
   using ClipboardContext = std::unique_ptr<CliprdrServerContext, Releases<cliprdr_server_context_free>>;
   PeerLink&          _link;
   Activation const&  _activation;
@@ -53,7 +53,7 @@ private:
   bool               _pending             { };
   bool               _has_unicode         { };
 };
-std::string       ClipboardAnsi(std::string_view text);
-std::vector<BYTE> ClipboardUnicode(std::string_view text);
-std::string       ClipboardUtf8(std::span<BYTE const> bytes);
+auto ClipboardAnsi(std::string_view text)       -> std::string;
+auto ClipboardUnicode(std::string_view text)    -> std::vector<BYTE>;
+auto ClipboardUtf8(std::span<BYTE const> bytes) -> std::string;
 } // namespace Backend

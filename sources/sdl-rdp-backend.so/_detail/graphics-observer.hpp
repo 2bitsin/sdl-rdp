@@ -32,23 +32,23 @@ struct GraphicsCapture {
 class GraphicsObserver {
 public:
   using Reset = GraphicsCapture::Reset;
-                         GraphicsObserver(GraphicsObserver const&) = delete;
-                         GraphicsObserver(GraphicsObserver&&)      = delete;
-  explicit               GraphicsObserver(Client& target);
-                         ~GraphicsObserver();
-  GraphicsObserver&      operator = (GraphicsObserver const&)      = delete;
-  GraphicsObserver&      operator = (GraphicsObserver&&)           = delete;
-  bool                   Ack(UINT32 depth = 0);
-  bool                   AckFrame(std::size_t index, UINT32 depth);
-  RdpgfxClientContext*   Channel() const;
-  GraphicsCapture&       Observed();
-  GraphicsCapture const& Observed() const;
+           GraphicsObserver(GraphicsObserver const&)                      = delete;
+           GraphicsObserver(GraphicsObserver&&)                           = delete;
+  explicit GraphicsObserver(Client& target);
+           ~GraphicsObserver();
+  auto     operator = (GraphicsObserver const&)      -> GraphicsObserver& = delete;
+  auto     operator = (GraphicsObserver&&)           -> GraphicsObserver& = delete;
+  auto     Ack(UINT32 depth = 0)                     -> bool;
+  auto     AckFrame(std::size_t index, UINT32 depth) -> bool;
+  auto     Channel() const                           -> RdpgfxClientContext*;
+  auto     Observed()                                -> GraphicsCapture&;
+  auto     Observed() const                          -> GraphicsCapture const&;
 
 private:
-  static void Connected(void* /*unused*/, ChannelConnectedEventArgs const* event);
-  void        ObserveAvc(RDPGFX_SURFACE_COMMAND const& command);
-  void        ObserveFrameLifecycle();
-  void        ObserveFrames();
+  static auto Connected(void* /*unused*/, ChannelConnectedEventArgs const* event) -> void;
+  auto        ObserveAvc(RDPGFX_SURFACE_COMMAND const& command)                   -> void;
+  auto        ObserveFrameLifecycle()                                             -> void;
+  auto        ObserveFrames()                                                     -> void;
 
   RdpgfxClientContext*                         channel        = nullptr;
   GraphicsCapture                              observed;

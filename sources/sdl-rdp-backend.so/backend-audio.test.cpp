@@ -99,14 +99,14 @@ TEST_F(AudioGate, AudioPlaybackConfirmsKeepRealtimeStreamContinuous) {
   CheckAudioStatistics(AudioSession());
 }
 namespace {
-UINT ObserveProgressivePayload(RdpgfxClientContext* channel, RDPGFX_SURFACE_COMMAND const* command) {
+auto ObserveProgressivePayload(RdpgfxClientContext* channel, RDPGFX_SURFACE_COMMAND const* command) -> UINT {
 
   Expects(channel, "channel is installed");
   Expects(command, "wire command is supplied");
   Expects(command->codecId == RDPGFX_CODECID_CAPROGRESSIVE, "payload uses the progressive codec");
   return CHANNEL_RC_OK;
 }
-unsigned ProduceProgressiveFrames(sdlrdp_handle* backend) {
+auto ProduceProgressiveFrames(sdlrdp_handle* backend) -> unsigned {
   std::vector<UINT32> pixels(1280uz * 800);
   sdlrdp_rect const   full      { 0, 0, 1280, 800 };
   auto                deadline  = Clock::now() + std::chrono::seconds(2);
@@ -144,8 +144,8 @@ TEST_F(AudioGate, AudioNeverConfirmsUsesServerClock) {
   GivenUnconfirmedSession();
   if (::testing::Test::HasFatalFailure()) return;
   std::vector<INT16> const pcm(48000uz * 2, 1234);
-  auto                     started = Clock::now();
-  auto writing = std::async(std::launch::async, [&] { return sdlrdp_audio_write(backend.get(), pcm.data(), 48000); });
+  auto started  = Clock::now();
+  auto writing  = std::async(std::launch::async, [&] { return sdlrdp_audio_write(backend.get(), pcm.data(), 48000); });
   auto captured = ClientSession().Until([&] { return AudioSession().CaptureState().samples.size() == pcm.size(); });
   if (!captured) sdlrdp_audio_close(backend.get());
   EXPECT_TRUE(captured);

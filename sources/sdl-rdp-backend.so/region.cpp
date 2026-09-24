@@ -7,7 +7,7 @@
 #include <optional>
 
 namespace Backend {
-void Region::Add(sdlrdp_rect area) {
+auto Region::Add(sdlrdp_rect area) -> void {
   Expects(area.w > 0, "band width is positive");
   Expects(area.h > 0, "band height is positive");
   std::optional<sdlrdp_rect> merged{ area };
@@ -27,16 +27,16 @@ void Region::Add(sdlrdp_rect area) {
     Merge(merged, r);
   rects.assign(1, *merged);
 }
-bool Region::empty() const {
+auto Region::empty() const -> bool {
   return rects.empty();
 }
-void Region::clear() {
+auto Region::clear() -> void {
   rects.clear();
 }
-std::vector<sdlrdp_rect> const& Region::Rects() const {
+auto Region::Rects() const -> std::vector<sdlrdp_rect> const& {
   return rects;
 }
-void Region::Swap(Region& other) {
+auto Region::Swap(Region& other) -> void {
   rects.swap(other.rects);
 }
 }

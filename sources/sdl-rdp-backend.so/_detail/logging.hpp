@@ -10,12 +10,12 @@ namespace Backend {
 // MS-RDPBCGR 2.2.1.1.1 requestedProtocols (FreeRDP keeps these constants private).
 inline constexpr unsigned SecurityTls = 0x01, SecurityNla = 0x02, SecurityRdstls = 0x04, SecurityNlaExt = 0x08,
                           SecurityRdsaad = 0x10;
-void PeerNegotiationLogging(rdpSettings const* settings);
-bool NegotiationRefused();
-bool TlsHandshakeFailed();
-auto ExpectedDisconnect(unsigned code) -> bool;
-void AuthenticationRejectedLogging();
-void ResetAuthenticationLogging();
+auto PeerNegotiationLogging(rdpSettings const* settings) -> void;
+auto NegotiationRefused()                                -> bool;
+auto TlsHandshakeFailed()                                -> bool;
+auto ExpectedDisconnect(unsigned code)                   -> bool;
+auto AuthenticationRejectedLogging()                     -> void;
+auto ResetAuthenticationLogging()                        -> void;
 class LogRoute {
 public:
   struct Filter {
@@ -25,12 +25,12 @@ public:
     bool               handshake_failed     { false   };
   };
   explicit    LogRoute(sdlrdp_config const& config);
-              LogRoute(LogRoute const&)    = delete;
-              LogRoute(LogRoute&&)         = delete;
+              LogRoute(LogRoute const&)                 = delete;
+              LogRoute(LogRoute&&)                      = delete;
               ~LogRoute();
-  LogRoute&   operator = (LogRoute const&) = delete;
-  LogRoute&   operator = (LogRoute&&)      = delete;
-  static auto WithFilter(auto operation) {
+  auto        operator = (LogRoute const&) -> LogRoute& = delete;
+  auto        operator = (LogRoute&&)      -> LogRoute& = delete;
+  static auto WithFilter(auto operation)   -> decltype(auto) {
     auto&                  routing = Shared();
     std::scoped_lock const lock(routing.guard);
     return operation(routing.filters[std::this_thread::get_id()]);
@@ -43,11 +43,11 @@ private:
     LogRoute*                         active   { nullptr };
     std::map<std::thread::id, Filter> filters;
   };
-  static Routing& Shared();
-  static auto     Forward(wLogMessage const* message)                     -> BOOL;
-  static void     Install();
-  auto            Deliver(sdlrdp_log_level level, char const* text) const -> void;
-  void  (*callback)(void*, sdlrdp_log_level, char const*);
-  void* user;
+  static auto Shared()                                                -> Routing&;
+  static auto Forward(wLogMessage const* message)                     -> BOOL;
+  static auto Install()                                               -> void;
+  auto        Deliver(sdlrdp_log_level level, char const* text) const -> void;
+  decltype(sdlrdp_config::log) callback;
+  void*                        user;
 };
 }

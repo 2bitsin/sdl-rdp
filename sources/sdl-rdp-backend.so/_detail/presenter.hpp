@@ -20,18 +20,18 @@ class Presenter : private Pinned {
 public:
        Presenter(Diagnostics const& diagnostics, FrameStore& frames, Session& session, PointerStore& pointer,
                  Configuration& configuration);
-  void Present(std::span<BYTE const> pixels, unsigned pitch, Extent size, std::span<sdlrdp_rect const> damage);
-  void Resize(Extent size);
-  void SetAspect(sdlrdp_aspect value);
-  void EnsurePicture();
-  void SetRefresh(RefreshMode mode, unsigned ceiling);
-  void SetCodec(sdlrdp_codec codec);
-  void SetPointer(PointerShape shape);
-  int  WaitFrame(int timeout);
+  auto Present(std::span<BYTE const> pixels, unsigned pitch, Extent size, std::span<sdlrdp_rect const> damage) -> void;
+  auto Resize(Extent size)                                                                                     -> void;
+  auto SetAspect(sdlrdp_aspect value)                                                                          -> void;
+  auto EnsurePicture()                                                                                         -> void;
+  auto SetRefresh(RefreshMode mode, unsigned ceiling)                                                          -> void;
+  auto SetCodec(sdlrdp_codec codec)                                                                            -> void;
+  auto SetPointer(PointerShape shape)                                                                          -> void;
+  auto WaitFrame(int timeout)                                                                                  -> int;
 
 private:
-  std::shared_ptr<std::vector<BYTE>> Acquire(Extent size);
-  void Publish(std::shared_ptr<std::vector<BYTE> const> next, Extent size, std::span<sdlrdp_rect const> damage);
+  auto Acquire(Extent size) -> std::shared_ptr<std::vector<BYTE>>;
+  auto Publish(std::shared_ptr<std::vector<BYTE> const> next, Extent size, std::span<sdlrdp_rect const> damage) -> void;
   std::mutex                                      _producer;
   std::vector<std::shared_ptr<std::vector<BYTE>>> _pool;
   Diagnostics const&                              _diagnostics;

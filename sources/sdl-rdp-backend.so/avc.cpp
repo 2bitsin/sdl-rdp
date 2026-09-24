@@ -9,7 +9,7 @@
 namespace Backend::Avc {
 using utilities::Ensures;
 using utilities::Expects;
-IntraRefresh IntraRefreshFor(unsigned fps) {
+auto IntraRefreshFor(unsigned fps) -> IntraRefresh {
   Expects(fps, "refresh rate is positive");
   Expects(fps <= UINT32_MAX / 2, "doubled refresh rate fits NVENC");
   // Recovery target: refresh every two seconds, spreading each sweep over half a second.
@@ -17,12 +17,12 @@ IntraRefresh IntraRefreshFor(unsigned fps) {
   Ensures(refresh.count <= refresh.period, "refresh sweep fits its period");
   return refresh;
 }
-unsigned Aligned(unsigned dimension) {
+auto Aligned(unsigned dimension) -> unsigned {
   Expects(dimension > 0, "surface dimension is positive");
   Expects(dimension <= 32766, "surface dimension fits the graphics protocol");
   return oxbox::utilities::AlignUp<16>(dimension);
 }
-unsigned Bitrate(Extent size, unsigned kbps) {
+auto Bitrate(Extent size, unsigned kbps) -> unsigned {
   Expects(size.width > 0, "surface width is positive");
   Expects(size.height > 0, "surface height is positive");
   Expects(size.width <= 32766, "surface width fits the graphics protocol");
@@ -32,13 +32,13 @@ unsigned Bitrate(Extent size, unsigned kbps) {
   auto const rate   = kbps ? uint64_t(kbps) * 1000 : std::max(uint64_t(2000000), scaled);
   return unsigned(std::clamp<uint64_t>(rate, 1, UINT32_MAX));
 }
-EncodingTimes& operator += (EncodingTimes& total, EncodingTimes const& frame) noexcept {
+auto operator += (EncodingTimes& total, EncodingTimes const& frame) noexcept -> EncodingTimes& {
   total.convert += frame.convert;
   total.upload  += frame.upload;
   total.encode  += frame.encode;
   return total;
 }
-void ReplicateEdges(std::span<BYTE> pixels, Extent size) {
+auto ReplicateEdges(std::span<BYTE> pixels, Extent size) -> void {
   auto const [width, height] = size;
   auto       stride          = Aligned(width) * 4;
   Expects(pixels.size() >= std::size_t(stride) * Aligned(height), "picture includes aligned storage");

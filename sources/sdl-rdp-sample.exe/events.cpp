@@ -36,12 +36,12 @@ constexpr std::array<std::pair<Uint32, char const*>, 24> EventLabels{ {
     { SDL_EVENT_MOUSE_BUTTON_UP             , "MOUSE_BUTTON_UP"              },
     { SDL_EVENT_MOUSE_WHEEL                 , "MOUSE_WHEEL"                  },
 } };
-char const* EventName(Uint32 type) {
+auto EventName(Uint32 type) -> char const* {
   auto const* label = std::ranges::find(EventLabels, type, &std::pair<Uint32, char const*>::first);
   return label == EventLabels.end() ? "OTHER" : label->second;
 }
 
-void PrintGeometry(SDL_Event const& event, SDL_Window* window) {
+auto PrintGeometry(SDL_Event const& event, SDL_Window* window) -> void {
   if (event.type == SDL_EVENT_WINDOW_EXPOSED || event.type == SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED ||
       event.type == SDL_EVENT_WINDOW_RESIZED) {
     auto const* mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
@@ -53,21 +53,21 @@ void PrintGeometry(SDL_Event const& event, SDL_Window* window) {
 }
 
 }
-void PrintAudioFormat(SDL_AudioDeviceID device) {
+auto PrintAudioFormat(SDL_AudioDeviceID device) -> void {
   SDL_AudioSpec actual;
   Check(SDL_GetAudioDeviceFormat(device, &actual, nullptr));
   SDL_Log("audio device=%s freq=%d", SDL_GetAudioDeviceName(device), actual.freq);
 }
 
 namespace {
-std::string DisplayTiming() {
+auto DisplayTiming() -> std::string {
   auto const* mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
   Check(mode != nullptr);
   return std::format(" refresh={} numerator={} denominator={}", mode->refresh_rate, mode->refresh_rate_numerator,
                      mode->refresh_rate_denominator);
 }
 
-std::string ClientProperties(SDL_Window* window) {
+auto ClientProperties(SDL_Window* window) -> std::string {
   auto properties = SDL_GetWindowProperties(window);
   return std::format(" keyboard_layout={} client_name={} codec={}",
                      SDL_GetNumberProperty(properties, SDL_PROP_WINDOW_RDP_KEYBOARD_LAYOUT_NUMBER, 0),
@@ -75,7 +75,7 @@ std::string ClientProperties(SDL_Window* window) {
                      SDL_GetStringProperty(properties, SDL_PROP_WINDOW_RDP_CODEC_STRING, ""));
 }
 
-std::string PointerDetails(SDL_Event const& event, unsigned frame) {
+auto PointerDetails(SDL_Event const& event, unsigned frame) -> std::string {
   switch (event.type) {
   case SDL_EVENT_MOUSE_MOTION:
     return std::format(" xrel={:g} yrel={:g} x={:.0f} y={:.0f} frame={}", event.motion.xrel, event.motion.yrel,
@@ -89,7 +89,7 @@ std::string PointerDetails(SDL_Event const& event, unsigned frame) {
     return { };
   }
 }
-std::string WindowDetails(SDL_Event const& event, SDL_Window* window) {
+auto WindowDetails(SDL_Event const& event, SDL_Window* window) -> std::string {
   if (event.type == SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED)
     return std::format(" width={} height={}", event.display.data1, event.display.data2);
   if (event.type == SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED) {
@@ -101,14 +101,14 @@ std::string WindowDetails(SDL_Event const& event, SDL_Window* window) {
     return std::format(" data1={} data2={}", event.window.data1, event.window.data2);
   return { };
 }
-std::string EventDetails(SDL_Event const& event, SDL_Window* window, unsigned frame) {
+auto EventDetails(SDL_Event const& event, SDL_Window* window, unsigned frame) -> std::string {
   if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP)
     return std::format(" scancode={} key={} down={}", int(event.key.scancode), event.key.key, int(event.key.down));
   if (event.type == SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED) PrintAudioFormat(event.adevice.which);
   return PointerDetails(event, frame) + WindowDetails(event, window);
 }
 }
-void PrintEvent(SDL_Event const& event, SDL_Window* window, unsigned frame) {
+auto PrintEvent(SDL_Event const& event, SDL_Window* window, unsigned frame) -> void {
   if (PrintClipboardEvent(event)) return;
   if (PrintInput(event, window)) return;
   auto line = std::format("event {} type={}", EventName(event.type), event.type);

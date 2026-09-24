@@ -12,20 +12,20 @@ class PeerLink;
 class Authenticator : private Pinned {
 public:
        Authenticator(PeerLink& link, Configuration const& configuration, Diagnostics const& diagnostics) noexcept;
-  BOOL Logon(BOOL automatic);
-  bool VerifySettings();
-  bool Hash(SEC_WINNT_AUTH_IDENTITY const& identity, BYTE* response);
-  void End();
+  auto Logon(BOOL automatic)                                         -> BOOL;
+  auto VerifySettings()                                              -> bool;
+  auto Hash(SEC_WINNT_AUTH_IDENTITY const& identity, BYTE* response) -> bool;
+  auto End()                                                         -> void;
 
 private:
-  void Reject();
-  bool Verify(char const* domain, char const* user, char const* password);
-  bool Denied();
-  bool ResponseKey(SEC_WINNT_AUTH_IDENTITY const& identity, BYTE* response);
+  auto Reject()                                                             -> void;
+  auto Verify(char const* domain, char const* user, char const* password)   -> bool;
+  auto Denied()                                                             -> bool;
+  auto ResponseKey(SEC_WINNT_AUTH_IDENTITY const& identity, BYTE* response) -> bool;
   PeerLink&            _link;
   Configuration const& _configuration;
   Diagnostics const&   _diagnostics;
   AuthenticationState  _state;
 };
-void AuthenticationIdentity(freerdp_peer const& client, sdlrdp_event& event);
+auto AuthenticationIdentity(freerdp_peer const& client, sdlrdp_event& event) -> void;
 }

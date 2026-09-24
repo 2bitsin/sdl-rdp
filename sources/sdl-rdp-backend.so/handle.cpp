@@ -14,32 +14,32 @@ sdlrdp_handle::sdlrdp_handle(sdlrdp_config const& config, bool tracing)
                   return std::make_unique<Backend::Peer>(std::move(accepted), _diagnostics, _events, _configuration,
                                                          _frames, _pointer, _clipboard, _session);
                 } } { }
-unsigned sdlrdp_handle::Port() const noexcept {
+auto sdlrdp_handle::Port() const noexcept -> unsigned {
   return _listener.Port();
 }
-Backend::Diagnostics& sdlrdp_handle::Diagnostics() noexcept {
+auto sdlrdp_handle::Diagnostics() noexcept -> Backend::Diagnostics& {
   return _diagnostics;
 }
-Backend::EventQueue& sdlrdp_handle::Events() noexcept {
+auto sdlrdp_handle::Events() noexcept -> Backend::EventQueue& {
   return _events;
 }
-Backend::Presenter& sdlrdp_handle::Presentation() noexcept {
+auto sdlrdp_handle::Presentation() noexcept -> Backend::Presenter& {
   return _presenter;
 }
-Backend::AudioOutput& sdlrdp_handle::Audio() noexcept {
+auto sdlrdp_handle::Audio() noexcept -> Backend::AudioOutput& {
   return _audio;
 }
-Backend::Session& sdlrdp_handle::Session() noexcept {
+auto sdlrdp_handle::Session() noexcept -> Backend::Session& {
   return _session;
 }
-Backend::ClipboardStore& sdlrdp_handle::Clipboard() noexcept {
+auto sdlrdp_handle::Clipboard() noexcept -> Backend::ClipboardStore& {
   return _clipboard;
 }
-Backend::FrameStore& sdlrdp_handle::Frames() noexcept {
+auto sdlrdp_handle::Frames() noexcept -> Backend::FrameStore& {
   return _frames;
 }
 namespace Backend {
-void SetError(sdlrdp_handle* handle, std::string text) {
+auto SetError(sdlrdp_handle* handle, std::string text) -> void {
   if (handle)
     handle->Diagnostics().Fail(std::move(text));
   else

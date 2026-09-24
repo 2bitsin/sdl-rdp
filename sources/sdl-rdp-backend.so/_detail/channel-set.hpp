@@ -12,15 +12,15 @@ inline constexpr unsigned ChannelHandleLimit = InputHandleLimit + RedirectionHan
 class Activation;
 class DisplayControl;
 class PeerLink;
-void ForgetChannelCreation(HANDLE manager);
+auto ForgetChannelCreation(HANDLE manager) -> void;
 using CreationRegistration = std::unique_ptr<void, Releases<ForgetChannelCreation>>;
 class ChannelSet : private Pinned {
 public:
-  ChannelSet(PeerLink& link, Activation const& activation, GraphicsLink& graphics, DisplayControl& display,
-             Redirection& redirection, Input& input);
-  bool              Pump(std::span<HANDLE const> ready);
-  std::span<HANDLE> Handles(std::span<HANDLE> out) const;
-  BOOL              Created(UINT32 channel_id, INT32 status);
+       ChannelSet(PeerLink& link, Activation const& activation, GraphicsLink& graphics, DisplayControl& display,
+                  Redirection& redirection, Input& input);
+  auto Pump(std::span<HANDLE const> ready)      -> bool;
+  auto Handles(std::span<HANDLE> out) const     -> std::span<HANDLE>;
+  auto Created(UINT32 channel_id, INT32 status) -> BOOL;
 
 private:
   PeerLink&            _link;

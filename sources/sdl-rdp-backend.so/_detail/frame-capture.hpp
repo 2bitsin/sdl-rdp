@@ -13,14 +13,14 @@ class PeerLink;
 enum class CaptureState{ Failed, Idle, Captured };
 class FrameCapture : private Pinned {
 public:
-  FrameCapture(PeerLink& link, FrameStore& store, PeerFrames& frames, DesktopLayout& desktop, FramePacing& pacing,
-               FrameStatistics& statistics, Encoder const& encoder) noexcept;
-  CaptureState Next();
+       FrameCapture(PeerLink& link, FrameStore& store, PeerFrames& frames, DesktopLayout& desktop, FramePacing& pacing,
+                    FrameStatistics& statistics, Encoder const& encoder) noexcept;
+  auto Next() -> CaptureState;
 
 private:
-  bool        Begin();
-  sdlrdp_rect Take();
-  bool        Resize(sdlrdp_rect picture);
+  auto Begin()                     -> bool;
+  auto Take()                      -> sdlrdp_rect;
+  auto Resize(sdlrdp_rect picture) -> bool;
   PeerLink&        _link;
   FrameStore&      _store;
   PeerFrames&      _frames;

@@ -21,19 +21,19 @@
 
 namespace Headless {
 namespace {
-BOOL ClientPostConnect(freerdp* client) {
+auto ClientPostConnect(freerdp* client) -> BOOL {
   auto* context = client->context;
   return freerdp_client_codecs_reset(context->codecs, FREERDP_CODEC_ALL,
                                      freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopWidth),
                                      freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopHeight)) &&
          gdi_init(client, PIXEL_FORMAT_BGRX32);
 }
-BOOL ClientDesktopResize(rdpContext* context) {
+auto ClientDesktopResize(rdpContext* context) -> BOOL {
   auto w = freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopWidth);
   auto h = freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopHeight);
   return freerdp_client_codecs_reset(context->codecs, FREERDP_CODEC_ALL, w, h) && gdi_resize(context->gdi, w, h);
 }
-void ConfigureClientCodecs(rdpSettings* settings, bool surface) {
+auto ConfigureClientCodecs(rdpSettings* settings, bool surface) -> void {
   Expects(freerdp_settings_set_bool(settings, FreeRDP_RemoteFxCodec, TRUE), "client RemoteFX support is configured");
   Expects(freerdp_settings_set_bool(settings, FreeRDP_NSCodec, TRUE), "client NSCodec support is configured");
   Expects(freerdp_settings_set_bool(settings, FreeRDP_IgnoreCertificate, TRUE),
@@ -44,7 +44,7 @@ void ConfigureClientCodecs(rdpSettings* settings, bool surface) {
   if (!surface)
     Expects(freerdp_settings_set_uint32(settings, FreeRDP_SurfaceCommandsSupported, 0), "surface commands disabled");
 }
-void ConfigureClient(rdpSettings* settings, unsigned port, bool surface, unsigned width, unsigned height) {
+auto ConfigureClient(rdpSettings* settings, unsigned port, bool surface, unsigned width, unsigned height) -> void {
   Expects(freerdp_settings_set_string(settings, FreeRDP_ServerHostname, "127.0.0.1"),
           "client server hostname is configured");
   Expects(freerdp_settings_set_string(settings, FreeRDP_Username, "test"), "client username is configured");
@@ -56,21 +56,21 @@ void ConfigureClient(rdpSettings* settings, unsigned port, bool surface, unsigne
           "client configured");
   ConfigureClientCodecs(settings, surface);
 }
-void ConnectGraphicsDecoder(void* raw, ChannelConnectedEventArgs const* event) {
+auto ConnectGraphicsDecoder(void* raw, ChannelConnectedEventArgs const* event) -> void {
   if (std::string_view(event->name) != RDPGFX_DVC_CHANNEL_NAME) return;
   auto* context = static_cast<rdpContext*>(raw);
   Expects(gdi_graphics_pipeline_init(context->gdi, static_cast<RdpgfxClientContext*>(event->pInterface)),
           "graphics decoder initialized");
 }
-void DisconnectGraphicsDecoder(void* raw, ChannelDisconnectedEventArgs const* event) {
+auto DisconnectGraphicsDecoder(void* raw, ChannelDisconnectedEventArgs const* event) -> void {
   if (std::string_view(event->name) != RDPGFX_DVC_CHANNEL_NAME) return;
   auto* context = static_cast<rdpContext*>(raw);
   gdi_graphics_pipeline_uninit(context->gdi, static_cast<RdpgfxClientContext*>(event->pInterface));
 }
-BOOL LoadGraphicsChannel(freerdp* instance) {
+auto LoadGraphicsChannel(freerdp* instance) -> BOOL {
   return LoadDynamicChannel(instance, "rdpgfx");
 }
-unsigned ChannelError(UINT32 a, UINT32 b) {
+auto ChannelError(UINT32 a, UINT32 b) -> unsigned {
   auto channel = [&](unsigned shift) { return std::abs(int((a >> shift) & 255) - int((b >> shift) & 255)); };
   return unsigned(std::max({ channel(0), channel(8), channel(16) }));
 }
@@ -83,7 +83,7 @@ Client::Client(unsigned port, bool surface, unsigned width, unsigned height) {
   instance->context->update->DesktopResize = ClientDesktopResize;
   ConfigureClient(instance->context->settings, port, surface, width, height);
 }
-void Client::EnableGraphics(bool h264) const {
+auto Client::EnableGraphics(bool h264) const -> void {
   auto* context = instance->context;
   Expects(freerdp_settings_set_bool(context->settings, FreeRDP_GfxH264, h264),
           "graphics pipeline enabled on the client pump thread");
@@ -98,7 +98,7 @@ void Client::EnableGraphics(bool h264) const {
   PubSub_SubscribeChannelDisconnected(context->pubSub, DisconnectGraphicsDecoder);
   instance->LoadChannels = LoadGraphicsChannel;
 }
-void Client::Credentials(char const* user, char const* password, char const* domain, bool nla) const {
+auto Client::Credentials(char const* user, char const* password, char const* domain, bool nla) const -> void {
   auto* settings = instance->context->settings;
   Expects(freerdp_settings_set_string(settings, FreeRDP_Username, user), "client username is configured");
   Expects(freerdp_settings_set_string(settings, FreeRDP_Password, password), "client password is configured");
@@ -109,13 +109,13 @@ void Client::Credentials(char const* user, char const* password, char const* dom
   Expects(freerdp_settings_set_string(settings, FreeRDP_AuthenticationPackageList, "!kerberos"),
           "client credentials configured");
 }
-bool Client::Pump(unsigned timeout) const {
+auto Client::Pump(unsigned timeout) const -> bool {
   std::array<HANDLE, 64> handles { };
   auto                   count   = freerdp_get_event_handles(instance->context, handles.data(), handles.size());
   return count && WaitForMultipleObjects(count, handles.data(), FALSE, timeout) != WAIT_FAILED &&
          freerdp_check_event_handles(instance->context);
 }
-bool Client::Matches(std::vector<UINT32> const& pixels) {
+auto Client::Matches(std::vector<UINT32> const& pixels) -> bool {
   auto* gdi = instance->context->gdi;
   Expects(std::cmp_equal(gdi->stride, gdi->width * 4), "decoded rows are packed");
   if (pixels.size() != std::size_t(gdi->width) * gdi->height) return false;
@@ -126,7 +126,7 @@ bool Client::Matches(std::vector<UINT32> const& pixels) {
   return std::equal(pixels.begin(), pixels.end(), actual,
                     [&](auto a, auto b) { return ChannelError(a, b) <= tolerance; });
 }
-unsigned Client::MaxError(std::vector<UINT32> const& pixels, std::vector<UINT32> const* reference) const {
+auto Client::MaxError(std::vector<UINT32> const& pixels, std::vector<UINT32> const* reference) const -> unsigned {
   Expects(instance->context->gdi != nullptr, "decoded framebuffer exists");
   auto const* actual   = reinterpret_cast<UINT32 const*>(instance->context->gdi->primary_buffer);
   auto const& expected = reference ? *reference : pixels;
@@ -134,19 +134,19 @@ unsigned Client::MaxError(std::vector<UINT32> const& pixels, std::vector<UINT32>
   return std::transform_reduce(
       expected.begin(), expected.end(), actual, 0u, [](auto a, auto b) { return std::max(a, b); }, ChannelError);
 }
-UINT64 Client::Received() const {
+auto Client::Received() const -> UINT64 {
   UINT64 bytes = 0;
   Expects(freerdp_get_stats(instance->context->rdp, &bytes, nullptr, nullptr, nullptr),
           "transport statistics available");
   return bytes;
 }
-std::unique_ptr<freerdp, ReleaseClient> const& Client::Instance() const {
+auto Client::Instance() const -> std::unique_ptr<freerdp, ReleaseClient> const& {
   return instance;
 }
-unsigned Client::Tolerance() const {
+auto Client::Tolerance() const -> unsigned {
   return tolerance;
 }
-void Client::Tolerance(unsigned value) {
+auto Client::Tolerance(unsigned value) -> void {
   tolerance = value;
 }
 }

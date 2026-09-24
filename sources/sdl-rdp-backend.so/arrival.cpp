@@ -16,7 +16,7 @@
 
 namespace Backend {
 namespace {
-sdlrdp_event Connected(rdpSettings const& settings) {
+auto Connected(rdpSettings const& settings) -> sdlrdp_event {
   sdlrdp_event event{ .type = SDLRDP_CONNECTED };
   event.connected.width           = freerdp_settings_get_uint32(&settings, FreeRDP_DesktopWidth);
   event.connected.height          = freerdp_settings_get_uint32(&settings, FreeRDP_DesktopHeight);
@@ -26,7 +26,7 @@ sdlrdp_event Connected(rdpSettings const& settings) {
   if (name) std::strncpy(event.connected.client_name, name, sizeof(event.connected.client_name) - 1);
   return event;
 }
-AcknowledgementMode Acknowledging(rdpSettings const& settings) {
+auto Acknowledging(rdpSettings const& settings) -> AcknowledgementMode {
   return freerdp_settings_get_uint32(&settings, FreeRDP_FrameAcknowledge) ? AcknowledgementMode::Tracking
                                                                           : AcknowledgementMode::Suspended;
 }
@@ -35,7 +35,7 @@ Arrival::Arrival(SessionAccess& session, FrameStore& store, PeerFrames& frames, 
                  DesktopLayout& desktop, FramePacing& pacing, Diagnostics const& diagnostics) noexcept
     : _session { session }, _store{ store }, _frames{ frames }, _link{ link }, _activation{ activation },
       _desktop{ desktop }, _pacing{ pacing }, _diagnostics{ diagnostics } { }
-sdlrdp_event Arrival::Connection(sdlrdp_codec codec) const {
+auto Arrival::Connection(sdlrdp_codec codec) const -> sdlrdp_event {
   auto const screen = _desktop.ScreenEvent().screen;
   auto       event  = Connected(_link.Settings());
   AuthenticationIdentity(_link.Client(), event);
@@ -45,7 +45,7 @@ sdlrdp_event Arrival::Connection(sdlrdp_codec codec) const {
   event.connected.screen_height      = screen.height;
   return event;
 }
-void Arrival::Enter(sdlrdp_event const& connection, sdlrdp_codec codec) {
+auto Arrival::Enter(sdlrdp_event const& connection, sdlrdp_codec codec) -> void {
   auto const frame = _session.Takeover(_link);
   _activation.Activate();
   if (auto const& shadow = _store.Snapshot(frame)) {
@@ -56,7 +56,7 @@ void Arrival::Enter(sdlrdp_event const& connection, sdlrdp_codec codec) {
   if (!freerdp_settings_get_bool(&_link.Settings(), FreeRDP_SupportGraphicsPipeline))
     _activation.Announce(codec, _pacing.Effective());
 }
-void Arrival::Admit(sdlrdp_codec codec) {
+auto Arrival::Admit(sdlrdp_codec codec) -> void {
   auto const connection = Connection(codec);
   _pacing.Acknowledgements(Acknowledging(_link.Settings()));
   _desktop.Assign(Whole({ .width = connection.connected.width, .height = connection.connected.height }));

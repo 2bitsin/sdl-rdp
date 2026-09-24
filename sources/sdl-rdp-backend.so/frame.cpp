@@ -45,7 +45,7 @@ auto SendSurfaceBits(rdpUpdate* update, PixelBand const& what, unsigned codec) -
   return update->SurfaceBits(update->context, &command);
 }
 
-BITMAP_DATA BitmapArea(sdlrdp_rect area) {
+auto BitmapArea(sdlrdp_rect area) -> BITMAP_DATA {
   auto rectangle = BITMAP_DATA{ };
   rectangle.destLeft           = area.x;
   rectangle.destTop            = area.y;
@@ -58,7 +58,7 @@ BITMAP_DATA BitmapArea(sdlrdp_rect area) {
   rectangle.cbUncompressedSize = std::size_t(area.w) * area.h * PixelBytes;
   return rectangle;
 }
-BITMAP_DATA BitmapRectangle(PixelBand const& band, bool compressed) {
+auto BitmapRectangle(PixelBand const& band, bool compressed) -> BITMAP_DATA {
   Expects(!band.Pixels().empty(), "bitmap payload exists");
   auto const payload   = band.Pixels();
   auto       rectangle = BitmapArea(band.Area());
@@ -69,7 +69,7 @@ BITMAP_DATA BitmapRectangle(PixelBand const& band, bool compressed) {
   rectangle.cbCompMainBodySize = payload.size();
   return rectangle;
 }
-bool SendBitmapBand(rdpUpdate* update, std::span<BITMAP_DATA> rectangles) {
+auto SendBitmapBand(rdpUpdate* update, std::span<BITMAP_DATA> rectangles) -> bool {
   Expects(update != nullptr, "update exists");
   Expects(update->BitmapUpdate != nullptr, "bitmap callback exists");
   Expects(!rectangles.empty(), "bitmap batch exists");
@@ -80,7 +80,7 @@ bool SendBitmapBand(rdpUpdate* update, std::span<BITMAP_DATA> rectangles) {
   return update->BitmapUpdate(update->context, &batch);
 }
 
-unsigned PackedStride(int width, unsigned depth) {
+auto PackedStride(int width, unsigned depth) -> unsigned {
   return (unsigned(width) * (depth / 8) + 3) & ~3u;
 }
 auto Convert(PixelBand band, unsigned depth) -> std::vector<BYTE> {
@@ -94,7 +94,7 @@ auto Convert(PixelBand band, unsigned depth) -> std::vector<BYTE> {
     return { };
   return converted;
 }
-std::size_t PacketBytes(auto const& packets) {
+auto PacketBytes(auto const& packets) -> std::size_t {
   auto sizes = packets | std::views::transform([](auto const& packet) { return std::span(packet.bands); }) |
                std::views::join | std::views::transform([](auto const& band) { return band.pixels.size(); });
   return std::ranges::fold_left(sizes, std::size_t{ 0 }, std::plus{ });
@@ -104,19 +104,19 @@ LegacyFrame::LegacyFrame(PeerLink& link, Configuration const& configuration, Act
                          PeerFrames& frames, FramePacing& pacing, Encoder& encoder, Scaler& scaler) noexcept
     : _link { link }, _configuration{ configuration }, _activation{ activation }, _frames{ frames }, _pacing{ pacing },
       _encoder{ encoder }, _scaler{ scaler } { }
-bool LegacyFrame::SelectEncoder() {
+auto LegacyFrame::SelectEncoder() -> bool {
   auto const previous = _encoder.Codec();
   if (!_encoder.Select(&_link.Settings(), _configuration.Codec())) return false;
   if (previous != _encoder.Codec()) _activation.CodecChanged(_encoder.Codec());
   return true;
 }
-bool LegacyFrame::Marker(UINT16 action) {
+auto LegacyFrame::Marker(UINT16 action) -> bool {
   auto& context = _link.Context();
   if (!freerdp_settings_get_bool(context.settings, FreeRDP_FrameMarkerCommandEnabled)) return true;
   SURFACE_FRAME_MARKER const marker{ action, _pacing.Frame() };
   return context.update->SurfaceFrameMarker(&context, &marker);
 }
-bool LegacyFrame::Prepare() {
+auto LegacyFrame::Prepare() -> bool {
   ExpectCaptured(_frames);
   _packets.clear();
   _next.reset();
@@ -130,8 +130,8 @@ bool LegacyFrame::Prepare() {
   _format = { .depth = depth, .codec = wire == LegacyWire::Surface ? _encoder.Id(&settings) : 0, .wire = wire };
   return true;
 }
-void LegacyFrame::AppendPlanar(Packet& packet, std::size_t& wire_size, sdlrdp_rect area,
-                               std::span<BYTE const> payload) {
+auto LegacyFrame::AppendPlanar(Packet& packet, std::size_t& wire_size, sdlrdp_rect area,
+                               std::span<BYTE const> payload) -> void {
   auto size = payload.size();
   if (wire_size + 26 + size > BITMAP_RECTANGLE_LIMIT && !packet.bands.empty()) {
     _packets.push_back(std::move(packet));
@@ -141,7 +141,7 @@ void LegacyFrame::AppendPlanar(Packet& packet, std::size_t& wire_size, sdlrdp_re
   packet.bands.push_back({ area, { payload.begin(), payload.end() } });
   wire_size += 26 + size;
 }
-bool LegacyFrame::Planar(sdlrdp_rect area) {
+auto LegacyFrame::Planar(sdlrdp_rect area) -> bool {
   Expects(area.w > 0, "planar width exists");
   Expects(area.h > 0, "planar height exists");
   Packet      packet;
@@ -155,7 +155,7 @@ bool LegacyFrame::Planar(sdlrdp_rect area) {
   if (!packet.bands.empty()) _packets.push_back(std::move(packet));
   return true;
 }
-bool LegacyFrame::AppendBand(PixelBand band) {
+auto LegacyFrame::AppendBand(PixelBand band) -> bool {
   auto const area = band.Area();
   if (_format.depth != 32) {
     auto converted = Convert(band, _format.depth);
@@ -169,7 +169,7 @@ bool LegacyFrame::AppendBand(PixelBand band) {
   _packets.push_back({ { Band{ .area = area, .pixels = { payload.begin(), payload.end() } } }, { } });
   return true;
 }
-bool LegacyFrame::Bands(sdlrdp_rect area) {
+auto LegacyFrame::Bands(sdlrdp_rect area) -> bool {
   auto const order = _encoder.Codec() == SDLRDP_CODEC_RAW ? RowOrder::BottomUp : RowOrder::TopDown;
   auto const lines = _encoder.Codec() == SDLRDP_CODEC_REMOTEFX
                          ? RemoteFxBandRows
@@ -182,7 +182,7 @@ bool LegacyFrame::Bands(sdlrdp_rect area) {
   }
   return true;
 }
-bool LegacyFrame::Encode() {
+auto LegacyFrame::Encode() -> bool {
   ExpectCaptured(_frames);
   auto encoded = std::ranges::all_of(_scaler.Areas(), [&](sdlrdp_rect area) {
     return _format.wire == LegacyWire::Planar ? Planar(area) : Bands(area);
@@ -190,7 +190,7 @@ bool LegacyFrame::Encode() {
   if (encoded) std::ranges::for_each(_packets, [&](auto& packet) { Describe(packet); });
   return encoded;
 }
-void LegacyFrame::Describe(Packet& packet) const {
+auto LegacyFrame::Describe(Packet& packet) const -> void {
   if (_format.wire == LegacyWire::Surface) return;
   auto const depth = _format.depth;
   packet.rectangles.reserve(packet.bands.size());
@@ -206,7 +206,7 @@ void LegacyFrame::Describe(Packet& packet) const {
     return rectangle;
   });
 }
-bool LegacyFrame::Write(Packet& packet) {
+auto LegacyFrame::Write(Packet& packet) -> bool {
   Expects(!packet.bands.empty(), "encoded packet exists");
   auto* const update = _link.Context().update;
   switch (_format.wire) {
@@ -219,14 +219,14 @@ bool LegacyFrame::Write(Packet& packet) {
     utilities::Unreachable(_format.wire);
   }
 }
-bool LegacyFrame::Finish() {
+auto LegacyFrame::Finish() -> bool {
   if (_link.WriteBlocked()) return true;
   if (!Marker(SURFACECMD_FRAMEACTION_END)) return false;
   _pacing.Sent(_frames, { .bytes = PacketBytes(_packets), .encoded = _encoder.EncodeTime(), .avc = std::nullopt });
   _packets.clear();
   return true;
 }
-bool LegacyFrame::Send() {
+auto LegacyFrame::Send() -> bool {
   ExpectCaptured(_frames);
   if (!_next) {
     if (!Marker(SURFACECMD_FRAMEACTION_BEGIN)) return false;
@@ -238,7 +238,7 @@ bool LegacyFrame::Send() {
   }
   return _link.WriteBlocked() || Finish();
 }
-bool LegacyFrame::Delivered() const noexcept {
+auto LegacyFrame::Delivered() const noexcept -> bool {
   return !_frames.Snapshot();
 }
 } // namespace Backend

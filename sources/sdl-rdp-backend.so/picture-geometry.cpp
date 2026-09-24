@@ -11,10 +11,10 @@ namespace Backend {
 PictureGeometry::PictureGeometry(Extent size, sdlrdp_aspect aspect) : _size{ size }, _aspect{ aspect } {
   std::ignore = Desktop();
 }
-sdlrdp_rect PictureGeometry::Desktop() const {
+auto PictureGeometry::Desktop() const -> sdlrdp_rect {
   return Desktop(_size);
 }
-sdlrdp_rect PictureGeometry::Desktop(Extent size) const {
+auto PictureGeometry::Desktop(Extent size) const -> sdlrdp_rect {
   Expects(size.width > 0, "shadow width is positive");
   Expects(size.height > 0, "shadow height is positive");
   if (!_aspect.num || !_aspect.den) return Whole(size);
@@ -26,16 +26,16 @@ sdlrdp_rect PictureGeometry::Desktop(Extent size) const {
     throw std::runtime_error("Aspect-corrected desktop exceeds RDP dimensions.");
   return Whole({ .width = unsigned(units * n), .height = unsigned(units * d) });
 }
-sdlrdp_rect PictureGeometry::Bounds() const noexcept {
+auto PictureGeometry::Bounds() const noexcept -> sdlrdp_rect {
   return Whole(_size);
 }
-bool PictureGeometry::Resize(Extent size) {
+auto PictureGeometry::Resize(Extent size) -> bool {
   std::ignore = Desktop(size);
   if (_size.width == size.width && _size.height == size.height) return false;
   _size = size;
   return true;
 }
-void PictureGeometry::SetAspect(sdlrdp_aspect value) {
+auto PictureGeometry::SetAspect(sdlrdp_aspect value) -> void {
   auto const previous = std::exchange(_aspect, value);
   try {
     std::ignore = Desktop();

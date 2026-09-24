@@ -10,14 +10,14 @@ struct IntraRefresh {
   unsigned period;
   unsigned count;
 };
-IntraRefresh IntraRefreshFor(unsigned fps);
-unsigned     Bitrate(Extent size, unsigned kbps = 0);
-unsigned     Aligned(unsigned dimension);
-void         ReplicateEdges(std::span<BYTE> pixels, Extent size);
+auto IntraRefreshFor(unsigned fps)                       -> IntraRefresh;
+auto Bitrate(Extent size, unsigned kbps = 0)             -> unsigned;
+auto Aligned(unsigned dimension)                         -> unsigned;
+auto ReplicateEdges(std::span<BYTE> pixels, Extent size) -> void;
 struct EncodingTimes {
   std::chrono::nanoseconds convert{ };
   std::chrono::nanoseconds upload { };
   std::chrono::nanoseconds encode { };
 };
-EncodingTimes& operator += (EncodingTimes& total, EncodingTimes const& frame) noexcept;
+auto operator += (EncodingTimes& total, EncodingTimes const& frame) noexcept -> EncodingTimes&;
 } // namespace Backend::Avc

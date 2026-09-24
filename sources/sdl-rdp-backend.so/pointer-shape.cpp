@@ -15,15 +15,15 @@ namespace Backend {
 namespace {
 constexpr unsigned ColorPointerLimit = 96;
 constexpr BYTE     TransparentAlpha  = 0;
-std::size_t MaskStride(unsigned width) {
+auto MaskStride(unsigned width) -> std::size_t {
   return std::size_t((width + 15) / 16) * 2;
 }
-void MarkTransparent(std::span<BYTE const> source, std::span<BYTE> mask_row) {
+auto MarkTransparent(std::span<BYTE const> source, std::span<BYTE> mask_row) -> void {
   constexpr std::size_t AlphaByte = 3;
   for (auto column : std::views::iota(0uz, source.size() / PixelBytes))
     if (source[(column * PixelBytes) + AlphaByte] == TransparentAlpha) mask_row[column / 8] |= 0x80 >> (column % 8);
 }
-PointerDelivery Delivered(BOOL sent) {
+auto Delivered(BOOL sent) -> PointerDelivery {
   return sent ? PointerDelivery::Sent : PointerDelivery::Failed;
 }
 }
@@ -42,7 +42,7 @@ PointerShape::PointerShape(Extent size, unsigned x, unsigned y, std::span<BYTE c
     MarkTransparent(source, std::span(_mask).subspan(target * stride, stride));
   }
 }
-PointerDelivery PointerShape::Send(rdpContext& context) {
+auto PointerShape::Send(rdpContext& context) -> PointerDelivery {
   auto* update = context.update->pointer;
   if (!_size.width) {
     POINTER_SYSTEM_UPDATE const hidden{ SYSPTR_NULL };
@@ -58,7 +58,7 @@ PointerDelivery PointerShape::Send(rdpContext& context) {
     return PointerDelivery::Unsupported;
   return Delivered(SendLarge(context));
 }
-BOOL PointerShape::SendLarge(rdpContext& context) {
+auto PointerShape::SendLarge(rdpContext& context) -> BOOL {
   POINTER_LARGE_UPDATE const image{ 32,
                                     0,
                                     UINT16(_hot_x),

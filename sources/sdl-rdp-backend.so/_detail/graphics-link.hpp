@@ -18,19 +18,19 @@ class FramePacing;
 class PeerLink;
 class GraphicsLink : private Pinned {
 public:
-  GraphicsLink(PeerLink& link, Diagnostics const& diagnostics, Activation& activation, FramePacing const& pacing,
-               Encoder const& encoder, Factory<std::unique_ptr<GfxChannel>> make) noexcept;
-  bool                  Pump(std::span<HANDLE const> ready);
-  void                  ExpireConfirmation();
-  bool                  Confirmed() const;
-  unsigned              Capacity() const;
-  GfxChannel&           Channel() const;
-  std::span<HANDLE>     Handles(std::span<HANDLE> out) const;
-  void                  Rejected(UINT32 channel_id);
-  GraphicsTiming const* Timing() const noexcept;
+       GraphicsLink(PeerLink& link, Diagnostics const& diagnostics, Activation& activation, FramePacing const& pacing,
+                    Encoder const& encoder, Factory<std::unique_ptr<GfxChannel>> make) noexcept;
+  auto Pump(std::span<HANDLE const> ready)  -> bool;
+  auto ExpireConfirmation()                 -> void;
+  auto Confirmed() const                    -> bool;
+  auto Capacity() const                     -> unsigned;
+  auto Channel() const                      -> GfxChannel&;
+  auto Handles(std::span<HANDLE> out) const -> std::span<HANDLE>;
+  auto Rejected(UINT32 channel_id)          -> void;
+  auto Timing() const noexcept              -> GraphicsTiming const*;
 
 private:
-  void Abandon(char const* reason);
+  auto Abandon(char const* reason) -> void;
   PeerLink&                            _link;
   Diagnostics const&                   _diagnostics;
   Activation&                          _activation;

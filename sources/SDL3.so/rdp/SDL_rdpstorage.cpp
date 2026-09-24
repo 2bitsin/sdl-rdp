@@ -12,7 +12,7 @@ public:
   auto Backend() const -> Driver const& { return *_driver; }
   auto Owner() const   -> std::shared_ptr<Driver const> const& { return _driver; }
   auto Drive() const   -> unsigned { return _drive; }
-  void Resolve() { _drive = DriveId(*_driver, _name); }
+  auto Resolve()       -> void { _drive = DriveId(*_driver, _name); }
 private:
   std::shared_ptr<Driver const> _driver;
   std::optional<std::string>    _name;
@@ -24,18 +24,18 @@ auto Opened(void* context) -> Storage& {
   return *static_cast<Storage*>(context);
 }
 // SDL returns ownership of opaque storage state to its close callback.
-bool StorageClose(void* context) {
+auto StorageClose(void* context) -> bool {
   std::unique_ptr<Storage> const owner{ &Opened(context) };
   return true;
 }
-bool StorageReady(void* context) {
+auto StorageReady(void* context) -> bool {
   return Boundary([&] {
     Opened(context).Resolve();
     return true;
   });
 }
 // SDL path queries supply a borrowed path and an ABI output record.
-bool StorageInfo(void* context, char const* path, SDL_PathInfo* info) {
+auto StorageInfo(void* context, char const* path, SDL_PathInfo* info) -> bool {
   utilities::Expects(path != nullptr, "path query has a path");
   utilities::Expects(info != nullptr, "path query has an output");
   auto const& data  = Opened(context);
@@ -79,7 +79,7 @@ auto Enumerate(Storage const& data, std::string const& path, SDL_EnumerateDirect
     if (batch.size() < entries.size()) return true;
   }
 }
-bool StorageEnumerate(void* context, char const* path, SDL_EnumerateDirectoryCallback callback, void* user) {
+auto StorageEnumerate(void* context, char const* path, SDL_EnumerateDirectoryCallback callback, void* user) -> bool {
   utilities::Expects(path != nullptr, "enumeration has a path");
   utilities::Expects(callback != nullptr, "enumeration has a consumer");
   auto const& data = Opened(context);
@@ -94,7 +94,7 @@ auto TransferAll(SDL_IOStream& stream, _Byte* buffer, std::size_t length) -> std
 // SDL storage transfer callbacks provide counted raw buffers and borrowed paths.
 template<typename _Byte>
   requires IoBuffer<_Byte>
-bool StorageTransfer(void* context, char const* path, _Byte* buffer, Uint64 length) {
+auto StorageTransfer(void* context, char const* path, _Byte* buffer, Uint64 length) -> bool {
   utilities::Expects(path != nullptr, "storage transfer has a path");
   auto const& data = Opened(context);
   return Boundary([&] {
@@ -109,7 +109,7 @@ bool StorageTransfer(void* context, char const* path, _Byte* buffer, Uint64 leng
 // SDL storage mutation callbacks supply an opaque context and one or more borrowed paths.
 template<Operation _Operation, typename... _Path>
   requires (std::same_as<_Path, char const*> && ...)
-bool StorageMutate(void* context, _Path... path) {
+auto StorageMutate(void* context, _Path... path) -> bool {
   (utilities::Expects(path != nullptr, "storage mutation has its paths"), ...);
   auto const& data = Opened(context);
   return data.Backend().Call<_Operation>(data.Drive(), path...) >= 0 || data.Backend().Fail();
@@ -122,7 +122,7 @@ auto CopyStream(SDL_IOStream& source, SDL_IOStream& target) -> bool {
   return SDL_GetIOStatus(&source) == SDL_IO_STATUS_EOF;
 }
 // SDL copy callbacks supply an opaque context and borrowed source and target paths.
-bool StorageCopy(void* context, char const* from, char const* to) {
+auto StorageCopy(void* context, char const* from, char const* to) -> bool {
   utilities::Expects(from != nullptr, "storage copy has a source path");
   utilities::Expects(to != nullptr, "storage copy has a target path");
   auto const& data = Opened(context);
@@ -137,13 +137,13 @@ bool StorageCopy(void* context, char const* from, char const* to) {
   });
 }
 // SDL storage space callbacks supply their opaque state.
-Uint64 StorageSpace([[maybe_unused]] void* unused_context) {
+auto StorageSpace([[maybe_unused]] void* unused_context) -> Uint64 {
   utilities::NotImplemented("RDP backend ABI has no free-space query");
   constexpr Uint64 unknown_space = 0;
   return unknown_space;
 }
 // SDL's storage bootstrap lends the name and takes ownership of the returned storage.
-SDL_Storage* StorageOpen(char const* name, [[maybe_unused]] SDL_PropertiesID unused_properties) {
+auto StorageOpen(char const* name, [[maybe_unused]] SDL_PropertiesID unused_properties) -> SDL_Storage* {
   return Boundary([&] {
     auto                       data      = std::make_unique<Storage>(Rendezvous::Acquire(), DriveName(name));
     SDL_StorageInterface const interface { sizeof(SDL_StorageInterface), StorageClose, StorageReady, StorageEnumerate,
@@ -157,7 +157,8 @@ SDL_Storage* StorageOpen(char const* name, [[maybe_unused]] SDL_PropertiesID unu
   });
 }
 // SDL's user storage bootstrap lends organization and application names.
-SDL_Storage* UserStorageOpen([[maybe_unused]] char const* organization, char const* app, SDL_PropertiesID properties) {
+auto UserStorageOpen([[maybe_unused]] char const* organization, char const* app,
+                     SDL_PropertiesID properties) -> SDL_Storage* {
   return StorageOpen(app, properties);
 }
 }

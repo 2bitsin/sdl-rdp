@@ -9,20 +9,20 @@
 #include <winpr/wtypes.h>
 
 namespace Backend {
-std::size_t FrameBytes(Extent size);
+auto FrameBytes(Extent size) -> std::size_t;
 class FrameSnapshot {
 public:
-                        FrameSnapshot() noexcept                                                   = default;
-                        FrameSnapshot(std::shared_ptr<std::vector<BYTE> const> value, Extent size) noexcept;
-  explicit              operator bool() const                                                      noexcept;
-  std::span<BYTE const> Pixels() const                                                             noexcept;
-  std::span<BYTE const> Row(unsigned row) const;
-  std::size_t           Stride() const;
-  unsigned              Width() const                                                              noexcept;
-  unsigned              Height() const                                                             noexcept;
-  sdlrdp_rect           Bounds() const                                                             noexcept;
-  FrameSnapshot         Matching(Extent size) const;
-  void                  Release()                                                                  noexcept;
+           FrameSnapshot() noexcept                                                   = default;
+           FrameSnapshot(std::shared_ptr<std::vector<BYTE> const> value, Extent size) noexcept;
+  explicit operator bool() const                                                      noexcept;
+  auto     Pixels() const noexcept     -> std::span<BYTE const>;
+  auto     Row(unsigned row) const     -> std::span<BYTE const>;
+  auto     Stride() const              -> std::size_t;
+  auto     Width() const noexcept      -> unsigned;
+  auto     Height() const noexcept     -> unsigned;
+  auto     Bounds() const noexcept     -> sdlrdp_rect;
+  auto     Matching(Extent size) const -> FrameSnapshot;
+  auto     Release() noexcept          -> void;
 
 private:
   std::shared_ptr<std::vector<BYTE> const> _pixels;

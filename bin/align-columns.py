@@ -99,10 +99,17 @@ class Overflow(NamedTuple):
     width: int
 
 
+class ExcludedForColumns(NamedTuple):
+    """A member that fits the limit in its run but would push other members over it, so it stands alone."""
+    line_number: int
+    text: str
+    width: int
+
+
 class Aligned(NamedTuple):
     text: str
     groups: int
-    exceptions: list[Overflow]
+    exceptions: list[Overflow | ExcludedForColumns]
 
 
 class Item(NamedTuple):
@@ -579,12 +586,6 @@ def render(item, widths):
     return item.indent + RENDERERS[item.kind](item.fields, widths)
 
 
-def body_width(item):
-    if item and item.kind == 'function' and item.fields.tail.startswith(' '):
-        return len(item.fields.tail)
-    return 0
-
-
 def column_widths(fields):
     return {name: max(len(getattr(f, name)) for f in fields) for name in fields[0]._fields}
 
@@ -662,8 +663,7 @@ class Group:
         return {index: self.width(index, text) for index, text in proposed.items()}
 
     def width(self, index, text):
-        member = self.members[index]
-        return len(text) - body_width(member.item) + member.extra
+        return len(text) + self.members[index].extra
 
     def overflow(self, active):
         return sum(max(0, width - COLUMN_LIMIT) for width in self.widths(active).values())
@@ -676,7 +676,7 @@ class Group:
         return self.overflow([other for other in active if other != index]), -self.unaligned_width(index)
 
     def setter(self, active, over):
-        return min(over, key=lambda index: self.exclusion_cost(active, index))
+        return min(sorted(set(active) - set(over)) + over, key=lambda index: self.exclusion_cost(active, index))
 
     def readmit(self, active, excluded):
         for index in excluded:
@@ -1025,7 +1025,8 @@ def assemble(segments, anchors, rendered):
 
 
 def overflows(output, excluded):
-    return [Overflow(index + 1, output[index], width) for (index, _), width in sorted(excluded.items())]
+    return [(Overflow if width > COLUMN_LIMIT else ExcludedForColumns)(index + 1, output[index], width)
+            for (index, _), width in sorted(excluded.items())]
 
 
 def constructor_names(code):
@@ -1071,7 +1072,7 @@ def padding_source(index, width, segments, anchors, texts):
 def pushed_overflows(output, layout, texts, items):
     pushed = {}
     for index, line in enumerate(output):
-        width = len(line) - body_width(items.get((index, 0)))
+        width = len(line)
         source = width > COLUMN_LIMIT and padding_source(index, width, *layout, texts)
         if source:
             pushed.setdefault(source, width)
@@ -1108,8 +1109,8 @@ def source_files(paths):
 
 def print_statistics(path, stats):
     print(f'{path}: {stats.groups} groups; {len(stats.exceptions)} exceptions')
-    for number, line, width in stats.exceptions:
-        print(f'{path}:{number}: {width}: {line}')
+    for exception in stats.exceptions:
+        print(f'{path}:{exception.line_number}: {type(exception).__name__} {exception.width}: {exception.text}')
 
 
 def check_python_columns():

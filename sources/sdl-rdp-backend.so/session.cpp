@@ -10,12 +10,12 @@
 
 namespace Backend {
 namespace {
-EventHandle ReapSignal() {
+auto ReapSignal() -> EventHandle {
   EventHandle signal{ CreateEvent(nullptr, TRUE, FALSE, nullptr) };
   if (!signal) throw std::runtime_error("peer reaping event allocation failed");
   return signal;
 }
-void AnnounceDeparture(Session& session, EventQueue& events, Peer const& peer) {
+auto AnnounceDeparture(Session& session, EventQueue& events, Peer const& peer) -> void {
   auto const* sound = peer.Audio();
   events.Push({ .type = SDLRDP_DISCONNECTED });
   if (sound && sound->Rate()) session.AudioGone();
@@ -23,23 +23,23 @@ void AnnounceDeparture(Session& session, EventQueue& events, Peer const& peer) {
 }
 Session::Session(FrameStore& frames, EventQueue& events)
     : _reap { ReapSignal() }, _frames{ frames }, _events{ events } { }
-SessionLock Session::Lock() {
+auto Session::Lock() -> SessionLock {
   return SessionLock{ _guard };
 }
-PeersLock Session::LockPeers() {
+auto Session::LockPeers() -> PeersLock {
   return _peers.Lock();
 }
-void Session::Add(std::unique_ptr<Peer> peer) {
+auto Session::Add(std::unique_ptr<Peer> peer) -> void {
   _peers.Add(std::move(peer));
 }
-void Session::Reap() {
+auto Session::Reap() -> void {
   ResetEvent(_reap.get());
   _peers.Reap();
 }
-HANDLE Session::ReapEvent() const noexcept {
+auto Session::ReapEvent() const noexcept -> HANDLE {
   return _reap.get();
 }
-FrameLock Session::Takeover(PeerLink const& self) {
+auto Session::Takeover(PeerLink const& self) -> FrameLock {
   std::scoped_lock const session(_guard);
   auto const             held    = LockPeers();
   auto                   frame   = _frames.Lock();
@@ -52,7 +52,7 @@ FrameLock Session::Takeover(PeerLink const& self) {
   Ensures(_current != nullptr, "the arriving peer is current");
   return frame;
 }
-void Session::Depart(PeerLink const& self, Activation& activation) {
+auto Session::Depart(PeerLink const& self, Activation& activation) -> void {
   {
     std::scoped_lock const session(_guard);
     auto const             held    = LockPeers();
@@ -68,25 +68,25 @@ void Session::Depart(PeerLink const& self, Activation& activation) {
   activation.Finish();
   SetEvent(_reap.get());
 }
-Peer* Session::Current(SessionLock const& held) const {
+auto Session::Current(SessionLock const& held) const -> Peer* {
   Expects(held.mutex() == &_guard, "reading the current peer holds the session lock");
   return _current;
 }
-Peer* Session::Current(FrameLock const& held) const {
+auto Session::Current(FrameLock const& held) const -> Peer* {
   Expects(_frames.Holds(held), "reading the current peer holds the frame lock");
   return _current;
 }
-unsigned Session::NextDrive() noexcept {
+auto Session::NextDrive() noexcept -> unsigned {
   return _next_drive.fetch_add(1);
 }
-void Session::AudioChanged() {
+auto Session::AudioChanged() -> void {
   _audio_changed.notify_all();
 }
-void Session::AudioGone() {
+auto Session::AudioGone() -> void {
   _events.Push({ .type = SDLRDP_AUDIO, .audio = { .freq = 0, .connected = 0 } });
   AudioChanged();
 }
-void Session::WaitAudio(SessionLock& held, std::chrono::steady_clock::time_point deadline) {
+auto Session::WaitAudio(SessionLock& held, std::chrono::steady_clock::time_point deadline) -> void {
   Expects(held.mutex() == &_guard, "audio waits hold the session lock");
   _audio_changed.wait_until(held, deadline);
 }

@@ -1,7 +1,7 @@
 #include "_detail/test-drive-checks.hpp"
 
 namespace DriveGate {
-void DriveChecks::ThenReadRanges(sdlrdp_file* file, std::string const& source) {
+auto DriveChecks::ThenReadRanges(sdlrdp_file* file, std::string const& source) -> void {
   std::string result(source.size(), '\0');
   auto        start  = Headless::Clock::now();
   ASSERT_EQ(sdlrdp_drive_read(handle.get(), file, 0, result.data(), result.size()), result.size())

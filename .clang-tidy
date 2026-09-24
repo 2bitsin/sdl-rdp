@@ -6,7 +6,7 @@ Checks: >
   misc-*, modernize-*, performance-*, portability-*, readability-*,
   -cppcoreguidelines-non-private-member-variables-in-classes, -concurrency-mt-unsafe,
   -readability-magic-numbers, -cppcoreguidelines-avoid-magic-numbers, -readability-identifier-length,
-  -modernize-use-trailing-return-type, -readability-braces-around-statements,
+  -readability-braces-around-statements,
   -cppcoreguidelines-pro-bounds-*, -cppcoreguidelines-pro-type-vararg,
   -cppcoreguidelines-pro-type-reinterpret-cast,
   -cppcoreguidelines-pro-type-union-access, -cppcoreguidelines-owning-memory,
@@ -16,7 +16,7 @@ Checks: >
   -modernize-use-nodiscard, -cert-err58-cpp, -cppcoreguidelines-avoid-do-while,
   -readability-avoid-nested-conditional-operator, -performance-enum-size
 WarningsAsErrors: '*'
-HeaderFilterRegex: 'sources/((sdl-rdp-backend\.so|sdl-rdp-sample\.exe)/.*\.(hpp|cpp)|SDL3\.so/rdp/.*\.[ch])$'
+HeaderFilterRegex: 'sources/(sdl-rdp-backend\.so|sdl-rdp-sample\.exe|SDL3\.so/rdp)/.*\.(hpp|cpp)$'
 ExcludeHeaderFilterRegex: 'sdl-rdp-backend\.h$|/(third-party|_build|_bdudata)/'
 CheckOptions:
   misc-header-include-cycle.IgnoredFilesList: '^/usr/include/'

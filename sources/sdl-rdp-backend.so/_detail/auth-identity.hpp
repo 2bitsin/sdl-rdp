@@ -16,7 +16,7 @@ struct IdentityNames {
   std::string user;
   std::string domain;
 };
-inline std::string QualifiedName(std::string_view domain, std::string_view user) {
+inline auto QualifiedName(std::string_view domain, std::string_view user) -> std::string {
   return domain.empty() ? std::string(user) : std::string(domain) + "\\" + std::string(user);
 }
 inline auto IdentityText(std::span<uint16_t const> utf16) -> std::string {

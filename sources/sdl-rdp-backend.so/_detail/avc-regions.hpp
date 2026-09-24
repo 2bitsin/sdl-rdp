@@ -8,12 +8,12 @@
 namespace Backend::Avc {
 class Regions {
 public:
-  void                                    Add(sdlrdp_rect area);
-  std::size_t                             Bytes() const;
-  std::vector<RECTANGLE_16>&              Rects();
-  std::vector<RDPGFX_H264_QUANT_QUALITY>& Quality();
-  sdlrdp_rect                             Bounds() const;
-  void                                    Clear();
+  auto Add(sdlrdp_rect area) -> void;
+  auto Bytes() const         -> std::size_t;
+  auto Rects()               -> std::vector<RECTANGLE_16>&;
+  auto Quality()             -> std::vector<RDPGFX_H264_QUANT_QUALITY>&;
+  auto Bounds() const        -> sdlrdp_rect;
+  auto Clear()               -> void;
 
 private:
   std::vector<RECTANGLE_16>              rects;

@@ -13,13 +13,13 @@
 namespace SampleGate {
 class VideoDriver : public Sample {
 protected:
-  void ThenResizeEvents(Headless::DisplayClient& display) {
+  auto ThenResizeEvents(Headless::DisplayClient& display) -> void {
     EXPECT_EQ(display.Observed().desktops, 1u);
     EXPECT_EQ(display.Observed().echoes, 1u);
     EXPECT_FALSE(logs.Contains("Unexpected client message")) << logs.Text(true);
     RecordProperty("DesktopResize_calls", display.Observed().desktops);
   }
-  static void ThenDesktopEvent(int width, int height) {
+  static auto ThenDesktopEvent(int width, int height) -> void {
     SDL_Event event;
     ASSERT_EQ(SDL_PeepEvents(&event, 1, SDL_GETEVENT, SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED,
                              SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED),
@@ -28,12 +28,12 @@ protected:
     EXPECT_EQ(event.display.data2, height);
     EXPECT_FALSE(SDL_HasEvent(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED));
   }
-  void GivenFullscreen() {
+  auto GivenFullscreen() -> void {
     auto mode = *SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
     ASSERT_TRUE(SDL_SetWindowFullscreenMode(window, &mode));
     ASSERT_TRUE(SDL_SetWindowFullscreen(window, true));
   }
-  void GivenVideoHints() {
+  auto GivenVideoHints() -> void {
     for (auto [name, value] : { std::pair{ SDL_HINT_VIDEO_DRIVER, "rdp" },
                                 { "SDL_RDP_PORT"  , "0"         },
                                 { "SDL_RDP_BIND"  , "127.0.0.1" },
@@ -45,7 +45,7 @@ protected:
     auto library = BuildRoot() / "sources/sdl-rdp-backend.so/libsdl-rdp-backend.so";
     ASSERT_TRUE(SDL_SetHint("SDL_RDP_BACKEND", library.c_str()));
   }
-  void SetUp() override {
+  auto SetUp() -> void override {
     Sample::SetUp();
     SDL_GetLogOutputFunction(&log_output, &log_userdata);
     SDL_SetLogOutputFunction(
@@ -64,19 +64,19 @@ protected:
     ASSERT_NE(window, nullptr) << SDL_GetError();
     SDL_FlushEvents(SDL_EVENT_FIRST, SDL_EVENT_LAST);
   }
-  void StormSizes() {
+  auto StormSizes() -> void {
     for (auto [w, h] : { std::pair{ 1600, 900 }, { 1920, 1080 }, { 1280, 800 } }) {
       ASSERT_TRUE(SDL_SetWindowSize(window, w, h));
     }
   }
-  static void Desktop(int width, int height) {
+  static auto Desktop(int width, int height) -> void {
     auto const* mode = SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
     ASSERT_NE(mode, nullptr);
     EXPECT_EQ(mode->w, width);
     EXPECT_EQ(mode->h, height);
     ThenDesktopEvent(width, height);
   }
-  void TearDown() override {
+  auto TearDown() -> void override {
     SDL_DestroyWindow(window);
     SDL_Quit();
     SDL_SetLogOutputFunction(log_output, log_userdata);
@@ -85,13 +85,13 @@ protected:
       SDL_ResetHint(hint);
     Sample::TearDown();
   }
-  void ThenResizeStorm(Client& client, Headless::DisplayClient& display) {
+  auto ThenResizeStorm(Client& client, Headless::DisplayClient& display) -> void {
     EXPECT_FALSE(freerdp_shall_disconnect_context(client.Instance()->context));
     EXPECT_EQ(client.Instance()->context->gdi->width, 1280);
     EXPECT_EQ(client.Instance()->context->gdi->height, 800);
     ThenResizeEvents(display);
   }
-  void ThenExclusivePicture(Client& client, Headless::DisplayClient& display, FullDesktopFrames const& frames) {
+  auto ThenExclusivePicture(Client& client, Headless::DisplayClient& display, FullDesktopFrames const& frames) -> void {
     EXPECT_EQ(frames.Deliveries(), 0u);
     EXPECT_EQ(display.Observed().desktops, 0u);
     EXPECT_EQ(client.Instance()->context->gdi->width, 1280);
@@ -106,14 +106,14 @@ protected:
 };
 
 namespace {
-void ThenUnchangedPicture(Headless::DisplayClient& display, FullDesktopFrames const& frames) {
+auto ThenUnchangedPicture(Headless::DisplayClient& display, FullDesktopFrames const& frames) -> void {
   EXPECT_FALSE(SDL_HasEvent(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED));
   EXPECT_FALSE(SDL_HasEvent(SDL_EVENT_WINDOW_RESIZED));
   EXPECT_EQ(frames.Deliveries(), 0u);
   EXPECT_EQ(display.Observed().desktops, 1u);
   testing::Test::RecordProperty("equal_layout_picture_resizes", 0);
 }
-void PumpDesktop(Client& client) {
+auto PumpDesktop(Client& client) -> void {
   for (unsigned i = 0; i < 20; ++i) {
     ASSERT_TRUE(client.Pump(5));
     SDL_PumpEvents();
@@ -121,7 +121,7 @@ void PumpDesktop(Client& client) {
 }
 }
 namespace {
-void ThenEqualLayout(Client& client, Headless::DisplayClient& display) {
+auto ThenEqualLayout(Client& client, Headless::DisplayClient& display) -> void {
   FullDesktopFrames const frames(client);
   ASSERT_TRUE(display.Layout(1280, 800));
   PumpDesktop(client);
@@ -130,7 +130,7 @@ void ThenEqualLayout(Client& client, Headless::DisplayClient& display) {
 }
 }
 namespace {
-void ThenAudioDeviceChanges(Client& client, SDL_AudioStream* stream) {
+auto ThenAudioDeviceChanges(Client& client, SDL_AudioStream* stream) -> void {
   SDL_AudioSpec before{ };
   ASSERT_TRUE(SDL_GetAudioDeviceFormat(SDL_GetAudioStreamDevice(stream), &before, nullptr));
   EXPECT_EQ(before.freq, 44100);
@@ -142,7 +142,7 @@ void ThenAudioDeviceChanges(Client& client, SDL_AudioStream* stream) {
 }
 }
 namespace {
-void AwaitResizedPicture(Client& client, Headless::DisplayClient& display) {
+auto AwaitResizedPicture(Client& client, Headless::DisplayClient& display) -> void {
   Expects(client.Instance() != nullptr, "resized client exists");
   std::vector<UINT32> pixels(1280uz * 800, 0);
   ASSERT_TRUE(client.Until([&] {
@@ -150,7 +150,7 @@ void AwaitResizedPicture(Client& client, Headless::DisplayClient& display) {
     return display.Observed().desktops && client.Matches(pixels);
   }));
 }
-void PresentDesktop(Client& client, SDL_Window* window) {
+auto PresentDesktop(Client& client, SDL_Window* window) -> void {
   auto* surface = SDL_GetWindowSurface(window);
   ASSERT_NE(surface, nullptr);
   ASSERT_TRUE(SDL_FillSurfaceRect(surface, nullptr, SDL_MapSurfaceRGB(surface, 0x12, 0x34, 0x56)));
@@ -158,7 +158,7 @@ void PresentDesktop(Client& client, SDL_Window* window) {
   std::vector<UINT32> pixels(1280uz * 800, 0x00123456);
   ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); }));
 }
-void ConnectDesktop(Client& client, Headless::Logs& logs) {
+auto ConnectDesktop(Client& client, Headless::Logs& logs) -> void {
   Expects(client.Instance() != nullptr, "desktop client exists");
   ASSERT_TRUE(freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_FrameAcknowledge, 0));
   ASSERT_TRUE(freerdp_connect(client.Instance().get())) << logs.Text(true);

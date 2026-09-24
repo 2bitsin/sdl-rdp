@@ -6,17 +6,17 @@
 
 namespace BackendGate {
 namespace {
-std::array<Backend::Descriptor, 2> OpeningSockets() {
+auto OpeningSockets() -> std::array<Backend::Descriptor, 2> {
   std::array<int, 2> sockets { };
   auto               result  = socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sockets.data());
   Expects(result == 0, "opening process has a control socket");
   return { Backend::Descriptor(sockets[0]), Backend::Descriptor(sockets[1]) };
 }
-void SendOpeningResult(int socket, int value) {
+auto SendOpeningResult(int socket, int value) -> void {
   auto sent = send(socket, &value, sizeof(value), MSG_NOSIGNAL);
   Expects(sent == sizeof(value), "opening process publishes its result");
 }
-void PublishListeningPort(void* user, sdlrdp_log_level level, char const* text) {
+auto PublishListeningPort(void* user, sdlrdp_log_level level, char const* text) -> void {
   Expects(user != nullptr, "control socket exists");
   Expects(text != nullptr, "log message exists");
   std::string_view const     line(text);
@@ -25,7 +25,7 @@ void PublishListeningPort(void* user, sdlrdp_log_level level, char const* text) 
   auto const port = Required(oxbox::utilities::ParseNumberAfter<int>(line, prefix), "listener logged a numeric port");
   SendOpeningResult(*static_cast<int*>(user), port);
 }
-bool OpenedWithClient(sdlrdp_config const& config) {
+auto OpenedWithClient(sdlrdp_config const& config) -> bool {
   sdlrdp_handle* handle = nullptr;
   auto           opened = sdlrdp_open(&config, &handle);
   std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> const backend(handle, sdlrdp_close);
@@ -33,7 +33,7 @@ bool OpenedWithClient(sdlrdp_config const& config) {
   return opened == 0 && sdlrdp_wait(handle, 0) == 1 && sdlrdp_poll(handle, &event, 1) == 1 &&
          event.type == SDLRDP_CONNECTED;
 }
-int RunOpeningProcess(sdlrdp_config config, int socket) {
+auto RunOpeningProcess(sdlrdp_config config, int socket) -> int {
   config.log      = PublishListeningPort;
   config.log_user = &socket;
   auto opened = OpenedWithClient(config);
@@ -47,7 +47,7 @@ WaitingOpen::~WaitingOpen() {
   // The ABI returns no handle until a blocking open completes; ending the process closes its listener.
   process.Kill();
 }
-std::optional<int> WaitingOpen::Receive(std::chrono::milliseconds timeout) const {
+auto WaitingOpen::Receive(std::chrono::milliseconds timeout) const -> std::optional<int> {
   pollfd ready  { .fd = sockets[0].Get(), .events = POLLIN, .revents = 0 };
   auto   polled = poll(&ready, 1, int(timeout.count()));
   if (polled != 1) return std::nullopt;

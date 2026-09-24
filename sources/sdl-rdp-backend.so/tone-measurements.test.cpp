@@ -8,7 +8,7 @@
 #include <numbers>
 
 namespace Headless {
-std::pair<double, double> ToneMeasurements(std::vector<INT16> const& samples, unsigned rate) {
+auto ToneMeasurements(std::vector<INT16> const& samples, unsigned rate) -> std::pair<double, double> {
   using utilities::Expects;
   auto start = std::ranges::find_if(samples, [](auto value) { return std::abs(value) > 100; }) - samples.begin();
   start += start % 2;

@@ -47,22 +47,22 @@ class PointerStore;
 class SessionAccess;
 class Peer : private Pinned {
 public:
-  Peer(PeerHandle accepted, Diagnostics const& diagnostics, EventQueue& events, Configuration const& configuration,
-       FrameStore& store, PointerStore& pointer, ClipboardStore& clipboard, SessionAccess& session);
-  void                          Start();
-  void                          Stop();
-  bool                          Owns(PeerLink const& link) const noexcept;
-  bool                          Evict();
-  bool                          Finished() const                 noexcept;
-  void                          Present(FrameLock const& held, std::span<sdlrdp_rect const> damage);
-  void                          Repaint(FrameLock const& held, sdlrdp_rect area);
-  void                          RestartPacing(FrameLock const& held);
-  void                          Signal();
-  bool                          Settled(FrameLock const& held, uint64_t target) const;
-  AudioChannel*                 Audio() const                    noexcept;
-  std::shared_ptr<DriveChannel> Drive() const;
-  void                          Point(MouseMode mode);
-  PeerStatus                    Status(FrameLock const& held) const;
+       Peer(PeerHandle accepted, Diagnostics const& diagnostics, EventQueue& events, Configuration const& configuration,
+            FrameStore& store, PointerStore& pointer, ClipboardStore& clipboard, SessionAccess& session);
+  auto Start()                                                             -> void;
+  auto Stop()                                                              -> void;
+  auto Owns(PeerLink const& link) const noexcept                           -> bool;
+  auto Evict()                                                             -> bool;
+  auto Finished() const noexcept                                           -> bool;
+  auto Present(FrameLock const& held, std::span<sdlrdp_rect const> damage) -> void;
+  auto Repaint(FrameLock const& held, sdlrdp_rect area)                    -> void;
+  auto RestartPacing(FrameLock const& held)                                -> void;
+  auto Signal()                                                            -> void;
+  auto Settled(FrameLock const& held, uint64_t target) const               -> bool;
+  auto Audio() const noexcept                                              -> AudioChannel*;
+  auto Drive() const                                                       -> std::shared_ptr<DriveChannel>;
+  auto Point(MouseMode mode)                                               -> void;
+  auto Status(FrameLock const& held) const                                 -> PeerStatus;
 
 private:
   PeerLink        _link;
