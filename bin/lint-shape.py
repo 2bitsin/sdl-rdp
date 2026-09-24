@@ -28,6 +28,9 @@ NESTING              = 2
 LONG_LINES           = 0
 COMPOUND_CONTRACTS   = 0
 C_FILES              = 0
+HEADER_CLASSES       = 1
+HEADER_BODIES        = 0
+HEADER               = '.hpp'
 EXTENSIONS           = frozenset(('.c', '.h', '.cpp', '.hpp'))
 FROZEN               = frozenset(('sources/sdl-rdp-backend.so/sdl-rdp-backend.h',))
 PUBLIC_DATA_CLASSES  = frozenset((('sources/sdl-rdp-backend.so/_detail/state.hpp', 'Peer'),
@@ -55,6 +58,8 @@ CONTRACTS            = frozenset(('Expects', 'Ensures'))
 LOGICAL              = frozenset(('&&', '||', 'and', 'or'))
 BRANCHES             = LOGICAL | {'if', 'for', 'while', 'case', 'catch', '?'}
 SCOPES               = frozenset(('namespace', 'extern', 'class', 'struct', 'union'))
+EVALUATED            = frozenset(('constexpr', 'consteval'))
+GENERATED            = (['=', 'default'], ['=', 'delete'])
 ACCESS               = frozenset(('public', 'protected', 'private'))
 RANKS                = {'public': 0, 'protected': 1, 'private': 2}
 FUNCTION_LIMITS      = {'complexity': COMPLEXITY, 'parameters': PARAMETERS, 'nesting': NESTING}
@@ -107,6 +112,19 @@ class Declarator(typing.NamedTuple):
     parameters: int
 
 
+class ClassSpan(typing.NamedTuple):
+    """A class definition: its key and name, the line and token of its key, and its body braces."""
+    kind:    str
+    name:    str
+    line:    int
+    keyword: int
+    start:   int
+    end:     int
+
+    def encloses(self, index):
+        return self.start <= index <= self.end
+
+
 class Member(typing.NamedTuple):
     access: str
     first:  int
@@ -151,6 +169,7 @@ class ClassTally:
     access:       str
     highest:      int                 = -1
     layout:       int                 = 0
+    generated:    int                 = 0
     functions:    list[str]           = dataclasses.field(default_factory=list)
     data:         collections.Counter = dataclasses.field(default_factory=collections.Counter)
     declarations: collections.Counter = dataclasses.field(default_factory=collections.Counter)
@@ -334,7 +353,7 @@ def classes(source):
             continue
         cursor = class_body(source, index + 2)
         if cursor in source.pairs and source.word(cursor) == '{':
-            yield token.value, source.word(index + 1), token.line, cursor, source.pairs[cursor]
+            yield ClassSpan(token.value, source.word(index + 1), token.line, index, cursor, source.pairs[cursor])
 
 
 def class_body(source, cursor):
@@ -435,13 +454,13 @@ def top_level_items(source, start, end):
 
 
 def tally_members(source, item):
-    kind, name, _, start, end = item
-    tally = ClassTally('private' if kind == 'class' else 'public')
-    for member in members(source, start, end):
+    tally = ClassTally('private' if item.kind == 'class' else 'public')
+    for member in members(source, item.start, item.end):
         if member.access:
             tally.enter(member.access)
-        elif (found := declarator(source, member.first, member.end, name)) is not None:
-            tally.function(found.name, name)
+        elif (found := declarator(source, member.first, member.end, item.name)) is not None:
+            tally.function(found.name, item.name)
+            tally.generated += source.words(member.end - 2, member.end) in GENERATED
         elif (count := data_count(source, member.first, member.end)):
             tally.datum(count)
     return tally
@@ -449,16 +468,71 @@ def tally_members(source, item):
 
 def class_measures(source, fixtures):
     for item in classes(source):
-        _, name, line, _, end = item
+        name, line = item.name, item.line
         tally = tally_members(source, item)
         if all(function == name for function in tally.functions):
             continue
         exposed = sum(tally.declarations[access] for access in exposure(source.path, name, fixtures).value)
-        size = source.tokens[end].line - line + 1
+        size = source.tokens[item.end].line - line + 1
         yield from over_limits(line, ((f'{name} lines',            size,                     CLASS_LINES),
                                       (f'{name} data members',     sum(tally.data.values()), DATA_MEMBERS),
                                       (f'{name} member functions', len(tally.functions),     MEMBER_FUNCTIONS),
                                       (f'{name} layout',           tally.layout + exposed,   LAYOUT)))
+
+
+def header_measures(source):
+    """Measure a header's classes with member functions, nested classes counted with their owner, and bodies."""
+    if source.path.suffix != HEADER:
+        return []
+    items = list(classes(source))
+    owners = [item for item in items if outermost(item, items)]
+    behaving = sum(any(behaves(source, inner) for inner in items if owner.encloses(inner.start)) for owner in owners)
+    heads = template_heads(source)
+    plain = {item for item in items if item.keyword not in heads}
+    bodies = collections.Counter(owner.name for function in definitions(source, 0, len(source.tokens))
+                                 if (owner := body_owner(source, function, items, plain)) is not None)
+    return over_limits(1, (('classes with member functions', behaving, HEADER_CLASSES),
+                           *((f'{name} bodies in header', count, HEADER_BODIES) for name, count in bodies.items())))
+
+
+def outermost(item, items):
+    return not any(other.encloses(item.start) for other in items if other is not item)
+
+
+def behaves(source, item):
+    """A class behaves when it declares a member function that is not defaulted or deleted."""
+    tally = tally_members(source, item)
+    return len(tally.functions) > tally.generated
+
+
+def body_owner(source, function, items, plain):
+    """Return the outermost class owning a body that is neither a template nor constexpr, else None."""
+    enclosing = [item for item in items if item.encloses(function.first)] or qualifiers(function, items)
+    if exempt(source, function) or not all(item in plain for item in enclosing):
+        return None
+    return next((item for item in enclosing if outermost(item, items)), None)
+
+
+def qualifiers(function, items):
+    """Return the outermost class an out-of-class definition names as its qualifier."""
+    names = function.name.split('::')[:-1]
+    return [item for item in items if item.name in names and outermost(item, items)][:1]
+
+
+def exempt(source, function):
+    """A function template, abbreviated ones included, or a constexpr or consteval function."""
+    parameters = source.words(function.parameters + 1, source.pairs[function.parameters])
+    return (generic(source, function.first) or 'auto' in parameters
+            or not EVALUATED.isdisjoint(source.words(function.first, function.parameters)))
+
+
+def template_heads(source):
+    """Return the index that follows each template header with parameters."""
+    return {template_header_end(source, index) for index in range(len(source.tokens)) if generic(source, index)}
+
+
+def generic(source, index):
+    return source.words(index, index + 2) == ['template', '<'] and source.word(index + 2) != '>'
 
 
 def exposure(path, name, fixtures):
@@ -778,7 +852,7 @@ def unbalanced_finding(source):
 
 def source_findings(source, fixtures=frozenset()):
     path = source.path
-    shape = file_measures(source) + list(class_measures(source, fixtures))
+    shape = file_measures(source) + list(class_measures(source, fixtures)) + header_measures(source)
     if path.as_posix() in FROZEN:
         return [finding(file_scope(path), measure) for measure in shape]
     shape += long_line_measures(source.lines, source.literal_columns)
@@ -857,7 +931,7 @@ def fixture_classes(sources):
     bases = {}
     helpers = set()
     for source in sources:
-        declared = [(name, base_names(source, start)) for _, name, _, start, _ in classes(source)]
+        declared = [(item.name, base_names(source, item.start)) for item in classes(source)]
         for name, parents in declared:
             bases.setdefault(name, set()).update(parents)
         if source.path.name.startswith('test-') or source.path.name.endswith('.test.cpp'):

@@ -10,14 +10,14 @@ version keeps its archive, patched tree and configure cache under
 `_build/generated/SDL3/<version>/`.
 
 - `sources/SDL3.so/` builds `libSDL3.so`, the library applications link.
-  `rdp/` is the driver, ordinary C in SDL's conventions with no FreeRDP
-  dependency. `rdp-driver.patch` registers it in SDL's build and bootstrap
-  list. `configure.py` is buildutil's per-module hook: it downloads the
-  selected SDL release into the generated folder once, applies the patch
-  there, runs SDL's own CMake configure (never its build) to learn the file
-  list, defines and `SDL_build_config.h` of a headless Linux build, and hands
-  those sources to buildutil, which compiles them and the driver into one
-  library. Nothing SDL lands in the source tree.
+  `rdp/` is the driver, C++23 with `extern "C"` only at SDL's bootstrap
+  tables (since #22) and no FreeRDP dependency. `rdp-driver.patch` registers
+  it in SDL's build and bootstrap list. `configure.py` is buildutil's
+  per-module hook: it downloads the selected SDL release into the generated
+  folder once, applies the patch there, runs SDL's own CMake configure (never
+  its build) to learn the file list, defines and `SDL_build_config.h` of a
+  headless Linux build, and hands those sources to buildutil, which compiles
+  them and the driver into one library. Nothing SDL lands in the source tree.
 - `sources/sdl-rdp-backend.so/` builds `libsdl-rdp-backend.so`: the FreeRDP 3
   server behind a versioned C ABI (`sdl-rdp-backend.h`), with its gtest
   gate (a headless FreeRDP client connects, frames and input round-trip). The
@@ -28,6 +28,13 @@ version keeps its archive, patched tree and configure cache under
 - `test_package/` consumes the published package the way a downstream
   project does: links the `SDL3` component, starts the `rdp` driver on an
   ephemeral port, and proves the backend resolves from the package.
+
+`bin/lint-shape.py` measures every `.hpp` under `sources/` twice:
+
+- `classes with member functions`: at most one class, nested ones counted with
+  their owner, declares a member function that is not defaulted or deleted.
+- `bodies in header`: none, unless the class or the function is a template or
+  the function is constexpr or consteval; every other body is in the `.cpp`.
 
 `sdlrdp_last_error()` reports the calling thread's most recent error; successful
 calls do not clear it. Each handle owns its per-thread error slots. A thread-local

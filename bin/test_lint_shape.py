@@ -1,4 +1,4 @@
-"""Unit tests for the function, column, contract and preprocessor measures of lint-shape.py."""
+"""Unit tests for the function, column, contract, preprocessor and header measures of lint-shape.py."""
 import importlib.util
 import pathlib
 
@@ -21,14 +21,15 @@ CONTINUED  = '#define OPEN(x) \\\n  { if (x) { \\\n  } \\\n\nvoid G(int a) { ++a
 UNBALANCED = 'void F(int a) {\n#ifdef A\n  if (a) {\n#else\n  if (!a) {\n#endif\n  }\n}\n'
 
 
-def write(tmp_path, source):
-    path = tmp_path / 'sample.cpp'
+def write(tmp_path, source, name='sample.cpp'):
+    path = tmp_path / name
     path.write_text(source)
     return path
 
 
-def labels(tmp_path, source):
-    return [finding.key.split(': ', 1)[1] for finding in LINT.source_findings(LINT.Source(write(tmp_path, source)))]
+def labels(tmp_path, source, name='sample.cpp'):
+    path = write(tmp_path, source, name)
+    return [finding.key.split(': ', 1)[1] for finding in LINT.source_findings(LINT.Source(path))]
 
 
 def values(tmp_path, source):
@@ -313,3 +314,28 @@ def test_report_is_the_allow_entry(tmp_path, capsys):
     findings = six_parameters(tmp_path)
     assert check(tmp_path, capsys, '', findings) == (1, f'{LINT.file_scope(tmp_path / "sample.cpp")}:1: '
                                                         'Sample parameters 6 > 5\n')
+
+
+@pytest.mark.parametrize(('source', 'expected'), [
+    ('class A {\npublic:\n  void F();\n};\nstruct B {\n  B(int value);\n};\n',
+     ['classes with member functions 2 > 1']),
+    ('class A {\npublic:\n  void F();\n};\nstruct Point {\n  int x{ };\n  int y{ };\n};\n', []),
+    ('class A {\npublic:\n  void F();\n};\nclass Pinned {\nprotected:\n  Pinned() = default;\n'
+     '  Pinned(Pinned const&) = delete;\n};\n', []),
+    ('class A {\npublic:\n  void F();\nprivate:\n  struct Inner {\n    void G();\n  };\n};\n', []),
+    ('template <class T> class A {\npublic:\n  A() { }\n  T F() const { return value; }\n'
+     'private:\n  T value;\n};\n', []),
+    ('class A {\npublic:\n  int F() const { return value; }\nprivate:\n  int value;\n};\n',
+     ['A bodies in header 1 > 0']),
+    ('class A {\npublic:\n  constexpr int F() const { return value; }\nprivate:\n  int value;\n};\n', []),
+    ('class A {\npublic:\n  template <class T> void F(T) { }\n  void G(auto) { }\n};\n', []),
+    ('class A {\n  struct Inner {\n    void G() { }\n  };\n};\n', ['A bodies in header 1 > 0']),
+    ('class A {\npublic:\n  void F();\n};\ninline void A::F() { }\n', ['A bodies in header 1 > 0']),
+    ('class A {\npublic:\n  template <class T> void F();\n};\ntemplate <> inline void A::F<int>() { }\n',
+     ['A bodies in header 1 > 0'])])
+def test_header_classes_and_bodies(tmp_path, source, expected):
+    assert labels(tmp_path, source, 'sample.hpp') == expected
+
+
+def test_sources_are_not_measured_as_headers(tmp_path):
+    assert labels(tmp_path, 'class A {\n  void F() { }\n};\nclass B {\n  void G() { }\n};\n') == []
