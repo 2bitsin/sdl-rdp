@@ -12,7 +12,7 @@ namespace Headless {
 struct Logs {
 public:
   static void Collect(void* user, sdlrdp_log_level level, char const* text) {
-    auto& self = *static_cast<Logs*>(user);
+    auto&                  self = *static_cast<Logs*>(user);
     std::scoped_lock const lock(self.guard);
     self.lines.emplace_back(level, text);
   }

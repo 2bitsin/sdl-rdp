@@ -84,7 +84,7 @@ void ThenStreamWrite(SDL_IOStream* stream) {
 }
 void VerifyStream(SDL_PropertiesID properties, fs::path const& path) {
   using Open = SDL_IOStream*(SDLCALL*)(char const*, char const*, char const*);
-  auto  open =
+  auto open =
       reinterpret_cast<Open>(SDL_GetPointerProperty(properties, SDL_PROP_DISPLAY_RDP_OPEN_FILE_POINTER, nullptr));
   ASSERT_NE(open, nullptr);
   auto* stream = open("share", "whole", "r+b");
@@ -104,10 +104,10 @@ TEST_F(Sample, DriveStorageAndStream) {
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_CERT_DIR, certificates.Path().c_str()));
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_PORT, "0"));
   ASSERT_TRUE(SDL_Init(SDL_INIT_VIDEO));
-  auto quit       = std::unique_ptr<void, void (*)(void*)>(reinterpret_cast<void*>(1), [](void*) { SDL_Quit(); });
-  auto properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
+  auto quit = std::unique_ptr<void, void (*)(void*)>(reinterpret_cast<void*>(1), [](void*) { SDL_Quit(); });
+  auto                               properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
   Client client(SDL_GetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0), false);
-  oxbox::platform::ScratchArea const share{ "storage-drive", "sdl-rdp" };
+  oxbox::platform::ScratchArea const share      { "storage-drive", "sdl-rdp" };
   ConnectDrive(client, share.Path());
   if (::testing::Test::HasFatalFailure()) return;
   std::jthread const pump([&](std::stop_token const& stop) {

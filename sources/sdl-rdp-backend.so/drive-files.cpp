@@ -14,7 +14,7 @@ using namespace Backend;
 std::shared_ptr<DriveChannel> Channel(sdlrdp_handle* handle) {
   if (!handle) throw std::runtime_error("Invalid drive handle.");
   std::scoped_lock const lock(handle->state->session_guard);
-  auto* peer = handle->state->current;
+  auto*                  peer = handle->state->current;
   if (!peer || !peer->drive) throw std::runtime_error("Drive peer disconnected or no drives shared.");
   return peer->drive;
 }
@@ -200,7 +200,7 @@ int sdlrdp_drive_list(sdlrdp_handle* handle, sdlrdp_drive* out, unsigned max) {
   return Call(handle, [&] {
     if (!handle || (!out && max) || max > INT_MAX) throw std::runtime_error("Invalid drive list arguments.");
     std::scoped_lock const lock(handle->state->session_guard);
-    auto* peer = handle->state->current;
+    auto*                  peer = handle->state->current;
     return peer && peer->drive ? peer->drive->List(out, max) : 0;
   });
 }

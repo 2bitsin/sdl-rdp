@@ -31,7 +31,7 @@ inline void ScaleColumns(Peer& peer, sdlrdp_rect area) {
   for (int x = 0; x < area.w; ++x) {
     auto position = std::clamp(((area.x + x + 0.5) * ratio) - 0.5, 0.0, double(peer.snapshot_width - 1));
     auto first    = unsigned(position);
-    peer.scale_columns[x] = { .first = first * 4,
+    peer.scale_columns[x] = { .first  = first * 4,
                               .second = std::min(first + 1, peer.snapshot_width - 1) * 4,
                               .weight = float(position - first) };
   }

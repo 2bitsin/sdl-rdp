@@ -7,11 +7,11 @@ protected:
     if (codec != SDLRDP_CODEC_PROGRESSIVE) return;
     ASSERT_TRUE(client.Until([&] {
       std::scoped_lock const lock(backend->state->session_guard);
-      auto const& peer = *backend->state->current;
+      auto const&            peer = *backend->state->current;
       return peer.graphics_qoe.frameId == peer.frame_id;
     }));
     std::scoped_lock const lock(backend->state->session_guard);
-    auto const& peer = *backend->state->current;
+    auto const&            peer = *backend->state->current;
     RecordProperty("activation_to_gfx_ms",
                    std::to_string(std::chrono::duration<double, std::milli>(peer.graphics_ready_time).count()));
     RecordProperty("client_decode_ms", peer.graphics_qoe.timeDiffSE);

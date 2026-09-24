@@ -30,7 +30,7 @@ void CheckLatency(std::string const& trace, std::string_view event, std::span<in
   Expects(!sent.empty(), "client sent measured events");
   auto                 prefix  = std::format("trace {} t=", event);
   std::vector<int64_t> latency;
-  std::istringstream lines(trace);
+  std::istringstream   lines(trace);
   for (std::string line; std::getline(lines, line);) {
     auto at = line.find(prefix);
     if (at == std::string::npos) continue;

@@ -51,7 +51,7 @@ protected:
     ASSERT_TRUE(update->SuppressOutput(client.Instance()->context, 0, nullptr));
     ASSERT_EQ(Events(2).size(), 2u);
     ASSERT_TRUE(freerdp_input_send_keyboard_event(client.Instance()->context->input, KBD_FLAGS_DOWN, 0x1e));
-    auto suppressed = Events(1); // Input follows SuppressOutput on the same connection.
+    auto suppressed = Events(1);  // Input follows SuppressOutput on the same connection.
     ASSERT_EQ(suppressed.size(), 1u);
     ASSERT_EQ(suppressed.front().type, SDLRDP_KEY);
   }
@@ -76,9 +76,9 @@ protected:
   }
   void ThenSparseDamage(Client& client, FrameObserver& observer, std::vector<UINT32> const& pixels,
                         std::size_t bounding, sdlrdp_codec codec) {
-    auto bytes = client.Received();
-    std::array<sdlrdp_rect, 2> damage{ { { .x = 0, .y = 0, .w = 8, .h = 8 },
-                                         { .x = 1016, .y = 760, .w = 8, .h = 8 } } };
+    auto                       bytes  = client.Received();
+    std::array<sdlrdp_rect, 2> damage { { { .x = 0   , .y = 0  , .w = 8, .h = 8 },
+                                          { .x = 1016, .y = 760, .w = 8, .h = 8 } } };
     ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 4096, 1024, 768, damage.data(), 2), 0);
     ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == 3; }));
     auto used = client.Received() - bytes;
@@ -110,7 +110,7 @@ protected:
     ASSERT_EQ(observer.Channel()->QoeFrameAcknowledge(observer.Channel(), &qoe), CHANNEL_RC_OK);
     ASSERT_TRUE(client.Until([&] {
       std::scoped_lock const lock(backend->state->session_guard);
-      auto const& received = backend->state->current->graphics_qoe;
+      auto const&            received = backend->state->current->graphics_qoe;
       return received.timestamp == qoe.timestamp && received.timeDiffSE == 7 && received.timeDiffEDR == 9;
     }));
     EXPECT_FALSE(logs.Contains("GFX QoE"));

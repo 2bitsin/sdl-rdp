@@ -114,7 +114,7 @@ protected:
     // Fill one latency window, then return its credit. This distinguishes a
     // slow confirming client from the deliberate no-confirmation fallback.
     std::vector<INT16> pcm(24000uz * 2);
-    auto automatic = audio.CaptureState().auto_confirm;
+    auto               automatic = audio.CaptureState().auto_confirm;
     audio.CaptureState().auto_confirm = true;
     ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 24000), 24000);
     ASSERT_TRUE(client.Until([&] { return audio.CaptureState().confirmed_frames == 24000; }));
@@ -255,7 +255,7 @@ protected:
     GivenUnconfirmedAudio(*connected_client, *connected_audio);
   }
   Client&      ClientSession() { return *connected_client; }
-  SoundClient& AudioSession()  { return *connected_audio; }
+  SoundClient& AudioSession() { return *connected_audio; }
 
 private:
   std::unique_ptr<Client>      connected_client;

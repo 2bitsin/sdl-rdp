@@ -19,7 +19,7 @@ void ResetAuthenticationLogging() {
   LogRoute::WithFilter([](auto& filter) { filter = { }; });
 }
 void PeerNegotiationLogging(rdpSettings const* settings) {
-  LogRoute::WithFilter([ = ](auto& filter) { filter.peer_settings = settings; });
+  LogRoute::WithFilter([=](auto& filter) { filter.peer_settings = settings; });
 }
 bool NegotiationRefused() {
   return LogRoute::WithFilter([](auto const& filter) { return filter.negotiation_failed; });
@@ -103,7 +103,7 @@ bool TransportEcho(std::string_view prefix, std::string_view text) {
 }
 constexpr std::array<std::string_view, 2> ntlm{ "Message Integrity Check (MIC) verification failed!",
                                                 "NtProofString verification failed!" };
-constexpr std::array<std::string_view, 1> nla{ "SPNEGO failed with NTSTATUS:" };
+constexpr std::array<std::string_view, 1> nla { "SPNEGO failed with NTSTATUS:" };
 constexpr std::array<std::string_view, 8> core{ "STATE_RUN_FAILED",
                                                 "rdp_server_accept_nego() fail",
                                                 "freerdp_post_connect failed",
@@ -143,9 +143,9 @@ bool ExpectedPeerMessage(LogRoute::Filter& filter, wLogMessage const& message) {
 }
 BOOL LogRoute::Forward(wLogMessage const* message) {
   utilities::Expects(message != nullptr, "WLog message exists");
-  auto& routing = Shared();
+  auto&                  routing = Shared();
   std::scoped_lock const lock(routing.guard);
-  auto& filter = routing.filters[std::this_thread::get_id()];
+  auto&                  filter  = routing.filters[std::this_thread::get_id()];
   // SSPI debug output can contain credentials and hashes, including binary dump callbacks.
   if (message->Level < WLOG_INFO || message->Type != WLOG_MESSAGE_TEXT) return TRUE;
   if (message->PrefixString && std::string_view(message->PrefixString) == "com.winpr.sspi.NTLM" &&
@@ -186,7 +186,7 @@ LogRoute::LogRoute(sdlrdp_config const& config) : callback(config.log), user(con
   utilities::Ensures(routing.active == this, "newest handle owns logging");
 }
 LogRoute::~LogRoute() {
-  auto& routing = Shared();
+  auto&                  routing = Shared();
   std::scoped_lock const lock(routing.guard);
   if (routing.active == this) routing.active = nullptr;
 }

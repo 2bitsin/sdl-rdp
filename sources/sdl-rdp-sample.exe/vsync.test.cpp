@@ -97,7 +97,7 @@ std::vector<Observation> Exercise(unsigned port, int scenario, std::string_view 
   Client                  client(port, true, 1280, 800);
   Headless::DisplayClient display(client);
   Expects(freerdp_connect(client.Instance().get()), "headless client connects");
-  auto receiver = mode == "auto-sender" && scenario >= 3 ? BoundReceiveBuffer(client) : -1;
+  auto                    receiver = mode == "auto-sender" && scenario >= 3 ? BoundReceiveBuffer(client) : -1;
   Headless::FrameObserver frames(client);
   Expects(client.Until([&] { return Headless::DisplayClient::Ready(); }), "display channel opens");
   AcknowledgeFor(client, frames, 2s);
@@ -134,7 +134,7 @@ std::vector<Observation> Exercise(unsigned port, int scenario, std::string_view 
 
 std::string TraceDuring(std::string const& trace, int64_t begin, int64_t end) {
   Expects(begin < end, "trace interval is positive");
-  std::string result;
+  std::string        result;
   std::istringstream lines(trace);
   for (std::string line; std::getline(lines, line);) {
     auto at = line.find(" t=");
@@ -156,7 +156,7 @@ void ResetRecovery(std::string const& trace, Observation const& observed) {
 void AverageFloor(std::string const& trace, Observation const& observed) {
   Expects(observed.reset > observed.started, "held acknowledgement precedes resize");
   std::istringstream lines(TraceDuring(trace, observed.started, observed.reset));
-  unsigned minimum = 60;
+  unsigned           minimum = 60;
   for (std::string line; std::getline(lines, line);) {
     auto at = line.find(" hz=");
     if (at == std::string::npos) continue;
@@ -171,7 +171,7 @@ void AverageFloor(std::string const& trace, Observation const& observed) {
 std::vector<int64_t> PresentTimes(std::string const& trace) {
   Expects(!trace.empty(), "sample emitted trace output");
   std::vector<int64_t> presents;
-  std::istringstream lines(trace);
+  std::istringstream   lines(trace);
   for (std::string line; std::getline(lines, line);) {
     auto at = line.find("trace present t=");
     if (at != std::string::npos) presents.push_back(std::stoll(line.substr(at + 16)));
@@ -202,7 +202,7 @@ class VsyncRecovery : public Sample, public testing::WithParamInterface<char con
 protected:
   void RecordEvidence(int scenario) {
     if (auto* directory = std::getenv("SDLRDP_TEST_EVIDENCE")) {
-      auto path = fs::path(directory) / (std::string(GetParam()) + "-" + std::to_string(scenario) + ".log");
+      auto          path = fs::path(directory) / (std::string(GetParam()) + "-" + std::to_string(scenario) + ".log");
       std::ofstream file(path);
       for (auto const& observed : observations)
         file << "scenario=" << observed.scenario << " started=" << observed.started << " resumed=" << observed.resumed

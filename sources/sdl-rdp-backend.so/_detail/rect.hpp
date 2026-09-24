@@ -56,9 +56,9 @@ public:
       Merge(merged, r);
     rects.assign(1, *merged);
   }
-  bool                            empty() const       { return rects.empty(); }
-  void                            clear()             { rects.clear(); }
-  std::vector<sdlrdp_rect> const& Rects() const       { return rects; }
+  bool                            empty() const { return rects.empty(); }
+  void                            clear() { rects.clear(); }
+  std::vector<sdlrdp_rect> const& Rects() const { return rects; }
   void                            Swap(Region& other) { rects.swap(other.rects); }
 
 private:

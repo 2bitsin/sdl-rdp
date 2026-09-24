@@ -65,9 +65,9 @@ inline pid_t Spawn(std::vector<std::string> arguments, int& output) {
 class Process {
 public:
   explicit Process(std::vector<std::string> arguments) : pid(Spawn(std::move(arguments), output)) { }
-           Process(Process const&)                     = delete;
-           Process(Process&&)                          = delete;
-           ~Process()                                  {
+           Process(Process const&) = delete;
+           Process(Process&&)      = delete;
+           ~Process() {
     if (pid > 0) {
       kill(pid, SIGKILL);
       while (waitpid(pid, nullptr, 0) < 0 && errno == EINTR) {
@@ -75,8 +75,8 @@ public:
     }
     close(output);
   }
-  Process& operator = (Process const&)                         = delete;
-  Process& operator = (Process&&)                              = delete;
+  Process& operator = (Process const&) = delete;
+  Process& operator = (Process&&)      = delete;
   bool     Line(std::string& line, Clock::time_point deadline) {
     Expects(output >= 0, "stdout pipe open");
     for (;;) {
@@ -146,7 +146,7 @@ inline unsigned Number(std::string_view text, int base = 10) {
 inline pid_t ProcId() {
   // procfs can belong to an outer PID namespace; its children file uses that namespace.
   std::ifstream children("/proc/thread-self/children");
-  pid_t child = 0;
+  pid_t         child    = 0;
   Expects(bool(children >> child), "spawned child visible in procfs");
   return child;
 }
@@ -160,9 +160,9 @@ inline unsigned ListeningPort(pid_t pid = 0) {
     if (!error && target.starts_with("socket:[")) sockets.push_back(target);
   }
   std::ifstream tcp("/proc/net/tcp");
-  std::string line;
+  std::string   line;
   while (std::getline(tcp, line)) {
-    std::istringstream fields(line);
+    std::istringstream          fields(line);
     std::array<std::string, 10> values;
     std::ranges::for_each(values, [&](auto& value) { fields >> value; });
     if (values[3] == "0A" && std::ranges::contains(sockets, "socket:[" + values[9] + "]"))

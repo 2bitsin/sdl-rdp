@@ -207,7 +207,7 @@ TEST_F(GraphicsCost, AvcFullFrame) {
   ConnectGraphics(client);
   if (::testing::Test::HasFatalFailure()) return;
   std::vector<UINT32> pixels(1920uz * 1080);
-  sdlrdp_rect const full{ 0, 0, 1920, 1080 };
+  sdlrdp_rect const   full  { 0, 0, 1920, 1080 };
   for (unsigned frame = 0; frame < 10; ++frame) {
     Headless::MovingTilePattern(pixels, 1920, 1080, frame);
     ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 7680, 1920, 1080, &full, 1), 0);
@@ -246,7 +246,7 @@ TEST_F(GraphicsCost, PlanarPartialMatchesFull) {
   ApplyPlanarDamage(pixels, expected, part);
   PresentPlanar(backend.get(), client, observer, pixels, expected, part);
   pixels = expected;
-  auto* gdi = client.Instance()->context->gdi;
+  auto*             gdi     = client.Instance()->context->gdi;
   std::vector<BYTE> partial(gdi->primary_buffer, gdi->primary_buffer + (std::size_t(gdi->stride) * gdi->height));
   PresentPlanar(backend.get(), client, observer, pixels, expected, full);
   EXPECT_TRUE(std::ranges::equal(partial, std::span(gdi->primary_buffer, partial.size())));

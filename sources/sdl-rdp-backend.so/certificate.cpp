@@ -20,8 +20,8 @@ using Certificate = std::unique_ptr<X509, Releases<X509_free>>;
 using Bio         = std::unique_ptr<BIO, Releases<BIO_free>>;
 struct DirectoryLock {
 public:
-           DirectoryLock(DirectoryLock const&)                   = delete;
-           DirectoryLock(DirectoryLock&&)                        = delete;
+           DirectoryLock(DirectoryLock const&) = delete;
+           DirectoryLock(DirectoryLock&&)      = delete;
   explicit DirectoryLock(std::filesystem::path const& directory)
       : fd(open(directory.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC)) {
     if (fd < 0) throw std::runtime_error("Certificate directory open failed.");
@@ -30,7 +30,7 @@ public:
       throw std::runtime_error("Certificate directory lock failed.");
     }
   }
-                 ~DirectoryLock()                  { close(fd); }
+                 ~DirectoryLock() { close(fd); }
   DirectoryLock& operator = (DirectoryLock const&) = delete;
   DirectoryLock& operator = (DirectoryLock&&)      = delete;
 
@@ -46,9 +46,9 @@ Certificate SelfSigned(EVP_PKEY* key) {
   Expects(key != nullptr, "RSA key exists");
   Certificate cert(X509_new());
   if (!cert) throw std::runtime_error("Certificate allocation failed.");
-  auto* name = X509_get_subject_name(cert.get());
-  auto  host = Hostname();
-  auto  san  = "DNS:" + host;
+  auto*                                                                name      = X509_get_subject_name(cert.get());
+  auto                                                                 host      = Hostname();
+  auto                                                                 san       = "DNS:" + host;
   std::unique_ptr<X509_EXTENSION, Releases<X509_EXTENSION_free>> const extension(
       X509V3_EXT_conf_nid(nullptr, nullptr, NID_subject_alt_name, san.c_str()));
   if (!X509_set_version(cert.get(), 2) || !ASN1_INTEGER_set(X509_get_serialNumber(cert.get()), 1) ||
@@ -66,8 +66,8 @@ void Generate(Credentials const& paths) {
   Expects(!paths.certificate.empty(), "certificate path is supplied");
   Key const key(EVP_RSA_gen(2048));
   if (!key) throw std::runtime_error("RSA key generation failed.");
-  auto cert = SelfSigned(key.get());
-  auto fd   = open(paths.key.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+  auto      cert     = SelfSigned(key.get());
+  auto      fd       = open(paths.key.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
   Bio const key_file(fd < 0 ? nullptr : BIO_new_fd(fd, BIO_CLOSE));
   if (key_file)
     std::filesystem::permissions(paths.key, std::filesystem::perms::owner_read | std::filesystem::perms::owner_write);
@@ -90,7 +90,7 @@ std::filesystem::path DefaultCertificateDirectory() {
 }
 Credentials EnsureCertificate(std::filesystem::path const& directory) {
   Expects(!directory.empty(), "certificate directory is nonempty");
-  static std::mutex generation_guard;
+  static std::mutex      generation_guard;
   std::scoped_lock const lock(generation_guard);
   if (!directory.parent_path().empty()) std::filesystem::create_directories(directory.parent_path());
   if (mkdir(directory.c_str(), 0700) && errno != EEXIST)

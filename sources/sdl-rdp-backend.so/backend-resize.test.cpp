@@ -5,8 +5,8 @@
 namespace BackendGate {
 struct ResizeProbe {
 public:
-           ResizeProbe(ResizeProbe const&)    = delete;
-           ResizeProbe(ResizeProbe&&)         = delete;
+           ResizeProbe(ResizeProbe const&) = delete;
+           ResizeProbe(ResizeProbe&&)      = delete;
   explicit ResizeProbe(Backend::State& state)
       : state(state), peer(*state.current), original(peer.client->context->update->DesktopResize) {
     std::scoped_lock const lock(state.session_guard);
@@ -26,9 +26,9 @@ public:
   }
   ResizeProbe& operator = (ResizeProbe const&) = delete;
   ResizeProbe& operator = (ResizeProbe&&)      = delete;
-  bool         Finalizing()                    {
+  bool         Finalizing() {
     std::scoped_lock const lock(state.session_guard);
-    auto current = freerdp_get_state(peer.client->context);
+    auto                   current = freerdp_get_state(peer.client->context);
     return current >= CONNECTION_STATE_FINALIZATION_SYNC && current <= CONNECTION_STATE_FINALIZATION_FONT_LIST;
   }
   void MatchingLayout() {
@@ -127,7 +127,7 @@ protected:
     display.Observed().finalizing = [&] {
       if (display.Observed().desktops == 1) DuringFinalization(probe, last_width, last_height);
     };
-    started = Clock::now();
+    started                       = Clock::now();
     ASSERT_EQ(sdlrdp_resize(backend.get(), 1280, 800), 0);
     ThenFinalLayout(client, display, probe, last_width, last_height, expected);
   }

@@ -25,14 +25,14 @@ std::vector<BYTE> PadReference(std::vector<UINT32> const& pixels, unsigned width
   return padded;
 }
 std::vector<UINT32> Yuv420Reference(std::vector<UINT32> const& pixels, unsigned width, unsigned height) {
-  auto w      { Backend::Avc::Aligned(width)                  };
-  auto h      { Backend::Avc::Aligned(height)                 };
-  auto padded = PadReference(pixels, width, height, w, h);
-  auto yuv    { std::vector<BYTE>(std::size_t(w) * h * 3 / 2) };
-  std::array<BYTE*, 3> planes{ yuv.data(), yuv.data() + (std::size_t(w) * h),
-                               yuv.data() + (std::size_t(w) * h * 5 / 4) };
-  std::array<UINT32, 3> strides{ w, w / 2, w / 2 };
-  prim_size_t const     size   { w, h            };
+  auto                  w       { Backend::Avc::Aligned(width)                  };
+  auto                  h       { Backend::Avc::Aligned(height)                 };
+  auto                  padded  = PadReference(pixels, width, height, w, h);
+  auto                  yuv     { std::vector<BYTE>(std::size_t(w) * h * 3 / 2) };
+  std::array<BYTE*, 3>  planes  { yuv.data(), yuv.data() + (std::size_t(w) * h),
+                                  yuv.data() + (std::size_t(w) * h * 5 / 4) };
+  std::array<UINT32, 3> strides { w, w / 2, w / 2                               };
+  prim_size_t const     size    { w, h                                          };
   EXPECT_EQ(primitives_get()->RGBToYUV420_8u_P3AC4R(padded.data(), PIXEL_FORMAT_BGRX32, w * 4, planes.data(),
                                                     strides.data(), &size),
             0);
@@ -77,8 +77,8 @@ protected:
     auto pattern = std::to_array("/tmp/sdlrdp-avc-XXXXXX");
     OpenGraphics(pattern.data(), width, height, codec);
   }
-  Headless::Client&           ClientSession()       { return *graphics_client; }
-  Headless::GraphicsObserver& ObserverSession()     { return *graphics_observer; }
+  Headless::Client&           ClientSession() { return *graphics_client; }
+  Headless::GraphicsObserver& ObserverSession() { return *graphics_observer; }
   void                        ThenProgressiveOnly() {
     EXPECT_TRUE(ObserverSession().Observed().avc_nals.empty());
     EXPECT_EQ(ObserverSession().Observed().progressive_headers, 1u);
@@ -268,7 +268,7 @@ TEST_F(AvcGraphics, AutoWithoutAvcUsesProgressiveSilently) {
 TEST_F(AvcGraphics, DecodesPFrameAndResize) {
   GivenAvc();
   if (::testing::Test::IsSkipped() || ::testing::Test::HasFatalFailure()) return;
-  std::vector<UINT32> pixels(320uz * 200);
+  std::vector<UINT32>             pixels(320uz * 200);
   constexpr std::array<UINT32, 4> colors{ 0xff0000, 0x00ff00, 0x0000ff, 0x55aaff };
   std::ranges::transform(std::views::iota(0uz, pixels.size()), pixels.begin(),
                          [&](size_t i) { return colors[(i % 320) / 80]; });

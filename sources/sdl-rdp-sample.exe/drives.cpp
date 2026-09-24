@@ -18,7 +18,7 @@ namespace {
 using DriveOpen = SDL_IOStream*(SDLCALL*)(char const*, char const*, char const*);
 std::pair<std::string, std::string> SplitDrive(char const* value) {
   std::string const path(value);
-  auto slash = path.find('/');
+  auto              slash = path.find('/');
   return { path.substr(0, slash), slash == std::string::npos ? "" : path.substr(slash + 1) };
 }
 SDL_IOStream* OpenDriveFile(char const* value, char const* mode) {

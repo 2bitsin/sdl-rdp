@@ -26,13 +26,13 @@ public:
   Socket(Socket const&) = delete;
   Socket(Socket&&)      = delete;
   Socket()              = default;
-  ~Socket()             {
+  ~Socket() {
     if (descriptor >= 0) ::close(descriptor);
   }
   Socket& operator = (Socket const&) = delete;
   Socket& operator = (Socket&&)      = delete;
-  int     Get() const                { return descriptor; }
-  void    Release()                  { descriptor = -1; }
+  int     Get() const { return descriptor; }
+  void    Release() { descriptor = -1; }
 
 private:
   int descriptor = ::socket(AF_INET, SOCK_STREAM, 0);
@@ -78,11 +78,11 @@ void ComposeRow(std::span<BYTE const> source, std::span<BYTE const> former, std:
     auto covered{ std::ranges::find_if(damage, [x](auto rect) { return rect.x <= x && x < rect.x + rect.w; }) };
     auto ahead  { damage | std::views::filter([x](auto rect) { return rect.x > x; })                          };
     auto nearest{ std::ranges::min_element(ahead, { }, &sdlrdp_rect::x)                                       };
-    auto end{ covered != damage.end() ? covered->x + covered->w
-              : nearest != ahead.end() ? nearest->x
-                                       : int(target.size() / 4) };
-    auto output{ target.subspan(x * 4, (end - x) * 4)      };
-    auto input { covered != damage.end() ? source : former };
+    auto end    { covered != damage.end() ? covered->x + covered->w
+                  : nearest != ahead.end() ? nearest->x
+                                           : int(target.size() / 4) };
+    auto output { target.subspan(x * 4, (end - x) * 4)                                                        };
+    auto input  { covered != damage.end() ? source : former                                                   };
     if (input.empty())
       std::ranges::fill(output, 0);
     else
@@ -162,11 +162,11 @@ State::~State() {
 BOOL State::Accepted(freerdp_listener* listener, freerdp_peer* client) {
   Expects(listener != nullptr, "listener exists");
   Expects(client != nullptr, "client transport exists");
-  auto& self = *static_cast<State*>(listener->info);
+  auto&      self     = *static_cast<State*>(listener->info);
   PeerHandle accepted(client);
   try {
     self.Log(SDLRDP_LOG_INFO, std::format("Peer accepted: {}.", client->hostname));
-    auto peer = std::make_unique<Peer>(std::move(accepted), self);
+    auto                   peer = std::make_unique<Peer>(std::move(accepted), self);
     std::scoped_lock const lock(self.peers_guard);
     self.peers.push_back(std::move(peer));
     self.peers.back()->Start();
@@ -258,15 +258,15 @@ void State::Push(sdlrdp_event event) {
 unsigned State::Poll(sdlrdp_event* out, unsigned max) {
   if (max) Expects(out != nullptr, "output covers requested events");
   std::scoped_lock const lock(events_guard);
-  auto count = std::min<std::size_t>(max, events.size());
+  auto                   count = std::min<std::size_t>(max, events.size());
   std::copy_n(events.begin(), count, out);
   events.erase(events.begin(), events.begin() + std::ptrdiff_t(count));
   return count;
 }
 int State::Wait(int timeout) {
   std::unique_lock lock(events_guard);
-  auto generation = wake_generation;
-  auto ready      = [&] { return !events.empty() || generation != wake_generation; };
+  auto             generation = wake_generation;
+  auto             ready      = [&] { return !events.empty() || generation != wake_generation; };
   if (timeout < 0)
     changed.wait(lock, ready);
   else
@@ -285,7 +285,7 @@ void State::Present(void const* pixels, int pitch, unsigned w, unsigned h, std::
   Expects(std::cmp_greater_equal(pitch, w * 4), "source pitch covers framebuffer rows");
   if (damage.empty()) return;
   std::scoped_lock const producer(producer_guard);
-  auto next = AcquireBuffer();
+  auto                   next     = AcquireBuffer();
   next->resize(std::size_t(Avc::Aligned(w)) * Avc::Aligned(h) * 4);
   std::shared_ptr<std::vector<BYTE>> previous;
   {

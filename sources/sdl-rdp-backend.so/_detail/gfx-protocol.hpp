@@ -8,12 +8,12 @@
 #include <winpr/sysinfo.h>
 
 namespace Backend {
-inline constexpr std::array versions{ RDPGFX_CAPVERSION_8, RDPGFX_CAPVERSION_81, RDPGFX_CAPVERSION_10,
-                                      RDPGFX_CAPVERSION_101, RDPGFX_CAPVERSION_102, RDPGFX_CAPVERSION_103,
-                                      RDPGFX_CAPVERSION_104, RDPGFX_CAPVERSION_105, RDPGFX_CAPVERSION_106,
-                                      RDPGFX_CAPVERSION_106_ERR, RDPGFX_CAPVERSION_107 };
-inline constexpr UINT32 Version101DataLength = 16;
-inline constexpr UINT32 FlagsDataLength      = 4;
+inline constexpr std::array versions             { RDPGFX_CAPVERSION_8, RDPGFX_CAPVERSION_81, RDPGFX_CAPVERSION_10,
+                                                   RDPGFX_CAPVERSION_101, RDPGFX_CAPVERSION_102, RDPGFX_CAPVERSION_103,
+                                                   RDPGFX_CAPVERSION_104, RDPGFX_CAPVERSION_105, RDPGFX_CAPVERSION_106,
+                                                   RDPGFX_CAPVERSION_106_ERR, RDPGFX_CAPVERSION_107 };
+inline constexpr UINT32     Version101DataLength = 16;
+inline constexpr UINT32     FlagsDataLength      = 4;
 inline bool AllowsAvc(RDPGFX_CAPSET const& cap) {
   return cap.version == RDPGFX_CAPVERSION_81
              ? (cap.flags & RDPGFX_CAPS_FLAG_AVC420_ENABLED) != 0

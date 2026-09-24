@@ -13,13 +13,13 @@ public:
   TlsSocket(TlsSocket const&) = delete;
   TlsSocket(TlsSocket&&)      = delete;
   TlsSocket()                 = default;
-  ~TlsSocket()                {
+  ~TlsSocket() {
     if (descriptor >= 0) close(descriptor);
   }
   TlsSocket& operator = (TlsSocket const&) = delete;
   TlsSocket& operator = (TlsSocket&&)      = delete;
-  int        Get() const                   { return descriptor; }
-  void       Release()                     { descriptor = -1; }
+  int        Get() const { return descriptor; }
+  void       Release() { descriptor = -1; }
 
 private:
   int descriptor = socket(AF_INET, SOCK_STREAM, 0);

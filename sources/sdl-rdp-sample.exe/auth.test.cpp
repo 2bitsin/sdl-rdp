@@ -59,8 +59,8 @@ public:
     auto secret = std::to_array("property-secret");
     return NTOWFv1A(secret.data(), secret.size() - 1, hash);
   }
-  unsigned Verified() const  { return verified.load(); }
-  unsigned LookedUp() const  { return looked_up.load(); }
+  unsigned Verified() const { return verified.load(); }
+  unsigned LookedUp() const { return looked_up.load(); }
   bool     Arguments() const { return arguments.load(); }
 
 private:
@@ -75,7 +75,7 @@ public:
   Quit(Quit const&) = delete;
   Quit(Quit&&)      = delete;
   Quit()            = default;
-  ~Quit()           {
+  ~Quit() {
     SDL_Quit();
     SDL_ResetHints();
   }

@@ -12,7 +12,7 @@
 namespace Backend {
 inline constexpr UINT16 GraphicsSurfaceId = 1;
 inline constexpr UINT32 GraphicsContextId = 1;
-class                   Peer;
+class Peer;
 class GfxChannel {
 public:
               GfxChannel(GfxChannel const&)  = delete;
@@ -28,7 +28,7 @@ public:
   bool        Encode();
   bool        Send();
   unsigned    FrameWindow() const;
-  bool        Confirmed() const              { return confirmed; }
+  bool        Confirmed() const { return confirmed; }
 
 private:
   bool                  CompressProgressive(REGION16& damage, std::chrono::steady_clock::time_point start);

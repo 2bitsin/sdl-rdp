@@ -163,9 +163,9 @@ int sdlrdp_set_pointer(sdlrdp_handle* handle, unsigned w, unsigned h, unsigned x
 int sdlrdp_set_clipboard_text(sdlrdp_handle* handle, char const* utf8) {
   try {
     if (!handle || !utf8) throw std::runtime_error("Invalid clipboard handle or text.");
-    std::string copied(utf8);
-    auto  unicode = Backend::ClipboardUnicode(copied);
-    auto& state   = *handle->state;
+    std::string            copied(utf8);
+    auto                   unicode = Backend::ClipboardUnicode(copied);
+    auto&                  state   = *handle->state;
     std::scoped_lock const lock(state.session_guard);
     state.clipboard.text    = std::move(copied);
     state.clipboard.unicode = std::move(unicode);
@@ -180,7 +180,7 @@ int sdlrdp_set_clipboard_text(sdlrdp_handle* handle, char const* utf8) {
 char const* sdlrdp_get_clipboard_text(sdlrdp_handle* handle) {
   try {
     if (!handle) throw std::runtime_error("Invalid clipboard handle.");
-    auto& state = *handle->state;
+    auto&                  state = *handle->state;
     std::scoped_lock const lock(state.session_guard);
     state.clipboard.exported = state.clipboard.text;
     return state.clipboard.exported.c_str();
@@ -194,7 +194,7 @@ int sdlrdp_has_clipboard_text(sdlrdp_handle* handle) {
     Backend::SetError(handle, "Invalid clipboard handle.");
     return -1;
   }
-  auto& state = *handle->state;
+  auto&                  state = *handle->state;
   std::scoped_lock const lock(state.session_guard);
   return !state.clipboard.text.empty();
 }

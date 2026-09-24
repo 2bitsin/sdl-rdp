@@ -74,7 +74,7 @@ protected:
   }
   void ThenVideoMatches() {
     std::vector<UINT32> pixels(320uz * 200uz, 0x00446688);
-    sdlrdp_rect const damage{ 0, 0, 320, 200 };
+    sdlrdp_rect const   damage{ 0, 0, 320, 200 };
     ASSERT_EQ(sdlrdp_present(handle.get(), pixels.data(), 1280, 320, 200, &damage, 1), 0);
     ASSERT_TRUE(client->Until([&] { return client->Matches(pixels); }));
   }
@@ -89,7 +89,7 @@ protected:
     Disconnect();
   }
   unsigned           Logged(sdlrdp_log_level level, std::string_view text) { return logs.Count(level, text); }
-  static std::string Pattern(size_t size, unsigned seed = 17)              {
+  static std::string Pattern(size_t size, unsigned seed = 17) {
     std::string bytes(size, '\0');
     std::ranges::transform(std::views::iota(0uz, size), bytes.begin(),
                            [=](size_t i) { return char((i * 31 + i / 251 + seed) & 255); });
@@ -139,7 +139,7 @@ class DriveChecks : public DriveSession {
 protected:
   void ThenReadRanges(sdlrdp_file* file, std::string const& source) {
     std::string result(source.size(), '\0');
-    auto start = Headless::Clock::now();
+    auto        start  = Headless::Clock::now();
     ASSERT_EQ(sdlrdp_drive_read(handle.get(), file, 0, result.data(), result.size()), result.size())
         << sdlrdp_last_error();
     auto seconds = std::chrono::duration<double>(Headless::Clock::now() - start).count();

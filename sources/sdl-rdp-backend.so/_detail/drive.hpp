@@ -27,15 +27,15 @@ struct Slot {
 // FreeRDP 3.15 Drive* uses 32-bit offsets and a private reader; this peer owns both directions.
 class DriveChannel : public std::enable_shared_from_this<DriveChannel> {
 public:
-                                DriveChannel(DriveChannel const&)                                            = delete;
-                                DriveChannel(DriveChannel&&)                                                 = delete;
+                                DriveChannel(DriveChannel const&) = delete;
+                                DriveChannel(DriveChannel&&)      = delete;
   explicit                      DriveChannel(Peer& /*value*/);
                                 ~DriveChannel();
-  DriveChannel&                 operator = (DriveChannel const&)                                             = delete;
-  DriveChannel&                 operator = (DriveChannel&&)                                                  = delete;
+  DriveChannel&                 operator = (DriveChannel const&)  = delete;
+  DriveChannel&                 operator = (DriveChannel&&)       = delete;
   bool                          Open();
   bool                          Pump(std::span<HANDLE const> signaled);
-  HANDLE Event() const { return event; }
+  HANDLE                        Event() const { return event; }
   void                          Disconnect();
   void                          Abort(std::string const& /*cause*/);
   int                           List(sdlrdp_drive* /*out*/, unsigned /*max*/);
@@ -88,10 +88,10 @@ public:
   sdlrdp_file&       operator = (sdlrdp_file const&) = delete;
   sdlrdp_file&       operator = (sdlrdp_file&&)      = delete;
   void               Close();
-  auto const&        Channel() const                 { return channel; }
-  unsigned           Drive() const                   { return drive; }
-  unsigned           Id() const                      { return wire; }
-  std::string const& Path() const                    { return path; }
+  auto const&        Channel() const { return channel; }
+  unsigned           Drive() const { return drive; }
+  unsigned           Id() const { return wire; }
+  std::string const& Path() const { return path; }
 
 private:
   std::shared_ptr<Backend::DriveChannel> channel;

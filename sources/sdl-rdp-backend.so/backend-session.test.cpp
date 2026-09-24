@@ -32,7 +32,7 @@ TEST_P(Gate, FramesAndInput) {
   if (::testing::Test::HasFatalFailure()) return;
   ASSERT_TRUE(client.Until([&] { return HasCookie(client); }));
   FrameCounter const counter(client);
-  auto bytes = client.Received();
+  auto               bytes   = client.Received();
   Frame(client, { 0, 0, 320, 200 });
   if (::testing::Test::HasFatalFailure()) return;
   if (GetParam().codec == SDLRDP_CODEC_PLANAR)
@@ -53,7 +53,7 @@ TEST_P(Gate, FramesAndInput) {
 TEST_P(Gate, ResizeAndWakeup) {
   Reopen(640, 480);
   if (::testing::Test::HasFatalFailure()) return;
-  auto* handle = backend.get();
+  auto*  handle = backend.get();
   Client client(sdlrdp_port(handle), GetParam().surface);
   ConnectCodec(client);
   if (::testing::Test::HasFatalFailure()) return;
@@ -113,7 +113,7 @@ TEST_P(Gate, WaitForClient) {
 TEST_P(Gate, BlockedSinglePresent) {
   Reopen(2048, 1536);
   if (::testing::Test::HasFatalFailure()) return;
-  auto* handle = backend.get();
+  auto*  handle = backend.get();
   Client client(sdlrdp_port(handle), GetParam().surface, 2048, 1536);
   ConnectCodec(client);
   if (::testing::Test::HasFatalFailure()) return;
@@ -122,10 +122,10 @@ TEST_P(Gate, BlockedSinglePresent) {
   ASSERT_EQ(events.front().type, SDLRDP_CONNECTED);
   pixels.resize(2048uz * 1536);
   std::ranges::generate(pixels, [index = 0u]() mutable { return (index++ * 2654435761u) & 0x00ffffff; });
-  sdlrdp_rect area       { 0, 0, 2048, 1536 };
+  sdlrdp_rect area{ 0, 0, 2048, 1536 };
   // Keep the client unpumped until the presenter completes. Completion therefore
   // cannot depend on the client draining output; ten seconds is a progress bound.
-  auto        presenting = std::async(std::launch::async,
+  auto presenting = std::async(std::launch::async,
                                [&] { return sdlrdp_present(handle, pixels.data(), 2048 * 4, 2048, 1536, &area, 1); });
   ThenUnblockedPresent(presenting, client);
   if (::testing::Test::HasFatalFailure()) return;

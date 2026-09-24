@@ -58,17 +58,17 @@ struct CertificateDirectory {
 public:
   CertificateDirectory(CertificateDirectory const&) = delete;
   CertificateDirectory(CertificateDirectory&&)      = delete;
-  CertificateDirectory()                            {
+  CertificateDirectory() {
     std::array<char, 40> pattern{ };
     std::ranges::copy(std::string("/tmp/sdlrdp-gate-XXXXXX"), pattern.begin());
     auto* result = mkdtemp(pattern.data());
     Expects(result != nullptr, "temporary directory created");
     path = result;
   }
-                               ~CertificateDirectory()                  { std::filesystem::remove_all(path); }
+                               ~CertificateDirectory() { std::filesystem::remove_all(path); }
   CertificateDirectory&        operator = (CertificateDirectory const&) = delete;
   CertificateDirectory&        operator = (CertificateDirectory&&)      = delete;
-  std::filesystem::path const& Path() const                             { return path; }
+  std::filesystem::path const& Path() const { return path; }
 
 private:
   std::filesystem::path path;
@@ -99,13 +99,13 @@ public:
   Socket(Socket const&) = delete;
   Socket(Socket&&)      = delete;
   Socket()              = default;
-  ~Socket()             {
+  ~Socket() {
     if (descriptor >= 0) close(descriptor);
   }
   Socket& operator = (Socket const&) = delete;
   Socket& operator = (Socket&&)      = delete;
-  int     Get() const                { return descriptor; }
-  void    Release()                  { descriptor = -1; }
+  int     Get() const { return descriptor; }
+  void    Release() { descriptor = -1; }
 
 private:
   int descriptor = socket(AF_INET, SOCK_STREAM, 0);
@@ -148,8 +148,8 @@ public:
     update->BitmapUpdate = bitmap;
     active               = nullptr;
   }
-  FrameCounter& operator = (FrameCounter const&)                                         = delete;
-  FrameCounter& operator = (FrameCounter&&)                                              = delete;
+  FrameCounter& operator = (FrameCounter const&) = delete;
+  FrameCounter& operator = (FrameCounter&&)      = delete;
   static BOOL   ReceiveSurface(rdpContext* context, SURFACE_BITS_COMMAND const* command) {
     Expects(active, "observer is installed");
     Expects(command, "wire command is supplied");
@@ -168,7 +168,7 @@ public:
       ++active->frames;
     return result;
   }
-  unsigned Frames() const     { return frames; }
+  unsigned Frames() const { return frames; }
   unsigned BitmapPdus() const { return bitmap_pdus; }
 
 private:

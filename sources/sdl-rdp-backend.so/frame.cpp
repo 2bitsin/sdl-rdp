@@ -74,8 +74,8 @@ bool SelectEncoder(Peer& peer) {
 }
 auto Convert(Frame band, unsigned depth) -> std::vector<BYTE> {
   Expects(std::ranges::contains(std::array{ 16u, 24u }, depth), "supported packed colour depth");
-  auto format = depth == 16 ? PIXEL_FORMAT_RGB16 : PIXEL_FORMAT_BGR24;
-  auto stride = (unsigned(band.area.w) * (depth / 8) + 3) & ~3u;
+  auto              format    = depth == 16 ? PIXEL_FORMAT_RGB16 : PIXEL_FORMAT_BGR24;
+  auto              stride    = (unsigned(band.area.w) * (depth / 8) + 3) & ~3u;
   std::vector<BYTE> converted(std::size_t(stride) * band.area.h);
   if (!freerdp_image_copy(converted.data(), format, stride, 0, 0, band.area.w, band.area.h, band.pixels.data(),
                           PIXEL_FORMAT_BGRX32, band.area.w * 4, 0, 0, nullptr, FREERDP_FLIP_NONE))
@@ -90,10 +90,10 @@ bool LegacyFrame::Prepare(Peer& peer) {
   if (!SelectEncoder(peer)) return false;
   auto* settings = peer.client->context->settings;
   depth = freerdp_settings_get_uint32(settings, FreeRDP_ColorDepth);
-  wire = depth != 32 ? Wire::Bitmap
-                   : peer.encoder.Codec() == SDLRDP_CODEC_PLANAR ? Wire::Planar
-                   : freerdp_settings_get_bool(settings, FreeRDP_SurfaceCommandsEnabled) ? Wire::Surface
-                                                                                         : Wire::Bitmap;
+  wire  = depth != 32 ? Wire::Bitmap
+          : peer.encoder.Codec() == SDLRDP_CODEC_PLANAR ? Wire::Planar
+          : freerdp_settings_get_bool(settings, FreeRDP_SurfaceCommandsEnabled) ? Wire::Surface
+                                                                                : Wire::Bitmap;
   codec = wire == Wire::Surface ? peer.encoder.Id(settings) : 0;
   return true;
 }
@@ -191,7 +191,7 @@ bool LegacyFrame::Finish(Peer& peer) {
   if (peer.client->IsWriteBlocked(peer.client.get())) return true;
   if (!peer.Marker(SURFACECMD_FRAMEACTION_END)) return false;
   std::scoped_lock const lock(peer.owner.frame_guard);
-  std::size_t bytes = 0;
+  std::size_t            bytes = 0;
   for (auto const& packet : packets)
     for (auto const& band : packet.bands)
       bytes += band.pixels.size();

@@ -14,9 +14,9 @@ bool GfxChannel::Open() {
   Expects(peer.client != nullptr, "peer owns its transport");
   Expects(peer.client->context, "peer transport has a context");
   if (!context) return false;
-  context->custom     = this;
-  context->rdpcontext = peer.client->context;
-  context->ChannelIdAssigned = [](RdpgfxServerContext* context, UINT32 id) -> BOOL {
+  context->custom              = this;
+  context->rdpcontext          = peer.client->context;
+  context->ChannelIdAssigned   = [](RdpgfxServerContext* context, UINT32 id) -> BOOL {
     static_cast<GfxChannel*>(context->custom)->peer.gfx_id = id;
     return TRUE;
   };
@@ -90,12 +90,12 @@ bool GfxChannel::ResetSurface() {
     return false;
   RDPGFX_DELETE_SURFACE_PDU const remove{ GraphicsSurfaceId };
   if (width && !Check(context->DeleteSurface(context.get(), &remove), "delete surface")) return false;
-  constexpr UINT32 PrimaryMonitor = 1;
-  constexpr UINT32 MonitorCount   = 1;
-  MONITOR_DEF      monitor        { 0, 0, peer.desktop.w - 1, peer.desktop.h - 1, PrimaryMonitor };
+  constexpr UINT32                PrimaryMonitor = 1;
+  constexpr UINT32                MonitorCount   = 1;
+  MONITOR_DEF                     monitor        { 0, 0, peer.desktop.w - 1, peer.desktop.h - 1, PrimaryMonitor };
   RDPGFX_RESET_GRAPHICS_PDU const reset{ unsigned(peer.desktop.w), unsigned(peer.desktop.h), MonitorCount, &monitor };
-  RDPGFX_CREATE_SURFACE_PDU const create{ GraphicsSurfaceId, UINT16(peer.desktop.w), UINT16(peer.desktop.h),
-                                          GFX_PIXEL_FORMAT_XRGB_8888 };
+  RDPGFX_CREATE_SURFACE_PDU const create         { GraphicsSurfaceId, UINT16(peer.desktop.w), UINT16(peer.desktop.h),
+                                                   GFX_PIXEL_FORMAT_XRGB_8888 };
   RDPGFX_MAP_SURFACE_TO_OUTPUT_PDU const map{ GraphicsSurfaceId, 0, 0, 0 };
   return Check(context->ResetGraphics(context.get(), &reset), "reset graphics") &&
          Check(context->CreateSurface(context.get(), &create), "create surface") &&

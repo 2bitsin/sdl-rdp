@@ -135,7 +135,7 @@ void ThenAudioDeviceChanges(Client& client, SDL_AudioStream* stream) {
 }
 TEST_F(VideoDriver, ResizeStormWithLayoutEcho) {
   ASSERT_TRUE(SDL_SetWindowSize(window, 640, 480));
-  auto properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
+  auto                    properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
   Client client(SDL_GetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0), true, 640, 480);
   Headless::DisplayClient display(client);
   display.Observed().echo_resize        = true;
@@ -170,7 +170,7 @@ TEST_F(VideoDriver, ExclusiveScreenChangeDoesNotResizePicture) {
   auto mode = *SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
   ASSERT_TRUE(SDL_SetWindowFullscreenMode(window, &mode));
   ASSERT_TRUE(SDL_SetWindowFullscreen(window, true));
-  auto properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
+  auto                    properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
   Client client(SDL_GetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0), true, 1280, 800);
   Headless::DisplayClient display(client);
   ASSERT_TRUE(freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_FrameAcknowledge, 0));
@@ -231,7 +231,7 @@ TEST_F(VideoDriver, DesktopFullscreenKeepsDesktopMode) {
   EXPECT_FALSE(SDL_HasEvent(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED));
 }
 TEST_F(VideoDriver, DefaultPresentDoesNotWaitForAcknowledgements) {
-  auto properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
+  auto   properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
   Client client(SDL_GetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0), true, 1280, 800);
   ASSERT_TRUE(freerdp_connect(client.Instance().get()));
   Headless::FrameObserver const observer(client);
@@ -247,12 +247,12 @@ TEST_F(VideoDriver, DefaultPresentDoesNotWaitForAcknowledgements) {
 TEST_F(VideoDriver, AudioEventChangesOpenDeviceFormat) {
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "rdp"));
   ASSERT_TRUE(SDL_Init(SDL_INIT_AUDIO));
-  SDL_AudioSpec const spec{ SDL_AUDIO_S16, 2, 44100 };
+  SDL_AudioSpec const                                                       spec  { SDL_AUDIO_S16, 2, 44100 };
   std::unique_ptr<SDL_AudioStream, decltype(&SDL_DestroyAudioStream)> const stream{
     SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr), SDL_DestroyAudioStream
   };
   ASSERT_TRUE(stream) << SDL_GetError();
-  auto properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
+  auto                  properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
   Client                client(SDL_GetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0), true, 1280, 800);
   Headless::SoundClient audio(client);
   audio.CaptureState().rate = 48000;

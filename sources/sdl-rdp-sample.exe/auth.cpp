@@ -11,8 +11,8 @@ bool SDLCALL Authenticator::Deny(void* /*unused*/, char const* /*unused*/, char 
   return false;
 }
 void SDLCALL Authenticator::AuthenticationLog(void* user, int category, SDL_LogPriority priority, char const* message) {
-  auto& self = *static_cast<Authenticator*>(user);
-  std::string_view text(message);
+  auto&                      self   = *static_cast<Authenticator*>(user);
+  std::string_view           text(message);
   constexpr std::string_view prefix = "Authentication rejected: user \"";
   self.previous(self.previous_user, category, priority, message);
   if (!text.starts_with(prefix)) return;
@@ -29,7 +29,7 @@ bool Authenticator::Option(std::string_view option, int& index, int argc, char**
     deny = true;
     return true;
   }
-  constexpr std::array<std::pair<std::string_view, char const*>, 4> hints{ { { "--user", SDL_HINT_RDP_USER },
+  constexpr std::array<std::pair<std::string_view, char const*>, 4> hints{ { { "--user"    , SDL_HINT_RDP_USER     },
                                                                              { "--password", SDL_HINT_RDP_PASSWORD },
                                                                              { "--domain"  , SDL_HINT_RDP_DOMAIN   },
                                                                              { "--auth", SDL_HINT_RDP_AUTH } } };

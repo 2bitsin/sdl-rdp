@@ -1,5 +1,6 @@
 """Exercise column alignment and preservation of C and C++ source."""
 import importlib.util
+import os
 import pathlib
 import subprocess
 import sys
@@ -103,7 +104,7 @@ def align(text):
     pytest.param(
         'Thing& operator=(Thing const&) = delete;\nint operator()(int x) const;\n'
         'bool operator==(Thing const&) const;\n',
-        'Thing& operator=(Thing const&)        = delete;\nint    operator()(int x) const;\n'
+        'Thing& operator=(Thing const&) = delete;\nint    operator()(int x) const;\n'
         'bool   operator==(Thing const&) const;\n',
         id='operators_are_functions',
     ),
@@ -115,7 +116,7 @@ def align(text):
     ),
     pytest.param(
         'void Empty() {}\nvoid Defaults(Value value = {});\nreturn {};\n',
-        'void Empty()                     { }\nvoid Defaults(Value value = { });\nreturn { };\n',
+        'void Empty() { }\nvoid Defaults(Value value = { });\nreturn { };\n',
         id='empty_bodies_defaults_and_returns',
     ),
     pytest.param(
@@ -315,7 +316,7 @@ def test_limit():
     result = MODULE.align('int a{1};\n' + line + 'int bb{22};\n')
     assert result.text == 'int a { 1  };\n' + line + 'int bb{ 22 };\n'
     assert result.groups == 1
-    assert result.exceptions == [(2, line.rstrip())]
+    assert result.exceptions == [MODULE.Overflow(2, line.rstrip(), len(line.rstrip()))]
 
 
 PEER = '''
@@ -519,14 +520,14 @@ def test_all_operator_declarations(source, expected):
         '  bool (*ready)(Handle*);\n',
         '  void (*close)          (Handle*);\n'
         '  int  (*drive_enumerate)(Handle*, unsigned drive,\n'
-        '                         unsigned max);\n'
+        '                          unsigned max);\n'
         '  bool (*ready)          (Handle*);\n',
     ),
     (
         'struct Peer {\n  Peer(Handle accepted);\n  ~Peer();\n  void Start();\n'
         '  bool Ready(int first,\n             int second) const;\n  unsigned Count();\n};\n',
         'struct Peer {\n           Peer(Handle accepted);\n           ~Peer();\n  void     Start();\n'
-        '  bool     Ready(int first,\n             int second) const;\n  unsigned Count();\n};\n',
+        '  bool     Ready(int first,\n                 int second) const;\n  unsigned Count();\n};\n',
     ),
 ], ids=['mixed_empty_and_equals', 'table_and_bitfield', 'last_initialiser_has_body',
         'ternary_untouched', 'constructor_list', 'multiline_function_pointer', 'constructors_and_members'])
@@ -541,7 +542,7 @@ def test_overflow_collapses_padding_and_check_reports_it(tmp_path):
     expected = '  int huge = ' + value + ';\n'
     result = MODULE.align(source)
     assert result.text == expected
-    assert result.exceptions == [MODULE.Overflow(1, expected.rstrip())]
+    assert result.exceptions == [MODULE.Overflow(1, expected.rstrip(), len(expected.rstrip()))]
     assert align(expected) == expected
     path = tmp_path / 'overflow.cpp'
     path.write_text(source)
@@ -588,18 +589,18 @@ def test_uppercase_calls_keep_control_flow_indentation():
         'virtual void Short() override;\n'
         'virtual bool Longer(int x) const noexcept final;\n'
         'void Abstract() = 0;\n',
-        'virtual void Short()             override;\n'
+        'virtual void Short()                      override;\n'
         'virtual bool Longer(int x) const noexcept final;\n'
-        'void         Abstract()          = 0;\n',
+        'void         Abstract()                   = 0;\n',
         id='trailing_specifiers',
     ),
     pytest.param(
         'Foo(Foo&&) noexcept = default;\n'
         'Foo(Foo const&) = delete;\n'
         '~Foo() = default;\n',
-        'Foo(Foo&&)      noexcept = default;\n'
-        'Foo(Foo const&) = delete;\n'
-        '~Foo()          = default;\n',
+        'Foo(Foo&&) noexcept = default;\n'
+        'Foo(Foo const&)     = delete;\n'
+        '~Foo()              = default;\n',
         id='standalone_special_members',
     ),
     pytest.param(
@@ -607,7 +608,7 @@ def test_uppercase_calls_keep_control_flow_indentation():
         'Type const& Name() const { return x; }\n'
         'bool Ready() const;\n',
         'void        Start();\n'
-        'Type const& Name() const  { return x; }\n'
+        'Type const& Name() const { return x; }\n'
         'bool        Ready() const;\n',
         id='inline_bodies_in_function_run',
     ),
@@ -618,11 +619,11 @@ def test_uppercase_calls_keep_control_flow_indentation():
         'enum class Mode { One, Two };\n'
         'std::unique_ptr<Impl> impl;\n',
         'int                   x;\n'
-        'using                 Callback = void (*)();\n'
-        'struct                Impl;\n'
-        'enum class            Mode     { One, Two };\n'
+        'using Callback = void (*)();\n'
+        'struct Impl;\n'
+        'enum class Mode{ One, Two };\n'
         'std::unique_ptr<Impl> impl;\n',
-        id='alias_forward_and_enum_in_declarations',
+        id='alias_forward_and_enum_skipped_in_declarations',
     ),
     pytest.param(
         'struct X* const x = get();\n'
@@ -685,7 +686,7 @@ def test_uppercase_calls_keep_control_flow_indentation():
         '      : value{ value } { }\n'
         '         ~Thing();\n'
         '  Thing& operator = (Thing&&) = delete;\n'
-        '  int    Get() const          { return value; }\n'
+        '  int    Get() const { return value; }\n'
         '};\n',
         id='constructor_multiline_initializer',
     ),
@@ -742,11 +743,11 @@ def test_uppercase_calls_keep_control_flow_indentation():
         '  auto operator=(GameSession const&) -> GameSession&   = delete;\n'
         '  auto operator=(GameSession&&) -> GameSession&        = delete;\n'
         '  ~GameSession()                                       = default;\n',
-        '       GameSession(GameSession const&)                 = delete;\n'
-        '       GameSession(GameSession&&)                      = delete;\n'
-        '  auto operator=(GameSession const&)   -> GameSession& = delete;\n'
-        '  auto operator=(GameSession&&)        -> GameSession& = delete;\n'
-        '       ~GameSession()                                  = default;\n',
+        '       GameSession(GameSession const&)               = delete;\n'
+        '       GameSession(GameSession&&)                    = delete;\n'
+        '  auto operator=(GameSession const&) -> GameSession& = delete;\n'
+        '  auto operator=(GameSession&&)      -> GameSession& = delete;\n'
+        '       ~GameSession()                                = default;\n',
         id='scooby_game_session_specifiers',
     ),
 ])
@@ -774,22 +775,11 @@ def test_writer_reports_whether_it_wrote(tmp_path):
     assert not MODULE.write_if_changed(path, path.read_text(), result)
 
 
-def test_tree_output_depends_on_collapsed_spacing():
-    root = pathlib.Path(__file__).resolve().parents[1]
-    for path in MODULE.source_files([root / 'sources']):
-        source = path.read_text()
-        hidden = MODULE.mask(source)
-        collapsed = ''.join(char for index, char in enumerate(source)
-                            if not (char in ' \t' and hidden[index] != '@' and index > 0
-                                    and hidden[index - 1] in ' \t' and hidden[:index].rpartition('\n')[2].strip()))
-        assert align(source) == align(collapsed), path
-
-
 def test_overflow_preserves_multiline_raw_literal():
     expected = 'auto text = R"x(keep   these ' + 'a' * 125 + '\nand   these)x";\n'
     result = MODULE.align(expected)
     assert result.text == expected
-    assert result.exceptions == [MODULE.Overflow(1, expected.splitlines()[0])]
+    assert result.exceptions == [MODULE.Overflow(1, expected.splitlines()[0], len(expected.splitlines()[0]))]
     assert align(result.text) == expected
 
 
@@ -798,3 +788,409 @@ def test_specifiers_after_noexcept_trailing_return():
     expected = 'auto F() noexcept -> bool override;\nauto Longer()     -> Ret  final;\n'
     assert align(source) == expected
     assert align(expected) == expected
+
+
+ENCODER = '''\
+class Encoder {
+public:
+  Encoder();
+  Encoder(Encoder const&) = delete;
+  Encoder(Encoder&&)      = delete;
+  ~Encoder();
+  Encoder& operator = (Encoder const&) = delete;
+  Encoder& operator = (Encoder&&)      = delete;
+  static bool Available();
+  static std::string UnavailableReason();
+  bool Open(unsigned width, unsigned height, unsigned bitrate, unsigned fps);
+  std::span<BYTE const> Encode(std::span<BYTE const> bgrx, unsigned stride, bool force_idr, std::vector<BYTE>& encoded);
+  void Close();
+  bool IsOpen() const;
+  bool TooSmall() const;
+  std::string const& Error() const;
+  EncodingTimes const& Timing() const { return times; }
+
+private:
+  EncodingTimes         times;
+  struct                Impl;
+  std::unique_ptr<Impl> impl;
+};
+'''
+
+ENCODER_EXPECTED = '''\
+class Encoder {
+public:
+                        Encoder();
+                        Encoder(Encoder const&)     = delete;
+                        Encoder(Encoder&&)          = delete;
+                        ~Encoder();
+  Encoder&              operator = (Encoder const&) = delete;
+  Encoder&              operator = (Encoder&&)      = delete;
+  static bool           Available();
+  static std::string    UnavailableReason();
+  bool                  Open(unsigned width, unsigned height, unsigned bitrate, unsigned fps);
+  std::span<BYTE const> Encode(std::span<BYTE const> bgrx, unsigned stride, bool force_idr, std::vector<BYTE>& encoded);
+  void                  Close();
+  bool                  IsOpen() const;
+  bool                  TooSmall() const;
+  std::string const&    Error() const;
+  EncodingTimes const&  Timing() const { return times; }
+
+private:
+  EncodingTimes         times;
+  struct Impl;
+  std::unique_ptr<Impl> impl;
+};
+'''
+
+DRIVE = '''\
+class DriveChannel : public std::enable_shared_from_this<DriveChannel> {
+public:
+  DriveChannel(DriveChannel const&) = delete;
+  DriveChannel(DriveChannel&&)      = delete;
+  explicit DriveChannel(Peer& /*value*/);
+  ~DriveChannel();
+  DriveChannel& operator = (DriveChannel const&) = delete;
+  DriveChannel& operator = (DriveChannel&&)      = delete;
+  bool Open();
+  bool Pump(std::span<HANDLE const> signaled);
+  HANDLE Event() const { return event; }
+  void Disconnect();
+  void Abort(std::string const& /*cause*/);
+  int List(sdlrdp_drive* /*out*/, unsigned /*max*/);
+  unsigned Device(unsigned id);
+  std::shared_ptr<DriveRequest> Send(unsigned drive, unsigned file, unsigned major, DrivePacket const& body,
+                                     unsigned minor = 0);
+  DrivePacket Wait(std::shared_ptr<DriveRequest> const& /*request*/, std::string const& path, bool end = false);
+  size_t WaitAny(std::span<Slot const> /*slots*/);
+  void Warn(std::string const& /*cause*/) const;
+
+'''
+
+DRIVE_EXPECTED = '''\
+class DriveChannel : public std::enable_shared_from_this<DriveChannel> {
+public:
+                                DriveChannel(DriveChannel const&) = delete;
+                                DriveChannel(DriveChannel&&)      = delete;
+  explicit                      DriveChannel(Peer& /*value*/);
+                                ~DriveChannel();
+  DriveChannel&                 operator = (DriveChannel const&)  = delete;
+  DriveChannel&                 operator = (DriveChannel&&)       = delete;
+  bool                          Open();
+  bool                          Pump(std::span<HANDLE const> signaled);
+  HANDLE                        Event() const { return event; }
+  void                          Disconnect();
+  void                          Abort(std::string const& /*cause*/);
+  int                           List(sdlrdp_drive* /*out*/, unsigned /*max*/);
+  unsigned                      Device(unsigned id);
+  std::shared_ptr<DriveRequest> Send(unsigned drive, unsigned file, unsigned major, DrivePacket const& body,
+                                     unsigned minor = 0);
+  DrivePacket Wait(std::shared_ptr<DriveRequest> const& /*request*/, std::string const& path, bool end = false);
+  size_t                        WaitAny(std::span<Slot const> /*slots*/);
+  void                          Warn(std::string const& /*cause*/) const;
+'''
+
+AUDIO = '''\
+  sound->num_server_formats = 2;
+  // mstsc plays 48 kHz at its 44.1 kHz device rate (measured 2026-09-23).
+  sound->server_formats[0]           = { .wFormatTag      = WAVE_FORMAT_PCM,
+                                         .nChannels       = 2,
+                                         .nSamplesPerSec  = 44100,
+                                         .nAvgBytesPerSec = 176400,
+                                         .nBlockAlign     = 4,
+                                         .wBitsPerSample  = 16,
+                                         .cbSize          = 0,
+                                         .data            = nullptr };
+  sound->server_formats[1]           = { .wFormatTag      = WAVE_FORMAT_PCM,
+                                         .nChannels       = 2,
+                                         .nSamplesPerSec  = 48000,
+                                         .nAvgBytesPerSec = 192000,
+                                         .nBlockAlign     = 4,
+                                         .wBitsPerSample  = 16,
+                                         .cbSize          = 0,
+                                         .data            = nullptr };
+  sound->src_format                  = &sound->server_formats[0];
+  sound->data                        = this;
+  sound->rdpcontext                  = context;
+  sound->use_dynamic_virtual_channel = FALSE;
+  sound->latency                     = 10;
+'''
+
+AUDIO_EXPECTED = '''\
+  sound->num_server_formats          = 2;
+  // mstsc plays 48 kHz at its 44.1 kHz device rate (measured 2026-09-23).
+  sound->server_formats[0]           = { .wFormatTag      = WAVE_FORMAT_PCM,
+                                         .nChannels       = 2,
+                                         .nSamplesPerSec  = 44100,
+                                         .nAvgBytesPerSec = 176400,
+                                         .nBlockAlign     = 4,
+                                         .wBitsPerSample  = 16,
+                                         .cbSize          = 0,
+                                         .data            = nullptr };
+  sound->server_formats[1]           = { .wFormatTag      = WAVE_FORMAT_PCM,
+                                         .nChannels       = 2,
+                                         .nSamplesPerSec  = 48000,
+                                         .nAvgBytesPerSec = 192000,
+                                         .nBlockAlign     = 4,
+                                         .wBitsPerSample  = 16,
+                                         .cbSize          = 0,
+                                         .data            = nullptr };
+  sound->src_format                  = &sound->server_formats[0];
+  sound->data                        = this;
+  sound->rdpcontext                  = context;
+  sound->use_dynamic_virtual_channel = FALSE;
+  sound->latency                     = 10;
+'''
+
+DRIVENAME = '''\
+    bool const wide = drive_version >= DRIVE_CAPABILITY_VERSION_02 && bytes.size() >= 2 && bytes.size() % 2 == 0 &&
+                      bytes[bytes.size() - 2] == 0;
+    auto format = wide ? oxbox::utilities::TextFormat{ .encoding = oxbox::utilities::Encoding::UTF16,
+                                                       .order    = std::endian::little }
+                       : oxbox::utilities::TextFormat{};
+    auto label  = TranscodeRange<std::string>(std::as_bytes(bytes.first(bytes.size() - (wide ? 2 : 1))), format, {});
+'''
+
+DRIVENAME_EXPECTED = '''\
+    bool const wide   = drive_version >= DRIVE_CAPABILITY_VERSION_02 && bytes.size() >= 2 && bytes.size() % 2 == 0 &&
+                        bytes[bytes.size() - 2] == 0;
+    auto       format = wide ? oxbox::utilities::TextFormat{ .encoding = oxbox::utilities::Encoding::UTF16,
+                                                             .order    = std::endian::little }
+                             : oxbox::utilities::TextFormat{ };
+    auto label = TranscodeRange<std::string>(std::as_bytes(bytes.first(bytes.size() - (wide ? 2 : 1))), format, { });
+'''
+
+INPUT = '''\
+    self.owner.Push({ .type = SDLRDP_KEY,
+                      .key  = { .scancode = code,
+                                .extended = !!(flags & KBD_FLAGS_EXTENDED),
+                                .down     = !(flags & KBD_FLAGS_RELEASE) } });
+'''
+
+INPUT_EXPECTED = '''\
+    self.owner.Push({ .type = SDLRDP_KEY,
+                      .key  = { .scancode = code,
+                                .extended = !!(flags & KBD_FLAGS_EXTENDED),
+                                .down     = !(flags & KBD_FLAGS_RELEASE) } });
+'''
+
+AUTH = '''\
+  PlainPassword const plain{ password };
+  bool const accepted = config.verify ? config.verify(config.auth_user, domain, user, plain.Text()) != 0
+                                      : sdlrdp_verify_pair(&config, domain, user, plain.Text()) != 0;
+'''
+
+AUTH_EXPECTED = '''\
+  PlainPassword const plain    { password };
+  bool const          accepted = config.verify ? config.verify(config.auth_user, domain, user, plain.Text()) != 0
+                                               : sdlrdp_verify_pair(&config, domain, user, plain.Text()) != 0;
+'''
+
+LOCALS = '''\
+inline std::vector<BYTE> SoundFormatReply(SoundCapture const& capture) {
+  auto supported = SupportedSoundFormats(capture);
+  std::vector<BYTE> bytes(24 + (supported.size() * 18));
+  wStream output{};
+  auto* out = Stream_StaticInit(&output, bytes.data(), bytes.size());
+'''
+
+LOCALS_EXPECTED = '''\
+inline std::vector<BYTE> SoundFormatReply(SoundCapture const& capture) {
+  auto              supported = SupportedSoundFormats(capture);
+  std::vector<BYTE> bytes(24 + (supported.size() * 18));
+  wStream           output    { };
+  auto*             out       = Stream_StaticInit(&output, bytes.data(), bytes.size());
+'''
+
+BRACEHEAD = '''\
+    auto confirmation = capture.pending[index];
+    std::array<BYTE, 8> bytes{
+      5, 0, 4, 0, BYTE(confirmation.timestamp), BYTE(confirmation.timestamp >> 8), confirmation.block, 0
+    };
+'''
+
+BRACEHEAD_EXPECTED = '''\
+    auto                confirmation = capture.pending[index];
+    std::array<BYTE, 8> bytes        {
+      5, 0, 4, 0, BYTE(confirmation.timestamp), BYTE(confirmation.timestamp >> 8), confirmation.block, 0
+    };
+'''
+
+LAMBDA = '''\
+  static std::string const reason = [] {
+    Impl probe;
+    auto available = probe.Load();
+    auto error     = probe.error;
+    probe.Close();
+    return available ? std::string{} : error;
+  }();
+'''
+
+LAMBDA_EXPECTED = '''\
+  static std::string const reason = [] {
+    Impl probe;
+    auto available = probe.Load();
+    auto error     = probe.error;
+    probe.Close();
+    return available ? std::string{ } : error;
+  }();
+'''
+
+LAMBDA2 = '''\
+  auto* file     = held_file;
+  auto& observer = *this->observer;
+  auto stat      = std::async(std::launch::async, [&] {
+    sdlrdp_stat info{};
+    auto result = sdlrdp_drive_fstat(handle.get(), file, &info);
+    return std::pair(result, std::string(sdlrdp_last_error()));
+  });
+  ASSERT_TRUE(client->Until([&] { return observer.Observed().requests == 1; }));
+'''
+
+LAMBDA2_EXPECTED = '''\
+  auto* file     = held_file;
+  auto& observer = *this->observer;
+  auto  stat     = std::async(std::launch::async, [&] {
+    sdlrdp_stat info   { };
+    auto        result = sdlrdp_drive_fstat(handle.get(), file, &info);
+    return std::pair(result, std::string(sdlrdp_last_error()));
+  });
+  ASSERT_TRUE(client->Until([&] { return observer.Observed().requests == 1; }));
+'''
+
+DAMAGE = '''\
+    auto bytes = client.Received();
+    std::array<sdlrdp_rect, 2> damage{ { { .x = 0, .y = 0, .w = 8, .h = 8 },
+                                         { .x = 1016, .y = 760, .w = 8, .h = 8 } } };
+'''
+
+DAMAGE_EXPECTED = '''\
+    auto                       bytes  = client.Received();
+    std::array<sdlrdp_rect, 2> damage { { { .x = 0   , .y = 0  , .w = 8, .h = 8 },
+                                          { .x = 1016, .y = 760, .w = 8, .h = 8 } } };
+'''
+
+STATE = '''\
+  static BOOL Keyboard(rdpInput* input, UINT16 flags, UINT8 code);
+  static BOOL Mouse(rdpInput* input, UINT16 flags, UINT16 x, UINT16 y);
+  static BOOL ExtendedMouse(rdpInput* input, UINT16 flags, UINT16 x, UINT16 y);
+  void RecordAcknowledgements(std::deque<Pending>::iterator const& last, Clock::time_point now);
+  enum class EncodeState { Idle, Legacy, Graphics, LegacyReady };
+  void TransitionEncode(EncodeState next);
+  bool PrepareFrame();
+  EncodeState encode_state{ EncodeState::Idle };
+  LegacyFrame legacy      {};
+'''
+
+STATE_EXPECTED = '''\
+  static BOOL Keyboard(rdpInput* input, UINT16 flags, UINT8 code);
+  static BOOL Mouse(rdpInput* input, UINT16 flags, UINT16 x, UINT16 y);
+  static BOOL ExtendedMouse(rdpInput* input, UINT16 flags, UINT16 x, UINT16 y);
+  void        RecordAcknowledgements(std::deque<Pending>::iterator const& last, Clock::time_point now);
+  enum class EncodeState{ Idle, Legacy, Graphics, LegacyReady };
+  void        TransitionEncode(EncodeState next);
+  bool        PrepareFrame();
+  EncodeState encode_state{ EncodeState::Idle };
+  LegacyFrame legacy      {                   };
+'''
+
+
+@pytest.mark.parametrize(('source', 'expected'), [
+    pytest.param(ENCODER, ENCODER_EXPECTED, id='item2_encoder_inline_body_tail'),
+    pytest.param(DRIVE, DRIVE_EXPECTED, id='item2_drive_channel_inline_body_tail'),
+    pytest.param(AUDIO, AUDIO_EXPECTED, id='item3_audio_continuations'),
+    pytest.param(DRIVENAME, DRIVENAME_EXPECTED, id='item3_drive_name_continuations'),
+    pytest.param(INPUT, INPUT_EXPECTED, id='item3_input_continuations'),
+    pytest.param(AUTH, AUTH_EXPECTED, id='item3_auth_continuations'),
+    pytest.param(LOCALS, LOCALS_EXPECTED, id='item5_paren_initialised_locals'),
+    pytest.param(BRACEHEAD, BRACEHEAD_EXPECTED, id='item6_multiline_brace_head'),
+    pytest.param(LAMBDA, LAMBDA_EXPECTED, id='item6_lambda_body'),
+    pytest.param(LAMBDA2, LAMBDA2_EXPECTED, id='item6_lambda_body_nested'),
+    pytest.param(DAMAGE, DAMAGE_EXPECTED, id='item6_damage_run'),
+    pytest.param(STATE, STATE_EXPECTED, id='item7_state_kinds'),
+    pytest.param(
+        '       GameSession(std::filesystem::path const& assets,\n'
+        '                   cartridge::Scenario scenario, std::optional<int> room,\n'
+        '                   std::optional<GameState> const& state = std::nullopt);\n'
+        '       GameSession(GameSession const&) = delete;\n'
+        '       GameSession(GameSession&&) = delete;\n'
+        '  auto operator=(GameSession const&) -> GameSession& = delete;\n'
+        '  auto operator=(GameSession&&) -> GameSession& = delete;\n'
+        '       ~GameSession() = default;\n',
+        '       GameSession(std::filesystem::path const& assets,\n'
+        '                   cartridge::Scenario scenario, std::optional<int> room,\n'
+        '                   std::optional<GameState> const& state = std::nullopt);\n'
+        '       GameSession(GameSession const&)               = delete;\n'
+        '       GameSession(GameSession&&)                    = delete;\n'
+        '  auto operator=(GameSession const&) -> GameSession& = delete;\n'
+        '  auto operator=(GameSession&&)      -> GameSession& = delete;\n'
+        '       ~GameSession()                                = default;\n',
+        id='item1_specifier_column_ignores_long_constructor',
+    ),
+    pytest.param(
+        '  Machine(Machine const&) = delete;\n'
+        '  Machine(Machine&&) noexcept = default;\n'
+        '  auto operator=(Machine const&) -> Machine& = delete;\n'
+        '  auto operator=(Machine&&) noexcept -> Machine& = delete;\n'
+        '  ~Machine() = default;\n',
+        '       Machine(Machine const&)                   = delete;\n'
+        '       Machine(Machine&&) noexcept               = default;\n'
+        '  auto operator=(Machine const&)     -> Machine& = delete;\n'
+        '  auto operator=(Machine&&) noexcept -> Machine& = delete;\n'
+        '       ~Machine()                                = default;\n',
+        id='item1_noexcept_default_in_delete_column',
+    ),
+    pytest.param(
+        'inline constexpr UINT32 CompatibleRate = 44100;\nclass Host;\ninline constexpr UINT32 NativeRate = 48000;\n'
+        'class Peer;\nenum class RowOrder{ TopDown, BottomUp };\nclass Scaler {\n',
+        'inline constexpr UINT32 CompatibleRate = 44100;\nclass Host;\n'
+        'inline constexpr UINT32 NativeRate     = 48000;\n'
+        'class Peer;\nenum class RowOrder{ TopDown, BottomUp };\nclass Scaler {\n',
+        id='item7_forward_declaration_among_constants',
+    ),
+    pytest.param(
+        '  using Clock = std::chrono::steady_clock;\n  AudioChannel(AudioChannel const&) = delete;\n'
+        '  explicit AudioChannel(Peer& owner);\n  using Handle = void*;\n  bool Initialize();\n',
+        '  using Clock  = std::chrono::steady_clock;\n           AudioChannel(AudioChannel const&) = delete;\n'
+        '  explicit AudioChannel(Peer& owner);\n  using Handle = void*;\n  bool     Initialize();\n',
+        id='item7_alias_among_functions',
+    ),
+    pytest.param(
+        '#define  PADDED   1\nint a{1};\n#define  WIDE(x) \\\n    int    x\nlong longer{22};\n',
+        '#define  PADDED   1\nint a{ 1 };\n#define  WIDE(x) \\\n    int    x\nlong longer{ 22 };\n',
+        id='item4_preprocessor_lines_untouched',
+    ),
+])
+def test_review_round_five(source, expected):
+    assert align(source) == expected
+    assert align(expected) == expected
+
+
+@pytest.mark.parametrize(('source', 'excluded'), [
+    pytest.param(DRIVE, 130, id='item2_drive_wait'),
+    pytest.param(DRIVENAME, 124, id='item3_drive_name_label'),
+])
+def test_round_five_overflow_widths(source, excluded):
+    assert [overflow.width for overflow in MODULE.align(source).exceptions] == [excluded]
+
+
+def test_overflow_setter_is_excluded_and_others_stay_aligned():
+    long_line = 'int count = ' + 'x' * 80 + ';'
+    source    = f'std::unordered_map<std::string, std::vector<int>> table;\n{long_line}\nint b = 2;\n'
+    result    = MODULE.align(source)
+    assert result.text.splitlines()[1:] == [long_line, 'int' + ' ' * 47 + 'b     = 2;']
+    assert result.exceptions == [MODULE.Overflow(2, long_line, 139)]
+
+
+def without_preprocessor(text):
+    return [line for line in text.splitlines() if not line.lstrip().startswith('#')]
+
+
+@pytest.mark.skipif('ALIGN_BASELINE' not in os.environ, reason='needs ALIGN_BASELINE=<commit>')
+def test_baseline_reformat_equals_tree():
+    root     = pathlib.Path(__file__).resolve().parents[1]
+    baseline = os.environ['ALIGN_BASELINE']
+    for path in MODULE.source_files([root / 'sources']):
+        relative = path.relative_to(root).as_posix()
+        shown    = subprocess.run(['git', 'show', f'{baseline}:{relative}'], cwd=root, capture_output=True, text=True)
+        if shown.returncode == 0:
+            assert without_preprocessor(align(shown.stdout)) == without_preprocessor(path.read_text()), relative

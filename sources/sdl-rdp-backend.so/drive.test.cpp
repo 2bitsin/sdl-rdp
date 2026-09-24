@@ -8,7 +8,7 @@ bool ReadSharedFile(sdlrdp_handle* handle, unsigned drive, std::string const& na
   sdlrdp_file* file = nullptr;
   if (sdlrdp_drive_open(handle, drive, name.c_str(), SDLRDP_FILE_READ, &file) < 0) return false;
   std::string bytes(source.size(), '\0');
-  auto count = sdlrdp_drive_read(handle, file, 0, bytes.data(), bytes.size());
+  auto        count = sdlrdp_drive_read(handle, file, 0, bytes.data(), bytes.size());
   sdlrdp_drive_close(handle, file);
   return std::cmp_equal(count, source.size()) && bytes == source;
 }
@@ -106,8 +106,8 @@ protected:
     SCOPED_TRACE(text);
     observer.Observed().io.clear();
     auto open = std::async(std::launch::async, [&] {
-      sdlrdp_file* file = nullptr;
-      auto result = sdlrdp_drive_open(handle.get(), drive, "missing.bin", SDLRDP_FILE_READ, &file);
+      sdlrdp_file* file   = nullptr;
+      auto         result = sdlrdp_drive_open(handle.get(), drive, "missing.bin", SDLRDP_FILE_READ, &file);
       return std::pair(result, std::string(sdlrdp_last_error()));
     });
     ASSERT_TRUE(client->Until([&] { return !observer.Observed().io.empty(); }));
@@ -198,7 +198,7 @@ TEST_F(Drive, DisconnectDuringRead) {
   pump.join();
   auto read = std::async(std::launch::async, [&] {
     std::string bytes(static_cast<std::ptrdiff_t>(3 * 1024) * 1024, '\0');
-    auto result = sdlrdp_drive_read(handle.get(), file, 0, bytes.data(), bytes.size());
+    auto        result = sdlrdp_drive_read(handle.get(), file, 0, bytes.data(), bytes.size());
     return std::pair(result, std::string(sdlrdp_last_error()));
   });
   std::this_thread::sleep_for(20ms);

@@ -39,7 +39,7 @@ void Peer::TransitionEncode(EncodeState next) {
 }
 bool Peer::SendEncoded(bool encoded, std::stop_token const& quit) {
   std::scoped_lock const lock(owner.session_guard);
-  auto kind = encode_state;
+  auto                   kind = encode_state;
   TransitionEncode(kind == EncodeState::Legacy ? EncodeState::LegacyReady : EncodeState::Idle);
   if (quit.stop_requested()) return false;
   if (!active) return true;
@@ -119,7 +119,7 @@ bool Peer::PrepareFrame() {
 BOOL Peer::Capabilities(freerdp_peer* client) {
   auto& self = Held(client);
   if (!AuthenticateSettings(client)) return FALSE;
-  auto* settings = client->context->settings;
+  auto*                  settings = client->context->settings;
   std::scoped_lock const lock(self.owner.frame_guard);
   if (!self.activated) {
     self.RestartRefresh();

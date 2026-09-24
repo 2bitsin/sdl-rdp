@@ -52,7 +52,7 @@ bool GfxChannel::CompressProgressive(REGION16& damage, std::chrono::steady_clock
   auto   picture { Picture()               };
   auto   stride  { Avc::Aligned(width) * 4 };
   auto   result  = progressive_compress(progressive.get(), picture.data(), picture.size(), PIXEL_FORMAT_BGRX32, width,
-                                     height, stride, &damage, &data, &size);
+                                        height, stride, &damage, &data, &size);
   peer.encoder.encode_time += Peer::Clock::now() - start;
   region16_uninit(&damage);
   return result >= 0 && data && ProgressivePayload({ data, size });
@@ -167,11 +167,11 @@ bool GfxChannel::WriteCommand(sdlrdp_rect area, std::span<BYTE> data, UINT32 cod
   Expects(area.h > 0, "command height is positive");
   Expects(std::cmp_less_equal(area.x + area.w, width), "command right edge fits surface");
   Expects(std::cmp_less_equal(area.y + area.h, height), "command bottom edge fits surface");
-  auto command = SurfaceCommand(area, data, codec);
-  RDPGFX_AVC420_BITMAP_STREAM stream{ { UINT32(regions.Rects().size()), regions.Rects().data(),
-                                        regions.Quality().data() },
-                                      UINT32(data.size()),
-                                      data.data() };
+  auto                        command = SurfaceCommand(area, data, codec);
+  RDPGFX_AVC420_BITMAP_STREAM stream  { { UINT32(regions.Rects().size()), regions.Rects().data(),
+                                          regions.Quality().data() },
+                                        UINT32(data.size()),
+                                        data.data() };
   if (codec == RDPGFX_CODECID_AVC420) command.extra = &stream;
   return Check(context->SurfaceCommand(context.get(), &command), "surface command");
 }
@@ -199,7 +199,7 @@ bool GfxChannel::ProgressivePayload(std::span<BYTE> data) {
   constexpr UINT16      ProgressiveContextBlock     = 0xCCC3;
   if (data.size() < ProgressiveHeaderBytes) return false;
   // FreeRDP 3.15 rfx.c repeats SYNC/CONTEXT; GRD sends them once per surface context.
-  constexpr std::array<BYTE, ProgressiveBlockHeaderBytes> sync{
+  constexpr std::array<BYTE, ProgressiveBlockHeaderBytes> sync          {
     BYTE(ProgressiveSyncBlock), BYTE(ProgressiveSyncBlock >> 8), ProgressiveSyncBytes, 0, 0, 0
   };
   constexpr std::array<BYTE, ProgressiveBlockHeaderBytes> context_header{

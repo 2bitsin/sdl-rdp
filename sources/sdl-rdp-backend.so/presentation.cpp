@@ -57,7 +57,7 @@ bool State::ChangePicture(unsigned w, unsigned h) {
 }
 void State::SetAspect(sdlrdp_aspect value) {
   std::scoped_lock const lock(peers_guard, frame_guard);
-  auto previous = aspect;
+  auto                   previous = aspect;
   aspect = value;
   try {
     Picture();
@@ -70,8 +70,8 @@ void State::SetAspect(sdlrdp_aspect value) {
 }
 int State::WaitFrame(int timeout) {
   std::unique_lock lock(frame_guard);
-  auto target = presented;
-  auto ready  = [&] { return !current || !current->ack_enabled || current->acknowledged + 1 >= target; };
+  auto             target = presented;
+  auto             ready  = [&] { return !current || !current->ack_enabled || current->acknowledged + 1 >= target; };
   if (timeout < 0)
     frame_changed.wait(lock, ready);
   else
@@ -91,11 +91,11 @@ void Peer::FrameSent(std::size_t bytes) {
 void Peer::LogFrames() {
   Expects(activated, "statistics belong to an activated connection");
   using Milliseconds = std::chrono::duration<double, std::milli>;
-  auto  phases       = avc_frames ? std::format(" (convert {:.1f}, upload {:.1f}, nvenc {:.1f})",
-                                                Milliseconds(avc_convert).count() / double(avc_frames),
-                                                Milliseconds(avc_upload).count() / double(avc_frames),
-                                                Milliseconds(avc_encode).count() / double(avc_frames))
-                                  : std::string{ };
+  auto phases = avc_frames ? std::format(" (convert {:.1f}, upload {:.1f}, nvenc {:.1f})",
+                                         Milliseconds(avc_convert).count() / double(avc_frames),
+                                         Milliseconds(avc_upload).count() / double(avc_frames),
+                                         Milliseconds(avc_encode).count() / double(avc_frames))
+                           : std::string{ };
   owner.Log(SDLRDP_LOG_INFO,
             std::format(
                 "Frames: {} sent, {} coalesced; encode {:.1f} ms mean, {:.1f} ms max{}; acknowledgement {:.1f} ms "
@@ -163,9 +163,9 @@ void Peer::RecordAcknowledgement(Clock::duration elapsed) {
 }
 void Peer::AcceptAcknowledgement(UINT32 id) {
   Expects(client != nullptr, "acknowledgement belongs to a peer");
-  auto& self = *this;
+  auto&                  self  = *this;
   std::scoped_lock const lock(self.owner.frame_guard);
-  auto found = std::ranges::find(self.pending, id, &Pending::id);
+  auto                   found = std::ranges::find(self.pending, id, &Pending::id);
   if (found == self.pending.end()) return;
   self.acknowledged = found->sequence;
   auto now = Clock::now();
@@ -181,7 +181,7 @@ void Peer::AcceptAcknowledgement(UINT32 id) {
 BOOL Peer::Suppress(rdpContext* context, BYTE allow, RECTANGLE_16 const* /*unused*/) {
   Expects(context, "callback context exists");
   Expects(context->peer, "context belongs to a peer");
-  auto& self = Held(context->peer);
+  auto&                  self = Held(context->peer);
   std::scoped_lock const lock(self.owner.frame_guard);
   self.suppressed = !allow;
   if (allow) self.Post({ 0, 0, int(self.owner.width), int(self.owner.height) });

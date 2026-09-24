@@ -146,7 +146,7 @@ namespace {
 void DisconnectWithPending(Backend::State& state, UINT32 code) {
   {
     std::scoped_lock const lock(state.session_guard);
-    auto& peer = *state.current;
+    auto&                  peer = *state.current;
     {
       std::scoped_lock const frame(state.frame_guard);
       peer.dirty.Add({ 0, 0, 1, 1 });

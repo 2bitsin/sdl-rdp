@@ -176,8 +176,8 @@ public:
     }
     return ready();
   }
-  auto const& Instance() const          { return instance; }
-  unsigned    Tolerance() const         { return tolerance; }
+  auto const& Instance() const { return instance; }
+  unsigned    Tolerance() const { return tolerance; }
   void        Tolerance(unsigned value) { tolerance = value; }
 
 private:
@@ -208,13 +208,13 @@ public:
     ack_times.push_back(sent);
     return true;
   }
-  auto const& Frames() const           { return ids; }
-  auto const& ReceivedAt() const       { return received; }
-  bool        AckFrame(UINT32 id)      { return update->SurfaceFrameAcknowledge(update->context, id); }
+  auto const& Frames() const { return ids; }
+  auto const& ReceivedAt() const { return received; }
+  bool        AckFrame(UINT32 id) { return update->SurfaceFrameAcknowledge(update->context, id); }
   auto const& Acknowledgements() const { return ack_times; }
-  bool        Coherent() const         { return coherent; }
-  bool        Installed() const        { return update != nullptr; }
-  void        Clear()                  { ids.clear(); }
+  bool        Coherent() const { return coherent; }
+  bool        Installed() const { return update != nullptr; }
+  void        Clear() { ids.clear(); }
 
 private:
   static BOOL Receive(rdpContext* context, SURFACE_FRAME_MARKER const* marker) {
@@ -277,8 +277,8 @@ public:
     channel = nullptr;
     ready   = false;
   }
-  DisplayClient&                        operator = (DisplayClient const&)                                    = delete;
-  DisplayClient&                        operator = (DisplayClient&&)                                         = delete;
+  DisplayClient&                        operator = (DisplayClient const&) = delete;
+  DisplayClient&                        operator = (DisplayClient&&)      = delete;
   static DISPLAY_CONTROL_MONITOR_LAYOUT Monitor(unsigned width, unsigned height, unsigned millimetres = 400) {
     DISPLAY_CONTROL_MONITOR_LAYOUT monitor{ };
     monitor.Flags              = DISPLAY_CONTROL_MONITOR_PRIMARY;
@@ -297,8 +297,8 @@ public:
     return channel.load()->SendMonitorLayout(channel.load(), 1, &monitor) == CHANNEL_RC_OK;
   }
   DisplayCapture&           Observed() { return observed; }
-  static bool               Ready()    { return ready.load(); }
-  static DispClientContext* Channel()  { return channel.load(); }
+  static bool               Ready() { return ready.load(); }
+  static DispClientContext* Channel() { return channel.load(); }
 
 private:
   static BOOL Resize(rdpContext* context) {
@@ -315,7 +315,7 @@ private:
   }
   static void Connected(void* /*unused*/, ChannelConnectedEventArgs const* event) {
     if (std::string_view(event->name) != DISP_DVC_CHANNEL_NAME) return;
-    channel = static_cast<DispClientContext*>(event->pInterface);
+    channel                            = static_cast<DispClientContext*>(event->pInterface);
     channel.load()->DisplayControlCaps = [](DispClientContext*, UINT32, UINT32, UINT32) -> UINT {
       ready = true;
       return CHANNEL_RC_OK;

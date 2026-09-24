@@ -82,7 +82,7 @@ public:
   }
   SoundClient(SoundClient const&) = delete;
   SoundClient(SoundClient&&)      = delete;
-  ~SoundClient()                  {
+  ~SoundClient() {
     freerdp_disconnect(client.Instance().get());
     client.Instance()->LoadChannels = previous_load;
     active                          = nullptr;
@@ -110,8 +110,8 @@ public:
   bool Confirm(std::size_t index = 0) {
     if (capture.pending.empty()) return true;
     Expects(index < capture.pending.size(), "confirmation identifies a received block");
-    auto confirmation = capture.pending[index];
-    std::array<BYTE, 8> bytes{
+    auto                confirmation = capture.pending[index];
+    std::array<BYTE, 8> bytes        {
       5, 0, 4, 0, BYTE(confirmation.timestamp), BYTE(confirmation.timestamp >> 8), confirmation.block, 0
     };
     if (!Send(bytes)) return false;
@@ -120,7 +120,7 @@ public:
     return true;
   }
 
-  SoundCapture&       CaptureState()       { return capture; }
+  SoundCapture&       CaptureState() { return capture; }
   SoundCapture const& CaptureState() const { return capture; }
 
 private:
@@ -218,10 +218,10 @@ inline void WriteSoundFormatHeader(wStream* out, SoundCapture const& capture, st
   Stream_Seek(out, 24);
 }
 inline std::vector<BYTE> SoundFormatReply(SoundCapture const& capture) {
-  auto supported = SupportedSoundFormats(capture);
+  auto              supported = SupportedSoundFormats(capture);
   std::vector<BYTE> bytes(24 + (supported.size() * 18));
-  wStream output { };
-  auto*   out    = Stream_StaticInit(&output, bytes.data(), bytes.size());
+  wStream           output    { };
+  auto*             out       = Stream_StaticInit(&output, bytes.data(), bytes.size());
   WriteSoundFormatHeader(out, capture, supported.size(), bytes.size());
   std::ranges::for_each(supported, [&](auto const& format) {
     Expects(audio_format_write(out, &format), "supported PCM format serialized");

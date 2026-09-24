@@ -30,7 +30,7 @@ bool ClipboardChannel::Open() {
   opened = true;
   CLIPRDR_GENERAL_CAPABILITY_SET general{ CB_CAPSTYPE_GENERAL, CB_CAPSTYPE_GENERAL_LEN, CB_CAPS_VERSION_2,
                                           CB_USE_LONG_FORMAT_NAMES };
-  CLIPRDR_CAPABILITIES caps{ .common = { .msgType = CB_CLIP_CAPS } };
+  CLIPRDR_CAPABILITIES           caps   { .common = { .msgType = CB_CLIP_CAPS } };
   caps.cCapabilitiesSets = 1;
   caps.capabilitySets    = reinterpret_cast<CLIPRDR_CAPABILITY_SET*>(&general);
   CLIPRDR_MONITOR_READY const monitor{ .common = { .msgType = CB_MONITOR_READY } };
@@ -47,8 +47,8 @@ bool ClipboardChannel::Pump(std::span<HANDLE const> signaled) {
 UINT ClipboardChannel::Announce() {
   Expects(opened, "clipboard channel open");
   std::array<CLIPRDR_FORMAT, 2> formats{ { { .formatId = CF_UNICODETEXT, .formatName = nullptr },
-                                           { .formatId = CF_TEXT, .formatName = nullptr } } };
-  CLIPRDR_FORMAT_LIST list{ .common = { .msgType = CB_FORMAT_LIST } };
+                                           { .formatId = CF_TEXT       , .formatName = nullptr } } };
+  CLIPRDR_FORMAT_LIST           list   { .common = { .msgType = CB_FORMAT_LIST } };
   list.numFormats = 2;
   list.formats    = formats.data();
   auto result = context->ServerFormatList(context.get(), &list);

@@ -75,7 +75,7 @@ protected:
     if (tight) arguments.emplace_back("--tight");
     GivenAudioProcess(arguments);
     if (::testing::Test::HasFatalFailure()) return;
-    auto port = audio_port;
+    auto                  port   = audio_port;
     Client                client(port, true, 640, 480);
     Headless::SoundClient audio(client);
     ASSERT_TRUE(freerdp_connect(client.Instance().get())) << ConnectLogs();
@@ -160,7 +160,7 @@ protected:
   void GivenSoundClient() {
     sound_client =
         std::make_unique<Client>(ListeningPort(pid_t(Number(fs::read_symlink("/proc/self").string()))), true);
-    sound = std::make_unique<Headless::SoundClient>(*sound_client);
+    sound        = std::make_unique<Headless::SoundClient>(*sound_client);
     ASSERT_TRUE(freerdp_connect(sound_client->Instance().get())) << ConnectLogs();
   }
   void PlayPcm(std::size_t count) {
@@ -183,8 +183,8 @@ protected:
         [](void* user, int category, SDL_LogPriority priority, char const* text) {
           auto& self  = *static_cast<AudioDriver*>(user);
           auto  level = priority >= SDL_LOG_PRIORITY_ERROR ? SDLRDP_LOG_ERROR
-                       : priority == SDL_LOG_PRIORITY_WARN ? SDLRDP_LOG_WARN
-                                                           : SDLRDP_LOG_INFO;
+                        : priority == SDL_LOG_PRIORITY_WARN ? SDLRDP_LOG_WARN
+                                                            : SDLRDP_LOG_INFO;
           Headless::Logs::Collect(&self.logs, level, text);
           if (self.previous_log) self.previous_log(self.previous_log_user, category, priority, text);
         },
@@ -324,7 +324,7 @@ TEST_F(AudioDriver, AudioOnlyPlaysBlackDesktop) {
   Headless::SoundClient audio(client);
   ConnectAudio(client, audio);
   if (::testing::Test::HasFatalFailure()) return;
-  auto* gdi = client.Instance()->context->gdi;
+  auto*               gdi   = client.Instance()->context->gdi;
   std::vector<UINT32> black(std::size_t(gdi->width) * gdi->height);
   ASSERT_TRUE(client.Until([&] { return client.Matches(black); }));
   ThenPcm(client, audio);

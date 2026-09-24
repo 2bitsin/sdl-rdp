@@ -23,7 +23,7 @@ TEST_F(AudioGate, AudioPcmAndReconnect) {
     SoundClient audio(client);
     ConnectAudioFormats(client, audio);
     if (::testing::Test::HasFatalFailure()) return;
-    auto frames = audio.CaptureState().rate / 50;
+    auto               frames = audio.CaptureState().rate / 50;
     std::vector<INT16> pcm(static_cast<std::size_t>(frames) * 2);
     std::ranges::iota(pcm, -480);
     ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), frames), frames);
@@ -60,7 +60,7 @@ TEST_F(AudioGate, AudioBothRatesPrefer44100) {
   ConnectAudioFormats(client, audio);
   if (::testing::Test::HasFatalFailure()) return;
   EXPECT_EQ(sdlrdp_audio_rate(backend.get()), 44100u);
-  auto frames = audio.CaptureState().rate / 50;
+  auto               frames = audio.CaptureState().rate / 50;
   std::vector<INT16> pcm(static_cast<std::size_t>(frames) * 2, 1234);
   ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), frames), frames);
   ASSERT_TRUE(client.Until([&] { return audio.CaptureState().samples.size() == pcm.size(); }));
@@ -82,8 +82,8 @@ TEST_F(AudioGate, AudioSlowConfirmsBoundTenSeconds) {
   GivenConfirmingSession();
   if (::testing::Test::HasFatalFailure()) return;
   std::vector<INT16> pcm(480000uz * 2, 1234);
-  auto writing  = std::async(std::launch::async, [&] { return sdlrdp_audio_write(backend.get(), pcm.data(), 480000); });
-  auto deadline = Clock::now() + std::chrono::seconds(15);
+  auto writing = std::async(std::launch::async, [&] { return sdlrdp_audio_write(backend.get(), pcm.data(), 480000); });
+  auto               deadline = Clock::now() + std::chrono::seconds(15);
   while (AudioSession().CaptureState().confirmed_frames < 480000 && Clock::now() < deadline) {
     if (!ClientSession().Pump(2)) break;
     while (!AudioSession().CaptureState().pending.empty() &&
@@ -110,9 +110,9 @@ UINT ObserveProgressivePayload(RdpgfxClientContext* channel, RDPGFX_SURFACE_COMM
 }
 unsigned ProduceProgressiveFrames(sdlrdp_handle* backend) {
   std::vector<UINT32> pixels(1280uz * 800);
-  sdlrdp_rect const full      { 0, 0, 1280, 800 };
-  auto              deadline  = Clock::now() + std::chrono::seconds(2);
-  unsigned          presented = 0;
+  sdlrdp_rect const   full      { 0, 0, 1280, 800 };
+  auto                deadline  = Clock::now() + std::chrono::seconds(2);
+  unsigned            presented = 0;
   while (Clock::now() < deadline) {
     if (!sdlrdp_wait_frame(backend, 10)) continue;
     Headless::MovingTilePattern(pixels, 1280, 800, presented);
@@ -146,8 +146,8 @@ TEST_F(AudioGate, AudioNeverConfirmsUsesServerClock) {
   GivenUnconfirmedSession();
   if (::testing::Test::HasFatalFailure()) return;
   std::vector<INT16> const pcm(48000uz * 2, 1234);
-  auto started  = Clock::now();
-  auto writing  = std::async(std::launch::async, [&] { return sdlrdp_audio_write(backend.get(), pcm.data(), 48000); });
+  auto                     started = Clock::now();
+  auto writing = std::async(std::launch::async, [&] { return sdlrdp_audio_write(backend.get(), pcm.data(), 48000); });
   auto captured = ClientSession().Until([&] { return AudioSession().CaptureState().samples.size() == pcm.size(); });
   if (!captured) sdlrdp_audio_close(backend.get());
   EXPECT_TRUE(captured);
@@ -169,9 +169,9 @@ TEST_F(AudioGate, AudioDisconnectDuringBlockedWrite) {
     if (::testing::Test::HasFatalFailure()) return;
     EstablishConfirmations(client, audio);
     if (::testing::Test::HasFatalFailure()) return;
-    unsigned frames = reconnect ? 960 : 480000;
+    unsigned           frames  = reconnect ? 960 : 480000;
     std::vector<INT16> pcm(static_cast<std::size_t>(frames) * 2, 1234);
-    auto writing =
+    auto               writing =
         std::async(std::launch::async, [&] { return sdlrdp_audio_write(backend.get(), pcm.data(), frames); });
     ThenDisconnectedWriter(client, audio, writing, reconnect, frames);
     if (::testing::Test::HasFatalFailure()) return;

@@ -85,7 +85,7 @@ protected:
   }
   void ThenResized(Client& client, Headless::GraphicsObserver& observer) {
     std::vector<UINT32> resized(352uz * 224, 0x0055aaff);
-    sdlrdp_rect const full{ 0, 0, 352, 224 };
+    sdlrdp_rect const   full   { 0, 0, 352, 224 };
     ASSERT_EQ(sdlrdp_present(backend.get(), resized.data(), 352 * 4, 352, 224, &full, 1), 0);
     ASSERT_TRUE(client.Until([&] { return client.Matches(resized); })) << logs.Text(true);
     EXPECT_EQ(client.Instance()->context->gdi->width, 352);
@@ -202,7 +202,7 @@ TEST_F(RoundFive, GraphicsAutoUsesProgressive) {
 TEST_F(RoundFive, ProgressiveDamageAndQoe) {
   GivenGraphicsClient(SDLRDP_CODEC_PROGRESSIVE);
   if (::testing::Test::HasFatalFailure()) return;
-  auto& client = GraphicsClient();
+  auto&                      client   = GraphicsClient();
   Headless::GraphicsObserver observer(client);
   Connect(client);
   ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
@@ -245,8 +245,8 @@ TEST_F(RoundFive, GraphicsWithoutDynamicChannelsUsesLegacy) {
   if (::testing::Test::HasFatalFailure()) return;
   {
     std::scoped_lock const lock(backend->state->session_guard);
-    auto const& peer    = *backend->state->current;
-    auto        elapsed = Clock::now() - peer.activated_at;
+    auto const&            peer    = *backend->state->current;
+    auto                   elapsed = Clock::now() - peer.activated_at;
     EXPECT_GE(elapsed, Backend::Peer::GraphicsConnectionWait);
     EXPECT_FALSE(peer.gfx);
     EXPECT_FALSE(peer.connection);
@@ -261,7 +261,7 @@ TEST_F(RoundFive, GraphicsWithoutDynamicChannelsUsesLegacy) {
 TEST_F(RoundFive, GraphicsWithoutCapabilitiesUsesLegacy) {
   GivenGraphicsClient(SDLRDP_CODEC_RAW);
   if (::testing::Test::HasFatalFailure()) return;
-  auto& client = GraphicsClient();
+  auto&                      client   = GraphicsClient();
   Headless::GraphicsObserver observer(client);
   observer.Observed().advertise = false;
   ThenLegacyFallback(client);

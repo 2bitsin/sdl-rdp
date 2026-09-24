@@ -124,8 +124,8 @@ bool Encoder::EncodePlanar(std::span<BYTE const> pixels, unsigned width) {
   compressed.resize(pixels.size() + 1024);
   UINT32 size   = compressed.size();
   auto*  result = width < 4 ? nullptr
-                           : freerdp_bitmap_compress_planar(planar.get(), pixels.data(), PIXEL_FORMAT_BGRA32, width, 1,
-                                                            width * 4, compressed.data(), &size);
+                            : freerdp_bitmap_compress_planar(planar.get(), pixels.data(), PIXEL_FORMAT_BGRA32, width, 1,
+                                                             width * 4, compressed.data(), &size);
   if (!result) {
     plain.reset(freerdp_bitmap_planar_context_new(skip_alpha ? PLANAR_FORMAT_HEADER_NA : 0, width, 1));
     if (!plain) return false;

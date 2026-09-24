@@ -37,7 +37,7 @@ unsigned DriveChannel::Device(unsigned id) {
 }
 int DriveChannel::List(sdlrdp_drive* out, unsigned max) {
   std::scoped_lock const lock(mutex);
-  unsigned count = 0;
+  unsigned               count = 0;
   for (auto const& [id, device] : devices) {
     if (count == max) break;
     out[count++] = device.drive;
@@ -48,7 +48,7 @@ size_t DriveChannel::WaitAny(std::span<Slot const> slots) {
   Expects(std::ranges::any_of(slots, [](auto const& slot) { return bool(slot.request); }),
           "transfer has outstanding requests");
   std::unique_lock lock(mutex);
-  size_t ready = slots.size();
+  size_t           ready = slots.size();
   changed.wait(lock, [&] {
     for (size_t i = 0; i < slots.size(); ++i) {
       if (slots[i].request && (slots[i].request->done || slots[i].request->removed || !connected)) {

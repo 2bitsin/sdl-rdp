@@ -12,13 +12,13 @@ struct Descriptor {
 public:
            Descriptor(Descriptor const&) = delete;
            Descriptor(Descriptor&&)      = delete;
-  explicit Descriptor(int descriptor)    : value{ descriptor } { }
-           ~Descriptor()                 {
+  explicit Descriptor(int descriptor) : value{ descriptor } { }
+           ~Descriptor() {
     if (value >= 0) close(value);
   }
   Descriptor& operator = (Descriptor const&) = delete;
   Descriptor& operator = (Descriptor&&)      = delete;
-  int         Get() const                    { return value; }
+  int         Get() const { return value; }
 
 private:
   int value;

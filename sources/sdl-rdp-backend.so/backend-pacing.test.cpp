@@ -39,10 +39,10 @@ TEST_F(RoundFive, SuppressOutput) {
   Client client(sdlrdp_port(backend.get()), true);
   Connect(client, false);
   FrameObserver observer(client);
-  auto* update = client.Instance()->context->update;
+  auto*         update   = client.Instance()->context->update;
   SuppressAndCheckInput(client);
   if (::testing::Test::HasFatalFailure()) return;
-  auto bytes = client.Received();
+  auto                bytes  = client.Received();
   std::vector<UINT32> pixels(640uz * 480, 0x123456);
   Present(pixels, 640, 480);
   std::ranges::fill(pixels, 0x654321);
@@ -120,7 +120,7 @@ TEST_F(RoundFive, NeverAcknowledges) {
   Connect(client);
   FrameObserver             observer(client);
   std::vector<UINT32> const pixels(320uz * 200, 0x778899);
-  auto start = Clock::now();
+  auto                      start    = Clock::now();
   Present(pixels, 320, 200);
   ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == 1; }));
   EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 10000), 1);
@@ -140,7 +140,7 @@ TEST_F(RoundFive, ColourDepths) {
 namespace {
 void ProduceFrames(sdlrdp_handle* backend, std::atomic<unsigned>& presents, std::stop_token const& stop) {
   std::vector<UINT32> pixels(1024uz * 768);
-  sdlrdp_rect const area{ 0, 0, 1024, 768 };
+  sdlrdp_rect const   area  { 0, 0, 1024, 768 };
   while (!stop.stop_requested()) {
     auto sequence = presents.load() + 1;
     std::fill_n(pixels.begin(), 1024, sequence);
@@ -155,9 +155,9 @@ TEST_F(RoundFive, ProducerDoesNotStarveOrTear) {
   Open(1024, 768);
   Client client(sdlrdp_port(backend.get()), true, 1024, 768);
   Connect(client);
-  FrameObserver observer(client);
+  FrameObserver         observer(client);
   std::atomic<unsigned> presents = 0;
-  std::jthread producer([&](std::stop_token const& stop) { ProduceFrames(backend.get(), presents, stop); });
+  std::jthread          producer([&](std::stop_token const& stop) { ProduceFrames(backend.get(), presents, stop); });
   for (unsigned i = 0; i < 20; ++i) {
     auto before       = presents.load();
     auto acknowledged = observer.Frames().size();
@@ -183,16 +183,16 @@ TEST_F(RoundFive, AutoPrefersRemoteFX) {
 }
 namespace {
 constexpr auto ExpectedTransportMessages = std::array<std::pair<char const*, char const*>, 9>{
-  { { "com.freerdp.core.peer", "ERRCONNECT_CONNECT_TRANSPORT_FAILED [0x0002000D]" },
-    { "com.freerdp.core.transport", "BIO_read retries exceeded" },
+  { { "com.freerdp.core.peer"     , "ERRCONNECT_CONNECT_TRANSPORT_FAILED [0x0002000D]"               },
+    { "com.freerdp.core.transport", "BIO_read retries exceeded"                                      },
     { "com.freerdp.core.transport", "BIO_read returned a system error 104: Connection reset by peer" },
     { "com.freerdp.core.transport",
       "BIO_should_retry returned an error: error:80000068:system library::Connection reset by peer" },
-    { "com.freerdp.core.transport", "BIO_write returned a system error 32: Broken pipe" },
+    { "com.freerdp.core.transport", "BIO_write returned a system error 32: Broken pipe"                              },
     { "com.freerdp.core.transport", "BIO_should_retry returned an error: error:80000020:system library::Broken pipe" },
-    { "com.freerdp.core.transport", "BIO_read returned a system error 110: Connection timed out" },
-    { "com.freerdp.core.transport", "BIO_read returned a system error 5: Input/output error" },
-    { "com.freerdp.core", "ERRCONNECT_CONNECT_TRANSPORT_FAILED [0x0002000D]" } }
+    { "com.freerdp.core.transport", "BIO_read returned a system error 110: Connection timed out"                     },
+    { "com.freerdp.core.transport", "BIO_read returned a system error 5: Input/output error"                         },
+    { "com.freerdp.core"          , "ERRCONNECT_CONNECT_TRANSPORT_FAILED [0x0002000D]"                               } }
 };
 }
 namespace {

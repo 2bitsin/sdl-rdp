@@ -39,7 +39,7 @@ inline void ThenSafeAuthenticationLog(sdlrdp_log_level level, std::string const&
 }
 class Authentication : public testing::Test {
 protected:
-  void TearDown()                                override { handle.reset(); }
+  void TearDown() override { handle.reset(); }
   void Open(sdlrdp_auth mode, bool fixed = true) {
     auto directory = certificates.Path().string();
     config.bind      = "127.0.0.1";
@@ -106,7 +106,7 @@ protected:
     if (connected) PasswordCleared();
   }
   void PasswordCleared() {
-    auto& state = *handle->state;
+    auto&                  state = *handle->state;
     std::scoped_lock const lock(state.session_guard);
     ASSERT_NE(state.current, nullptr);
     auto const* password = freerdp_settings_get_string(state.current->client->context->settings, FreeRDP_Password);
@@ -119,9 +119,9 @@ protected:
   void RejectionLogs(char const* password, unsigned expected = 1) {
     handle.reset();
     std::scoped_lock const lock(guard);
-    unsigned    rejected = 0;
-    unsigned    warnings = 0;
-    std::string trace;
+    unsigned               rejected = 0;
+    unsigned               warnings = 0;
+    std::string            trace;
     for (auto const& [level, text] : logs) {
       warnings += level == SDLRDP_LOG_WARN;
       ThenSafeAuthenticationLog(level, text, password);

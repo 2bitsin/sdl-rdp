@@ -121,8 +121,8 @@ TEST_F(DriveWire, MalformedInformationKeepsVideoSession) {
   auto* file     = held_file;
   auto& observer = *this->observer;
   auto  stat     = std::async(std::launch::async, [&] {
-    sdlrdp_stat info { };
-    auto result = sdlrdp_drive_fstat(handle.get(), file, &info);
+    sdlrdp_stat info   { };
+    auto        result = sdlrdp_drive_fstat(handle.get(), file, &info);
     return std::pair(result, std::string(sdlrdp_last_error()));
   });
   ASSERT_TRUE(client->Until([&] { return observer.Observed().requests == 1; }));
@@ -142,8 +142,8 @@ TEST_F(DriveWire, MalformedInformationKeepsVideoSession) {
 TEST_F(DriveWire, SlidingWindowRefillsOnOutOfOrderCompletion) {
   GivenHeldFile();
   if (::testing::Test::HasFatalFailure()) return;
-  auto* file     = held_file;
-  auto& observer = *this->observer;
+  auto*       file     = held_file;
+  auto&       observer = *this->observer;
   std::string bytes(10uz * 65536, '\0');
   auto read = std::async(std::launch::async,
                          [&] { return sdlrdp_drive_read(handle.get(), file, 0, bytes.data(), bytes.size()); });
@@ -172,7 +172,7 @@ TEST_F(DriveWire, UnknownCompletionIsIgnored) {
   pump.request_stop();
   pump.join();
   Headless::DriveObserver const observer(*client);
-  Backend::DrivePacket packet;
+  Backend::DrivePacket          packet;
   packet.Put(RDPDR_CTYP_CORE, 2);
   packet.Put(PAKID_CORE_DEVICE_IOCOMPLETION, 2);
   packet.Put(0);

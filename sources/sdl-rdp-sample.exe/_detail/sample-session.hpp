@@ -34,9 +34,9 @@ inline testing::AssertionResult Pattern(Client& client, bool /*pointer*/) {
   auto first   = std::ranges::find_if(columns, [&](int x) { return pixel((40 * 640) + x) == 0x00ff00; });
   if (first == columns.end() || *first > 608) return testing::AssertionFailure() << "no complete green block on row 40";
   auto expected = [&](int index) {
-    int const x = index % 640;
-    int const y = index / 640;
-    auto expected = x >= *first && x < *first + 32 && y >= 40 && y < 72 ? 0x00ff00u : 0x010101u;
+    int const x        = index % 640;
+    int const y        = index / 640;
+    auto      expected = x >= *first && x < *first + 32 && y >= 40 && y < 72 ? 0x00ff00u : 0x010101u;
     return expected;
   };
   auto indices  = std::views::iota(0, 640 * 480);
@@ -67,8 +67,8 @@ public:
   }
   FullDesktopFrames& operator = (FullDesktopFrames const&) = delete;
   FullDesktopFrames& operator = (FullDesktopFrames&&)      = delete;
-  unsigned           Full() const                          { return full; }
-  unsigned           Deliveries() const                    { return deliveries; }
+  unsigned           Full() const { return full; }
+  unsigned           Deliveries() const { return deliveries; }
 
 private:
   void Observe(rdpContext* context, unsigned left, unsigned top, unsigned right, unsigned bottom) {
@@ -110,8 +110,8 @@ private:
 
 class NextFrame {
 public:
-           NextFrame(NextFrame const&)              = delete;
-           NextFrame(NextFrame&&)                   = delete;
+           NextFrame(NextFrame const&) = delete;
+           NextFrame(NextFrame&&)      = delete;
   explicit NextFrame(Client& value, unsigned frame)
       : client(value), column(frame % 640), original(value.Instance()->context->update->SurfaceBits),
         original_bitmap(value.Instance()->context->update->BitmapUpdate) {
@@ -129,8 +129,8 @@ public:
   }
   NextFrame&  operator = (NextFrame const&) = delete;
   NextFrame&  operator = (NextFrame&&)      = delete;
-  bool        Received() const              { return received; }
-  auto const& Matches() const               { return matches; }
+  bool        Received() const { return received; }
+  auto const& Matches() const { return matches; }
 
 private:
   static BOOL Receive(rdpContext* context, SURFACE_BITS_COMMAND const* command) {
@@ -256,7 +256,7 @@ protected:
     Headless::SendKeyboardAndMouse(client, 100, 120);
     if (::testing::Test::HasFatalFailure()) return;
     for (auto [event, text] :
-         std::array<std::pair<std::string_view, std::string_view>, 6>{ { { "KEY_DOWN", " scancode=4 " },
+         std::array<std::pair<std::string_view, std::string_view>, 6>{ { { "KEY_DOWN"         , " scancode=4 " },
                                                                          { "KEY_UP"           , " scancode=4 " },
                                                                          { "MOUSE_MOTION"     , " x=100 y=120" },
                                                                          { "MOUSE_BUTTON_DOWN", " button=1 "   },

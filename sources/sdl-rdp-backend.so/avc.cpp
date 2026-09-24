@@ -228,9 +228,9 @@ int ConvertInput(NV_ENC_LOCK_INPUT_BUFFER const& lock, prim_size_t const& size, 
                  unsigned stride) {
   Expects(lock.pitch >= size.width, "I420 pitch covers aligned width");
   Expects(lock.pitch % 2 == 0, "I420 pitch is even");
-  auto* y{ static_cast<BYTE*>(lock.bufferDataPtr) };
-  std::array<BYTE*, 3> planes{ y, y + (std::size_t(lock.pitch) * size.height),
-                               y + (std::size_t(lock.pitch) * size.height * 5 / 4) };
+  auto*                 y      { static_cast<BYTE*>(lock.bufferDataPtr)     };
+  std::array<BYTE*, 3>  planes { y, y + (std::size_t(lock.pitch) * size.height),
+                                 y + (std::size_t(lock.pitch) * size.height * 5 / 4) };
   std::array<UINT32, 3> pitches{ lock.pitch, lock.pitch / 2, lock.pitch / 2 };
   return primitives_get()->RGBToYUV420_8u_P3AC4R(bgrx.data(), PIXEL_FORMAT_BGRX32, stride, planes.data(),
                                                  pitches.data(), &size);
@@ -239,7 +239,7 @@ int ConvertInput(NV_ENC_LOCK_INPUT_BUFFER const& lock, prim_size_t const& size, 
 bool Encoder::Impl::Fill(std::span<BYTE const> bgrx, unsigned stride, Encoder& timing) {
   Expects(session != nullptr, "encoder session exists");
   Expects(input != nullptr, "encoder input buffer exists");
-  using                    Clock = std::chrono::steady_clock;
+  using Clock = std::chrono::steady_clock;
   auto                     start = Clock::now();
   NV_ENC_LOCK_INPUT_BUFFER lock  { };
   lock.version     = NV_ENC_LOCK_INPUT_BUFFER_VER;
@@ -287,7 +287,7 @@ std::string Encoder::UnavailableReason() {
   static std::string const reason = [] {
     Impl probe;
     auto available = probe.Load();
-    auto error = probe.error;
+    auto error     = probe.error;
     probe.Close();
     return available ? std::string{ } : error;
   }();

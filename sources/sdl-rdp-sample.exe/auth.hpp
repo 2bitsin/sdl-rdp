@@ -4,12 +4,12 @@
 
 class Authenticator {
 public:
-                 Authenticator()                                                    = default;
-                 Authenticator(Authenticator const&)                                = delete;
-                 Authenticator(Authenticator&&)                                     = delete;
+                 Authenticator()                     = default;
+                 Authenticator(Authenticator const&) = delete;
+                 Authenticator(Authenticator&&)      = delete;
                  ~Authenticator();
-  Authenticator& operator = (Authenticator const&)                                  = delete;
-  Authenticator& operator = (Authenticator&&)                                       = delete;
+  Authenticator& operator = (Authenticator const&)   = delete;
+  Authenticator& operator = (Authenticator&&)        = delete;
   bool           Option(std::string_view option, int& index, int argc, char** argv);
   void           Defaults() const;
   void           Install();

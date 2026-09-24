@@ -9,12 +9,12 @@
 namespace Backend {
 class ErrorStore {
 public:
-  static char const* Last()                                       { return CallingThread().text->c_str(); }
+  static char const* Last() { return CallingThread().text->c_str(); }
   static void        Publish(ErrorStore* owner, std::string text) {
     auto& caller = CallingThread();
     if (owner) {
       std::scoped_lock const lock(owner->guard);
-      auto& slot = owner->errors[std::this_thread::get_id()];
+      auto&                  slot = owner->errors[std::this_thread::get_id()];
       if (!slot) slot = std::make_shared<std::string>();
       *slot       = std::move(text);
       caller.text = slot;

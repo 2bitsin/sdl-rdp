@@ -52,7 +52,7 @@ bool Input::Motion(Peer& peer, int x, int y) {
 UINT Input::Advanced(ainput_server_context* context, UINT64 /*unused*/, UINT64 flags, INT32 x, INT32 y) {
   Expects(context, "callback context exists");
   Expects(context->data, "channel context carries its owner");
-  auto& peer = *static_cast<Peer*>(context->data);
+  auto&                  peer = *static_cast<Peer*>(context->data);
   std::scoped_lock const lock(peer.owner.session_guard);
   if (!peer.active) return CHANNEL_RC_OK;
   auto& input = Held(peer);
@@ -69,7 +69,7 @@ UINT Input::Advanced(ainput_server_context* context, UINT64 /*unused*/, UINT64 f
       peer.owner.Push(
           { .type = SDLRDP_MOUSE_BUTTON, .mouse_button = { .button = i + 1, .down = !!(flags & AINPUT_FLAGS_DOWN) } });
   if (flags & AINPUT_FLAGS_WHEEL)
-    peer.owner.Push({ .type = SDLRDP_MOUSE_WHEEL,
+    peer.owner.Push({ .type        = SDLRDP_MOUSE_WHEEL,
                       .mouse_wheel = { .dx = float(x) / (120.0f * 65536), .dy = float(y) / (120.0f * 65536) } });
   return CHANNEL_RC_OK;
 }
@@ -77,7 +77,7 @@ UINT Input::Advanced(ainput_server_context* context, UINT64 /*unused*/, UINT64 f
 int sdlrdp_set_relative_mouse(sdlrdp_handle* handle, int enabled) {
   Backend::Expects(handle, "backend is open");
   Backend::Expects(handle->state != nullptr, "backend is open");
-  auto& owner = *handle->state;
+  auto&                  owner = *handle->state;
   std::scoped_lock const lock(owner.session_guard);
   if (owner.current) {
     auto& input = Backend::Input::Held(*owner.current);

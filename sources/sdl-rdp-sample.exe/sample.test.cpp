@@ -39,7 +39,7 @@ TEST_F(DesktopSample, WholeSystem) {
 TEST_F(DesktopSample, RequestedSizeReturns) {
   GivenProcess();
   if (::testing::Test::HasFatalFailure()) return;
-  auto port = Number(std::string_view(line).substr(5));
+  auto   port  = Number(std::string_view(line).substr(5));
   Client first(port, true, 320, 200);
   WhenSmallerDesktop(first);
   if (::testing::Test::HasFatalFailure()) return;
@@ -54,7 +54,7 @@ TEST_F(DesktopSample, RequestedSizeReturns) {
 TEST_F(DesktopSample, TakeoverFocus) {
   GivenProcess();
   if (::testing::Test::HasFatalFailure()) return;
-  auto port = Number(std::string_view(line).substr(5));
+  auto         port  = Number(std::string_view(line).substr(5));
   Client const first(port, true, 640, 480);
   GivenFocusedClient(first);
   if (::testing::Test::HasFatalFailure()) return;
@@ -148,8 +148,8 @@ TEST_F(DesktopSample, FullscreenFollowsScreen) {
 
 TEST_F(DesktopSample, FirstFrameObserverWithoutSuccessfulConnect) {
   Client client(0, true);
-  auto paint   = +[](rdpContext*) -> BOOL { return TRUE; };
-  auto connect = +[](freerdp*) -> BOOL { return FALSE; };
+  auto   paint   = +[](rdpContext*) -> BOOL { return TRUE; };
+  auto   connect = +[](freerdp*) -> BOOL { return FALSE; };
   client.Instance()->context->update->EndPaint = paint;
   client.Instance()->PostConnect               = connect;
   for (bool const attempt : { false, true }) {

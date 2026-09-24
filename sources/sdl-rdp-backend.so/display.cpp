@@ -41,10 +41,10 @@ bool Peer::OpenDisplayControl() {
     return true;
   disp.reset(disp_server_context_new(channels));
   if (!disp) return false;
-  disp->custom            = this;
-  disp->rdpcontext        = client->context;
-  disp->DispMonitorLayout = Layout;
-  disp->ChannelIdAssigned = [](DispServerContext* context, UINT32 id) -> BOOL {
+  disp->custom                = this;
+  disp->rdpcontext            = client->context;
+  disp->DispMonitorLayout     = Layout;
+  disp->ChannelIdAssigned     = [](DispServerContext* context, UINT32 id) -> BOOL {
     static_cast<Peer*>(context->custom)->display_id = id;
     return TRUE;
   };

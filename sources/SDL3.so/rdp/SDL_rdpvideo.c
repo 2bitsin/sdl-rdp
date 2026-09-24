@@ -104,7 +104,7 @@ static bool SDL_RDP_VideoInit(SDL_VideoDevice* _this) {
   }
   SDL_AddKeyboard(SDL_DEFAULT_KEYBOARD_ID, NULL);
   SDL_AddMouse(SDL_DEFAULT_MOUSE_ID, NULL);
-SDL_GetMouse() -> SetRelativeMouseMode = SDL_RDP_RelativeMouse;
+            SDL_GetMouse() -> SetRelativeMouseMode = SDL_RDP_RelativeMouse;
   SDL_RDP_InitMouse();
   return true;
 }

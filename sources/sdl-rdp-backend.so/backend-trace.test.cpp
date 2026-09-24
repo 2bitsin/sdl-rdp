@@ -41,7 +41,7 @@ protected:
     ConnectAudio(client, audio);
     if (::testing::Test::HasFatalFailure()) return;
     ASSERT_TRUE(freerdp_input_send_keyboard_event(client.Instance()->context->input, KBD_FLAGS_DOWN, 0x1e));
-    auto frames = 3 * (audio.CaptureState().rate / 50);
+    auto               frames = 3 * (audio.CaptureState().rate / 50);
     std::vector<INT16> pcm(static_cast<std::size_t>(frames) * 2, -1234);
     ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), frames), frames);
     Present(std::vector<UINT32>(320uz * 200, 0xff123456), 320, 200);

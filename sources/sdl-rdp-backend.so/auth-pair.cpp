@@ -9,7 +9,7 @@
 namespace Backend {
 Authentication::Authentication(sdlrdp_config const& value)
     : config(value), user(value.user ? value.user : ""), password(value.password ? value.password : ""),
-domain(value.domain ? value.domain : "") {
+      domain(value.domain ? value.domain : "") {
   utilities::Expects(value.auth >= SDLRDP_AUTH_NONE, "valid authentication mode");
   utilities::Expects(value.auth <= SDLRDP_AUTH_NLA, "valid authentication mode");
   config.user     = value.user ? user.c_str() : nullptr;

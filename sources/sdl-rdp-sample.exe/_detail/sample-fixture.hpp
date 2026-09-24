@@ -34,7 +34,7 @@ protected:
     if (advanced) channels = std::make_unique<InputClient>(*session);
     GivenFocus(*session);
   }
-  Client& SessionClient()        { return *session; }
+  Client& SessionClient() { return *session; }
   void    GivenPositionSession() {
     GivenProcess();
     if (::testing::Test::HasFatalFailure()) return;
@@ -43,7 +43,7 @@ protected:
     position = std::make_unique<PositionObserver>(*session);
     ASSERT_TRUE(Read("event FOCUS_GAINED "));
   }
-  PositionObserver& Position()        { return *position; }
+  PositionObserver& Position() { return *position; }
   void              GivenFullscreen() {
     auto arguments = Arguments(certificates.Path(), false);
     arguments.insert(arguments.end(), { "--fullscreen", "--mode", "320x200" });
@@ -74,7 +74,7 @@ protected:
     ASSERT_TRUE(freerdp_connect(client.Instance().get())) << ConnectLogs();
     Escape(client);
   }
-  Headless::ClipboardClient& ClipboardSession()                      { return *clipboard; }
+  Headless::ClipboardClient& ClipboardSession() { return *clipboard; }
   void                       GivenClipboard(std::string const& text) {
     auto arguments = Arguments(certificates.Path(), false);
     arguments.insert(arguments.end(), { "--clip", text });

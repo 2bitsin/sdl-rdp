@@ -70,7 +70,7 @@ TEST(Errors, WidthAndBind) {
 
 namespace {
 void MeasureFullFrame(sdlrdp_handle* handle, Client& client, std::vector<UINT32> const& pixels, sdlrdp_codec codec) {
-  FrameCounter counter(client);
+  FrameCounter      counter(client);
   auto              bytes   = client.Received();
   auto              started = Clock::now();
   sdlrdp_rect const area    { 0, 0, 1024, 768 };
@@ -119,7 +119,7 @@ void ThenCertificate(std::string const& first, std::filesystem::path const& data
 TEST(Measurement, FullFrames1024x768) {
   CertificateDirectory const certificates;
   Logs                       logs;
-  std::vector<UINT32> pixels(1024uz * 768);
+  std::vector<UINT32>        pixels(1024uz * 768);
   std::ranges::generate(pixels, [index = 0u]() mutable { return (index++ * 2654435761u) & 0x00ffffff; });
   for (auto codec : { SDLRDP_CODEC_RAW, SDLRDP_CODEC_PLANAR, SDLRDP_CODEC_REMOTEFX, SDLRDP_CODEC_NSCODEC }) {
     WhenFullFrameMeasured(certificates, logs, pixels, codec);
@@ -127,8 +127,8 @@ TEST(Measurement, FullFrames1024x768) {
   }
 }
 TEST(Planar, SignedDelta64Rows) {
-  constexpr unsigned width  = 64;
-  constexpr unsigned height = 64;
+  constexpr unsigned  width   = 64;
+  constexpr unsigned  height  = 64;
   std::vector<UINT32> pixels(static_cast<std::size_t>(width) * height);
   std::vector<UINT32> decoded(pixels.size());
   std::ranges::generate(pixels,
@@ -140,7 +140,7 @@ TEST(Planar, SignedDelta64Rows) {
   ASSERT_TRUE(encoder && decoder);
   freerdp_planar_topdown_image(encoder.get(), TRUE);
   std::vector<BYTE> compressed((pixels.size() * 4) + 1024);
-  UINT32 size = compressed.size();
+  UINT32            size       = compressed.size();
   CompressSignedDelta(encoder.get(), pixels, compressed, size);
   if (::testing::Test::HasFatalFailure()) return;
   ASSERT_TRUE(planar_decompress(decoder.get(), compressed.data(), size, width, height,
@@ -196,7 +196,7 @@ struct ProcessEnvironment {
 public:
   ProcessEnvironment(ProcessEnvironment const&) = delete;
   ProcessEnvironment(ProcessEnvironment&&)      = delete;
-  ProcessEnvironment()                          {
+  ProcessEnvironment() {
     if (auto* value = getenv("XDG_DATA_HOME")) data = value;
   }
   ~ProcessEnvironment() {

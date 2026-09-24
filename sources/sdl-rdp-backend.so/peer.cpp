@@ -20,7 +20,7 @@ namespace Backend {
 namespace {
 std::string ProtocolNames(UINT32 mask, bool rdp) {
   std::string names = rdp ? "RDP" : "";
-  for (auto [flag, name] : std::array<std::pair<UINT32, char const*>, 5>{ { { SecurityTls, "TLS" },
+  for (auto [flag, name] : std::array<std::pair<UINT32, char const*>, 5>{ { { SecurityTls   , "TLS"     },
                                                                             { SecurityNla   , "NLA"     },
                                                                             { SecurityNlaExt, "NLA_EXT" },
                                                                             { SecurityRdstls, "RDSTLS"  },
