@@ -1,5 +1,6 @@
 #include "SDL_rdpboundary.hpp"
 #include "SDL_rdpsettings.hpp"
+#include <oxbox/utilities/number-text.hpp>
 #include <oxbox/utilities/text.hpp>
 #include <algorithm>
 #include <stdexcept>
@@ -7,11 +8,6 @@ namespace rdp {
 namespace {
 constexpr auto CodecNames = std::to_array<std::string_view>({"auto", "planar", "remotefx", "nscodec", "raw",
                                                              "progressive", "avc420"});
-auto AspectPart(std::string_view text, std::string_view field) -> unsigned {
-  auto const value = oxbox::utilities::WholeNumber<unsigned>(oxbox::utilities::Trimmed(text));
-  if (!value || *value == 0) InvalidSetting("Invalid RDP aspect " + std::string(field) + ": " + std::string(text));
-  return *value;
-}
 }
 [[noreturn]] void InvalidSetting(std::string const& message) {
   SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "%s", message.c_str());
@@ -30,9 +26,9 @@ auto CodecName(sdlrdp_codec codec) -> std::string {
 }
 auto Aspect(std::optional<std::string> const& text) -> sdlrdp_aspect {
   if (!text || text->empty()) return { };
-  auto const separator = text->find(':');
-  if (separator == std::string::npos) InvalidSetting("Invalid RDP aspect: " + *text);
-  auto const view = std::string_view{*text};
-  return {AspectPart(view.substr(0, separator), "numerator"), AspectPart(view.substr(separator + 1), "denominator")};
+  auto const parts = oxbox::utilities::ParseNumbers<unsigned, 2>(oxbox::utilities::Trimmed(*text), ':');
+  if (!parts || std::ranges::contains(*parts, 0U))
+    InvalidSetting("Invalid RDP aspect '" + *text + "': expected two positive whole numbers as N:D");
+  return {(*parts)[0], (*parts)[1]};
 }
 }

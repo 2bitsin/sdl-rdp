@@ -43,7 +43,7 @@ protected:
 TEST_F(FullscreenSample, ExplicitFullscreenBeforeConnect) {
   GivenFullscreen();
   if (::testing::Test::HasFatalFailure()) return;
-  auto port = Number(std::string_view(line).substr(5));
+  auto port = AnnouncedPort(line);
   ASSERT_TRUE(Read("event GEOMETRY window=320x200 desktop=320x200"));
   Client         client(port, true, 1280, 800);
   FirstFrameSize frame(client);
@@ -57,7 +57,7 @@ TEST_F(FullscreenSample, ExplicitFullscreenBeforeConnect) {
 TEST_F(FullscreenSample, ExplicitFullscreenRestoresWindow) {
   GivenFullscreen();
   if (::testing::Test::HasFatalFailure()) return;
-  Client client(Number(std::string_view(line).substr(5)), true, 1280, 800);
+  Client client(AnnouncedPort(line), true, 1280, 800);
   ConnectExposed(client);
   if (::testing::Test::HasFatalFailure()) return;
   ThenExplicitGeometry(client);
@@ -79,7 +79,7 @@ TEST_F(FullscreenSample, ExplicitFullscreenRestoresWindow) {
 TEST_F(FullscreenSample, ExplicitFullscreenSurvivesScreenChange) {
   GivenFullscreen();
   if (::testing::Test::HasFatalFailure()) return;
-  Client                        client(Number(std::string_view(line).substr(5)), true, 1280, 800);
+  Client                        client(AnnouncedPort(line), true, 1280, 800);
   Headless::DisplayClient const display(client);
   ConnectExposed(client);
   if (::testing::Test::HasFatalFailure()) return;
@@ -169,7 +169,7 @@ TEST_P(RefreshMode, AcknowledgementsPreserveDeclaredRate) {
   Expects(process == nullptr, "sample has not started");
   Start();
   if (::testing::Test::HasFatalFailure()) return;
-  Client client(Number(std::string_view(line).substr(5)), true, 1024, 768);
+  Client client(AnnouncedPort(line), true, 1024, 768);
   ASSERT_TRUE(freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_FrameAcknowledge, 2));
   ASSERT_TRUE(freerdp_connect(client.Instance().get()));
   Headless::FrameObserver frames(client);
@@ -252,7 +252,7 @@ TEST_P(ExclusiveFullscreen, DoesNotRepaintOnModeChanges) {
   Expects(process == nullptr, "sample has not started");
   Start();
   if (::testing::Test::HasFatalFailure()) return;
-  Client                  client(Number(std::string_view(line).substr(5)), true, 1280, 800);
+  Client                  client(AnnouncedPort(line), true, 1280, 800);
   Headless::DisplayClient display(client);
   ASSERT_TRUE(freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_FrameAcknowledge, 2));
   ASSERT_TRUE(freerdp_connect(client.Instance().get()));
@@ -286,7 +286,7 @@ TEST_F(FullscreenSample, ExplicitFullscreenKeepsDeclaredAspect) {
 TEST_F(FullscreenSample, AspectMapsMouse) {
   GivenAspect();
   if (::testing::Test::HasFatalFailure()) return;
-  Client client(Number(std::string_view(line).substr(5)), true, 1024, 768);
+  Client client(AnnouncedPort(line), true, 1024, 768);
   ASSERT_TRUE(freerdp_connect(client.Instance().get())) << ConnectLogs();
   ThenAbsoluteAspectMouse(client);
   if (::testing::Test::HasFatalFailure()) return;
@@ -321,7 +321,7 @@ TEST_F(FullscreenSample, SendWindowWithoutRefreshFeedback) {
   arguments.emplace_back("--tight");
   process = std::make_unique<Process>(arguments);
   ASSERT_TRUE(Read("port "));
-  Client client(Number(std::string_view(line).substr(5)), true, 640, 480);
+  Client client(AnnouncedPort(line), true, 640, 480);
   ASSERT_TRUE(freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_FrameAcknowledge, 2));
   ASSERT_TRUE(freerdp_connect(client.Instance().get())) << ConnectLogs();
   Headless::FrameObserver observer(client);

@@ -1,6 +1,7 @@
 #include "_detail/test-audio.hpp"
 
 #include <cstddef>
+#include <oxbox/utilities/number-text.hpp>
 
 namespace BackendGate {
 class TraceGate : public AudioGate {
@@ -19,20 +20,11 @@ protected:
         true, &client);
     ASSERT_NE(std::ranges::find(events, SDLRDP_KEY, &sdlrdp_event::type), events.end());
   }
-  static void ThenTimestamp(std::string const& line, std::size_t start, int64_t now) {
-    auto    end    = line.find(' ', start + 3);
-    auto    value  = std::string_view(line).substr(start + 3, end == std::string::npos ? end : end - start - 3);
-    int64_t time   = 0;
-    auto    parsed = std::from_chars(value.data(), value.data() + value.size(), time);
-    EXPECT_EQ(parsed.ec, std::errc()) << line;
-    EXPECT_EQ(parsed.ptr, value.data() + value.size()) << line;
-    EXPECT_LE(std::abs(now - time), 60000) << line;
-  }
   static void ThenTraceTime(sdlrdp_log_level level, std::string const& line, int64_t now) {
     EXPECT_EQ(level, SDLRDP_LOG_INFO);
-    auto start = line.find(" t=");
-    ASSERT_NE(start, std::string::npos) << line;
-    ThenTimestamp(line, start, now);
+    auto const time = Backend::Required(oxbox::utilities::ParseNumberAfter<int64_t>(line, " t="),
+                                        "trace lines carry a whole-millisecond time");
+    EXPECT_LE(std::abs(now - time), 60000) << line;
   }
   void Exercise() {
     ASSERT_EQ(sdlrdp_audio_open(backend.get()), 0);

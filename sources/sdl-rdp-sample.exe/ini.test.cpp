@@ -97,7 +97,7 @@ TEST_F(Sample, IniApplicationHintWins) {
   args.insert(args.end(), { "--aspect", "2:1" });
   process = std::make_unique<Process>(args);
   ASSERT_TRUE(Read("port ")) << process->Transcript();
-  Client client(Number(std::string_view(line).substr(5)), true, 640, 480);
+  Client client(AnnouncedPort(line), true, 640, 480);
   ASSERT_TRUE(freerdp_connect(client.Instance().get())) << ConnectLogs();
   ASSERT_TRUE(client.Until([&] { return client.Instance()->context->gdi->width == 960; }));
   EXPECT_EQ(client.Instance()->context->gdi->height, 480);
@@ -185,8 +185,8 @@ void ThenWindowAspect(char const* expected) {
   ASSERT_TRUE(window) << SDL_GetError();
   EXPECT_EQ(WindowAspect(window), expected);
 }
-void ThenInvalidAspectFailsWindow() {
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_ASPECT, "1:0"));
+void ThenInvalidAspectFailsWindow(char const* aspect) {
+  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_ASPECT, aspect));
   EXPECT_EQ(Window(SDL_CreateWindow("invalid aspect", 640, 480, 0), SDL_DestroyWindow), nullptr);
   EXPECT_TRUE(std::string_view(SDL_GetError()).contains("aspect")) << SDL_GetError();
 }
@@ -246,7 +246,7 @@ TEST_F(IniSession, PartialVideoQuitKeepsDriverAndIniSnapshot) {
 }
 TEST_F(IniSession, InvalidAspectHintFailsWindowCreationAndCanRecover) {
   if (HasFatalFailure()) return;
-  ThenInvalidAspectFailsWindow();
+  for (auto const* aspect : { "1:0", "4:3:2", "4:x", "4 : 3" }) ThenInvalidAspectFailsWindow(aspect);
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_ASPECT, "4:3"));
   ThenWindowAspect("4:3");
 }
@@ -263,5 +263,7 @@ TEST_P(InvalidInteger, FailsBeforeBackendLoadingAndNamesTheSetting) {
 }
 INSTANTIATE_TEST_SUITE_P(Settings, InvalidInteger,
                          testing::Values(std::pair{SDL_HINT_RDP_PORT, "-5"}, std::pair{SDL_HINT_RDP_WIDTH, "+640"},
-                                         std::pair{SDL_HINT_RDP_WIDTH, "-1"}));
+                                         std::pair{SDL_HINT_RDP_WIDTH, "-1"},
+                                         std::pair{SDL_HINT_RDP_PORT, "3389x"},
+                                         std::pair{SDL_HINT_RDP_WIDTH, "640 480"}));
 }

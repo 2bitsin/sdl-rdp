@@ -8,13 +8,13 @@
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <array>
-#include <charconv>
 #include <cmath>
 #include <cstddef>
 #include <cstdlib>
 #include <format>
 #include <memory>
 #include <numbers>
+#include <oxbox/utilities/number-text.hpp>
 #include <ranges>
 #include <string>
 
@@ -111,31 +111,36 @@ SDL_AudioStream* OpenTone(Uint64& frame) {
   return stream;
 }
 
-struct Options {
-  DriveOptions drives;
-  char const*  clip        = nullptr;
-  int          width       = 640;
-  int          height      = 480;
-  int          mode_width  = 0;
-  int          mode_height = 0;
-  bool         tight       = false;
-  bool         fullscreen  = false;
-  bool         tone        = false;
-  bool         partial     = false;
+struct Extent {
+  int width  = 0;
+  int height = 0;
 };
 
-void ParseSize(std::string_view size, int& width, int& height) {
-  auto first = std::from_chars(size.data(), size.data() + size.size(), width);
-  Check(first.ec == std::errc{ } && first.ptr != size.data() + size.size() && *first.ptr == 'x');
-  auto second = std::from_chars(first.ptr + 1, size.data() + size.size(), height);
-  Check(second.ec == std::errc{ } && second.ptr == size.data() + size.size() && width > 0 && height > 0);
+struct Options {
+  DriveOptions drives;
+  char const*  clip       = nullptr;
+  Extent       size       = { .width = 640, .height = 480 };
+  Extent       mode       = { };
+  bool         tight      = false;
+  bool         fullscreen = false;
+  bool         tone       = false;
+  bool         partial    = false;
+};
+
+Extent ParseSize(std::string_view size) {
+  auto const sides = oxbox::utilities::ParseNumbers<int, 2>(size, 'x').value_or(std::array{ 0, 0 });
+  if (std::ranges::any_of(sides, [](int side) { return side <= 0; })) {
+    SDL_SetError("Invalid size '%.*s': expected WxH with positive sides", int(size.size()), size.data());
+    Check(false);
+  }
+  return { .width = sides[0], .height = sides[1] };
 }
 
 void Fullscreen(SDL_Window* window, Options const& options) {
-  if (options.mode_width) {
+  if (options.mode.width) {
     auto mode = *SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
-    mode.w = options.mode_width;
-    mode.h = options.mode_height;
+    mode.w = options.mode.width;
+    mode.h = options.mode.height;
     Check(SDL_SetWindowFullscreenMode(window, &mode));
   }
   if (options.fullscreen) Check(SDL_SetWindowFullscreen(window, true));
@@ -164,9 +169,9 @@ bool ValueOption(std::string_view name, char const* value, Options& options) {
   else if (name == "--aspect")
     Check(SDL_SetHint(SDL_HINT_RDP_ASPECT, value));
   else if (name == "--size")
-    ParseSize(value, options.width, options.height);
+    options.size = ParseSize(value);
   else if (name == "--mode")
-    ParseSize(value, options.mode_width, options.mode_height);
+    options.mode = ParseSize(value);
   else
     return false;
   return true;
@@ -211,7 +216,7 @@ void ConfigureVideo() {
 }
 void RunWindow(Options const& options) {
   std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)> const window(
-      SDL_CreateWindow("SDL RDP sample", options.width, options.height, 0), SDL_DestroyWindow);
+      SDL_CreateWindow("SDL RDP sample", options.size.width, options.size.height, 0), SDL_DestroyWindow);
   Check(window != nullptr);
   Fullscreen(window.get(), options);
   std::unique_ptr<SDL_Cursor, decltype(&SDL_DestroyCursor)> const cursor(CreateCursor(), SDL_DestroyCursor);

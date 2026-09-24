@@ -3,7 +3,6 @@
 
 #include <SDL3/SDL.h>
 #include <algorithm>
-#include <charconv>
 #include <cstddef>
 #include <fcntl.h>
 #include <filesystem>
@@ -12,6 +11,7 @@
 #include <fstream>
 #include <gtest/gtest.h>
 #include <oxbox/platform/scratch-area.hpp>
+#include <oxbox/utilities/number-text.hpp>
 #include <poll.h>
 #include <ranges>
 #include <sdl-rdp-backend.so/_detail/headless-client.hpp>
@@ -135,12 +135,19 @@ inline std::vector<std::string> Arguments(fs::path const& certificates, bool wai
            (root / "bin/sdl-rdp-sample").string() };
 }
 
-inline unsigned Number(std::string_view text, int base = 10) {
-  Expects(base >= 2, "integer base is at least binary");
-  Expects(base <= 36, "integer base fits the supported digit alphabet");
-  unsigned value        = 0;
-  auto     [end, error] = std::from_chars(text.data(), text.data() + text.size(), value, base);
-  return error == std::errc{ } && end == text.data() + text.size() ? value : 0;
+inline pid_t ProcfsSelf() {
+  return utilities::Required(oxbox::utilities::ParseNumber<pid_t>(fs::read_symlink("/proc/self").string()),
+                             "/proc/self links to a process id");
+}
+
+inline unsigned AnnouncedPort(std::string_view line) {
+  return utilities::Required(oxbox::utilities::ParseNumberAfter<unsigned>(line, "port "),
+                             "the sample announces its port as a whole number");
+}
+
+inline unsigned ProcfsPort(std::string_view address) {
+  return utilities::Required(oxbox::utilities::ParseNumberAfter<unsigned>(address, ":", oxbox::utilities::Radix::HEX),
+                             "a procfs socket address ends in a hex port");
 }
 
 inline pid_t ProcId() {
@@ -166,7 +173,7 @@ inline unsigned ListeningPort(pid_t pid = 0) {
     std::array<std::string, 10> values;
     std::ranges::for_each(values, [&](auto& value) { fields >> value; });
     if (values[3] == "0A" && std::ranges::contains(sockets, "socket:[" + values[9] + "]"))
-      return Number(std::string_view(values[1]).substr(9), 16);
+      return ProcfsPort(values[1]);
   }
   return 0;
 }

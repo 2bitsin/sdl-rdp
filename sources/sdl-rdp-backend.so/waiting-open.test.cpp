@@ -22,9 +22,8 @@ void PublishListeningPort(void* user, sdlrdp_log_level level, char const* text) 
   std::string_view const     line(text);
   constexpr std::string_view prefix = "Listening on port ";
   if (level != SDLRDP_LOG_INFO || !line.starts_with(prefix)) return;
-  auto port = oxbox::utilities::ParseNumber<int>(line.substr(prefix.size()));
-  Expects(port.has_value(), "listener logged a numeric port");
-  if (port) SendOpeningResult(*static_cast<int*>(user), *port);
+  auto const port = Required(oxbox::utilities::ParseNumberAfter<int>(line, prefix), "listener logged a numeric port");
+  SendOpeningResult(*static_cast<int*>(user), port);
 }
 bool OpenedWithClient(sdlrdp_config const& config) {
   sdlrdp_handle* handle = nullptr;

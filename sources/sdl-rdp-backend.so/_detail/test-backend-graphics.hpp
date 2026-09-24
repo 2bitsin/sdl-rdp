@@ -144,7 +144,7 @@ protected:
     ASSERT_TRUE(std::regex_search(text, match, std::regex(std::format(R"(Frames: {} sent,[^\n]*, ([0-9]+) timed out\.)",
                                                                       sent))))
         << text;
-    EXPECT_GE(std::stoull(match[1].str()), minimum);
+    EXPECT_GE(oxbox::utilities::ParseNumber<unsigned>(match.str(1)), minimum);
   }
   void ThenAspectMouse(Client& client) {
     ASSERT_TRUE(freerdp_input_send_mouse_event(client.Instance()->context->input, PTR_FLAGS_MOVE, 639, 479));

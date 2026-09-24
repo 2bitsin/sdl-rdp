@@ -25,7 +25,7 @@ auto* TouchChannel(Client& client) {
 TEST_F(Sample, UnicodeTextAndStopped) {
   GivenProcess();
   if (::testing::Test::HasFatalFailure()) return;
-  Client const client(Number(std::string_view(line).substr(5)), true, 640, 480);
+  Client const client(AnnouncedPort(line), true, 640, 480);
   GivenFrenchKeyboard(client);
   if (::testing::Test::HasFatalFailure()) return;
   auto* input = client.Instance()->context->input;
@@ -102,7 +102,7 @@ TEST_F(Sample, TouchContacts) {
 TEST_F(Sample, TouchPressureCancel) {
   GivenProcess();
   if (::testing::Test::HasFatalFailure()) return;
-  Client            client(Number(std::string_view(line).substr(5)), true, 640, 480);
+  Client            client(AnnouncedPort(line), true, 640, 480);
   InputClient const channels(client);
   ASSERT_TRUE(freerdp_connect(client.Instance().get()));
   auto* touch = TouchChannel(client);
@@ -119,7 +119,7 @@ TEST_F(Sample, TouchPressureCancel) {
 TEST_F(Sample, AdvancedAspectRelative) {
   GivenAspect();
   if (::testing::Test::HasFatalFailure()) return;
-  Client            client(Number(std::string_view(line).substr(5)), true, 640, 480);
+  Client            client(AnnouncedPort(line), true, 640, 480);
   InputClient const channels(client);
   GivenFocus(client);
   if (::testing::Test::HasFatalFailure()) return;

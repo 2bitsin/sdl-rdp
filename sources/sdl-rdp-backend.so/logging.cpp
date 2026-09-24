@@ -5,11 +5,11 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
-#include <charconv>
 #include <cstdlib>
 #include <freerdp/error.h>
 #include <freerdp/settings.h>
 #include <mutex>
+#include <oxbox/utilities/number-text.hpp>
 #include <stdexcept>
 #include <string_view>
 #include <winpr/wlog.h>
@@ -56,9 +56,9 @@ bool ExpectedLibraryMessage(std::string_view prefix, std::string_view text) {
     constexpr std::string_view system_error = "BIO_read returned a system error ";
     if (!text.starts_with(system_error)) return false;
     text.remove_prefix(system_error.size());
-    unsigned error         = 0;
-    auto     [end, status] = std::from_chars(text.data(), text.data() + text.size(), error);
-    return status == std::errc{ } && std::string_view(end, text.data() + text.size()).starts_with(": ");
+    auto const colon = text.find(": ");
+    if (colon == std::string_view::npos) return false;
+    return oxbox::utilities::ParseNumber<unsigned>(text.substr(0, colon)).has_value();
   }
   return false;
 }

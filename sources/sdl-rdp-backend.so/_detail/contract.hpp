@@ -2,9 +2,13 @@
 
 #include <algorithm>
 #include <array>
+#include <optional>
 #include <oxbox/platform/contract.hpp>
 #include <source_location>
+#include <stdexcept>
+#include <string>
 #include <string_view>
+#include <utility>
 
 namespace utilities::detail::contract {
 consteval auto Mode() -> oxbox::platform::ContractMode {
@@ -32,6 +36,15 @@ template <typename VTy>
   oxbox::platform::Contracts<oxbox::platform::ContractMode::STOP>::Unreachable(value, where);
 }
 
+// The throw is the continuation where complain or ignore lets an empty value through.
+template <typename VTy>
+auto Required(std::optional<VTy> value, std::string_view text,
+              std::source_location where = std::source_location::current()) -> VTy {
+  Checked::Expects(value.has_value(), text, where);
+  if (!value) throw std::invalid_argument(std::string(text));
+  return *std::move(value);
+}
+
 inline auto NotImplemented(std::string_view text, std::source_location where = std::source_location::current())
     -> void {
   Checked::NotImplemented(text, where);
@@ -42,10 +55,12 @@ namespace utilities {
 using detail::contract::Ensures;
 using detail::contract::Expects;
 using detail::contract::NotImplemented;
+using detail::contract::Required;
 using detail::contract::Unreachable;
 }
 
 namespace Backend {
 using utilities::Ensures;
 using utilities::Expects;
+using utilities::Required;
 }

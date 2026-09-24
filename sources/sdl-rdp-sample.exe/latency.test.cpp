@@ -1,14 +1,15 @@
 #include "_detail/sample-fixture.hpp"
+#include "_detail/trace-number.hpp"
 
 #include <sdl-rdp-backend.so/_detail/headless-audio.hpp>
 #include <sdl-rdp-backend.so/_detail/headless-clipboard.hpp>
 
 namespace SampleGate {
 namespace {
-void RecordSample(std::string const& line, std::size_t offset, std::span<int64_t const> sent,
+void RecordSample(std::string_view line, std::string_view prefix, std::span<int64_t const> sent,
                   std::vector<int64_t>& latency) {
   ASSERT_LT(latency.size(), sent.size());
-  auto elapsed = std::stoll(line.substr(offset)) - sent[latency.size()];
+  auto elapsed = TraceNumber(line, prefix) - sent[latency.size()];
   EXPECT_GE(elapsed, 0);
   latency.push_back(elapsed);
 }
@@ -32,10 +33,9 @@ void CheckLatency(std::string const& trace, std::string_view event, std::span<in
   std::vector<int64_t> latency;
   std::istringstream   lines(trace);
   for (std::string line; std::getline(lines, line);) {
-    auto at = line.find(prefix);
-    if (at == std::string::npos) continue;
+    if (!line.contains(prefix)) continue;
     if (event == "key" && !line.contains(" code=30 ")) continue;
-    RecordSample(line, at + prefix.size(), sent, latency);
+    RecordSample(line, prefix, sent, latency);
     if (::testing::Test::HasFatalFailure()) return;
   }
   ASSERT_EQ(latency.size(), sent.size()) << event;

@@ -224,6 +224,8 @@ TEST_F(RoundFive, ExpectedDisconnectLogLevels) {
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_ERROR, failure));
   WLog_Print(peer, WLOG_ERROR, "%s", "BIO_read returned a system error 110: Connection timed out");
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_ERROR, "BIO_read returned a system error 110"));
+  WLog_Print(WLog_Get("com.freerdp.core.transport"), WLOG_ERROR, "BIO_read returned a system error x5: bad errno");
+  EXPECT_TRUE(logs.Contains(SDLRDP_LOG_ERROR, "system error x5"));
   WLog_Print(peer, WLOG_ERROR, "transport failure marker");
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_ERROR, "transport failure marker"));
   WLog_Print(WLog_Get("com.freerdp.core.transport"), WLOG_ERROR, "ERRINFO_LOGOFF_BY_USER [0x0001000C]");

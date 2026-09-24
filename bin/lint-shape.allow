@@ -44,7 +44,7 @@ sdl-rdp-backend.so/_detail/test-backend-core.hpp: BackendEvents bodies in header
 sdl-rdp-backend.so/_detail/test-backend-core.hpp: CertificateDirectory bodies in header 3 > 0 # moved to .cpp in #7
 sdl-rdp-backend.so/_detail/test-backend-core.hpp: FrameCounter bodies in header 6 > 0 # moved to .cpp in #7
 sdl-rdp-backend.so/_detail/test-backend-core.hpp: classes with member functions 3 > 1 # split in #6
-sdl-rdp-backend.so/_detail/test-backend-core.hpp:166: EventsUntil nesting 3 > 2 # size in #19
+sdl-rdp-backend.so/_detail/test-backend-core.hpp:163: EventsUntil nesting 3 > 2 # size in #19
 sdl-rdp-backend.so/_detail/test-backend-graphics.hpp: GraphicsSession bodies in header 14 > 0 # moved to .cpp in #7
 sdl-rdp-backend.so/_detail/test-backend-graphics.hpp: RoundFive bodies in header 11 > 0 # moved to .cpp in #7
 sdl-rdp-backend.so/_detail/test-backend-graphics.hpp: classes with member functions 2 > 1 # split in #6

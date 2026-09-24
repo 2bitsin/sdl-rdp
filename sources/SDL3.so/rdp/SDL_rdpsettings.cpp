@@ -1,5 +1,7 @@
 #include "SDL_rdpresources.hpp"
 #include "SDL_rdpsettings.hpp"
+#include <oxbox/utilities/number-text.hpp>
+#include <oxbox/utilities/text.hpp>
 #include <stdexcept>
 #if defined(SDL_PLATFORM_WINDOWS)
 #include "src/core/windows/SDL_windows.h"
@@ -87,7 +89,7 @@ auto Settings::Integer(std::string const& name, int fallback, int minimum, int m
   utilities::Expects(minimum <= maximum, "integer setting range is ordered");
   auto const text = Get(name);
   if (!text) return fallback;
-  auto const number = oxbox::utilities::WholeNumber<int>(oxbox::utilities::Trimmed(*text));
+  auto const number = oxbox::utilities::ParseNumber<int>(oxbox::utilities::Trimmed(*text));
   if (!number || *number < minimum || *number > maximum)
     InvalidSetting("Invalid " + name + " '" + *text + "': expected a whole number from " + std::to_string(minimum) +
                    " to " + std::to_string(maximum));

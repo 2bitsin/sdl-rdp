@@ -12,13 +12,13 @@ protected:
   void GivenDesktopProcess(std::vector<std::string> const& arguments) {
     GivenProcess(arguments);
     if (::testing::Test::HasFatalFailure()) return;
-    session = std::make_unique<Client>(Number(std::string_view(line).substr(5)), true, 1280, 800);
+    session = std::make_unique<Client>(AnnouncedPort(line), true, 1280, 800);
     ConnectExposed(*session);
   }
   void GivenDriveProcess(std::vector<std::string> const& arguments, fs::path const& share) {
     GivenProcess(arguments);
     if (::testing::Test::HasFatalFailure()) return;
-    session = std::make_unique<Client>(Number(std::string_view(line).substr(5)), true, 640, 480);
+    session = std::make_unique<Client>(AnnouncedPort(line), true, 640, 480);
     ConnectDrive(*session, share);
   }
 
@@ -30,7 +30,7 @@ protected:
   void GivenInputSession(bool advanced = false) {
     GivenProcess();
     if (::testing::Test::HasFatalFailure()) return;
-    session = std::make_unique<Client>(Number(std::string_view(line).substr(5)), true, 640, 480);
+    session = std::make_unique<Client>(AnnouncedPort(line), true, 640, 480);
     if (advanced) channels = std::make_unique<InputClient>(*session);
     GivenFocus(*session);
   }
@@ -38,7 +38,7 @@ protected:
   void    GivenPositionSession() {
     GivenProcess();
     if (::testing::Test::HasFatalFailure()) return;
-    session = std::make_unique<Client>(Number(std::string_view(line).substr(5)), true, 640, 480);
+    session = std::make_unique<Client>(AnnouncedPort(line), true, 640, 480);
     ASSERT_TRUE(freerdp_connect(session->Instance().get()));
     position = std::make_unique<PositionObserver>(*session);
     ASSERT_TRUE(Read("event FOCUS_GAINED "));
@@ -64,7 +64,7 @@ protected:
   void GivenAudioProcess(std::vector<std::string> const& arguments) {
     process = std::make_unique<Process>(arguments);
     ASSERT_TRUE(Read("port "));
-    audio_port = Number(std::string_view(line).substr(5));
+    audio_port = AnnouncedPort(line);
     ASSERT_TRUE(Read("audio device=RDP client freq=44100"));
   }
   void ThenIniConnects(std::vector<std::string> const& args, unsigned port) {
@@ -80,14 +80,14 @@ protected:
     arguments.insert(arguments.end(), { "--clip", text });
     GivenProcess(arguments);
     if (::testing::Test::HasFatalFailure()) return;
-    session   = std::make_unique<Client>(Number(std::string_view(line).substr(5)), true, 640, 480);
+    session   = std::make_unique<Client>(AnnouncedPort(line), true, 640, 480);
     clipboard = std::make_unique<Headless::ClipboardClient>(*session);
     ASSERT_TRUE(freerdp_connect(session->Instance().get())) << ConnectLogs();
   }
   void GivenIniProcess(std::vector<std::string> const& args, unsigned port) {
     process = std::make_unique<Process>(args);
     ASSERT_TRUE(Read("port ")) << process->Transcript();
-    EXPECT_EQ(Number(std::string_view(line).substr(5)), port);
+    EXPECT_EQ(AnnouncedPort(line), port);
   }
   unsigned audio_port = 0;
 
@@ -145,7 +145,7 @@ protected:
   }
   void ThenWaitingPort(unsigned port) {
     ASSERT_TRUE(Read("port ")) << "port after connection: " << process->Transcript();
-    ASSERT_EQ(Number(std::string_view(line).substr(5)), port) << line;
+    ASSERT_EQ(AnnouncedPort(line), port) << line;
   }
   void WhenCodecKeyChanges(Client const& client) {
     auto* input = client.Instance()->context->input;

@@ -187,9 +187,8 @@ protected:
     ASSERT_TRUE(Read("event " + std::string(event) + " ")) << event << text << ": " << process->Transcript();
     ASSERT_TRUE(line.contains(text)) << "expected " << event << text << ", actual: " << line;
     if (event == "MOUSE_MOTION") {
-      auto field = line.find(" frame=");
-      ASSERT_NE(field, std::string::npos) << "motion frame identifier: " << line;
-      motion_frame = Number(std::string_view(line).substr(field + 7));
+      motion_frame = utilities::Required(oxbox::utilities::ParseNumberAfter<unsigned>(line, " frame="),
+                                         "motion events carry a frame identifier");
     }
   }
   void GivenProcess(std::vector<std::string> arguments = { }) {

@@ -42,7 +42,7 @@ TEST_F(DriveSample, DriveDisconnectDuringCat) {
   arguments.insert(arguments.end(), { "--cat", "share/huge.bin" });
   GivenProcess(arguments);
   if (::testing::Test::HasFatalFailure()) return;
-  auto port = Number(std::string_view(line).substr(5));
+  auto port = AnnouncedPort(line);
   DisconnectReading(port, share.Path());
   if (::testing::Test::HasFatalFailure()) return;
   ASSERT_TRUE(Read("cat failed: ")) << process->Transcript();

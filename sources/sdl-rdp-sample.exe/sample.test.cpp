@@ -22,7 +22,7 @@ protected:
 TEST_F(DesktopSample, WholeSystem) {
   GivenWholeSample();
   if (::testing::Test::HasFatalFailure()) return;
-  auto port = Number(std::string_view(line).substr(5));
+  auto port = AnnouncedPort(line);
   ASSERT_GT(port, 0u) << line;
   Client client(port, true, 640, 480);
   ASSERT_TRUE(freerdp_connect(client.Instance().get())) << ConnectLogs() << "connect 640x480";
@@ -39,7 +39,7 @@ TEST_F(DesktopSample, WholeSystem) {
 TEST_F(DesktopSample, RequestedSizeReturns) {
   GivenProcess();
   if (::testing::Test::HasFatalFailure()) return;
-  auto   port  = Number(std::string_view(line).substr(5));
+  auto   port  = AnnouncedPort(line);
   Client first(port, true, 320, 200);
   WhenSmallerDesktop(first);
   if (::testing::Test::HasFatalFailure()) return;
@@ -54,7 +54,7 @@ TEST_F(DesktopSample, RequestedSizeReturns) {
 TEST_F(DesktopSample, TakeoverFocus) {
   GivenProcess();
   if (::testing::Test::HasFatalFailure()) return;
-  auto         port  = Number(std::string_view(line).substr(5));
+  auto         port  = AnnouncedPort(line);
   Client const first(port, true, 640, 480);
   GivenFocusedClient(first);
   if (::testing::Test::HasFatalFailure()) return;
@@ -74,7 +74,7 @@ TEST_F(DesktopSample, AutoAvcCodecProperty) {
   arguments.insert(arguments.end() - 1, "SDL_RDP_CODEC=auto");
   GivenProcess(arguments);
   if (::testing::Test::HasFatalFailure()) return;
-  Client client(Number(std::string_view(line).substr(5)), true, 640, 480);
+  Client client(AnnouncedPort(line), true, 640, 480);
   client.EnableGraphics(true);
   ASSERT_TRUE(freerdp_connect(client.Instance().get())) << ConnectLogs();
   ASSERT_TRUE(ReadInput(client, "event CODEC_CHANGED codec=avc420", 30s)) << process->Transcript();
@@ -86,7 +86,7 @@ TEST_F(DesktopSample, LiveCodec) {
   arguments.insert(arguments.end() - 1, "SDL_RDP_CODEC=remotefx");
   GivenProcess(arguments);
   if (::testing::Test::HasFatalFailure()) return;
-  Client const client(Number(std::string_view(line).substr(5)), true, 640, 480);
+  Client const client(AnnouncedPort(line), true, 640, 480);
   GivenSwitchableCodec(client);
   if (::testing::Test::HasFatalFailure()) return;
   ASSERT_TRUE(Read("event EXPOSED "));
@@ -117,7 +117,7 @@ TEST_F(DesktopSample, DesktopIsPicture) {
   arguments.insert(arguments.end(), { "--size", "640x480" });
   GivenProcess(arguments);
   if (::testing::Test::HasFatalFailure()) return;
-  Client client(Number(std::string_view(line).substr(5)), true, 1024, 768);
+  Client client(AnnouncedPort(line), true, 1024, 768);
   ASSERT_TRUE(freerdp_connect(client.Instance().get())) << ConnectLogs();
   ASSERT_TRUE(Read("event GEOMETRY window=640x480 desktop=1024x768"));
   ASSERT_TRUE(client.Until([&] { return Pattern(client, false); }));
@@ -130,7 +130,7 @@ TEST_F(DesktopSample, FullscreenFollowsScreen) {
   arguments.emplace_back("--fullscreen");
   GivenProcess(arguments);
   if (::testing::Test::HasFatalFailure()) return;
-  Client                        client(Number(std::string_view(line).substr(5)), true, 1024, 768);
+  Client                        client(AnnouncedPort(line), true, 1024, 768);
   Headless::DisplayClient const display(client);
   ASSERT_TRUE(freerdp_connect(client.Instance().get())) << ConnectLogs();
   ThenSizeEvents("data1=1024 data2=768");
@@ -195,7 +195,7 @@ TEST_F(DesktopSample, FullscreenModeMovesDesktopMode) {
 TEST_F(DesktopSample, CursorShape) {
   GivenProcess();
   if (::testing::Test::HasFatalFailure()) return;
-  Client client(Number(std::string_view(line).substr(5)), true, 640, 480);
+  Client client(AnnouncedPort(line), true, 640, 480);
   ASSERT_TRUE(freerdp_connect(client.Instance().get())) << ConnectLogs();
   PointerObserver pointer(client);
   ASSERT_TRUE(freerdp_input_send_mouse_event(client.Instance()->context->input, PTR_FLAGS_MOVE, 100, 120));
@@ -257,7 +257,7 @@ TEST_F(DesktopSample, GraphicsPipelinePattern) {
   arguments.insert(arguments.begin() + 1, "SDL_LOGGING=video=info");
   GivenProcess(arguments);
   if (::testing::Test::HasFatalFailure()) return;
-  Client client(Number(std::string_view(line).substr(5)), true, 640, 480);
+  Client client(AnnouncedPort(line), true, 640, 480);
   client.EnableGraphics();
   ASSERT_TRUE(freerdp_connect(client.Instance().get()));
   ASSERT_TRUE(client.Until([&] { return Pattern(client, false); })) << Pattern(client, false).message();
@@ -272,6 +272,12 @@ TEST_F(DesktopSample, InvalidCodecLogsValidNames) {
   ASSERT_TRUE(Read(
       "ERROR: Invalid SDL_RDP_CODEC 'avc'; valid names: auto, planar, remotefx, nscodec, raw, progressive, avc420"))
       << process->Transcript();
+}
+TEST_F(DesktopSample, MalformedSizeIsRefused) {
+  auto arguments = Arguments(certificates.Path(), false);
+  arguments.insert(arguments.end(), { "--size", "640x" });
+  process = std::make_unique<Process>(arguments);
+  ASSERT_TRUE(Read("ERROR: Invalid size '640x': expected WxH with positive sides")) << process->Transcript();
 }
 
 }

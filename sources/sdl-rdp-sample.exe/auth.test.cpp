@@ -19,7 +19,7 @@ TEST_F(AuthenticationSample, AuthenticationPair) {
   arguments.insert(arguments.end(), { "--user", "alice", "--password", "sample-secret", "--domain", "LAB" });
   GivenProcess(arguments);
   if (::testing::Test::HasFatalFailure()) return;
-  auto port = Number(std::string_view(line).substr(5));
+  auto port = AnnouncedPort(line);
   ThenWrongPassword(port);
   if (::testing::Test::HasFatalFailure()) return;
   Client const right(port, true);
@@ -36,7 +36,7 @@ TEST_F(AuthenticationSample, AuthenticationPropertyDenies) {
                    { "--user", "alice", "--password", "sample-secret", "--auth", "tls", "--verify-deny" });
   GivenProcess(arguments);
   if (::testing::Test::HasFatalFailure()) return;
-  Client const client(Number(std::string_view(line).substr(5)), true);
+  Client const client(AnnouncedPort(line), true);
   client.Credentials("alice", "sample-secret", "", false);
   ASSERT_FALSE(freerdp_connect(client.Instance().get()));
   ASSERT_TRUE(Read("event AUTH_REJECTED user=alice"));

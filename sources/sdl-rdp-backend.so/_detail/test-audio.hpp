@@ -103,7 +103,7 @@ protected:
         std::regex(
             R"(Audio: ([0-9]+) blocks sent; gap ([0-9.]+) ms mean, ([0-9.]+) ms max; ([0-9]+) gaps over 40 ms\.)")))
         << text;
-    EXPECT_EQ(std::stoull(match[1]), audio.CaptureState().received.size());
+    EXPECT_EQ(oxbox::utilities::ParseNumber<std::size_t>(match.str(1)), audio.CaptureState().received.size());
     EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "Audio:"), 1u);
     EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "Frames:"), 1u);
     EXPECT_TRUE(std::regex_search(

@@ -17,7 +17,8 @@
 #include <arpa/inet.h>
 #include <array>
 #include <cerrno>
-#include <charconv>
+#include <oxbox/utilities/number-text.hpp>
+#include <oxbox/utilities/text.hpp>
 #include <chrono>
 #include <cstddef>
 #include <cstring>
@@ -56,6 +57,7 @@ using Headless::Client;
 using Headless::DisplayClient;
 using Headless::GraphicsScene;
 using utilities::Expects;
+using utilities::Required;
 struct CertificateDirectory {
 public:
   CertificateDirectory(CertificateDirectory const&) = delete;
@@ -76,15 +78,10 @@ private:
   std::filesystem::path path;
 };
 inline std::size_t ResidentBytes() {
-  auto        statm    = Headless::ReadText("/proc/self/statm");
-  std::size_t total    = 0;
-  std::size_t resident = 0;
-  auto        first    = std::from_chars(statm.data(), statm.data() + statm.size(), total);
-  Expects(first.ec == std::errc(), "total page count parses successfully");
-  Expects(first.ptr != statm.data() + statm.size(), "resident page count follows the total");
-  auto second = std::from_chars(first.ptr + 1, statm.data() + statm.size(), resident);
-  Expects(second.ec == std::errc(), "resident pages readable");
-  return resident * std::size_t(sysconf(_SC_PAGESIZE));
+  auto const statm = Headless::ReadText("/proc/self/statm");
+  auto const pages = Required(oxbox::utilities::ParseNumbers<std::size_t, 7>(oxbox::utilities::Trimmed(statm), ' '),
+                              "statm holds seven page counts");
+  return pages[1] * std::size_t(sysconf(_SC_PAGESIZE));
 }
 using Headless::Logs;
 
