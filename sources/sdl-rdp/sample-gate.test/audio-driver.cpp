@@ -2,8 +2,10 @@
 
 #include <sdl-rdp/sample-gate.test/procfs.hpp>
 #include <sdl-rdp/sample-gate.test/sample-launch.hpp>
+#include <sdl-rdp/utilities/deadline.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -50,6 +52,10 @@ auto AudioDriver::PlayFlushed(std::span<std::int16_t const> pcm) -> Clock::time_
   auto const started = Clock::now();
   EXPECT_TRUE(SDL_ResumeAudioStreamDevice(stream.get()));
   return started;
+}
+auto AudioDriver::QueueDrained(Clock::time_point deadline, std::chrono::milliseconds poll) -> bool {
+  return Backend::Until(deadline, Backend::Sleeping(poll),
+                        [this] { return SDL_GetAudioStreamQueued(stream.get()) == 0; });
 }
 auto AudioDriver::OpenStream() -> void {
   SDL_AudioSpec const spec{ SDL_AUDIO_S16, 2, 48000 };

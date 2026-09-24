@@ -18,6 +18,7 @@ class Module(NamedTuple):
     names:     frozenset[str]
     links:     frozenset[str]
     tests:     frozenset[str]
+    benches:   frozenset[str]
 
 
 class Finding(NamedTuple):
@@ -33,13 +34,23 @@ def names(relative):
     return frozenset({'-'.join(parts), parts[-1]})
 
 
+def grouped(words):
+    """One Link_dependencies call's words by group: positional under '', then TEST and BENCH."""
+    groups, group = {'': set(), 'TEST': set(), 'BENCH': set()}, ''
+    for word in words:
+        if word in groups:
+            group = word
+        else:
+            groups[group].add(word)
+    return groups
+
+
 def dependencies(path):
-    """Positional and TEST names of the module's Link_dependencies calls."""
+    """Positional, TEST and BENCH names of the module's Link_dependencies calls."""
     calls, _ = cmake.scan(path.read_text())
-    words = [word for call in calls if call.name == 'Link_dependencies'
-             for word in call.text.partition('(')[2].rstrip(')').split()]
-    split = words.index('TEST') if 'TEST' in words else len(words)
-    return frozenset(words[:split]), frozenset(words[split + 1:])
+    groups = [grouped(call.text.partition('(')[2].rstrip(')').split())
+              for call in calls if call.name == 'Link_dependencies']
+    return tuple(frozenset().union(*(group[key] for group in groups)) for key in ('', 'TEST', 'BENCH'))
 
 
 def modules(root):
@@ -58,8 +69,8 @@ def owner(modules_by_directory, relative):
     return None
 
 
-def is_test(path):
-    return '.test' in path.name or any(part.endswith('.test') for part in path.parts)
+def in_lane(path, lane):
+    return lane in path.name or any(part.endswith(lane) for part in path.parts)
 
 
 def checked_files(root, catalogue):
@@ -72,7 +83,8 @@ def checked_files(root, catalogue):
 
 
 def unlinked(root, catalogue, relative, module):
-    linked = module.links | (module.tests if is_test(relative) else frozenset())
+    linked = (module.links | (module.tests if in_lane(relative, '.test') else frozenset())
+              | (module.benches if in_lane(relative, '.bench') else frozenset()))
     text   = (root / relative).read_text(errors='replace')
     for match in INCLUDE.finditer(text):
         target = owner(catalogue, pathlib.Path('sources', match.group('path')).parent)

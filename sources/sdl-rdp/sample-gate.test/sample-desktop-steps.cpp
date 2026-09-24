@@ -20,18 +20,18 @@ auto SampleDesktopSteps::PressFullscreenKey(Client& client) -> void {
   ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x3e));
 }
 auto SampleDesktopSteps::WhenUnicodeClipboardOffered(Client& client, std::vector<std::uint8_t> const& bytes) -> void {
-  ASSERT_EQ(ClipboardSession().Offer(bytes), CHANNEL_RC_OK);
+  ASSERT_TRUE(ClipboardSession().Offer(bytes));
   ASSERT_TRUE(client.Until([&] { return ClipboardSession().Observed().requests.load() == 2; }));
   ASSERT_TRUE(Read("event CLIPBOARD text=żółw"));
   SDL_Log("trace CLIPBOARD client formats=13 request=13 utf16le=7c01f300420177000000 text=żółw");
 }
 auto SampleDesktopSteps::WhenClipboardEmptied(Client& client) -> void {
-  ASSERT_EQ(ClipboardSession().Offer({ 0, 0 }), CHANNEL_RC_OK);
+  ASSERT_TRUE(ClipboardSession().Offer({ 0, 0 }));
   ASSERT_TRUE(client.Until([&] { return ClipboardSession().Observed().requests.load() == 1; }));
   ASSERT_TRUE(Read("event CLIPBOARD text="));
 }
 auto SampleDesktopSteps::WhenAsciiClipboardOffered(Client& client) -> void {
-  ASSERT_EQ(ClipboardSession().Offer({ 'w', 0, 'o', 0, 'r', 0, 'l', 0, 'd', 0, 0, 0 }), CHANNEL_RC_OK);
+  ASSERT_TRUE(ClipboardSession().Offer({ 'w', 0, 'o', 0, 'r', 0, 'l', 0, 'd', 0, 0, 0 }));
   ASSERT_TRUE(client.Until([&] { return ClipboardSession().Observed().requests.load() == 1; }));
   ASSERT_TRUE(Read("event CLIPBOARD text=world"));
   SDL_Log("trace CLIPBOARD client formats=13 request=13 utf16le=77006f0072006c0064000000 text=world");

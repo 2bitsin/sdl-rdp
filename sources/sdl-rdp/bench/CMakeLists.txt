@@ -1,2 +1,2 @@
 Init_submodule()
-Link_dependencies(TEST sample-gate headless-client SDL3 video utilities)
+Link_dependencies(BENCH sample-gate headless-client SDL3 video utilities)

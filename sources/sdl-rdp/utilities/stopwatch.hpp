@@ -1,5 +1,8 @@
 #pragma once
 #include <chrono>
+#include <concepts>
+#include <functional>
+#include <utility>
 
 namespace Backend {
 class Stopwatch {
@@ -11,4 +14,10 @@ public:
 private:
   Clock::time_point _start{ Clock::now() };
 };
+template <std::invocable StepTy>
+auto Timed(StepTy&& step) -> Stopwatch::Clock::duration {
+  Stopwatch const watch;
+  std::invoke(std::forward<StepTy>(step));
+  return watch.Elapsed();
+}
 }

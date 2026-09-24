@@ -37,7 +37,7 @@ protected:
     });
   }
   auto ThenNonTextOffer() -> void {
-    ASSERT_EQ(clipboard->Offer({ }, false), CHANNEL_RC_OK);
+    ASSERT_TRUE(clipboard->Offer({ }, false));
     ASSERT_TRUE(UntilClipboardEvent());
     EXPECT_EQ(sdlrdp_has_clipboard_text(handle.Handle()), 0);
     EXPECT_STREQ(sdlrdp_get_clipboard_text(handle.Handle()), "");
@@ -71,7 +71,7 @@ protected:
 auto OfferMalformedText(Headless::Client& client, Headless::ClipboardClient& clipboard) -> void {
   for (auto const& bytes : { std::vector<std::uint8_t>{ 0x7c }, { 0, 0xdc, 0, 0 }, { 'x', 0 } }) {
     auto count = clipboard.Observed().requests.load();
-    ASSERT_EQ(clipboard.Offer(bytes), CHANNEL_RC_OK);
+    ASSERT_TRUE(clipboard.Offer(bytes));
     ASSERT_TRUE(client.Until([&] { return clipboard.Observed().requests.load() > count; }));
   }
 }
@@ -105,7 +105,7 @@ TEST_F(Clipboard, LiveSetAndMalformedResponse) {
   Drain();
   auto const* retained = sdlrdp_get_clipboard_text(handle.Handle());
   ASSERT_NO_FATAL_FAILURE(OfferMalformedText(*client, *clipboard));
-  ASSERT_EQ(clipboard->Offer({ 'w', 0, 'o', 0, 'r', 0, 'l', 0, 'd', 0, 0, 0 }), CHANNEL_RC_OK);
+  ASSERT_TRUE(clipboard->Offer({ 'w', 0, 'o', 0, 'r', 0, 'l', 0, 'd', 0, 0, 0 }));
   ASSERT_TRUE(UntilClipboardEvent());
   ThenReplacedText(retained);
 }

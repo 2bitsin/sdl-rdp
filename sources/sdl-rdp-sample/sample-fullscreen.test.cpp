@@ -108,7 +108,7 @@ protected:
   }
   auto WhenFocusSynchronized(Client& client) -> void {
     ASSERT_TRUE(ReadInput(client, "event FOCUS_GAINED "));
-    ASSERT_NO_FATAL_FAILURE(client.Tap(0x30));
+    ASSERT_NO_FATAL_FAILURE(Headless::Tap(client, 0x30));
     ASSERT_TRUE(ReadInput(client, "event KEY_UP "));
   }
   auto Count(std::string_view event) -> std::size_t {

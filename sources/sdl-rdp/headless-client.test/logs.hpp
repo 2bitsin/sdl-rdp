@@ -23,6 +23,7 @@ public:
   auto Contains(sdlrdp_log_level level, std::string_view text) -> bool;
   auto Contains(std::string_view text)                         -> bool;
   auto Entries()                                               -> std::vector<std::pair<sdlrdp_log_level, std::string>>;
+  auto Statistics(std::string_view pattern)                    -> std::optional<std::vector<std::string>>;
   template <typename Observe>
   auto Follow(std::size_t next, Observe observe) -> std::size_t {
     std::scoped_lock const lock(guard);

@@ -14,7 +14,7 @@ inline auto SendMouse(Client const& client, std::uint16_t x, std::uint16_t y) ->
   ASSERT_TRUE(freerdp_input_send_mouse_event(input, PTR_FLAGS_WHEEL | 120, 0, 0)) << "send wheel";
 }
 inline auto SendKeyboardAndMouse(Client const& client, std::uint16_t x, std::uint16_t y) -> void {
-  ASSERT_NO_FATAL_FAILURE(client.Tap(0x1e));
+  ASSERT_NO_FATAL_FAILURE(Tap(client, 0x1e));
   SendMouse(client, x, y);
 }
 inline auto ThenKey(sdlrdp_event const& event, bool down) -> void {

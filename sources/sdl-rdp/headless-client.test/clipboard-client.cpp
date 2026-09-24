@@ -22,6 +22,13 @@ auto HeldClipboard(CliprdrClientContext* context) -> ClipboardClient& {
   Expects(context->custom, "callback context carries its observer");
   return *static_cast<ClipboardClient*>(context->custom);
 }
+auto AnnounceFormat(CliprdrClientContext& context, bool unicode) -> std::uint32_t {
+  CLIPRDR_FORMAT      format{ Backend::Narrowed<std::uint32_t>(unicode ? CF_UNICODETEXT : CF_DIB), nullptr };
+  CLIPRDR_FORMAT_LIST list  { .common = { .msgType = CB_FORMAT_LIST }                                      };
+  list.numFormats = 1;
+  list.formats    = &format;
+  return context.ClientFormatList(&context, &list);
+}
 }
 class ClipboardClient::Callbacks {
 public:
@@ -99,17 +106,13 @@ auto ClipboardClient::RequestFormat(std::uint32_t format) -> std::uint32_t {
   request.requestedFormatId = format;
   return channel.load()->ClientFormatDataRequest(channel.load(), &request);
 }
-auto ClipboardClient::Offer(std::vector<std::uint8_t> bytes, bool unicode) -> std::uint32_t {
+auto ClipboardClient::Offer(std::vector<std::uint8_t> bytes, bool unicode) -> bool {
   Expects(channel.load(), "clipboard channel connected");
   {
     std::scoped_lock const lock(guard);
     outgoing = std::move(bytes);
   }
-  CLIPRDR_FORMAT      format{ Backend::Narrowed<std::uint32_t>(unicode ? CF_UNICODETEXT : CF_DIB), nullptr };
-  CLIPRDR_FORMAT_LIST list  { .common = { .msgType = CB_FORMAT_LIST }                                      };
-  list.numFormats = 1;
-  list.formats    = &format;
-  return channel.load()->ClientFormatList(channel.load(), &list);
+  return AnnounceFormat(*channel.load(), unicode) == CHANNEL_RC_OK;
 }
 auto ClipboardClient::Observed() const -> ClipboardCapture const& {
   return observed;
@@ -122,7 +125,7 @@ auto ClipboardClient::Ready(CliprdrClientContext& context) -> std::uint32_t {
   auto result = Backend::SendGeneralCapabilities(
       [&](auto const* caps) { return context.ClientCapabilities(&context, caps); });
   if (result != CHANNEL_RC_OK) return result;
-  if (!outgoing.empty()) return Offer(outgoing);
+  if (!outgoing.empty()) return AnnounceFormat(context, true);
   CLIPRDR_FORMAT_LIST const list{ .common = { .msgType = CB_FORMAT_LIST } };
   return context.ClientFormatList(&context, &list);
 }

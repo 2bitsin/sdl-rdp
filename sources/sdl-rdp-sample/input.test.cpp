@@ -131,7 +131,7 @@ TEST_F(Sample, ScancodeTextAndStopped) {
   ASSERT_NO_FATAL_FAILURE(WhenScancodeText(client));
   ASSERT_NO_FATAL_FAILURE(WhenTextStops(client));
   auto stopped = process->Transcript().size();
-  ASSERT_NO_FATAL_FAILURE(client.Tap(0x1e));
+  ASSERT_NO_FATAL_FAILURE(Headless::Tap(client, 0x1e));
   ASSERT_TRUE(Read("event KEY_UP type=769 scancode=4 key=97 down=0"));
   ASSERT_NO_FATAL_FAILURE(Escape(client));
   ThenStoppedScancodeText(stopped);

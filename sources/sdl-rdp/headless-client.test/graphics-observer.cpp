@@ -111,7 +111,7 @@ auto GraphicsObserver::ObserveFrameLifecycle() -> void {
     if (command->codecId == RDPGFX_CODECID_CAPROGRESSIVE && command->length >= 2 && command->data[0] == 0xc0
         && command->data[1] == 0xcc)
       ++self->observed.progressive_headers;
-    return self->surface(channel, command);
+    return self->observed.decode ? self->surface(channel, command) : CHANNEL_RC_OK;
   };
   ObserveResets();
 }

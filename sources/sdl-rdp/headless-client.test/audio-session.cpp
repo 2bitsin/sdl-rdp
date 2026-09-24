@@ -10,7 +10,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <future>
-#include <regex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -42,7 +41,6 @@ auto ThenAudioCadence(SoundClient const& audio) -> void {
   auto const maximum_gap = Headless::MaximumGapMs(audio.CaptureState().received);
   auto       block_ms    = 1000.0 * double(audio.CaptureState().samples.size()) / 2
                            / double(audio.CaptureState().received.size()) / audio.CaptureState().rate;
-  testing::Test::RecordProperty("maximum_block_gap_ms", std::to_string(maximum_gap));
   EXPECT_LE(maximum_gap, (2 * block_ms) + 10);
 }
 }
@@ -101,19 +99,15 @@ auto AudioSession::RunRealtimeAudio(Client& client, SoundClient& audio) -> void 
 }
 auto AudioSession::CheckAudioStatistics(SoundClient const& audio) -> void {
   Expects(!backend, "connection statistics have been flushed");
-  auto        text  = logs.Text(true);
-  std::smatch match;
-  ASSERT_TRUE(std::regex_search(
-      text, match,
-      std::regex(
-          R"(Audio: ([0-9]+) blocks sent; gap ([0-9.]+) ms mean, ([0-9.]+) ms max; ([0-9]+) gaps over 40 ms\.)")))
-      << text;
-  EXPECT_EQ(oxbox::utilities::ParseNumber<std::size_t>(match.str(1)), audio.CaptureState().received.size());
+  auto const audio_line = logs.Statistics(
+      R"(Audio: ([0-9]+) blocks sent; gap ([0-9.]+) ms mean, ([0-9.]+) ms max; ([0-9]+) gaps over 40 ms\.)");
+  if (!audio_line) FAIL() << logs.Text(true);
+  EXPECT_EQ(oxbox::utilities::ParseNumber<std::size_t>((*audio_line)[1]), audio.CaptureState().received.size());
   EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "Audio:"), 1u);
   EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "Frames:"), 1u);
-  EXPECT_TRUE(std::regex_search(
-      text, std::regex(R"(acknowledgement [0-9.]+ ms mean, [0-9.]+ ms max, [0-9]+ over 100 ms, [0-9]+ timed out\.)")))
-      << text;
+  auto const acknowledgements = logs.Statistics(
+      R"(acknowledgement [0-9.]+ ms mean, [0-9.]+ ms max, [0-9]+ over 100 ms, [0-9]+ timed out\.)");
+  EXPECT_TRUE(acknowledgements.has_value()) << logs.Text(true);
 }
 auto AudioSession::EstablishConfirmations(Client& client, SoundClient& audio) -> void {
   // Fill one latency window, then return its credit. This distinguishes a

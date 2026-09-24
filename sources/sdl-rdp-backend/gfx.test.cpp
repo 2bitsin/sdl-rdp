@@ -107,7 +107,7 @@ protected:
                      bool avc = true) -> void {
     ASSERT_NO_FATAL_FAILURE(Open(codec, width, height));
     graphics_client = std::make_unique<Headless::Client>(sdlrdp_port(backend.Handle()), true);
-    graphics_client->EnableGraphics(avc);
+    graphics_client->EnableGraphics({ .h264 = avc });
     if (!avc)
       ASSERT_TRUE(freerdp_settings_set_bool(graphics_client->Instance()->context->settings, FreeRDP_GfxH264, false));
     graphics_observer = std::make_unique<Headless::GraphicsObserver>(*graphics_client);

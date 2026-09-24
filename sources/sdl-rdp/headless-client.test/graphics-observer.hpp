@@ -20,6 +20,7 @@ struct GraphicsCapture {
   std::vector<RDPGFX_FRAME_ACKNOWLEDGE_PDU>            frames;
   bool                                                 automatic           = true;
   bool                                                 advertise           = true;
+  bool                                                 decode              = true;
   std::vector<RDPGFX_CREATE_SURFACE_PDU>               surfaces;
   std::vector<std::uint32_t>                           avc_nals;
   std::vector<RECTANGLE_16>                            avc_rects;

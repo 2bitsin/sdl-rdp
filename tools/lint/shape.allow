@@ -5,7 +5,6 @@ sdl-rdp-backend/main.so.cpp:108: sdlrdp_present parameters 7 > 5 # frozen C ABI
 sdl-rdp-sample/main.cpp:72: DrawScheduled parameters 6 > 5 # size in #19
 sdl-rdp/audio/audio.hpp: AudioChannel data members 24 > 10 # collaborators replace Peer&; split in #6
 sdl-rdp/audio/audio.hpp: AudioChannel member functions 25 > 15 # AudioProtocol friend folded in, C.21 deleted copy and move; split in #6
-sdl-rdp/bench/latency.test.cpp:68: SampleLatency parameters 6 > 5 # size in #19
 sdl-rdp/clipboard/clipboard.hpp: ClipboardChannel data members 15 > 10 # collaborators replace Peer&; split in #6
 sdl-rdp/clipboard/clipboard.hpp: ClipboardChannel member functions 18 > 15 # split in #6
 sdl-rdp/headless-client.test/drive-observer.cpp:37: DriveObserver::DriveObserver lambda@37 parameters 6 > 5 # FreeRDP pReceiveChannelData signature is the ABI

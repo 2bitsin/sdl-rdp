@@ -79,6 +79,13 @@ auto DisconnectGraphicsDecoder(void* raw, ChannelDisconnectedEventArgs const* ev
 auto LoadGraphicsChannel(freerdp* instance) -> int {
   return LoadDynamicChannel(instance, "rdpgfx");
 }
+auto KeyboardFlags(KeyState state) -> std::uint16_t {
+  switch (state) {
+  case KeyState::Down: return KBD_FLAGS_DOWN;
+  case KeyState::Up:   return KBD_FLAGS_RELEASE;
+  default:             ::utilities::Unreachable(state);
+  }
+}
 auto ChannelError(std::uint32_t a, std::uint32_t b) -> std::uint32_t {
   auto channel = [&](std::uint32_t shift) { return std::abs(int((a >> shift) & 255) - int((b >> shift) & 255)); };
   return Backend::Narrowed<std::uint32_t>(std::max({ channel(0), channel(8), channel(16) }));
@@ -95,13 +102,16 @@ Client::Client(std::uint32_t port, bool surface, std::uint32_t width, std::uint3
   instance->context->update->DesktopResize = ClientDesktopResize;
   ConfigureClient(instance->context->settings, port, surface, width, height);
 }
-auto Client::EnableGraphics(bool h264) const -> void {
+auto Client::EnableGraphics(GraphicsOptions options) const -> void {
   auto*      context     = instance->context;
-  auto const h264_set    = freerdp_settings_set_bool(context->settings, FreeRDP_GfxH264, h264);
+  auto const h264_set    = freerdp_settings_set_bool(context->settings, FreeRDP_GfxH264, options.h264);
+  auto const qoe_set     = freerdp_settings_set_bool(context->settings, FreeRDP_GfxSendQoeAck,
+                                                     options.qoe_acknowledgements);
   auto const avc444_set  = freerdp_settings_set_bool(context->settings, FreeRDP_GfxAVC444, false);
   auto const pipeline_on = freerdp_settings_set_bool(context->settings, FreeRDP_SupportGraphicsPipeline, true);
   auto const synchronous = freerdp_settings_set_bool(context->settings, FreeRDP_SynchronousDynamicChannels, true);
   Expects(h264_set, "the client's H.264 preference is set");
+  Expects(qoe_set, "the client's QoE acknowledgement preference is set");
   Expects(avc444_set, "the client's AVC444 preference is set");
   Expects(pipeline_on, "the client's graphics pipeline is enabled");
   Expects(synchronous, "the client's dynamic channels are synchronous");
@@ -123,12 +133,14 @@ auto Client::Credentials(char const* user, char const* password, char const* dom
           "client credentials configured");
 }
 auto Client::Connect() const -> bool {
-  return freerdp_connect(instance.get()) != 0;
+  auto const connected = freerdp_connect(instance.get()) != 0;
+  if (connected)
+    utilities::Ensures(instance->context->codecs->ThreadingFlags == THREADING_FLAGS_DISABLE_THREADS,
+                       "the connected client decodes on its pump thread");
+  return connected;
 }
-auto Client::Tap(std::uint16_t scancode) const -> void {
-  auto* input = instance->context->input;
-  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, scancode)) << "send key down " << scancode;
-  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, scancode)) << "send key up " << scancode;
+auto Client::Key(std::uint16_t scancode, KeyState state) const -> bool {
+  return freerdp_input_send_keyboard_event(instance->context->input, KeyboardFlags(state), scancode);
 }
 auto Client::Disconnect() const -> bool {
   return freerdp_disconnect(instance.get()) != 0;
@@ -138,6 +150,10 @@ auto Client::Pump(std::uint32_t timeout) const -> bool {
   auto count = freerdp_get_event_handles(instance->context, handles.data(), handles.size());
   return count && WaitForMultipleObjects(count, handles.data(), false, timeout) != WAIT_FAILED
          && freerdp_check_event_handles(instance->context);
+}
+auto Tap(Client const& client, std::uint16_t scancode) -> void {
+  ASSERT_TRUE(client.Key(scancode, KeyState::Down)) << "send key down " << scancode;
+  ASSERT_TRUE(client.Key(scancode, KeyState::Up)) << "send key up " << scancode;
 }
 auto PumpInBackground(Client const& client) -> std::jthread {
   return std::jthread([&client](std::stop_token const& stop) {

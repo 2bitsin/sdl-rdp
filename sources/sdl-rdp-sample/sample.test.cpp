@@ -81,7 +81,7 @@ TEST_F(DesktopSample, AutoAvcCodecProperty) {
   if (!Backend::Avc::Encoder::Available()) GTEST_SKIP() << Backend::Avc::Encoder::UnavailableReason();
   ASSERT_NO_FATAL_FAILURE(GivenProcess({ "SDL_RDP_CODEC=auto" }));
   auto client = AnnouncedClient(640, 480);
-  client.EnableGraphics(true);
+  client.EnableGraphics({ .h264 = true });
   ASSERT_NO_FATAL_FAILURE(Connect(client));
   ASSERT_TRUE(ReadInput(client, "event CODEC_CHANGED codec=avc420", 30s)) << process->Transcript();
   Escape(client);

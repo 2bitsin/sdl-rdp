@@ -70,7 +70,7 @@ class Allocations : public Headless::GraphicsBackend, public testing::WithParamI
 protected:
   auto Connect(Scenario const& scenario) -> void {
     _client = std::make_unique<Headless::Client>(sdlrdp_port(backend.Handle()), true, Width, Height);
-    _client->EnableGraphics(scenario.codec == SDLRDP_CODEC_AVC420);
+    _client->EnableGraphics({ .h264 = scenario.codec == SDLRDP_CODEC_AVC420 });
     _observer = std::make_unique<Headless::GraphicsObserver>(*_client);
     ConnectGraphics(*_client);
   }

@@ -47,12 +47,12 @@ auto SampleChecks::ThenAbsoluteMouse(rdpInput* input) -> void {
 auto SampleChecks::WhenShiftedText(Client const& client) -> void {
   auto* input = client.Instance()->context->input;
   ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x2a));
-  ASSERT_NO_FATAL_FAILURE(client.Tap(0x1e));
+  ASSERT_NO_FATAL_FAILURE(Headless::Tap(client, 0x1e));
   ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x2a));
   ASSERT_TRUE(Read("event TEXT_INPUT text=A"));
 }
 auto SampleChecks::WhenScancodeText(Client const& client) -> void {
-  ASSERT_NO_FATAL_FAILURE(client.Tap(0x1e));
+  ASSERT_NO_FATAL_FAILURE(Headless::Tap(client, 0x1e));
   ASSERT_TRUE(Read("event TEXT_INPUT text=a"));
   WhenShiftedText(client);
 }
@@ -129,7 +129,7 @@ auto SampleChecks::DisconnectReading(std::uint32_t port, fs::path const& share) 
   }
 }
 auto SampleChecks::ThenClipboardCleared(Client& client, Headless::ClipboardClient& clipboard) -> void {
-  ASSERT_EQ(clipboard.Offer({ }, false), CHANNEL_RC_OK);
+  ASSERT_TRUE(clipboard.Offer({ }, false));
   ASSERT_TRUE(client.Until([&] { return clipboard.Observed().accepted.load() == 4; }));
   ASSERT_TRUE(Read("event CLIPBOARD text="));
   SDL_Log("trace CLIPBOARD client formats=8 text-cleared=1");

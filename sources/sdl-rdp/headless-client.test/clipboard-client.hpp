@@ -24,7 +24,7 @@ public:
   auto     operator=(ClipboardClient&&)                                -> ClipboardClient& = delete;
   auto     Received(std::vector<std::uint8_t> const& bytes)            -> bool;
   auto     RequestFormat(std::uint32_t format)                         -> std::uint32_t;
-  auto     Offer(std::vector<std::uint8_t> bytes, bool unicode = true) -> std::uint32_t;
+  auto     Offer(std::vector<std::uint8_t> bytes, bool unicode = true) -> bool;
   auto     Observed() const                                            -> ClipboardCapture const&;
 
 private:

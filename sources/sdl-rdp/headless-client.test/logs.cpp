@@ -1,5 +1,6 @@
 #include <sdl-rdp/headless-client.test/logs.hpp>
 #include <cstddef>
+#include <regex>
 
 namespace Headless {
 auto Logs::Collect(void* user, sdlrdp_log_level level, char const* text) -> void {
@@ -27,6 +28,13 @@ auto Logs::Contains(sdlrdp_log_level level, std::string_view text) -> bool {
 }
 auto Logs::Contains(std::string_view text) -> bool {
   return Matching([=](auto const& line) { return line.second.contains(text); }) != 0;
+}
+// The whole match is group 0; nullopt when the collected text holds no match.
+auto Logs::Statistics(std::string_view pattern) -> std::optional<std::vector<std::string>> {
+  auto const  text  = Text(true);
+  std::smatch match;
+  if (!std::regex_search(text, match, std::regex(pattern.begin(), pattern.end()))) return std::nullopt;
+  return match | std::views::transform([](auto const& group) { return group.str(); }) | std::ranges::to<std::vector>();
 }
 auto Logs::Entries() -> std::vector<std::pair<sdlrdp_log_level, std::string>> {
   std::scoped_lock const lock(guard);
