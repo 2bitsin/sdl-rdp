@@ -1,8 +1,8 @@
 #pragma once
 #include "sdl-rdp-backend.h"
 
-#include <span>
 #include <winpr/wtypes.h>
+#include <span>
 
 namespace Backend {
 class PixelBand {

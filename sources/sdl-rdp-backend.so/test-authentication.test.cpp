@@ -90,8 +90,8 @@ auto Authentication::Lookup(void* raw, char const* domain, char const* user, uns
   EXPECT_TRUE(self.seen.password.empty());
   return sdlrdp_lookup_pair(&self.config, domain, user, hash);
 }
-auto Authentication::Attempt(char const* user, char const* password, char const* domain, bool nla,
-                             bool accepted) -> void {
+auto Authentication::Attempt(char const* user, char const* password, char const* domain, bool nla, bool accepted)
+    -> void {
   Headless::Client client(sdlrdp_port(handle.get()), false);
   client.Credentials(user, password, domain, nla);
   ASSERT_EQ(bool(freerdp_connect(client.Instance().get())), accepted);
@@ -164,8 +164,8 @@ auto Authentication::ThenCertificateDisconnect(std::string_view closed) -> void 
   RecordProperty("trace", trace);
 }
 auto Authentication::ThenPendingDisconnect(UINT32 code) -> void {
-  auto const* message =
-      code == FREERDP_ERROR_CONNECT_FAILED ? "Peer transport failed with pending data:" : "Peer disconnected:";
+  auto const* message = code == FREERDP_ERROR_CONNECT_FAILED ? "Peer transport failed with pending data:"
+                                                             : "Peer disconnected:";
   EXPECT_TRUE(Until([&] {
     return std::ranges::any_of(logs, [&](auto const& entry) {
       auto const& [level, text] = entry;

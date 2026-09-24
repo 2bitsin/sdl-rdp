@@ -4,7 +4,7 @@
 #include <optional>
 #include <string>
 namespace rdp {
-template<typename _Byte>
+template <typename _Byte>
 concept IoBuffer = std::same_as<_Byte, void> || std::same_as<_Byte, void const>;
 // An absent name selects the first shared drive; SDL's interfaces spell that as a null or empty name.
 auto         DriveName(char const* name)                                           -> std::optional<std::string>;

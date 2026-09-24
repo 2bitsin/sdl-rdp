@@ -24,8 +24,7 @@ inline auto RequiredGraphics(sdlrdp_handle& handle) -> Backend::GraphicsTiming {
   return graphics.value_or(Backend::GraphicsTiming{ });
 }
 inline auto Presented(sdlrdp_handle& handle) -> uint64_t {
-  return handle.Frames().Read([](Backend::FrameStore const& frames, Backend::FrameLock const& held) {
-    return frames.Presented(held);
-  });
+  return handle.Frames().Read(
+      [](Backend::FrameStore const& frames, Backend::FrameLock const& held) { return frames.Presented(held); });
 }
 }

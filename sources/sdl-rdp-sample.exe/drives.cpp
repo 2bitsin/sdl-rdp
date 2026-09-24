@@ -3,12 +3,12 @@
 #include "_detail/check.hpp"
 
 #include <SDL3/SDL.h>
+#include <openssl/evp.h>
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <format>
 #include <memory>
-#include <openssl/evp.h>
 #include <ranges>
 #include <span>
 #include <string>
@@ -24,13 +24,12 @@ auto SplitDrive(char const* value) -> std::pair<std::string, std::string> {
 auto OpenDriveFile(char const* value, char const* mode) -> SDL_IOStream* {
   auto [drive, path] = SplitDrive(value);
   auto props         = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
-  auto open          =
-      reinterpret_cast<DriveOpen>(SDL_GetPointerProperty(props, SDL_PROP_DISPLAY_RDP_OPEN_FILE_POINTER, nullptr));
+  auto open          = reinterpret_cast<DriveOpen>(
+      SDL_GetPointerProperty(props, SDL_PROP_DISPLAY_RDP_OPEN_FILE_POINTER, nullptr));
   Check(open != nullptr);
   return open(drive.c_str(), path.c_str(), mode);
 }
 auto ListEntry(void* user, char const* directory, char const* name) -> SDL_EnumerationResult {
-
   auto*        storage = static_cast<SDL_Storage*>(user);
   SDL_PathInfo info    { };
   if (!SDL_GetStoragePathInfo(storage, (std::string(directory) + name).c_str(), &info)) return SDL_ENUM_FAILURE;
@@ -113,10 +112,10 @@ auto WriteDrive(char const* value) -> void {
   std::vector<unsigned char> bytes(1024uz * 1024);
   std::ranges::transform(std::views::iota(0uz, bytes.size()), bytes.begin(),
                          [](size_t i) { return static_cast<unsigned char>(i % 251); });
-  if (SDL_WriteIO(file, bytes.data(), bytes.size()) != bytes.size() ||
-      SDL_SeekIO(file, static_cast<std::ptrdiff_t>(2 * 1024) * 1024, SDL_IO_SEEK_SET) !=
-          static_cast<std::ptrdiff_t>(2 * 1024) * 1024 ||
-      SDL_WriteIO(file, bytes.data(), bytes.size()) != bytes.size()) {
+  if (SDL_WriteIO(file, bytes.data(), bytes.size()) != bytes.size()
+      || SDL_SeekIO(file, static_cast<std::ptrdiff_t>(2 * 1024) * 1024, SDL_IO_SEEK_SET)
+             != static_cast<std::ptrdiff_t>(2 * 1024) * 1024
+      || SDL_WriteIO(file, bytes.data(), bytes.size()) != bytes.size()) {
     SDL_Log("write failed: %s", SDL_GetError());
     return;
   }

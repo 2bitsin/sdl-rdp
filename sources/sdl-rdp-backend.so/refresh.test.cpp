@@ -6,11 +6,9 @@ TEST(RefreshEstimator, ClientLatencyIgnoresPresentSpacing) {
   Refresh value{ RefreshMode::Client };
   value.Restart();
   auto now = Refresh::Clock::now();
-  for (int frame = 0; frame < 10; ++frame)
-    value.Acknowledge(now += 100ms, 100ms);
+  for (int frame = 0; frame < 10; ++frame) value.Acknowledge(now += 100ms, 100ms);
   EXPECT_EQ(value.Rate(), 10u);
-  for (int frame = 0; frame < 5; ++frame)
-    value.Acknowledge(now += 1s, 1ms);
+  for (int frame = 0; frame < 5; ++frame) value.Acknowledge(now += 1s, 1ms);
   EXPECT_EQ(value.Rate(), 60u);
 }
 TEST(RefreshEstimator, AverageHeldAcknowledgementRespectsFloor) {
@@ -31,13 +29,11 @@ TEST(RefreshEstimator, SenderUsesQueueAndSegments) {
   WireSample wire{
     .available = true, .outq = 10001, .notsent = 500, .unacked = 10, .rtt = 100, .mss = 1000, .delivery_rate = 100000
   };
-  for (int frame = 0; frame < 10; ++frame)
-    value.Written(wire, 10000);
+  for (int frame = 0; frame < 10; ++frame) value.Written(wire, 10000);
   EXPECT_EQ(value.Rate(), 10u);
   wire.outq    = 0;
   wire.unacked = 0;
-  for (int frame = 0; frame < 5; ++frame)
-    value.Written(wire, 10000);
+  for (int frame = 0; frame < 5; ++frame) value.Written(wire, 10000);
   EXPECT_EQ(value.Rate(), 60u);
   wire.unacked = 11;
   value.Written(wire, 10000);
@@ -62,11 +58,9 @@ TEST(RefreshEstimator, BlockedSenderStepsOncePerCurrentInterval) {
   value.Restart();
   auto now = Refresh::Clock::now();
   ThenBlockedIntervals(value, now);
-  for (auto elapsed = 50ms; elapsed <= 1s; elapsed += 5ms)
-    value.Blocked(now + elapsed);
+  for (auto elapsed = 50ms; elapsed <= 1s; elapsed += 5ms) value.Blocked(now + elapsed);
   EXPECT_EQ(value.Rate(), 10u);
-  for (int frame = 0; frame < 5; ++frame)
-    value.Written({ .available = true }, 10000);
+  for (int frame = 0; frame < 5; ++frame) value.Written({ .available = true }, 10000);
   EXPECT_EQ(value.Rate(), 60u);
   value.Restart();
   value.Blocked(now + 1s);
@@ -77,8 +71,7 @@ TEST(RefreshEstimator, BlockedTransportDoesNotChangeOtherModes) {
     Refresh value{ mode };
     value.Restart();
     auto now = Refresh::Clock::now();
-    for (auto elapsed = 0ms; elapsed <= 1s; elapsed += 5ms)
-      value.Blocked(now + elapsed);
+    for (auto elapsed = 0ms; elapsed <= 1s; elapsed += 5ms) value.Blocked(now + elapsed);
     EXPECT_EQ(value.Rate(), 60u);
   }
 }

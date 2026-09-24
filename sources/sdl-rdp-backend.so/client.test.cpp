@@ -2,9 +2,6 @@
 
 #include "_detail/client-channels.hpp"
 
-#include <algorithm>
-#include <array>
-#include <cstdlib>
 #include <freerdp/addin.h>
 #include <freerdp/channels/channels.h>
 #include <freerdp/client/channels.h>
@@ -14,10 +11,13 @@
 #include <freerdp/gdi/gdi.h>
 #include <freerdp/gdi/gfx.h>
 #include <freerdp/settings.h>
+#include <winpr/synch.h>
+#include <algorithm>
+#include <array>
+#include <cstdlib>
 #include <numeric>
 #include <string_view>
 #include <utility>
-#include <winpr/synch.h>
 
 namespace Headless {
 namespace {
@@ -25,8 +25,8 @@ auto ClientPostConnect(freerdp* client) -> BOOL {
   auto* context = client->context;
   return freerdp_client_codecs_reset(context->codecs, FREERDP_CODEC_ALL,
                                      freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopWidth),
-                                     freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopHeight)) &&
-         gdi_init(client, PIXEL_FORMAT_BGRX32);
+                                     freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopHeight))
+         && gdi_init(client, PIXEL_FORMAT_BGRX32);
 }
 auto ClientDesktopResize(rdpContext* context) -> BOOL {
   auto w = freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopWidth);
@@ -112,8 +112,8 @@ auto Client::Credentials(char const* user, char const* password, char const* dom
 auto Client::Pump(unsigned timeout) const -> bool {
   std::array<HANDLE, 64> handles { };
   auto                   count   = freerdp_get_event_handles(instance->context, handles.data(), handles.size());
-  return count && WaitForMultipleObjects(count, handles.data(), FALSE, timeout) != WAIT_FAILED &&
-         freerdp_check_event_handles(instance->context);
+  return count && WaitForMultipleObjects(count, handles.data(), FALSE, timeout) != WAIT_FAILED
+         && freerdp_check_event_handles(instance->context);
 }
 auto Client::Matches(std::vector<UINT32> const& pixels) -> bool {
   auto* gdi = instance->context->gdi;
@@ -121,8 +121,7 @@ auto Client::Matches(std::vector<UINT32> const& pixels) -> bool {
   if (pixels.size() != std::size_t(gdi->width) * gdi->height) return false;
   auto const* actual = reinterpret_cast<UINT32 const*>(gdi->primary_buffer);
   if (!tolerance)
-    return std::equal(pixels.begin(), pixels.end(), actual,
-                      [](auto a, auto b) { return ((a ^ b) & 0x00ffffff) == 0; });
+    return std::equal(pixels.begin(), pixels.end(), actual, [](auto a, auto b) { return ((a ^ b) & 0x00ffffff) == 0; });
   return std::equal(pixels.begin(), pixels.end(), actual,
                     [&](auto a, auto b) { return ChannelError(a, b) <= tolerance; });
 }

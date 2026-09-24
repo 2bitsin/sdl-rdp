@@ -3,13 +3,13 @@
 
 #include "sdl-rdp-backend.h"
 
-#include <stdexcept>
 #include <winpr/nt.h>
+#include <stdexcept>
 
 namespace Backend {
 namespace {
-constexpr unsigned AllowedFlags =
-    SDLRDP_FILE_READ | SDLRDP_FILE_WRITE | SDLRDP_FILE_CREATE | SDLRDP_FILE_TRUNCATE | SDLRDP_FILE_DIRECTORY;
+constexpr unsigned AllowedFlags = SDLRDP_FILE_READ | SDLRDP_FILE_WRITE | SDLRDP_FILE_CREATE | SDLRDP_FILE_TRUNCATE
+                                  | SDLRDP_FILE_DIRECTORY;
 auto Validated(unsigned flags) -> unsigned {
   if ((flags & SDLRDP_FILE_TRUNCATE) && !(flags & SDLRDP_FILE_WRITE))
     throw std::runtime_error("Truncate requires write access.");
@@ -29,19 +29,15 @@ auto Disposition(unsigned flags) -> unsigned {
 }
 auto CreateOptions(FileKind kind) -> unsigned {
   switch (kind) {
-  case FileKind::Directory:
-    return FILE_DIRECTORY_FILE;
-  case FileKind::File:
-    return FILE_NON_DIRECTORY_FILE;
-  case FileKind::Any:
-    return 0;
-  default:
-    utilities::Unreachable(kind);
+  case FileKind::Directory: return FILE_DIRECTORY_FILE;
+  case FileKind::File:      return FILE_NON_DIRECTORY_FILE;
+  case FileKind::Any:       return 0;
+  default:                  utilities::Unreachable(kind);
   }
 }
 }
 FileRequest::FileRequest(unsigned flags, FileKind file_kind, unsigned extra_access)
-    : _access { Access(Validated(flags), extra_access) }, _disposition{ Disposition(flags) }, _kind{ file_kind } { }
+    : _access{ Access(Validated(flags), extra_access) }, _disposition{ Disposition(flags) }, _kind{ file_kind } { }
 auto FileRequest::Create(std::span<uint8_t const> name) const -> DrivePacket {
   DrivePacket packet;
   packet.Put(_access);

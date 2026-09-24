@@ -1,6 +1,6 @@
+#include "SDL_rdpvideo.hpp"
 #include "SDL_rdpconstants.hpp"
 #include "boundary.hpp"
-#include "SDL_rdpvideo.hpp"
 #include <oxbox/utilities/hash.hpp>
 namespace rdp {
 using namespace oxbox::utilities::literals;
@@ -24,7 +24,7 @@ auto ApplyAspect(SDL_VideoData& data, std::optional<std::string> const& value) -
   if (auto const window = data.Window()) PublishAspect(*window, value);
 }
 // SDL hint observers receive an opaque context and nullable C strings.
-template<auto _Apply>
+template <auto _Apply>
 auto SDLCALL HintChanged(void* context, char const* name, char const* old_value, char const* new_value) -> void {
   utilities::Expects(context != nullptr, "hint observer has video state");
   utilities::Expects(name != nullptr, "hint observer has a name");
@@ -36,13 +36,14 @@ auto ConfiguredRefresh(Settings const& settings) -> RefreshMode {
   case "auto-client"_hash:         return RefreshMode::CLIENT;
   case "auto-client-average"_hash: return RefreshMode::CLIENT_AVERAGE;
   case "auto-sender"_hash:         return RefreshMode::SENDER;
-  default: return RefreshMode::FIXED;
+  default:                         return RefreshMode::FIXED;
   }
 }
 auto StartRefresh(Driver const& driver) -> int {
   auto const mode = ConfiguredRefresh(driver.Options());
   auto const hz   = mode == RefreshMode::FIXED
-      ? driver.Options().Integer(SDL_HINT_RDP_REFRESH, DefaultRefreshHz, 1, MaximumRefreshHz) : DefaultRefreshHz;
+                      ? driver.Options().Integer(SDL_HINT_RDP_REFRESH, DefaultRefreshHz, 1, MaximumRefreshHz)
+                      : DefaultRefreshHz;
   if (driver.Call<Operation::SET_REFRESH>(std::to_underlying(mode), hz) != 0) driver.Throw();
   return hz;
 }
@@ -65,16 +66,32 @@ auto InitDisplay(SDL_VideoData& data) -> void {
   if (!SDL_SetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, data.Backend().Call<Operation::PORT>()))
     throw std::runtime_error(SDL_GetError());
 }
+constexpr auto StandardModes = std::to_array<std::pair<int, int>>({
+    { 320 , 200  },
+    { 320 , 240  },
+    { 320 , 256  },
+    { 400 , 300  },
+    { 512 , 384  },
+    { 640 , 350  },
+    { 640 , 400  },
+    { 640 , 480  },
+    { 720 , 400  },
+    { 720 , 480  },
+    { 800 , 600  },
+    { 1024, 768  },
+    { 1280, 720  },
+    { 1280, 800  },
+    { 1920, 1080 },
+    { 1920, 1200 },
+    { 2560, 1440 },
+    { 3840, 2160 },
+});
 // SDL's video callback table supplies a borrowed device and display.
 auto DisplayModes([[maybe_unused]] SDL_VideoDevice* unused_device, SDL_VideoDisplay* display) -> bool {
   utilities::Expects(display != nullptr, "mode enumeration has a display");
-  constexpr auto standard_modes = std::to_array<std::pair<int, int>>({
-      {320, 200}, {320, 240}, {320, 256}, {400, 300}, {512, 384}, {640, 350}, {640, 400}, {640, 480}, {720, 400},
-      {720, 480}, {800, 600}, {1024, 768}, {1280, 720}, {1280, 800}, {1920, 1080}, {1920, 1200}, {2560, 1440},
-      { 3840, 2160 }});
-  auto           mode           = display->desktop_mode;
+  auto mode = display->desktop_mode;
   SDL_AddFullscreenDisplayMode(display, &mode);
-  for (auto const& [width, height] : standard_modes) {
+  for (auto const& [width, height] : StandardModes) {
     mode.w = width;
     mode.h = height;
     SDL_AddFullscreenDisplayMode(display, &mode);
@@ -82,8 +99,8 @@ auto DisplayModes([[maybe_unused]] SDL_VideoDevice* unused_device, SDL_VideoDisp
   return true;
 }
 // SDL's video callback table supplies borrowed device, display and mode pointers.
-auto DisplayMode(SDL_VideoDevice* device, [[maybe_unused]] SDL_VideoDisplay* unused_display,
-                 SDL_DisplayMode* mode) -> bool {
+auto DisplayMode(SDL_VideoDevice* device, [[maybe_unused]] SDL_VideoDisplay* unused_display, SDL_DisplayMode* mode)
+    -> bool {
   utilities::Expects(device != nullptr, "mode change has a device");
   utilities::Expects(mode != nullptr, "mode change has a mode");
   return ResizePicture(*device->internal, mode->w, mode->h);
@@ -99,7 +116,7 @@ auto VideoInit(SDL_VideoDevice* device) -> bool {
     InitDisplay(*device->internal);
     SDL_AddKeyboard(SDL_DEFAULT_KEYBOARD_ID, nullptr);
     SDL_AddMouse(SDL_DEFAULT_MOUSE_ID, nullptr);
-     SDL_GetMouse() -> SetRelativeMouseMode = RelativeMouse;
+    SDL_GetMouse()->SetRelativeMouseMode = RelativeMouse;
     InitMouse();
     return true;
   });
@@ -143,4 +160,4 @@ auto CreateDevice() -> SDL_VideoDevice* {
 }
 }
 // SDL's C bootstrap table requires this named object with static storage.
-extern "C" VideoBootStrap const RDP_bootstrap = {"rdp", "SDL RDP video driver", rdp::CreateDevice, nullptr, false};
+extern "C" VideoBootStrap const RDP_bootstrap = { "rdp", "SDL RDP video driver", rdp::CreateDevice, nullptr, false };

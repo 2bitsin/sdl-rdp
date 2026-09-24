@@ -33,8 +33,8 @@ auto Sample::WhenUnicodeControl(rdpInput* input, int code) -> void {
 auto Sample::ThenStoppedScancodeText(std::size_t stopped) -> void {
   EXPECT_EQ(process->Transcript().find("event TEXT_INPUT", stopped), std::string::npos);
   auto lines = std::string_view(process->Transcript()) | std::views::split('\n');
-  EXPECT_EQ(
-      std::ranges::count_if(lines, [](auto text) { return std::string_view(text).contains("event TEXT_INPUT"); }), 2);
+  EXPECT_EQ(std::ranges::count_if(lines, [](auto text) { return std::string_view(text).contains("event TEXT_INPUT"); }),
+            2);
   SDL_Log("gate SCANCODE_TEXT a=1 A=1 stopped_text=0");
 }
 auto Sample::WhenAspectRelative(Client& client) -> void {

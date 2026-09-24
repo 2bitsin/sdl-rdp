@@ -16,8 +16,8 @@ auto ChangeMonitor(Headless::Client& client) -> void {
 
 auto ThenAdvanced(Headless::Client& client) -> void {
   ASSERT_TRUE(client.Until([&] {
-    return InputClient::Advanced().load() && InputClient::Touch().load() &&
-           InputClient::Touch().load()->GetVersion(InputClient::Touch().load()) == RDPINPUT_PROTOCOL_V10;
+    return InputClient::Advanced().load() && InputClient::Touch().load()
+           && InputClient::Touch().load()->GetVersion(InputClient::Touch().load()) == RDPINPUT_PROTOCOL_V10;
   }));
 }
 

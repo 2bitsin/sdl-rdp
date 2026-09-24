@@ -2,7 +2,7 @@
 
 namespace Backend {
 SentFrame::SentFrame(UINT32 frame, uint64_t presented, Clock::time_point at) noexcept
-    : _id { frame }, _sequence{ presented }, _sent{ at } { }
+    : _id{ frame }, _sequence{ presented }, _sent{ at } { }
 auto SentFrame::Id() const noexcept -> UINT32 {
   return _id;
 }

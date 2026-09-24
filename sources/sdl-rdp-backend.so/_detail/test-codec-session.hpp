@@ -2,8 +2,8 @@
 #include "test-backend-events.hpp"
 #include "test-mode.hpp"
 
-#include <cstdint>
 #include <gtest/gtest.h>
+#include <cstdint>
 #include <span>
 #include <vector>
 

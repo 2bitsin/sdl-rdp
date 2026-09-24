@@ -4,12 +4,12 @@
 #include "support.test/sample.hpp"
 
 #include <SDL3/SDL.h>
-#include <cstddef>
-#include <filesystem>
-#include <fstream>
 #include <sdl-rdp-backend.so/_detail/drive-observer.hpp>
 #include <sdl-rdp-backend.so/_detail/frame-observer.hpp>
 #include <sdl-rdp-backend.so/_detail/share-drive.hpp>
+#include <cstddef>
+#include <filesystem>
+#include <fstream>
 #include <string>
 
 namespace SampleGate {

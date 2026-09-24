@@ -1,9 +1,9 @@
 #pragma once
 
+#include <oxbox/platform/contract.hpp>
 #include <algorithm>
 #include <array>
 #include <optional>
-#include <oxbox/platform/contract.hpp>
 #include <source_location>
 #include <stdexcept>
 #include <string>

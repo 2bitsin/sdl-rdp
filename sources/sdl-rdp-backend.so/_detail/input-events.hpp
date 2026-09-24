@@ -2,10 +2,10 @@
 #include "pinned.hpp"
 #include "sdl-rdp-backend.h"
 
-#include <array>
 #include <freerdp/freerdp.h>
 #include <freerdp/server/rdpei.h>
 #include <oxbox/utilities/utf-decode.hpp>
+#include <array>
 
 namespace Backend {
 class Activation;

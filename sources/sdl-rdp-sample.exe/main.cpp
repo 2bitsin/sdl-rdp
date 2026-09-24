@@ -6,6 +6,7 @@
 #include "input.hpp"
 
 #include <SDL3/SDL.h>
+#include <oxbox/utilities/number-text.hpp>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -14,7 +15,6 @@
 #include <format>
 #include <memory>
 #include <numbers>
-#include <oxbox/utilities/number-text.hpp>
 #include <ranges>
 #include <string>
 
@@ -92,8 +92,8 @@ auto SDLCALL FeedTone(void* userdata, SDL_AudioStream* stream, int additional, i
     auto count = std::min(additional / int(2 * sizeof(Sint16)), 480);
     if (!count) return;
     for (int i = 0; i < count; ++i, ++frame) {
-      auto value = Sint16(std::lround(32767 * std::pow(10.0, -12.0 / 20.0) *
-                                      std::sin(2 * std::numbers::pi * 440 * double(frame) / 48000)));
+      auto value = Sint16(std::lround(32767 * std::pow(10.0, -12.0 / 20.0)
+                                      * std::sin(2 * std::numbers::pi * 440 * double(frame) / 48000)));
       samples[2uz * i] = samples[(2uz * i) + 1] = value;
     }
     Check(SDL_PutAudioStreamData(stream, samples.data(), count * 2 * int(sizeof(Sint16))));

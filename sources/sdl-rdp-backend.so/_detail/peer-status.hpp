@@ -2,10 +2,10 @@
 #include "graphics-timing.hpp"
 #include "sdl-rdp-backend.h"
 
-#include <chrono>
-#include <cstdint>
 #include <freerdp/peer.h>
 #include <freerdp/server/disp.h>
+#include <chrono>
+#include <cstdint>
 #include <optional>
 
 namespace Backend {

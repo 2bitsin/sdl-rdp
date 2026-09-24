@@ -6,14 +6,14 @@
 #include "_detail/peer.hpp"
 #include "_detail/sdlrdp-file.hpp"
 
+#include <freerdp/channels/rdpdr.h>
+#include <winpr/nt.h>
 #include <array>
 #include <chrono>
 #include <climits>
 #include <concepts>
 #include <cstring>
-#include <freerdp/channels/rdpdr.h>
 #include <memory>
-#include <winpr/nt.h>
 
 namespace {
 using namespace Backend;
@@ -38,8 +38,8 @@ template <std::invocable Operation> auto Call(sdlrdp_handle* handle, Operation o
     return -1;
   }
 }
-auto Open(sdlrdp_handle* handle, unsigned drive, char const* path,
-          FileRequest const& request) -> std::unique_ptr<sdlrdp_file> {
+auto Open(sdlrdp_handle* handle, unsigned drive, char const* path, FileRequest const& request)
+    -> std::unique_ptr<sdlrdp_file> {
   auto channel  = Channel(handle);
   auto packet   = request.Create(DrivePath(path));
   auto response = channel->Wait(channel->Send(drive, 0, IRP_MJ_CREATE, packet), path);
@@ -62,8 +62,8 @@ auto UnixSeconds(uint64_t value) -> int64_t {
   // WinPR 3.15 FileTimeToSystemTime is a stub on Linux.
   constexpr uint64_t filetime_ticks_per_second = 10'000'000;
   using namespace std::chrono;
-  constexpr auto epoch =
-      duration_cast<seconds>(sys_days{ 1970y / January / 1 } - sys_days{ 1601y / January / 1 }).count();
+  constexpr auto epoch = duration_cast<seconds>(sys_days{ 1970y / January / 1 } - sys_days{ 1601y / January / 1 })
+                             .count();
   return int64_t(value / filetime_ticks_per_second) - epoch;
 }
 auto Stat(sdlrdp_file& file) -> sdlrdp_stat {
@@ -79,8 +79,8 @@ auto Stat(sdlrdp_file& file) -> sdlrdp_stat {
   standard.Skip(end_of_file_offset);
   return { standard.Get(8), bool(attributes & FILE_ATTRIBUTE_DIRECTORY), UnixSeconds(modified) };
 }
-auto ValidateTransfer(sdlrdp_handle* handle, sdlrdp_file* file, uint64_t offset, void const* buffer,
-                      std::size_t size) -> void {
+auto ValidateTransfer(sdlrdp_handle* handle, sdlrdp_file* file, uint64_t offset, void const* buffer, std::size_t size)
+    -> void {
   if (!handle || !file || (!buffer && size) || size > INT_MAX || offset > UINT64_MAX - size)
     throw std::runtime_error("Invalid drive transfer arguments.");
   if (Channel(handle) != file->Channel()) throw std::runtime_error("File belongs to a disconnected peer.");
@@ -95,8 +95,8 @@ auto SetInformation(sdlrdp_file& file, unsigned type, DrivePacket body) -> void 
   packet.Append(body.Bytes());
   Exchange(file, IRP_MJ_SET_INFORMATION, packet);
 }
-auto SetPathInformation(sdlrdp_handle* handle, unsigned drive, char const* path, unsigned type,
-                        DrivePacket body) -> void {
+auto SetPathInformation(sdlrdp_handle* handle, unsigned drive, char const* path, unsigned type, DrivePacket body)
+    -> void {
   auto file = Open(handle, drive, path, { 0, FileKind::Any, DELETE });
   SetInformation(*file, type, std::move(body));
   file->Close();
@@ -154,8 +154,8 @@ auto DirectoryQuery(bool first, std::span<uint8_t const> pattern) -> DrivePacket
   if (first) packet.Append(pattern);
   return packet;
 }
-auto Enumerate(sdlrdp_handle* handle, unsigned drive, char const* path, unsigned offset,
-               std::span<sdlrdp_dirent> out) -> int {
+auto Enumerate(sdlrdp_handle* handle, unsigned drive, char const* path, unsigned offset, std::span<sdlrdp_dirent> out)
+    -> int {
   auto     file    = Open(handle, drive, path, { SDLRDP_FILE_READ, FileKind::Directory });
   auto     pattern = DrivePath((std::string(path) + "/*").c_str());
   unsigned count   = 0;
@@ -181,8 +181,8 @@ auto sdlrdp_drive_list(sdlrdp_handle* handle, sdlrdp_drive* out, unsigned max) -
     return drive ? drive->List(out, max) : 0;
   });
 }
-auto sdlrdp_drive_open(sdlrdp_handle* handle, unsigned drive, char const* path, unsigned flags,
-                       sdlrdp_file** out) -> int {
+auto sdlrdp_drive_open(sdlrdp_handle* handle, unsigned drive, char const* path, unsigned flags, sdlrdp_file** out)
+    -> int {
   return Call(handle, [&] {
     if (!out) throw std::runtime_error("File output is null.");
     *out = nullptr;

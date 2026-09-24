@@ -1,9 +1,9 @@
 #pragma once
 #include "client.hpp"
 
-#include <atomic>
 #include <freerdp/client/disp.h>
 #include <freerdp/event.h>
+#include <atomic>
 #include <functional>
 
 namespace Headless {
@@ -19,8 +19,8 @@ public:
               DisplayClient(DisplayClient&&)                                                         = delete;
   explicit    DisplayClient(Client& client);
               ~DisplayClient();
-  auto        operator = (DisplayClient const&)                                    -> DisplayClient& = delete;
-  auto        operator = (DisplayClient&&)                                         -> DisplayClient& = delete;
+  auto        operator=(DisplayClient const&)                                      -> DisplayClient& = delete;
+  auto        operator=(DisplayClient&&)                                           -> DisplayClient& = delete;
   static auto Monitor(unsigned width, unsigned height, unsigned millimetres = 400) -> DISPLAY_CONTROL_MONITOR_LAYOUT;
   static auto Layout(unsigned width, unsigned height)                              -> bool;
   auto        Observed()                                                           -> DisplayCapture&;

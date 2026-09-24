@@ -3,10 +3,10 @@
 #include "_detail/contract.hpp"
 #include "_detail/extent.hpp"
 
+#include <freerdp/constants.h>
 #include <algorithm>
 #include <array>
 #include <cstddef>
-#include <freerdp/constants.h>
 
 namespace Backend {
 namespace {
@@ -18,9 +18,9 @@ auto PrepareRemoteFx(RemoteFxContext& rfx) -> bool {
 }
 auto PrepareNsCodec(NsCodecContext& nsc) -> bool {
   if (!nsc) nsc.reset(nsc_context_new());
-  return nsc && nsc_context_set_parameters(nsc.get(), NSC_COLOR_FORMAT, PIXEL_FORMAT_BGRX32) &&
-         nsc_context_set_parameters(nsc.get(), NSC_COLOR_LOSS_LEVEL, 1) &&
-         nsc_context_set_parameters(nsc.get(), NSC_ALLOW_SUBSAMPLING, 0);
+  return nsc && nsc_context_set_parameters(nsc.get(), NSC_COLOR_FORMAT, PIXEL_FORMAT_BGRX32)
+         && nsc_context_set_parameters(nsc.get(), NSC_COLOR_LOSS_LEVEL, 1)
+         && nsc_context_set_parameters(nsc.get(), NSC_ALLOW_SUBSAMPLING, 0);
 }
 auto CompressRow(BITMAP_PLANAR_CONTEXT& context, std::span<BYTE const> pixels, unsigned width, std::span<BYTE> out,
                  UINT32& size) -> BYTE* {
@@ -31,20 +31,14 @@ auto Available(rdpSettings const* settings, sdlrdp_codec codec) -> bool {
   utilities::Expects(settings != nullptr, "negotiated settings exist");
   auto surface = freerdp_settings_get_bool(settings, FreeRDP_SurfaceCommandsEnabled);
   switch (codec) {
-  case SDLRDP_CODEC_PLANAR:
-    return freerdp_settings_get_uint32(settings, FreeRDP_ColorDepth) == 32;
-  case SDLRDP_CODEC_REMOTEFX:
-    return surface && freerdp_settings_get_bool(settings, FreeRDP_RemoteFxCodec);
-  case SDLRDP_CODEC_NSCODEC:
-    return surface && freerdp_settings_get_bool(settings, FreeRDP_NSCodec);
-  case SDLRDP_CODEC_RAW:
-    return true;
+  case SDLRDP_CODEC_PLANAR:   return freerdp_settings_get_uint32(settings, FreeRDP_ColorDepth) == 32;
+  case SDLRDP_CODEC_REMOTEFX: return surface && freerdp_settings_get_bool(settings, FreeRDP_RemoteFxCodec);
+  case SDLRDP_CODEC_NSCODEC:  return surface && freerdp_settings_get_bool(settings, FreeRDP_NSCodec);
+  case SDLRDP_CODEC_RAW:      return true;
   case SDLRDP_CODEC_AVC420:
   case SDLRDP_CODEC_PROGRESSIVE:
-  case SDLRDP_CODEC_AUTO:
-    return false;
-  default:
-    utilities::Unreachable(codec);
+  case SDLRDP_CODEC_AUTO: return false;
+  default:                utilities::Unreachable(codec);
   }
 }
 }
@@ -65,16 +59,11 @@ auto Encoder::SetupPlanar(rdpSettings const* settings, bool xrgb) -> bool {
 }
 auto Encoder::InitializeCodec(rdpSettings const* settings) -> bool {
   switch (codec) {
-  case SDLRDP_CODEC_PLANAR:
-    return SetupPlanar(settings);
-  case SDLRDP_CODEC_REMOTEFX:
-    return PrepareRemoteFx(remote_fx.context);
-  case SDLRDP_CODEC_NSCODEC:
-    return PrepareNsCodec(nsc);
-  case SDLRDP_CODEC_RAW:
-    return true;
-  default:
-    utilities::Unreachable(codec);
+  case SDLRDP_CODEC_PLANAR:   return SetupPlanar(settings);
+  case SDLRDP_CODEC_REMOTEFX: return PrepareRemoteFx(remote_fx.context);
+  case SDLRDP_CODEC_NSCODEC:  return PrepareNsCodec(nsc);
+  case SDLRDP_CODEC_RAW:      return true;
+  default:                    utilities::Unreachable(codec);
   }
 }
 auto Encoder::Select(rdpSettings const* settings, sdlrdp_codec preference) -> bool {
@@ -148,14 +137,10 @@ auto Encoder::EncodePlanar(std::span<BYTE const> pixels, unsigned width) -> bool
 auto Encoder::Id(rdpSettings const* settings) const -> unsigned {
   utilities::Expects(settings != nullptr, "codec IDs were negotiated");
   switch (codec) {
-  case SDLRDP_CODEC_REMOTEFX:
-    return freerdp_settings_get_uint32(settings, FreeRDP_RemoteFxCodecId);
-  case SDLRDP_CODEC_NSCODEC:
-    return freerdp_settings_get_uint32(settings, FreeRDP_NSCodecId);
-  case SDLRDP_CODEC_RAW:
-    return RDP_CODEC_ID_NONE;
-  default:
-    utilities::Unreachable(codec);
+  case SDLRDP_CODEC_REMOTEFX: return freerdp_settings_get_uint32(settings, FreeRDP_RemoteFxCodecId);
+  case SDLRDP_CODEC_NSCODEC:  return freerdp_settings_get_uint32(settings, FreeRDP_NSCodecId);
+  case SDLRDP_CODEC_RAW:      return RDP_CODEC_ID_NONE;
+  default:                    utilities::Unreachable(codec);
   }
 }
 auto Encoder::Codec() const noexcept -> sdlrdp_codec {

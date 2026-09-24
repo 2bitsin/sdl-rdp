@@ -1,12 +1,12 @@
 #include "_detail/test-audio-session.hpp"
 
+#include <freerdp/input.h>
+#include <oxbox/utilities/number-text.hpp>
 #include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstddef>
-#include <freerdp/input.h>
 #include <future>
-#include <oxbox/utilities/number-text.hpp>
 #include <regex>
 #include <string>
 #include <thread>
@@ -38,11 +38,11 @@ auto ThenAudioCadence(SoundClient const& audio) -> void {
   ASSERT_GT(audio.CaptureState().received.size(), 1u);
   double maximum_gap = 0;
   for (std::size_t i = 1; i < audio.CaptureState().received.size(); ++i)
-    maximum_gap = std::max(maximum_gap, std::chrono::duration<double, std::milli>(audio.CaptureState().received[i] -
-                                                                                  audio.CaptureState().received[i - 1])
+    maximum_gap = std::max(maximum_gap, std::chrono::duration<double, std::milli>(
+                                            audio.CaptureState().received[i] - audio.CaptureState().received[i - 1])
                                             .count());
-  auto block_ms = 1000.0 * double(audio.CaptureState().samples.size()) / 2 /
-                  double(audio.CaptureState().received.size()) / audio.CaptureState().rate;
+  auto block_ms = 1000.0 * double(audio.CaptureState().samples.size()) / 2
+                  / double(audio.CaptureState().received.size()) / audio.CaptureState().rate;
   testing::Test::RecordProperty("maximum_block_gap_ms", std::to_string(maximum_gap));
   EXPECT_LE(maximum_gap, (2 * block_ms) + 10);
 }
@@ -100,8 +100,8 @@ auto AudioSession::RunRealtimeAudio(Client& client, SoundClient& audio) -> void 
   Expects(backend != nullptr, "backend exists");
   Expects(audio.CaptureState().opened, "client audio channel is open");
   auto writing = std::async(std::launch::async, [&] { return WriteRealtimeAudio(backend.get()); });
-  ConfirmDelayedAudio(client, audio, { .frames  = 96000, .delay = std::chrono::milliseconds(150),
-                                       .timeout = std::chrono::seconds(4) });
+  ConfirmDelayedAudio(client, audio,
+                      { .frames = 96000, .delay = std::chrono::milliseconds(150), .timeout = std::chrono::seconds(4) });
   sdlrdp_audio_close(backend.get());
   EXPECT_EQ(writing.get(), 96000);
   EXPECT_EQ(audio.CaptureState().samples.size() / 2, 96000u);

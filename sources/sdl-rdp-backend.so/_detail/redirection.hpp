@@ -1,9 +1,9 @@
 #pragma once
 #include "factory.hpp"
 
+#include <winpr/wtypes.h>
 #include <memory>
 #include <span>
-#include <winpr/wtypes.h>
 
 namespace Backend {
 inline constexpr unsigned RedirectionHandleLimit = 3;
@@ -21,8 +21,8 @@ public:
                    Factory<std::unique_ptr<AudioChannel>> sound, Factory<std::unique_ptr<ClipboardChannel>> clipboard,
                    Factory<std::shared_ptr<DriveChannel>> drive) noexcept;
        ~Redirection();
-  auto operator = (Redirection const&)           -> Redirection& = delete;
-  auto operator = (Redirection&&)                -> Redirection& = delete;
+  auto operator=(Redirection const&)             -> Redirection& = delete;
+  auto operator=(Redirection&&)                  -> Redirection& = delete;
   auto OpenStatic(std::span<HANDLE const> ready) -> bool;
   auto Sound(std::span<HANDLE const> ready)      -> void;
   auto Audio() const noexcept                    -> AudioChannel*;

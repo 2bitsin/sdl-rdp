@@ -1,12 +1,12 @@
 #pragma once
 #include "contract.hpp"
 
+#include <freerdp/channels/rdpgfx.h>
+#include <winpr/sysinfo.h>
 #include <algorithm>
 #include <array>
-#include <freerdp/channels/rdpgfx.h>
 #include <ranges>
 #include <span>
-#include <winpr/sysinfo.h>
 
 namespace Backend {
 inline constexpr std::array versions             { RDPGFX_CAPVERSION_8, RDPGFX_CAPVERSION_81, RDPGFX_CAPVERSION_10,
@@ -33,8 +33,8 @@ inline auto Newest(std::span<RDPGFX_CAPSET const> caps) -> RDPGFX_CAPSET {
 }
 inline auto AnsweredFlags(RDPGFX_CAPSET const& cap, bool avc) -> uint32_t {
   if (cap.version == RDPGFX_CAPVERSION_101) return 0;
-  auto const kept =
-      cap.flags & (RDPGFX_CAPS_FLAG_THINCLIENT | RDPGFX_CAPS_FLAG_SMALL_CACHE | RDPGFX_CAPS_FLAG_SCALEDMAP_DISABLE);
+  auto const kept = cap.flags
+                    & (RDPGFX_CAPS_FLAG_THINCLIENT | RDPGFX_CAPS_FLAG_SMALL_CACHE | RDPGFX_CAPS_FLAG_SCALEDMAP_DISABLE);
   if (cap.version == RDPGFX_CAPVERSION_81) return avc ? kept | RDPGFX_CAPS_FLAG_AVC420_ENABLED : kept;
   return cap.version >= RDPGFX_CAPVERSION_10 && !avc ? kept | RDPGFX_CAPS_FLAG_AVC_DISABLED : kept;
 }
@@ -57,7 +57,7 @@ inline auto FrameTimestamp(SYSTEMTIME const& time) -> UINT32 {
   utilities::Expects(time.wMinute < (1u << MinuteBits), "MS-RDPEGFX 2.2.2.11 timestamp fields fit");
   utilities::Expects(time.wSecond < (1u << SecondBits), "MS-RDPEGFX 2.2.2.11 timestamp fields fit");
   utilities::Expects(time.wMilliseconds < (1u << MillisecondBits), "MS-RDPEGFX 2.2.2.11 timestamp fields fit");
-  return (UINT32(time.wHour) << HourShift) | (UINT32(time.wMinute) << MinuteShift) |
-         (UINT32(time.wSecond) << SecondShift) | time.wMilliseconds;
+  return (UINT32(time.wHour) << HourShift) | (UINT32(time.wMinute) << MinuteShift)
+         | (UINT32(time.wSecond) << SecondShift) | time.wMilliseconds;
 }
 }

@@ -2,12 +2,12 @@
 
 #include "_detail/sound-client.hpp"
 
+#include <freerdp/svc.h>
+#include <oxbox/utilities/serdes.hpp>
 #include <algorithm>
 #include <array>
 #include <cstring>
-#include <freerdp/svc.h>
 #include <iterator>
-#include <oxbox/utilities/serdes.hpp>
 #include <span>
 
 namespace Headless {
@@ -75,7 +75,8 @@ auto SoundProtocol::Register(CHANNEL_ENTRY_POINTS_EX* points, void* handle) -> B
   std::memcpy(definition.name, "rdpsnd", 7);
   definition.options = CHANNEL_OPTION_INITIALIZED | CHANNEL_OPTION_ENCRYPT_RDP;
   return points->pVirtualChannelInitEx(self, nullptr, handle, &definition, 1, VIRTUAL_CHANNEL_VERSION_WIN2000,
-                                       Initialized) == CHANNEL_RC_OK;
+                                       Initialized)
+         == CHANNEL_RC_OK;
 }
 auto SoundProtocol::Initialized(void* user, void* /*unused*/, UINT event, void* /*unused*/, UINT /*unused*/) -> void {
   auto& self = *static_cast<SoundClient*>(user);
@@ -149,22 +150,16 @@ auto SoundProtocol::CaptureWave(SoundClient& self) -> void {
 }
 auto SoundProtocol::Dispatch(SoundClient& self, wStream* stream, BYTE type, UINT16 size) -> void {
   switch (type) {
-  case 7:
-    Formats(self, stream);
-    break;
+  case 7: Formats(self, stream); break;
   case 2:
-  case 13:
-    Wave(self, stream, size, type == 13);
-    break;
+  case 13: Wave(self, stream, size, type == 13); break;
   case 6:
     Expects(self.incoming.size() >= 8, "training request has its header");
     Expects(self.Send(std::span(self.incoming).first(8)), "training response is sent");
     break;
   case 1:
-  case 3:
-    break;
-  default:
-    utilities::Unreachable(type);
+  case 3:  break;
+  default: utilities::Unreachable(type);
   }
 }
 }

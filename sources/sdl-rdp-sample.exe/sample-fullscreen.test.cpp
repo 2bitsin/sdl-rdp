@@ -5,14 +5,13 @@
 #include "support.test/sample-launch.hpp"
 #include "support.test/sample.hpp"
 
-
 #include <SDL3/SDL.h>
+#include <sdl-rdp-backend.so/_detail/display-client.hpp>
+#include <sdl-rdp-backend.so/_detail/frame-observer.hpp>
 #include <algorithm>
 #include <fstream>
 #include <memory>
 #include <ranges>
-#include <sdl-rdp-backend.so/_detail/display-client.hpp>
-#include <sdl-rdp-backend.so/_detail/frame-observer.hpp>
 #include <string>
 #include <thread>
 
@@ -102,9 +101,9 @@ TEST_F(FullscreenSample, ExplicitFullscreenSurvivesScreenChange) {
   ASSERT_TRUE(Read("event GEOMETRY window=320x200 desktop=320x200"));
   ChangeMonitor(client);
   if (::testing::Test::HasFatalFailure()) return;
-  ASSERT_TRUE(ReadInput(
-      client, "event DISPLAY_DESKTOP_MODE_CHANGED type=" + std::to_string(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED) +
-                  " width=1920 height=1080"));
+  ASSERT_TRUE(ReadInput(client, "event DISPLAY_DESKTOP_MODE_CHANGED type="
+                                    + std::to_string(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED)
+                                    + " width=1920 height=1080"));
   ThenExplicitGeometry(client);
   if (::testing::Test::HasFatalFailure()) return;
   SDL_Log("trace screen=1920x1080 gdi=320x200");
@@ -200,13 +199,13 @@ INSTANTIATE_TEST_SUITE_P(Window, RefreshMode, testing::Values("windowed", "borde
 
 class ExclusiveFullscreen : public FullscreenSample, public testing::WithParamInterface<char const*> {
 protected:
-  auto WhenDesktopModeChanges(Client& client, Headless::DisplayClient& display,
-                              FullDesktopFrames const& desktop) -> void {
+  auto WhenDesktopModeChanges(Client& client, Headless::DisplayClient& display, FullDesktopFrames const& desktop)
+      -> void {
     ASSERT_GT(desktop.Full(), 0u);
     ASSERT_TRUE(display.Layout(1920, 1080));
-    ASSERT_TRUE(ReadInput(
-        client, "event DISPLAY_DESKTOP_MODE_CHANGED type=" + std::to_string(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED) +
-                    " width=1920 height=1080"));
+    ASSERT_TRUE(ReadInput(client, "event DISPLAY_DESKTOP_MODE_CHANGED type="
+                                      + std::to_string(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED)
+                                      + " width=1920 height=1080"));
   }
   static auto ThenNextWindow(Client& client, Headless::FrameObserver& frames) -> void {
     auto initial = frames.Frames().size();
@@ -313,8 +312,8 @@ TEST_F(FullscreenSample, AspectMapsMouse) {
 }
 
 namespace {
-auto ThenRefilledWindow(Client& client, Headless::FrameObserver& observer, std::size_t& acknowledged,
-                        unsigned window) -> void {
+auto ThenRefilledWindow(Client& client, Headless::FrameObserver& observer, std::size_t& acknowledged, unsigned window)
+    -> void {
   ASSERT_EQ(observer.Frames().size() - acknowledged, window);
   ASSERT_TRUE(observer.Ack());
   acknowledged = observer.Frames().size();

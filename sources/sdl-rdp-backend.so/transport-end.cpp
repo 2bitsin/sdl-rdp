@@ -7,10 +7,10 @@
 #include "_detail/peer-frames.hpp"
 #include "_detail/peer-link.hpp"
 
+#include <freerdp/settings.h>
 #include <array>
 #include <format>
 #include <ranges>
-#include <freerdp/settings.h>
 #include <string>
 #include <utility>
 
@@ -30,8 +30,8 @@ auto ProtocolNames(UINT32 mask, bool rdp) -> std::string {
   return names;
 }
 auto Refusal(rdpSettings const& settings, std::string const& protocols) -> std::string {
-  auto const offered = (freerdp_settings_get_bool(&settings, FreeRDP_TlsSecurity) ? SecurityTls : 0) |
-                       (freerdp_settings_get_bool(&settings, FreeRDP_NlaSecurity) ? SecurityNla : 0);
+  auto const offered = (freerdp_settings_get_bool(&settings, FreeRDP_TlsSecurity) ? SecurityTls : 0)
+                       | (freerdp_settings_get_bool(&settings, FreeRDP_NlaSecurity) ? SecurityNla : 0);
   return std::format("Connection refused: client requested {}, server offers {}", protocols,
                      ProtocolNames(offered, freerdp_settings_get_bool(&settings, FreeRDP_RdpSecurity)));
 }
@@ -55,7 +55,7 @@ auto ReportDisconnect(Diagnostics const& diagnostics, Activation const& activati
 }
 TransportEnd::TransportEnd(PeerLink& link, Activation const& activation, Authenticator& authenticator,
                            PeerFrames const& frames, FrameStore& store, Diagnostics const& diagnostics) noexcept
-    : _link { link }, _activation{ activation }, _authenticator{ authenticator }, _frames{ frames }, _store{ store },
+    : _link{ link }, _activation{ activation }, _authenticator{ authenticator }, _frames{ frames }, _store{ store },
       _diagnostics{ diagnostics } { }
 auto TransportEnd::SecurityEnded() const -> bool {
   if (!NegotiationRefused() && !TlsHandshakeFailed()) return false;

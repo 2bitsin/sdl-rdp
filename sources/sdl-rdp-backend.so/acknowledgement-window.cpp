@@ -1,8 +1,8 @@
 #include "_detail/acknowledgement-window.hpp"
 
+#include <winpr/synch.h>
 #include <algorithm>
 #include <iterator>
-#include <winpr/synch.h>
 
 namespace Backend {
 auto WaitMilliseconds(std::chrono::nanoseconds remaining, int64_t floor) -> DWORD {

@@ -2,6 +2,7 @@
 
 #include "support.test/spawn-actions.hpp"
 
+#include <sdl-rdp-backend.so/_detail/descriptor.hpp>
 #include <algorithm>
 #include <array>
 #include <cerrno>
@@ -10,7 +11,6 @@
 #include <fcntl.h>
 #include <iterator>
 #include <poll.h>
-#include <sdl-rdp-backend.so/_detail/descriptor.hpp>
 #include <sys/wait.h>
 #include <thread>
 #include <unistd.h>

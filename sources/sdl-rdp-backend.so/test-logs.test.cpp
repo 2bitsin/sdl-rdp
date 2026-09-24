@@ -11,12 +11,12 @@ auto Logs::Collect(void* user, sdlrdp_log_level level, char const* text) -> void
 }
 auto Logs::Text(bool include_info) -> std::string {
   std::scoped_lock const lock(guard);
-  return lines | std::views::filter([=](auto const& line) { return include_info || line.first != SDLRDP_LOG_INFO; }) |
-         std::views::transform([](auto const& line) {
-           auto level = line.first == SDLRDP_LOG_ERROR ? "ERROR" : line.first == SDLRDP_LOG_WARN ? "WARN" : "INFO";
-           return std::string(level) + ": " + line.second;
-         }) |
-         std::views::join_with('\n') | std::ranges::to<std::string>();
+  return lines | std::views::filter([=](auto const& line) { return include_info || line.first != SDLRDP_LOG_INFO; })
+         | std::views::transform([](auto const& line) {
+             auto level = line.first == SDLRDP_LOG_ERROR ? "ERROR" : line.first == SDLRDP_LOG_WARN ? "WARN" : "INFO";
+             return std::string(level) + ": " + line.second;
+           })
+         | std::views::join_with('\n') | std::ranges::to<std::string>();
 }
 auto Logs::Count(sdlrdp_log_level level, std::string_view text) -> unsigned {
   return Matching([=](auto const& line) { return line.first == level && line.second.contains(text); });

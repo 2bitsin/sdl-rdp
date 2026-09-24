@@ -4,9 +4,9 @@
 #include "releases-peer.hpp"
 #include "wake-event.hpp"
 
-#include <concepts>
 #include <freerdp/freerdp.h>
 #include <winpr/wtsapi.h>
+#include <concepts>
 
 namespace Backend {
 using ChannelManager = std::unique_ptr<void, Releases<WTSCloseServer>>;

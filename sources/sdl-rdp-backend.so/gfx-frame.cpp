@@ -10,6 +10,7 @@
 #include "_detail/rect.hpp"
 #include "_detail/scaler.hpp"
 
+#include <winpr/sysinfo.h>
 #include <algorithm>
 #include <array>
 #include <concepts>
@@ -17,7 +18,6 @@
 #include <memory>
 #include <ranges>
 #include <utility>
-#include <winpr/sysinfo.h>
 
 namespace Backend {
 namespace {
@@ -48,16 +48,13 @@ auto SurfaceCommand(sdlrdp_rect area, std::span<BYTE> data, UINT32 codec) -> RDP
 auto Persistent(sdlrdp_codec codec) -> bool {
   switch (codec) {
   case SDLRDP_CODEC_PROGRESSIVE:
-  case SDLRDP_CODEC_AVC420:
-    return true;
+  case SDLRDP_CODEC_AVC420: return true;
   case SDLRDP_CODEC_AUTO:
   case SDLRDP_CODEC_PLANAR:
   case SDLRDP_CODEC_REMOTEFX:
   case SDLRDP_CODEC_NSCODEC:
-  case SDLRDP_CODEC_RAW:
-    return false;
-  default:
-    utilities::Unreachable(codec);
+  case SDLRDP_CODEC_RAW: return false;
+  default:               utilities::Unreachable(codec);
   }
 }
 auto FellBack(sdlrdp_codec preference, sdlrdp_codec requested, sdlrdp_codec choice) -> bool {
@@ -91,8 +88,8 @@ auto ProgressiveHeaders(std::span<BYTE const> data) -> bool {
   if (data.size() < ProgressiveHeaderBytes) return false;
   constexpr auto sync    = BlockHeader(ProgressiveSyncBlock, ProgressiveSyncBytes);
   constexpr auto context = BlockHeader(ProgressiveContextBlock, ProgressiveContextBytes);
-  return std::ranges::equal(sync, data.first(sync.size())) &&
-         std::ranges::equal(context, data.subspan(ProgressiveSyncBytes, context.size()));
+  return std::ranges::equal(sync, data.first(sync.size()))
+         && std::ranges::equal(context, data.subspan(ProgressiveSyncBytes, context.size()));
 }
 }
 auto GfxChannel::CodecChoice() -> sdlrdp_codec {
@@ -270,16 +267,11 @@ auto GfxChannel::Encode() -> bool {
   BeginPayload();
   auto const codec = _encoder.Codec();
   switch (codec) {
-  case SDLRDP_CODEC_AVC420:
-    return Avc420();
-  case SDLRDP_CODEC_PROGRESSIVE:
-    return Progressive();
-  case SDLRDP_CODEC_PLANAR:
-    return Planar();
-  case SDLRDP_CODEC_RAW:
-    return Raw();
-  default:
-    utilities::Unreachable(codec);
+  case SDLRDP_CODEC_AVC420:      return Avc420();
+  case SDLRDP_CODEC_PROGRESSIVE: return Progressive();
+  case SDLRDP_CODEC_PLANAR:      return Planar();
+  case SDLRDP_CODEC_RAW:         return Raw();
+  default:                       utilities::Unreachable(codec);
   }
 }
 auto GfxChannel::Send() -> bool {

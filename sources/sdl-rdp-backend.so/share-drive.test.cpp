@@ -2,11 +2,11 @@
 
 #include "_detail/client-channels.hpp"
 
-#include <array>
 #include <freerdp/addin.h>
 #include <freerdp/channels/channels.h>
 #include <freerdp/client/channels.h>
 #include <freerdp/client/cmdline.h>
+#include <array>
 
 namespace Headless {
 auto ShareDrive(Client& client, char const* path, char const* name) -> void {

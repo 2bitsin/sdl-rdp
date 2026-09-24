@@ -49,8 +49,8 @@ auto ThenMissingDriveFile(sdlrdp_handle* handle, unsigned drive) -> void {
 namespace {
 class Drive : public DriveChecks {
 protected:
-  auto WhenDirectoryPaged(std::array<sdlrdp_dirent, 32>& entries, std::set<std::string>& actual,
-                          unsigned& offset) -> void {
+  auto WhenDirectoryPaged(std::array<sdlrdp_dirent, 32>& entries, std::set<std::string>& actual, unsigned& offset)
+      -> void {
     for (;;) {
       auto count = sdlrdp_drive_enumerate(handle.get(), drive, "many", offset, entries.data(), 32);
       ASSERT_GE(count, 0) << sdlrdp_last_error();
@@ -82,13 +82,11 @@ protected:
     EXPECT_GT(info.modified, 0);
   }
   auto ThenNoDriveRequests(Headless::DriveObserver const& observer) -> void {
-    for (unsigned i = 0; i < 10; ++i)
-      ASSERT_TRUE(client->Pump());
+    for (unsigned i = 0; i < 10; ++i) ASSERT_TRUE(client->Pump());
     EXPECT_EQ(observer.Observed().requests, 0u);
   }
   static auto ThenUniquePage(std::span<sdlrdp_dirent const> entries, std::set<std::string>& actual) -> void {
-    for (auto const& entry : entries)
-      EXPECT_TRUE(actual.insert(entry.name).second);
+    for (auto const& entry : entries) EXPECT_TRUE(actual.insert(entry.name).second);
   }
   auto ThenSharedFile(sdlrdp_drive const& entry) -> void {
     sdlrdp_file* file = nullptr;

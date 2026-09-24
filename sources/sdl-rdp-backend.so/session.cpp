@@ -5,8 +5,8 @@
 #include "_detail/event-queue.hpp"
 #include "_detail/peer.hpp"
 
-#include <stdexcept>
 #include <winpr/synch.h>
+#include <stdexcept>
 
 namespace Backend {
 namespace {
@@ -22,7 +22,7 @@ auto AnnounceDeparture(Session& session, EventQueue& events, Peer const& peer) -
 }
 }
 Session::Session(FrameStore& frames, EventQueue& events)
-    : _reap { ReapSignal() }, _frames{ frames }, _events{ events } { }
+    : _reap{ ReapSignal() }, _frames{ frames }, _events{ events } { }
 auto Session::Lock() -> SessionLock {
   return SessionLock{ _guard };
 }

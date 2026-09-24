@@ -40,8 +40,7 @@ protected:
     ASSERT_TRUE(observer.AckFrame(0, 10000000));
     ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 1280, 320, 200, &full, 1), 0);
     auto deadline = Clock::now() + std::chrono::milliseconds(80);
-    while (Clock::now() < deadline)
-      ASSERT_TRUE(client.Pump());
+    while (Clock::now() < deadline) ASSERT_TRUE(client.Pump());
     EXPECT_EQ(observer.Observed().frames.size(), 2u);
   }
   auto ThenDecodedGraphics(Client& client, Headless::GraphicsObserver& observer) -> void {

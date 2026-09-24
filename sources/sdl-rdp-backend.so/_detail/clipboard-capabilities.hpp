@@ -1,7 +1,7 @@
 #pragma once
 
-#include <concepts>
 #include <freerdp/channels/cliprdr.h>
+#include <concepts>
 
 namespace Backend {
 template <std::invocable<CLIPRDR_CAPABILITIES const*> Send>

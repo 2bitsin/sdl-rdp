@@ -13,7 +13,7 @@
 namespace Backend {
 FrameCapture::FrameCapture(PeerLink& link, FrameStore& store, PeerFrames& frames, DesktopLayout& desktop,
                            FramePacing& pacing, FrameStatistics& statistics, Encoder const& encoder) noexcept
-    : _link { link }, _store{ store }, _frames{ frames }, _desktop{ desktop }, _pacing{ pacing },
+    : _link{ link }, _store{ store }, _frames{ frames }, _desktop{ desktop }, _pacing{ pacing },
       _statistics{ statistics }, _encoder{ encoder } { }
 auto FrameCapture::Next() -> CaptureState {
   if (!_frames.Snapshot() && !Begin()) return CaptureState::Failed;

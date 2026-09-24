@@ -10,12 +10,13 @@ namespace rdp {
 class Driver {
 public:
   Driver();
-  template<Operation _Operation, typename... _Args>
+  template <Operation _Operation, typename... _Args>
     requires BackendOperation<_Operation, sdlrdp_handle*, _Args...>
   auto Call(_Args&&... args) const -> decltype(auto) {
     return _backend.Call<_Operation>(_session.Get().second, std::forward<_Args>(args)...);
   }
-  template<typename _Accept> requires std::invocable<_Accept const&, sdlrdp_event const&>
+  template <typename _Accept>
+    requires std::invocable<_Accept const&, sdlrdp_event const&>
   auto Poll(_Accept const& accept) const -> void {
     std::array<sdlrdp_event, _EventBatch> events{ };
     for (auto count = _Poll(events); count; count = _Poll(events))
@@ -24,7 +25,7 @@ public:
   auto Options() const                                   -> Settings const&;
   auto Config() const                                    -> sdlrdp_config const&;
   auto AuthDisplay(SDL_PropertiesID properties) noexcept -> void;
-  template<typename _Failure = bool>
+  template <typename _Failure = bool>
   auto Fail(_Failure failure = { }) const -> _Failure {
     _ReportError();
     return failure;
@@ -32,7 +33,7 @@ public:
   [[noreturn]] auto Throw() const -> void;
 private:
   // Backend authentication callbacks carry an opaque context and borrowed C strings.
-  template<Operation _Operation, AuthenticationCredential _Credential>
+  template <Operation _Operation, AuthenticationCredential _Credential>
   static auto _Authenticate(void* context, char const* domain, char const* user, _Credential credential) -> int;
   auto _Poll(std::span<sdlrdp_event> events) const -> std::size_t;
   auto _ReportError() const                        -> void;

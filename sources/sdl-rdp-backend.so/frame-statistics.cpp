@@ -41,14 +41,13 @@ auto FrameStatistics::AvcPhases() const -> std::string {
                      MeanMilliseconds(_avc.upload, _avc_frames), MeanMilliseconds(_avc.encode, _avc_frames));
 }
 auto FrameStatistics::Summary() const -> std::string {
-  return std::format(
-      "Frames: {} sent, {} coalesced; encode {:.1f} ms mean, {:.1f} ms max{}; acknowledgement {:.1f} ms "
-      "mean, {:.1f} ms max, {} over 100 ms, {} timed out. Send buffer: {:.1f} bytes mean, {} bytes max.",
-      _encode.Count(), _coalesced, MeanMilliseconds(_encode.Total(), _encode.Count()),
-      Milliseconds(_encode.Maximum()).count(), AvcPhases(),
-      MeanMilliseconds(_acknowledgement.Total(), _acknowledgement.Count()),
-      Milliseconds(_acknowledgement.Maximum()).count(), _slow, _timed_out, Mean(_outq.Total(), _encode.Count()),
-      _outq.Maximum());
+  return std::format("Frames: {} sent, {} coalesced; encode {:.1f} ms mean, {:.1f} ms max{}; acknowledgement {:.1f} ms "
+                     "mean, {:.1f} ms max, {} over 100 ms, {} timed out. Send buffer: {:.1f} bytes mean, {} bytes max.",
+                     _encode.Count(), _coalesced, MeanMilliseconds(_encode.Total(), _encode.Count()),
+                     Milliseconds(_encode.Maximum()).count(), AvcPhases(),
+                     MeanMilliseconds(_acknowledgement.Total(), _acknowledgement.Count()),
+                     Milliseconds(_acknowledgement.Maximum()).count(), _slow, _timed_out,
+                     Mean(_outq.Total(), _encode.Count()), _outq.Maximum());
 }
 auto FrameStatistics::Acknowledgements() const noexcept -> uint64_t {
   return _acknowledgement.Count();

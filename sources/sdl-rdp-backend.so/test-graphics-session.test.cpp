@@ -2,10 +2,10 @@
 
 #include "_detail/test-has-cookie.hpp"
 
+#include <freerdp/settings.h>
 #include <algorithm>
 #include <chrono>
 #include <concepts>
-#include <freerdp/settings.h>
 #include <ranges>
 
 namespace BackendGate {
@@ -28,8 +28,8 @@ auto GraphicsSession::ThenWriteDisconnect(Client& client) -> void {
   EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, "")) << logs.Text(true);
   RecordProperty("trace", logs.Text(true));
 }
-auto GraphicsSession::Open(unsigned w, unsigned h, sdlrdp_aspect aspect, sdlrdp_codec codec,
-                           unsigned audio_latency) -> void {
+auto GraphicsSession::Open(unsigned w, unsigned h, sdlrdp_aspect aspect, sdlrdp_codec codec, unsigned audio_latency)
+    -> void {
   sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), w, h, 0, Logs::Collect, &logs };
   config.aspect           = aspect;
   config.codec            = codec;
@@ -44,8 +44,8 @@ auto GraphicsSession::GraphicsClient() -> Client& {
 auto GraphicsSession::GraphicsObserver() -> Headless::GraphicsObserver& {
   return *graphics_observer;
 }
-auto GraphicsSession::PresentProgressiveDamage(Client& client, std::vector<UINT32> const& pixels,
-                                               sdlrdp_rect damage) -> void {
+auto GraphicsSession::PresentProgressiveDamage(Client& client, std::vector<UINT32> const& pixels, sdlrdp_rect damage)
+    -> void {
   ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 640 * 4, 640, 480, &damage, 1), 0);
   ASSERT_TRUE(client.Until([&] { return Acknowledged(); }));
   EXPECT_LE(client.MaxError(pixels), 24u);
@@ -104,8 +104,7 @@ auto GraphicsSession::ConnectGraphics(Client& client, Headless::GraphicsObserver
   ConnectConfirmed(client, logs, [this](Client& connecting) { Connect(connecting); });
 }
 auto GraphicsSession::Connect(Client& client, bool ack) -> void {
-  ASSERT_TRUE(
-      freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_FrameAcknowledge, ack ? 2 : 0));
+  ASSERT_TRUE(freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_FrameAcknowledge, ack ? 2 : 0));
   ASSERT_TRUE(freerdp_connect(client.Instance().get())) << logs.Text(true);
   ASSERT_TRUE(client.Until([&] { return HasCookie(client); }));
 }

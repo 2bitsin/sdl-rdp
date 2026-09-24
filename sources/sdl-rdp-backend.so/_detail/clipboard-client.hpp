@@ -1,9 +1,9 @@
 #pragma once
 #include "client.hpp"
 
-#include <atomic>
 #include <freerdp/client/cliprdr.h>
 #include <freerdp/event.h>
+#include <atomic>
 #include <mutex>
 #include <vector>
 
@@ -19,8 +19,8 @@ public:
            ClipboardClient(ClipboardClient&&)                                      = delete;
   explicit ClipboardClient(Client& value, std::vector<BYTE> initial = { });
            ~ClipboardClient();
-  auto     operator = (ClipboardClient const&)                 -> ClipboardClient& = delete;
-  auto     operator = (ClipboardClient&&)                      -> ClipboardClient& = delete;
+  auto     operator=(ClipboardClient const&)                   -> ClipboardClient& = delete;
+  auto     operator=(ClipboardClient&&)                        -> ClipboardClient& = delete;
   auto     Received(std::vector<BYTE> const& bytes)            -> bool;
   auto     RequestFormat(UINT32 format)                        -> UINT;
   auto     Offer(std::vector<BYTE> bytes, bool unicode = true) -> UINT;

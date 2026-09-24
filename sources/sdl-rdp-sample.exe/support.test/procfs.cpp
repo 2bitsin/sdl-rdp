@@ -1,11 +1,11 @@
 #include "support.test/procfs.hpp"
 
+#include <oxbox/utilities/number-text.hpp>
+#include <sdl-rdp-backend.so/_detail/contract.hpp>
 #include <algorithm>
 #include <array>
 #include <filesystem>
 #include <fstream>
-#include <oxbox/utilities/number-text.hpp>
-#include <sdl-rdp-backend.so/_detail/contract.hpp>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -48,8 +48,7 @@ auto ListeningPort(pid_t pid) -> unsigned {
     std::istringstream          fields(line);
     std::array<std::string, 10> values;
     std::ranges::for_each(values, [&](auto& value) { fields >> value; });
-    if (values[3] == "0A" && std::ranges::contains(sockets, "socket:[" + values[9] + "]"))
-      return ProcfsPort(values[1]);
+    if (values[3] == "0A" && std::ranges::contains(sockets, "socket:[" + values[9] + "]")) return ProcfsPort(values[1]);
   }
   return 0;
 }

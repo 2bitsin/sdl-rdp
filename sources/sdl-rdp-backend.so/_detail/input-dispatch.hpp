@@ -17,7 +17,6 @@ template <std::unsigned_integral Flags>
 auto PushButtons(EventQueue& events, std::span<Flags const> buttons, Flags flags, unsigned first, bool down) -> void {
   for (auto const [index, button] : std::views::enumerate(buttons))
     if (flags & button)
-      events.Push({ .type         = SDLRDP_MOUSE_BUTTON,
-                    .mouse_button = { .button = first + unsigned(index), .down = down } });
+      events.Push({ .type = SDLRDP_MOUSE_BUTTON, .mouse_button = { .button = first + unsigned(index), .down = down } });
 }
 }

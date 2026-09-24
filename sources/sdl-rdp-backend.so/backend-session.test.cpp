@@ -31,8 +31,7 @@ auto ThenDisplaced(Client const& first) -> void {
   ASSERT_TRUE(freerdp_input_send_keyboard_event(first.Instance()->context->input, KBD_FLAGS_DOWN, 0x30));
   auto deadline  = Clock::now() + std::chrono::seconds(10);
   bool connected = true;
-  while (connected && Clock::now() < deadline)
-    connected = first.Pump();
+  while (connected && Clock::now() < deadline) connected = first.Pump();
   ASSERT_FALSE(connected);
   EXPECT_EQ(freerdp_get_last_error(first.Instance()->context), FREERDP_ERROR_DISCONNECTED_BY_OTHER_CONNECTION);
 }
@@ -40,7 +39,7 @@ auto CodecTolerance(sdlrdp_codec codec, bool surface) -> std::uint32_t {
   switch (codec) {
   case SDLRDP_CODEC_REMOTEFX:
   case SDLRDP_CODEC_AUTO: return surface ? 40 : 0;
-  default: return 0;
+  default:                return 0;
   }
 }
 auto NegotiatedCodec(sdlrdp_codec requested, bool surface) -> sdlrdp_codec {
@@ -50,7 +49,7 @@ auto NegotiatedCodec(sdlrdp_codec requested, bool surface) -> sdlrdp_codec {
   case SDLRDP_CODEC_NSCODEC: return surface ? requested : SDLRDP_CODEC_PLANAR;
   case SDLRDP_CODEC_PLANAR:
   case SDLRDP_CODEC_RAW: return requested;
-  default: utilities::Unreachable(requested);
+  default:               utilities::Unreachable(requested);
   }
 }
 }
@@ -221,10 +220,9 @@ TEST_P(Gate, ProbeClosesBeforeActivation) {
   while (!logs.Contains(SDLRDP_LOG_INFO, "Connection closed before activation") && Clock::now() < deadline)
     std::this_thread::yield();
   {
-
     EXPECT_TRUE(std::ranges::any_of(logs.Entries(), [](auto const& line) {
-      return line.first == SDLRDP_LOG_INFO &&
-             line.second == "Connection closed before activation: ERRCONNECT_CONNECT_TRANSPORT_FAILED.";
+      return line.first == SDLRDP_LOG_INFO
+             && line.second == "Connection closed before activation: ERRCONNECT_CONNECT_TRANSPORT_FAILED.";
     }));
   }
   EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, "Peer transport failed")) << logs.Text();

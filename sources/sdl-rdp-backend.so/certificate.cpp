@@ -5,27 +5,27 @@
 #include "_detail/rdp-handles.hpp"
 #include "_detail/system-call.hpp"
 
-#include <array>
-#include <cerrno>
-#include <chrono>
-#include <cstdlib>
 #include <freerdp/crypto/certificate.h>
 #include <freerdp/crypto/privatekey.h>
-#include <memory>
-#include <mutex>
-#include <fcntl.h>
 #include <openssl/pem.h>
 #include <openssl/rsa.h>
 #include <openssl/x509v3.h>
 #include <oxbox/utilities/span.hpp>
+#include <array>
+#include <cerrno>
+#include <chrono>
+#include <cstdlib>
+#include <fcntl.h>
+#include <memory>
+#include <mutex>
 #include <pwd.h>
 #include <stdexcept>
 #include <string>
-#include <tuple>
-#include <utility>
 #include <sys/file.h>
 #include <sys/stat.h>
+#include <tuple>
 #include <unistd.h>
+#include <utility>
 
 namespace Backend {
 using utilities::Ensures;
@@ -62,19 +62,19 @@ auto Hostname() -> std::string {
 auto Stamp(X509& cert) -> bool {
   constexpr long X509Version3 = 2;
   constexpr auto Validity     = std::chrono::seconds(std::chrono::days(3650));
-  return X509_set_version(&cert, X509Version3) && ASN1_INTEGER_set(X509_get_serialNumber(&cert), 1) &&
-         X509_gmtime_adj(X509_getm_notBefore(&cert), 0) && X509_gmtime_adj(X509_getm_notAfter(&cert), Validity.count());
+  return X509_set_version(&cert, X509Version3) && ASN1_INTEGER_set(X509_get_serialNumber(&cert), 1)
+         && X509_gmtime_adj(X509_getm_notBefore(&cert), 0)
+         && X509_gmtime_adj(X509_getm_notAfter(&cert), Validity.count());
 }
 auto Identify(X509& cert, EVP_PKEY* key, std::string const& host) -> bool {
   auto* const     name      = X509_get_subject_name(&cert);
   auto const      san       = "DNS:" + host;
-  Extension const extension(
-      X509V3_EXT_conf_nid(nullptr, nullptr, NID_subject_alt_name, san.c_str()));
-  return X509_set_pubkey(&cert, key) &&
-         X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC,
-                                    oxbox::utilities::SpanCast<unsigned char const>(std::span(host)).data(), -1, -1,
-                                    0) &&
-         X509_set_issuer_name(&cert, name) && extension && X509_add_ext(&cert, extension.get(), -1);
+  Extension const extension(X509V3_EXT_conf_nid(nullptr, nullptr, NID_subject_alt_name, san.c_str()));
+  return X509_set_pubkey(&cert, key)
+         && X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC,
+                                       oxbox::utilities::SpanCast<unsigned char const>(std::span(host)).data(), -1, -1,
+                                       0)
+         && X509_set_issuer_name(&cert, name) && extension && X509_add_ext(&cert, extension.get(), -1);
 }
 auto SelfSigned(EVP_PKEY* key) -> Certificate {
   Expects(key != nullptr, "RSA key exists");
@@ -93,9 +93,9 @@ auto Generate(Credentials const& paths) -> void {
   if (key_file)
     std::filesystem::permissions(paths.Key(), std::filesystem::perms::owner_read | std::filesystem::perms::owner_write);
   Bio const cert_file(BIO_new_file(paths.Certificate().c_str(), "w"));
-  if (!key_file || !cert_file ||
-      !PEM_write_bio_PrivateKey(key_file.get(), key.get(), nullptr, nullptr, 0, nullptr, nullptr) ||
-      !PEM_write_bio_X509(cert_file.get(), cert.get()))
+  if (!key_file || !cert_file
+      || !PEM_write_bio_PrivateKey(key_file.get(), key.get(), nullptr, nullptr, 0, nullptr, nullptr)
+      || !PEM_write_bio_X509(cert_file.get(), cert.get()))
     throw std::runtime_error("Credential writing failed.");
 }
 }

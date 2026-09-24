@@ -8,16 +8,16 @@
 #include "_detail/event-queue.hpp"
 #include "_detail/peer-link.hpp"
 
-#include <algorithm>
-#include <array>
 #include <freerdp/channels/wtsvc.h>
 #include <oxbox/utilities/span.hpp>
 #include <winpr/clipboard.h>
+#include <algorithm>
+#include <array>
 
 namespace Backend {
 ClipboardChannel::ClipboardChannel(PeerLink& link, Activation const& activation, ClipboardStore& store,
                                    EventQueue& events, Diagnostics const& diagnostics) noexcept
-    : _link { link }, _activation{ activation }, _store{ store }, _events{ events }, _diagnostics{ diagnostics } { }
+    : _link{ link }, _activation{ activation }, _store{ store }, _events{ events }, _diagnostics{ diagnostics } { }
 ClipboardChannel::~ClipboardChannel() {
   if (_context) _context->Close(_context.get());
 }
@@ -36,10 +36,9 @@ auto ClipboardChannel::Open() -> bool {
   if (_context->Open(_context.get()) != CHANNEL_RC_OK) return false;
   _opened = true;
   CLIPRDR_MONITOR_READY const monitor{ .common = { .msgType = CB_MONITOR_READY } };
-  return SendGeneralCapabilities([&](auto const* caps) {
-           return _context->ServerCapabilities(_context.get(), caps);
-         }) == CHANNEL_RC_OK &&
-         _context->MonitorReady(_context.get(), &monitor) == CHANNEL_RC_OK;
+  return SendGeneralCapabilities([&](auto const* caps) { return _context->ServerCapabilities(_context.get(), caps); })
+             == CHANNEL_RC_OK
+         && _context->MonitorReady(_context.get(), &monitor) == CHANNEL_RC_OK;
 }
 auto ClipboardChannel::Pump(std::span<HANDLE const> signaled) -> bool {
   Expects(_opened, "clipboard channel open");
@@ -106,7 +105,7 @@ auto ClipboardChannel::Formats(CliprdrServerContext* context, CLIPRDR_FORMAT_LIS
 auto ClipboardChannel::RequestOfferedText(CLIPRDR_FORMAT_LIST const& list) -> UINT {
   if (FirstOfferWhileAppHoldsText()) return CHANNEL_RC_OK;
   _has_unicode = std::ranges::any_of(std::span(list.formats, list.numFormats),
-                                    [](auto const& format) { return format.formatId == CF_UNICODETEXT; });
+                                     [](auto const& format) { return format.formatId == CF_UNICODETEXT; });
   if (!_activation.Active()) return CHANNEL_RC_OK;
   // A client clipboard holding only non-text is an empty text clipboard.
   if (!_has_unicode) Changed("");
@@ -139,8 +138,8 @@ auto ClipboardChannel::DataRequest(CliprdrServerContext* context, CLIPRDR_FORMAT
     return ERROR_INTERNAL_ERROR;
   }
 }
-auto ClipboardChannel::DataResponse(CliprdrServerContext* context,
-                                    CLIPRDR_FORMAT_DATA_RESPONSE const* response) -> UINT {
+auto ClipboardChannel::DataResponse(CliprdrServerContext* context, CLIPRDR_FORMAT_DATA_RESPONSE const* response)
+    -> UINT {
   Expects(context, "callback context exists");
   Expects(response, "callback response is supplied");
   auto& self = CallbackOwner<ClipboardChannel>(context->custom);
@@ -148,9 +147,8 @@ auto ClipboardChannel::DataResponse(CliprdrServerContext* context,
   self._pending = false;
   try {
     auto const active = self._activation.Active();
-    if (active && self._requested == self._offered &&
-        self._requested_generation == self._store.Generation() &&
-        (response->common.msgFlags & CB_RESPONSE_OK))
+    if (active && self._requested == self._offered && self._requested_generation == self._store.Generation()
+        && (response->common.msgFlags & CB_RESPONSE_OK))
       self.Changed(ClipboardUtf8({ response->requestedFormatData, response->common.dataLen }));
     if (active && self._requested != self._offered && self._has_unicode) return self.Request();
   } catch (std::exception const& error) {

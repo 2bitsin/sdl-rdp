@@ -2,11 +2,11 @@
 #include "extent.hpp"
 #include "sdl-rdp-backend.h"
 
+#include <winpr/wtypes.h>
 #include <cstddef>
 #include <memory>
 #include <span>
 #include <vector>
-#include <winpr/wtypes.h>
 
 namespace Backend {
 auto FrameBytes(Extent size) -> std::size_t;

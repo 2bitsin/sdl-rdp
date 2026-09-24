@@ -1,5 +1,5 @@
-#include "SDL_rdpresources.hpp"
 #include "SDL_rdpsettings.hpp"
+#include "SDL_rdpresources.hpp"
 #include <oxbox/utilities/number-text.hpp>
 #include <oxbox/utilities/text.hpp>
 #include <stdexcept>
@@ -12,7 +12,7 @@
 namespace rdp {
 auto Text(char const* text) -> std::optional<std::string> {
   if (!text) return std::nullopt;
-  return std::string{text};
+  return std::string{ text };
 }
 namespace {
 constexpr auto IniFileName = "libSDL3.ini";
@@ -21,7 +21,8 @@ auto LibraryPath() -> std::filesystem::path {
   constexpr DWORD long_path_limit = 32768;
   HMODULE         module          { };
   if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                         reinterpret_cast<LPCWSTR>(LibraryPath), &module)) return { };
+                          reinterpret_cast<LPCWSTR>(LibraryPath), &module))
+    return { };
   std::wstring filename(long_path_limit, L'\0');
   auto const   length   = GetModuleFileNameW(module, filename.data(), long_path_limit);
   if (!length || length >= long_path_limit) return { };
@@ -43,18 +44,24 @@ auto WarnIniEntry(std::filesystem::path const& path, IniEntry const& entry) -> v
   auto const file = path.string();
   if (entry.Status() == IniStatus::MALFORMED)
     SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "%s:%u: malformed ini line (missing '=')", file.c_str(), entry.Line());
-  else SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "%s:%u: unknown RDP setting '%.*s'", file.c_str(), entry.Line(),
-                   static_cast<int>(entry.Key().size()), entry.Key().data());
+  else
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "%s:%u: unknown RDP setting '%.*s'", file.c_str(), entry.Line(),
+                static_cast<int>(entry.Key().size()), entry.Key().data());
 }
 }
 auto Settings::_Read(std::filesystem::path const& path) -> bool {
   utilities::Expects(!path.empty(), "ini path is specified");
   SDL_PathInfo info{ };
-  if (!SDL_GetPathInfo(path.string().c_str(), &info)) { SDL_ClearError(); return false; }
+  if (!SDL_GetPathInfo(path.string().c_str(), &info)) {
+    SDL_ClearError();
+    return false;
+  }
   LoadedFile const text{ path };
   ParseIni(text.Get(), [&](IniEntry const& entry) {
-    if (auto const index = entry.Index()) _values.at(*index) = entry.Value();
-    else WarnIniEntry(path, entry);
+    if (auto const index = entry.Index())
+      _values.at(*index) = entry.Value();
+    else
+      WarnIniEntry(path, entry);
   });
   return true;
 }
@@ -91,8 +98,8 @@ auto Settings::Integer(std::string const& name, int fallback, int minimum, int m
   if (!text) return fallback;
   auto const number = oxbox::utilities::ParseNumber<int>(oxbox::utilities::Trimmed(*text));
   if (!number || *number < minimum || *number > maximum)
-    InvalidSetting("Invalid " + name + " '" + *text + "': expected a whole number from " + std::to_string(minimum) +
-                   " to " + std::to_string(maximum));
+    InvalidSetting("Invalid " + name + " '" + *text + "': expected a whole number from " + std::to_string(minimum)
+                   + " to " + std::to_string(maximum));
   return *number;
 }
 auto Settings::Boolean(std::string const& name, bool fallback) const -> bool {

@@ -2,9 +2,11 @@
 #include "boundary.hpp"
 namespace rdp {
 namespace {
-constexpr auto TextMimeTypes = std::to_array({"text/plain;charset=utf-8"});
+constexpr auto TextMimeTypes = std::to_array({ "text/plain;charset=utf-8" });
 // SDL takes ownership of the SDL-allocated string this produces.
-auto CopyText(std::string const& text)                  -> char* { return SDL_strdup(text.c_str()); }
+auto CopyText(std::string const& text) -> char* {
+  return SDL_strdup(text.c_str());
+}
 using ClipboardText = Resource<char*, CopyText, SDL_free>;
 // SDL's clipboard callback borrows its device and a null-terminated string.
 auto SetText(SDL_VideoDevice* device, char const* text) -> bool {
@@ -20,7 +22,7 @@ auto GetText(SDL_VideoDevice* device) -> char* {
   return Boundary([&] {
     auto const text = Text(driver.Call<Operation::GET_CLIPBOARD_TEXT>());
     if (!text) driver.Throw();
-    return ClipboardText{*text}.Release();
+    return ClipboardText{ *text }.Release();
   });
 }
 // SDL's clipboard predicate borrows its device.

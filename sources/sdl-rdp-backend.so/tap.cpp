@@ -13,7 +13,7 @@ auto Position(int index, double ratio, unsigned extent) -> double {
 }
 }
 Tap::Tap(int index, double ratio, unsigned extent)
-    : _first { unsigned(Position(index, ratio, extent)) }, _second{ std::min(_first + 1, extent - 1) },
+    : _first{ unsigned(Position(index, ratio, extent)) }, _second{ std::min(_first + 1, extent - 1) },
       _weight{ float(Position(index, ratio, extent) - _first) } { }
 auto Tap::First() const noexcept -> unsigned {
   return _first;

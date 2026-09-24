@@ -9,8 +9,7 @@ namespace {
 auto ThenSuppressed(Client& client, FrameObserver const& observer, uint64_t bytes) -> void {
   // Probe for forbidden output after the ordered suppression barrier. No
   // required event or minimum amount of work depends on this observation span.
-  for (unsigned i = 0; i < 10; ++i)
-    ASSERT_TRUE(client.Pump(5));
+  for (unsigned i = 0; i < 10; ++i) ASSERT_TRUE(client.Pump(5));
   EXPECT_EQ(client.Received(), bytes);
   EXPECT_TRUE(observer.Frames().empty());
 }

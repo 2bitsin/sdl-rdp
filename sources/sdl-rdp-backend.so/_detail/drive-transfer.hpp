@@ -4,15 +4,15 @@
 #include "malformed-response.hpp"
 #include "sdlrdp-file.hpp"
 
-#include <array>
-#include <cstring>
 #include <freerdp/channels/rdpdr.h>
 #include <winpr/nt.h>
+#include <array>
+#include <cstring>
 
 namespace Backend {
 using utilities::Expects;
-template <class Byte> auto Submit(sdlrdp_file& file, uint64_t offset,
-                                  std::span<Byte> bytes) -> std::shared_ptr<DriveRequest> {
+template <class Byte> auto Submit(sdlrdp_file& file, uint64_t offset, std::span<Byte> bytes)
+    -> std::shared_ptr<DriveRequest> {
   Expects(!bytes.empty(), "transfer chunk is nonempty");
   Expects(bytes.size() <= UINT32_MAX, "transfer length fits the wire field");
   constexpr bool     write                = std::is_const_v<Byte>;
@@ -43,8 +43,8 @@ struct TransferProgress {
   std::exception_ptr failure;
 };
 template <class Byte>
-auto SubmitSlot(sdlrdp_file& file, uint64_t offset, std::span<Byte> bytes, TransferProgress& progress,
-                Slot& slot) -> void {
+auto SubmitSlot(sdlrdp_file& file, uint64_t offset, std::span<Byte> bytes, TransferProgress& progress, Slot& slot)
+    -> void {
   if (progress.failure || progress.submitted >= progress.limit) return;
   Expects(!slot.request, "submission slot is empty");
   slot.offset        =  progress.submitted;

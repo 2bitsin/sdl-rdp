@@ -4,15 +4,15 @@
 namespace SampleGate {
 class FirstFrameSize {
 public:
-           FirstFrameSize(FirstFrameSize const&)                 = delete;
-           FirstFrameSize(FirstFrameSize&&)                      = delete;
+           FirstFrameSize(FirstFrameSize const&)               = delete;
+           FirstFrameSize(FirstFrameSize&&)                    = delete;
   explicit FirstFrameSize(Headless::Client& value);
            ~FirstFrameSize();
-  auto     operator = (FirstFrameSize const&) -> FirstFrameSize& = delete;
-  auto     operator = (FirstFrameSize&&)      -> FirstFrameSize& = delete;
-  auto     Received() const                   -> bool;
-  auto     Width() const                      -> int;
-  auto     Height() const                     -> int;
+  auto     operator=(FirstFrameSize const&) -> FirstFrameSize& = delete;
+  auto     operator=(FirstFrameSize&&)      -> FirstFrameSize& = delete;
+  auto     Received() const                 -> bool;
+  auto     Width() const                    -> int;
+  auto     Height() const                   -> int;
 
 private:
   static auto Connect(freerdp* instance) -> BOOL;

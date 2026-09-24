@@ -1,8 +1,8 @@
 #include "SDL_rdpaudio.hpp"
-#include "boundary.hpp"
 #include "SDL_rdpconstants.hpp"
 #include "SDL_rdprefresh.hpp"
 #include "SDL_rdpvideo.hpp"
+#include "boundary.hpp"
 // The RDP protocol sends Windows scan codes; SDL's Windows table maps them.
 #include "src/events/scancodes_windows.h"
 #include <oxbox/utilities/codepoint.hpp>
@@ -14,7 +14,9 @@ namespace {
 constexpr SDL_TouchID TouchDevice       { 1 };
 constexpr auto        ExtendedScanCodes = std::size(windows_scancode_table) / 2;
 // SDL reserves finger id 0; the backend counts fingers from 0.
-auto Finger(unsigned id)       -> SDL_FingerID { return SDL_FingerID{id} + 1; }
+auto Finger(unsigned id) -> SDL_FingerID {
+  return SDL_FingerID{ id } + 1;
+}
 auto IsCodePoint(Uint32 value) -> bool {
   return oxbox::utilities::CodepointTriage(value) != oxbox::utilities::CodepointType::OUT_OF_RANGE;
 }
@@ -38,7 +40,7 @@ auto ScreenMode(SDL_VideoData& data, int width, int height) -> void {
 }
 auto FollowsDesktop(SDL_VideoData const& data, int width, int height) -> bool {
   auto const& window  = BoundWindow(data);
-  auto const  picture = std::pair{width, height};
+  auto const  picture = std::pair{ width, height };
   return (window.flags & SDL_WINDOW_FULLSCREEN) && !window.requested_fullscreen_mode.w && data.Picture() != picture;
 }
 auto Resize(SDL_VideoData& data, unsigned screen_width, unsigned screen_height) -> void {
@@ -54,8 +56,9 @@ auto ApplyRefresh(SDL_VideoData& data, unsigned millihertz) -> void {
   utilities::Expects(millihertz > 0, "refresh event specifies positive millihertz");
   auto& display = *SDL_GetVideoDisplay(data.Display());
   if (SameRefresh(static_cast<unsigned>(display.current_mode->refresh_rate_numerator),
-                  static_cast<unsigned>(display.current_mode->refresh_rate_denominator),
-                  millihertz, MillihertzPerHertz)) return;
+                  static_cast<unsigned>(display.current_mode->refresh_rate_denominator), millihertz,
+                  MillihertzPerHertz))
+    return;
   auto& mode = data.RefreshMode(*display.current_mode);
   mode.refresh_rate             = static_cast<float>(millihertz) / static_cast<float>(MillihertzPerHertz);
   mode.refresh_rate_numerator   = static_cast<int>(millihertz);
@@ -65,17 +68,17 @@ auto ApplyRefresh(SDL_VideoData& data, unsigned millihertz) -> void {
 auto RestoreRefresh(SDL_VideoData& data) -> void {
   auto const& desktop = SDL_GetVideoDisplay(data.Display())->desktop_mode;
   if (desktop.refresh_rate_denominator <= 0) return;
-  ApplyRefresh(data, static_cast<unsigned>(static_cast<Uint64>(desktop.refresh_rate_numerator) * MillihertzPerHertz /
-                                           static_cast<Uint64>(desktop.refresh_rate_denominator)));
+  ApplyRefresh(data, static_cast<unsigned>(static_cast<Uint64>(desktop.refresh_rate_numerator) * MillihertzPerHertz
+                                           / static_cast<Uint64>(desktop.refresh_rate_denominator)));
 }
 auto PublishClient(SDL_Window& window, decltype(sdlrdp_event::connected) const& client) -> void {
   auto const properties = SDL_GetWindowProperties(&window);
   auto const codec      = CodecName(client.codec);
-  auto const strings    = std::to_array<std::pair<char const*, char const*>>({
-      { SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING, client.client_name },
-      { SDL_PROP_WINDOW_RDP_CODEC_STRING      , codec.c_str()      },
-      { SDL_PROP_WINDOW_RDP_USER_STRING       , client.user        },
-      { SDL_PROP_WINDOW_RDP_DOMAIN_STRING     , client.domain      }});
+  auto const strings    = std::to_array<std::pair<char const*, char const*>>(
+      { { SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING, client.client_name },
+        { SDL_PROP_WINDOW_RDP_CODEC_STRING      , codec.c_str()      },
+        { SDL_PROP_WINDOW_RDP_USER_STRING       , client.user        },
+        { SDL_PROP_WINDOW_RDP_DOMAIN_STRING     , client.domain      } });
   for (auto const& [key, value] : strings) SDL_SetStringProperty(properties, key, value);
   SDL_SetBooleanProperty(properties, SDL_PROP_WINDOW_RDP_AUTHENTICATED_BOOLEAN, client.authenticated != 0);
   SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_RDP_KEYBOARD_LAYOUT_NUMBER, client.keyboard_layout);
@@ -129,7 +132,7 @@ auto FingerEvent(sdlrdp_touch_phase phase) -> SDL_EventType {
   case SDLRDP_TOUCH_DOWN:   return SDL_EVENT_FINGER_DOWN;
   case SDLRDP_TOUCH_UP:     return SDL_EVENT_FINGER_UP;
   case SDLRDP_TOUCH_CANCEL: return SDL_EVENT_FINGER_CANCELED;
-  default: utilities::Unreachable(phase);
+  default:                  utilities::Unreachable(phase);
   }
 }
 auto Touch(SDL_Window& window, sdlrdp_event const& event) -> void {
@@ -137,13 +140,14 @@ auto Touch(SDL_Window& window, sdlrdp_event const& event) -> void {
   auto const& touch = event.touch;
   if (touch.phase == SDLRDP_TOUCH_MOVE)
     SDL_SendTouchMotion(0, TouchDevice, Finger(touch.id), &window, touch.x, touch.y, touch.pressure);
-  else SDL_SendTouch(0, TouchDevice, Finger(touch.id), &window, FingerEvent(touch.phase), touch.x, touch.y,
-                     touch.pressure);
+  else
+    SDL_SendTouch(0, TouchDevice, Finger(touch.id), &window, FingerEvent(touch.phase), touch.x, touch.y,
+                  touch.pressure);
 }
 auto MouseButton(SDL_Window& window, sdlrdp_event const& event) -> void {
   utilities::Expects(event.type == SDLRDP_MOUSE_BUTTON, "button event has button data");
-  constexpr auto buttons = std::to_array<Uint8>({SDL_BUTTON_LEFT, SDL_BUTTON_MIDDLE, SDL_BUTTON_RIGHT, SDL_BUTTON_X1,
-                                                 SDL_BUTTON_X2});
+  constexpr auto buttons = std::to_array<Uint8>(
+      { SDL_BUTTON_LEFT, SDL_BUTTON_MIDDLE, SDL_BUTTON_RIGHT, SDL_BUTTON_X1, SDL_BUTTON_X2 });
   auto const     button  = event.mouse_button.button;
   if (button > 0 && button <= buttons.size())
     SDL_SendMouseButton(0, &window, SDL_DEFAULT_MOUSE_ID, buttons.at(button - 1), event.mouse_button.down != 0);
@@ -164,8 +168,10 @@ auto CodecChanged(SDL_Window& window, sdlrdp_event const& event) -> void {
   SDL_SetStringProperty(SDL_GetWindowProperties(&window), SDL_PROP_WINDOW_RDP_CODEC_STRING,
                         CodecName(event.codec_changed.codec).c_str());
 }
-auto ClientLeft(SDL_VideoData& data, [[maybe_unused]] sdlrdp_event const& event) -> void { Disconnected(data); }
-auto RefreshChanged(SDL_VideoData& data, sdlrdp_event const& event)              -> void {
+auto ClientLeft(SDL_VideoData& data, [[maybe_unused]] sdlrdp_event const& event) -> void {
+  Disconnected(data);
+}
+auto RefreshChanged(SDL_VideoData& data, sdlrdp_event const& event) -> void {
   ApplyRefresh(data, event.refresh.millihertz);
 }
 auto ScreenChanged(SDL_VideoData& data, sdlrdp_event const& event) -> void {
@@ -182,11 +188,11 @@ auto AudioChanged([[maybe_unused]] SDL_VideoData& data, sdlrdp_event const& even
   AudioRate(event.audio.freq);
 }
 using Handler = auto (*)(SDL_VideoData&, sdlrdp_event const&) -> void;
-template<Handler _Handle>
+template <Handler _Handle>
 auto WhenBound(SDL_VideoData& data, sdlrdp_event const& event) -> void {
   if (data.Window()) _Handle(data, event);
 }
-template<auto (*_Handle)(SDL_Window&, sdlrdp_event const&) -> void>
+template <auto (*_Handle)(SDL_Window&, sdlrdp_event const&)->void>
 auto ToWindow(SDL_VideoData& data, sdlrdp_event const& event) -> void {
   if (auto const window = data.Window()) _Handle(*window, event);
 }
@@ -225,8 +231,10 @@ auto PumpEvents(SDL_VideoDevice* device) -> void {
 // SDL specifies nanoseconds and a borrowed device in its wait callback.
 auto WaitEvent(SDL_VideoDevice* device, Sint64 timeout) -> int {
   utilities::Expects(device != nullptr, "event wait has a device");
-  auto const milliseconds = timeout < 0 ? -1
-      : std::chrono::ceil<std::chrono::milliseconds>(std::chrono::nanoseconds{timeout}).count();
+  auto const milliseconds = timeout < 0
+                                ? -1
+                                : std::chrono::ceil<std::chrono::milliseconds>(std::chrono::nanoseconds{ timeout })
+                                      .count();
   return device->internal->Backend().Call<Operation::WAIT>(
       static_cast<int>(std::min<std::int64_t>(milliseconds, SDL_MAX_SINT32)));
 }

@@ -20,8 +20,8 @@ public:
        ClipboardChannel(PeerLink& link, Activation const& activation, ClipboardStore& store, EventQueue& events,
                         Diagnostics const& diagnostics) noexcept;
        ~ClipboardChannel();
-  auto operator = (ClipboardChannel const&)   -> ClipboardChannel& = delete;
-  auto operator = (ClipboardChannel&&)        -> ClipboardChannel& = delete;
+  auto operator=(ClipboardChannel const&)     -> ClipboardChannel& = delete;
+  auto operator=(ClipboardChannel&&)          -> ClipboardChannel& = delete;
   auto Open()                                 -> bool;
   auto Pump(std::span<HANDLE const> signaled) -> bool;
   auto Event() const                          -> HANDLE;

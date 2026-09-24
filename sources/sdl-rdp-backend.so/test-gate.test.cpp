@@ -4,12 +4,12 @@
 #include "_detail/test-has-cookie.hpp"
 #include "_detail/test-io.hpp"
 
-#include <algorithm>
-#include <cstddef>
-#include <cstdint>
 #include <freerdp/gdi/gdi.h>
 #include <oxbox/utilities/number-text.hpp>
 #include <oxbox/utilities/text.hpp>
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <ranges>
 #include <span>
 #include <string>

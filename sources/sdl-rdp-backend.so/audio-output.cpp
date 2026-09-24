@@ -14,7 +14,7 @@ using Clock = std::chrono::steady_clock;
 constexpr auto AudioPollPeriod = std::chrono::milliseconds(2);
 }
 AudioOutput::AudioOutput(Session& session, Presenter& presenter, Configuration const& configuration) noexcept
-    : _session { session }, _presenter{ presenter }, _configuration{ configuration } { }
+    : _session{ session }, _presenter{ presenter }, _configuration{ configuration } { }
 auto AudioOutput::Channel(SessionLock const& held) const -> AudioChannel* {
   auto* const current = _session.Current(held);
   return current ? current->Audio() : nullptr;

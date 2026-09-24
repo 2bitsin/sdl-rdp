@@ -3,9 +3,9 @@
 #include "_detail/test-rdpdr-packets.hpp"
 #include "_detail/transcode.hpp"
 
+#include <freerdp/channels/rdpdr.h>
 #include <array>
 #include <cstddef>
-#include <freerdp/channels/rdpdr.h>
 #include <future>
 #include <string>
 #include <utility>
@@ -28,7 +28,6 @@ auto EmptyBasicInformation(Headless::DriveObserver& observer) -> Backend::DriveP
   return response;
 }
 auto CompleteRead(Headless::DriveObserver& observer, size_t index) -> void {
-
   auto response = ReplyTo(observer.Observed().io[index], STATUS_SUCCESS);
   response.Put(65536);
   response.Bytes().resize(response.Bytes().size() + 65536, 'x');

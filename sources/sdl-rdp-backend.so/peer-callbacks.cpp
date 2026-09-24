@@ -23,7 +23,7 @@ auto Router(rdpContext* context) -> PeerCallbacks& {
 }
 PeerCallbacks::PeerCallbacks(PeerLink& link, Authenticator& authenticator, Activator& activator,
                              CapabilityCheck& capabilities, OutputControl& output, InputEvents& input)
-    : _link { link }, _authenticator{ authenticator }, _activator{ activator }, _capabilities{ capabilities },
+    : _link{ link }, _authenticator{ authenticator }, _activator{ activator }, _capabilities{ capabilities },
       _output{ output } {
   _link.Client().ContextExtra = this;
   InstallClient();
@@ -38,8 +38,8 @@ auto PeerCallbacks::InstallClient() -> void {
   client.Logon                = [](freerdp_peer* peer, SEC_WINNT_AUTH_IDENTITY const*, BOOL automatic) {
     return Router(peer)._authenticator.Logon(automatic);
   };
-  client.SspiNtlmHashCallback = [](void* peer, SEC_WINNT_AUTH_IDENTITY const* identity, SecBuffer const*,
-                                   BYTE const*, BYTE const*, SecBuffer const*, BYTE* response) -> SECURITY_STATUS {
+  client.SspiNtlmHashCallback = [](void* peer, SEC_WINNT_AUTH_IDENTITY const* identity, SecBuffer const*, BYTE const*,
+                                   BYTE const*, SecBuffer const*, BYTE* response) -> SECURITY_STATUS {
     Expects(identity != nullptr, "NTLM identity is supplied");
     Expects(response != nullptr, "callback response is supplied");
     return Router(static_cast<freerdp_peer*>(peer))._authenticator.Hash(*identity, response) ? 1 : 0;

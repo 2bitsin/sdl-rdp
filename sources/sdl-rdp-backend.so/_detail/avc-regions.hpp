@@ -1,8 +1,8 @@
 #pragma once
 #include "sdl-rdp-backend.h"
 
-#include <cstddef>
 #include <freerdp/channels/rdpgfx.h>
+#include <cstddef>
 #include <vector>
 
 namespace Backend::Avc {

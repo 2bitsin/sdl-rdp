@@ -22,12 +22,12 @@ auto ForgetChannelCreation(HANDLE manager) -> void {
 }
 ChannelSet::ChannelSet(PeerLink& link, Activation const& activation, GraphicsLink& graphics, DisplayControl& display,
                        Redirection& redirection, Input& input)
-    : _link { link }, _activation{ activation }, _graphics{ graphics }, _display{ display },
-      _redirection{ redirection }, _input{ input }, _registration{ Register(link.Channels(), *this) } { }
+    : _link{ link }, _activation{ activation }, _graphics{ graphics }, _display{ display }, _redirection{ redirection },
+      _input{ input }, _registration{ Register(link.Channels(), *this) } { }
 auto ChannelSet::Pump(std::span<HANDLE const> ready) -> bool {
   if (!_activation.Active()) return true;
-  return WTSVirtualChannelManagerCheckFileDescriptor(_link.Channels()) && _input.Channels(ready) &&
-         _redirection.OpenStatic(ready) && _display.Open() && _graphics.Pump(ready);
+  return WTSVirtualChannelManagerCheckFileDescriptor(_link.Channels()) && _input.Channels(ready)
+         && _redirection.OpenStatic(ready) && _display.Open() && _graphics.Pump(ready);
 }
 auto ChannelSet::Handles(std::span<HANDLE> out) const -> std::span<HANDLE> {
   Expects(out.size() >= ChannelHandleLimit, "handle span has room for every channel");

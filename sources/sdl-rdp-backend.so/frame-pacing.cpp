@@ -22,7 +22,7 @@ auto WarnUnmeasured(RefreshTracker& refresh, Diagnostics const& diagnostics, Wir
 FramePacing::FramePacing(Diagnostics const& diagnostics, EventQueue& events, Configuration const& configuration,
                          FrameStore& store, PeerLink& link, Activation const& activation, TraceQueue& traces,
                          FrameStatistics& statistics) noexcept
-    : _diagnostics { diagnostics }, _events{ events }, _configuration{ configuration }, _store{ store }, _link{ link },
+    : _diagnostics{ diagnostics }, _events{ events }, _configuration{ configuration }, _store{ store }, _link{ link },
       _activation{ activation }, _traces{ traces }, _statistics{ statistics } { }
 auto FramePacing::Adjust(std::invocable<Refresh&> auto step) -> void {
   if (!_refresh.Adjust(step) || !_activation.Active()) return;
@@ -79,17 +79,10 @@ auto FramePacing::Acknowledgements(AcknowledgementMode mode) -> void {
   {
     auto const held = _store.Lock();
     switch (mode) {
-    case AcknowledgementMode::Suspended:
-      _window.Disable();
-      break;
-    case AcknowledgementMode::Restarted:
-      _window.Clear();
-      [[fallthrough]];
-    case AcknowledgementMode::Tracking:
-      _window.Enable();
-      break;
-    default:
-      utilities::Unreachable(mode);
+    case AcknowledgementMode::Suspended: _window.Disable(); break;
+    case AcknowledgementMode::Restarted: _window.Clear(); [[fallthrough]];
+    case AcknowledgementMode::Tracking:  _window.Enable(); break;
+    default:                             utilities::Unreachable(mode);
     }
   }
   _store.Notify();

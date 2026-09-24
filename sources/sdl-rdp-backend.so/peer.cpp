@@ -5,25 +5,31 @@
 #include "_detail/drive-channel.hpp"
 #include "_detail/gfx.hpp"
 
-#include <algorithm>
 #include <freerdp/error.h>
+#include <algorithm>
 #include <utility>
 
 namespace Backend {
 Peer::Peer(PeerHandle accepted, Diagnostics const& diagnostics, EventQueue& events, Configuration const& configuration,
            FrameStore& store, PointerStore& pointer, ClipboardStore& clipboard, SessionAccess& session)
-    : _link { std::move(accepted) }, _traces{ diagnostics }, _activation{ events, _link }, _frames{ store },
+    : _link{ std::move(accepted) }, _traces{ diagnostics }, _activation{ events, _link }, _frames{ store },
       _pacing{ diagnostics, events, configuration, store, _link, _activation, _traces, _statistics },
       _scaler{ _frames, _desktop }, _authenticator{ _link, configuration, diagnostics },
-      _graphics{ _link, diagnostics, _activation, _pacing, _encoder,
+      _graphics{ _link,
+                 diagnostics,
+                 _activation,
+                 _pacing,
+                 _encoder,
                  [&, this] {
-                   return std::make_unique<GfxChannel>(_link, diagnostics, configuration, _activation, _frames,
-                                                       _pacing, _encoder, _scaler);
+                   return std::make_unique<GfxChannel>(_link, diagnostics, configuration, _activation, _frames, _pacing,
+                                                       _encoder, _scaler);
                  } },
       _display     { _link, _activation, _desktop, events                              },
       _input_events{ _link, _activation, _desktop, events, store, diagnostics, session },
       _input       { _link, _input_events                                              },
-      _redirection{ _link, _activation, session,
+      _redirection{ _link,
+                    _activation,
+                    session,
                     [&, this] { return std::make_unique<AudioChannel>(_link, diagnostics, events, session, _traces); },
                     [&, this] {
                       return std::make_unique<ClipboardChannel>(_link, _activation, clipboard, events, diagnostics);

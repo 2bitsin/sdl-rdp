@@ -11,7 +11,7 @@
 namespace Backend {
 PeerPump::PeerPump(PeerLink& link, SessionAccess& session, ChannelSet& channels, Redirection& redirection,
                    FrameSender& sender, TransportEnd& end, TraceQueue& traces) noexcept
-    : _link { link }, _session{ session }, _channels{ channels }, _redirection{ redirection }, _sender{ sender },
+    : _link{ link }, _session{ session }, _channels{ channels }, _redirection{ redirection }, _sender{ sender },
       _end{ end }, _traces{ traces } { }
 auto PeerPump::Service(std::stop_token const& quit, std::span<HANDLE const> ready) -> bool {
   auto const healthy = Exchange(quit, ready) && Deliver(quit);
@@ -33,16 +33,13 @@ auto PeerPump::Exchange(std::stop_token const& quit, std::span<HANDLE const> rea
 auto PeerPump::Deliver(std::stop_token const& quit) -> bool {
   auto const delivery = _sender.Encode(quit);
   switch (delivery) {
-  case Delivery::Healthy:
-    return true;
-  case Delivery::Stopped:
-    return false;
+  case Delivery::Healthy: return true;
+  case Delivery::Stopped: return false;
   case Delivery::Failed: {
     auto const session = _session.Lock();
     return Ended();
   }
-  default:
-    utilities::Unreachable(delivery);
+  default: utilities::Unreachable(delivery);
   }
 }
 }

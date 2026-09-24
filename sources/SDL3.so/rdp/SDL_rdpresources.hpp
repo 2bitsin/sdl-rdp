@@ -12,9 +12,9 @@ using ScopedMutexLock      = utilities::RAIIWrap<SDL_Mutex&, LockMutex, UnlockMu
 auto LockProperties(SDL_PropertiesID properties)            -> SDL_PropertiesID;
 auto UnlockProperties(SDL_PropertiesID properties) noexcept -> void;
 using ScopedPropertiesLock = utilities::RAIIWrap<SDL_PropertiesID, LockProperties, UnlockProperties>;
-template<typename _Handle, auto _Acquire, auto _Release>
-using Resource = utilities::RAIIWrap<_Handle, CheckedAcquisition<_Acquire>{ }, _Release,
-    PointerState<_Handle>::IsNull, PointerState<_Handle>::MakeNull>;
+template <typename _Handle, auto _Acquire, auto _Release>
+using Resource = utilities::RAIIWrap<_Handle, CheckedAcquisition<_Acquire>{ }, _Release, PointerState<_Handle>::IsNull,
+                                     PointerState<_Handle>::MakeNull>;
 using Stream            = Resource<SDL_IOStream*, SDL_OpenIO, SDL_CloseIO>;
 using Surface           = Resource<SDL_Surface*, SDL_CreateSurface, SDL_DestroySurface>;
 using ConvertedSurface  = Resource<SDL_Surface*, SDL_ConvertSurface, SDL_DestroySurface>;

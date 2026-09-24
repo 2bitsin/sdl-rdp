@@ -1,9 +1,9 @@
 #include "support.test/sample-launch.hpp"
 
-#include <cstdlib>
 #include <oxbox/utilities/number-text.hpp>
-#include <ranges>
 #include <sdl-rdp-backend.so/_detail/contract.hpp>
+#include <cstdlib>
+#include <ranges>
 
 namespace SampleGate {
 namespace fs = std::filesystem;

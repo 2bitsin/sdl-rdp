@@ -33,8 +33,8 @@ auto ThenEmptyIntersections() -> void {
   EXPECT_FALSE(Backend::Intersect({ 0, 0, 0, 20 }, { 0, 0, 320, 200 }));
 }
 auto ThenMaximumCoordinate() -> void {
-  auto edge =
-      Backend::Intersect({ std::numeric_limits<int>::max(), 0, 1, 1 }, { std::numeric_limits<int>::max(), 0, 1, 1 });
+  auto edge = Backend::Intersect({ std::numeric_limits<int>::max(), 0, 1, 1 },
+                                 { std::numeric_limits<int>::max(), 0, 1, 1 });
   ASSERT_TRUE(edge.has_value());
   Backend::Expects(edge.has_value(), "intersection exists before inspecting its bounds");
   if (!edge.has_value()) return;
@@ -50,8 +50,7 @@ auto ThenBridge(Backend::Region& region) -> void {
 }
 auto ThenRegionCap(Backend::Region& region) -> void {
   region.clear();
-  for (int i = 0; i < 16; ++i)
-    region.Add({ i * 20, i * 20, 8, 8 });
+  for (int i = 0; i < 16; ++i) region.Add({ i * 20, i * 20, 8, 8 });
   ASSERT_EQ(region.Rects().size(), 16u);
   region.Add({ 320, 320, 8, 8 });
   ASSERT_EQ(region.Rects().size(), 1u);

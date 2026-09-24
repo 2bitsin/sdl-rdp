@@ -6,8 +6,8 @@
 #include "_detail/graphics-link.hpp"
 #include "_detail/peer-link.hpp"
 
-#include <algorithm>
 #include <freerdp/channels/wtsvc.h>
+#include <algorithm>
 
 namespace Backend {
 namespace {
@@ -16,7 +16,7 @@ constexpr DWORD BlockedRetry = 5;
 }
 PeerWait::PeerWait(PeerLink& link, ChannelSet const& channels, Activation const& activation, FramePacing& pacing,
                    GraphicsLink& graphics) noexcept
-    : _link { link }, _channels{ channels }, _activation{ activation }, _pacing{ pacing }, _graphics{ graphics } { }
+    : _link{ link }, _channels{ channels }, _activation{ activation }, _pacing{ pacing }, _graphics{ graphics } { }
 auto PeerWait::Plan(std::span<HANDLE> handles) -> WaitPlan {
   _graphics.ExpireConfirmation();
   if (!_activation.Activated()) _link.Invalidate();

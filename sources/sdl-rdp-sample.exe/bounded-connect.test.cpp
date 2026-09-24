@@ -7,8 +7,8 @@
 #include <sys/socket.h>
 
 namespace SampleGate {
-auto BoundedConnect([[maybe_unused]] rdpContext* context, [[maybe_unused]] rdpSettings* settings,
-                    char const* hostname, int port, [[maybe_unused]] DWORD timeout) -> int {
+auto BoundedConnect([[maybe_unused]] rdpContext* context, [[maybe_unused]] rdpSettings* settings, char const* hostname,
+                    int port, [[maybe_unused]] DWORD timeout) -> int {
   utilities::Expects(std::string_view(hostname) == "127.0.0.1", "local test listener");
   utilities::Expects(port > 0, "listener has a port");
   Backend::Descriptor socket  { ::socket(AF_INET, SOCK_STREAM, 0) };

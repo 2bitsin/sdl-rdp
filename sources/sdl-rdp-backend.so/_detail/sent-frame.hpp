@@ -1,7 +1,7 @@
 #pragma once
+#include <winpr/wtypes.h>
 #include <chrono>
 #include <cstdint>
-#include <winpr/wtypes.h>
 
 namespace Backend {
 class SentFrame {

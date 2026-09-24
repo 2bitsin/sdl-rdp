@@ -1,6 +1,6 @@
 #pragma once
-#include <filesystem>
 #include <sdl-rdp-backend.so/_detail/client.hpp>
+#include <filesystem>
 
 namespace SampleGate {
 auto ChangeMonitor(Headless::Client& client)                                    -> void;

@@ -2,10 +2,10 @@
 #include "sdl-rdp-backend.h"
 
 #include <freerdp/settings.h>
+#include <winpr/wlog.h>
 #include <map>
 #include <mutex>
 #include <thread>
-#include <winpr/wlog.h>
 namespace Backend {
 // MS-RDPBCGR 2.2.1.1.1 requestedProtocols (FreeRDP keeps these constants private).
 inline constexpr unsigned SecurityTls = 0x01, SecurityNla = 0x02, SecurityRdstls = 0x04, SecurityNlaExt = 0x08,
@@ -25,12 +25,12 @@ public:
     bool               handshake_failed     { false   };
   };
   explicit    LogRoute(sdlrdp_config const& config);
-              LogRoute(LogRoute const&)                 = delete;
-              LogRoute(LogRoute&&)                      = delete;
+              LogRoute(LogRoute const&)               = delete;
+              LogRoute(LogRoute&&)                    = delete;
               ~LogRoute();
-  auto        operator = (LogRoute const&) -> LogRoute& = delete;
-  auto        operator = (LogRoute&&)      -> LogRoute& = delete;
-  static auto WithFilter(auto operation)   -> decltype(auto) {
+  auto        operator=(LogRoute const&) -> LogRoute& = delete;
+  auto        operator=(LogRoute&&)      -> LogRoute& = delete;
+  static auto WithFilter(auto operation) -> decltype(auto) {
     auto&                  routing = Shared();
     std::scoped_lock const lock(routing.guard);
     return operation(routing.filters[std::this_thread::get_id()]);

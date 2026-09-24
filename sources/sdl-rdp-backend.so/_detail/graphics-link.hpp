@@ -3,10 +3,10 @@
 #include "gfx.hpp"
 #include "pinned.hpp"
 
+#include <winpr/wtypes.h>
 #include <chrono>
 #include <memory>
 #include <span>
-#include <winpr/wtypes.h>
 
 namespace Backend {
 inline constexpr auto     GraphicsConnectionWait = std::chrono::seconds(3);

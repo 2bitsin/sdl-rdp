@@ -1,7 +1,7 @@
 #include "_detail/test-audio-gate.hpp"
 
-#include <cstddef>
 #include <oxbox/utilities/number-text.hpp>
+#include <cstddef>
 
 namespace BackendGate {
 class TraceGate : public AudioGate {
@@ -41,9 +41,9 @@ protected:
     ThenKeyTraced(client);
   }
   auto CheckTimes() -> void {
-    auto now =
-        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
-            .count();
+    auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                   std::chrono::system_clock::now().time_since_epoch())
+                   .count();
 
     for (auto const& [level, line] : logs.Entries()) {
       if (!line.starts_with("trace ")) continue;
@@ -71,7 +71,6 @@ TEST_F(TraceGate, DisabledByDefault) {
   if (::testing::Test::HasFatalFailure()) return;
   backend.reset();
 
-  for (auto const& [level, line] : logs.Entries())
-    EXPECT_FALSE(line.starts_with("trace ")) << line;
+  for (auto const& [level, line] : logs.Entries()) EXPECT_FALSE(line.starts_with("trace ")) << line;
 }
 }

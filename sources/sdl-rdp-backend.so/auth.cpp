@@ -6,23 +6,27 @@
 #include "_detail/logging.hpp"
 #include "_detail/peer-link.hpp"
 
-#include <cstring>
 #include <freerdp/settings.h>
 #include <openssl/crypto.h>
 #include <oxbox/utilities/span.hpp>
 #include <winpr/ntlm.h>
+#include <cstring>
 
 namespace Backend {
 namespace {
 struct NtHash {
 public:
-       NtHash(NtHash const&)                 = delete;
-       NtHash(NtHash&&)                      = delete;
-       NtHash()                              = default;
-       ~NtHash() { OPENSSL_cleanse(bytes.data(), bytes.size()); }
-  auto operator = (NtHash const&) -> NtHash& = delete;
-  auto operator = (NtHash&&)      -> NtHash& = delete;
-  auto Data()                     -> BYTE* { return bytes.data(); }
+  NtHash(NtHash const&) = delete;
+  NtHash(NtHash&&)      = delete;
+  NtHash()              = default;
+  ~NtHash() {
+    OPENSSL_cleanse(bytes.data(), bytes.size());
+  }
+  auto operator=(NtHash const&) -> NtHash& = delete;
+  auto operator=(NtHash&&)      -> NtHash& = delete;
+  auto Data()                   -> BYTE* {
+    return bytes.data();
+  }
 
 private:
   std::array<BYTE, 16> bytes{ };
@@ -38,21 +42,25 @@ public:
     // FreeRDP 3.15 include/freerdp/settings.h: set_string copies input; NULL removes the old entry.
     Ensures(freerdp_settings_set_string(settings, FreeRDP_Password, nullptr), "password cleared");
   }
-  auto operator = (SettingsPassword const&) -> SettingsPassword& = delete;
-  auto operator = (SettingsPassword&&)      -> SettingsPassword& = delete;
+  auto operator=(SettingsPassword const&) -> SettingsPassword& = delete;
+  auto operator=(SettingsPassword&&)      -> SettingsPassword& = delete;
 
 private:
   rdpSettings* settings;
 };
 struct PlainPassword {
 public:
-           PlainPassword(PlainPassword const&)                 = delete;
-           PlainPassword(PlainPassword&&)                      = delete;
+           PlainPassword(PlainPassword const&) = delete;
+           PlainPassword(PlainPassword&&)      = delete;
   explicit PlainPassword(char const* text) : value{ text } { }
-           ~PlainPassword() { OPENSSL_cleanse(value.data(), value.size()); }
-  auto     operator = (PlainPassword const&) -> PlainPassword& = delete;
-  auto     operator = (PlainPassword&&)      -> PlainPassword& = delete;
-  auto     Text() const                      -> char const* { return value.c_str(); }
+           ~PlainPassword() {
+    OPENSSL_cleanse(value.data(), value.size());
+  }
+  auto operator=(PlainPassword const&) -> PlainPassword& = delete;
+  auto operator=(PlainPassword&&)      -> PlainPassword& = delete;
+  auto Text() const                    -> char const* {
+    return value.c_str();
+  }
 
 private:
   std::string value;
@@ -79,7 +87,7 @@ auto NtlmResponseKey(AuthenticationState const& identity, BYTE* nt_hash_v1, BYTE
 }
 Authenticator::Authenticator(PeerLink& link, Configuration const& configuration,
                              Diagnostics const& diagnostics) noexcept
-    : _link { link }, _configuration{ configuration }, _diagnostics{ diagnostics } { }
+    : _link{ link }, _configuration{ configuration }, _diagnostics{ diagnostics } { }
 auto Authenticator::Reject() -> void {
   if (_state.TestAndSetRejected()) return;
   _link.Client().authenticated = FALSE;

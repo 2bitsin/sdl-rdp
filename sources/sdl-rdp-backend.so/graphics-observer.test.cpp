@@ -75,8 +75,8 @@ auto GraphicsObserver::ObserveFrameLifecycle() -> void {
   channel->SurfaceCommand = [](RdpgfxClientContext* channel, RDPGFX_SURFACE_COMMAND const* command) -> UINT {
     ++active->observed.commands;
     if (command->codecId == RDPGFX_CODECID_AVC420) active->ObserveAvc(*command);
-    if (command->codecId == RDPGFX_CODECID_CAPROGRESSIVE && command->length >= 2 && command->data[0] == 0xc0 &&
-        command->data[1] == 0xcc)
+    if (command->codecId == RDPGFX_CODECID_CAPROGRESSIVE && command->length >= 2 && command->data[0] == 0xc0
+        && command->data[1] == 0xcc)
       ++active->observed.progressive_headers;
     return active->surface(channel, command);
   };

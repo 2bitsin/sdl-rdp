@@ -25,8 +25,8 @@ auto NextFrame::Inspect() -> void {
   Expects(context, "callback context exists");
   Expects(context->gdi, "decoded framebuffer exists");
   auto const index  = (40 * 640) + static_cast<int>(column);
-  bool const origin = PatternPixel(context->gdi, index) == 0x00ff00 &&
-                      (!column || PatternPixel(context->gdi, index - 1) != 0x00ff00);
+  bool const origin = PatternPixel(context->gdi, index) == 0x00ff00
+                      && (!column || PatternPixel(context->gdi, index - 1) != 0x00ff00);
   if (!received && origin) {
     matches  = Pattern(client, true);
     received = true;

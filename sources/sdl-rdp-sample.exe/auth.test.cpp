@@ -2,9 +2,9 @@
 #include "support.test/sample.hpp"
 
 #include <SDL3/SDL.h>
+#include <winpr/ntlm.h>
 #include <atomic>
 #include <filesystem>
-#include <winpr/ntlm.h>
 
 namespace SampleGate {
 namespace {
@@ -50,8 +50,8 @@ struct PropertyCredentials {
 public:
   static auto SDLCALL Verify(void* raw, char const* domain, char const* user, char const* password) -> bool {
     auto& self = *static_cast<PropertyCredentials*>(raw);
-    self.arguments = self.arguments && std::string_view(domain) == "LAB" && std::string_view(user) == "alice" &&
-                     std::string_view(password) == "property-secret";
+    self.arguments = self.arguments && std::string_view(domain) == "LAB" && std::string_view(user) == "alice"
+                     && std::string_view(password) == "property-secret";
     ++self.verified;
     return true;
   }
@@ -62,9 +62,15 @@ public:
     auto secret = std::to_array("property-secret");
     return NTOWFv1A(secret.data(), secret.size() - 1, hash);
   }
-  auto Verified() const  -> unsigned { return verified.load(); }
-  auto LookedUp() const  -> unsigned { return looked_up.load(); }
-  auto Arguments() const -> bool { return arguments.load(); }
+  auto Verified() const -> unsigned {
+    return verified.load();
+  }
+  auto LookedUp() const -> unsigned {
+    return looked_up.load();
+  }
+  auto Arguments() const -> bool {
+    return arguments.load();
+  }
 
 private:
   std::atomic<unsigned> verified  = 0;
@@ -82,8 +88,8 @@ public:
     SDL_Quit();
     SDL_ResetHints();
   }
-  auto operator = (Quit const&) -> Quit& = delete;
-  auto operator = (Quit&&)      -> Quit& = delete;
+  auto operator=(Quit const&) -> Quit& = delete;
+  auto operator=(Quit&&)      -> Quit& = delete;
 };
 auto GivenAuthenticationHints(fs::path const& certificates) -> void {
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));

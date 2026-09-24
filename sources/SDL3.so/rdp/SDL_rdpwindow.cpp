@@ -5,7 +5,7 @@ namespace {
 // SDL rejects desktop updates while fullscreen_active is set.
 using FullscreenState = std::pair<std::reference_wrapper<SDL_VideoDisplay>, bool>;
 auto SuspendFullscreen(SDL_VideoDisplay& display) -> FullscreenState {
-  return {display, std::exchange(display.fullscreen_active, false)};
+  return { display, std::exchange(display.fullscreen_active, false) };
 }
 auto RestoreFullscreen(FullscreenState const& state) noexcept -> void {
   state.first.get().fullscreen_active = state.second;
@@ -37,8 +37,8 @@ auto PlaceAtOrigin(SDL_Window& window) -> void {
   window.y = window.windowed.y = window.floating.y = 0;
 }
 // SDL's video callback table supplies borrowed device and window pointers.
-auto CreateWindow(SDL_VideoDevice* device, SDL_Window* window,
-                  [[maybe_unused]] SDL_PropertiesID unused_properties) -> bool {
+auto CreateWindow(SDL_VideoDevice* device, SDL_Window* window, [[maybe_unused]] SDL_PropertiesID unused_properties)
+    -> bool {
   utilities::Expects(device != nullptr, "window creation has a device");
   utilities::Expects(window != nullptr, "window creation has a window");
   return Boundary([&] {
@@ -71,8 +71,8 @@ auto SetWindowSize(SDL_VideoDevice* device, SDL_Window* window) -> void {
 // SDL's video callback table requires a show callback even for a headless window.
 auto ShowWindow([[maybe_unused]] SDL_VideoDevice* unused_device, [[maybe_unused]] SDL_Window* unused_window) -> void { }
 // SDL's fullscreen callback supplies borrowed device, window and display pointers.
-auto Fullscreen(SDL_VideoDevice* device, SDL_Window* window, SDL_VideoDisplay* display,
-                SDL_FullscreenOp operation) -> SDL_FullscreenResult {
+auto Fullscreen(SDL_VideoDevice* device, SDL_Window* window, SDL_VideoDisplay* display, SDL_FullscreenOp operation)
+    -> SDL_FullscreenResult {
   utilities::Expects(device != nullptr, "fullscreen has a device");
   utilities::Expects(window != nullptr, "fullscreen has a window");
   utilities::Expects(display != nullptr, "fullscreen has a display");

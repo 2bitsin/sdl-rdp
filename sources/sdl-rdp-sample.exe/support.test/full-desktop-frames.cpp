@@ -21,8 +21,8 @@ auto FullDesktopFrames::Cover(sdlrdp_rect region, Backend::Extent desktop) -> vo
   ++deliveries;
   rows.resize(desktop.height);
   auto const bottom = region.y + region.h;
-  if (region.x || std::cmp_not_equal(region.x + region.w, desktop.width) || region.h <= 0 ||
-      std::cmp_greater(bottom, rows.size()))
+  if (region.x || std::cmp_not_equal(region.x + region.w, desktop.width) || region.h <= 0
+      || std::cmp_greater(bottom, rows.size()))
     return;
   std::fill(rows.begin() + region.y, rows.begin() + bottom, true);
   if (std::ranges::all_of(rows, [](bool covered) { return covered; })) {

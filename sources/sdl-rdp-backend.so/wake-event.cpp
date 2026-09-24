@@ -2,9 +2,9 @@
 
 #include "_detail/contract.hpp"
 
-#include <stdexcept>
 #include <winpr/file.h>
 #include <winpr/synch.h>
+#include <stdexcept>
 
 namespace Backend {
 auto Signalled(HANDLE event) -> bool {
@@ -31,8 +31,7 @@ auto WakeEvent::Transition(Phase next) -> void {
     ResetEvent(get());
     phase.store(next);
     break;
-  default:
-    utilities::Unreachable("known wake phase");
+  default: utilities::Unreachable("known wake phase");
   }
 }
 }

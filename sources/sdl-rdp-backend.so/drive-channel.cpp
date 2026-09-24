@@ -4,14 +4,14 @@
 #include "_detail/peer-link.hpp"
 #include "_detail/session-access.hpp"
 
-#include <algorithm>
-#include <ranges>
-#include <array>
-#include <cstring>
 #include <freerdp/channels/rdpdr.h>
 #include <oxbox/utilities/span.hpp>
-#include <span>
 #include <winpr/nt.h>
+#include <algorithm>
+#include <array>
+#include <cstring>
+#include <ranges>
+#include <span>
 
 namespace Backend {
 namespace {
@@ -57,12 +57,12 @@ auto GeneralCapability(DrivePacket& packet) -> void {
   body.Put(0);
   body.Put(RDPDR_VERSION_MAJOR, 2);
   body.Put(RDPDR_VERSION_MINOR_RDP6X, 2);
-  constexpr unsigned all_irps = RDPDR_IRP_MJ_CREATE | RDPDR_IRP_MJ_CLEANUP | RDPDR_IRP_MJ_CLOSE | RDPDR_IRP_MJ_READ |
-                                RDPDR_IRP_MJ_WRITE | RDPDR_IRP_MJ_FLUSH_BUFFERS | RDPDR_IRP_MJ_SHUTDOWN |
-                                RDPDR_IRP_MJ_DEVICE_CONTROL | RDPDR_IRP_MJ_QUERY_VOLUME_INFORMATION |
-                                RDPDR_IRP_MJ_SET_VOLUME_INFORMATION | RDPDR_IRP_MJ_QUERY_INFORMATION |
-                                RDPDR_IRP_MJ_SET_INFORMATION | RDPDR_IRP_MJ_DIRECTORY_CONTROL |
-                                RDPDR_IRP_MJ_LOCK_CONTROL | RDPDR_IRP_MJ_QUERY_SECURITY | RDPDR_IRP_MJ_SET_SECURITY;
+  constexpr unsigned all_irps = RDPDR_IRP_MJ_CREATE | RDPDR_IRP_MJ_CLEANUP | RDPDR_IRP_MJ_CLOSE | RDPDR_IRP_MJ_READ
+                                | RDPDR_IRP_MJ_WRITE | RDPDR_IRP_MJ_FLUSH_BUFFERS | RDPDR_IRP_MJ_SHUTDOWN
+                                | RDPDR_IRP_MJ_DEVICE_CONTROL | RDPDR_IRP_MJ_QUERY_VOLUME_INFORMATION
+                                | RDPDR_IRP_MJ_SET_VOLUME_INFORMATION | RDPDR_IRP_MJ_QUERY_INFORMATION
+                                | RDPDR_IRP_MJ_SET_INFORMATION | RDPDR_IRP_MJ_DIRECTORY_CONTROL
+                                | RDPDR_IRP_MJ_LOCK_CONTROL | RDPDR_IRP_MJ_QUERY_SECURITY | RDPDR_IRP_MJ_SET_SECURITY;
   body.Put(all_irps);
   body.Put(0);
   body.Put(RDPDR_DEVICE_REMOVE_PDUS | RDPDR_CLIENT_DISPLAY_NAME_PDU | RDPDR_USER_LOGGEDON_PDU);
@@ -81,11 +81,13 @@ auto DriveChannel::Abort(std::string const& cause) -> void {
 }
 DriveChannel::DriveChannel(PeerLink& link, EventQueue& events, Diagnostics const& diagnostics,
                            SessionAccess& session) noexcept
-    : _link { link }, _events{ events }, _diagnostics{ diagnostics }, _session{ session } { }
+    : _link{ link }, _events{ events }, _diagnostics{ diagnostics }, _session{ session } { }
 DriveChannel::~DriveChannel() {
   Disconnect();
 }
-auto DriveChannel::Event() const -> HANDLE { return event; }
+auto DriveChannel::Event() const -> HANDLE {
+  return event;
+}
 auto DriveChannel::Open() -> bool {
   Expects(!channel, "drive channel opens once");
   try {
@@ -105,8 +107,8 @@ auto DriveChannel::Write(DrivePacket& packet) -> void {
   Expects(channel != nullptr, "drive transport exists");
   ULONG written = 0;
   if (!WTSVirtualChannelWrite(channel.get(), oxbox::utilities::SpanCast<char>(std::span(packet.Bytes())).data(),
-                              packet.Bytes().size(), &written) ||
-      written != packet.Bytes().size())
+                              packet.Bytes().size(), &written)
+      || written != packet.Bytes().size())
     throw std::runtime_error("Drive transport disconnected.");
   _link.Signal();
 }
@@ -129,8 +131,7 @@ auto DriveChannel::Announce(DrivePacket& packet) -> void {
     auto                type = packet.Get(4);
     auto                wire = packet.Get(4);
     std::array<char, 9> name { };
-    for (unsigned i = 0; i < 8; ++i)
-      name[i] = char(packet.Get(1));
+    for (unsigned i = 0; i < 8; ++i) name[i] = char(packet.Get(1));
     auto length = packet.Get(4);
     auto begin  = packet.Position();
     packet.Skip(length);
@@ -219,8 +220,7 @@ auto DriveChannel::Receive(DrivePacket& packet) -> void {
     Complete(packet);
   else if (type == PAKID_CORE_DEVICELIST_REMOVE) {
     auto count = packet.Get(4);
-    while (count--)
-      Remove(packet.Get(4));
+    while (count--) Remove(packet.Get(4));
   }
 }
 auto DriveChannel::Pump(std::span<HANDLE const> signaled) -> bool {
@@ -237,8 +237,8 @@ auto DriveChannel::Pump(std::span<HANDLE const> signaled) -> bool {
     return true;
   }
 }
-auto DriveChannel::Send(unsigned drive, unsigned file, unsigned major, DrivePacket const& body,
-                        unsigned minor) -> std::shared_ptr<DriveRequest> {
+auto DriveChannel::Send(unsigned drive, unsigned file, unsigned major, DrivePacket const& body, unsigned minor)
+    -> std::shared_ptr<DriveRequest> {
   std::scoped_lock const lock(mutex);
   if (!connected) throw std::runtime_error("Drive channel ended.");
   auto wire = Device(drive);

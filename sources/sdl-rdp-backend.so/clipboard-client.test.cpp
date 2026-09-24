@@ -3,15 +3,15 @@
 #include "_detail/client-channels.hpp"
 #include "_detail/clipboard-capabilities.hpp"
 
-#include <algorithm>
 #include <freerdp/addin.h>
 #include <freerdp/channels/channels.h>
 #include <freerdp/client/channels.h>
+#include <winpr/clipboard.h>
+#include <algorithm>
 #include <ranges>
 #include <span>
 #include <string_view>
 #include <utility>
-#include <winpr/clipboard.h>
 
 namespace Headless {
 namespace {
@@ -41,8 +41,7 @@ ClipboardClient::~ClipboardClient() {
 }
 auto ClipboardClient::Received(std::vector<BYTE> const& bytes) -> bool {
   std::scoped_lock const lock(guard);
-  return incoming == bytes && std::ranges::contains(formats, CF_UNICODETEXT) &&
-         std::ranges::contains(formats, CF_TEXT);
+  return incoming == bytes && std::ranges::contains(formats, CF_UNICODETEXT) && std::ranges::contains(formats, CF_TEXT);
 }
 auto ClipboardClient::RequestFormat(UINT32 format) -> UINT {
   Expects(channel.load(), "clipboard channel connected");
@@ -81,8 +80,8 @@ auto ClipboardClient::Connected(void* /*unused*/, ChannelConnectedEventArgs cons
   attaching->channel                = context;
 }
 auto ClipboardClient::Ready(CliprdrClientContext* context, CLIPRDR_MONITOR_READY const* /*unused*/) -> UINT {
-  auto result =
-      Backend::SendGeneralCapabilities([&](auto const* caps) { return context->ClientCapabilities(context, caps); });
+  auto result = Backend::SendGeneralCapabilities(
+      [&](auto const* caps) { return context->ClientCapabilities(context, caps); });
   if (result != CHANNEL_RC_OK) return result;
   auto& self = HeldClipboard(context);
   if (!self.outgoing.empty()) return self.Offer(self.outgoing);
@@ -93,8 +92,8 @@ auto ClipboardClient::Formats(CliprdrClientContext* context, CLIPRDR_FORMAT_LIST
   auto& self = HeldClipboard(context);
   {
     std::scoped_lock const lock(self.guard);
-    self.formats = std::span(list->formats, list->numFormats) | std::views::transform(&CLIPRDR_FORMAT::formatId) |
-                   std::ranges::to<std::vector>();
+    self.formats = std::span(list->formats, list->numFormats) | std::views::transform(&CLIPRDR_FORMAT::formatId)
+                   | std::ranges::to<std::vector>();
   }
   CLIPRDR_FORMAT_LIST_RESPONSE response{ .common = { .msgType = CB_FORMAT_LIST_RESPONSE } };
   response.common.msgFlags = CB_RESPONSE_OK;

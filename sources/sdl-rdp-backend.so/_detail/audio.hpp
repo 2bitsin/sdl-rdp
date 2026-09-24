@@ -1,9 +1,9 @@
 #pragma once
 #include "rdp-handles.hpp"
 
+#include <freerdp/server/rdpsnd.h>
 #include <chrono>
 #include <deque>
-#include <freerdp/server/rdpsnd.h>
 #include <span>
 #include <vector>
 
@@ -23,8 +23,8 @@ public:
        AudioChannel(PeerLink& link, Diagnostics const& diagnostics, EventQueue& events, SessionAccess& session,
                     TraceQueue& traces);
        ~AudioChannel();
-  auto operator = (AudioChannel const&)       -> AudioChannel& = delete;
-  auto operator = (AudioChannel&&)            -> AudioChannel& = delete;
+  auto operator=(AudioChannel const&)         -> AudioChannel& = delete;
+  auto operator=(AudioChannel&&)              -> AudioChannel& = delete;
   auto Initialize()                           -> bool;
   auto Pump()                                 -> bool;
   auto Event() const                          -> HANDLE;

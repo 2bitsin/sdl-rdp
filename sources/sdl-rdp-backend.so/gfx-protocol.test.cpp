@@ -3,9 +3,9 @@
 #include "_detail/avc-regions.hpp"
 #include "_detail/avc.hpp"
 
+#include <gtest/gtest.h>
 #include <algorithm>
 #include <array>
-#include <gtest/gtest.h>
 #include <ranges>
 
 namespace {
@@ -32,8 +32,8 @@ TEST(GraphicsCapability, Version101ReservedLength) {
   EXPECT_EQ(selected.flags, 0u);
 }
 TEST(GraphicsCapability, MasksFlagsAndDisablesAvc) {
-  constexpr auto handled =
-      RDPGFX_CAPS_FLAG_THINCLIENT | RDPGFX_CAPS_FLAG_SMALL_CACHE | RDPGFX_CAPS_FLAG_SCALEDMAP_DISABLE;
+  constexpr auto handled = RDPGFX_CAPS_FLAG_THINCLIENT | RDPGFX_CAPS_FLAG_SMALL_CACHE
+                           | RDPGFX_CAPS_FLAG_SCALEDMAP_DISABLE;
   for (UINT32 const version : { RDPGFX_CAPVERSION_8, RDPGFX_CAPVERSION_81, RDPGFX_CAPVERSION_10, RDPGFX_CAPVERSION_102,
                                 RDPGFX_CAPVERSION_107 }) {
     RDPGFX_CAPSET cap      { version, 4, 0xffffffff };

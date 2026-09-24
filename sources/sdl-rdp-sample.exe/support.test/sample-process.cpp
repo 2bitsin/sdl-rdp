@@ -4,10 +4,10 @@
 #include "support.test/sample-launch.hpp"
 
 #include <SDL3/SDL.h>
-#include <array>
 #include <freerdp/input.h>
 #include <oxbox/utilities/number-text.hpp>
 #include <sdl-rdp-backend.so/_detail/test-input-steps.hpp>
+#include <array>
 #include <utility>
 
 namespace SampleGate {
@@ -104,8 +104,7 @@ auto SampleProcess::TearDown() -> void {
   if (process) SDL_Log("%s", process->Transcript().c_str());
 }
 auto SampleProcess::Escape(Client const& client) -> void {
-  ASSERT_TRUE(freerdp_input_send_keyboard_event(client.Instance()->context->input, KBD_FLAGS_DOWN, 1))
-      << "send Escape";
+  ASSERT_TRUE(freerdp_input_send_keyboard_event(client.Instance()->context->input, KBD_FLAGS_DOWN, 1)) << "send Escape";
   ASSERT_TRUE(process->Exit()) << "sample exit 0 within ten seconds: " << process->Transcript();
 }
 auto SampleProcess::CollectClientLog(wLogMessage const* message) -> BOOL {

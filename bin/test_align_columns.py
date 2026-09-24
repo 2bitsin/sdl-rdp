@@ -1276,3 +1276,29 @@ def test_scope_head_is_not_an_expression_continuation():
     source = 'class Peer\n{\n  int a;\n  long b;\n};\n'
     expected = 'class Peer\n{\n  int  a;\n  long b;\n};\n'
     assert align(source) == expected
+
+
+def test_inline_body_past_the_limit_leaves_the_run():
+    head      = 'class Session {\npublic:\n  [[nodiscard]] SessionLock Lock();\n'
+    signature = '  void ForEach(PeersLock const& held, std::invocable<Peer&> auto visit)'
+    wide      = signature + ' { _peers.ForEach(held, visit); }\n'
+    source    = head + wide + '  void Reap();\n};\n'
+    assert align(source) == head + wide + '  void                      Reap();\n};\n'
+
+
+def test_qualified_class_keeps_its_constructor_indent():
+    before = 'void Install() {\n  Hook();\n}\n'
+    source = before + 'class Hook::Installation {\npublic:\n  Installation(int x);\n  ~Installation();\n};\n'
+    assert align(source) == source
+
+
+def test_qualified_class_constructor_without_destructor_is_a_member():
+    source = 'class Hook::Installation {\npublic:\n  Installation(int x);\n  auto Run() -> bool;\n};\n'
+    expected = 'class Hook::Installation {\npublic:\n       Installation(int x);\n  auto Run() -> bool;\n};\n'
+    assert align(source) == expected
+
+
+def test_default_joins_the_case_run():
+    cases  = 'switch (phase) {\ncase Phase::DOWN: return 1;\n'
+    source = cases + 'case Phase::UP: return 2;\ndefault: return 0;\n}\n'
+    assert align(source) == cases + 'case Phase::UP:   return 2;\ndefault:          return 0;\n}\n'

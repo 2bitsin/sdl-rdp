@@ -1,14 +1,14 @@
 #pragma once
-#include <bit>
-#include <functional>
 #include <oxbox/utilities/span.hpp>
 #include <oxbox/utilities/transcode.hpp>
+#include <bit>
+#include <functional>
 #include <stdexcept>
 #include <vector>
 
 namespace Backend {
-inline constexpr oxbox::utilities::TextFormat Utf16Little { .encoding = oxbox::utilities::Encoding::UTF16,
-                                                          .order = std::endian::little };
+inline constexpr oxbox::utilities::TextFormat Utf16Little{ .encoding = oxbox::utilities::Encoding::UTF16,
+                                                           .order    = std::endian::little };
 template <class Output, class Map = std::identity>
 auto TranscodeRange(std::span<std::byte const> input, oxbox::utilities::TextFormat source,
                     oxbox::utilities::TextFormat target, Map map = { }) -> Output {

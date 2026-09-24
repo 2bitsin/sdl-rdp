@@ -10,8 +10,8 @@ auto SDLCALL Authenticator::Deny(void* /*unused*/, char const* /*unused*/, char 
                                  char const* /*unused*/) -> bool {
   return false;
 }
-auto SDLCALL Authenticator::AuthenticationLog(void* user, int category, SDL_LogPriority priority,
-                                              char const* message) -> void {
+auto SDLCALL Authenticator::AuthenticationLog(void* user, int category, SDL_LogPriority priority, char const* message)
+    -> void {
   auto&                      self   = *static_cast<Authenticator*>(user);
   std::string_view           text(message);
   constexpr std::string_view prefix = "Authentication rejected: user \"";

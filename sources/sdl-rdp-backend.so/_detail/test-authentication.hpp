@@ -3,18 +3,18 @@
 #include "sdl-rdp-backend.h"
 #include "test-peer-status.hpp"
 
+#include <gtest/gtest.h>
+#include <oxbox/platform/scratch-area.hpp>
+#include <winpr/wtypes.h>
 #include <chrono>
 #include <condition_variable>
-#include <gtest/gtest.h>
 #include <memory>
 #include <mutex>
-#include <oxbox/platform/scratch-area.hpp>
 #include <string>
 #include <string_view>
 #include <thread>
 #include <utility>
 #include <vector>
-#include <winpr/wtypes.h>
 
 namespace AuthenticationGate {
 using BackendGate::CurrentStatus;

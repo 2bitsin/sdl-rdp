@@ -42,8 +42,8 @@ auto EventName(Uint32 type) -> char const* {
 }
 
 auto PrintGeometry(SDL_Event const& event, SDL_Window* window) -> void {
-  if (event.type == SDL_EVENT_WINDOW_EXPOSED || event.type == SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED ||
-      event.type == SDL_EVENT_WINDOW_RESIZED) {
+  if (event.type == SDL_EVENT_WINDOW_EXPOSED || event.type == SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED
+      || event.type == SDL_EVENT_WINDOW_RESIZED) {
     auto const* mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
     int         w    = 0;
     int         h    = 0;
@@ -81,12 +81,9 @@ auto PointerDetails(SDL_Event const& event, unsigned frame) -> std::string {
     return std::format(" xrel={:g} yrel={:g} x={:.0f} y={:.0f} frame={}", event.motion.xrel, event.motion.yrel,
                        event.motion.x, event.motion.y, frame);
   case SDL_EVENT_MOUSE_BUTTON_DOWN:
-  case SDL_EVENT_MOUSE_BUTTON_UP:
-    return std::format(" button={} down={}", event.button.button, int(event.button.down));
-  case SDL_EVENT_MOUSE_WHEEL:
-    return std::format(" x={} y={}", event.wheel.x, event.wheel.y);
-  default:
-    return { };
+  case SDL_EVENT_MOUSE_BUTTON_UP: return std::format(" button={} down={}", event.button.button, int(event.button.down));
+  case SDL_EVENT_MOUSE_WHEEL:     return std::format(" x={} y={}", event.wheel.x, event.wheel.y);
+  default:                        return { };
   }
 }
 auto WindowDetails(SDL_Event const& event, SDL_Window* window) -> std::string {

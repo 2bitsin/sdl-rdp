@@ -12,15 +12,15 @@
 #include "_detail/peer-wait.hpp"
 #include "_detail/session-access.hpp"
 
+#include <freerdp/settings.h>
+#include <winpr/synch.h>
 #include <algorithm>
 #include <array>
 #include <format>
-#include <freerdp/settings.h>
 #include <memory>
 #include <ranges>
 #include <stdexcept>
 #include <utility>
-#include <winpr/synch.h>
 
 namespace Backend {
 namespace {
@@ -30,17 +30,17 @@ auto Apply(rdpSettings& settings, std::ranges::input_range auto const& entries, 
 }
 auto Flags(sdlrdp_auth auth) -> SecurityFlags {
   return { {
-    { FreeRDP_NlaSecurity              , auth == SDLRDP_AUTH_NLA  },
-    { FreeRDP_TlsSecurity              , true                     },
-    { FreeRDP_RdpSecurity              , auth == SDLRDP_AUTH_NONE },
-    { FreeRDP_RemoteFxCodec            , true                     },
-    { FreeRDP_NSCodec                  , true                     },
-    { FreeRDP_SupportGraphicsPipeline  , true                     },
-    { FreeRDP_AutoReconnectionEnabled  , true                     },
-    { FreeRDP_WaitForOutputBufferFlush , false                    },
-    { FreeRDP_FrameMarkerCommandEnabled, true                     },
-    { FreeRDP_SupportDisplayControl    , true                     },
-    { FreeRDP_SuppressOutput           , true                     },
+      { FreeRDP_NlaSecurity              , auth == SDLRDP_AUTH_NLA  },
+      { FreeRDP_TlsSecurity              , true                     },
+      { FreeRDP_RdpSecurity              , auth == SDLRDP_AUTH_NONE },
+      { FreeRDP_RemoteFxCodec            , true                     },
+      { FreeRDP_NSCodec                  , true                     },
+      { FreeRDP_SupportGraphicsPipeline  , true                     },
+      { FreeRDP_AutoReconnectionEnabled  , true                     },
+      { FreeRDP_WaitForOutputBufferFlush , false                    },
+      { FreeRDP_FrameMarkerCommandEnabled, true                     },
+      { FreeRDP_SupportDisplayControl    , true                     },
+      { FreeRDP_SuppressOutput           , true                     },
   } };
 }
 auto ApplySettings(rdpSettings& settings, sdlrdp_auth auth, sdlrdp_rect picture) -> bool {
@@ -49,9 +49,9 @@ auto ApplySettings(rdpSettings& settings, sdlrdp_auth auth, sdlrdp_rect picture)
     std::pair{ FreeRDP_FrameAcknowledge, UINT32(AcknowledgedFrameWindow) },
     std::pair{ FreeRDP_LargePointerFlag, UINT32(LARGE_POINTER_FLAG_96x96 | LARGE_POINTER_FLAG_384x384) },
   };
-  return freerdp_settings_set_string(&settings, FreeRDP_AuthenticationPackageList, "!kerberos") &&
-         Apply(settings, Flags(auth), freerdp_settings_set_bool) &&
-         Apply(settings, numbers, freerdp_settings_set_uint32) && ApplyDesktopSize(settings, picture);
+  return freerdp_settings_set_string(&settings, FreeRDP_AuthenticationPackageList, "!kerberos")
+         && Apply(settings, Flags(auth), freerdp_settings_set_bool)
+         && Apply(settings, numbers, freerdp_settings_set_uint32) && ApplyDesktopSize(settings, picture);
 }
 auto NegotiationLogging(rdpSettings& settings) {
   ResetAuthenticationLogging();
@@ -71,8 +71,8 @@ auto Connection(PeerLink& link, SessionAccess& session) {
 PeerLoop::PeerLoop(PeerLink& link, SessionAccess& session, Diagnostics const& diagnostics,
                    Configuration const& configuration, FrameStore& store, PeerWait& wait, PeerPump& pump,
                    Departure& departure) noexcept
-    : _link { link }, _session{ session }, _diagnostics{ diagnostics }, _configuration{ configuration },
-      _store{ store }, _wait{ wait }, _pump{ pump }, _departure{ departure } { }
+    : _link{ link }, _session{ session }, _diagnostics{ diagnostics }, _configuration{ configuration }, _store{ store },
+      _wait{ wait }, _pump{ pump }, _departure{ departure } { }
 auto PeerLoop::Start() -> void {
   Expects(!_thread.joinable(), "peer starts once");
   _thread = std::jthread([this](std::stop_token const& quit) { Serve(quit); });

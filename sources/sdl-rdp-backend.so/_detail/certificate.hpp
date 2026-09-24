@@ -1,8 +1,8 @@
 #pragma once
 #include "credentials.hpp"
 
-#include <filesystem>
 #include <freerdp/settings.h>
+#include <filesystem>
 
 namespace Backend {
 auto DefaultCertificateDirectory()                                                   -> std::filesystem::path;

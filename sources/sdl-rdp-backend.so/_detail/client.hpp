@@ -2,9 +2,9 @@
 #include "contract.hpp"
 #include "release-client.hpp"
 
+#include <freerdp/freerdp.h>
 #include <algorithm>
 #include <chrono>
-#include <freerdp/freerdp.h>
 #include <memory>
 #include <ranges>
 #include <vector>

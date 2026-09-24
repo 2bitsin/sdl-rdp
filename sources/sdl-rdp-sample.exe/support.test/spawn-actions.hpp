@@ -8,8 +8,8 @@ public:
        SpawnActions(SpawnActions const&)                     = delete;
        SpawnActions(SpawnActions&&)                          = delete;
        ~SpawnActions();
-  auto operator = (SpawnActions const&)     -> SpawnActions& = delete;
-  auto operator = (SpawnActions&&)          -> SpawnActions& = delete;
+  auto operator=(SpawnActions const&)       -> SpawnActions& = delete;
+  auto operator=(SpawnActions&&)            -> SpawnActions& = delete;
   auto Redirect(int descriptor, int target) -> void;
   auto Get() const                          -> posix_spawn_file_actions_t const*;
 

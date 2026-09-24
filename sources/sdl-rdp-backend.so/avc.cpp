@@ -1,9 +1,9 @@
 #include "_detail/avc.hpp"
 #include "_detail/contract.hpp"
 
+#include <oxbox/utilities/bits.hpp>
 #include <algorithm>
 #include <cstddef>
-#include <oxbox/utilities/bits.hpp>
 #include <ranges>
 
 namespace Backend::Avc {
@@ -32,7 +32,7 @@ auto Bitrate(Extent size, unsigned kbps) -> unsigned {
   auto const rate   = kbps ? uint64_t(kbps) * 1000 : std::max(uint64_t(2000000), scaled);
   return unsigned(std::clamp<uint64_t>(rate, 1, UINT32_MAX));
 }
-auto operator += (EncodingTimes& total, EncodingTimes const& frame) noexcept -> EncodingTimes& {
+auto operator+=(EncodingTimes& total, EncodingTimes const& frame) noexcept -> EncodingTimes& {
   total.convert += frame.convert;
   total.upload  += frame.upload;
   total.encode  += frame.encode;

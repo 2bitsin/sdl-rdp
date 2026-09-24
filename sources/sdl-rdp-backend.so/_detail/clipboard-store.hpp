@@ -1,9 +1,9 @@
 #pragma once
+#include <winpr/wtypes.h>
 #include <cstdint>
 #include <span>
 #include <string>
 #include <vector>
-#include <winpr/wtypes.h>
 
 namespace Backend {
 class ClipboardStore {

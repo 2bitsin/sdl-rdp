@@ -5,18 +5,21 @@ namespace rdp {
 namespace {
 constexpr int FrameAcknowledgementWaitMs = 100;
 auto Damage(std::span<SDL_Rect const> rects) -> std::vector<sdlrdp_rect> {
-  return rects | std::views::transform([](SDL_Rect const& rect) { return sdlrdp_rect{rect.x, rect.y, rect.w, rect.h}; })
-      | std::ranges::to<std::vector>();
+  return rects
+         | std::views::transform([](SDL_Rect const& rect) { return sdlrdp_rect{ rect.x, rect.y, rect.w, rect.h }; })
+         | std::ranges::to<std::vector>();
 }
 auto Present(Driver const& driver, SDL_Surface const& surface, std::span<sdlrdp_rect const> damage) -> bool {
   if (driver.Call<Operation::PRESENT>(surface.pixels, surface.pitch, surface.w, surface.h, damage.data(),
-                                      static_cast<unsigned>(damage.size())) != 0) return driver.Fail();
+                                      static_cast<unsigned>(damage.size()))
+      != 0)
+    return driver.Fail();
   if (!driver.Options().Boolean(SDL_HINT_RDP_VSYNC, false)) return true;
   return driver.Call<Operation::WAIT_FRAME>(FrameAcknowledgementWaitMs) >= 0 || driver.Fail();
 }
 // SDL returns a framebuffer through format, pixels and pitch output parameters.
-auto CreateFramebuffer(SDL_VideoDevice* device, SDL_Window* window, SDL_PixelFormat* format, void** pixels,
-                       int* pitch) -> bool {
+auto CreateFramebuffer(SDL_VideoDevice* device, SDL_Window* window, SDL_PixelFormat* format, void** pixels, int* pitch)
+    -> bool {
   utilities::Expects(device != nullptr, "framebuffer has a device");
   utilities::Expects(window != nullptr, "framebuffer has a window");
   utilities::Expects(format != nullptr, "framebuffer format output exists");
@@ -43,9 +46,8 @@ auto UpdateFramebuffer(SDL_VideoDevice* device, [[maybe_unused]] SDL_Window* unu
   auto const  surface = data.Framebuffer();
   if (!surface) return SDL_SetError("Couldn't find RDP surface for window");
   if (count == 0) return true;
-  return Boundary([&] {
-    return Present(data.Backend(), *surface, Damage(std::span(rects, static_cast<std::size_t>(count))));
-  });
+  return Boundary(
+      [&] { return Present(data.Backend(), *surface, Damage(std::span(rects, static_cast<std::size_t>(count)))); });
 }
 // SDL's framebuffer destruction callback borrows its device and window.
 auto DestroyFramebuffer(SDL_VideoDevice* device, [[maybe_unused]] SDL_Window* unused_window) -> void {

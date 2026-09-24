@@ -207,8 +207,7 @@ TEST_F(Authentication, PendingDisconnectLogLevels) {
 }
 TEST_F(Authentication, TenRejectionsThenSuccess) {
   Open(SDLRDP_AUTH_TLS);
-  for (unsigned i = 0; i < 10; ++i)
-    Attempt("alice", "wrong-secret", "LAB", false, false);
+  for (unsigned i = 0; i < 10; ++i) Attempt("alice", "wrong-secret", "LAB", false, false);
   Attempt("alice", "correct-secret", "LAB", false, true);
   RejectionLogs("wrong-secret", 10);
 }

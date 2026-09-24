@@ -8,8 +8,8 @@ namespace SampleGate {
 auto PatternPixel(rdpGdi const* gdi, int index) -> UINT32 {
   UINT32 value = 0;
   std::memcpy(&value,
-              gdi->primary_buffer + (static_cast<std::size_t>((index / 640)) * gdi->stride) +
-                  ((static_cast<std::ptrdiff_t>(index % 640)) * 4),
+              gdi->primary_buffer + (static_cast<std::size_t>((index / 640)) * gdi->stride)
+                  + ((static_cast<std::ptrdiff_t>(index % 640)) * 4),
               4);
   return value & 0xffffff;
 }

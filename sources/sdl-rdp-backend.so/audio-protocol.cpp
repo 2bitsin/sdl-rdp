@@ -18,8 +18,8 @@ auto Supported(RdpsndServerContext const& context) -> bool {
   static constexpr unsigned wave2_version = 8;
   if (context.clientVersion < wave2_version || !context.num_client_formats) return false;
   auto const& selected = context.client_formats[0];
-  return selected.wFormatTag == WAVE_FORMAT_PCM && selected.nChannels == 2 && selected.wBitsPerSample == 16 &&
-         (selected.nSamplesPerSec == NativeRate || selected.nSamplesPerSec == CompatibleRate);
+  return selected.wFormatTag == WAVE_FORMAT_PCM && selected.nChannels == 2 && selected.wBitsPerSample == 16
+         && (selected.nSamplesPerSec == NativeRate || selected.nSamplesPerSec == CompatibleRate);
 }
 auto Formats(RdpsndServerContext const& context) -> std::string {
   std::string formats;

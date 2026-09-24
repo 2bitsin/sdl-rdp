@@ -6,20 +6,21 @@
 #include "_detail/test-io.hpp"
 #include "support.test/child-process.hpp"
 
+#include <gtest/gtest.h>
+#include <openssl/pem.h>
+#include <openssl/x509v3.h>
+#include <oxbox/utilities/span.hpp>
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <fcntl.h>
 #include <future>
-#include <gtest/gtest.h>
-#include <openssl/pem.h>
-#include <openssl/x509v3.h>
-#include <oxbox/utilities/span.hpp>
 #include <span>
 #include <system_error>
 
 namespace BackendGate {
 namespace {
+using PlanarContext = std::unique_ptr<BITMAP_PLANAR_CONTEXT, Backend::Releases<freerdp_bitmap_planar_context_free>>;
 auto ThenCertificateLifetime(X509* cert) -> void {
   int days    = 0;
   int seconds = 0;
@@ -84,8 +85,8 @@ TEST(Errors, WidthAndBind) {
 }
 
 namespace {
-auto MeasureFullFrame(sdlrdp_handle* handle, Client& client, std::vector<UINT32> const& pixels,
-                      sdlrdp_codec codec) -> void {
+auto MeasureFullFrame(sdlrdp_handle* handle, Client& client, std::vector<UINT32> const& pixels, sdlrdp_codec codec)
+    -> void {
   FrameCounter      counter(client);
   auto              bytes   = client.Received();
   auto              started = Clock::now();
@@ -150,10 +151,8 @@ TEST(Planar, SignedDelta64Rows) {
   std::vector<UINT32> decoded(pixels.size());
   std::ranges::generate(pixels,
                         [index = 0u]() mutable { return 0xff000000u | ((200u - index++ / width) * 0x00010101u); });
-  std::unique_ptr<BITMAP_PLANAR_CONTEXT, Backend::Releases<freerdp_bitmap_planar_context_free>> const encoder(
-      freerdp_bitmap_planar_context_new(PLANAR_FORMAT_HEADER_RLE, width, height));
-  std::unique_ptr<BITMAP_PLANAR_CONTEXT, Backend::Releases<freerdp_bitmap_planar_context_free>> const decoder(
-      freerdp_bitmap_planar_context_new(0, width, height));
+  PlanarContext const encoder(freerdp_bitmap_planar_context_new(PLANAR_FORMAT_HEADER_RLE, width, height));
+  PlanarContext const decoder(freerdp_bitmap_planar_context_new(0, width, height));
   ASSERT_TRUE(encoder && decoder);
   freerdp_planar_topdown_image(encoder.get(), TRUE);
   std::vector<BYTE> compressed((pixels.size() * 4) + 1024);
@@ -218,8 +217,8 @@ public:
     else
       unsetenv("XDG_DATA_HOME");
   }
-  auto operator = (ProcessEnvironment const&) -> ProcessEnvironment& = delete;
-  auto operator = (ProcessEnvironment&&)      -> ProcessEnvironment& = delete;
+  auto operator=(ProcessEnvironment const&) -> ProcessEnvironment& = delete;
+  auto operator=(ProcessEnvironment&&)      -> ProcessEnvironment& = delete;
 
 private:
   std::filesystem::path      cwd  = std::filesystem::current_path();
@@ -250,12 +249,11 @@ TEST(Certificate, StableDefaultAndPermissions) {
 TEST(Planar, Noisy640Rows) {
   std::unique_ptr<rdpSettings, Backend::Releases<freerdp_settings_free>> const settings(freerdp_settings_new(0));
   ASSERT_TRUE(freerdp_settings_set_uint32(settings.get(), FreeRDP_ColorDepth, 32));
-  std::unique_ptr<BITMAP_PLANAR_CONTEXT, Backend::Releases<freerdp_bitmap_planar_context_free>> const encoder(
+  PlanarContext const encoder(
       freerdp_bitmap_planar_context_new(PLANAR_FORMAT_HEADER_RLE | PLANAR_FORMAT_HEADER_NA, 1, 1));
   ASSERT_TRUE(freerdp_bitmap_planar_context_reset(encoder.get(), 640, 1));
   std::vector<BYTE>   payload((640 * 4) + 1024);
-  std::unique_ptr<BITMAP_PLANAR_CONTEXT, Backend::Releases<freerdp_bitmap_planar_context_free>> const decoder(
-      freerdp_bitmap_planar_context_new(0, 640, 1));
+  PlanarContext const decoder(freerdp_bitmap_planar_context_new(0, 640, 1));
   std::vector<UINT32> pixels(640);
   std::vector<UINT32> decoded(640);
   auto const          source  = oxbox::utilities::SpanCast<std::uint8_t const>(std::span(pixels));
@@ -265,8 +263,9 @@ TEST(Planar, Noisy640Rows) {
     UINT32 size = payload.size();
     ASSERT_TRUE(freerdp_bitmap_compress_planar(encoder.get(), source.data(), PIXEL_FORMAT_BGRA32, 640, 1, 2560,
                                                payload.data(), &size));
-    ASSERT_TRUE(planar_decompress(decoder.get(), payload.data(), size, 640, 1, target.data(), PIXEL_FORMAT_BGRX32,
-                                  2560, 0, 0, 640, 1, TRUE)) << y;
+    ASSERT_TRUE(planar_decompress(decoder.get(), payload.data(), size, 640, 1, target.data(), PIXEL_FORMAT_BGRX32, 2560,
+                                  0, 0, 640, 1, TRUE))
+        << y;
   }
 }
 }

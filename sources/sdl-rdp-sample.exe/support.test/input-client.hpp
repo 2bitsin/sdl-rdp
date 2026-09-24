@@ -1,9 +1,9 @@
 #pragma once
-#include <atomic>
 #include <freerdp/client/ainput.h>
 #include <freerdp/client/channels.h>
 #include <freerdp/client/rdpei.h>
 #include <sdl-rdp-backend.so/_detail/client.hpp>
+#include <atomic>
 
 namespace SampleGate {
 struct InputClient {

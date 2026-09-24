@@ -11,10 +11,8 @@ auto TouchHandled(uint32_t result) -> bool {
   switch (result) {
   case CHANNEL_RC_OK:
   // FreeRDP 3.15 channels/rdpei/server/rdpei_main.c:701 maps ERROR_NO_DATA to ERROR_READ_FAULT.
-  case ERROR_READ_FAULT:
-    return true;
-  default:
-    return false;
+  case ERROR_READ_FAULT: return true;
+  default:               return false;
   }
 }
 }
@@ -41,16 +39,16 @@ auto Input::Open() -> bool {
   _touch.reset(rdpei_server_context_new(_link.Channels()));
   if (!_advanced || !_touch) return false;
   InstallChannels();
-  return _advanced->Initialize(_advanced.get(), TRUE) == CHANNEL_RC_OK &&
-         _advanced->Open(_advanced.get()) == CHANNEL_RC_OK && _advanced->Poll(_advanced.get()) == CHANNEL_RC_OK &&
-         _advanced->ChannelHandle(_advanced.get(), &_advanced_event) &&
-         rdpei_server_init(_touch.get()) == CHANNEL_RC_OK;
+  return _advanced->Initialize(_advanced.get(), TRUE) == CHANNEL_RC_OK
+         && _advanced->Open(_advanced.get()) == CHANNEL_RC_OK && _advanced->Poll(_advanced.get()) == CHANNEL_RC_OK
+         && _advanced->ChannelHandle(_advanced.get(), &_advanced_event)
+         && rdpei_server_init(_touch.get()) == CHANNEL_RC_OK;
 }
 auto Input::Channels(std::span<HANDLE const> ready) -> bool {
   if (!DynamicChannelsReady(_link)) return true;
   if (!_opened) return Open();
-  if (_advanced_ready && std::ranges::contains(ready, _advanced_event) &&
-      _advanced->Poll(_advanced.get()) != CHANNEL_RC_OK)
+  if (_advanced_ready && std::ranges::contains(ready, _advanced_event)
+      && _advanced->Poll(_advanced.get()) != CHANNEL_RC_OK)
     return false;
   if (!_touch_ready || !std::ranges::contains(ready, rdpei_server_get_event_handle(_touch.get()))) return true;
   return TouchHandled(rdpei_server_handle_messages(_touch.get()));

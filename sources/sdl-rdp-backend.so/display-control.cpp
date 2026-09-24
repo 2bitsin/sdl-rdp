@@ -6,11 +6,11 @@
 #include "_detail/event-queue.hpp"
 #include "_detail/peer-link.hpp"
 
+#include <freerdp/channels/wtsvc.h>
+#include <freerdp/settings.h>
 #include <algorithm>
 #include <concepts>
 #include <cstdint>
-#include <freerdp/channels/wtsvc.h>
-#include <freerdp/settings.h>
 #include <ranges>
 #include <span>
 
@@ -43,10 +43,10 @@ auto Covering(std::span<Monitor const> monitors) -> sdlrdp_rect {
 }
 DisplayControl::DisplayControl(PeerLink& link, Activation const& activation, DesktopLayout const& desktop,
                                EventQueue& events) noexcept
-    : _link { link }, _activation{ activation }, _desktop{ desktop }, _events{ events } { }
+    : _link{ link }, _activation{ activation }, _desktop{ desktop }, _events{ events } { }
 auto DisplayControl::Open() -> bool {
-  if (_open || !freerdp_settings_get_bool(&_link.Settings(), FreeRDP_SupportDisplayControl) ||
-      !DynamicChannelsReady(_link))
+  if (_open || !freerdp_settings_get_bool(&_link.Settings(), FreeRDP_SupportDisplayControl)
+      || !DynamicChannelsReady(_link))
     return true;
   _context.reset(disp_server_context_new(_link.Channels()));
   if (!BindContext(_context.get(), this, _link.Context())) return false;

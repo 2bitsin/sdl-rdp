@@ -1,10 +1,10 @@
 #pragma once
 #include "pinned.hpp"
 
+#include <winpr/wtypes.h>
 #include <span>
 #include <stop_token>
 #include <thread>
-#include <winpr/wtypes.h>
 
 namespace Backend {
 class Configuration;

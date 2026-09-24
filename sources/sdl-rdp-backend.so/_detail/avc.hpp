@@ -1,9 +1,9 @@
 #pragma once
 #include "extent.hpp"
 
+#include <winpr/wtypes.h>
 #include <chrono>
 #include <span>
-#include <winpr/wtypes.h>
 
 namespace Backend::Avc {
 struct IntraRefresh {
@@ -19,5 +19,5 @@ struct EncodingTimes {
   std::chrono::nanoseconds upload { };
   std::chrono::nanoseconds encode { };
 };
-auto operator += (EncodingTimes& total, EncodingTimes const& frame) noexcept -> EncodingTimes&;
+auto operator+=(EncodingTimes& total, EncodingTimes const& frame) noexcept -> EncodingTimes&;
 } // namespace Backend::Avc

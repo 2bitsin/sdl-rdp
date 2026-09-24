@@ -1,12 +1,12 @@
 #pragma once
 #include "client.hpp"
 
+#include <freerdp/codec/audio.h>
+#include <winpr/wtsapi.h>
 #include <array>
 #include <deque>
-#include <freerdp/codec/audio.h>
 #include <span>
 #include <vector>
-#include <winpr/wtsapi.h>
 
 namespace Headless {
 struct SoundCapture {
@@ -35,11 +35,11 @@ class SoundClient {
 public:
   using Confirmation = SoundCapture::Confirmation;
   explicit SoundClient(Client& target);
-           SoundClient(SoundClient const&)                 = delete;
-           SoundClient(SoundClient&&)                      = delete;
+           SoundClient(SoundClient const&)               = delete;
+           SoundClient(SoundClient&&)                    = delete;
            ~SoundClient();
-  auto     operator = (SoundClient const&) -> SoundClient& = delete;
-  auto     operator = (SoundClient&&)      -> SoundClient& = delete;
+  auto     operator=(SoundClient const&) -> SoundClient& = delete;
+  auto     operator=(SoundClient&&)      -> SoundClient& = delete;
 
   auto Send(std::span<BYTE const> bytes) const -> bool;
   auto Capture(std::span<BYTE const> bytes)    -> void;

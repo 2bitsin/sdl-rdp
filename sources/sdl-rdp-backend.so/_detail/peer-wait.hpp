@@ -2,8 +2,8 @@
 #include "channel-set.hpp"
 #include "pinned.hpp"
 
-#include <span>
 #include <winpr/wtypes.h>
+#include <span>
 
 namespace Backend {
 inline constexpr DWORD LoopHandleCount     = 2;

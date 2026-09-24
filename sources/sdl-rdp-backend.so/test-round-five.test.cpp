@@ -2,12 +2,12 @@
 
 #include "_detail/test-peer-status.hpp"
 
-#include <algorithm>
-#include <cstdint>
-#include <format>
 #include <freerdp/input.h>
 #include <freerdp/settings.h>
 #include <oxbox/utilities/number-text.hpp>
+#include <algorithm>
+#include <cstdint>
+#include <format>
 #include <regex>
 #include <string>
 
@@ -24,8 +24,8 @@ auto RoundFive::ThenTimedOutFrames(std::string_view sent, unsigned minimum) -> v
   backend.reset();
   auto        text  = logs.Text(true);
   std::smatch match;
-  ASSERT_TRUE(std::regex_search(text, match, std::regex(std::format(R"(Frames: {} sent,[^\n]*, ([0-9]+) timed out\.)",
-                                                                    sent))))
+  ASSERT_TRUE(
+      std::regex_search(text, match, std::regex(std::format(R"(Frames: {} sent,[^\n]*, ([0-9]+) timed out\.)", sent))))
       << text;
   EXPECT_GE(oxbox::utilities::ParseNumber<unsigned>(match.str(1)), minimum);
 }
@@ -55,8 +55,8 @@ auto RoundFive::ThenColourDepth(unsigned depth) -> void {
   Present(pixels, 320, 200);
   ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text();
 }
-auto RoundFive::ThenProgressiveDamageCost(Client& client, Headless::GraphicsObserver& observer,
-                                          uint64_t before) -> void {
+auto RoundFive::ThenProgressiveDamageCost(Client& client, Headless::GraphicsObserver& observer, uint64_t before)
+    -> void {
   EXPECT_EQ(observer.Observed().progressive_headers, 1u);
   EXPECT_EQ(observer.Observed().surfaces.size(), 1u);
   EXPECT_LT(client.Received() - before, 4096u);
@@ -71,8 +71,7 @@ auto RoundFive::ThenAutoChangesToRaw(Client& client, std::vector<UINT32>& pixels
   auto changed = std::ranges::find(events, SDLRDP_CODEC_CHANGED, &sdlrdp_event::type);
   ASSERT_NE(changed, events.end());
   EXPECT_EQ(changed->codec_changed.codec, SDLRDP_CODEC_RAW);
-  RecordProperty("trace",
-                 "auto connects as progressive; live raw preference produces exact RGB and CODEC_CHANGED raw");
+  RecordProperty("trace", "auto connects as progressive; live raw preference produces exact RGB and CODEC_CHANGED raw");
 }
 auto RoundFive::ThenGraphicsTimeoutStatistics() -> void {
   ThenTimedOutFrames("7", 2);

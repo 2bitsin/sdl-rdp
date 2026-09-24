@@ -11,8 +11,8 @@ public:
            Process(Process const&)                                                   = delete;
            Process(Process&&)                                                        = delete;
            ~Process();
-  auto     operator = (Process const&)                                   -> Process& = delete;
-  auto     operator = (Process&&)                                        -> Process& = delete;
+  auto     operator=(Process const&)                                     -> Process& = delete;
+  auto     operator=(Process&&)                                          -> Process& = delete;
   auto     Line(std::string& line, Headless::Clock::time_point deadline) -> bool;
   auto     Exit()                                                        -> bool;
   auto     Transcript() const                                            -> std::string const&;

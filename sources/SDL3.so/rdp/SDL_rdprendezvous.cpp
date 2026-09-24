@@ -27,5 +27,7 @@ auto Rendezvous::_Driver() -> std::shared_ptr<Driver> {
   _driver = driver;
   return driver;
 }
-auto Rendezvous::Acquire() -> std::shared_ptr<Driver> { return _Published()._Driver(); }
+auto Rendezvous::Acquire() -> std::shared_ptr<Driver> {
+  return _Published()._Driver();
+}
 }

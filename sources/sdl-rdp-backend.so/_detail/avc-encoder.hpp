@@ -2,11 +2,11 @@
 #include "avc.hpp"
 #include "extent.hpp"
 
+#include <winpr/wtypes.h>
 #include <memory>
 #include <span>
 #include <string>
 #include <vector>
-#include <winpr/wtypes.h>
 
 namespace Backend::Avc {
 class Encoder {
@@ -15,13 +15,13 @@ public:
               Encoder(Encoder const&)                                       = delete;
               Encoder(Encoder&&)                                            = delete;
               ~Encoder();
-  auto        operator = (Encoder const&)                       -> Encoder& = delete;
-  auto        operator = (Encoder&&)                            -> Encoder& = delete;
+  auto        operator=(Encoder const&)                         -> Encoder& = delete;
+  auto        operator=(Encoder&&)                              -> Encoder& = delete;
   static auto Available()                                       -> bool;
   static auto UnavailableReason()                               -> std::string;
   auto        Open(Extent size, unsigned bitrate, unsigned fps) -> bool;
-  auto        Encode(std::span<BYTE const> bgrx, unsigned stride, bool force_idr,
-                     std::vector<BYTE>& encoded) -> std::span<BYTE const>;
+  auto        Encode(std::span<BYTE const> bgrx, unsigned stride, bool force_idr, std::vector<BYTE>& encoded)
+      -> std::span<BYTE const>;
   auto        Close()                                           -> void;
   auto        IsOpen() const                                    -> bool;
   auto        TooSmall() const                                  -> bool;

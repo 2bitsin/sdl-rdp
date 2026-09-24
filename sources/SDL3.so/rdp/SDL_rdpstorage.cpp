@@ -8,11 +8,19 @@ constexpr std::size_t CopyChunkBytes = 65536;
 class Storage {
 public:
        Storage(std::shared_ptr<Driver const> driver, std::optional<std::string> name)
-      : _driver{std::move(driver)}, _name{std::move(name)} { }
-  auto Backend() const -> Driver const& { return *_driver; }
-  auto Owner() const   -> std::shared_ptr<Driver const> const& { return _driver; }
-  auto Drive() const   -> unsigned { return _drive; }
-  auto Resolve()       -> void { _drive = DriveId(*_driver, _name); }
+      : _driver{ std::move(driver) }, _name{ std::move(name) } { }
+  auto Backend() const -> Driver const& {
+    return *_driver;
+  }
+  auto Owner() const -> std::shared_ptr<Driver const> const& {
+    return _driver;
+  }
+  auto Drive() const -> unsigned {
+    return _drive;
+  }
+  auto Resolve() -> void {
+    _drive = DriveId(*_driver, _name);
+  }
 private:
   std::shared_ptr<Driver const> _driver;
   std::optional<std::string>    _name;
@@ -56,7 +64,7 @@ auto DirectoryPrefix(std::string_view path) -> std::string {
 auto ReadDirectory(Storage const& data, std::string const& path, unsigned offset, std::span<sdlrdp_dirent> entries)
     -> std::span<sdlrdp_dirent const> {
   auto const count = data.Backend().Call<Operation::DRIVE_ENUMERATE>(data.Drive(), path.c_str(), offset, entries.data(),
-                                                                      static_cast<unsigned>(entries.size()));
+                                                                     static_cast<unsigned>(entries.size()));
   if (count < 0) data.Backend().Throw();
   utilities::Ensures(std::cmp_less_equal(count, entries.size()), "backend fills at most the directory buffer");
   return entries.first(static_cast<std::size_t>(count));
@@ -83,16 +91,18 @@ auto StorageEnumerate(void* context, char const* path, SDL_EnumerateDirectoryCal
   utilities::Expects(path != nullptr, "enumeration has a path");
   utilities::Expects(callback != nullptr, "enumeration has a consumer");
   auto const& data = Opened(context);
-  return Boundary([&] { return Enumerate(data, std::string{path}, callback, user); });
+  return Boundary([&] { return Enumerate(data, std::string{ path }, callback, user); });
 }
-template<typename _Byte>
+template <typename _Byte>
   requires IoBuffer<_Byte>
 auto TransferAll(SDL_IOStream& stream, _Byte* buffer, std::size_t length) -> std::size_t {
-  if constexpr (std::is_const_v<_Byte>) return SDL_WriteIO(&stream, buffer, length);
-  else return SDL_ReadIO(&stream, buffer, length);
+  if constexpr (std::is_const_v<_Byte>)
+    return SDL_WriteIO(&stream, buffer, length);
+  else
+    return SDL_ReadIO(&stream, buffer, length);
 }
 // SDL storage transfer callbacks provide counted raw buffers and borrowed paths.
-template<typename _Byte>
+template <typename _Byte>
   requires IoBuffer<_Byte>
 auto StorageTransfer(void* context, char const* path, _Byte* buffer, Uint64 length) -> bool {
   utilities::Expects(path != nullptr, "storage transfer has a path");
@@ -107,8 +117,8 @@ auto StorageTransfer(void* context, char const* path, _Byte* buffer, Uint64 leng
   });
 }
 // SDL storage mutation callbacks supply an opaque context and one or more borrowed paths.
-template<Operation _Operation, typename... _Path>
-  requires (std::same_as<_Path, char const*> && ...)
+template <Operation _Operation, typename... _Path>
+  requires(std::same_as<_Path, char const*> && ...)
 auto StorageMutate(void* context, _Path... path) -> bool {
   (utilities::Expects(path != nullptr, "storage mutation has its paths"), ...);
   auto const& data = Opened(context);
@@ -127,9 +137,9 @@ auto StorageCopy(void* context, char const* from, char const* to) -> bool {
   utilities::Expects(to != nullptr, "storage copy has a target path");
   auto const& data = Opened(context);
   return Boundary([&] {
-    if (std::string_view{from} == to) return SDL_SetError("RDP copy source equals destination");
-    auto       source        = OpenDriveFile(data.Owner(), data.Drive(), from, FileMode{"rb"});
-    auto       target        = OpenDriveFile(data.Owner(), data.Drive(), to, FileMode{"wb"});
+    if (std::string_view{ from } == to) return SDL_SetError("RDP copy source equals destination");
+    auto       source        = OpenDriveFile(data.Owner(), data.Drive(), from, FileMode{ "rb" });
+    auto       target        = OpenDriveFile(data.Owner(), data.Drive(), to, FileMode{ "wb" });
     auto const copied        = CopyStream(*source.Get(), *target.Get());
     auto const target_closed = target.Close();
     auto const source_closed = source.Close();
@@ -146,10 +156,18 @@ auto StorageSpace([[maybe_unused]] void* unused_context) -> Uint64 {
 auto StorageOpen(char const* name, [[maybe_unused]] SDL_PropertiesID unused_properties) -> SDL_Storage* {
   return Boundary([&] {
     auto                       data      = std::make_unique<Storage>(Rendezvous::Acquire(), DriveName(name));
-    SDL_StorageInterface const interface { sizeof(SDL_StorageInterface), StorageClose, StorageReady, StorageEnumerate,
-        StorageInfo, StorageTransfer<void>, StorageTransfer<void const>,
-        StorageMutate<Operation::DRIVE_MKDIR, char const*>, StorageMutate<Operation::DRIVE_REMOVE, char const*>,
-        StorageMutate<Operation::DRIVE_RENAME, char const*, char const*>, StorageCopy, StorageSpace};
+    SDL_StorageInterface const interface { sizeof(SDL_StorageInterface),
+                                           StorageClose,
+                                           StorageReady,
+                                           StorageEnumerate,
+                                           StorageInfo,
+                                           StorageTransfer<void>,
+                                           StorageTransfer<void const>,
+                                           StorageMutate<Operation::DRIVE_MKDIR, char const*>,
+                                           StorageMutate<Operation::DRIVE_REMOVE, char const*>,
+                                           StorageMutate<Operation::DRIVE_RENAME, char const*, char const*>,
+                                           StorageCopy,
+                                           StorageSpace };
     StorageHandle              storage   { &interface, data.get() };
     // The storage owns its state from here on; StorageClose adopts it.
     std::ignore = data.release();
@@ -157,13 +175,13 @@ auto StorageOpen(char const* name, [[maybe_unused]] SDL_PropertiesID unused_prop
   });
 }
 // SDL's user storage bootstrap lends organization and application names.
-auto UserStorageOpen([[maybe_unused]] char const* organization, char const* app,
-                     SDL_PropertiesID properties) -> SDL_Storage* {
+auto UserStorageOpen([[maybe_unused]] char const* organization, char const* app, SDL_PropertiesID properties)
+    -> SDL_Storage* {
   return StorageOpen(app, properties);
 }
 }
 }
 // SDL's C title storage table requires this named object with static storage.
-extern "C" TitleStorageBootStrap const RDP_titlebootstrap = {"rdp", "RDP client drive storage", rdp::StorageOpen};
+extern "C" TitleStorageBootStrap const RDP_titlebootstrap = { "rdp", "RDP client drive storage", rdp::StorageOpen };
 // SDL's C user storage table requires this named object with static storage.
-extern "C" UserStorageBootStrap const RDP_userbootstrap   = {"rdp", "RDP client drive storage", rdp::UserStorageOpen};
+extern "C" UserStorageBootStrap const RDP_userbootstrap   = { "rdp", "RDP client drive storage", rdp::UserStorageOpen };

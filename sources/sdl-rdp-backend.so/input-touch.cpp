@@ -34,14 +34,13 @@ auto Contact(sdlrdp_rect desktop, RDPINPUT_CONTACT_DATA const& contact) -> sdlrd
 auto Contacts(RDPINPUT_TOUCH_EVENT const& event) {
   return std::span(event.frames, event.frameCount) | std::views::transform([](RDPINPUT_TOUCH_FRAME const& frame) {
            return std::span(frame.contacts, frame.contactCount);
-         }) |
-         std::views::join;
+         })
+         | std::views::join;
 }
 }
 auto InputEvents::Touch(RDPINPUT_TOUCH_EVENT const& event) -> UINT {
   return WhenActive(UINT{ CHANNEL_RC_OK }, [&] {
-    for (auto const& contact : Contacts(event))
-      _events.Push(Contact(_desktop.Rect(), contact));
+    for (auto const& contact : Contacts(event)) _events.Push(Contact(_desktop.Rect(), contact));
     return UINT{ CHANNEL_RC_OK };
   });
 }

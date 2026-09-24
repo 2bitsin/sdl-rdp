@@ -2,19 +2,19 @@
 #include "_detail/avc.hpp"
 #include "_detail/contract.hpp"
 
+#include <winpr/wlog.h>
 #include <algorithm>
 #include <array>
 #include <cstddef>
-#include <winpr/wlog.h>
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage): Required by the ffnvcodec loader.
 #define FFNV_LOG_FUNC(ctx, msg, ...) WLog_ERR("sdlrdp.avc", msg, __VA_ARGS__)
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage): Required by the ffnvcodec loader.
 #define FFNV_DEBUG_LOG_FUNC(ctx, msg, ...) ((void)0)
 // WinPR already supplies the ABI-compatible GUID type.
 #define GUID_DEFINED
+#include <freerdp/primitives.h>
 #include <ffnvcodec/dynlink_loader.h>
 #include <format>
-#include <freerdp/primitives.h>
 #include <ranges>
 #include <utility>
 
@@ -65,9 +65,9 @@ auto Encoder::Impl::Check(int status, char const* operation) -> bool {
   return false;
 }
 auto Encoder::Impl::Load() -> bool {
-  return Check(cuda_load_functions(&driver.cuda, nullptr), "load libcuda.so.1") &&
-         Check(nvenc_load_functions(&driver.loader, nullptr), "load libnvidia-encode.so.1") &&
-         Check(driver.cuda->cuInit(0), "cuInit");
+  return Check(cuda_load_functions(&driver.cuda, nullptr), "load libcuda.so.1")
+         && Check(nvenc_load_functions(&driver.loader, nullptr), "load libnvidia-encode.so.1")
+         && Check(driver.cuda->cuInit(0), "cuInit");
 }
 auto Encoder::Impl::Session() -> bool {
   Expects(driver.cuda != nullptr, "CUDA library is loaded");
@@ -75,9 +75,9 @@ auto Encoder::Impl::Session() -> bool {
   Expects(handles.session == nullptr, "encoder session is fresh");
   Expects(driver.context == nullptr, "CUDA context is fresh");
   driver.api.version = NV_ENCODE_API_FUNCTION_LIST_VER;
-  if (!Check(driver.loader->NvEncodeAPICreateInstance(&driver.api), "create API") ||
-      !Check(driver.cuda->cuDeviceGet(&driver.device, 0), "cuDeviceGet") ||
-      !Check(driver.cuda->cuDevicePrimaryCtxRetain(&driver.context, driver.device), "retain CUDA context"))
+  if (!Check(driver.loader->NvEncodeAPICreateInstance(&driver.api), "create API")
+      || !Check(driver.cuda->cuDeviceGet(&driver.device, 0), "cuDeviceGet")
+      || !Check(driver.cuda->cuDevicePrimaryCtxRetain(&driver.context, driver.device), "retain CUDA context"))
     return false;
   NV_ENC_OPEN_ENCODE_SESSION_EX_PARAMS open{ };
   open.version    = NV_ENC_OPEN_ENCODE_SESSION_EX_PARAMS_VER;
@@ -228,7 +228,9 @@ auto Encoder::Close() -> void {
 auto Encoder::IsOpen() const -> bool {
   return impl->handles.output != nullptr;
 }
-auto Encoder::Timing() const -> EncodingTimes const& { return times; }
+auto Encoder::Timing() const -> EncodingTimes const& {
+  return times;
+}
 auto Encoder::TooSmall() const -> bool {
   return impl->small;
 }
@@ -272,8 +274,8 @@ auto Encoder::Open(Extent size, unsigned bitrate, unsigned fps) -> bool {
   impl->small   = false;
   impl->picture = size;
   impl->aligned = { .width = Aligned(width), .height = Aligned(height) };
-  if (!impl->Load() || !impl->Session() || !impl->MinimumSize() || impl->small || !impl->Initialize(bitrate, fps) ||
-      !impl->Buffers()) {
+  if (!impl->Load() || !impl->Session() || !impl->MinimumSize() || impl->small || !impl->Initialize(bitrate, fps)
+      || !impl->Buffers()) {
     Close();
     return false;
   }
@@ -291,8 +293,8 @@ auto Encoder::Impl::Picture(bool force_idr) const -> NV_ENC_PIC_PARAMS {
   if (force_idr || first) pic.encodePicFlags = NV_ENC_PIC_FLAG_FORCEIDR | NV_ENC_PIC_FLAG_OUTPUT_SPSPPS;
   return pic;
 }
-auto Encoder::Encode(std::span<BYTE const> bgrx, unsigned stride, bool force_idr,
-                     std::vector<BYTE>& encoded) -> std::span<BYTE const> {
+auto Encoder::Encode(std::span<BYTE const> bgrx, unsigned stride, bool force_idr, std::vector<BYTE>& encoded)
+    -> std::span<BYTE const> {
   Expects(IsOpen(), "encoder is open");
   Expects(stride >= impl->aligned.width * 4, "source stride covers aligned width");
   Expects(bgrx.size() >= (std::size_t(impl->aligned.height - 1) * stride) + (std::size_t(impl->aligned.width) * 4),

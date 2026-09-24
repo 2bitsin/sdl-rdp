@@ -20,11 +20,11 @@ public:
   using Observer = std::function<void(PictureUpdate const& update)>;
 
        PictureUpdateHook(Client& client, Observer observer);
-       PictureUpdateHook(PictureUpdateHook const&)                 = delete;
-       PictureUpdateHook(PictureUpdateHook&&)                      = delete;
+       PictureUpdateHook(PictureUpdateHook const&)               = delete;
+       PictureUpdateHook(PictureUpdateHook&&)                    = delete;
        ~PictureUpdateHook();
-  auto operator = (PictureUpdateHook const&) -> PictureUpdateHook& = delete;
-  auto operator = (PictureUpdateHook&&)      -> PictureUpdateHook& = delete;
+  auto operator=(PictureUpdateHook const&) -> PictureUpdateHook& = delete;
+  auto operator=(PictureUpdateHook&&)      -> PictureUpdateHook& = delete;
 
 private:
   class Installation;

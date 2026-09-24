@@ -4,16 +4,16 @@
 #include "support.test/sample.hpp"
 #include <sdl-rdp-backend.so/_detail/scoped.hpp>
 
-#include <netinet/in.h>
-#include <sys/socket.h>
 #include <SDL3/SDL.h>
-#include <fstream>
-#include <string>
-#include <vector>
-#include <memory>
-#include <utility>
-#include <optional>
 #include <filesystem>
+#include <fstream>
+#include <memory>
+#include <netinet/in.h>
+#include <optional>
+#include <string>
+#include <sys/socket.h>
+#include <utility>
+#include <vector>
 
 namespace SampleGate {
 namespace {
@@ -159,7 +159,9 @@ auto Initialize(std::function<void()> const& initialize) -> bool {
   initialize();
   return true;
 }
-auto Quit([[maybe_unused]] bool initialized) noexcept -> void { SDL_Quit(); }
+auto Quit([[maybe_unused]] bool initialized) noexcept -> void {
+  SDL_Quit();
+}
 // In-process tests end with SDL_Quit even when an assertion returns early.
 using InitializedSdl = utilities::RAIIWrap<bool, Initialize, Quit>;
 using Storage        = std::unique_ptr<SDL_Storage, decltype(&SDL_CloseStorage)>;
@@ -169,7 +171,9 @@ public:
   explicit IniFile(char const* name) : _directory{ name, "sdl-rdp" }, _path{ _directory.Path() / "libSDL3.ini" } {
     WriteIni(_path, 1);
   }
-  auto Path() const -> fs::path const& { return _path; }
+  auto Path() const -> fs::path const& {
+    return _path;
+  }
 private:
   oxbox::platform::ScratchArea const _directory;
   fs::path const                     _path;
@@ -179,7 +183,7 @@ auto RdpPort() -> Sint64 {
 }
 auto RdpTitleStorage() -> Storage {
   EXPECT_TRUE(SDL_SetHint(SDL_HINT_STORAGE_TITLE_DRIVER, "rdp"));
-  return {SDL_OpenTitleStorage("", 0), SDL_CloseStorage};
+  return { SDL_OpenTitleStorage("", 0), SDL_CloseStorage };
 }
 auto WindowAspect(Window const& window) -> std::string {
   return SDL_GetStringProperty(SDL_GetWindowProperties(window.get()), SDL_PROP_WINDOW_RDP_ASPECT_STRING, "");
@@ -187,7 +191,7 @@ auto WindowAspect(Window const& window) -> std::string {
 auto ThenVideoRejoinsDriver(fs::path const& ini) -> void {
   auto const port = RdpPort();
   SDL_QuitSubSystem(SDL_INIT_VIDEO);
-  std::ofstream{ini, std::ios::app} << "SDL_RDP_ASPECT=2:1\n";
+  std::ofstream{ ini, std::ios::app } << "SDL_RDP_ASPECT=2:1\n";
   ASSERT_TRUE(SDL_InitSubSystem(SDL_INIT_VIDEO)) << SDL_GetError();
   EXPECT_EQ(RdpPort(), port);
 }
@@ -212,7 +216,8 @@ auto RerunInChild() -> Process {
 }
 auto ThenChildStops(Process& child) -> void {
   std::string line;
-  while (child.Line(line, Clock::now() + 10s)) { }
+  while (child.Line(line, Clock::now() + 10s)) {
+  }
   EXPECT_FALSE(child.Exit());
   EXPECT_TRUE(child.Transcript().contains("free-space query")) << child.Transcript();
 }
@@ -227,7 +232,8 @@ auto ThenStorageSpaceStops(Storage const& storage) -> void {
 auto ThenStorageSpaceIsNotImplemented(Storage const& storage) -> void {
   if constexpr (utilities::detail::contract::Mode() == oxbox::platform::ContractMode::STOP)
     ThenStorageSpaceStops(storage);
-  else EXPECT_EQ(SDL_GetStorageSpaceRemaining(storage.get()), 0);
+  else
+    EXPECT_EQ(SDL_GetStorageSpaceRemaining(storage.get()), 0);
 }
 auto WhenInitializedWith(std::pair<char const*, char const*> const& setting) -> void {
   EXPECT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));
@@ -242,7 +248,9 @@ protected:
     Sample::SetUp();
     _sdl.emplace([this] { GivenIniHints(_ini.Path()); });
   }
-  auto IniPath() const -> fs::path const& { return _ini.Path(); }
+  auto IniPath() const -> fs::path const& {
+    return _ini.Path();
+  }
 private:
   IniFile const                 _ini{ testing::UnitTest::GetInstance()->current_test_info()->name() };
   std::optional<InitializedSdl> _sdl;
@@ -273,8 +281,7 @@ TEST_P(InvalidInteger, FailsBeforeBackendLoadingAndNamesTheSetting) {
   EXPECT_TRUE(std::string_view(SDL_GetError()).contains(GetParam().first)) << SDL_GetError();
 }
 INSTANTIATE_TEST_SUITE_P(Settings, InvalidInteger,
-                         testing::Values(std::pair{SDL_HINT_RDP_PORT, "-5"}, std::pair{SDL_HINT_RDP_WIDTH, "+640"},
-                                         std::pair{SDL_HINT_RDP_WIDTH, "-1"},
-                                         std::pair{SDL_HINT_RDP_PORT, "3389x"},
-                                         std::pair{SDL_HINT_RDP_WIDTH, "640 480"}));
+                         testing::Values(std::pair{ SDL_HINT_RDP_PORT, "-5" }, std::pair{ SDL_HINT_RDP_WIDTH, "+640" },
+                                         std::pair{ SDL_HINT_RDP_WIDTH, "-1" }, std::pair{ SDL_HINT_RDP_PORT, "3389x" },
+                                         std::pair{ SDL_HINT_RDP_WIDTH, "640 480" }));
 }

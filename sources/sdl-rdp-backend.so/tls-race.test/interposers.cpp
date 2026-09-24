@@ -2,8 +2,8 @@
 #include "tls-race.test/injected-faults.hpp"
 #include "tls-race.test/method-fill.hpp"
 
-#include <dlfcn.h>
 #include <openssl/ssl.h>
+#include <dlfcn.h>
 
 namespace {
 using Write = auto (*)(BIO*, char const*, int) -> int;
@@ -34,8 +34,7 @@ extern "C" [[gnu::visibility("default")]] auto BIO_meth_set_write(BIO_METHOD* bi
   Race::MethodFill::Shared().Filling(biom, Race::Setter::Write);
   return next(biom, WriteFor(biom, write));
 }
-extern "C" [[gnu::visibility("default")]] auto BIO_meth_set_create(BIO_METHOD* biom,
-                                                                    auto (*create)(BIO*) -> int) -> int {
+extern "C" [[gnu::visibility("default")]] auto BIO_meth_set_create(BIO_METHOD* biom, auto (*create)(BIO*)->int) -> int {
   static auto* const next = Next<decltype(BIO_meth_set_create)>("BIO_meth_set_create");
   Race::MethodFill::Shared().Filling(biom, Race::Setter::Create);
   return next(biom, create);

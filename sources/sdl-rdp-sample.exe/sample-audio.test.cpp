@@ -3,14 +3,14 @@
 #include "support.test/sample.hpp"
 
 #include <SDL3/SDL.h>
+#include <sdl-rdp-backend.so/_detail/frame-observer.hpp>
+#include <sdl-rdp-backend.so/_detail/sound-client.hpp>
+#include <sdl-rdp-backend.so/_detail/tone-measurements.hpp>
 #include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <memory>
 #include <ranges>
-#include <sdl-rdp-backend.so/_detail/frame-observer.hpp>
-#include <sdl-rdp-backend.so/_detail/sound-client.hpp>
-#include <sdl-rdp-backend.so/_detail/tone-measurements.hpp>
 #include <string>
 #include <vector>
 
@@ -47,8 +47,8 @@ auto ThenTone(Headless::SoundClient const& audio, Headless::FrameObserver const&
   if (tight) EXPECT_GE(frames.Frames().size(), 2u);
 }
 auto ToneCaptured(Headless::SoundClient const& audio, Headless::FrameObserver const& frames) -> bool {
-  return audio.CaptureState().samples.size() >= std::size_t(audio.CaptureState().rate) * 2 &&
-         frames.Frames().size() >= 2;
+  return audio.CaptureState().samples.size() >= std::size_t(audio.CaptureState().rate) * 2
+         && frames.Frames().size() >= 2;
 }
 auto ThreeSecondsCaptured(Headless::SoundClient const& audio, Headless::FrameObserver const& /*frames*/) -> bool {
   return !audio.CaptureState().received.empty() && Clock::now() >= audio.CaptureState().received.front() + 3s;
@@ -60,16 +60,16 @@ auto ThenLeadCadence(Headless::SoundClient const& audio, size_t first, size_t fr
   ASSERT_GT(audio.CaptureState().received.size(), first);
   double maximum_gap = 0;
   for (auto i = first; i < audio.CaptureState().received.size(); ++i)
-    maximum_gap = std::max(maximum_gap, std::chrono::duration<double, std::milli>(audio.CaptureState().received[i] -
-                                                                                  audio.CaptureState().received[i - 1])
+    maximum_gap = std::max(maximum_gap, std::chrono::duration<double, std::milli>(
+                                            audio.CaptureState().received[i] - audio.CaptureState().received[i - 1])
                                             .count());
   auto sent_frames = (audio.CaptureState().samples.size() / 2) - frames;
-  auto block_ms    =
-      1000.0 * double(sent_frames) / double(audio.CaptureState().received.size() - first) / audio.CaptureState().rate;
+  auto block_ms    = 1000.0 * double(sent_frames) / double(audio.CaptureState().received.size() - first)
+                     / audio.CaptureState().rate;
   EXPECT_LE(maximum_gap, (2 * block_ms) + 10);
-  auto elapsed =
-      std::chrono::duration<double>(audio.CaptureState().received.back() - audio.CaptureState().received[first - 1])
-          .count();
+  auto elapsed = std::chrono::duration<double>(audio.CaptureState().received.back()
+                                               - audio.CaptureState().received[first - 1])
+                     .count();
   EXPECT_NEAR(double(sent_frames) / audio.CaptureState().rate, elapsed, 0.030);
   testing::Test::RecordProperty("maximum_block_gap_ms", std::to_string(maximum_gap));
 }
@@ -112,9 +112,8 @@ TEST_F(AudioSample, ToneAndVsync) {
   WhenTonePlayedTwice(ToneCaptured, ThenTone);
 }
 TEST_F(AudioSample, BlockCadence) {
-  WhenTonePlayedTwice(ThreeSecondsCaptured, [](auto const& audio, auto const& /*frames*/, bool tight) {
-    ThenBlockCadence(audio, tight);
-  });
+  WhenTonePlayedTwice(ThreeSecondsCaptured,
+                      [](auto const& audio, auto const& /*frames*/, bool tight) { ThenBlockCadence(audio, tight); });
 }
 
 TEST_F(AudioSample, ToneAtClientRate) {
@@ -133,14 +132,12 @@ protected:
     if (::testing::Test::HasFatalFailure()) return;
   }
   static auto ThenRefilledLead(Client& client, Headless::SoundClient& audio, std::size_t frames) -> void {
-    ASSERT_TRUE(client.Until([&] {
-      return (audio.CaptureState().samples.size() / 2) - frames >= audio.CaptureState().rate * 150 / 1000;
-    }));
+    ASSERT_TRUE(client.Until(
+        [&] { return (audio.CaptureState().samples.size() / 2) - frames >= audio.CaptureState().rate * 150 / 1000; }));
   }
   static auto ThenInitialLead(Client& client, Headless::SoundClient& audio) -> void {
-    ASSERT_TRUE(client.Until([&] {
-      return audio.CaptureState().samples.size() / 2 >= audio.CaptureState().rate * 140 / 1000;
-    }));
+    ASSERT_TRUE(client.Until(
+        [&] { return audio.CaptureState().samples.size() / 2 >= audio.CaptureState().rate * 140 / 1000; }));
   }
   auto ReceiveLead() -> void {
     PlayPcm(48000uz * 5 * 2);
@@ -248,8 +245,7 @@ TEST_F(AudioDriver, NoClientTenSecondClock) {
   auto started = Clock::now();
   ASSERT_TRUE(SDL_ResumeAudioStreamDevice(stream.get()));
   auto deadline = started + 30s;
-  while (SDL_GetAudioStreamQueued(stream.get()) > 0 && Clock::now() < deadline)
-    SDL_Delay(5);
+  while (SDL_GetAudioStreamQueued(stream.get()) > 0 && Clock::now() < deadline) SDL_Delay(5);
   auto elapsed = std::chrono::duration<double>(Clock::now() - started).count();
   EXPECT_EQ(SDL_GetAudioStreamQueued(stream.get()), 0);
   // Consuming ten seconds of PCM may run one lead ahead of real time.
@@ -306,8 +302,7 @@ TEST_F(AudioDriver, ZeroLeadKeepsRealtimeClock) {
   ASSERT_TRUE(SDL_FlushAudioStream(stream.get()));
   auto started = Clock::now();
   ASSERT_TRUE(SDL_ResumeAudioStreamDevice(stream.get()));
-  while (SDL_GetAudioStreamQueued(stream.get()) > 0 && Clock::now() < started + 3s)
-    SDL_Delay(1);
+  while (SDL_GetAudioStreamQueued(stream.get()) > 0 && Clock::now() < started + 3s) SDL_Delay(1);
   EXPECT_EQ(SDL_GetAudioStreamQueued(stream.get()), 0);
   EXPECT_GE(Clock::now() - started, 990ms);
 }

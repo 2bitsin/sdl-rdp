@@ -7,9 +7,9 @@
 #include "_detail/peer-link.hpp"
 
 namespace Backend {
-OutputControl::OutputControl(PeerLink& link, GraphicsLink const& graphics, FramePacing& pacing,
-                             Activation& activation, PeerFrames& frames) noexcept
-    : _link { link }, _graphics{ graphics }, _pacing{ pacing }, _activation{ activation }, _frames{ frames } { }
+OutputControl::OutputControl(PeerLink& link, GraphicsLink const& graphics, FramePacing& pacing, Activation& activation,
+                             PeerFrames& frames) noexcept
+    : _link{ link }, _graphics{ graphics }, _pacing{ pacing }, _activation{ activation }, _frames{ frames } { }
 auto OutputControl::Acknowledge(UINT32 id) -> void {
   if (!_graphics.Confirmed()) _pacing.Accept(id);
 }

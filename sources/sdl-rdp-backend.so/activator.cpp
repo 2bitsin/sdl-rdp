@@ -7,11 +7,11 @@
 #include "_detail/encoder.hpp"
 #include "_detail/peer-link.hpp"
 
-#include <algorithm>
 #include <freerdp/session.h>
 #include <freerdp/settings.h>
 #include <freerdp/update.h>
 #include <winpr/crypto.h>
+#include <algorithm>
 
 namespace Backend {
 namespace {
@@ -33,7 +33,7 @@ auto SendCookie(rdpContext& context) -> bool {
 }
 Activator::Activator(PeerLink& link, Authenticator& authenticator, Activation const& activation, Encoder& encoder,
                      Configuration const& configuration, Arrival& arrival) noexcept
-    : _link { link }, _authenticator{ authenticator }, _activation{ activation }, _encoder{ encoder },
+    : _link{ link }, _authenticator{ authenticator }, _activation{ activation }, _encoder{ encoder },
       _configuration{ configuration }, _arrival{ arrival } { }
 auto Activator::Activate() -> BOOL {
   if (_activation.Active()) {

@@ -3,9 +3,9 @@
 #include "_detail/input-dispatch.hpp"
 #include "_detail/peer-link.hpp"
 
+#include <freerdp/server/ainput.h>
 #include <algorithm>
 #include <array>
-#include <freerdp/server/ainput.h>
 #include <utility>
 
 namespace Backend {
@@ -34,8 +34,8 @@ auto AbsoluteMotion(int x, int y, sdlrdp_rect bounds) -> sdlrdp_event {
 }
 auto InputEvents::Scaled(int x, int y, std::invocable<int, int, sdlrdp_rect> auto build) -> void {
   auto const bounds = _store.Read([](FrameStore const& store, FrameLock const& held) { return store.Bounds(held); });
-  _events.Push(build(_desktop.Scale(x, bounds.w, &sdlrdp_rect::w), _desktop.Scale(y, bounds.h, &sdlrdp_rect::h),
-                     bounds));
+  _events.Push(
+      build(_desktop.Scale(x, bounds.w, &sdlrdp_rect::w), _desktop.Scale(y, bounds.h, &sdlrdp_rect::h), bounds));
 }
 auto InputEvents::Point(MouseMode mode) noexcept -> void {
   _mouse.mode           = mode;

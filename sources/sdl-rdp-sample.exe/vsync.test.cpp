@@ -76,7 +76,7 @@ protected:
   auto Run(RateRecovery recovery) -> void {
     Expects(renderer != nullptr, "vsync renderer exists");
     auto port   = SDL_GetNumberProperty(SDL_GetDisplayProperties(SDL_GetPrimaryDisplay()),
-                                     SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0);
+                                        SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0);
     auto client = std::async(std::launch::async, ExerciseRate, unsigned(port), std::ref(logs), GetParam().mode,
                              recovery);
     ASSERT_NO_FATAL_FAILURE(RenderWhile(client));

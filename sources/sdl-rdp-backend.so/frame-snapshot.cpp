@@ -11,7 +11,7 @@ auto FrameBytes(Extent size) -> std::size_t {
   return std::size_t(Avc::Aligned(size.width)) * Avc::Aligned(size.height) * PixelBytes;
 }
 FrameSnapshot::FrameSnapshot(std::shared_ptr<std::vector<BYTE> const> value, Extent size) noexcept
-    : _pixels { std::move(value) }, _size{ size } { }
+    : _pixels{ std::move(value) }, _size{ size } { }
 FrameSnapshot::operator bool() const noexcept {
   return _pixels != nullptr;
 }

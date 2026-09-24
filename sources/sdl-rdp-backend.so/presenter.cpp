@@ -18,8 +18,8 @@ namespace {
 auto Spans(int start, int length, int value) -> bool {
   return start <= value && value < start + length;
 }
-auto ComposeRow(std::span<BYTE const> source, std::span<BYTE const> former, std::span<BYTE> target,
-                auto damage) -> void {
+auto ComposeRow(std::span<BYTE const> source, std::span<BYTE const> former, std::span<BYTE> target, auto damage)
+    -> void {
   auto const width = int(target.size() / PixelBytes);
   for (int x = 0; x < width;) {
     auto covered{ std::ranges::find_if(damage, [x](auto rect) { return Spans(rect.x, rect.w, x); })               };
@@ -50,25 +50,24 @@ auto ComposePicture(std::span<BYTE const> source, unsigned pitch, FrameSnapshot 
 }
 Presenter::Presenter(Diagnostics const& diagnostics, FrameStore& frames, Session& session, PointerStore& pointer,
                      Configuration& configuration)
-    : _diagnostics { diagnostics }, _frames{ frames }, _session{ session }, _pointer{ pointer },
+    : _diagnostics{ diagnostics }, _frames{ frames }, _session{ session }, _pointer{ pointer },
       _configuration{ configuration } { }
-auto Presenter::Present(std::span<BYTE const> pixels, unsigned pitch, Extent size,
-                        std::span<sdlrdp_rect const> damage) -> void {
+auto Presenter::Present(std::span<BYTE const> pixels, unsigned pitch, Extent size, std::span<sdlrdp_rect const> damage)
+    -> void {
   Expects(pitch >= size.width * PixelBytes, "source pitch covers framebuffer rows");
   Expects(pixels.size() >= std::size_t(pitch) * size.height, "source framebuffer covers every row");
   _diagnostics.Line("present", [&] { return std::format("dirty={}", damage.size()); });
   if (damage.empty()) return;
   std::scoped_lock const lock(_producer);
   auto                   next     = Acquire(size);
-  auto const             previous = _frames.Read([size](FrameStore const& frames, FrameLock const& held) {
-    return frames.Previous(held, size);
-  });
+  auto const             previous = _frames.Read(
+      [size](FrameStore const& frames, FrameLock const& held) { return frames.Previous(held, size); });
   ComposePicture(pixels, pitch, previous, *next, damage);
   Avc::ReplicateEdges(*next, size);
   Publish(std::move(next), size, damage);
 }
-auto Presenter::Publish(std::shared_ptr<std::vector<BYTE> const> next, Extent size,
-                        std::span<sdlrdp_rect const> damage) -> void {
+auto Presenter::Publish(std::shared_ptr<std::vector<BYTE> const> next, Extent size, std::span<sdlrdp_rect const> damage)
+    -> void {
   auto const held    = _session.LockPeers();
   auto const frame   = _frames.Lock();
   auto const resized = _frames.Publish(frame, std::move(next), size);

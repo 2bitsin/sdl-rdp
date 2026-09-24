@@ -10,9 +10,9 @@
 #include "_detail/peer-link.hpp"
 #include "_detail/session-access.hpp"
 
+#include <freerdp/settings.h>
 #include <cstring>
 #include <format>
-#include <freerdp/settings.h>
 
 namespace Backend {
 namespace {
@@ -33,7 +33,7 @@ auto Acknowledging(rdpSettings const& settings) -> AcknowledgementMode {
 }
 Arrival::Arrival(SessionAccess& session, FrameStore& store, PeerFrames& frames, PeerLink& link, Activation& activation,
                  DesktopLayout& desktop, FramePacing& pacing, Diagnostics const& diagnostics) noexcept
-    : _session { session }, _store{ store }, _frames{ frames }, _link{ link }, _activation{ activation },
+    : _session{ session }, _store{ store }, _frames{ frames }, _link{ link }, _activation{ activation },
       _desktop{ desktop }, _pacing{ pacing }, _diagnostics{ diagnostics } { }
 auto Arrival::Connection(sdlrdp_codec codec) const -> sdlrdp_event {
   auto const screen = _desktop.ScreenEvent().screen;

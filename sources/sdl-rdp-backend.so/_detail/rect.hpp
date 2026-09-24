@@ -10,8 +10,8 @@
 namespace Backend {
 using utilities::Expects;
 inline auto Rows(sdlrdp_rect area) {
-  return std::views::iota(area.y, area.y + area.h) |
-         std::views::transform([area](int y) { return sdlrdp_rect{ area.x, y, area.w, 1 }; });
+  return std::views::iota(area.y, area.y + area.h)
+         | std::views::transform([area](int y) { return sdlrdp_rect{ area.x, y, area.w, 1 }; });
 }
 constexpr auto SameSize(sdlrdp_rect left, sdlrdp_rect right) noexcept -> bool {
   return left.w == right.w && left.h == right.h;

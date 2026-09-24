@@ -40,8 +40,7 @@ TEST_F(RoundFive, GraphicsFrameStatistics) {
   std::vector<UINT32> const pixels(320uz * 200, 0x123456);
   PresentGraphicsFrames(GraphicsClient(), GraphicsObserver(), pixels, 1, 2);
   if (::testing::Test::HasFatalFailure()) return;
-  for (unsigned count = 0; count < 3; ++count)
-    Present(pixels, 320, 200);
+  for (unsigned count = 0; count < 3; ++count) Present(pixels, 320, 200);
   EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 1), 0);
   ASSERT_TRUE(GraphicsObserver().AckFrame(0, 0));
   AwaitFrames(GraphicsClient(), GraphicsObserver().Observed().frames, 3);

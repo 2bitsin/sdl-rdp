@@ -8,17 +8,17 @@ public:
        Authenticator(Authenticator const&)                                                  = delete;
        Authenticator(Authenticator&&)                                                       = delete;
        ~Authenticator();
-  auto operator = (Authenticator const&)                                  -> Authenticator& = delete;
-  auto operator = (Authenticator&&)                                       -> Authenticator& = delete;
+  auto operator=(Authenticator const&)                                    -> Authenticator& = delete;
+  auto operator=(Authenticator&&)                                         -> Authenticator& = delete;
   auto Option(std::string_view option, int& index, int argc, char** argv) -> bool;
   auto Defaults() const                                                   -> void;
   auto Install()                                                          -> void;
 
 private:
-  static auto SDLCALL Deny(void* /*unused*/, char const* /*unused*/, char const* /*unused*/,
-                           char const* /*unused*/) -> bool;
-  static auto SDLCALL AuthenticationLog(void* user, int category, SDL_LogPriority priority,
-                                        char const* message) -> void;
+  static auto SDLCALL Deny(void* /*unused*/, char const* /*unused*/, char const* /*unused*/, char const* /*unused*/)
+      -> bool;
+  static auto SDLCALL AuthenticationLog(void* user, int category, SDL_LogPriority priority, char const* message)
+      -> void;
   bool                  deny          = false;
   SDL_LogOutputFunction previous      = nullptr;
   void*                 previous_user = nullptr;

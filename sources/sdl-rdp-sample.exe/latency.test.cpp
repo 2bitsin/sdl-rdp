@@ -1,17 +1,17 @@
+#include "_detail/trace-number.hpp"
 #include "support.test/process.hpp"
 #include "support.test/sample-launch.hpp"
 #include "support.test/sample.hpp"
 #include "support.test/wall-milliseconds.hpp"
-#include "_detail/trace-number.hpp"
 
 #include <SDL3/SDL.h>
+#include <sdl-rdp-backend.so/_detail/clipboard-client.hpp>
+#include <sdl-rdp-backend.so/_detail/frame-observer.hpp>
+#include <sdl-rdp-backend.so/_detail/sound-client.hpp>
 #include <algorithm>
 #include <filesystem>
 #include <format>
 #include <ranges>
-#include <sdl-rdp-backend.so/_detail/clipboard-client.hpp>
-#include <sdl-rdp-backend.so/_detail/frame-observer.hpp>
-#include <sdl-rdp-backend.so/_detail/sound-client.hpp>
 #include <span>
 #include <sstream>
 #include <string>
@@ -89,8 +89,7 @@ auto TightAudioArguments(fs::path const& certificates) -> std::vector<std::strin
 namespace {
 auto DrainTrace(Process& process, std::stop_token const& stop) -> void {
   std::string output;
-  while (!stop.stop_requested())
-    process.Line(output, Clock::now() + 10ms);
+  while (!stop.stop_requested()) process.Line(output, Clock::now() + 10ms);
 }
 }
 namespace {

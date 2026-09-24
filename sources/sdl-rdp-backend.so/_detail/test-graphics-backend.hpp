@@ -4,8 +4,8 @@
 #include "sdl-rdp-backend.h"
 #include "test-logs.hpp"
 
-#include <filesystem>
 #include <gtest/gtest.h>
+#include <filesystem>
 #include <memory>
 
 namespace Headless {

@@ -49,8 +49,8 @@ auto AudioGate::WhenLastAudioBlockConfirms(std::vector<INT16> const& pcm) -> voi
 auto AudioGate::WhenIdleAudioBurst(std::vector<INT16> const& pcm, unsigned burst) -> void {
   auto started  = Clock::now();
   auto writing  = std::async(std::launch::async, [&] { return sdlrdp_audio_write(backend.get(), pcm.data(), 48000); });
-  auto captured =
-      ClientSession().Until([&] { return AudioSession().CaptureState().samples.size() == burst * pcm.size(); });
+  auto captured = ClientSession().Until(
+      [&] { return AudioSession().CaptureState().samples.size() == burst * pcm.size(); });
   if (!captured) sdlrdp_audio_close(backend.get());
   EXPECT_TRUE(captured);
   EXPECT_EQ(writing.get(), 48000);

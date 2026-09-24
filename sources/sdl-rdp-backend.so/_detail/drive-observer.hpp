@@ -18,8 +18,8 @@ public:
            DriveObserver(DriveObserver&&)                                   = delete;
   explicit DriveObserver(Client& client);
            ~DriveObserver();
-  auto     operator = (DriveObserver const&)              -> DriveObserver& = delete;
-  auto     operator = (DriveObserver&&)                   -> DriveObserver& = delete;
+  auto     operator=(DriveObserver const&)                -> DriveObserver& = delete;
+  auto     operator=(DriveObserver&&)                     -> DriveObserver& = delete;
   auto     Send(Backend::DrivePacket const& packet) const -> bool;
   auto     Observed()                                     -> DriveCapture&;
   auto     Observed() const                               -> DriveCapture const&;

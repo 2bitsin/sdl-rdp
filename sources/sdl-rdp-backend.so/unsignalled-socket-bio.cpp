@@ -57,14 +57,10 @@ auto Reported(BIO* bio, void const* out) -> long {
 auto Control(BIO* bio, int command, long argument, void* pointer) noexcept -> long {
   // OpenSSL sends an open set of commands; 0 answers every one a plain socket does not support.
   switch (command) {
-  case BIO_C_SET_FD:
-    return Adopt(bio, *static_cast<int const*>(pointer), argument);
-  case BIO_C_GET_FD:
-    return Reported(bio, pointer);
-  case BIO_CTRL_FLUSH:
-    return 1;
-  default:
-    return 0;
+  case BIO_C_SET_FD:   return Adopt(bio, *static_cast<int const*>(pointer), argument);
+  case BIO_C_GET_FD:   return Reported(bio, pointer);
+  case BIO_CTRL_FLUSH: return 1;
+  default:             return 0;
   }
 }
 auto Create(BIO* bio) noexcept -> int {
@@ -84,9 +80,8 @@ auto NewMethod() -> Method {
   Method method{ BIO_meth_new(BIO_get_new_index() | BIO_TYPE_SOURCE_SINK, "sdl-rdp unsignalled socket") };
   if (!method) throw std::runtime_error("Socket BIO method allocation failed.");
   auto* const filling = method.get();
-  if (!BIO_meth_set_write(filling, Write) || !BIO_meth_set_read(filling, Read) ||
-      !BIO_meth_set_ctrl(filling, Control) || !BIO_meth_set_create(filling, Create) ||
-      !BIO_meth_set_destroy(filling, Destroy))
+  if (!BIO_meth_set_write(filling, Write) || !BIO_meth_set_read(filling, Read) || !BIO_meth_set_ctrl(filling, Control)
+      || !BIO_meth_set_create(filling, Create) || !BIO_meth_set_destroy(filling, Destroy))
     throw std::runtime_error("Socket BIO method setup failed.");
   return method;
 }

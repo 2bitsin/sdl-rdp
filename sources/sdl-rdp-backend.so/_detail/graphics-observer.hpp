@@ -1,9 +1,9 @@
 #pragma once
 #include "client.hpp"
 
-#include <cstddef>
 #include <freerdp/client/rdpgfx.h>
 #include <freerdp/event.h>
+#include <cstddef>
 #include <utility>
 #include <vector>
 
@@ -36,8 +36,8 @@ public:
            GraphicsObserver(GraphicsObserver&&)                           = delete;
   explicit GraphicsObserver(Client& target);
            ~GraphicsObserver();
-  auto     operator = (GraphicsObserver const&)      -> GraphicsObserver& = delete;
-  auto     operator = (GraphicsObserver&&)           -> GraphicsObserver& = delete;
+  auto     operator=(GraphicsObserver const&)        -> GraphicsObserver& = delete;
+  auto     operator=(GraphicsObserver&&)             -> GraphicsObserver& = delete;
   auto     Ack(UINT32 depth = 0)                     -> bool;
   auto     AckFrame(std::size_t index, UINT32 depth) -> bool;
   auto     Channel() const                           -> RdpgfxClientContext*;

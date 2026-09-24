@@ -4,11 +4,11 @@
 #include "release-stream.hpp"
 #include "sdl-rdp-backend.h"
 
-#include <chrono>
 #include <freerdp/codec/nsc.h>
 #include <freerdp/codec/planar.h>
 #include <freerdp/codec/rfx.h>
 #include <freerdp/settings.h>
+#include <chrono>
 #include <span>
 #include <vector>
 

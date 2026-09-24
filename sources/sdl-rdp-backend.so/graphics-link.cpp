@@ -7,20 +7,20 @@
 #include "_detail/frame-pacing.hpp"
 #include "_detail/peer-link.hpp"
 
-#include <algorithm>
 #include <freerdp/settings.h>
+#include <algorithm>
 #include <utility>
 
 namespace Backend {
 GraphicsLink::GraphicsLink(PeerLink& link, Diagnostics const& diagnostics, Activation& activation,
                            FramePacing const& pacing, Encoder const& encoder,
                            Factory<std::unique_ptr<GfxChannel>> make) noexcept
-    : _link { link }, _diagnostics{ diagnostics }, _activation{ activation }, _pacing{ pacing }, _encoder{ encoder },
+    : _link{ link }, _diagnostics{ diagnostics }, _activation{ activation }, _pacing{ pacing }, _encoder{ encoder },
       _make{ std::move(make) } { }
 auto GraphicsLink::Pump(std::span<HANDLE const> ready) -> bool {
   if (_channel) return !std::ranges::contains(ready, _channel->Event()) || _channel->Pump();
-  if (_attempted || !freerdp_settings_get_bool(&_link.Settings(), FreeRDP_SupportGraphicsPipeline) ||
-      !DynamicChannelsReady(_link))
+  if (_attempted || !freerdp_settings_get_bool(&_link.Settings(), FreeRDP_SupportGraphicsPipeline)
+      || !DynamicChannelsReady(_link))
     return true;
   _attempted = true;
   _link.Invalidate();

@@ -7,13 +7,13 @@
 #include "_detail/redirection.hpp"
 #include "_detail/session-access.hpp"
 
-#include <format>
 #include <freerdp/settings.h>
+#include <format>
 
 namespace Backend {
 Departure::Departure(PeerLink& link, SessionAccess& session, Activation& activation, Redirection& redirection,
                      FrameStatistics const& statistics, Diagnostics const& diagnostics) noexcept
-    : _link { link }, _session{ session }, _activation{ activation }, _redirection{ redirection },
+    : _link{ link }, _session{ session }, _activation{ activation }, _redirection{ redirection },
       _statistics{ statistics }, _diagnostics{ diagnostics } { }
 auto Departure::Log() const -> void {
   if (!_activation.Activated()) return;

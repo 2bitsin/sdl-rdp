@@ -6,12 +6,12 @@
 #include "_detail/test-pattern.hpp"
 #include "_detail/test-peer-status.hpp"
 
+#include <gtest/gtest.h>
+#include <oxbox/utilities/span.hpp>
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
-#include <gtest/gtest.h>
-#include <oxbox/utilities/span.hpp>
 #include <random>
 #include <ranges>
 #include <regex>
@@ -67,16 +67,15 @@ auto BilinearRow(std::vector<std::uint32_t> const& pixels, std::size_t y) -> std
   auto const weight   = static_cast<float>(position - static_cast<double>(first));
   auto const top      = std::span(pixels).subspan(first * 320, 320);
   auto const bottom   = std::span(pixels).subspan(second * 320, 320);
-  return std::views::zip_transform([=](std::uint32_t a, std::uint32_t b) { return Blend(a, b, weight); }, top, bottom) |
-         std::ranges::to<std::vector>();
+  return std::views::zip_transform([=](std::uint32_t a, std::uint32_t b) { return Blend(a, b, weight); }, top, bottom)
+         | std::ranges::to<std::vector>();
 }
 auto ThenBilinearRow(rdpGdi const& gdi, std::vector<std::uint32_t> const& pixels, std::size_t y) -> void {
   auto const frame    = std::span(gdi.primary_buffer, std::size_t{ gdi.stride } * static_cast<std::size_t>(gdi.height));
   auto const row      = frame.subspan(y * gdi.stride, 320 * Backend::PixelBytes);
   auto const actual   = oxbox::utilities::SpanCast<std::uint32_t const>(row);
   auto const expected = BilinearRow(pixels, y);
-  for (std::size_t x = 0; x < 320; ++x)
-    ASSERT_EQ(actual[x] & 0xffffff, expected[x]) << x << ',' << y;
+  for (std::size_t x = 0; x < 320; ++x) ASSERT_EQ(actual[x] & 0xffffff, expected[x]) << x << ',' << y;
 }
 auto ThenBilinearPixels(rdpGdi const& gdi, std::vector<std::uint32_t> const& pixels) -> void {
   for (std::size_t y = 0; y < 240; ++y) {
@@ -84,8 +83,8 @@ auto ThenBilinearPixels(rdpGdi const& gdi, std::vector<std::uint32_t> const& pix
     if (::testing::Test::HasFatalFailure()) return;
   }
 }
-auto ThenProgressiveGeneration(Headless::GraphicsObserver const& observer, unsigned generations, unsigned w,
-                               unsigned h) -> void {
+auto ThenProgressiveGeneration(Headless::GraphicsObserver const& observer, unsigned generations, unsigned w, unsigned h)
+    -> void {
   EXPECT_EQ(observer.Observed().progressive_headers, generations);
   EXPECT_EQ(observer.Observed().deleted, generations - 1);
   ASSERT_EQ(observer.Observed().surfaces.size(), generations);
@@ -217,10 +216,9 @@ TEST_F(GraphicsCost, FullRandomFrame) {
 auto RecordAvcCost(Headless::Logs& logs) -> void {
   auto        text  = logs.Text(true);
   std::smatch match;
-  MatchCostStatistics(
-      text, match,
-      R"(Frames: 10 sent, 0 coalesced; encode ([0-9.]+) ms mean, ([0-9.]+) ms max )"
-      R"(\(convert ([0-9.]+), upload ([0-9.]+), nvenc ([0-9.]+)\); acknowledgement)");
+  MatchCostStatistics(text, match,
+                      R"(Frames: 10 sent, 0 coalesced; encode ([0-9.]+) ms mean, ([0-9.]+) ms max )"
+                      R"(\(convert ([0-9.]+), upload ([0-9.]+), nvenc ([0-9.]+)\); acknowledgement)");
   if (::testing::Test::HasFatalFailure()) return;
   for (auto [name, index] : { std::pair{ "encode_ms", 1 }, { "convert_ms", 3 }, { "upload_ms", 4 }, { "nvenc_ms", 5 } })
     testing::Test::RecordProperty(name, match[index].str());

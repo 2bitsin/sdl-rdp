@@ -3,9 +3,9 @@
 #include "_detail/contract.hpp"
 
 #include <freerdp/channels/wtsvc.h>
+#include <winpr/synch.h>
 #include <stdexcept>
 #include <utility>
-#include <winpr/synch.h>
 
 namespace Backend {
 namespace {
@@ -21,7 +21,7 @@ auto OpenChannelManager(rdpContext* context) -> ChannelManager {
 }
 }
 PeerLink::PeerLink(PeerHandle accepted)
-    : _client { Accepted(std::move(accepted)) }, _socket{ _client->sockfd },
+    : _client{ Accepted(std::move(accepted)) }, _socket{ _client->sockfd },
       _wake{ CreateEvent(nullptr, TRUE, FALSE, nullptr) } {
   if (!_wake) throw std::runtime_error("peer event allocation failed");
   if (!freerdp_peer_context_new(_client.get())) throw std::runtime_error("peer context failed");

@@ -38,9 +38,9 @@ public:
     _client.ClientCapabilities             = _capabilities;
     active                                 = nullptr;
   }
-  auto operator = (ResizeProbe const&) -> ResizeProbe& = delete;
-  auto operator = (ResizeProbe&&)      -> ResizeProbe& = delete;
-  auto AwaitFinalizing()               -> bool {
+  auto operator=(ResizeProbe const&) -> ResizeProbe& = delete;
+  auto operator=(ResizeProbe&&)      -> ResizeProbe& = delete;
+  auto AwaitFinalizing()             -> bool {
     auto held = _handle.Session().Lock();
     return _changed.wait_for(held, std::chrono::seconds(10), [&] { return InFinalization(); });
   }
@@ -134,8 +134,7 @@ protected:
         << "server calls=" << probe.Calls() << " client calls=" << display.Observed().desktops
         << " GDI=" << client.Instance()->context->gdi->width << "x" << client.Instance()->context->gdi->height << "\n"
         << logs.Text(true);
-    for (unsigned i = 0; i < 20; ++i)
-      ASSERT_TRUE(client.Pump(5));
+    for (unsigned i = 0; i < 20; ++i) ASSERT_TRUE(client.Pump(5));
     ThenFinalDesktop(client, last);
     if (::testing::Test::HasFatalFailure()) return;
     ThenResizeCounts(display, probe, expected);

@@ -2,14 +2,14 @@
 #include "contract.hpp"
 #include "transcode.hpp"
 
+#include <oxbox/utilities/span.hpp>
+#include <winpr/sspi.h>
 #include <bit>
 #include <cstddef>
 #include <cstdint>
-#include <oxbox/utilities/span.hpp>
 #include <span>
 #include <string>
 #include <string_view>
-#include <winpr/sspi.h>
 
 namespace Backend {
 struct IdentityNames {

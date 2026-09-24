@@ -13,8 +13,8 @@ auto Region::Add(sdlrdp_rect area) -> void {
   std::optional<sdlrdp_rect> merged{ area };
   for (std::size_t i = 0; i < rects.size();) {
     auto r = rects[i];
-    if (r.x <= merged->x + merged->w && merged->x <= r.x + r.w && r.y <= merged->y + merged->h &&
-        merged->y <= r.y + r.h) {
+    if (r.x <= merged->x + merged->w && merged->x <= r.x + r.w && r.y <= merged->y + merged->h
+        && merged->y <= r.y + r.h) {
       Merge(merged, r);
       rects.erase(rects.begin() + std::ptrdiff_t(i));
       i = 0;
@@ -23,8 +23,7 @@ auto Region::Add(sdlrdp_rect area) -> void {
   }
   rects.push_back(*merged);
   if (rects.size() <= 16) return;
-  for (auto r : rects)
-    Merge(merged, r);
+  for (auto r : rects) Merge(merged, r);
   rects.assign(1, *merged);
 }
 auto Region::empty() const -> bool {

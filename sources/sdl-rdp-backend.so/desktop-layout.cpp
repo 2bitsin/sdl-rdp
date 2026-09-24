@@ -8,8 +8,8 @@
 
 namespace Backend {
 auto ApplyDesktopSize(rdpSettings& settings, sdlrdp_rect picture) -> bool {
-  return freerdp_settings_set_uint32(&settings, FreeRDP_DesktopWidth, picture.w) &&
-         freerdp_settings_set_uint32(&settings, FreeRDP_DesktopHeight, picture.h);
+  return freerdp_settings_set_uint32(&settings, FreeRDP_DesktopWidth, picture.w)
+         && freerdp_settings_set_uint32(&settings, FreeRDP_DesktopHeight, picture.h);
 }
 auto DesktopLayout::Rect() const noexcept -> sdlrdp_rect {
   return _desktop;

@@ -1,12 +1,12 @@
-#include "_detail/drive-channel.hpp"
 #include "_detail/contract.hpp"
+#include "_detail/drive-channel.hpp"
 #include "_detail/peer-link.hpp"
 
-#include <format>
 #include <freerdp/channels/rdpdr.h>
-#include <algorithm>
-#include <utility>
 #include <winpr/nt.h>
+#include <algorithm>
+#include <format>
+#include <utility>
 
 namespace Backend {
 auto DriveChannel::Disconnect() -> void {
@@ -17,8 +17,7 @@ auto DriveChannel::Disconnect() -> void {
 auto DriveChannel::Shutdown() -> void {
   if (!connected) return;
   connected = false;
-  while (!devices.empty())
-    Remove(devices.begin()->second.wire);
+  while (!devices.empty()) Remove(devices.begin()->second.wire);
   pending.clear();
   changed.notify_all();
   _link.Signal();
@@ -29,7 +28,6 @@ auto DriveChannel::CloseTransport() -> void {
   event = nullptr;
 }
 auto DriveChannel::Device(unsigned id) -> unsigned {
-
   if (!connected) throw std::runtime_error("Drive peer disconnected.");
   auto found = devices.find(id);
   if (found == devices.end()) throw std::runtime_error("Drive removed or peer disconnected.");
@@ -58,18 +56,20 @@ auto DriveChannel::WaitAny(std::span<Slot const> slots) -> size_t {
   });
   return ready;
 }
-auto DriveChannel::Wait(std::shared_ptr<DriveRequest> const& request, std::string const& path,
-                        bool end) -> DrivePacket {
+auto DriveChannel::Wait(std::shared_ptr<DriveRequest> const& request, std::string const& path, bool end)
+    -> DrivePacket {
   std::unique_lock lock(mutex);
   changed.wait(lock, [&] { return request->done || request->removed || !connected; });
   if (!connected) throw std::runtime_error("Drive peer disconnected: " + path);
   if (request->removed) throw std::runtime_error("Drive removed: " + path);
-  if (request->status && (!end || (!std::cmp_equal(request->status, unsigned(STATUS_NO_MORE_FILES)) &&
-                                   !std::cmp_equal(request->status, unsigned(STATUS_END_OF_FILE))))) {
+  if (request->status
+      && (!end
+          || (!std::cmp_equal(request->status, unsigned(STATUS_NO_MORE_FILES))
+              && !std::cmp_equal(request->status, unsigned(STATUS_END_OF_FILE))))) {
     // WinPR owns the NTSTATUS name table; unknown client values retain their code.
     auto const* name   = NtStatus2Tag(static_cast<NTSTATUS>(request->status));
-    auto        status =
-        name ? std::format("{} (0x{:08x})", name, request->status) : std::format("NTSTATUS 0x{:08x}", request->status);
+    auto        status = name ? std::format("{} (0x{:08x})", name, request->status)
+                              : std::format("NTSTATUS 0x{:08x}", request->status);
     throw std::runtime_error(std::format("Drive '{}' failed: {}", path, status));
   }
   request->response.Origin(weak_from_this());

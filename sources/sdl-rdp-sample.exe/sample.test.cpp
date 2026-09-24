@@ -1,3 +1,4 @@
+#include "support.test/sample.hpp"
 #include "support.test/client-steps.hpp"
 #include "support.test/first-frame-size.hpp"
 #include "support.test/frame-pattern.hpp"
@@ -5,13 +6,12 @@
 #include "support.test/process.hpp"
 #include "support.test/procfs.hpp"
 #include "support.test/sample-launch.hpp"
-#include "support.test/sample.hpp"
 
 #include <SDL3/SDL.h>
-#include <filesystem>
-#include <memory>
 #include <sdl-rdp-backend.so/_detail/avc-encoder.hpp>
 #include <sdl-rdp-backend.so/_detail/display-client.hpp>
+#include <filesystem>
+#include <memory>
 #include <string>
 #include <thread>
 #include <vector>
@@ -113,8 +113,7 @@ TEST_F(DesktopSample, WaitForClient) {
   process = std::make_unique<Process>(Arguments(certificates.Path(), true));
   auto     deadline = Clock::now() + 10s;
   unsigned port     = 0;
-  while (!(port = ListeningPort()) && Clock::now() < deadline)
-    std::this_thread::sleep_for(1ms);
+  while (!(port = ListeningPort()) && Clock::now() < deadline) std::this_thread::sleep_for(1ms);
   ASSERT_GT(port, 0u) << "sample's ephemeral listener: " << process->Transcript();
   ASSERT_FALSE(Read("port ", 300ms)) << "no port line before client: " << process->Transcript();
   Client const client(port, true, 640, 480);

@@ -26,17 +26,27 @@ auto IsIniEntry(std::string_view line) -> bool {
 auto ParseEntry(std::string_view line, unsigned number) -> IniEntry {
   utilities::Expects(number > 0, "ini lines are one based");
   auto const equals = line.find('=');
-  if (equals == std::string_view::npos) return IniEntry{number};
-  return {oxbox::utilities::Trimmed(line.substr(0, equals)),
-          Unquoted(oxbox::utilities::Trimmed(line.substr(equals + 1))), number};
+  if (equals == std::string_view::npos) return IniEntry{ number };
+  return { oxbox::utilities::Trimmed(line.substr(0, equals)),
+           Unquoted(oxbox::utilities::Trimmed(line.substr(equals + 1))), number };
 }
 IniEntry::IniEntry(std::string_view key, std::string_view value, unsigned line)
-    : _index{SettingIndex(key)}, _key{key}, _value{value}, _line{line},
+    : _index{ SettingIndex(key) }, _key{ key }, _value{ value }, _line{ line },
       _status{ _index ? IniStatus::SETTING : IniStatus::UNKNOWN } { }
 IniEntry::IniEntry(unsigned line) : _line{ line }, _status{ IniStatus::MALFORMED } { }
-auto IniEntry::Index() const -> std::optional<std::size_t> { return _index; }
-auto IniEntry::Key() const -> std::string_view { return _key; }
-auto IniEntry::Value() const -> std::string_view { return _value; }
-auto IniEntry::Line() const -> unsigned { return _line; }
-auto IniEntry::Status() const -> IniStatus { return _status; }
+auto IniEntry::Index() const -> std::optional<std::size_t> {
+  return _index;
+}
+auto IniEntry::Key() const -> std::string_view {
+  return _key;
+}
+auto IniEntry::Value() const -> std::string_view {
+  return _value;
+}
+auto IniEntry::Line() const -> unsigned {
+  return _line;
+}
+auto IniEntry::Status() const -> IniStatus {
+  return _status;
+}
 }

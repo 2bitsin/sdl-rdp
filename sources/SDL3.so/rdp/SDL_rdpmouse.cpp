@@ -4,10 +4,16 @@
 struct SDL_CursorData {
 public:
        SDL_CursorData(SDL_Surface& source, int hot_x, int hot_y)
-      : _surface{&source, SDL_PIXELFORMAT_ARGB8888}, _hot_x{hot_x}, _hot_y{hot_y} { }
-  auto Surface() const -> SDL_Surface const& { return *_surface.Get(); }
-  auto HotX() const    -> int { return _hot_x; }
-  auto HotY() const    -> int { return _hot_y; }
+      : _surface{ &source, SDL_PIXELFORMAT_ARGB8888 }, _hot_x{ hot_x }, _hot_y{ hot_y } { }
+  auto Surface() const -> SDL_Surface const& {
+    return *_surface.Get();
+  }
+  auto HotX() const -> int {
+    return _hot_x;
+  }
+  auto HotY() const -> int {
+    return _hot_y;
+  }
 private:
   rdp::ConvertedSurface const _surface;
   int                         _hot_x;
@@ -19,9 +25,11 @@ auto SetPointer(Driver const& driver, SDL_CursorData const& shape) -> int {
   auto const& surface = shape.Surface();
   return driver.Call<Operation::SET_POINTER>(surface.w, surface.h, shape.HotX(), shape.HotY(), surface.pixels);
 }
-auto HidePointer(Driver const& driver) -> int { return driver.Call<Operation::SET_POINTER>(0, 0, 0, 0, nullptr); }
+auto HidePointer(Driver const& driver) -> int {
+  return driver.Call<Operation::SET_POINTER>(0, 0, 0, 0, nullptr);
+}
 // SDL returns cursor ownership through this destruction callback.
-auto FreeCursor(SDL_Cursor* cursor)    -> void {
+auto FreeCursor(SDL_Cursor* cursor) -> void {
   utilities::Expects(cursor != nullptr, "cursor destruction owns a cursor");
   std::unique_ptr<SDL_Cursor> const     owner{ cursor                                  };
   std::unique_ptr<SDL_CursorData> const state{ std::exchange(owner->internal, nullptr) };

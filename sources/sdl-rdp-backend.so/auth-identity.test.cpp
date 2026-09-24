@@ -3,11 +3,11 @@
 #include "_detail/handle.hpp"
 #include "sdl-rdp-backend.h"
 
+#include <gtest/gtest.h>
+#include <oxbox/platform/scratch-area.hpp>
 #include <condition_variable>
 #include <format>
-#include <gtest/gtest.h>
 #include <mutex>
-#include <oxbox/platform/scratch-area.hpp>
 #include <thread>
 
 namespace {

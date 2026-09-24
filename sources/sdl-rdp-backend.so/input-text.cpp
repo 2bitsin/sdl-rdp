@@ -2,9 +2,9 @@
 #include "_detail/diagnostics.hpp"
 #include "_detail/input-dispatch.hpp"
 
+#include <freerdp/input.h>
 #include <array>
 #include <format>
-#include <freerdp/input.h>
 
 namespace Backend {
 namespace {
@@ -28,21 +28,16 @@ auto Owner(rdpInput* input) -> InputEvents& {
   return CallbackOwner<InputEvents>(input->param1);
 }
 }
-InputEvents::InputEvents(PeerLink& link, Activation const& activation, DesktopLayout const& desktop,
-                         EventQueue& events, FrameStore& store, Diagnostics const& diagnostics,
-                         SessionAccess& session) noexcept
-    : _link { link }, _activation{ activation }, _desktop{ desktop }, _events{ events }, _store{ store },
+InputEvents::InputEvents(PeerLink& link, Activation const& activation, DesktopLayout const& desktop, EventQueue& events,
+                         FrameStore& store, Diagnostics const& diagnostics, SessionAccess& session) noexcept
+    : _link{ link }, _activation{ activation }, _desktop{ desktop }, _events{ events }, _store{ store },
       _diagnostics{ diagnostics }, _session{ session } { }
 auto InputEvents::Install(rdpInput& input) -> void {
-  input.param1               = this;
-  input.KeyboardEvent        = [](rdpInput* in, UINT16 flags, UINT8 code) { return Owner(in).Key(flags, code); };
+  input.param1        = this;
+  input.KeyboardEvent = [](rdpInput* in, UINT16 flags, UINT8 code) { return Owner(in).Key(flags, code); };
   input.UnicodeKeyboardEvent = [](rdpInput* in, UINT16 flags, UINT16 code) { return Owner(in).Text(flags, code); };
-  input.MouseEvent           = [](rdpInput* in, UINT16 flags, UINT16 x, UINT16 y) {
-    return Owner(in).Mouse(flags, x, y);
-  };
-  input.ExtendedMouseEvent   = [](rdpInput* in, UINT16 flags, UINT16, UINT16) {
-    return Owner(in).ExtendedMouse(flags);
-  };
+  input.MouseEvent    = [](rdpInput* in, UINT16 flags, UINT16 x, UINT16 y) { return Owner(in).Mouse(flags, x, y); };
+  input.ExtendedMouseEvent = [](rdpInput* in, UINT16 flags, UINT16, UINT16) { return Owner(in).ExtendedMouse(flags); };
 }
 auto InputEvents::Key(UINT16 flags, UINT8 code) -> BOOL {
   return WhenActive(BOOL{ TRUE }, [&] {

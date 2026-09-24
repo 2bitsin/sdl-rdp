@@ -2,18 +2,18 @@
 
 #include "_detail/test-peer-status.hpp"
 
-#include <algorithm>
-#include <array>
-#include <cstdint>
-#include <cstdlib>
 #include <freerdp/gdi/gdi.h>
 #include <freerdp/input.h>
 #include <gtest/gtest.h>
 #include <oxbox/utilities/span.hpp>
+#include <winpr/synch.h>
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <cstdlib>
 #include <ranges>
 #include <string>
 #include <utility>
-#include <winpr/synch.h>
 
 namespace BackendGate {
 namespace {
@@ -30,7 +30,8 @@ auto ThenMonitor(MONITOR_DEF const& monitor, Backend::Extent size) -> void {
   EXPECT_EQ(monitor.flags, 1u);
 }
 auto CountsOf(Headless::GraphicsObserver const& observer) -> GraphicsCounts {
-  return { .desktops = observer.Observed().desktops.size(), .resets = observer.Observed().resets.size(),
+  return { .desktops = observer.Observed().desktops.size(),
+           .resets   = observer.Observed().resets.size(),
            .frames   = observer.Observed().frames.size() };
 }
 auto ThenResetGeometry(Headless::GraphicsObserver::Reset const& reset, GraphicsCounts before, Backend::Extent size)
@@ -92,23 +93,22 @@ auto FrameChecks::ThenScaledHighlight(Client& client) -> void {
   auto actual    = oxbox::utilities::SpanCast<std::uint32_t const>(
       std::span(client.Instance()->context->gdi->primary_buffer, 640uz * 480 * 4));
   auto rows      = std::views::iota(0, 480);
-  auto brightest =
-      std::ranges::max_element(rows, { }, [&](int y) { return actual[static_cast<std::size_t>(y) * 640] & 255; });
+  auto brightest = std::ranges::max_element(rows, { },
+                                            [&](int y) { return actual[static_cast<std::size_t>(y) * 640] & 255; });
   EXPECT_LE(std::abs(*brightest - 240), 1);
 }
 auto FrameChecks::ThenSparseDamage(Client& client, FrameObserver& observer, std::vector<UINT32> const& pixels,
                                    std::size_t bounding, sdlrdp_codec codec) -> void {
   auto                       bytes  = client.Received();
-  std::array<sdlrdp_rect, 2> damage { { { .x = 0   , .y = 0  , .w = 8, .h = 8 },
-                                        { .x = 1016, .y = 760, .w = 8, .h = 8 } } };
+  std::array<sdlrdp_rect, 2> damage { { { .x = 0, .y = 0, .w = 8, .h = 8 }, { .x = 1016, .y = 760, .w = 8, .h = 8 } } };
   ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 4096, 1024, 768, damage.data(), 2), 0);
   ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == 3; }));
   auto used = client.Received() - bytes;
   testing::Test::RecordProperty("region_bytes_" + std::to_string(codec), std::to_string(used));
   EXPECT_LT(used, bounding / 100);
 }
-auto FrameChecks::ThenProducerFrame(Client& client, FrameObserver& observer,
-                                    std::atomic<unsigned> const& presents) -> void {
+auto FrameChecks::ThenProducerFrame(Client& client, FrameObserver& observer, std::atomic<unsigned> const& presents)
+    -> void {
   std::vector<UINT32> final(1024uz * 768);
   std::fill_n(final.begin(), 1024, presents.load());
   std::fill_n(final.end() - 1024, 1024, presents.load());

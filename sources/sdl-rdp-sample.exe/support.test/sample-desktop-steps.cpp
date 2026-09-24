@@ -43,9 +43,9 @@ auto SampleDesktopSteps::ThenSizeEvents(std::string const& dimensions) -> void {
   EXPECT_TRUE(line.ends_with(dimensions)) << line;
 }
 auto SampleDesktopSteps::ThenDesktopMode(Client& client, unsigned w, unsigned h) -> void {
-  ASSERT_TRUE(ReadInput(
-      client, "event DISPLAY_DESKTOP_MODE_CHANGED type=" + std::to_string(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED) +
-                  std::format(" width={} height={}", w, h)));
+  ASSERT_TRUE(ReadInput(client, "event DISPLAY_DESKTOP_MODE_CHANGED type="
+                                    + std::to_string(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED)
+                                    + std::format(" width={} height={}", w, h)));
   ASSERT_TRUE(Read(std::format("event GEOMETRY window={}x{} desktop={}x{}", w, h, w, h)));
   ASSERT_TRUE(client.Until([&] {
     auto* gdi = client.Instance()->context->gdi;
@@ -72,8 +72,7 @@ auto SampleDesktopSteps::GivenSwitchableCodec(Client const& client) -> void {
 auto SampleDesktopSteps::ThenTakeoverEvent(char const* expected) -> void {
   do {
     ASSERT_TRUE(process->Line(line, Clock::now() + 10s)) << process->Transcript();
-  } while (!line.starts_with("event ") || line.starts_with("event GEOMETRY ") ||
-           line.starts_with("event CONNECTED "));
+  } while (!line.starts_with("event ") || line.starts_with("event GEOMETRY ") || line.starts_with("event CONNECTED "));
   EXPECT_TRUE(line.starts_with("event " + std::string(expected) + " ")) << line;
 }
 auto SampleDesktopSteps::WhenSmallerDesktop(Client& first) -> void {

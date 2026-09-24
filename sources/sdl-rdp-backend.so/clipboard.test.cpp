@@ -4,9 +4,9 @@
 #include "_detail/transcode.hpp"
 #include "sdl-rdp-backend.h"
 
-#include <cstring>
 #include <gtest/gtest.h>
 #include <oxbox/platform/scratch-area.hpp>
+#include <cstring>
 
 namespace {
 class Clipboard : public testing::Test {
@@ -130,10 +130,10 @@ TEST_F(Clipboard, NonTextOfferClearsText) {
 TEST(ClipboardTranscode, ByteRanges) {
   using namespace oxbox::utilities;
   using Backend::TranscodeRange;
-  std::string_view const text    = "Aż😀";
-  auto                   input   = std::as_bytes(std::span(text));
-  auto                   encoded =
-      TranscodeRange<std::vector<BYTE>>(input, { }, { .encoding = Encoding::UTF16, .order = std::endian::little });
+  std::string_view const text  = "Aż😀";
+  auto                   input = std::as_bytes(std::span(text));
+  auto encoded = TranscodeRange<std::vector<BYTE>>(input, { },
+                                                   { .encoding = Encoding::UTF16, .order = std::endian::little });
   EXPECT_EQ(encoded, (std::vector<BYTE>{ 0x41, 0, 0x7c, 1, 0x3d, 0xd8, 0, 0xde }));
   EXPECT_EQ(
       TranscodeRange<std::string>(std::as_bytes(std::span(encoded)), { Encoding::UTF16, std::endian::little }, { }),

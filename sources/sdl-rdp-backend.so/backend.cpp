@@ -45,9 +45,9 @@ auto ValidateConfiguration(sdlrdp_config const& config) -> void {
   if (config.port > MaximumPort) throw std::runtime_error("Open failed: port exceeds 65535.");
 }
 auto Inside(sdlrdp_rect area, Extent size) -> bool {
-  return area.x >= 0 && area.y >= 0 && area.w > 0 && area.h > 0 && std::cmp_less_equal(area.x, size.width) &&
-         unsigned(area.w) <= size.width - unsigned(area.x) && std::cmp_less_equal(area.y, size.height) &&
-         unsigned(area.h) <= size.height - unsigned(area.y);
+  return area.x >= 0 && area.y >= 0 && area.w > 0 && area.h > 0 && std::cmp_less_equal(area.x, size.width)
+         && unsigned(area.w) <= size.width - unsigned(area.x) && std::cmp_less_equal(area.y, size.height)
+         && unsigned(area.h) <= size.height - unsigned(area.y);
 }
 auto ValidateDamage(std::span<sdlrdp_rect const> damage, Extent size) -> void {
   if (!std::ranges::all_of(damage, [=](sdlrdp_rect area) { return Inside(area, size); }))
@@ -62,8 +62,8 @@ auto ValidPointer(unsigned w, unsigned h, unsigned x, unsigned y, void const* ar
   return !(w || h) || (w && h && argb && x < w && y < h);
 }
 auto ValidRefresh(unsigned mode, unsigned ceiling) -> bool {
-  return mode <= MaximumRefreshMode && ceiling && ceiling <= unsigned(INT32_MAX) / Backend::MillihertzPerHz &&
-         (!mode || ceiling >= MinimumPacedRefresh);
+  return mode <= MaximumRefreshMode && ceiling && ceiling <= unsigned(INT32_MAX) / Backend::MillihertzPerHz
+         && (!mode || ceiling >= MinimumPacedRefresh);
 }
 }
 auto sdlrdp_last_error() -> char const* {
@@ -141,11 +141,10 @@ auto sdlrdp_set_aspect(sdlrdp_handle* handle, sdlrdp_aspect aspect) -> int {
   });
 }
 auto sdlrdp_wait_frame(sdlrdp_handle* handle, int timeout) -> int {
-  return Guarded(handle, -1,
-                 [&] { return Opened(handle, "Invalid handle.").Presentation().WaitFrame(timeout); });
+  return Guarded(handle, -1, [&] { return Opened(handle, "Invalid handle.").Presentation().WaitFrame(timeout); });
 }
-auto sdlrdp_set_pointer(sdlrdp_handle* handle, unsigned w, unsigned h, unsigned x, unsigned y,
-                        void const* argb) -> int {
+auto sdlrdp_set_pointer(sdlrdp_handle* handle, unsigned w, unsigned h, unsigned x, unsigned y, void const* argb)
+    -> int {
   return Guarded(handle, -1, [&] {
     if (!handle || !ValidPointer(w, h, x, y, argb))
       throw std::runtime_error("Invalid pointer dimensions, hotspot, pixels or handle.");
@@ -191,13 +190,11 @@ auto sdlrdp_audio_write(sdlrdp_handle* handle, void const* frames, unsigned coun
   return Guarded(handle, -1, [&] {
     if (!handle || (!frames && count) || count > unsigned(INT_MAX))
       throw std::runtime_error("Invalid audio handle, frames or count.");
-    return handle->Audio().Write(
-        { static_cast<int16_t const*>(frames), std::size_t(count) * StereoChannels });
+    return handle->Audio().Write({ static_cast<int16_t const*>(frames), std::size_t(count) * StereoChannels });
   });
 }
 auto sdlrdp_audio_wait(sdlrdp_handle* handle, int timeout) -> int {
-  return Guarded(handle, -1,
-                 [&] { return Opened(handle, "Invalid audio handle.").Audio().Wait(timeout); });
+  return Guarded(handle, -1, [&] { return Opened(handle, "Invalid audio handle.").Audio().Wait(timeout); });
 }
 auto sdlrdp_audio_close(sdlrdp_handle* handle) -> void {
   if (!handle) return;

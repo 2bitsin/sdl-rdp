@@ -7,12 +7,12 @@
 namespace Headless {
 struct FrameObserver {
 public:
-           FrameObserver(FrameObserver const&)                 = delete;
-           FrameObserver(FrameObserver&&)                      = delete;
+           FrameObserver(FrameObserver const&)               = delete;
+           FrameObserver(FrameObserver&&)                    = delete;
   explicit FrameObserver(Client& client);
            ~FrameObserver();
-  auto     operator = (FrameObserver const&) -> FrameObserver& = delete;
-  auto     operator = (FrameObserver&&)      -> FrameObserver& = delete;
+  auto     operator=(FrameObserver const&) -> FrameObserver& = delete;
+  auto     operator=(FrameObserver&&)      -> FrameObserver& = delete;
 
   auto Ack()                    -> bool;
   auto Frames() const           -> std::vector<UINT32> const&;

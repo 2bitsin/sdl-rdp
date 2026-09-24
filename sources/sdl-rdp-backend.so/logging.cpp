@@ -2,17 +2,17 @@
 
 #include "_detail/contract.hpp"
 
+#include <freerdp/error.h>
+#include <freerdp/settings.h>
+#include <oxbox/utilities/number-text.hpp>
+#include <winpr/wlog.h>
 #include <algorithm>
 #include <array>
 #include <atomic>
 #include <cstdlib>
-#include <freerdp/error.h>
-#include <freerdp/settings.h>
 #include <mutex>
-#include <oxbox/utilities/number-text.hpp>
 #include <stdexcept>
 #include <string_view>
-#include <winpr/wlog.h>
 
 namespace Backend {
 auto ResetAuthenticationLogging() -> void {
@@ -37,10 +37,8 @@ auto ExpectedDisconnect(unsigned code) -> bool {
   case FREERDP_ERROR_DISCONNECTED_BY_OTHER_CONNECTION:
   case FREERDP_ERROR_RPC_INITIATED_DISCONNECT:
   case FREERDP_ERROR_AUTHENTICATION_FAILED:
-  case FREERDP_ERROR_SERVER_DENIED_CONNECTION:
-    return true;
-  default:
-    return false;
+  case FREERDP_ERROR_SERVER_DENIED_CONNECTION: return true;
+  default:                                     return false;
   }
 }
 namespace {
@@ -102,17 +100,17 @@ auto NegotiationEcho(LogRoute::Filter const& filter, std::string_view prefix, st
     "BIO_do_handshake failed", "rdp_server_accept_nego() fail",
     "STATE_RUN_FAILED", "ERRCONNECT_CONNECT_TRANSPORT_FAILED"
   };
-  return (filter.negotiation_failed || filter.handshake_failed) &&
-         (prefix.starts_with("com.freerdp.core") || prefix == "com.freerdp.api" || prefix == "com.freerdp.crypto") &&
-         std::ranges::any_of(echoes, [&](auto entry) { return text.contains(entry); });
+  return (filter.negotiation_failed || filter.handshake_failed)
+         && (prefix.starts_with("com.freerdp.core") || prefix == "com.freerdp.api" || prefix == "com.freerdp.crypto")
+         && std::ranges::any_of(echoes, [&](auto entry) { return text.contains(entry); });
 }
 auto TransportEcho(std::string_view prefix, std::string_view text) -> bool {
   static constexpr std::array<std::string_view, 3> disconnects { "ERRINFO_LOGOFF_BY_USER",
                                                                  "ERRINFO_DISCONNECTED_BY_OTHER_CONNECTION",
                                                                  "ERRINFO_RPC_INITIATED_DISCONNECT" };
   auto const                                       name        = ErrorName(text);
-  if ((prefix == "com.freerdp.core" || prefix == "com.freerdp.core.peer") &&
-      name == "ERRCONNECT_CONNECT_TRANSPORT_FAILED")
+  if ((prefix == "com.freerdp.core" || prefix == "com.freerdp.core.peer")
+      && name == "ERRCONNECT_CONNECT_TRANSPORT_FAILED")
     return true;
   return prefix == "com.freerdp.core.peer" && std::ranges::contains(disconnects, name);
 }
@@ -131,15 +129,14 @@ constexpr std::array<std::string_view, 8> core    { "STATE_RUN_FAILED",
                                                     "freerdp_peer::Activate() callback failed" };
 
 auto AuthenticationFailure(std::string_view prefix, std::string_view text) -> bool {
-  return (prefix == "com.winpr.sspi.NTLM" && std::ranges::contains(ntlm, text)) ||
-         (prefix == "com.freerdp.core.nla" &&
-          std::ranges::any_of(nla, [&](auto entry) { return text.starts_with(entry); })) ||
-         std::ranges::contains(rejected, ErrorName(text));
+  return (prefix == "com.winpr.sspi.NTLM" && std::ranges::contains(ntlm, text))
+         || (prefix == "com.freerdp.core.nla"
+             && std::ranges::any_of(nla, [&](auto entry) { return text.starts_with(entry); }))
+         || std::ranges::contains(rejected, ErrorName(text));
 }
-auto AuthenticationCoreEcho(LogRoute::Filter const& filter, std::string_view prefix, std::string_view text)
-    -> bool {
-  return filter.authentication_failed && (prefix.starts_with("com.freerdp.core") || prefix == "com.freerdp.api") &&
-         std::ranges::any_of(core, [&](auto entry) { return text.contains(entry); });
+auto AuthenticationCoreEcho(LogRoute::Filter const& filter, std::string_view prefix, std::string_view text) -> bool {
+  return filter.authentication_failed && (prefix.starts_with("com.freerdp.core") || prefix == "com.freerdp.api")
+         && std::ranges::any_of(core, [&](auto entry) { return text.contains(entry); });
 }
 auto AuthenticationEcho(LogRoute::Filter& filter, std::string_view prefix, std::string_view text) -> bool {
   if (!AuthenticationFailure(prefix, text)) return AuthenticationCoreEcho(filter, prefix, text);
@@ -150,10 +147,10 @@ auto ExpectedPeerMessage(LogRoute::Filter& filter, wLogMessage const& message) -
   if (!message.PrefixString || !message.TextString) return false;
   auto prefix = std::string_view(message.PrefixString);
   auto text   = std::string_view(message.TextString);
-  return ExpectedLibraryMessage(prefix, text) || SspiRejectionEcho(filter, prefix, text) ||
-         DetectNegotiationRefusal(filter, prefix, text) || DetectTlsHandshakeFailure(filter, prefix, text) ||
-         NegotiationEcho(filter, prefix, text) || TransportEcho(prefix, text) ||
-         AuthenticationEcho(filter, prefix, text);
+  return ExpectedLibraryMessage(prefix, text) || SspiRejectionEcho(filter, prefix, text)
+         || DetectNegotiationRefusal(filter, prefix, text) || DetectTlsHandshakeFailure(filter, prefix, text)
+         || NegotiationEcho(filter, prefix, text) || TransportEcho(prefix, text)
+         || AuthenticationEcho(filter, prefix, text);
 }
 auto NtlmMessage(wLogMessage const& message) -> bool {
   return message.PrefixString && std::string_view(message.PrefixString) == "com.winpr.sspi.NTLM";
@@ -184,8 +181,8 @@ auto LogRoute::Install() -> void {
   auto* root = WLog_GetRoot();
   utilities::Expects(root != nullptr, "WLog root exists");
   wLogCallbacks callbacks{ Forward, Forward, Forward, Forward };
-  if (!WLog_SetLogAppenderType(root, WLOG_APPENDER_CALLBACK) ||
-      !WLog_ConfigureAppender(WLog_GetLogAppender(root), "callbacks", &callbacks))
+  if (!WLog_SetLogAppenderType(root, WLOG_APPENDER_CALLBACK)
+      || !WLog_ConfigureAppender(WLog_GetLogAppender(root), "callbacks", &callbacks))
     throw std::runtime_error("WLog callback installation failed.");
   WLog_Layout_SetPrefixFormat(root, WLog_GetLogLayout(root), "%mn");
   if (auto* level = std::getenv("WLOG_LEVEL"))

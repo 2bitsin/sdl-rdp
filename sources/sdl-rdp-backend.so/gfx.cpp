@@ -12,10 +12,10 @@
 #include "_detail/rect.hpp"
 #include "_detail/scaler.hpp"
 
+#include <freerdp/channels/wtsvc.h>
 #include <array>
 #include <cstddef>
 #include <format>
-#include <freerdp/channels/wtsvc.h>
 #include <numeric>
 #include <utility>
 
@@ -36,7 +36,7 @@ auto FitsProtocol(sdlrdp_rect desktop) -> bool {
 GfxChannel::GfxChannel(PeerLink& link, Diagnostics const& diagnostics, Configuration const& configuration,
                        Activation& activation, PeerFrames& frames, FramePacing& pacing, Encoder& encoder,
                        Scaler& scaler)
-    : _link { link }, _diagnostics{ diagnostics }, _configuration{ configuration }, _activation{ activation },
+    : _link{ link }, _diagnostics{ diagnostics }, _configuration{ configuration }, _activation{ activation },
       _frames{ frames }, _pacing{ pacing }, _encoder{ encoder }, _scaler{ scaler },
       _context{ rdpgfx_server_context_new(link.Channels()) } { }
 GfxChannel::~GfxChannel() = default;
@@ -75,8 +75,7 @@ auto GfxChannel::Check(UINT result, char const* operation) const -> bool {
 auto GfxChannel::LogCapabilities(std::span<RDPGFX_CAPSET const> advertised) const -> void {
   if (_logged) return;
   std::string sets;
-  for (auto const& cap : advertised)
-    sets += std::format(" version=0x{:08x} flags=0x{:08x};", cap.version, cap.flags);
+  for (auto const& cap : advertised) sets += std::format(" version=0x{:08x} flags=0x{:08x};", cap.version, cap.flags);
   _diagnostics.Log(SDLRDP_LOG_INFO, "GFX advertised sets:" + sets);
 }
 auto GfxChannel::ActivateCapabilities(RDPGFX_CAPSET const& selected, bool wanted) -> UINT {
@@ -102,13 +101,13 @@ auto GfxChannel::ResetSurface() -> bool {
   constexpr UINT32                       MonitorCount   = 1;
   auto const                             desktop        = _scaler.Target();
   MONITOR_DEF                            monitor        { 0, 0, desktop.w - 1, desktop.h - 1, PrimaryMonitor };
-  RDPGFX_RESET_GRAPHICS_PDU const reset { unsigned(desktop.w), unsigned(desktop.h), MonitorCount, &monitor };
+  RDPGFX_RESET_GRAPHICS_PDU const reset{ unsigned(desktop.w), unsigned(desktop.h), MonitorCount, &monitor };
   RDPGFX_CREATE_SURFACE_PDU const        create         { GraphicsSurfaceId, UINT16(desktop.w), UINT16(desktop.h),
                                                           GFX_PIXEL_FORMAT_XRGB_8888 };
   RDPGFX_MAP_SURFACE_TO_OUTPUT_PDU const map            { GraphicsSurfaceId, 0, 0, 0                         };
-  return Check(_context->ResetGraphics(_context.get(), &reset), "reset graphics") &&
-         Check(_context->CreateSurface(_context.get(), &create), "create surface") &&
-         Check(_context->MapSurfaceToOutput(_context.get(), &map), "map surface");
+  return Check(_context->ResetGraphics(_context.get(), &reset), "reset graphics")
+         && Check(_context->CreateSurface(_context.get(), &create), "create surface")
+         && Check(_context->MapSurfaceToOutput(_context.get(), &map), "map surface");
 }
 auto GfxChannel::Caps(RdpgfxServerContext* context, RDPGFX_CAPS_ADVERTISE_PDU const* caps) -> UINT {
   Expects(caps, "graphics capabilities are supplied");
@@ -134,8 +133,8 @@ auto GfxChannel::ConfirmedCapability(RDPGFX_CAPSET const& cap) -> void {
   Expects(cap.version, "supported capabilities confirmed");
   _avc_allowed = cap.version == RDPGFX_CAPVERSION_81
                      ? (cap.flags & RDPGFX_CAPS_FLAG_AVC420_ENABLED) != 0
-                     : cap.version >= RDPGFX_CAPVERSION_10 && !(cap.flags & RDPGFX_CAPS_FLAG_AVC_DISABLED) &&
-                           Avc::Encoder::Available();
+                     : cap.version >= RDPGFX_CAPVERSION_10 && !(cap.flags & RDPGFX_CAPS_FLAG_AVC_DISABLED)
+                           && Avc::Encoder::Available();
   ResetAvc();
   _confirmed = true;
   _timing.Ready(Activation::Clock::now() - _activation.ActivatedAt());

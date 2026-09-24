@@ -9,15 +9,17 @@
 #include "tls-race.test/injected-faults.hpp"
 #include "tls-race.test/method-fill.hpp"
 
+#include <gtest/gtest.h>
+#include <oxbox/platform/scratch-area.hpp>
+#include <winpr/ssl.h>
+#include <winpr/wlog.h>
 #include <algorithm>
 #include <array>
 #include <chrono>
 #include <csignal>
 #include <functional>
 #include <future>
-#include <gtest/gtest.h>
 #include <memory>
-#include <oxbox/platform/scratch-area.hpp>
 #include <ranges>
 #include <stdexcept>
 #include <string>
@@ -27,8 +29,6 @@
 #include <unistd.h>
 #include <utility>
 #include <vector>
-#include <winpr/ssl.h>
-#include <winpr/wlog.h>
 
 namespace {
 using namespace std::chrono_literals;
@@ -55,15 +55,15 @@ auto Child(std::function<int()> const& body) -> Headless::ChildProcess {
   } };
 }
 auto WaveStatuses(unsigned size, std::function<int()> const& body) -> std::vector<int> {
-  auto children = std::views::iota(0U, size) | std::views::transform([&](unsigned) { return Child(body); }) |
-                  std::ranges::to<std::vector>();
+  auto children = std::views::iota(0U, size) | std::views::transform([&](unsigned) { return Child(body); })
+                  | std::ranges::to<std::vector>();
   return children | std::views::transform([](auto& child) { return child.Wait(); }) | std::ranges::to<std::vector>();
 }
 auto Statuses(unsigned count, std::function<int()> const& body) -> std::vector<int> {
   utilities::Expects(count % ChildrenPerWave == 0, "the children fill whole waves");
-  return std::views::iota(0U, count / ChildrenPerWave) |
-         std::views::transform([&](unsigned) { return WaveStatuses(ChildrenPerWave, body); }) | std::views::join |
-         std::ranges::to<std::vector>();
+  return std::views::iota(0U, count / ChildrenPerWave)
+         | std::views::transform([&](unsigned) { return WaveStatuses(ChildrenPerWave, body); }) | std::views::join
+         | std::ranges::to<std::vector>();
 }
 auto ExitedWith(int status, int code) -> bool {
   return WIFEXITED(status) && WEXITSTATUS(status) == code;
@@ -166,8 +166,12 @@ protected:
     if (MethodFill::Shared().Seen(Race::SocketMethod) || MethodFill::Shared().Seen(Race::TlsMethod))
       GTEST_SKIP() << "FreeRDP filled its BIO methods earlier in this process.";
   }
-  [[nodiscard]] auto ServerCredentials() const    -> Backend::Credentials const& { return credentials; }
-  [[nodiscard]] auto CertificateDirectory() const -> std::string const& { return path; }
+  [[nodiscard]] auto ServerCredentials() const -> Backend::Credentials const& {
+    return credentials;
+  }
+  [[nodiscard]] auto CertificateDirectory() const -> std::string const& {
+    return path;
+  }
 
 private:
   oxbox::platform::ScratchArea directory  { "tls-race", "sdl-rdp"                        };

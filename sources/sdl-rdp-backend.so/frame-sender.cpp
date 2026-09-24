@@ -13,7 +13,7 @@ namespace Backend {
 FrameSender::FrameSender(PeerLink& link, Activation const& activation, SessionAccess& session, FrameGate& gate,
                          FrameCapture& capture, PointerSender& pointer, GraphicsLink& graphics,
                          LegacyFrame& legacy) noexcept
-    : _link { link }, _activation{ activation }, _session{ session }, _gate{ gate }, _capture{ capture },
+    : _link{ link }, _activation{ activation }, _session{ session }, _gate{ gate }, _capture{ capture },
       _pointer{ pointer }, _graphics{ graphics }, _legacy{ legacy } { }
 auto FrameSender::Drain() -> bool {
   if (!_activation.Active()) return true;
@@ -23,14 +23,10 @@ auto FrameSender::Drain() -> bool {
   if (!_pointer.Send()) return false;
   auto const captured = _capture.Next();
   switch (captured) {
-  case CaptureState::Failed:
-    return false;
-  case CaptureState::Idle:
-    return true;
-  case CaptureState::Captured:
-    return Prepare();
-  default:
-    utilities::Unreachable(captured);
+  case CaptureState::Failed:   return false;
+  case CaptureState::Idle:     return true;
+  case CaptureState::Captured: return Prepare();
+  default:                     utilities::Unreachable(captured);
   }
 }
 auto FrameSender::Encode(std::stop_token const& quit) -> Delivery {
@@ -60,18 +56,11 @@ auto FrameSender::SendLegacy() -> bool {
 }
 auto FrameSender::Transition(EncodeState next) -> void {
   switch (_state) {
-  case EncodeState::Idle:
-    Expects(next != EncodeState::LegacyReady, "encoding precedes legacy writes");
-    break;
-  case EncodeState::Legacy:
-    Expects(next == EncodeState::LegacyReady, "legacy encoding produces packets");
-    break;
+  case EncodeState::Idle:   Expects(next != EncodeState::LegacyReady, "encoding precedes legacy writes"); break;
+  case EncodeState::Legacy: Expects(next == EncodeState::LegacyReady, "legacy encoding produces packets"); break;
   case EncodeState::Graphics:
-  case EncodeState::LegacyReady:
-    Expects(next == EncodeState::Idle, "completed encoding returns to idle");
-    break;
-  default:
-    utilities::Unreachable(_state);
+  case EncodeState::LegacyReady: Expects(next == EncodeState::Idle, "completed encoding returns to idle"); break;
+  default:                       utilities::Unreachable(_state);
   }
   _state = next;
 }

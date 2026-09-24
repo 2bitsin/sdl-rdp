@@ -4,8 +4,8 @@
 #include "refresh.hpp"
 #include "sdl-rdp-backend.h"
 
-#include <atomic>
 #include <freerdp/settings.h>
+#include <atomic>
 
 namespace Backend {
 class Configuration {

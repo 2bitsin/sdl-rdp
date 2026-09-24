@@ -11,13 +11,19 @@ auto Close(int* count) noexcept -> bool {
   --*count;
   return true;
 }
-auto IsNull(int const* count) noexcept -> bool { return count == nullptr; }
-auto MakeNull(int*& count) noexcept    -> void { count = nullptr; }
-auto Enter(int& count)                 -> int& {
+auto IsNull(int const* count) noexcept -> bool {
+  return count == nullptr;
+}
+auto MakeNull(int*& count) noexcept -> void {
+  count = nullptr;
+}
+auto Enter(int& count) -> int& {
   ++count;
   return count;
 }
-auto Leave(int& count) noexcept -> void { --count; }
+auto Leave(int& count) noexcept -> void {
+  --count;
+}
 using Counted = utilities::RAIIWrap<int*, Open, Close, IsNull, MakeNull>;
 using Entered = utilities::RAIIWrap<int&, Enter, Leave>;
 static_assert(!std::copy_constructible<Counted>);
@@ -38,7 +44,7 @@ auto EnterAndThrow(int& active) -> void {
 TEST(ScopedResource, MovedFromOwnersReleaseNothingAndAssignmentClosesPrevious) {
   std::array<int, 2> counts{ };
   MoveTwiceIntoOccupied(&counts.front(), &counts.back());
-  EXPECT_EQ(counts, (std::array{0, 0}));
+  EXPECT_EQ(counts, (std::array{ 0, 0 }));
 }
 TEST(ScopedResource, CloseReturnsStatusAndPreventsDoubleRelease) {
   std::array<int, 1> count{ };

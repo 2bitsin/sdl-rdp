@@ -3,14 +3,14 @@
 #include "rdp-handles.hpp"
 #include "sdl-rdp-backend.h"
 
+#include <winpr/wtsapi.h>
+#include <winpr/wtypes.h>
 #include <atomic>
 #include <condition_variable>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <span>
-#include <winpr/wtsapi.h>
-#include <winpr/wtypes.h>
 
 namespace Backend {
 class Diagnostics;
@@ -36,8 +36,8 @@ public:
        DriveChannel(DriveChannel&&)                                   = delete;
   DriveChannel(PeerLink& link, EventQueue& events, Diagnostics const& diagnostics, SessionAccess& session) noexcept;
        ~DriveChannel();
-  auto operator = (DriveChannel const&)              -> DriveChannel& = delete;
-  auto operator = (DriveChannel&&)                   -> DriveChannel& = delete;
+  auto operator=(DriveChannel const&)                -> DriveChannel& = delete;
+  auto operator=(DriveChannel&&)                     -> DriveChannel& = delete;
   auto Open()                                        -> bool;
   auto Pump(std::span<HANDLE const> signaled)        -> bool;
   auto Event() const                                 -> HANDLE;
@@ -45,8 +45,8 @@ public:
   auto Abort(std::string const& /*cause*/)           -> void;
   auto List(sdlrdp_drive* /*out*/, unsigned /*max*/) -> int;
   auto Device(unsigned id)                           -> unsigned;
-  auto Send(unsigned drive, unsigned file, unsigned major, DrivePacket const& body,
-            unsigned minor = 0) -> std::shared_ptr<DriveRequest>;
+  auto Send(unsigned drive, unsigned file, unsigned major, DrivePacket const& body, unsigned minor = 0)
+      -> std::shared_ptr<DriveRequest>;
   auto Wait(std::shared_ptr<DriveRequest> const& /*request*/, std::string const& path, bool end = false) -> DrivePacket;
   auto WaitAny(std::span<Slot const> /*slots*/)      -> size_t;
   auto Warn(std::string const& /*cause*/) const      -> void;
@@ -57,8 +57,8 @@ private:
     sdlrdp_drive drive;
   };
   auto AnnounceDevice(unsigned wire, std::string const& label)             -> void;
-  auto GeneralClientCapability(DrivePacket& packet, std::size_t start, std::size_t length,
-                               unsigned version) const -> void;
+  auto GeneralClientCapability(DrivePacket& packet, std::size_t start, std::size_t length, unsigned version) const
+      -> void;
   auto PumpAvailable()                                                     -> bool;
   auto Write(DrivePacket& packet)                                          -> void;
   auto Receive(DrivePacket& /*packet*/)                                    -> void;

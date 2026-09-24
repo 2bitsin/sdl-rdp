@@ -1,7 +1,7 @@
 #include "_detail/test-rdpdr-packets.hpp"
 
-#include <array>
 #include <freerdp/channels/rdpdr.h>
+#include <array>
 
 namespace DriveGate {
 auto Completion(unsigned device, unsigned id, unsigned status) -> Backend::DrivePacket {

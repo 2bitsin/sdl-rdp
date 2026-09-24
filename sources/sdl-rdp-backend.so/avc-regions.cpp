@@ -29,9 +29,15 @@ auto Regions::Bytes() const -> std::size_t {
   Expects(rects.size() == quality.size(), "every region has quantization metadata");
   return 4 + (10 * rects.size());
 }
-auto Regions::Rects() -> std::vector<RECTANGLE_16>& { return rects; }
-auto Regions::Quality() -> std::vector<RDPGFX_H264_QUANT_QUALITY>& { return quality; }
-auto Regions::Bounds() const -> sdlrdp_rect { return bounds; }
+auto Regions::Rects() -> std::vector<RECTANGLE_16>& {
+  return rects;
+}
+auto Regions::Quality() -> std::vector<RDPGFX_H264_QUANT_QUALITY>& {
+  return quality;
+}
+auto Regions::Bounds() const -> sdlrdp_rect {
+  return bounds;
+}
 auto Regions::Clear() -> void {
   rects.clear();
   quality.clear();

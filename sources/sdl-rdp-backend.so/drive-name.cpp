@@ -1,8 +1,8 @@
 #include "_detail/drive-channel.hpp"
 #include "_detail/transcode.hpp"
 
-#include <format>
 #include <freerdp/channels/rdpdr.h>
+#include <format>
 
 namespace Backend {
 namespace {
@@ -10,8 +10,8 @@ auto DecodeDriveName(std::span<uint8_t const> bytes, unsigned drive_version, cha
   if (!bytes.empty()) {
     if (bytes.back()) throw std::runtime_error("Unterminated drive name.");
     // FreeRDP 3.15 sends UTF-8 despite advertising drive capability v2.
-    bool const wide   = drive_version >= DRIVE_CAPABILITY_VERSION_02 && bytes.size() >= 2 && bytes.size() % 2 == 0 &&
-                        bytes[bytes.size() - 2] == 0;
+    bool const wide   = drive_version >= DRIVE_CAPABILITY_VERSION_02 && bytes.size() >= 2 && bytes.size() % 2 == 0
+                        && bytes[bytes.size() - 2] == 0;
     auto       format = wide ? oxbox::utilities::TextFormat{ .encoding = oxbox::utilities::Encoding::UTF16,
                                                              .order    = std::endian::little }
                              : oxbox::utilities::TextFormat{ };
@@ -34,8 +34,7 @@ auto DriveChannel::Name(std::span<uint8_t const> bytes, char const* dos) const -
   if (label.size() > capacity) {
     Warn(std::format("Drive name exceeds {} bytes; truncating.", capacity));
     auto end = capacity;
-    while ((uint8_t(label[end]) & 0xc0) == 0x80)
-      --end;
+    while ((uint8_t(label[end]) & 0xc0) == 0x80) --end;
     label.resize(end);
   }
   return label;

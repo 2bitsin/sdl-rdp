@@ -6,8 +6,8 @@
 #include <stdexcept>
 namespace rdp {
 namespace {
-constexpr auto CodecNames = std::to_array<std::string_view>({"auto", "planar", "remotefx", "nscodec", "raw",
-                                                             "progressive", "avc420"});
+constexpr auto CodecNames = std::to_array<std::string_view>(
+    { "auto", "planar", "remotefx", "nscodec", "raw", "progressive", "avc420" });
 }
 [[noreturn]] auto InvalidSetting(std::string const& message) -> void {
   SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "%s", message.c_str());
@@ -29,6 +29,6 @@ auto Aspect(std::optional<std::string> const& text) -> sdlrdp_aspect {
   auto const parts = oxbox::utilities::ParseNumbers<unsigned, 2>(oxbox::utilities::Trimmed(*text), ':');
   if (!parts || std::ranges::contains(*parts, 0U))
     InvalidSetting("Invalid RDP aspect '" + *text + "': expected two positive whole numbers as N:D");
-  return {(*parts)[0], (*parts)[1]};
+  return { (*parts)[0], (*parts)[1] };
 }
 }

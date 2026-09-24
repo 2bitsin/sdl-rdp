@@ -4,11 +4,11 @@
 #include "sdl-rdp-backend.h"
 #include "test-logs.hpp"
 
+#include <gtest/gtest.h>
+#include <oxbox/platform/scratch-area.hpp>
 #include <chrono>
 #include <cstddef>
-#include <gtest/gtest.h>
 #include <memory>
-#include <oxbox/platform/scratch-area.hpp>
 #include <set>
 #include <string>
 #include <string_view>

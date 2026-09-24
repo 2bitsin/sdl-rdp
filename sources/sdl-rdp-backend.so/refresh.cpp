@@ -8,9 +8,15 @@ namespace Backend {
 Refresh::Refresh(RefreshMode selected, unsigned limit) : mode(selected), ceiling(limit) {
   utilities::Expects(limit > 0, "refresh ceiling is positive");
 }
-auto Refresh::Rate() const -> unsigned { return rate; }
-auto Refresh::Mode() const -> RefreshMode { return mode; }
-auto Refresh::AwaitingEmpty() const -> bool { return awaiting_empty != 0; }
+auto Refresh::Rate() const -> unsigned {
+  return rate;
+}
+auto Refresh::Mode() const -> RefreshMode {
+  return mode;
+}
+auto Refresh::AwaitingEmpty() const -> bool {
+  return awaiting_empty != 0;
+}
 auto Refresh::Restart() -> void {
   utilities::Expects(ceiling > 0, "declared refresh is positive");
   rate           = ceiling;
@@ -22,16 +28,10 @@ auto Refresh::Restart() -> void {
 auto Refresh::Step(Direction direction) -> void {
   utilities::Expects(ceiling >= 10, "adaptive ceiling reaches the floor");
   switch (direction) {
-  case Direction::Down:
-    rate = rate > 20 ? rate - 10 : 10;
-    break;
-  case Direction::Hold:
-    break;
-  case Direction::Up:
-    rate = std::min(ceiling, rate + 10);
-    break;
-  default:
-    utilities::Unreachable(direction);
+  case Direction::Down: rate = rate > 20 ? rate - 10 : 10; break;
+  case Direction::Hold: break;
+  case Direction::Up:   rate = std::min(ceiling, rate + 10); break;
+  default:              utilities::Unreachable(direction);
   }
 }
 auto Refresh::FromLatency(Clock::duration latency) const -> Direction {

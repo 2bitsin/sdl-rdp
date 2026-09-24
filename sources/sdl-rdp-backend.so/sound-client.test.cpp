@@ -3,9 +3,9 @@
 #include "_detail/client-channels.hpp"
 #include "_detail/sound-protocol.hpp"
 
+#include <freerdp/channels/channels.h>
 #include <algorithm>
 #include <cstring>
-#include <freerdp/channels/channels.h>
 
 namespace Headless {
 SoundClient::SoundClient(Client& target) : client(target), previous_load(client.Instance()->LoadChannels) {
@@ -17,7 +17,8 @@ SoundClient::SoundClient(Client& target) : client(target), previous_load(client.
   client.Instance()->LoadChannels = [](freerdp* instance) -> BOOL {
     if (active->previous_load && !active->previous_load(instance)) return FALSE;
     return freerdp_channels_client_load_ex(instance->context->channels, instance->context->settings,
-                                           SoundProtocol::Register, active) == 0;
+                                           SoundProtocol::Register, active)
+           == 0;
   };
 }
 SoundClient::~SoundClient() {
@@ -36,8 +37,8 @@ auto SoundClient::Capture(std::span<BYTE const> bytes) -> void {
   std::memcpy(capture.samples.data() + start, bytes.data(), bytes.size());
   capture.received.push_back(Clock::now());
   capture.pending.push_back({ timestamp, block, unsigned(bytes.size() / 4), capture.received.back() });
-  capture.maximum_pending_frames =
-      std::max(capture.maximum_pending_frames, (capture.samples.size() / 2) - capture.confirmed_frames);
+  capture.maximum_pending_frames = std::max(capture.maximum_pending_frames,
+                                            (capture.samples.size() / 2) - capture.confirmed_frames);
   if (capture.auto_confirm) Expects(Confirm(), "wave confirmation sent");
 }
 auto SoundClient::Confirm(std::size_t index) -> bool {

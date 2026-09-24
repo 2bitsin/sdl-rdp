@@ -1,22 +1,23 @@
 #include "support.test/sample-checks.hpp"
 
 #include <SDL3/SDL.h>
-#include <algorithm>
-#include <array>
 #include <freerdp/channels/rdpdr.h>
 #include <openssl/evp.h>
 #include <oxbox/utilities/hex.hpp>
 #include <sdl-rdp-backend.so/_detail/drive-observer.hpp>
 #include <sdl-rdp-backend.so/_detail/share-drive.hpp>
 #include <sdl-rdp-backend.so/_detail/test-io.hpp>
+#include <algorithm>
+#include <array>
 #include <span>
 
 namespace SampleGate {
 namespace {
 auto ThenWrittenBytes(std::string const& output) -> void {
   for (size_t i = 0; i < output.size(); ++i) {
-    auto expected =
-        i >= 1024uz * 1024 && i < static_cast<std::ptrdiff_t>(2 * 1024) * 1024 ? 0 : (i % (1024uz * 1024)) % 251;
+    auto expected = i >= 1024uz * 1024 && i < static_cast<std::ptrdiff_t>(2 * 1024) * 1024
+                        ? 0
+                        : (i % (1024uz * 1024)) % 251;
     ASSERT_EQ(static_cast<unsigned char>(output[i]), expected) << i;
   }
 }

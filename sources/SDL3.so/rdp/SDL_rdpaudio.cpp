@@ -1,13 +1,15 @@
 #include "SDL_rdpaudio.hpp"
-#include "boundary.hpp"
 #include "SDL_rdpdrive.hpp"
+#include "boundary.hpp"
 namespace rdp {
 namespace {
 constexpr SDL_AudioSpec PlaybackSpec     { SDL_AUDIO_S16, 2, 44100 };
 constexpr int           PeriodsPerSecond = 100;
 constexpr int           BackendWaitMs    = 100;
 constexpr int           DefaultLeadMs    = 150;
-auto PeriodFrames(int frequency)     -> int { return frequency / PeriodsPerSecond; }
+auto PeriodFrames(int frequency) -> int {
+  return frequency / PeriodsPerSecond;
+}
 auto AudioLead(Driver const& driver) -> Uint64 {
   auto const lead = driver.Options().Integer(SDL_HINT_RDP_AUDIO_LEAD, DefaultLeadMs, 0, SDL_MAX_SINT32);
   if (std::cmp_greater_equal(lead, driver.Config().audio_latency_ms))
@@ -28,12 +30,18 @@ using AudioSession = utilities::RAIIWrap<std::reference_wrapper<Driver const>, O
 struct SDL_PrivateAudioData {
 public:
   explicit SDL_PrivateAudioData(std::shared_ptr<rdp::Driver const> driver)
-      : _driver{std::move(driver)}, _lead{rdp::AudioLead(*_driver)},
-        _rate{_driver->Call<rdp::Operation::AUDIO_RATE>()}, _session{*_driver} { }
-  auto     Backend() const     -> rdp::Driver const& { return *_driver; }
-  auto     Buffer()            -> std::vector<Uint8>& { return _buffer; }
-  auto     Rate() const        -> unsigned { return _rate; }
-  auto     Rate(unsigned rate) -> void {
+      : _driver{ std::move(driver) }, _lead{ rdp::AudioLead(*_driver) },
+        _rate{ _driver->Call<rdp::Operation::AUDIO_RATE>() }, _session{ *_driver } { }
+  auto     Backend() const -> rdp::Driver const& {
+    return *_driver;
+  }
+  auto Buffer() -> std::vector<Uint8>& {
+    return _buffer;
+  }
+  auto Rate() const -> unsigned {
+    return _rate;
+  }
+  auto Rate(unsigned rate) -> void {
     if (rate && !_rate) _next = SDL_GetTicksNS();
     _rate = rate;
   }
@@ -80,8 +88,11 @@ auto ChangeRate(SDL_AudioDevice& device, unsigned rate) -> bool {
   auto spec = device.spec;
   spec.freq = static_cast<int>(rate);
   if (!SDL_AudioDeviceFormatChangedAlreadyLocked(&device, &spec, PeriodFrames(spec.freq))) return false;
-  try{ data.Buffer().resize(static_cast<std::size_t>(device.buffer_size)); }
-  catch (std::bad_alloc const&) { return SDL_OutOfMemory(); }
+  try {
+    data.Buffer().resize(static_cast<std::size_t>(device.buffer_size));
+  } catch (std::bad_alloc const&) {
+    return SDL_OutOfMemory();
+  }
   return true;
 }
 // SDL's audio registry identifies this driver's device by its discovery callback address.
@@ -104,8 +115,9 @@ namespace {
 auto AwaitBackend(SDL_AudioDevice& device) -> bool {
   auto const& driver = device.hidden->Backend();
   int         result { };
-  do{ result = driver.Call<Operation::AUDIO_WAIT>(BackendWaitMs); }
-  while (!result && !SDL_GetAtomicInt(&device.shutdown));
+  do {
+    result = driver.Call<Operation::AUDIO_WAIT>(BackendWaitMs);
+  } while (!result && !SDL_GetAtomicInt(&device.shutdown));
   return result >= 0 || driver.Fail();
 }
 // Without video nothing else drains the backend's event queue, so rate changes are polled here.
@@ -163,4 +175,4 @@ auto InitAudio(SDL_AudioDriverImpl* implementation) -> bool {
 }
 }
 // SDL's C bootstrap table requires this named object with static storage.
-extern "C" AudioBootStrap const RDPAUDIO_bootstrap = {"rdp", "SDL RDP audio driver", rdp::InitAudio, true, false};
+extern "C" AudioBootStrap const RDPAUDIO_bootstrap = { "rdp", "SDL RDP audio driver", rdp::InitAudio, true, false };

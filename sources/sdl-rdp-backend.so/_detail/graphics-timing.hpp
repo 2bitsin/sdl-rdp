@@ -1,6 +1,6 @@
 #pragma once
-#include <chrono>
 #include <freerdp/channels/rdpgfx.h>
+#include <chrono>
 
 namespace Backend {
 class GraphicsTiming {

@@ -16,13 +16,16 @@ if(TARGET sdl-rdp-backend-tests)
   add_test(NAME              shape-lint-tests
            COMMAND           ${CMAKE_SOURCE_DIR}/bin/lint-shape-tests.sh ${Python3_EXECUTABLE}
            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-  add_test(NAME              align-check
-           COMMAND           ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/bin/align-columns.py --check sources
-           WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
   add_test(NAME              align-columns-test
            COMMAND           ${CMAKE_SOURCE_DIR}/bin/test-align-columns.sh ${Python3_EXECUTABLE}
            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
   set_tests_properties(align-columns-test PROPERTIES SKIP_RETURN_CODE 77)
+  add_test(NAME              format-check
+           COMMAND           ${CMAKE_SOURCE_DIR}/bin/format.sh --check --python ${Python3_EXECUTABLE}
+           WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+  add_test(NAME              format-test
+           COMMAND           ${CMAKE_SOURCE_DIR}/bin/test-format.sh ${Python3_EXECUTABLE}
+           WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
   add_test(NAME              clone-lint
            COMMAND           ${CMAKE_SOURCE_DIR}/bin/lint-clones.sh
            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

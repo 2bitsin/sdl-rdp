@@ -221,7 +221,7 @@ def match_fields(pattern, body, code):
 
 
 def parse_case(body, code):
-    if fields := match_fields(r'(case\s+(?:[^:]|::)+:)\s*(.+;)', body, code):
+    if fields := match_fields(r'(case\s+(?:[^:]|::)+:|default:)\s*(.+;)', body, code):
         label, statement = fields
         return 'case', CaseFields(label, statement)
     return None
@@ -663,7 +663,8 @@ class Group:
         return {index: self.width(index, text) for index, text in proposed.items()}
 
     def width(self, index, text):
-        return len(text) + self.members[index].extra
+        member = self.members[index]
+        return len(text) + member.extra
 
     def overflow(self, active):
         return sum(max(0, width - COLUMN_LIMIT) for width in self.widths(active).values())
@@ -777,7 +778,7 @@ def constructor_indents(lines):
     owners = {fields.signature.split('(', 1)[0].lstrip('~'): base for _, fields in functions
               if not fields.typ and is_function_declaration(fields, set())}
     for line in lines:
-        if match := re.match(r'\s*(?:class|struct)\s+(\w+).*\{', line.code):
+        if match := re.match(r'\s*(?:class|struct)\s+(?:\w+::)*(\w+).*\{', line.code):
             owners[match[1]] = indentation(line.line) + ' ' * INDENT_WIDTH
     return owners
 
@@ -1030,7 +1031,7 @@ def overflows(output, excluded):
 
 
 def constructor_names(code):
-    return set(re.findall(r'\b(?:class|struct)\s+(\w+)', code)) | set(re.findall(r'~(\w+)\s*\(', code))
+    return set(re.findall(r'\b(?:class|struct)\s+(?:\w+::)*(\w+)', code)) | set(re.findall(r'~(\w+)\s*\(', code))
 
 
 def stream_members(streams, physical, constructors):
@@ -1069,7 +1070,7 @@ def padding_source(index, width, segments, anchors, texts):
     return chain[0][0]
 
 
-def pushed_overflows(output, layout, texts, items):
+def pushed_overflows(output, layout, texts):
     pushed = {}
     for index, line in enumerate(output):
         width = len(line)
@@ -1080,12 +1081,11 @@ def pushed_overflows(output, layout, texts, items):
 
 
 def lay_out(segments, anchors, groups):
-    items = {member.key: member.item for members in groups for member in members}
     forced = {}
     while True:
         texts, excluded = render_groups(groups, forced)
         output = assemble(segments, anchors, texts)
-        pushed = pushed_overflows(output, (segments, anchors), texts, items)
+        pushed = pushed_overflows(output, (segments, anchors), texts)
         if not pushed.keys() - forced.keys():
             return output, excluded
         forced.update(pushed)

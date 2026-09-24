@@ -32,8 +32,8 @@ public:
   GfxChannel(PeerLink& link, Diagnostics const& diagnostics, Configuration const& configuration, Activation& activation,
              PeerFrames& frames, FramePacing& pacing, Encoder& encoder, Scaler& scaler);
        ~GfxChannel();
-  auto operator = (GfxChannel const&)             -> GfxChannel& = delete;
-  auto operator = (GfxChannel&&)                  -> GfxChannel& = delete;
+  auto operator=(GfxChannel const&)               -> GfxChannel& = delete;
+  auto operator=(GfxChannel&&)                    -> GfxChannel& = delete;
   auto Open()                                     -> bool;
   auto Pump()                                     -> bool;
   auto Event() const                              -> HANDLE;

@@ -1,18 +1,18 @@
 #pragma once
 #include "support.test/process.hpp"
 
-#include <chrono>
-#include <filesystem>
 #include <gtest/gtest.h>
-#include <memory>
-#include <mutex>
 #include <oxbox/platform/scratch-area.hpp>
 #include <sdl-rdp-backend.so/_detail/client.hpp>
 #include <sdl-rdp-backend.so/_detail/test-logs.hpp>
+#include <winpr/wlog.h>
+#include <chrono>
+#include <filesystem>
+#include <memory>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <vector>
-#include <winpr/wlog.h>
 
 namespace SampleGate {
 using Headless::Client;

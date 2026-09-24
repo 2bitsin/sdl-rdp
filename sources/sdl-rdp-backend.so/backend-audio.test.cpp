@@ -84,7 +84,8 @@ TEST_F(AudioGate, AudioSlowConfirmsBoundTenSeconds) {
   GivenConfirmingSession();
   if (::testing::Test::HasFatalFailure()) return;
   std::vector<std::int16_t> pcm(480000uz * 2, 1234);
-  ConfirmationPace const    pace{ .frames  = 480000, .delay = std::chrono::milliseconds(80),
+  ConfirmationPace const    pace{ .frames  = 480000,
+                                  .delay   = std::chrono::milliseconds(80),
                                   .timeout = std::chrono::seconds(15) };
   auto writing = std::async(std::launch::async, [&] { return sdlrdp_audio_write(backend.get(), pcm.data(), 480000); });
   ConfirmDelayedAudio(ClientSession(), AudioSession(), pace);
@@ -100,7 +101,6 @@ TEST_F(AudioGate, AudioPlaybackConfirmsKeepRealtimeStreamContinuous) {
 }
 namespace {
 auto ObserveProgressivePayload(RdpgfxClientContext* channel, RDPGFX_SURFACE_COMMAND const* command) -> UINT {
-
   Expects(channel, "channel is installed");
   Expects(command, "wire command is supplied");
   Expects(command->codecId == RDPGFX_CODECID_CAPROGRESSIVE, "payload uses the progressive codec");
@@ -169,8 +169,8 @@ TEST_F(AudioGate, AudioDisconnectDuringBlockedWrite) {
     if (::testing::Test::HasFatalFailure()) return;
     unsigned           frames  = reconnect ? 960 : 480000;
     std::vector<INT16> pcm(static_cast<std::size_t>(frames) * 2, 1234);
-    auto               writing =
-        std::async(std::launch::async, [&] { return sdlrdp_audio_write(backend.get(), pcm.data(), frames); });
+    auto               writing = std::async(std::launch::async,
+                                            [&] { return sdlrdp_audio_write(backend.get(), pcm.data(), frames); });
     ThenDisconnectedWriter(client, audio, writing, reconnect, frames);
     if (::testing::Test::HasFatalFailure()) return;
   }
@@ -185,8 +185,8 @@ TEST_F(AudioGate, AudioOneMillisecondPartialBlock) {
   if (::testing::Test::HasFatalFailure()) return;
   std::array<INT16, 1920> pcm{ };
   ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 48), 48);
-  auto writing  =
-      std::async(std::launch::async, [&] { return sdlrdp_audio_write(backend.get(), pcm.data() + 96, 912); });
+  auto writing  = std::async(std::launch::async,
+                             [&] { return sdlrdp_audio_write(backend.get(), pcm.data() + 96, 912); });
   auto captured = client.Until([&] { return audio.CaptureState().samples.size() == pcm.size(); });
   if (!captured) sdlrdp_audio_close(backend.get());
   EXPECT_TRUE(captured);

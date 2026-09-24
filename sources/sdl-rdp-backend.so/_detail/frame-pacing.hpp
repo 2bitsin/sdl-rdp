@@ -19,9 +19,8 @@ class TraceQueue;
 enum class AcknowledgementMode{ Suspended, Tracking, Restarted };
 class FramePacing : private Pinned {
 public:
-       FramePacing(Diagnostics const& diagnostics, EventQueue& events, Configuration const& configuration,
-                   FrameStore& store, PeerLink& link, Activation const& activation, TraceQueue& traces,
-                   FrameStatistics& statistics) noexcept;
+  FramePacing(Diagnostics const& diagnostics, EventQueue& events, Configuration const& configuration, FrameStore& store,
+              PeerLink& link, Activation const& activation, TraceQueue& traces, FrameStatistics& statistics) noexcept;
   auto Restart(FrameLock const& held)                  -> void;
   auto Blocked()                                       -> void;
   auto Drained()                                       -> void;

@@ -16,8 +16,8 @@ public:
                      PeerSet(PeerSet&&)                                                           = delete;
                      PeerSet()                                                                    = default;
                      ~PeerSet();
-  auto               operator = (PeerSet const&)                                      -> PeerSet& = delete;
-  auto               operator = (PeerSet&&)                                           -> PeerSet& = delete;
+  auto               operator=(PeerSet const&)                                        -> PeerSet& = delete;
+  auto               operator=(PeerSet&&)                                             -> PeerSet& = delete;
   [[nodiscard]] auto Lock()                                                           -> PeersLock;
   auto               ForEach(PeersLock const& held, std::invocable<Peer&> auto visit) -> void {
     Expects(held.mutex() == &_guard, "visiting peers holds the peer lock");

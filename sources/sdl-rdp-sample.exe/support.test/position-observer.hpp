@@ -4,15 +4,15 @@
 namespace SampleGate {
 struct PositionObserver {
 public:
-           PositionObserver(PositionObserver const&)                 = delete;
-           PositionObserver(PositionObserver&&)                      = delete;
+           PositionObserver(PositionObserver const&)               = delete;
+           PositionObserver(PositionObserver&&)                    = delete;
   explicit PositionObserver(Headless::Client& client);
            ~PositionObserver();
-  auto     operator = (PositionObserver const&) -> PositionObserver& = delete;
-  auto     operator = (PositionObserver&&)      -> PositionObserver& = delete;
-  auto     Count() const                        -> unsigned;
-  auto     X() const                            -> unsigned;
-  auto     Y() const                            -> unsigned;
+  auto     operator=(PositionObserver const&) -> PositionObserver& = delete;
+  auto     operator=(PositionObserver&&)      -> PositionObserver& = delete;
+  auto     Count() const                      -> unsigned;
+  auto     X() const                          -> unsigned;
+  auto     Y() const                          -> unsigned;
 
 private:
   static auto Receive(rdpContext* /*unused*/, POINTER_POSITION_UPDATE const* position) -> BOOL;

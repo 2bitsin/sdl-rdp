@@ -2,9 +2,9 @@
 
 #include "_detail/contract.hpp"
 
-#include <cstdint>
 #include <freerdp/gdi/gdi.h>
 #include <freerdp/update.h>
+#include <cstdint>
 #include <ranges>
 #include <utility>
 #include <vector>
@@ -24,8 +24,8 @@ auto Regions(BITMAP_UPDATE const& command) -> std::vector<sdlrdp_rect> {
   // Bitmap update corners are inclusive; surface command corners are exclusive.
   return std::span(command.rectangles, command.number) | std::views::transform([](auto const& rectangle) {
            return Corners(rectangle.destLeft, rectangle.destTop, rectangle.destRight + 1, rectangle.destBottom + 1);
-         }) |
-         std::ranges::to<std::vector>();
+         })
+         | std::ranges::to<std::vector>();
 }
 auto Desktop(rdpContext const* context) -> Backend::Extent {
   Expects(context, "callback context exists");
@@ -37,12 +37,12 @@ auto Desktop(rdpContext const* context) -> Backend::Extent {
 
 class PictureUpdateHook::Installation {
 public:
-Installation(Client& client, Observer observer);
-Installation(Installation const&) = delete;
-Installation(Installation&&)      = delete;
-~Installation();
-  auto operator = (Installation const&) -> Installation& = delete;
-  auto operator = (Installation&&)      -> Installation& = delete;
+       Installation(Client& client, Observer observer);
+       Installation(Installation const&)               = delete;
+       Installation(Installation&&)                    = delete;
+       ~Installation();
+  auto operator=(Installation const&) -> Installation& = delete;
+  auto operator=(Installation&&)      -> Installation& = delete;
 
 private:
   template <auto original, PictureCommand command, class Wire>

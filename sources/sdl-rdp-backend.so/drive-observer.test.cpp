@@ -45,8 +45,8 @@ auto DriveObserver::Observed() -> DriveCapture& {
 auto DriveObserver::Observed() const -> DriveCapture const& {
   return observed;
 }
-auto DriveObserver::Receive(freerdp* instance, UINT16 id, BYTE const* data, size_t size, UINT32 flags,
-                            size_t total) -> BOOL {
+auto DriveObserver::Receive(freerdp* instance, UINT16 id, BYTE const* data, size_t size, UINT32 flags, size_t total)
+    -> BOOL {
   auto& self = *active;
   if (id == freerdp_channels_get_id_by_name(instance, RDPDR_CHANNEL_NAME)) {
     if ((flags & CHANNEL_FLAG_FIRST) && size >= 4) ObserveDrive(self.observed, { data, size });

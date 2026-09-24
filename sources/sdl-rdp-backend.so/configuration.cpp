@@ -13,7 +13,7 @@ auto CertificateDirectory(sdlrdp_config const& config) -> std::filesystem::path 
 }
 }
 Configuration::Configuration(sdlrdp_config const& config)
-    : _authentication { config }, _credentials{ EnsureCertificate(CertificateDirectory(config)) },
+    : _authentication{ config }, _credentials{ EnsureCertificate(CertificateDirectory(config)) },
       _codec{ config.codec }, _avc_bitrate_kbps{ config.avc_bitrate_kbps },
       _audio_latency{ config.audio_latency_ms ? config.audio_latency_ms : DefaultAudioLatency } { }
 auto Configuration::Config() const noexcept -> sdlrdp_config const& {

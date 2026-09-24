@@ -7,9 +7,9 @@
 #include "_detail/frame-pacing.hpp"
 #include "_detail/peer-link.hpp"
 
+#include <freerdp/settings.h>
 #include <algorithm>
 #include <array>
-#include <freerdp/settings.h>
 
 namespace Backend {
 namespace {
@@ -18,8 +18,8 @@ constexpr std::array<UINT32, 3> ColourDepths{ 16, 24, 32 };
 CapabilityCheck::CapabilityCheck(PeerLink& link, Authenticator& authenticator, Activation const& activation,
                                  FramePacing& pacing, DesktopLayout& desktop, FrameStore& store,
                                  Diagnostics const& diagnostics) noexcept
-    : _link { link }, _authenticator{ authenticator }, _activation{ activation }, _pacing{ pacing },
-      _desktop{ desktop }, _store{ store }, _diagnostics{ diagnostics } { }
+    : _link{ link }, _authenticator{ authenticator }, _activation{ activation }, _pacing{ pacing }, _desktop{ desktop },
+      _store{ store }, _diagnostics{ diagnostics } { }
 auto CapabilityCheck::Accept() -> BOOL {
   if (!_authenticator.VerifySettings()) return FALSE;
   auto&      settings = _link.Settings();

@@ -7,13 +7,13 @@
 #include "_detail/test-graphics-backend.hpp"
 #include "_detail/test-pattern.hpp"
 
+#include <freerdp/primitives.h>
+#include <gtest/gtest.h>
+#include <oxbox/utilities/span.hpp>
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <freerdp/primitives.h>
-#include <gtest/gtest.h>
-#include <oxbox/utilities/span.hpp>
 #include <ranges>
 #include <span>
 
@@ -60,9 +60,9 @@ auto DecodeYuv420(std::vector<std::uint8_t> const& yuv, Backend::Extent size) ->
 }
 auto Cropped(std::span<std::uint32_t const> pixels, std::size_t stride, Backend::Extent size)
     -> std::vector<std::uint32_t> {
-  return pixels | std::views::chunk(stride) | std::views::take(size.height) |
-         std::views::transform([=](auto row) { return row | std::views::take(size.width); }) | std::views::join |
-         std::ranges::to<std::vector>();
+  return pixels | std::views::chunk(stride) | std::views::take(size.height)
+         | std::views::transform([=](auto row) { return row | std::views::take(size.width); }) | std::views::join
+         | std::ranges::to<std::vector>();
 }
 auto Yuv420Reference(std::vector<std::uint32_t> const& pixels, Backend::Extent size) -> std::vector<std::uint32_t> {
   Backend::Extent const aligned { .width  = Backend::Avc::Aligned(size.width),
@@ -70,8 +70,8 @@ auto Yuv420Reference(std::vector<std::uint32_t> const& pixels, Backend::Extent s
   auto const            yuv     = EncodeYuv420(PadReference(pixels, size, aligned), aligned);
   return Cropped(DecodeYuv420(yuv, aligned), aligned.width, size);
 }
-auto ThenScaledError(Headless::Client& client, std::vector<UINT32> const& scaled,
-                     std::vector<UINT32> const& reference) -> void {
+auto ThenScaledError(Headless::Client& client, std::vector<UINT32> const& scaled, std::vector<UINT32> const& reference)
+    -> void {
   auto error = client.MaxError(scaled, &reference);
   testing::Test::RecordProperty("scaled_maximum_channel_error", error);
   EXPECT_LE(error, 8u);
@@ -99,8 +99,12 @@ protected:
     auto pattern = std::to_array("/tmp/sdlrdp-avc-XXXXXX");
     OpenGraphics(pattern.data(), width, height, codec);
   }
-  auto ClientSession()       -> Headless::Client& { return *graphics_client; }
-  auto ObserverSession()     -> Headless::GraphicsObserver& { return *graphics_observer; }
+  auto ClientSession() -> Headless::Client& {
+    return *graphics_client;
+  }
+  auto ObserverSession() -> Headless::GraphicsObserver& {
+    return *graphics_observer;
+  }
   auto ThenProgressiveOnly() -> void {
     EXPECT_TRUE(ObserverSession().Observed().avc_nals.empty());
     EXPECT_EQ(ObserverSession().Observed().progressive_headers, 1u);
@@ -122,8 +126,8 @@ protected:
       std::array<sdlrdp_event, 32> events { };
       auto                         count  = sdlrdp_poll(backend.get(), events.data(), events.size());
       reported |= std::ranges::any_of(std::span(events).first(count), [=](auto const& event) {
-        return (event.type == SDLRDP_CONNECTED && event.connected.codec == codec) ||
-               (event.type == SDLRDP_CODEC_CHANGED && event.codec_changed.codec == codec);
+        return (event.type == SDLRDP_CONNECTED && event.connected.codec == codec)
+               || (event.type == SDLRDP_CODEC_CHANGED && event.codec_changed.codec == codec);
       });
       return reported;
     }));
@@ -243,8 +247,8 @@ protected:
     EXPECT_EQ(ObserverSession().Observed().avc_quality[0].qpVal, 0x9a);
     EXPECT_EQ(ObserverSession().Observed().avc_quality[0].qualityVal, 100);
   }
-  auto ScaledPattern(Headless::Client& client, Headless::GraphicsObserver& observer,
-                     std::vector<UINT32> const& pixels) -> void {
+  auto ScaledPattern(Headless::Client& client, Headless::GraphicsObserver& observer, std::vector<UINT32> const& pixels)
+      -> void {
     ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_RAW), 0);
     ASSERT_EQ(sdlrdp_set_aspect(backend.get(), { 3, 2 }), 0);
     auto              before{ observer.Observed().frames.size() };

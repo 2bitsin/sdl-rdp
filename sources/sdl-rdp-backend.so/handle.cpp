@@ -6,10 +6,10 @@
 #include <utility>
 
 sdlrdp_handle::sdlrdp_handle(sdlrdp_config const& config, bool tracing)
-    : _diagnostics { config, tracing }, _configuration{ config },
-      _frames{ { .width = config.width, .height = config.height }, config.aspect },
-      _session{ _frames, _events }, _presenter{ _diagnostics, _frames, _session, _pointer, _configuration },
-      _audio{ _session, _presenter, _configuration },
+    : _diagnostics{ config, tracing }, _configuration{ config },
+      _frames{ { .width = config.width, .height = config.height }, config.aspect }, _session{ _frames, _events },
+      _presenter{ _diagnostics, _frames, _session, _pointer, _configuration },
+      _audio    { _session, _presenter, _configuration                      },
       _listener{ _configuration, _diagnostics, _session, [this](Backend::PeerHandle accepted) {
                   return std::make_unique<Backend::Peer>(std::move(accepted), _diagnostics, _events, _configuration,
                                                          _frames, _pointer, _clipboard, _session);

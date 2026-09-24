@@ -3,8 +3,8 @@
 #include "support.test/position-observer.hpp"
 #include "support.test/sample-checks.hpp"
 
-#include <memory>
 #include <sdl-rdp-backend.so/_detail/clipboard-client.hpp>
+#include <memory>
 
 namespace SampleGate {
 class SampleSession : public SampleChecks {

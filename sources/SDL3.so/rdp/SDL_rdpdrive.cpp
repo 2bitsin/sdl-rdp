@@ -6,7 +6,8 @@
 namespace rdp {
 namespace {
 constexpr std::size_t InitialDriveCapacity = 16;
-template<typename _Element, typename _Fill> requires std::invocable<_Fill const&, std::span<_Element>>
+template <typename _Element, typename _Fill>
+  requires std::invocable<_Fill const&, std::span<_Element>>
 auto GrowUntilFits(std::size_t capacity, _Fill const& fill) -> std::vector<_Element> {
   std::vector<_Element> buffer(capacity);
   auto                  count  = std::invoke(fill, std::span(buffer));
@@ -40,7 +41,7 @@ auto OpenHandle(Driver const& driver, unsigned drive, std::string const& path, u
     -> std::pair<std::reference_wrapper<Driver const>, sdlrdp_file*> {
   sdlrdp_file* opened{ };
   if (driver.Call<Operation::DRIVE_OPEN>(drive, path.c_str(), flags, &opened) < 0) driver.Throw();
-  return {driver, opened};
+  return { driver, opened };
 }
 auto CloseHandle(std::pair<std::reference_wrapper<Driver const>, sdlrdp_file*> const& handle) noexcept -> bool {
   auto const& driver = handle.first.get();
@@ -53,13 +54,25 @@ using DriveFile = utilities::RAIIWrap<std::pair<std::reference_wrapper<Driver co
 class File {
 public:
        File(std::shared_ptr<Driver const> driver, unsigned drive, std::string const& path, FileMode mode)
-      : _driver{std::move(driver)}, _file{*_driver, drive, path, mode.Flags()}, _mode{mode} { }
-  auto Backend() const       -> Driver const& { return *_driver; }
-  auto Handle() const        -> sdlrdp_file* { return _file.Get().second; }
-  auto Mode() const          -> FileMode { return _mode; }
-  auto Position() const      -> Sint64 { return _position; }
-  auto Seek(Sint64 position) -> void { _position = position; }
-  auto Close()               -> bool { return _file.Close(); }
+      : _driver{ std::move(driver) }, _file{ *_driver, drive, path, mode.Flags() }, _mode{ mode } { }
+  auto Backend() const -> Driver const& {
+    return *_driver;
+  }
+  auto Handle() const -> sdlrdp_file* {
+    return _file.Get().second;
+  }
+  auto Mode() const -> FileMode {
+    return _mode;
+  }
+  auto Position() const -> Sint64 {
+    return _position;
+  }
+  auto Seek(Sint64 position) -> void {
+    _position = position;
+  }
+  auto Close() -> bool {
+    return _file.Close();
+  }
 private:
   std::shared_ptr<Driver const> _driver;
   DriveFile                     _file;
@@ -78,7 +91,7 @@ auto SeekBase(File const& file, SDL_IOWhence origin) -> Sint64 {
   case SDL_IO_SEEK_SET: return 0;
   case SDL_IO_SEEK_CUR: return file.Position();
   case SDL_IO_SEEK_END: return Size(file);
-  default: return -1;
+  default:              return -1;
   }
 }
 // SDL stream callbacks carry their owned File through an opaque context pointer.
@@ -98,18 +111,18 @@ auto SDLCALL FileSeek(void* context, Sint64 offset, SDL_IOWhence origin) -> Sint
   file.Seek(base + offset);
   return file.Position();
 }
-auto Advance(File& file, int count, std::size_t size, SDL_IOStatus short_status) -> std::pair<std::size_t,
-    SDL_IOStatus> {
-  if (count < 0) return file.Backend().Fail(std::pair{0uz, SDL_IO_STATUS_ERROR});
+auto Advance(File& file, int count, std::size_t size, SDL_IOStatus short_status)
+    -> std::pair<std::size_t, SDL_IOStatus> {
+  if (count < 0) return file.Backend().Fail(std::pair{ 0uz, SDL_IO_STATUS_ERROR });
   if (count > SDL_MAX_SINT64 - file.Position()) {
     SDL_SetError("RDP file exceeds signed stream position");
-    return {0, SDL_IO_STATUS_ERROR};
+    return { 0, SDL_IO_STATUS_ERROR };
   }
   file.Seek(file.Position() + count);
-  return {static_cast<std::size_t>(count), std::cmp_less(count, size) ? short_status : SDL_IO_STATUS_READY};
+  return { static_cast<std::size_t>(count), std::cmp_less(count, size) ? short_status : SDL_IO_STATUS_READY };
 }
 // SDL's stream transfer callbacks require raw counted buffers and a status output.
-template<Operation _Operation, typename _Byte>
+template <Operation _Operation, typename _Byte>
   requires IoBuffer<_Byte>
 auto SDLCALL Transfer(void* context, _Byte* buffer, std::size_t size, SDL_IOStatus* status) -> std::size_t {
   utilities::Expects(context != nullptr, "stream transfer has state");
@@ -138,7 +151,7 @@ auto SDLCALL FileFlush(void* context, SDL_IOStatus* status) -> bool {
 // SDL returns ownership of stream state to its close callback.
 auto SDLCALL FileClose(void* context) -> bool {
   utilities::Expects(context != nullptr, "stream close owns state");
-  return std::unique_ptr<File>{static_cast<File*>(context)}->Close();
+  return std::unique_ptr<File>{ static_cast<File*>(context) }->Close();
 }
 auto FileInterface(FileMode mode) -> SDL_IOStreamInterface {
   SDL_IOStreamInterface interface{ };

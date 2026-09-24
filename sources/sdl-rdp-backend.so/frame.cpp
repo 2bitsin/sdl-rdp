@@ -9,14 +9,14 @@
 #include "_detail/planar-rows.hpp"
 #include "_detail/rect.hpp"
 
-#include <algorithm>
-#include <array>
-#include <functional>
-#include <ranges>
 #include <freerdp/codec/color.h>
 #include <freerdp/constants.h>
 #include <freerdp/settings.h>
 #include <freerdp/update.h>
+#include <algorithm>
+#include <array>
+#include <functional>
+#include <ranges>
 #include <span>
 namespace Backend {
 namespace {
@@ -95,14 +95,14 @@ auto Convert(PixelBand band, unsigned depth) -> std::vector<BYTE> {
   return converted;
 }
 auto PacketBytes(auto const& packets) -> std::size_t {
-  auto sizes = packets | std::views::transform([](auto const& packet) { return std::span(packet.bands); }) |
-               std::views::join | std::views::transform([](auto const& band) { return band.pixels.size(); });
+  auto sizes = packets | std::views::transform([](auto const& packet) { return std::span(packet.bands); })
+               | std::views::join | std::views::transform([](auto const& band) { return band.pixels.size(); });
   return std::ranges::fold_left(sizes, std::size_t{ 0 }, std::plus{ });
 }
 } // namespace
-LegacyFrame::LegacyFrame(PeerLink& link, Configuration const& configuration, Activation& activation,
-                         PeerFrames& frames, FramePacing& pacing, Encoder& encoder, Scaler& scaler) noexcept
-    : _link { link }, _configuration{ configuration }, _activation{ activation }, _frames{ frames }, _pacing{ pacing },
+LegacyFrame::LegacyFrame(PeerLink& link, Configuration const& configuration, Activation& activation, PeerFrames& frames,
+                         FramePacing& pacing, Encoder& encoder, Scaler& scaler) noexcept
+    : _link{ link }, _configuration{ configuration }, _activation{ activation }, _frames{ frames }, _pacing{ pacing },
       _encoder{ encoder }, _scaler{ scaler } { }
 auto LegacyFrame::SelectEncoder() -> bool {
   auto const previous = _encoder.Codec();
@@ -130,8 +130,8 @@ auto LegacyFrame::Prepare() -> bool {
   _format = { .depth = depth, .codec = wire == LegacyWire::Surface ? _encoder.Id(&settings) : 0, .wire = wire };
   return true;
 }
-auto LegacyFrame::AppendPlanar(Packet& packet, std::size_t& wire_size, sdlrdp_rect area,
-                               std::span<BYTE const> payload) -> void {
+auto LegacyFrame::AppendPlanar(Packet& packet, std::size_t& wire_size, sdlrdp_rect area, std::span<BYTE const> payload)
+    -> void {
   auto size = payload.size();
   if (wire_size + 26 + size > BITMAP_RECTANGLE_LIMIT && !packet.bands.empty()) {
     _packets.push_back(std::move(packet));
@@ -173,8 +173,8 @@ auto LegacyFrame::Bands(sdlrdp_rect area) -> bool {
   auto const order = _encoder.Codec() == SDLRDP_CODEC_RAW ? RowOrder::BottomUp : RowOrder::TopDown;
   auto const lines = _encoder.Codec() == SDLRDP_CODEC_REMOTEFX
                          ? RemoteFxBandRows
-                         : std::max(1, int((BITMAP_RECTANGLE_LIMIT - BitmapHeaderReserve) /
-                                           (std::size_t(area.w) * PixelBytes)));
+                         : std::max(1, int((BITMAP_RECTANGLE_LIMIT - BitmapHeaderReserve)
+                                           / (std::size_t(area.w) * PixelBytes)));
   for (int row = 0; row < area.h; row += lines) {
     auto const height  = std::min(lines, area.h - row);
     auto const scratch = _encoder.Scratch(std::size_t(area.w) * height * PixelBytes);
@@ -213,10 +213,8 @@ auto LegacyFrame::Write(Packet& packet) -> bool {
   case LegacyWire::Surface:
     return SendSurfaceBits(update, PixelBand{ packet.bands.front().area, packet.bands.front().pixels }, _format.codec);
   case LegacyWire::Bitmap:
-  case LegacyWire::Planar:
-    return SendBitmapBand(update, packet.rectangles);
-  default:
-    utilities::Unreachable(_format.wire);
+  case LegacyWire::Planar: return SendBitmapBand(update, packet.rectangles);
+  default:                 utilities::Unreachable(_format.wire);
   }
 }
 auto LegacyFrame::Finish() -> bool {

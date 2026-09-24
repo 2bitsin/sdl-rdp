@@ -10,9 +10,9 @@
 #include <freerdp/freerdp.h>
 
 namespace Backend {
-FrameGate::FrameGate(PeerLink& link, FrameStore& store, PeerFrames& frames, DesktopLayout& desktop,
-                     FramePacing& pacing, Activation const& activation, GraphicsLink const& graphics) noexcept
-    : _link { link }, _store{ store }, _frames{ frames }, _desktop{ desktop }, _pacing{ pacing },
+FrameGate::FrameGate(PeerLink& link, FrameStore& store, PeerFrames& frames, DesktopLayout& desktop, FramePacing& pacing,
+                     Activation const& activation, GraphicsLink const& graphics) noexcept
+    : _link{ link }, _store{ store }, _frames{ frames }, _desktop{ desktop }, _pacing{ pacing },
       _activation{ activation }, _graphics{ graphics } { }
 auto FrameGate::Settle() -> bool {
   auto const frame = _store.Lock();

@@ -29,8 +29,8 @@ auto BlendRow(std::span<Tap const> columns, std::span<BYTE const> top, std::span
   auto channels = std::views::iota(std::size_t{ 0 }, PixelBytes);
   for (auto [index, column] : std::views::enumerate(columns))
     for (auto channel : channels)
-      out[(std::size_t(index) * PixelBytes) + channel] =
-          BYTE(std::floor(Blend(Sample(top, column, channel), Sample(bottom, column, channel), weight) + 0.5F));
+      out[(std::size_t(index) * PixelBytes) + channel] = BYTE(
+          std::floor(Blend(Sample(top, column, channel), Sample(bottom, column, channel), weight) + 0.5F));
 }
 auto CheckArea(sdlrdp_rect area, sdlrdp_rect desktop) -> void {
   Expects(area.w > 0, "band width is positive");
@@ -42,10 +42,10 @@ auto CheckArea(sdlrdp_rect area, sdlrdp_rect desktop) -> void {
 }
 }
 Scaler::Scaler(PeerFrames const& source, DesktopLayout const& layout) noexcept
-    : _frames { source }, _desktop{ layout } { }
+    : _frames{ source }, _desktop{ layout } { }
 auto Scaler::Areas() const -> std::vector<sdlrdp_rect> {
-  return _frames.Sending() | std::views::transform([this](sdlrdp_rect rect) { return Area(rect); }) |
-         std::ranges::to<std::vector>();
+  return _frames.Sending() | std::views::transform([this](sdlrdp_rect rect) { return Area(rect); })
+         | std::ranges::to<std::vector>();
 }
 auto Scaler::Target() const noexcept -> sdlrdp_rect {
   return _desktop.Rect();
@@ -72,8 +72,8 @@ auto Scaler::Area(sdlrdp_rect damage) const -> sdlrdp_rect {
 }
 auto Scaler::Scaled() const -> bool {
   auto const& snapshot = _frames.Snapshot();
-  return std::cmp_not_equal(_desktop.Rect().w, snapshot.Width()) ||
-         std::cmp_not_equal(_desktop.Rect().h, snapshot.Height());
+  return std::cmp_not_equal(_desktop.Rect().w, snapshot.Width())
+         || std::cmp_not_equal(_desktop.Rect().h, snapshot.Height());
 }
 auto Scaler::Fill(sdlrdp_rect area, std::span<BYTE> buffer, std::size_t pitch, RowOrder order) -> PixelBand {
   auto const& snapshot = _frames.Snapshot();
@@ -105,15 +105,15 @@ auto Scaler::Resample(sdlrdp_rect area, std::span<BYTE> buffer, std::size_t pitc
 auto Scaler::Columns(sdlrdp_rect area) -> void {
   auto const source = _frames.Snapshot().Width();
   auto const width  = _desktop.Rect().w;
-  if (_column_x == area.x && _column_width == width && _column_source == source &&
-      _columns.size() == std::size_t(area.w))
+  if (_column_x == area.x && _column_width == width && _column_source == source
+      && _columns.size() == std::size_t(area.w))
     return;
   auto const ratio = double(source) / width;
   _column_x      = area.x;
   _column_width  = width;
   _column_source = source;
-  _columns = std::views::iota(0, area.w) |
-            std::views::transform([&](int x) { return Tap{ area.x + x, ratio, source }; }) |
-            std::ranges::to<std::vector>();
+  _columns       = std::views::iota(0, area.w)
+                   | std::views::transform([&](int x) { return Tap{ area.x + x, ratio, source }; })
+                   | std::ranges::to<std::vector>();
 }
 }

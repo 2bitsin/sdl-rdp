@@ -1,7 +1,7 @@
 #include "_detail/frame-observer.hpp"
 
-#include <cstddef>
 #include <freerdp/gdi/gdi.h>
+#include <cstddef>
 
 namespace Headless {
 FrameObserver::FrameObserver(Client& client)
@@ -48,8 +48,8 @@ auto FrameObserver::Receive(rdpContext* context, SURFACE_FRAME_MARKER const* mar
   active->received.push_back(Clock::now());
   auto*       gdi    = context->gdi;
   auto const* pixels = reinterpret_cast<UINT32 const*>(gdi->primary_buffer);
-  active->coherent &=
-      (pixels[0] & 0xffffff) == (pixels[(static_cast<std::ptrdiff_t>(gdi->height - 1)) * gdi->width] & 0xffffff);
+  active->coherent &= (pixels[0] & 0xffffff)
+                      == (pixels[(static_cast<std::ptrdiff_t>(gdi->height - 1)) * gdi->width] & 0xffffff);
   return TRUE;
 }
 }

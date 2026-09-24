@@ -1,14 +1,16 @@
 #pragma once
 
-#include <memory>
 #include <openssl/bio.h>
 #include <winpr/handle.h>
 #include <winpr/wtsapi.h>
+#include <memory>
 
 namespace Backend {
 template <auto RELEASE> struct Releases {
 public:
-  template <typename VTy> auto operator()(VTy* what) const -> void { (void)RELEASE(what); }
+  template <typename VTy> auto operator()(VTy* what) const -> void {
+    (void)RELEASE(what);
+  }
 };
 
 using EventHandle    = std::unique_ptr<void, Releases<CloseHandle>>;

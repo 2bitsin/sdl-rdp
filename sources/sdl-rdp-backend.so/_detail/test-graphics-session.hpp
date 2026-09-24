@@ -2,8 +2,8 @@
 #include "graphics-observer.hpp"
 #include "test-frame-checks.hpp"
 
-#include <cstddef>
 #include <gtest/gtest.h>
+#include <cstddef>
 #include <memory>
 #include <vector>
 

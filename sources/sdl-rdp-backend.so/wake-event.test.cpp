@@ -2,16 +2,16 @@
 
 #include "_detail/contract.hpp"
 
+#include <gtest/gtest.h>
+#include <winpr/synch.h>
 #include <algorithm>
 #include <chrono>
-#include <gtest/gtest.h>
 #include <ranges>
 #include <thread>
-#include <winpr/synch.h>
 
 namespace {
-auto ConsumePublished(Backend::WakeEvent& wake, std::atomic<unsigned>& published,
-                      std::atomic<unsigned>& consumed) -> void {
+auto ConsumePublished(Backend::WakeEvent& wake, std::atomic<unsigned>& published, std::atomic<unsigned>& consumed)
+    -> void {
   for (int iteration = 0; iteration < 4096; ++iteration) {
     wake.Transition(Backend::WakeEvent::Phase::Idle);
     if (published.load() == consumed.load()) ASSERT_EQ(WaitForSingleObject(wake.get(), 10000), WAIT_OBJECT_0);

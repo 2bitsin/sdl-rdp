@@ -7,8 +7,8 @@
 #include "_detail/peer-link.hpp"
 #include "_detail/session-access.hpp"
 
-#include <algorithm>
 #include <freerdp/channels/rdpdr.h>
+#include <algorithm>
 #include <utility>
 
 namespace Backend {
@@ -16,7 +16,7 @@ Redirection::Redirection(PeerLink& link, Activation const& activation, SessionAc
                          Factory<std::unique_ptr<AudioChannel>> sound,
                          Factory<std::unique_ptr<ClipboardChannel>> clipboard,
                          Factory<std::shared_ptr<DriveChannel>> drive) noexcept
-    : _link { link }, _activation{ activation }, _session{ session }, _make_sound{ std::move(sound) },
+    : _link{ link }, _activation{ activation }, _session{ session }, _make_sound{ std::move(sound) },
       _make_clipboard{ std::move(clipboard) }, _make_drive{ std::move(drive) } { }
 Redirection::~Redirection() {
   Disconnect();

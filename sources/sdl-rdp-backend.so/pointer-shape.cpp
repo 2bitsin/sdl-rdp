@@ -3,11 +3,11 @@
 #include "_detail/contract.hpp"
 #include "_detail/frame-snapshot.hpp"
 
-#include <algorithm>
-#include <cstddef>
 #include <freerdp/freerdp.h>
 #include <freerdp/settings.h>
 #include <freerdp/update.h>
+#include <algorithm>
+#include <cstddef>
 #include <ranges>
 #include <span>
 

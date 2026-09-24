@@ -1,8 +1,8 @@
+#include "../SDL3.so/rdp/SDL_rdpini.hpp"
 #include <gtest/gtest.h>
 #include <map>
 #include <string>
 #include <vector>
-#include "../SDL3.so/rdp/SDL_rdpini.hpp"
 
 namespace {
 struct Ini {
@@ -15,7 +15,7 @@ public:
   explicit Ini(std::string const& text) {
     rdp::ParseIni(text, [this](rdp::IniEntry entry) {
       if (!entry.Index())
-        warnings.push_back({entry.Status(), std::string(entry.Key()), entry.Line()});
+        warnings.push_back({ entry.Status(), std::string(entry.Key()), entry.Line() });
       else
         values[std::string(entry.Key())] = entry.Value();
     });

@@ -10,17 +10,17 @@
 #include "_detail/system-call.hpp"
 #include "_detail/tls-rehearsal.hpp"
 
+#include <freerdp/channels/channels.h>
+#include <winpr/ssl.h>
+#include <winpr/synch.h>
+#include <winpr/wtsapi.h>
 #include <arpa/inet.h>
 #include <array>
 #include <format>
-#include <freerdp/channels/channels.h>
 #include <mutex>
 #include <stdexcept>
 #include <tuple>
 #include <utility>
-#include <winpr/ssl.h>
-#include <winpr/synch.h>
-#include <winpr/wtsapi.h>
 
 namespace Backend {
 namespace {
@@ -84,8 +84,8 @@ auto NewStopEvent() -> EventHandle {
 Listener::Listener(Configuration const& configuration, Diagnostics const& diagnostics, Session& session,
                    PeerFactory make)
     : _diagnostics{ diagnostics }, _session{ session }, _make{ std::move(make) },
-      _listener{ NewListener(configuration.ServerCredentials()) },
-      _stop{ NewStopEvent() }, _port{ Bind(*_listener, configuration.Config()) } {
+      _listener{ NewListener(configuration.ServerCredentials()) }, _stop{ NewStopEvent() },
+      _port{ Bind(*_listener, configuration.Config()) } {
   _listener->info = this;
   _listener->PeerAccepted = [](freerdp_listener* accepting, freerdp_peer* client) -> BOOL {
     CallbackOwner<Listener>(accepting->info).Accept(client);
@@ -116,8 +116,8 @@ auto Listener::Listen(std::stop_token const& quit) -> void {
     if (!count) break;
     handles[count++] = _stop.get();
     handles[count++] = _session.ReapEvent();
-    if (WaitForMultipleObjects(count, handles.data(), FALSE, INFINITE) == WAIT_FAILED || quit.stop_requested() ||
-        !_listener->CheckFileDescriptor(_listener.get()))
+    if (WaitForMultipleObjects(count, handles.data(), FALSE, INFINITE) == WAIT_FAILED || quit.stop_requested()
+        || !_listener->CheckFileDescriptor(_listener.get()))
       break;
     _session.Reap();
   }

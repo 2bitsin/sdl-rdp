@@ -13,8 +13,8 @@ public:
                              SessionAccess(SessionAccess const&)                                    = delete;
                              SessionAccess(SessionAccess&&)                                         = delete;
   virtual                    ~SessionAccess()                                                       = default;
-  auto                       operator = (SessionAccess const&)                    -> SessionAccess& = delete;
-  auto                       operator = (SessionAccess&&)                         -> SessionAccess& = delete;
+  auto                       operator=(SessionAccess const&)                      -> SessionAccess& = delete;
+  auto                       operator=(SessionAccess&&)                           -> SessionAccess& = delete;
   [[nodiscard]] virtual auto Lock()                                               -> SessionLock    = 0;
   [[nodiscard]] virtual auto Takeover(PeerLink const& self)                       -> FrameLock      = 0;
   virtual auto               Depart(PeerLink const& self, Activation& activation) -> void           = 0;

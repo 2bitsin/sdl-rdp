@@ -20,8 +20,8 @@ auto WhenPressureContact(auto* touch, INT32& id) -> void {
 }
 auto TouchChannel(Client& client) -> auto* {
   bool const ready = client.Until([&] {
-    return InputClient::Touch().load() &&
-           InputClient::Touch().load()->GetVersion(InputClient::Touch().load()) == RDPINPUT_PROTOCOL_V10;
+    return InputClient::Touch().load()
+           && InputClient::Touch().load()->GetVersion(InputClient::Touch().load()) == RDPINPUT_PROTOCOL_V10;
   });
   EXPECT_TRUE(ready);
   return ready ? SampleGate::InputClient::Touch().load() : nullptr;
