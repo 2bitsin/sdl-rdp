@@ -6,8 +6,10 @@ module_define_prefix = "BACKEND"
 [cmake]
 extensions = []
 
+[modules.SDL3]
+soversion = 0
+
 [options]
-sdl_version = "3.4.8"
 contracts = "stop"
 
 [run]
@@ -18,4 +20,4 @@ kind = "library"
 name = "sdl-rdp"
 
 [test]
-exclude_labels = ["bench"]
+exclude_labels = ["sdl-rdp-bench"]

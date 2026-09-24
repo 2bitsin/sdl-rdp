@@ -1,4 +1,4 @@
-# clang-format 20 lays out lines; bin/align-columns.py then owns every column (bin/format.sh runs both).
+# clang-format 20 lays out lines; tools/lint/columns.py then owns every column (tools/lint/format.py runs both).
 ---
 Language: Cpp
 BasedOnStyle: LLVM
@@ -36,7 +36,7 @@ SpacesBeforeTrailingComments: 1
 AlignAfterOpenBracket: Align
 AlignOperands: Align
 AlignEscapedNewlines: Left
-# Off: bin/align-columns.py owns these columns.
+# Off: tools/lint/columns.py owns these columns.
 AlignConsecutiveAssignments: { Enabled: false }
 AlignConsecutiveDeclarations: { Enabled: false }
 AlignConsecutiveBitFields: { Enabled: false }
@@ -75,10 +75,11 @@ InsertNewlineAtEOF: true
 InsertBraces: false
 RemoveBracesLLVM: false
 IncludeBlocks: Preserve
+MainIncludeChar: Any
 IncludeCategories:
   - { Regex: '\.generated\.hpp"$', Priority: 2 }
   - { Regex: '^"', Priority: 1 }
-  - { Regex: '^<(sdl-rdp/|sdl-rdp-backend\.so/|oxbox/|SDL3/|freerdp/|winpr/|gtest/|openssl/)', Priority: 3 }
+  - { Regex: '^<(sdl-rdp/|sdl-rdp-backend/|oxbox/|SDL3/|freerdp/|winpr/|gtest/|openssl/)', Priority: 3 }
   - { Regex: '^<', Priority: 4 }
 SortIncludes: CaseSensitive
 SortUsingDeclarations: Never

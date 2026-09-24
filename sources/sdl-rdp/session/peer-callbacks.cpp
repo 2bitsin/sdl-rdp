@@ -1,0 +1,62 @@
+#include <sdl-rdp/session/peer-callbacks.hpp>
+
+#include <sdl-rdp/auth/auth.hpp>
+#include <sdl-rdp/core/peer-link.hpp>
+#include <sdl-rdp/freerdp-facade/callback-owner.hpp>
+#include <sdl-rdp/input/input-events.hpp>
+#include <sdl-rdp/session/activator.hpp>
+#include <sdl-rdp/session/capability-check.hpp>
+#include <sdl-rdp/video/output-control.hpp>
+
+#include <freerdp/update.h>
+
+namespace Backend {
+namespace {
+auto Router(freerdp_peer* client) -> PeerCallbacks& {
+  Expects(client != nullptr, "client transport exists");
+  return CallbackOwner<PeerCallbacks>(client->ContextExtra);
+}
+auto Router(rdpContext* context) -> PeerCallbacks& {
+  Expects(context != nullptr, "callback context exists");
+  return Router(context->peer);
+}
+}
+PeerCallbacks::PeerCallbacks(PeerLink& link, Authenticator& authenticator, Activator& activator,
+                             CapabilityCheck& capabilities, OutputControl& output, InputEvents& input)
+    : _link{ link }, _authenticator{ authenticator }, _activator{ activator }, _capabilities{ capabilities },
+      _output{ output } {
+  _link.Client().ContextExtra = this;
+  InstallClient();
+  InstallUpdates();
+  input.Install(*_link.Context().input);
+}
+auto PeerCallbacks::InstallClient() -> void {
+  auto& client = _link.Client();
+  client.Activate             = [](freerdp_peer* peer) { return Router(peer)._activator.Activate(); };
+  client.Capabilities         = [](freerdp_peer* peer) { return Router(peer)._capabilities.Accept(); };
+  client.PostConnect          = [](freerdp_peer*) -> BOOL { return TRUE; };
+  client.Logon                = [](freerdp_peer* peer, SEC_WINNT_AUTH_IDENTITY const*, BOOL automatic) {
+    return Router(peer)._authenticator.Logon(automatic);
+  };
+  client.SspiNtlmHashCallback = [](void* peer, SEC_WINNT_AUTH_IDENTITY const* identity, SecBuffer const*, BYTE const*,
+                                   BYTE const*, SecBuffer const*, BYTE* response) -> SECURITY_STATUS {
+    Expects(identity != nullptr, "NTLM identity is supplied");
+    Expects(response != nullptr, "callback response is supplied");
+    return Router(static_cast<freerdp_peer*>(peer))._authenticator.Hash(*identity, response) ? 1 : 0;
+  };
+}
+auto PeerCallbacks::InstallUpdates() -> void {
+  auto& update = *_link.Context().update;
+  update.SurfaceFrameAcknowledge = [](rdpContext* context, UINT32 id) -> BOOL {
+    Router(context)._output.Acknowledge(id);
+    return TRUE;
+  };
+  update.SuppressOutput          = [](rdpContext* context, BYTE allow, RECTANGLE_16 const*) -> BOOL {
+    Router(context)._output.Suppress(allow != 0);
+    return TRUE;
+  };
+}
+PeerCallbacks::~PeerCallbacks() {
+  _link.Client().ContextExtra = nullptr;
+}
+}

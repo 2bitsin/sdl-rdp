@@ -16,10 +16,10 @@ Checks: >
   -modernize-use-nodiscard, -cert-err58-cpp, -cppcoreguidelines-avoid-do-while,
   -readability-avoid-nested-conditional-operator, -performance-enum-size
 WarningsAsErrors: '*'
-HeaderFilterRegex: 'sources/(sdl-rdp-backend\.so|sdl-rdp-sample\.exe|SDL3\.so/rdp)/.*\.(hpp|cpp)$'
+HeaderFilterRegex: 'sources/(sdl-rdp/[^/]+|sdl-rdp-backend|sdl-rdp-sample|SDL3/rdp)/.*\.(hpp|cpp)$'
 ExcludeHeaderFilterRegex: 'sdl-rdp-backend\.h$|/(third-party|_build|_bdudata)/'
 CheckOptions:
-  misc-header-include-cycle.IgnoredFilesList: '^/usr/include/'
+  misc-header-include-cycle.IgnoredFilesList: '^/usr/include/;/generated/sdl-rdp-freerdp-facade/freerdp/'
   readability-function-size.LineThreshold: 40
   readability-function-size.StatementThreshold: 60
   readability-function-size.ParameterThreshold: 8

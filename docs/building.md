@@ -24,13 +24,13 @@ only found next to it at runtime.
 # Quality gate
 
 Run `./buildutil test --parallel` and `./buildutil analyze` before committing.
-`bin/lint-shape.py` checks non-blank file lines, class lines, member counts,
+`tools/lint/shape.py` checks non-blank file lines, class lines, member counts,
 access/function/data ordering, and wholly-comment line percentages in `sources/`;
 function and lambda body lines (over 20 needs an allow entry, over 40 fails),
 complexity, parameters and nesting, lines over 120 columns, compound contracts,
 NOLINT lines and C files in `sources/`; and columns, body lines, parameters and
-nesting in `bin/*.py`.
-`bin/lint-shape.allow` records exact outstanding measurements, each with the one
+nesting in `tools/lint/*.py`.
+`tools/lint/shape.allow` records exact outstanding measurements, each with the one
 round that removes it as a required `# reason`; paths are relative to `sources/`
 (`.` is the whole tree), the lint prints each finding in exactly this form so a
 report line pastes in unchanged, the file is data and exempt from the 120-column
@@ -41,21 +41,29 @@ list, so moving the definition makes its entry stale and the change re-measures
 it. Never raise a limit; the allow list only shrinks. A brace opened or closed by
 a macro is not seen by the lint; a file it leaves unbalanced is reported as
 `unbalanced braces`.
-Run `python3 bin/lint-shape.py --allow bin/lint-shape.allow` directly to inspect
-shape failures. Run `bin/lint-clones.sh` for the clone gate (40 tokens, 5 lines).
+Run `python3 tools/lint/shape.py --allow tools/lint/shape.allow` directly to
+inspect shape failures, `python3 tools/lint/clones.py` for the clone gate (jscpd
+4.0.5, 40 tokens, 5 lines), `python3 tools/lint/format.py` to format the tree
+(`--check` to verify) and `python3 tools/lint/cmake.py` for the CMake vocabulary.
 Test fixtures retain protected data members so derived test bodies can use them.
-The C driver (`sources/SDL3.so/rdp`) is SDL's own style and is outside
-clang-tidy; it is glue only, and new code goes on the C++ side.
-Both lint gates and the lint's own tests run under CTest when tests are built.
-Missing `npx` skips the clone gate, and missing pytest skips `shape-lint-tests`,
-with exit code 77 and the reason printed; neither passes silently.
+The driver (`sources/SDL3/rdp`) is C++23 under clang-tidy like the backend;
+its pure logic (INI parsing, refresh scheduling) is the static module
+`sources/sdl-rdp-driver/`, tested beside it, and the backend's C ABI header is
+the header-only module `sources/sdl-rdp-abi/`.
+`tools/lint/` is a pytest suite that `buildutil test` runs after CTest:
+`test_gate.py` runs every lint over the tree, the other files test the lints.
+A lint whose tool is missing (`npx`, clang-format 20) fails with the reason
+printed; the gate has no skips. `python3 tools/lint/includes.py` refuses an
+include of another module's header unless the module links it.
 
-The driver C files in `rdp/` are compiled directly, not copied into the SDL patch.
+The driver sources in `rdp/` are compiled directly, not copied into the SDL patch.
 For bootstrap changes, extract two pristine copies of the pinned SDL archive,
 apply `rdp-driver.patch` to one, edit it, then regenerate with `diff -ruN a b`.
 
-The gate excludes the `bench` label, the tests that measure the box's real-time
-scheduling (input and clipboard p95 under tight video, PCM clock and cadence,
-present latency); their behaviour halves stay in the gate.
-`./buildutil test --parallel bench` runs the benchmarks. Buildutil has no project
+The gate excludes the `sdl-rdp-bench` label, the module `sources/sdl-rdp/bench/`
+holding the tests that measure the box's real-time scheduling (input and
+clipboard p95 under tight video, PCM clock and cadence, present latency, graphics
+cost); their behaviour halves stay in the gate. The allocation ratchets in
+`sources/sdl-rdp/allocations/` count deterministically and are gate tests.
+`./buildutil test --parallel sdl-rdp-bench` runs the benchmarks. Buildutil has no project
 setting for parallel tests, so every gate command carries `--parallel`.
