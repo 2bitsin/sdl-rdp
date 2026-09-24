@@ -13,6 +13,8 @@ class FrameChecks : protected BackendEvents {
 protected:
   auto        Present(std::vector<std::uint32_t> const& pixels, std::uint32_t w, std::uint32_t h)           -> void;
   auto        FillLegacyWindow(Client& client, FrameObserver& observer, std::vector<std::uint32_t>& pixels) -> void;
+  auto        PresentObserved(Client& client, FrameObserver const& observer, std::vector<std::uint32_t> const& pixels,
+                              std::size_t frames) -> void;
   auto        SuppressAndCheckInput(Client& client)                                                         -> void;
   static auto ThenDesktopGeometry(Client const& client, std::uint32_t w, std::uint32_t h)                   -> void;
   auto        ThenAspectGeometry(Client& client)                                                            -> void;

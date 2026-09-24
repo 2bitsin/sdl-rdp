@@ -12,12 +12,12 @@
 namespace BackendGate {
 class RoundFive : public GraphicsSession {
 protected:
-  auto ThenPipelinedWindow(Client& client, auto const& frames, std::vector<UINT32> const& pixels) -> void {
+  auto ThenPipelinedWindow(Client& client, auto const& frames, std::vector<std::uint32_t> const& pixels) -> void {
     ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
     EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 0), 1);
-    ASSERT_NO_FATAL_FAILURE(AwaitFrames(client, frames, 1));
+    ASSERT_TRUE(client.Until([&] { return frames.size() == 1; }));
     ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
-    ASSERT_NO_FATAL_FAILURE(AwaitFrames(client, frames, 2));
+    ASSERT_TRUE(client.Until([&] { return frames.size() == 2; }));
     EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 1), 0);
   }
   auto ThenNeverAcknowledges(auto timed) -> void {

@@ -29,12 +29,15 @@ protected:
     auto& audio  = AudioSession();
     ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
     ASSERT_TRUE(freerdp_input_send_keyboard_event(client.Instance()->context->input, KBD_FLAGS_DOWN, 0x1e));
-    auto               frames = 3 * (audio.CaptureState().rate / 50);
-    std::vector<INT16> pcm(static_cast<std::size_t>(frames) * 2, -1234);
+    ASSERT_NO_FATAL_FAILURE(WhenSoundAndPicture(client, audio));
+    ThenKeyTraced(client);
+  }
+  auto WhenSoundAndPicture(Client& client, SoundClient& audio) -> void {
+    auto                      frames = 3 * (audio.CaptureState().rate / 50);
+    std::vector<std::int16_t> pcm(static_cast<std::size_t>(frames) * 2, -1234);
     ASSERT_EQ(sdlrdp_audio_write(backend.Handle(), pcm.data(), frames), frames);
     ASSERT_NO_FATAL_FAILURE(Present(std::vector<std::uint32_t>(320uz * 200, 0xff123456), 320, 200));
     ASSERT_TRUE(client.Until([&] { return audio.CaptureState().samples.size() == pcm.size() && Acknowledged(); }));
-    ThenKeyTraced(client);
   }
   auto CheckTimes() -> void {
     auto const now = Headless::WallMilliseconds();

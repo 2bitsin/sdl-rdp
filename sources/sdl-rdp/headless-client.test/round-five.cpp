@@ -101,10 +101,8 @@ auto RoundFive::RunPictureSizes(bool graphics) -> void {
   Client client(sdlrdp_port(backend.Handle()), true, 640, 480);
   if (graphics) client.EnableGraphics();
   Headless::GraphicsObserver observer(client);
-  ASSERT_NO_FATAL_FAILURE(Connect(client, false));
   std::vector<std::uint32_t> pixels(640uz * 480, 0x123456);
-  ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
-  ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text(true);
+  ASSERT_NO_FATAL_FAILURE(ShowFirstPicture(client, pixels));
   for (auto size : { Backend::Extent{ .width = 320, .height = 200 }, Backend::Extent{ .width = 640, .height = 480 } }) {
     ASSERT_NO_FATAL_FAILURE(ResizePicture(client, observer, pixels, size, graphics));
   }

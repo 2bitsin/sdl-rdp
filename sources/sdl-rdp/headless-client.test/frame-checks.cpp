@@ -58,17 +58,20 @@ auto FrameChecks::Present(std::vector<std::uint32_t> const& pixels, std::uint32_
 }
 auto FrameChecks::FillLegacyWindow(Client& client, FrameObserver& observer, std::vector<std::uint32_t>& pixels)
     -> void {
-  ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
-  ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == 1; }));
+  ASSERT_NO_FATAL_FAILURE(PresentObserved(client, observer, pixels, 1));
   std::ranges::fill(pixels, 0x223344);
-  ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
-  ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == 2; }));
+  ASSERT_NO_FATAL_FAILURE(PresentObserved(client, observer, pixels, 2));
   for (std::size_t i = 0; i < 10; ++i) {
     std::ranges::fill(pixels, 0x334455 + i);
     ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
   }
   EXPECT_EQ(observer.Frames().size(), 2u);
   EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 0), 0);
+}
+auto FrameChecks::PresentObserved(Client& client, FrameObserver const& observer,
+                                  std::vector<std::uint32_t> const& pixels, std::size_t frames) -> void {
+  ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
+  ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == frames; }));
 }
 auto FrameChecks::SuppressAndCheckInput(Client& client) -> void {
   auto* update = client.Instance()->context->update;

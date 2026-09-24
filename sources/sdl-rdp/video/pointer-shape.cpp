@@ -27,10 +27,6 @@ auto MarkTransparent(std::span<std::uint8_t const> source, std::span<std::uint8_
   for (auto column : std::views::iota(0uz, source.size() / PixelBytes))
     if (source[(column * PixelBytes) + AlphaByte] == TransparentAlpha) mask_row[column / 8] |= 0x80 >> (column % 8);
 }
-// abi: FreeRDP's pointer update structs hold the buffers as non-const pointers and only read them.
-auto MutableForAbi(std::vector<std::uint8_t> const& bytes) -> std::uint8_t* {
-  return const_cast<std::uint8_t*>(bytes.data());
-}
 auto Delivered(bool sent) -> PointerDelivery {
   return sent ? PointerDelivery::Sent : PointerDelivery::Failed;
 }
@@ -50,8 +46,8 @@ PointerShape::PointerShape(Extent size, std::uint32_t x, std::uint32_t y, std::s
     MarkTransparent(source, std::span(_mask).subspan(target * stride, stride));
   }
 }
-auto PointerShape::ColorImage() const -> POINTER_COLOR_UPDATE {
-  auto const large = LargeImage();
+auto PointerShape::ColorImage(Buffers& buffers) const -> POINTER_COLOR_UPDATE {
+  auto const large = LargeImage(buffers);
   return { .cacheIndex    = large.cacheIndex,
            .hotSpotX      = large.hotSpotX,
            .hotSpotY      = large.hotSpotY,
@@ -62,7 +58,7 @@ auto PointerShape::ColorImage() const -> POINTER_COLOR_UPDATE {
            .xorMaskData   = large.xorMaskData,
            .andMaskData   = large.andMaskData };
 }
-auto PointerShape::LargeImage() const -> POINTER_LARGE_UPDATE {
+auto PointerShape::LargeImage(Buffers& buffers) const -> POINTER_LARGE_UPDATE {
   return { .xorBpp        = ColorBits,
            .cacheIndex    = 0,
            .hotSpotX      = Narrowed<std::uint16_t>(_hot_x),
@@ -71,8 +67,8 @@ auto PointerShape::LargeImage() const -> POINTER_LARGE_UPDATE {
            .height        = Narrowed<std::uint16_t>(_size.height),
            .lengthAndMask = Narrowed<std::uint32_t>(_mask.size()),
            .lengthXorMask = Narrowed<std::uint32_t>(_pixels.size()),
-           .xorMaskData   = MutableForAbi(_pixels),
-           .andMaskData   = MutableForAbi(_mask) };
+           .xorMaskData   = buffers.pixels.data(),
+           .andMaskData   = buffers.mask.data() };
 }
 auto PointerShape::Send(rdpContext& context) const -> PointerDelivery {
   auto* update = context.update->pointer;
@@ -80,16 +76,17 @@ auto PointerShape::Send(rdpContext& context) const -> PointerDelivery {
     POINTER_SYSTEM_UPDATE const hidden{ SYSPTR_NULL };
     return Delivered(update->PointerSystem(&context, &hidden) != 0);
   }
+  Buffers buffers{ .pixels = _pixels, .mask = _mask };
   if (_size.width <= ColorPointerLimit && _size.height <= ColorPointerLimit) {
-    POINTER_NEW_UPDATE const image{ ColorBits, ColorImage() };
+    POINTER_NEW_UPDATE const image{ ColorBits, ColorImage(buffers) };
     return Delivered(update->PointerNew(&context, &image) != 0);
   }
   if (!(freerdp_settings_get_uint32(context.settings, FreeRDP_LargePointerFlag) & LARGE_POINTER_FLAG_384x384))
     return PointerDelivery::Unsupported;
-  return Delivered(SendLarge(context));
+  return Delivered(SendLarge(context, buffers));
 }
-auto PointerShape::SendLarge(rdpContext& context) const -> bool {
-  auto const image = LargeImage();
+auto PointerShape::SendLarge(rdpContext& context, Buffers& buffers) const -> bool {
+  auto const image = LargeImage(buffers);
   return context.update->pointer->PointerLarge(&context, &image) != 0;
 }
 }

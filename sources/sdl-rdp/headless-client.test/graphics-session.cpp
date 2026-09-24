@@ -66,9 +66,9 @@ auto GraphicsSession::ThenLegacyFallback(Client& client) -> void {
   ASSERT_NO_FATAL_FAILURE(ThenConnectedCodec(client, SDLRDP_CODEC_RAW));
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_WARN, "GFX confirmation timed out"));
 }
-auto GraphicsSession::PresentMatching(Client& client, std::vector<UINT32> const& pixels) -> void {
+auto GraphicsSession::PresentMatching(Client& client, std::vector<std::uint32_t> const& pixels) -> void {
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
-  ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); }));
+  ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text(true);
 }
 auto GraphicsSession::PresentGraphicsFrames(Client& client, Headless::GraphicsObserver& observer,
                                             std::vector<UINT32> const& pixels, unsigned first, unsigned last) -> void {
@@ -85,5 +85,9 @@ auto GraphicsSession::Connect(Client& client, bool ack) -> void {
   ASSERT_TRUE(freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_FrameAcknowledge, ack ? 2 : 0));
   ASSERT_TRUE(client.Connect()) << logs.Text(true);
   ASSERT_TRUE(client.Until([&] { return HasCookie(client); }));
+}
+auto GraphicsSession::ShowFirstPicture(Client& client, std::vector<std::uint32_t> const& pixels) -> void {
+  ASSERT_NO_FATAL_FAILURE(Connect(client, false));
+  ASSERT_NO_FATAL_FAILURE(PresentMatching(client, pixels));
 }
 }

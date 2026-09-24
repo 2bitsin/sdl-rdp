@@ -50,9 +50,9 @@ auto Open(sdlrdp_handle* handle, unsigned drive, char const* path, FileRequest c
   return file;
 }
 auto InformationRequest(std::uint32_t type, DrivePacket const& body) -> DrivePacket {
-  constexpr unsigned padding_after_length = 24;
-  DrivePacket        packet;
-  packet.Write(std::uint32_t{ type });
+  constexpr std::size_t padding_after_length = 24;
+  DrivePacket           packet;
+  packet.Write(type);
   packet.Write(Narrowed<std::uint32_t>(body.Bytes().size()));
   packet.Zero(padding_after_length);
   packet.Append(body.Bytes());

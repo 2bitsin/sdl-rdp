@@ -24,7 +24,7 @@ auto ToneMeasurements(std::vector<std::int16_t> const& samples, std::uint32_t ra
     crossings += samples[start + ((frame - 1) * 2)] <= 0 && sample > 0;
     square    += double(sample) * sample;
   }
-  auto frequency = crossings * double(rate) / double(frames);
+  auto frequency = static_cast<double>(crossings) * rate / static_cast<double>(frames);
   auto db        = 20 * std::log10(std::sqrt(square / double(frames - 1)) * std::numbers::sqrt2 / 32767);
   return { frequency, db };
 }

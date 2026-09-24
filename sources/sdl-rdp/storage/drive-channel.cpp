@@ -36,7 +36,7 @@ auto Announcement(std::uint32_t type, std::uint32_t client_id) -> DrivePacket {
   auto packet = Header(type);
   packet.Write(std::uint16_t{ RDPDR_VERSION_MAJOR });
   packet.Write(std::uint16_t{ RDPDR_VERSION_MINOR_RDP6X });
-  packet.Write(std::uint32_t{ client_id });
+  packet.Write(client_id);
   return packet;
 }
 auto IoRequest(std::span<std::uint32_t const> header, DrivePacket const& body) -> DrivePacket {
@@ -50,7 +50,7 @@ auto Capability(DrivePacket& packet, std::uint32_t type, std::uint32_t version, 
   Expects(body.Bytes().size() <= UINT16_MAX - header_size, "capability length fits its header");
   packet.Write(Narrowed<std::uint16_t>(type));
   packet.Write(Narrowed<std::uint16_t>(header_size + body.Bytes().size()));
-  packet.Write(std::uint32_t{ version });
+  packet.Write(version);
   packet.Append(body.Bytes());
 }
 auto GeneralCapability(DrivePacket& packet) -> void {
@@ -144,7 +144,7 @@ auto DriveChannel::Announce(DrivePacket& packet) -> void {
     auto begin  = packet.Position();
     packet.Skip(length);
     auto response = Header(PAKID_CORE_DEVICE_REPLY);
-    response.Write(std::uint32_t{ wire });
+    response.Write(wire);
     response.Write(std::bit_cast<std::uint32_t>(type == RDPDR_DTYP_FILESYSTEM ? STATUS_SUCCESS : STATUS_NOT_SUPPORTED));
     Write(response);
     if (type != RDPDR_DTYP_FILESYSTEM) continue;
