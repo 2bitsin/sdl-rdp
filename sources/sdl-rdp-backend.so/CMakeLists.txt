@@ -35,22 +35,29 @@ if(TARGET sdl-rdp-backend-tests)
   set_property(DIRECTORY APPEND PROPERTY TEST_INCLUDE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/bench-tests.cmake")
   target_sources(sdl-rdp-backend-tests PRIVATE ../SDL3.so/rdp/SDL_rdpini.cpp ../SDL3.so/rdp/SDL_rdprefresh.cpp)
   target_link_libraries(sdl-rdp-backend-tests PRIVATE sdl-rdp-backend-internal SDL3)
-  # tls-race.test/ interposes libcrypto and libc symbols, so it must not share a process with the other tests.
-  file(GLOB TLS_RACE_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tls-race.test/*.cpp)
   get_target_property(BACKEND_TEST_SOURCES sdl-rdp-backend-tests SOURCES)
-  list(REMOVE_ITEM BACKEND_TEST_SOURCES ${TLS_RACE_SOURCES})
-  set_property(TARGET sdl-rdp-backend-tests PROPERTY SOURCES ${BACKEND_TEST_SOURCES})
-  add_executable(sdl-rdp-backend-tls-race-tests ${TLS_RACE_SOURCES} support.test/child-process.cpp
-    client.test.cpp release-client.test.cpp client-channels.test.cpp)
-  target_include_directories(sdl-rdp-backend-tls-race-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-  target_link_libraries(sdl-rdp-backend-tls-race-tests PRIVATE sdl-rdp-backend sdl-rdp-backend-internal
-    GTest::gtest_main freerdp-client ${SDLRDP_TEST_SSL} ${SDLRDP_HOST_CRYPTO} ${CMAKE_DL_LIBS})
+  # Each directory interposes C or C++ library symbols, so it runs in a process of its own.
+  function(sdlrdp_isolated_tests target directory label)
+    file(GLOB isolated CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${directory}/*.cpp)
+    list(REMOVE_ITEM BACKEND_TEST_SOURCES ${isolated})
+    set(BACKEND_TEST_SOURCES ${BACKEND_TEST_SOURCES} PARENT_SCOPE)
+    add_executable(${target} ${isolated} ${ARGN} client.test.cpp release-client.test.cpp client-channels.test.cpp)
+    target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(${target} PRIVATE sdl-rdp-backend sdl-rdp-backend-internal
+      GTest::gtest_main freerdp-client ${SDLRDP_TEST_SSL} ${SDLRDP_HOST_CRYPTO} ${CMAKE_DL_LIBS})
+    gtest_discover_tests(${target}
+      DISCOVERY_MODE PRE_TEST
+      DISCOVERY_TIMEOUT 30
+      PROPERTIES LABELS ${label} FIXTURES_REQUIRED buildutil-driver)
+  endfunction()
+  sdlrdp_isolated_tests(sdl-rdp-backend-tls-race-tests tls-race.test sdl-rdp-backend support.test/child-process.cpp)
   target_link_options(sdl-rdp-backend-tls-race-tests PRIVATE
     "LINKER:--export-dynamic-symbol=BIO_meth_new,--export-dynamic-symbol=BIO_meth_set_write"
     "LINKER:--export-dynamic-symbol=BIO_meth_set_create,--export-dynamic-symbol=SSL_use_PrivateKey"
     "LINKER:--export-dynamic-symbol=SSL_connect")
-  gtest_discover_tests(sdl-rdp-backend-tls-race-tests
-    DISCOVERY_MODE PRE_TEST
-    DISCOVERY_TIMEOUT 30
-    PROPERTIES LABELS sdl-rdp-backend FIXTURES_REQUIRED buildutil-driver)
+  sdlrdp_isolated_tests(sdl-rdp-backend-allocation-tests allocations.test bench
+    graphics-observer.test.cpp test-graphics-backend.test.cpp test-logs.test.cpp test-pattern.test.cpp)
+  target_link_options(sdl-rdp-backend-allocation-tests PRIVATE
+    "LINKER:--export-dynamic-symbol=malloc,--export-dynamic-symbol=calloc,--export-dynamic-symbol=realloc")
+  set_property(TARGET sdl-rdp-backend-tests PROPERTY SOURCES ${BACKEND_TEST_SOURCES})
 endif()
