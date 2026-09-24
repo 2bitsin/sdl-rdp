@@ -9,7 +9,6 @@ namespace Headless {
 class GraphicsCost : public GraphicsBackend {
 protected:
   auto        ThenProgressiveCost(Client& client, GraphicsObserver& observer) -> void;
-  auto        AwaitAcknowledgement(Client& client, std::uint64_t sequence)    -> void;
   auto Open(std::uint32_t width = 1280, std::uint32_t height = 800, sdlrdp_codec codec = SDLRDP_CODEC_PROGRESSIVE)
       -> void;
   auto        PresentMovingTiles(Client& client, std::size_t frames)          -> void;

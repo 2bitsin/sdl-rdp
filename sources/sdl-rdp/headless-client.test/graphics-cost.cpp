@@ -2,7 +2,6 @@
 #include <sdl-rdp/headless-client.test/backend-instance.hpp>
 
 #include <sdl-rdp/headless-client.test/pattern.hpp>
-#include <sdl-rdp/headless-client.test/peer-status.hpp>
 
 #include <array>
 #include <cstdint>
@@ -36,12 +35,6 @@ auto GraphicsCost::ThenProgressiveCost(Client& client, GraphicsObserver& observe
   client.Disconnect();
   backend.Close();
   RecordProgressiveCost(logs);
-}
-auto GraphicsCost::AwaitAcknowledgement(Client& client, std::uint64_t sequence) -> void {
-  ASSERT_TRUE(client.Until([&] {
-    auto const status = BackendGate::CurrentStatus(*backend);
-    return status && status->acknowledged == sequence;
-  })) << logs.Text(true);
 }
 auto GraphicsCost::Open(std::uint32_t width, std::uint32_t height, sdlrdp_codec codec) -> void {
   auto pattern = std::to_array("/tmp/sdlrdp-cost-XXXXXX");

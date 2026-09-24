@@ -13,6 +13,10 @@ inline auto CurrentStatus(sdlrdp_handle& handle) -> std::optional<Backend::PeerS
   auto const* current = handle.Session().Current(frame);
   return current ? std::optional{ current->Status(frame) } : std::nullopt;
 }
+inline auto AcknowledgedThrough(sdlrdp_handle& handle, std::uint64_t sequence) -> bool {
+  auto const status = CurrentStatus(handle);
+  return status && status->acknowledged >= sequence;
+}
 inline auto RequiredStatus(sdlrdp_handle& handle) -> Backend::PeerStatus {
   auto status = CurrentStatus(handle);
   utilities::Expects(status.has_value(), "a client is current");

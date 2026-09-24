@@ -18,8 +18,7 @@ auto Contains(sdlrdp_event_type type) {
 }
 auto BackendEvents::Acknowledged() const -> bool {
   Expects(backend.Handle() != nullptr, "backend exists");
-  auto const status = CurrentStatus(*backend);
-  return status && status->acknowledged >= Presented(*backend);
+  return AcknowledgedThrough(*backend, Presented(*backend));
 }
 auto BackendEvents::Events(std::size_t wanted) -> std::vector<sdlrdp_event> {
   return EventsUntil([=](auto const& events) { return events.size() >= wanted; }, false,
