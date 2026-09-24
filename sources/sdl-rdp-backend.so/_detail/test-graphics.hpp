@@ -1,5 +1,5 @@
 #pragma once
-#include "headless-gfx.hpp"
+#include "client.hpp"
 #include "handle.hpp"
 #include "test-logs.hpp"
 

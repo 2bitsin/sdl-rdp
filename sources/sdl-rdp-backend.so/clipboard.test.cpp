@@ -1,4 +1,4 @@
-#include "_detail/headless-clipboard.hpp"
+#include "_detail/clipboard-client.hpp"
 #include "_detail/test-config.hpp"
 #include "_detail/test-logs.hpp"
 #include "_detail/transcode.hpp"

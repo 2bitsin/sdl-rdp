@@ -40,7 +40,8 @@ if(TARGET sdl-rdp-backend-tests)
   get_target_property(BACKEND_TEST_SOURCES sdl-rdp-backend-tests SOURCES)
   list(REMOVE_ITEM BACKEND_TEST_SOURCES ${TLS_RACE_SOURCES})
   set_property(TARGET sdl-rdp-backend-tests PROPERTY SOURCES ${BACKEND_TEST_SOURCES})
-  add_executable(sdl-rdp-backend-tls-race-tests ${TLS_RACE_SOURCES} support.test/child-process.cpp)
+  add_executable(sdl-rdp-backend-tls-race-tests ${TLS_RACE_SOURCES} support.test/child-process.cpp
+    client.test.cpp release-client.test.cpp client-channels.test.cpp)
   target_include_directories(sdl-rdp-backend-tls-race-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
   target_link_libraries(sdl-rdp-backend-tls-race-tests PRIVATE sdl-rdp-backend sdl-rdp-backend-internal
     GTest::gtest_main freerdp-client ${SDLRDP_TEST_SSL} ${SDLRDP_HOST_CRYPTO} ${CMAKE_DL_LIBS})

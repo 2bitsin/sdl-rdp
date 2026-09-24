@@ -1,6 +1,6 @@
 #include "_detail/avc-encoder.hpp"
 #include "_detail/gfx-protocol.hpp"
-#include "_detail/headless-gfx.hpp"
+#include "_detail/graphics-observer.hpp"
 #include "_detail/test-graphics.hpp"
 #include "_detail/test-peer-status.hpp"
 #include "_detail/test-pattern.hpp"

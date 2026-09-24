@@ -1,6 +1,7 @@
 #pragma once
+#include "drive-observer.hpp"
 #include "drive-packet.hpp"
-#include "headless-drive.hpp"
+#include "share-drive.hpp"
 #include "sdl-rdp-backend.h"
 #include "test-config.hpp"
 #include "test-io.hpp"

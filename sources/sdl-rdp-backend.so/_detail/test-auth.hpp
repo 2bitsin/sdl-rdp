@@ -1,7 +1,7 @@
 #pragma once
 #include "../sdl-rdp-backend.h"
 #include "auth-identity.hpp"
-#include "headless-client.hpp"
+#include "client.hpp"
 #include "handle.hpp"
 #include "peer.hpp"
 #include "test-peer-status.hpp"

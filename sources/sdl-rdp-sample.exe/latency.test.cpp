@@ -1,8 +1,9 @@
 #include "_detail/sample-fixture.hpp"
 #include "_detail/trace-number.hpp"
 
-#include <sdl-rdp-backend.so/_detail/headless-audio.hpp>
-#include <sdl-rdp-backend.so/_detail/headless-clipboard.hpp>
+#include <sdl-rdp-backend.so/_detail/clipboard-client.hpp>
+#include <sdl-rdp-backend.so/_detail/frame-observer.hpp>
+#include <sdl-rdp-backend.so/_detail/sound-client.hpp>
 
 namespace SampleGate {
 namespace {

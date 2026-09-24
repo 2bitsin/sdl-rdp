@@ -1,4 +1,5 @@
 #pragma once
+#include "graphics-observer.hpp"
 #include "test-backend-core.hpp"
 #include "test-frame-checks.hpp"
 namespace BackendGate {

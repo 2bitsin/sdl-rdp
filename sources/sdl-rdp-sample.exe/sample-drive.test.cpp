@@ -1,7 +1,9 @@
 #include "_detail/sample-fixture.hpp"
 
 #include <cstddef>
-#include <sdl-rdp-backend.so/_detail/headless-drive.hpp>
+#include <sdl-rdp-backend.so/_detail/drive-observer.hpp>
+#include <sdl-rdp-backend.so/_detail/frame-observer.hpp>
+#include <sdl-rdp-backend.so/_detail/share-drive.hpp>
 
 namespace SampleGate {
 namespace {

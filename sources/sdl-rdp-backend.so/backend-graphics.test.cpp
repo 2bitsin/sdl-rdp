@@ -1,3 +1,4 @@
+#include "_detail/graphics-observer.hpp"
 #include "_detail/test-backend.hpp"
 
 namespace BackendGate {

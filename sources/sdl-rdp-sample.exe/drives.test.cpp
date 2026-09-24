@@ -4,7 +4,7 @@
 #include <format>
 #include <openssl/evp.h>
 #include <oxbox/platform/file-writer.hpp>
-#include <sdl-rdp-backend.so/_detail/headless-drive.hpp>
+#include <sdl-rdp-backend.so/_detail/client.hpp>
 #include <sdl-rdp-backend.so/_detail/test-io.hpp>
 
 namespace SampleGate {

@@ -1,6 +1,6 @@
 #include "_detail/certificate.hpp"
+#include "_detail/client.hpp"
 #include "_detail/contract.hpp"
-#include "_detail/headless-client.hpp"
 #include "_detail/test-config.hpp"
 #include "_detail/tls-accept-refused.hpp"
 #include "_detail/tls-rehearsal.hpp"

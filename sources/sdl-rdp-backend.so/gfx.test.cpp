@@ -1,7 +1,7 @@
 #include "_detail/avc-encoder.hpp"
 #include "_detail/avc.hpp"
 #include "_detail/gfx-protocol.hpp"
-#include "_detail/headless-gfx.hpp"
+#include "_detail/graphics-observer.hpp"
 #include "_detail/handle.hpp"
 #include "_detail/test-graphics.hpp"
 #include "_detail/test-pattern.hpp"
@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <cstring>
 #include <filesystem>
 #include <freerdp/primitives.h>
 #include <gtest/gtest.h>

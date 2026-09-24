@@ -1,5 +1,6 @@
 #pragma once
 #include "rdp-handles.hpp"
+#include "release-stream.hpp"
 #include "sdl-rdp-backend.h"
 
 #include <chrono>

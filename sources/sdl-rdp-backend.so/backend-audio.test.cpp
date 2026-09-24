@@ -1,3 +1,4 @@
+#include "_detail/graphics-observer.hpp"
 #include "_detail/test-audio.hpp"
 
 #include <algorithm>

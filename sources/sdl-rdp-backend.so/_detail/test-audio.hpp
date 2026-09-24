@@ -1,5 +1,6 @@
 #pragma once
-#include "headless-audio.hpp"
+#include "frame-observer.hpp"
+#include "sound-client.hpp"
 #include "test-backend.hpp"
 
 #include <cstddef>

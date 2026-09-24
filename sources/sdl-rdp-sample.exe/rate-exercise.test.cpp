@@ -3,6 +3,8 @@
 #include "_detail/bounded-connect.hpp"
 #include "_detail/trace-number.hpp"
 
+#include <sdl-rdp-backend.so/_detail/frame-observer.hpp>
+
 namespace SampleGate {
 namespace {
 struct Pace {

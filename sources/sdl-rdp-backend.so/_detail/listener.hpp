@@ -1,6 +1,8 @@
 #pragma once
 #include "pinned.hpp"
 #include "rdp-handles.hpp"
+#include "releases-listener.hpp"
+#include "releases-peer.hpp"
 #include "sdl-rdp-backend.h"
 
 #include <functional>

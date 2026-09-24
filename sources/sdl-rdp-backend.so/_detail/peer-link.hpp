@@ -1,6 +1,7 @@
 #pragma once
 #include "pinned.hpp"
 #include "rdp-handles.hpp"
+#include "releases-peer.hpp"
 #include "wake-event.hpp"
 
 #include <concepts>

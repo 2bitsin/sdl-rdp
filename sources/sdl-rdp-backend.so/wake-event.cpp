@@ -3,6 +3,7 @@
 #include "_detail/contract.hpp"
 
 #include <stdexcept>
+#include <winpr/file.h>
 #include <winpr/synch.h>
 
 namespace Backend {

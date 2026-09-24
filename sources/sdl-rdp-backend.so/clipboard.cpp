@@ -2,6 +2,7 @@
 
 #include "_detail/activation.hpp"
 #include "_detail/callback-owner.hpp"
+#include "_detail/clipboard-capabilities.hpp"
 #include "_detail/clipboard-store.hpp"
 #include "_detail/diagnostics.hpp"
 #include "_detail/event-queue.hpp"
@@ -33,13 +34,10 @@ bool ClipboardChannel::Open() {
   _context->ClientFormatDataResponse   = DataResponse;
   if (_context->Open(_context.get()) != CHANNEL_RC_OK) return false;
   _opened = true;
-  CLIPRDR_GENERAL_CAPABILITY_SET general{ CB_CAPSTYPE_GENERAL, CB_CAPSTYPE_GENERAL_LEN, CB_CAPS_VERSION_2,
-                                          CB_USE_LONG_FORMAT_NAMES };
-  CLIPRDR_CAPABILITIES           caps   { .common = { .msgType = CB_CLIP_CAPS } };
-  caps.cCapabilitiesSets = 1;
-  caps.capabilitySets    = reinterpret_cast<CLIPRDR_CAPABILITY_SET*>(&general);
   CLIPRDR_MONITOR_READY const monitor{ .common = { .msgType = CB_MONITOR_READY } };
-  return _context->ServerCapabilities(_context.get(), &caps) == CHANNEL_RC_OK &&
+  return SendGeneralCapabilities([&](auto const* caps) {
+           return _context->ServerCapabilities(_context.get(), caps);
+         }) == CHANNEL_RC_OK &&
          _context->MonitorReady(_context.get(), &monitor) == CHANNEL_RC_OK;
 }
 bool ClipboardChannel::Pump(std::span<HANDLE const> signaled) {

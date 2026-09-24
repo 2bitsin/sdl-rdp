@@ -1,5 +1,7 @@
 #include "_detail/sample-fixture.hpp"
 
+#include <sdl-rdp-backend.so/_detail/frame-observer.hpp>
+
 namespace SampleGate {
 namespace {
 class FullscreenSample : public SampleGate::Sample {

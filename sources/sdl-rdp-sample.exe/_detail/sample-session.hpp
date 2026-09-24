@@ -1,7 +1,8 @@
 #pragma once
 #include "sample-process.hpp"
 
-#include <sdl-rdp-backend.so/_detail/headless-clipboard.hpp>
+#include <cstring>
+#include <sdl-rdp-backend.so/_detail/display-client.hpp>
 #include <sdl-rdp-backend.so/_detail/test-input-steps.hpp>
 #include <utility>
 

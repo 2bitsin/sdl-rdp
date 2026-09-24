@@ -1,7 +1,7 @@
 #include "_detail/sample-fixture.hpp"
 
 #include <sdl-rdp-backend.so/_detail/avc-encoder.hpp>
-#include <sdl-rdp-backend.so/_detail/headless-clipboard.hpp>
+#include <sdl-rdp-backend.so/_detail/display-client.hpp>
 
 namespace SampleGate {
 namespace {

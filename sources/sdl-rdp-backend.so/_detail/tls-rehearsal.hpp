@@ -1,6 +1,6 @@
 #pragma once
 #include "certificate.hpp"
-#include "rdp-handles.hpp"
+#include "releases-peer.hpp"
 #include "socket-pair.hpp"
 
 #include <chrono>

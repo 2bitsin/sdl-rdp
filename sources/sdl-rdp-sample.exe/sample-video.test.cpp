@@ -1,4 +1,6 @@
-#include "../sdl-rdp-backend.so/_detail/headless-audio.hpp"
+#include "../sdl-rdp-backend.so/_detail/display-client.hpp"
+#include "../sdl-rdp-backend.so/_detail/frame-observer.hpp"
+#include "../sdl-rdp-backend.so/_detail/sound-client.hpp"
 #include "_detail/sample-fixture.hpp"
 
 namespace SampleGate {

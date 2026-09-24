@@ -1,4 +1,5 @@
 #pragma once
+#include "graphics-observer.hpp"
 #include "test-backend-core.hpp"
 namespace BackendGate {
 inline void ThenMonitor(auto const& monitor, unsigned w, unsigned h) {

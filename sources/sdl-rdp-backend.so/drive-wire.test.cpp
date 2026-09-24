@@ -1,14 +1,15 @@
+#include "_detail/client-channels.hpp"
 #include "_detail/test-drive.hpp"
 #include "_detail/transcode.hpp"
 
+#include <array>
 #include <cstddef>
+#include <freerdp/channels/rdpdr.h>
 namespace DriveGate {
 namespace {
 void SendMalformedDrivePacket(Headless::Client& client) {
-  auto*               instance  = client.Instance().get();
-  auto                channel   = freerdp_channels_get_id_by_name(instance, RDPDR_CHANNEL_NAME);
-  std::array<BYTE, 4> malformed { 0x72, 0x44, 0x41, 0x44 };
-  ASSERT_TRUE(instance->SendChannelData(instance, channel, malformed.data(), malformed.size()));
+  std::array<BYTE, 4> const malformed{ 0x72, 0x44, 0x41, 0x44 };
+  ASSERT_TRUE(Headless::SendStaticChannel(client.Instance().get(), RDPDR_CHANNEL_NAME, malformed));
 }
 Backend::DrivePacket EmptyBasicInformation(Headless::DriveObserver& observer) {
   auto request = observer.Observed().io.front();

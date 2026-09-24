@@ -1,7 +1,9 @@
 #include "_detail/sample-fixture.hpp"
 
 #include <cstddef>
-#include <sdl-rdp-backend.so/_detail/headless-audio.hpp>
+#include <sdl-rdp-backend.so/_detail/frame-observer.hpp>
+#include <sdl-rdp-backend.so/_detail/sound-client.hpp>
+#include <sdl-rdp-backend.so/_detail/tone-measurements.hpp>
 
 namespace SampleGate {
 namespace {

@@ -14,7 +14,7 @@
 #include <oxbox/utilities/number-text.hpp>
 #include <poll.h>
 #include <ranges>
-#include <sdl-rdp-backend.so/_detail/headless-client.hpp>
+#include <sdl-rdp-backend.so/_detail/client.hpp>
 #include <sdl-rdp-backend.so/_detail/test-logs.hpp>
 #include <span>
 #include <spawn.h>

@@ -2,9 +2,12 @@
 #include "sample-session.hpp"
 
 #include <format>
+#include <freerdp/channels/rdpdr.h>
 #include <openssl/evp.h>
 #include <oxbox/utilities/hex.hpp>
-#include <sdl-rdp-backend.so/_detail/headless-drive.hpp>
+#include <sdl-rdp-backend.so/_detail/clipboard-client.hpp>
+#include <sdl-rdp-backend.so/_detail/drive-observer.hpp>
+#include <sdl-rdp-backend.so/_detail/share-drive.hpp>
 #include <sdl-rdp-backend.so/_detail/test-io.hpp>
 
 namespace SampleGate {

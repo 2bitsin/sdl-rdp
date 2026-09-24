@@ -1,6 +1,6 @@
 #pragma once
 #include "../sdl-rdp-backend.h"
-#include "headless-client.hpp"
+#include "client.hpp"
 
 #include <gtest/gtest.h>
 namespace Headless {

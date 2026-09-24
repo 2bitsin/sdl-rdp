@@ -1,7 +1,9 @@
 #pragma once
+#include <atomic>
 #include <freerdp/client/ainput.h>
+#include <freerdp/client/channels.h>
 #include <freerdp/client/rdpei.h>
-#include <sdl-rdp-backend.so/_detail/headless-client.hpp>
+#include <sdl-rdp-backend.so/_detail/client.hpp>
 
 namespace SampleGate {
 using Headless::Client;
