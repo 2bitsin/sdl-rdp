@@ -1,4 +1,5 @@
 #include <sdl-rdp/headless-client.test/graphics-session.hpp>
+#include <sdl-rdp/headless-client.test/await-acknowledged.hpp>
 #include <sdl-rdp/headless-client.test/backend-instance.hpp>
 
 #include <sdl-rdp/headless-client.test/has-cookie.hpp>
@@ -44,7 +45,7 @@ auto GraphicsSession::GraphicsObserver() -> Headless::GraphicsObserver& {
 auto GraphicsSession::PresentProgressiveDamage(Client& client, std::vector<std::uint32_t> const& pixels,
                                                sdlrdp_rect damage) -> void {
   ASSERT_EQ(backend.Present(pixels, 640, 480, damage), 0);
-  ASSERT_TRUE(client.Until([&] { return Acknowledged(); }));
+  ASSERT_NO_FATAL_FAILURE(AwaitAllAcknowledged(client, backend, logs));
   EXPECT_LE(client.MaxError(pixels), 24u);
 }
 auto GraphicsSession::ConnectPipeline(Client& client) -> void {

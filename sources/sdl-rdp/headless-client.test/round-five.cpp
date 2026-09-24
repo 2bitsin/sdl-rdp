@@ -1,5 +1,6 @@
 #include <sdl-rdp/headless-client.test/round-five.hpp>
 
+#include <sdl-rdp/headless-client.test/await-acknowledged.hpp>
 #include <sdl-rdp/headless-client.test/pattern.hpp>
 #include <sdl-rdp/headless-client.test/peer-status.hpp>
 
@@ -80,7 +81,7 @@ auto RoundFive::ThenGraphicsTimeoutStatistics() -> void {
 }
 auto RoundFive::ThenGraphicsAcknowledgementsCounted() -> void {
   ASSERT_TRUE(GraphicsObserver().Ack());
-  ASSERT_TRUE(GraphicsClient().Until([&] { return Acknowledged(); }));
+  ASSERT_NO_FATAL_FAILURE(AwaitAllAcknowledged(GraphicsClient(), backend, logs));
   EXPECT_EQ(RequiredStatus(*backend).acknowledgements, 3u);
 }
 auto RoundFive::ThenGraphicsWindowReleases(std::vector<std::uint32_t> const& pixels) -> void {

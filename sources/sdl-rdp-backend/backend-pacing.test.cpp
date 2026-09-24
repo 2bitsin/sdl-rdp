@@ -1,3 +1,4 @@
+#include <sdl-rdp/headless-client.test/await-acknowledged.hpp>
 #include <sdl-rdp/headless-client.test/backend-instance.hpp>
 #include <sdl-rdp/headless-client.test/pattern.hpp>
 #include <sdl-rdp/headless-client.test/round-five.hpp>
@@ -225,7 +226,7 @@ TEST_F(RoundFive, GraphicsDisconnectDuringWrite) {
   std::ignore = backend.Poll();
   std::vector<std::uint32_t> pixels(static_cast<std::size_t>(side) * side);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, side, side));
-  ASSERT_TRUE(client.Until([&] { return Acknowledged(); }));
+  ASSERT_NO_FATAL_FAILURE(AwaitAllAcknowledged(client, backend, logs));
   Headless::NoisePattern(pixels, 1);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, side, side));
   ASSERT_NO_FATAL_FAILURE(ThenReadable(client));

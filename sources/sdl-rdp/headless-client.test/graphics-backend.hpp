@@ -16,7 +16,6 @@ protected:
   auto OpenGraphics(char* pattern, std::uint32_t width, std::uint32_t height, sdlrdp_codec codec) -> void;
   auto TearDown()                                                                                 -> void override;
   auto ConnectGraphics(Client& client)                                                            -> void;
-  auto AwaitAcknowledgement(Client& client, std::uint64_t sequence)                               -> void;
   Logs                      logs;
   std::filesystem::path     directory;
   Headless::BackendInstance backend;

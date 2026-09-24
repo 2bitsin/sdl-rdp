@@ -1,4 +1,5 @@
 #include <sdl-rdp/headless-client.test/audio-gate.hpp>
+#include <sdl-rdp/headless-client.test/peer-status.hpp>
 #include <sdl-rdp/headless-client.test/wall-milliseconds.hpp>
 
 #include <oxbox/utilities/number-text.hpp>
@@ -38,7 +39,8 @@ protected:
     std::vector<std::int16_t> pcm(std::size_t{ frames } * 2, -1234);
     ASSERT_EQ(sdlrdp_audio_write(backend.Handle(), pcm.data(), frames), frames);
     ASSERT_NO_FATAL_FAILURE(Present(std::vector<std::uint32_t>(320uz * 200, 0xff123456), 320, 200));
-    ASSERT_TRUE(client.Until([&] { return audio.CaptureState().samples.size() == pcm.size() && Acknowledged(); }));
+    ASSERT_TRUE(
+        client.Until([&] { return audio.CaptureState().samples.size() == pcm.size() && AllAcknowledged(*backend); }));
   }
   auto CheckTimes() -> void {
     auto const now = Headless::WallMilliseconds();

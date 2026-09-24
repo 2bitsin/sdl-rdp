@@ -1,4 +1,5 @@
 #include <sdl-rdp/headless-client.test/graphics-cost.hpp>
+#include <sdl-rdp/headless-client.test/await-acknowledged.hpp>
 #include <sdl-rdp/headless-client.test/backend-instance.hpp>
 
 #include <sdl-rdp/headless-client.test/pattern.hpp>
@@ -46,7 +47,7 @@ auto GraphicsCost::PresentMovingTiles(Client& client, std::size_t frames) -> voi
   for (std::size_t frame = 0; frame < frames; ++frame) {
     MovingTilePattern(pixels, 1920, 1080, frame);
     ASSERT_EQ(backend.Present(pixels, 1920, 1080, full), 0);
-    ASSERT_NO_FATAL_FAILURE(AwaitAcknowledgement(client, frame + 1));
+    ASSERT_NO_FATAL_FAILURE(BackendGate::AwaitAllAcknowledged(client, backend, logs));
   }
 }
 auto GraphicsCost::PresentPlanar(Client& client, GraphicsObserver& observer, std::vector<std::uint32_t> const& pixels,

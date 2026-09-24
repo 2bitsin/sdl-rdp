@@ -1,9 +1,9 @@
 #include "support.test/counting-heap.hpp"
+#include <sdl-rdp/headless-client.test/await-acknowledged.hpp>
 #include <sdl-rdp/headless-client.test/backend-instance.hpp>
 #include <sdl-rdp/headless-client.test/graphics-backend.hpp>
 #include <sdl-rdp/headless-client.test/graphics-observer.hpp>
 #include <sdl-rdp/headless-client.test/pattern.hpp>
-#include <sdl-rdp/headless-client.test/peer-status.hpp>
 #include <sdl-rdp/video/avc-encoder.hpp>
 
 #include <gtest/gtest.h>
@@ -84,9 +84,9 @@ private:
     Headless::MovingTilePattern(_pixels, Width, Height, frame);
     auto const received = _observer->Observed().frames.size();
     ASSERT_EQ(backend.Present(_pixels, Width, Height, area), 0);
-    HeapCount::Uncounted const client_side;
+    HeapCount::Uncounted const waiting;
     ASSERT_TRUE(_client->Until([&] { return _observer->Observed().frames.size() > received; })) << logs.Text(true);
-    ASSERT_NO_FATAL_FAILURE(AwaitAcknowledgement(*_client, BackendGate::Presented(*backend)));
+    ASSERT_NO_FATAL_FAILURE(BackendGate::AwaitAllAcknowledged(*_client, backend, logs));
   }
   std::vector<std::uint32_t>                  _pixels   = std::vector<std::uint32_t>(std::size_t{ Width } * Height);
   std::unique_ptr<Headless::Client>           _client;

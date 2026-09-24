@@ -29,7 +29,6 @@ using utilities::Required;
 // whole sequence, so an early poll cannot lose half of a transition.
 class BackendEvents {
 protected:
-  auto Acknowledged() const                                                         -> bool;
   auto EventsUntil(auto predicate, bool include_refresh, std::predicate auto await) -> std::vector<sdlrdp_event> {
     std::vector<sdlrdp_event> result;
     auto                      deadline = Clock::now() + std::chrono::seconds(10);

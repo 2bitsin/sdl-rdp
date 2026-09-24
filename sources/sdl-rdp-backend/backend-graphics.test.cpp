@@ -1,3 +1,4 @@
+#include <sdl-rdp/headless-client.test/await-acknowledged.hpp>
 #include <sdl-rdp/headless-client.test/backend-instance.hpp>
 #include <sdl-rdp/headless-client.test/gate.hpp>
 #include <sdl-rdp/headless-client.test/graphics-observer.hpp>
@@ -196,7 +197,7 @@ TEST_F(RoundFive, ProgressiveDamageAndQoe) {
   ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
   auto pixels = GraphicsScene(5, false);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
-  ASSERT_TRUE(client.Until([&] { return Acknowledged(); }));
+  ASSERT_NO_FATAL_FAILURE(AwaitAllAcknowledged(client, backend, logs));
   auto              before = client.Received();
   sdlrdp_rect const damage { 17, 19, 7, 5 };
   std::ranges::for_each(std::views::iota(damage.y, damage.y + damage.h), [&](int y) {

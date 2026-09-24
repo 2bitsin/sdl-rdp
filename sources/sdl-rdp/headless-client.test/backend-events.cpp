@@ -1,7 +1,5 @@
 #include <sdl-rdp/headless-client.test/backend-events.hpp>
 
-#include <sdl-rdp/headless-client.test/peer-status.hpp>
-
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <array>
@@ -15,10 +13,6 @@ auto Contains(sdlrdp_event_type type) {
     return std::ranges::contains(events, type, &sdlrdp_event::type);
   };
 }
-}
-auto BackendEvents::Acknowledged() const -> bool {
-  Expects(backend.Handle() != nullptr, "backend exists");
-  return AcknowledgedThrough(*backend, Presented(*backend));
 }
 auto BackendEvents::Events(std::size_t wanted) -> std::vector<sdlrdp_event> {
   return EventsUntil([=](auto const& events) { return events.size() >= wanted; }, false,

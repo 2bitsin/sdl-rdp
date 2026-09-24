@@ -13,10 +13,6 @@ inline auto CurrentStatus(sdlrdp_handle& handle) -> std::optional<Backend::PeerS
   auto const* current = handle.Session().Current(frame);
   return current ? std::optional{ current->Status(frame) } : std::nullopt;
 }
-inline auto AcknowledgedThrough(sdlrdp_handle& handle, std::uint64_t sequence) -> bool {
-  auto const status = CurrentStatus(handle);
-  return status && status->acknowledged >= sequence;
-}
 inline auto RequiredStatus(sdlrdp_handle& handle) -> Backend::PeerStatus {
   auto status = CurrentStatus(handle);
   utilities::Expects(status.has_value(), "a client is current");
@@ -30,5 +26,9 @@ inline auto RequiredGraphics(sdlrdp_handle& handle) -> Backend::GraphicsTiming {
 inline auto Presented(sdlrdp_handle& handle) -> std::uint64_t {
   return handle.Frames().Read(
       [](Backend::FrameStore const& frames, Backend::FrameLock const& held) { return frames.Presented(held); });
+}
+inline auto AllAcknowledged(sdlrdp_handle& handle) -> bool {
+  auto const status = CurrentStatus(handle);
+  return status && status->acknowledged >= Presented(handle);
 }
 }

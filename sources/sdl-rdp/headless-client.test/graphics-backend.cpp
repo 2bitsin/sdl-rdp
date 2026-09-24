@@ -1,7 +1,5 @@
 #include <sdl-rdp/headless-client.test/graphics-backend.hpp>
 
-#include <sdl-rdp/headless-client.test/peer-status.hpp>
-
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -24,8 +22,5 @@ auto GraphicsBackend::ConnectGraphics(Client& client) -> void {
   ASSERT_TRUE(client.Connect());
   ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }, std::chrono::seconds(20)))
       << logs.Text(true);
-}
-auto GraphicsBackend::AwaitAcknowledgement(Client& client, std::uint64_t sequence) -> void {
-  ASSERT_TRUE(client.Until([&] { return BackendGate::AcknowledgedThrough(*backend, sequence); })) << logs.Text(true);
 }
 }
