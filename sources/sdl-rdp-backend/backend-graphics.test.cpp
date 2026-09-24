@@ -197,7 +197,7 @@ TEST_F(RoundFive, ProgressiveDamageAndQoe) {
   ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
   auto pixels = GraphicsScene(5, false);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
-  ASSERT_NO_FATAL_FAILURE(AwaitAllAcknowledged(client, backend, logs));
+  ASSERT_NO_FATAL_FAILURE(sdl_rdp::headless_client_test::AwaitAllAcknowledged(client, backend, logs));
   auto              before = client.Received();
   sdlrdp_rect const damage { 17, 19, 7, 5 };
   std::ranges::for_each(std::views::iota(damage.y, damage.y + damage.h), [&](int y) {

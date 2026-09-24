@@ -45,7 +45,7 @@ auto GraphicsSession::GraphicsObserver() -> Headless::GraphicsObserver& {
 auto GraphicsSession::PresentProgressiveDamage(Client& client, std::vector<std::uint32_t> const& pixels,
                                                sdlrdp_rect damage) -> void {
   ASSERT_EQ(backend.Present(pixels, 640, 480, damage), 0);
-  ASSERT_NO_FATAL_FAILURE(AwaitAllAcknowledged(client, backend, logs));
+  ASSERT_NO_FATAL_FAILURE(sdl_rdp::headless_client_test::AwaitAllAcknowledged(client, backend, logs));
   EXPECT_LE(client.MaxError(pixels), 24u);
 }
 auto GraphicsSession::ConnectPipeline(Client& client) -> void {

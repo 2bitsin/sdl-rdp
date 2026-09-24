@@ -27,8 +27,13 @@ inline auto Presented(sdlrdp_handle& handle) -> std::uint64_t {
   return handle.Frames().Read(
       [](Backend::FrameStore const& frames, Backend::FrameLock const& held) { return frames.Presented(held); });
 }
+inline auto AllAcknowledged(sdlrdp_handle& handle, Backend::FrameLock const& held) -> bool {
+  auto const* current = handle.Session().Current(held);
+  return current != nullptr && current->Status(held).acknowledged >= handle.Frames().Presented(held);
+}
 inline auto AllAcknowledged(sdlrdp_handle& handle) -> bool {
-  auto const status = CurrentStatus(handle);
-  return status && status->acknowledged >= Presented(handle);
+  auto const session = handle.Session().Lock();
+  auto const frame   = handle.Frames().Lock();
+  return AllAcknowledged(handle, frame);
 }
 }

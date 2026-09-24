@@ -33,7 +33,7 @@ protected:
     ASSERT_NO_FATAL_FAILURE(Connect(client));
     if (codec == SDLRDP_CODEC_PROGRESSIVE) ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
     ASSERT_NO_FATAL_FAILURE(Present(GraphicsScene(0, noise), 640, 480));
-    ASSERT_NO_FATAL_FAILURE(AwaitAllAcknowledged(client, backend, logs));
+    ASSERT_NO_FATAL_FAILURE(sdl_rdp::headless_client_test::AwaitAllAcknowledged(client, backend, logs));
   }
   auto MeasureFrames(Client& client, bool noise, std::uint32_t& maximum_error, double& latency) -> void {
     for (std::uint32_t frame = 1; frame <= 20; ++frame) {
@@ -41,7 +41,7 @@ protected:
       auto              presented = Clock::now();
       sdlrdp_rect const damage    = noise ? sdlrdp_rect{ 0, 0, 640, 480 } : sdlrdp_rect{ int(frame - 1), 40, 33, 32 };
       ASSERT_EQ(backend.Present(pixels, 640, 480, damage), 0);
-      ASSERT_NO_FATAL_FAILURE(AwaitAllAcknowledged(client, backend, logs));
+      ASSERT_NO_FATAL_FAILURE(sdl_rdp::headless_client_test::AwaitAllAcknowledged(client, backend, logs));
       latency       += std::chrono::duration<double, std::milli>(Clock::now() - presented).count();
       maximum_error =  std::max(maximum_error, client.MaxError(pixels));
     }

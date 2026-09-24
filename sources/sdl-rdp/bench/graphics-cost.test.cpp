@@ -24,7 +24,7 @@ TEST_F(GraphicsCost, FullRandomFrame) {
   std::ranges::generate(pixels, [&] { return random() & 0x00ffffff; });
   sdlrdp_rect const full{ 0, 0, 1280, 800 };
   ASSERT_EQ(backend.Present(pixels, 1280, 800, full), 0);
-  ASSERT_NO_FATAL_FAILURE(BackendGate::AwaitAllAcknowledged(client, backend, logs));
+  ASSERT_NO_FATAL_FAILURE(sdl_rdp::headless_client_test::AwaitAllAcknowledged(client, backend, logs));
   ThenProgressiveCost(client, observer);
 }
 TEST_F(GraphicsCost, AvcFullFrame) {

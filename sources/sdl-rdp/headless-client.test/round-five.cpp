@@ -81,7 +81,7 @@ auto RoundFive::ThenGraphicsTimeoutStatistics() -> void {
 }
 auto RoundFive::ThenGraphicsAcknowledgementsCounted() -> void {
   ASSERT_TRUE(GraphicsObserver().Ack());
-  ASSERT_NO_FATAL_FAILURE(AwaitAllAcknowledged(GraphicsClient(), backend, logs));
+  ASSERT_NO_FATAL_FAILURE(sdl_rdp::headless_client_test::AwaitAllAcknowledged(GraphicsClient(), backend, logs));
   EXPECT_EQ(RequiredStatus(*backend).acknowledgements, 3u);
 }
 auto RoundFive::ThenGraphicsWindowReleases(std::vector<std::uint32_t> const& pixels) -> void {

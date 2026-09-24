@@ -47,7 +47,7 @@ auto GraphicsCost::PresentMovingTiles(Client& client, std::size_t frames) -> voi
   for (std::size_t frame = 0; frame < frames; ++frame) {
     MovingTilePattern(pixels, 1920, 1080, frame);
     ASSERT_EQ(backend.Present(pixels, 1920, 1080, full), 0);
-    ASSERT_NO_FATAL_FAILURE(BackendGate::AwaitAllAcknowledged(client, backend, logs));
+    ASSERT_NO_FATAL_FAILURE(sdl_rdp::headless_client_test::AwaitAllAcknowledged(client, backend, logs));
   }
 }
 auto GraphicsCost::PresentPlanar(Client& client, GraphicsObserver& observer, std::vector<std::uint32_t> const& pixels,

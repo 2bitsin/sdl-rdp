@@ -86,7 +86,7 @@ private:
     ASSERT_EQ(backend.Present(_pixels, Width, Height, area), 0);
     HeapCount::Uncounted const waiting;
     ASSERT_TRUE(_client->Until([&] { return _observer->Observed().frames.size() > received; })) << logs.Text(true);
-    ASSERT_NO_FATAL_FAILURE(BackendGate::AwaitAllAcknowledged(*_client, backend, logs));
+    ASSERT_NO_FATAL_FAILURE(sdl_rdp::headless_client_test::AwaitAllAcknowledged(*_client, backend, logs));
   }
   std::vector<std::uint32_t>                  _pixels   = std::vector<std::uint32_t>(std::size_t{ Width } * Height);
   std::unique_ptr<Headless::Client>           _client;

@@ -1,6 +1,7 @@
 #include <sdl-rdp/headless-client.test/await-acknowledged.hpp>
 #include <sdl-rdp/headless-client.test/backend-instance.hpp>
 #include <sdl-rdp/headless-client.test/pattern.hpp>
+#include <sdl-rdp/headless-client.test/peer-status.hpp>
 #include <sdl-rdp/headless-client.test/round-five.hpp>
 #include <sdl-rdp/session/peer.hpp>
 
@@ -95,10 +96,8 @@ auto WaitForAcknowledgement(sdlrdp_handle& handle) -> bool {
   auto& frames = handle.Frames();
   auto  lock   = frames.Lock();
   Expects(handle.Session().Current(lock) != nullptr, "active peer owns the pending frame");
-  return frames.WaitFor(lock, Backend::DeadlineAfter(std::chrono::seconds(10)), [&] {
-    auto const* current = handle.Session().Current(lock);
-    return current != nullptr && current->Status(lock).acknowledged >= frames.Presented(lock);
-  });
+  return frames.WaitFor(lock, Backend::DeadlineAfter(std::chrono::seconds(10)),
+                        [&] { return AllAcknowledged(handle, lock); });
 }
 }
 TEST_F(RoundFive, WaitWithoutRefreshFeedback) {
@@ -226,7 +225,7 @@ TEST_F(RoundFive, GraphicsDisconnectDuringWrite) {
   std::ignore = backend.Poll();
   std::vector<std::uint32_t> pixels(static_cast<std::size_t>(side) * side);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, side, side));
-  ASSERT_NO_FATAL_FAILURE(AwaitAllAcknowledged(client, backend, logs));
+  ASSERT_NO_FATAL_FAILURE(sdl_rdp::headless_client_test::AwaitAllAcknowledged(client, backend, logs));
   Headless::NoisePattern(pixels, 1);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, side, side));
   ASSERT_NO_FATAL_FAILURE(ThenReadable(client));
