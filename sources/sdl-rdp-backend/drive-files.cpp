@@ -59,7 +59,7 @@ auto Information(sdlrdp_file& file, unsigned type) -> DrivePacket {
   return result;
 }
 auto UnixSeconds(uint64_t value) -> int64_t {
-  // WinPR 3.15 FileTimeToSystemTime is a stub on Linux.
+  // WinPR 3.32 timezone.c:689 FileTimeToSystemTime is a stub on Linux.
   constexpr uint64_t filetime_ticks_per_second = 10'000'000;
   using namespace std::chrono;
   constexpr auto epoch = duration_cast<seconds>(sys_days{ 1970y / January / 1 } - sys_days{ 1601y / January / 1 })
@@ -260,7 +260,7 @@ auto sdlrdp_drive_fstat(sdlrdp_handle* h, sdlrdp_file* file, sdlrdp_stat* out) -
 auto sdlrdp_drive_flush(sdlrdp_handle* h, sdlrdp_file* file) -> int {
   return Call(h, [&] {
     if (!file || Channel(h) != file->Channel()) throw std::runtime_error("Invalid or disconnected file.");
-    // FreeRDP 3.15 does not handle FLUSH_BUFFERS; synchronous writes are already acknowledged.
+    // FreeRDP 3.32 drive_main.c:754 has no FLUSH_BUFFERS case; synchronous writes are already acknowledged.
     return 0;
   });
 }

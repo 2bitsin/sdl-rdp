@@ -42,7 +42,7 @@ template <class Identity> auto NamesOf(Identity const& identity) -> IdentityName
 }
 inline auto ClientNames(SEC_WINNT_AUTH_IDENTITY const& identity) -> IdentityNames {
   if ((identity.Flags & SEC_WINNT_AUTH_IDENTITY_UNICODE) != 0) return NamesOf(identity);
-  // FreeRDP on Linux fills ANSI identities from UTF-8 settings (3.15 winpr/libwinpr/sspi/sspi_winpr.c).
+  // FreeRDP on Linux fills ANSI identities from UTF-8 settings (3.32 winpr/libwinpr/sspi/sspi_winpr.c:621).
   // WinPR declares the W and A identities with one layout (sspi.h); Flags says which pointer type is live.
   return NamesOf(std::bit_cast<SEC_WINNT_AUTH_IDENTITY_A>(identity));
 }

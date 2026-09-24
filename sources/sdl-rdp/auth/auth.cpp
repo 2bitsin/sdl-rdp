@@ -39,7 +39,7 @@ public:
            ~SettingsPassword() {
     auto* password = freerdp_settings_get_string_writable(settings, FreeRDP_Password);
     if (password) OPENSSL_cleanse(password, std::strlen(password));
-    // FreeRDP 3.15 include/freerdp/settings.h: set_string copies input; NULL removes the old entry.
+    // FreeRDP 3.32 include/freerdp/settings.h:553: set_string copies input; nullptr removes the old entry.
     Ensures(freerdp_settings_set_string(settings, FreeRDP_Password, nullptr), "password cleared");
   }
   auto operator=(SettingsPassword const&) -> SettingsPassword& = delete;
@@ -73,7 +73,7 @@ auto Utf16(std::string const& text) -> std::vector<BYTE> {
   return TranscodeRange<std::vector<BYTE>>(std::as_bytes(std::span(text)), { }, Utf16Little);
 }
 auto NtlmResponseKey(AuthenticationState const& identity, BYTE* nt_hash_v1, BYTE* response) -> bool {
-  // FreeRDP 3.15's NTLM callback consumes a response key and treats nonzero as success.
+  // FreeRDP 3.32 ntlm_compute.c:513 takes the NTLMv2 response key, not the NT hash, and needs SEC_E_OK.
   auto user          = Utf16(identity.User());
   auto domain        = Utf16(identity.Domain());
   auto user_length   = user.size();
@@ -114,31 +114,40 @@ auto Authenticator::Verify(char const* domain, char const* user, char const* pas
   return accepted;
 }
 auto Authenticator::Denied() -> bool {
+  _link.Client().authenticated = false;
   _link.Refuse(ERRINFO_SERVER_DENIED_CONNECTION);
   return false;
 }
 auto Authenticator::Logon(BOOL automatic) -> BOOL {
-  if (!automatic || _configuration.Config().auth == SDLRDP_AUTH_NONE) return FALSE;
-  // FreeRDP 3.15 stores delegated credentials in settings, not nla_get_identity().
+  // FreeRDP 3.32 peer.c:846 drops a failed Logon unannounced; the refusal waits for activation, where ERRINFO reaches.
+  if (!automatic || _configuration.Config().auth == SDLRDP_AUTH_NONE) return true;
+  // FreeRDP 3.32 nla.c:1494 stores delegated credentials in settings, not nla_get_identity().
   std::ignore = _state.TestAndSetChecked();
   auto& client = _link.Client();
   try {
-    return Verify(Setting(client, FreeRDP_Domain), Setting(client, FreeRDP_Username),
-                  Setting(client, FreeRDP_Password));
+    std::ignore = Verify(Setting(client, FreeRDP_Domain), Setting(client, FreeRDP_Username),
+                         Setting(client, FreeRDP_Password));
   } catch (...) {
     Reject();
-    return FALSE;
   }
+  return true;
 }
 auto Authenticator::VerifySettings() -> bool {
   auto&                  client = _link.Client();
   SettingsPassword const clear  { client.context->settings };
-  if (_state.TestAndSetChecked()) return _state.Rejected() ? Denied() : true;
+  if (_state.TestAndSetChecked()) {
+    if (!_state.Rejected()) return true;
+    std::ignore = Denied();
+    Ensures(!client.authenticated, "a rejected peer is not authenticated at activation");
+    return false;
+  }
   try {
     auto const* domain = Setting(client, FreeRDP_Domain);
     auto const* user   = Setting(client, FreeRDP_Username);
-    if (_configuration.Config().auth == SDLRDP_AUTH_NONE)
+    if (_configuration.Config().auth == SDLRDP_AUTH_NONE) {
+      client.authenticated = false;
       return sspi_SetAuthIdentityA(&client.identity, user, domain, nullptr) > 0;
+    }
     return Verify(domain, user, Setting(client, FreeRDP_Password)) || Denied();
   } catch (...) {
     Reject();

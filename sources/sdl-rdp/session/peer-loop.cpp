@@ -24,13 +24,15 @@
 
 namespace Backend {
 namespace {
-using SecurityFlags = std::array<std::pair<FreeRDP_Settings_Keys_Bool, bool>, 11>;
+using SecurityFlags = std::array<std::pair<FreeRDP_Settings_Keys_Bool, bool>, 12>;
 auto Apply(rdpSettings& settings, std::ranges::input_range auto const& entries, auto set) -> bool {
   return std::ranges::all_of(entries, [&](auto const& entry) { return set(&settings, entry.first, entry.second); });
 }
 auto Flags(sdlrdp_auth auth) -> SecurityFlags {
   return { {
       { FreeRDP_NlaSecurity              , auth == SDLRDP_AUTH_NLA  },
+      // sdl-rdp#41: FreeRDP 3.32 nla.c:943 sends Early User Authorization success before Logon decides.
+      { FreeRDP_ExtSecurity              , false                    },
       { FreeRDP_TlsSecurity              , true                     },
       { FreeRDP_RdpSecurity              , auth == SDLRDP_AUTH_NONE },
       { FreeRDP_RemoteFxCodec            , true                     },

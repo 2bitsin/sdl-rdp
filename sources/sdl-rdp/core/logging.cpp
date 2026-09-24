@@ -73,8 +73,8 @@ auto ErrorName(std::string_view text) -> std::string_view {
 }
 auto SspiRejectionEcho(LogRoute::Filter const& filter, std::string_view prefix, std::string_view text) -> bool {
   static constexpr std::array<std::string_view, 2> sspi{
-    "AcceptSecurityContext status SEC_E_MESSAGE_ALTERED [0x8009030F]",
-    "AcceptSecurityContext status SEC_E_NO_CREDENTIALS [0x8009030E]"
+    "AcceptSecurityContext status SEC_E_MESSAGE_ALTERED [0x8009030f]",
+    "AcceptSecurityContext status SEC_E_NO_CREDENTIALS [0x8009030e]"
   };
   return filter.authentication_failed && prefix == "com.winpr.sspi" && std::ranges::contains(sspi, text);
 }
@@ -96,7 +96,7 @@ auto DetectTlsHandshakeFailure(LogRoute::Filter& filter, std::string_view prefix
 }
 auto NegotiationEcho(LogRoute::Filter const& filter, std::string_view prefix, std::string_view text) -> bool {
   static constexpr std::array<std::string_view, 6> echoes{
-    "server supports only", "Protocol security negotiation failure",
+    "server supports only", "Protocol security negotiation fail",
     "BIO_do_handshake failed", "rdp_server_accept_nego() fail",
     "STATE_RUN_FAILED", "ERRCONNECT_CONNECT_TRANSPORT_FAILED"
   };

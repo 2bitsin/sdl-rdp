@@ -29,7 +29,7 @@ struct Slot {
   size_t                        offset { };
   size_t                        count  { };
 };
-// FreeRDP 3.15 Drive* uses 32-bit offsets and a private reader; this peer owns both directions.
+// FreeRDP 3.32 server/rdpdr.h:103 Drive* uses 32-bit offsets and a private reader; this peer owns both directions.
 class DriveChannel : public std::enable_shared_from_this<DriveChannel> {
 public:
        DriveChannel(DriveChannel const&)                              = delete;

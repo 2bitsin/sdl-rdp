@@ -84,7 +84,7 @@ auto ExpectInside(sdlrdp_rect area, Extent surface) -> void {
 constexpr auto BlockHeader(UINT16 block, std::size_t bytes) -> std::array<BYTE, ProgressiveBlockHeaderBytes> {
   return { BYTE(block), BYTE(block >> 8), BYTE(bytes), 0, 0, 0 };
 }
-// FreeRDP 3.15 rfx.c repeats SYNC/CONTEXT; GRD sends them once per surface context.
+// FreeRDP 3.32 rfx.c:2499 repeats SYNC/CONTEXT; GRD sends them once per surface context.
 auto ProgressiveHeaders(std::span<BYTE const> data) -> bool {
   if (data.size() < ProgressiveHeaderBytes) return false;
   constexpr auto sync    = BlockHeader(ProgressiveSyncBlock, ProgressiveSyncBytes);

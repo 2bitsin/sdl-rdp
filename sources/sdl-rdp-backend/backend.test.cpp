@@ -31,12 +31,6 @@ auto ThenLoggingChild(Headless::ChildProcess& child, std::string const& output) 
   EXPECT_TRUE(child.ExitedCleanly()) << output;
   EXPECT_FALSE(output.contains("com.freerdp")) << output;
 }
-auto ThenSignedDelta(std::vector<UINT32> const& decoded, std::vector<UINT32> const& pixels) -> void {
-  EXPECT_EQ(decoded.front(), pixels.front());
-  // FreeRDP 3.15 planar.c:1477 tests unsigned s2c >= 0, misencoding negative deltas.
-  EXPECT_NE(decoded, pixels);
-  EXPECT_NE(decoded[64], pixels[64]);
-}
 auto ThenCertificatePermissions(std::filesystem::path const& data) -> void {
   using Perm = std::filesystem::perms;
   EXPECT_EQ(std::filesystem::status(data / "sdl-rdp").permissions() & Perm::mask, Perm::owner_all);
@@ -160,9 +154,9 @@ TEST(Planar, SignedDelta64Rows) {
   CompressSignedDelta(encoder.get(), pixels, compressed, size);
   if (::testing::Test::HasFatalFailure()) return;
   auto const target = oxbox::utilities::SpanCast<std::uint8_t>(std::span(decoded));
-  ASSERT_TRUE(planar_decompress(decoder.get(), compressed.data(), size, width, height, target.data(),
-                                PIXEL_FORMAT_BGRA32, width * 4, 0, 0, width, height, FALSE));
-  ThenSignedDelta(decoded, pixels);
+  ASSERT_TRUE(freerdp_bitmap_decompress_planar(decoder.get(), compressed.data(), size, width, height, target.data(),
+                                               PIXEL_FORMAT_BGRA32, width * 4, 0, 0, width, height, false));
+  EXPECT_EQ(decoded, pixels);
 }
 TEST(Logging, ListenerCallback) {
   CertificateDirectory const certificates;
@@ -263,8 +257,8 @@ TEST(Planar, Noisy640Rows) {
     UINT32 size = payload.size();
     ASSERT_TRUE(freerdp_bitmap_compress_planar(encoder.get(), source.data(), PIXEL_FORMAT_BGRA32, 640, 1, 2560,
                                                payload.data(), &size));
-    ASSERT_TRUE(planar_decompress(decoder.get(), payload.data(), size, 640, 1, target.data(), PIXEL_FORMAT_BGRX32, 2560,
-                                  0, 0, 640, 1, TRUE))
+    ASSERT_TRUE(freerdp_bitmap_decompress_planar(decoder.get(), payload.data(), size, 640, 1, target.data(),
+                                                 PIXEL_FORMAT_BGRX32, 2560, 0, 0, 640, 1, true))
         << y;
   }
 }

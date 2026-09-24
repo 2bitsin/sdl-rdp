@@ -1,5 +1,5 @@
 #pragma once
-#include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/freerdp-facade/releases-sound.hpp>
 
 #include <freerdp/server/rdpsnd.h>
 #include <chrono>
@@ -52,7 +52,6 @@ private:
   auto        Confirm(BYTE id, UINT16 timestamp)                                 -> void;
   static auto Activated(RdpsndServerContext* context)                            -> void;
   static auto Confirmed(RdpsndServerContext* context, BYTE id, UINT16 timestamp) -> UINT;
-  using SoundContext = std::unique_ptr<RdpsndServerContext, Releases<rdpsnd_server_context_free>>;
   PeerLink&            _link;
   Diagnostics const&   _diagnostics;
   EventQueue&          _events;

@@ -100,7 +100,7 @@ auto Encoder::EncodePayload(std::span<BYTE const> pixels, unsigned width, unsign
   utilities::Expects(pixels.size() == std::size_t(width) * height * 4, "encoder input is a packed band");
   Stream_SetPosition(stream.get(), 0);
   if (codec == SDLRDP_CODEC_PLANAR) {
-    utilities::Expects(height == 1, "planar avoids signed delta corruption in FreeRDP 3.15");
+    utilities::Expects(height == 1, "planar is row by row until sdl-rdp#42");
     return EncodePlanar(pixels, width);
   }
   bool result = false;

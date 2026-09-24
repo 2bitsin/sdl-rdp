@@ -19,7 +19,6 @@ WarningsAsErrors: '*'
 HeaderFilterRegex: 'sources/(sdl-rdp/[^/]+|sdl-rdp-backend|sdl-rdp-sample|SDL3/rdp)/.*\.(hpp|cpp)$'
 ExcludeHeaderFilterRegex: 'sdl-rdp-backend\.h$|/(third-party|_build|_bdudata)/'
 CheckOptions:
-  misc-header-include-cycle.IgnoredFilesList: '^/usr/include/;/generated/sdl-rdp-freerdp-facade/freerdp/'
   readability-function-size.LineThreshold: 40
   readability-function-size.StatementThreshold: 60
   readability-function-size.ParameterThreshold: 8

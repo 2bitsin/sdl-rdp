@@ -9,7 +9,7 @@ namespace {
 auto DecodeDriveName(std::span<uint8_t const> bytes, unsigned drive_version, char const* dos) -> std::string {
   if (!bytes.empty()) {
     if (bytes.back()) throw std::runtime_error("Unterminated drive name.");
-    // FreeRDP 3.15 sends UTF-8 despite advertising drive capability v2.
+    // FreeRDP 3.32 drive_main.c:1023 sends UTF-8 despite advertising drive capability v2.
     bool const wide   = drive_version >= DRIVE_CAPABILITY_VERSION_02 && bytes.size() >= 2 && bytes.size() % 2 == 0
                         && bytes[bytes.size() - 2] == 0;
     auto       format = wide ? oxbox::utilities::TextFormat{ .encoding = oxbox::utilities::Encoding::UTF16,

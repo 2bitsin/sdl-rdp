@@ -12,7 +12,7 @@ The negotiated Windows keyboard layout ID is reported in backend
 `connected.keyboard_layout` and window property `SDL_PROP_WINDOW_RDP_KEYBOARD_LAYOUT_NUMBER`.
 SDL's `scancodes_windows.h` maps physical keys, not keyboard layouts. SDL builds
 Windows character keymaps using Windows `MapVirtualKey`/`ToUnicode` APIs; it
-ships no portable Windows-layout-to-character table. FreeRDP 3.15 has no
+ships no portable Windows-layout-to-character table. FreeRDP 3.32 has no
 `freerdp_keyboard_get_rdp_scancode_from_virtual_key_code` API; WinPR's
 `GetVirtualScanCodeFromVirtualKeyCode` maps VKs by keyboard **type**, not layout.
 This driver uses the keymap SDL holds, falling back to SDL’s default US keymap.
@@ -44,5 +44,3 @@ reported as native finger events. Missing pressure defaults to 1.
 Backend ABI version 4 adds `sdlrdp_set_relative_mouse`, `SDLRDP_TEXT`,
 `SDLRDP_MOUSE_RELATIVE`, `SDLRDP_TOUCH`, and the negotiated layout ID; wheel
 components are now floating-point notch counts. Driver and backend must match.
-
-FreeRDP 3.15.0 `rdpei_server_context_free` omits the private `outputStream` (about 256 bytes per connection); no public API exposes it for backend cleanup.

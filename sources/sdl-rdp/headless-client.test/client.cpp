@@ -104,6 +104,7 @@ auto Client::Credentials(char const* user, char const* password, char const* dom
   Expects(freerdp_settings_set_string(settings, FreeRDP_Password, password), "client password is configured");
   Expects(freerdp_settings_set_string(settings, FreeRDP_Domain, domain), "client domain is configured");
   Expects(freerdp_settings_set_bool(settings, FreeRDP_NlaSecurity, nla), "client NLA policy is configured");
+  Expects(freerdp_settings_set_bool(settings, FreeRDP_ExtSecurity, nla), "client NLA_EXT follows NLA");
   Expects(freerdp_settings_set_bool(settings, FreeRDP_TlsSecurity, !nla), "client TLS policy is configured");
   Expects(freerdp_settings_set_bool(settings, FreeRDP_RdpSecurity, FALSE), "client RDP security policy is configured");
   Expects(freerdp_settings_set_string(settings, FreeRDP_AuthenticationPackageList, "!kerberos"),

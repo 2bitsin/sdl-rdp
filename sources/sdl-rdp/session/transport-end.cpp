@@ -60,7 +60,7 @@ TransportEnd::TransportEnd(PeerLink& link, Activation const& activation, Authent
 auto TransportEnd::SecurityEnded() const -> bool {
   if (!NegotiationRefused() && !TlsHandshakeFailed()) return false;
   auto const& settings  = _link.Settings();
-  // FreeRDP 3.15 nego.c publishes requestedProtocols even after negotiation fails.
+  // FreeRDP 3.32 nego.c:1663 publishes requestedProtocols even after a failure response.
   auto const  requested = freerdp_settings_get_uint32(&settings, FreeRDP_RequestedProtocols);
   auto const  protocols = ProtocolNames(requested, !requested);
   _diagnostics.Log(SDLRDP_LOG_WARN,

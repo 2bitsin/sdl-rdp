@@ -12,7 +12,7 @@ namespace {
 auto TouchHandled(std::uint32_t result) -> bool {
   switch (result) {
   case CHANNEL_RC_OK:
-  // FreeRDP 3.15 channels/rdpei/server/rdpei_main.c:701 maps ERROR_NO_DATA to ERROR_READ_FAULT.
+  // FreeRDP 3.32 channels/rdpei/server/rdpei_main.c:710 maps ERROR_NO_DATA to ERROR_READ_FAULT.
   case ERROR_READ_FAULT: return true;
   default:               return false;
   }

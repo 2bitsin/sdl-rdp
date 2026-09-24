@@ -44,12 +44,12 @@ times are Unix seconds. Drive names have a 511-byte UTF-8 limit and entry names
 Calls from different threads can be outstanding together. The peer owns the
 static channel; transport loss wakes all waiters and removes its drives.
 
-FreeRDP 3.15's server `DriveReadFile`/`DriveWriteFile` wrappers expose 32-bit
+FreeRDP 3.32's server `DriveReadFile`/`DriveWriteFile` wrappers expose 32-bit
 offsets and a private reader thread. This backend instead pumps MS-RDPEFS
 packets through FreeRDP's WTS channel on the peer and owns completion IDs,
 preserving 64-bit offsets and avoiding races with directory continuations.
 The 64 KiB chunk size is this backend's transfer limit, not a negotiated
-client maximum; FreeRDP 3.15's drive reader accepts a 32-bit Length field
+client maximum; FreeRDP 3.32's drive reader accepts a 32-bit Length field
 without an explicit smaller read cap.
 
 The sample accepts `--ls share[/path]`, `--cat share/path` and

@@ -24,7 +24,7 @@ sdl-rdp/session/channel-set.cpp:24: ChannelSet::ChannelSet parameters 6 > 5 # co
 sdl-rdp/session/departure.cpp:14: Departure::Departure parameters 6 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp/session/peer-callbacks.cpp:24: PeerCallbacks::PeerCallbacks parameters 6 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp/session/peer-callbacks.cpp:41: PeerCallbacks::InstallClient lambda@41 parameters 7 > 5 # FreeRDP SspiNtlmHashCallback signature is the ABI
-sdl-rdp/session/peer-loop.cpp:71: PeerLoop::PeerLoop parameters 8 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
+sdl-rdp/session/peer-loop.cpp:73: PeerLoop::PeerLoop parameters 8 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp/session/peer-pump.cpp:12: PeerPump::PeerPump parameters 7 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp/session/peer.cpp:13: Peer::Peer parameters 8 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp/session/peer.hpp: Peer data members 31 > 10 # composition root: owns every per-peer part, each wired with only what it uses

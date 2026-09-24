@@ -10,6 +10,7 @@
 #include <ranges>
 #include <span>
 #include <string_view>
+#include <vector>
 
 namespace AuthenticationGate {
 namespace {
@@ -140,15 +141,17 @@ auto Authentication::RejectionLogs(char const* password, unsigned expected) -> v
   RecordProperty("trace", trace);
 }
 auto Authentication::ThenSecurityWarning(bool nla) -> void {
-  unsigned warnings = 0;
+  using Warnings = std::vector<std::string>;
+  // FreeRDP 3.32 nego.c:682 retries a refused NLA_EXT attempt (nego.c:660) as NLA (nego.c:701).
+  auto const expected = nla ? Warnings{ "TLS handshake failed: client requested TLS|NLA|NLA_EXT, server selected TLS",
+                                        "TLS handshake failed: client requested TLS|NLA, server selected TLS" }
+                            : Warnings{ "Connection refused: client requested RDP, server offers TLS" };
+  Warnings   warnings;
   for (auto const& [level, text] : logs) {
     EXPECT_NE(level, SDLRDP_LOG_ERROR) << text;
-    if (level != SDLRDP_LOG_WARN) continue;
-    ++warnings;
-    EXPECT_EQ(text, nla ? "TLS handshake failed: client requested TLS|NLA, server selected TLS"
-                        : "Connection refused: client requested RDP, server offers TLS");
+    if (level == SDLRDP_LOG_WARN) warnings.push_back(text);
   }
-  EXPECT_EQ(warnings, 1);
+  EXPECT_EQ(warnings, expected);
 }
 auto Authentication::ThenCertificateDisconnect(std::string_view closed) -> void {
   unsigned    disconnects = 0;

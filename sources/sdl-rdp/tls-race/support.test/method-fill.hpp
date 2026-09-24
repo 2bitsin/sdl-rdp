@@ -9,7 +9,7 @@
 
 namespace Race {
 enum class Setter{ Write, Create };
-// FreeRDP 3.15's names for its lazily filled methods: tcp.c's socket method and tls.c's TLS method.
+// FreeRDP 3.32's lazily filled methods: tcp.c:431 socket method and tls.c:672 TLS method (2bitsin/FreeRDP#2).
 inline constexpr std::string_view SocketMethod = "SimpleSocket";
 inline constexpr std::string_view TlsMethod    = "RdpTls";
 

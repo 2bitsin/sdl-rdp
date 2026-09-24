@@ -14,7 +14,7 @@ auto Accepted(PeerHandle accepted) -> PeerHandle {
   return accepted;
 }
 auto OpenChannelManager(rdpContext* context) -> ChannelManager {
-  // FreeRDP 3.15 WTSOpenServerA takes the peer's rdpContext through its server-name parameter.
+  // FreeRDP 3.32 server.c:1134 WTSOpenServerA takes the peer's rdpContext through its server-name parameter.
   auto* opened = WTSOpenServerA(reinterpret_cast<char*>(context));
   if (!opened || opened == INVALID_HANDLE_VALUE) throw std::runtime_error("Channel manager allocation failed.");
   return ChannelManager{ opened };

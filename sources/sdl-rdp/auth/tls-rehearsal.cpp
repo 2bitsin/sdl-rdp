@@ -97,7 +97,7 @@ TlsRehearsal::TlsRehearsal(Credentials const& credentials, std::chrono::millisec
 auto TlsRehearsal::Perform() && -> void {
   auto       handshake = std::async(std::launch::async, ConnectTls, ends.Client(), blocked_call_limit);
   auto const accepted  = AcceptTls(*server);
-  // FreeRDP 3.15 keeps the server socket open after a failed accept, so the client would wait for it.
+  // FreeRDP 3.32 transport.c:708 keeps the server socket open after a failed accept, so the client would wait for it.
   StopDirection(ends.Client(), SHUT_RD);
   auto const connected = handshake.get();
   if (!accepted) throw TlsAcceptRefused("TLS rehearsal accept failed.");

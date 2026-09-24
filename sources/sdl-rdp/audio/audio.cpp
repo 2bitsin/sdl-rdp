@@ -66,17 +66,7 @@ AudioChannel::AudioChannel(PeerLink& link, Diagnostics const& diagnostics, Event
   _sound->Activated = Activated;
   _sound->ConfirmBlock = Confirmed;
 }
-AudioChannel::~AudioChannel() {
-  _sound.reset();
-  int major   { 0 };
-  int minor   { 0 };
-  int revision{ 0 };
-  freerdp_get_version(&major, &minor, &revision);
-  if (major != 3 || minor != 15 || revision != 0) return;
-  // FreeRDP 3.15.0 returns the existing static-channel handle from Open.
-  auto                 name    = std::to_array(RDPSND_CHANNEL_NAME);
-  VirtualChannel const channel { WTSVirtualChannelOpen(_link.Channels(), WTS_CURRENT_SESSION, name.data()) };
-}
+AudioChannel::~AudioChannel() = default;
 auto AudioChannel::Initialize() -> bool {
   Expects(_sound != nullptr, "sound context exists");
   return _sound->Initialize(_sound.get(), FALSE) == CHANNEL_RC_OK;

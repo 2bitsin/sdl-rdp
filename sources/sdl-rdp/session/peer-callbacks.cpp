@@ -42,7 +42,8 @@ auto PeerCallbacks::InstallClient() -> void {
                                    BYTE const*, SecBuffer const*, BYTE* response) -> SECURITY_STATUS {
     Expects(identity != nullptr, "NTLM identity is supplied");
     Expects(response != nullptr, "callback response is supplied");
-    return Router(static_cast<freerdp_peer*>(peer))._authenticator.Hash(*identity, response) ? 1 : 0;
+    return Router(static_cast<freerdp_peer*>(peer))._authenticator.Hash(*identity, response) ? SEC_E_OK
+                                                                                             : SEC_E_LOGON_DENIED;
   };
 }
 auto PeerCallbacks::InstallUpdates() -> void {
