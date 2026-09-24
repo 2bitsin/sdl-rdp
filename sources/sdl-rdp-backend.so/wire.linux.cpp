@@ -1,4 +1,5 @@
 #include "_detail/refresh.hpp"
+#include "_detail/contract.hpp"
 
 #include <linux/sockios.h>
 #include <linux/tcp.h>

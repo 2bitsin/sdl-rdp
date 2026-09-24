@@ -1,6 +1,7 @@
 #include "_detail/configuration.hpp"
 
 #include "_detail/certificate.hpp"
+#include "_detail/contract.hpp"
 
 #include <stdexcept>
 

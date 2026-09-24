@@ -1,4 +1,5 @@
 #include "_detail/file-request.hpp"
+#include "_detail/contract.hpp"
 
 #include "sdl-rdp-backend.h"
 

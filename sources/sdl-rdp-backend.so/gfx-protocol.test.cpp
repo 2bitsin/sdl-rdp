@@ -1,5 +1,6 @@
 #include "_detail/gfx-protocol.hpp"
 
+#include "_detail/avc-regions.hpp"
 #include "_detail/avc.hpp"
 
 #include <algorithm>

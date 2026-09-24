@@ -1,6 +1,8 @@
 #pragma once
 #include "contract.hpp"
-#include "drive.hpp"
+#include "drive-channel.hpp"
+#include "malformed-response.hpp"
+#include "sdlrdp-file.hpp"
 
 #include <array>
 #include <cstring>

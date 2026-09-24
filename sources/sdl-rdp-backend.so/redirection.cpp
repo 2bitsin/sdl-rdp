@@ -3,7 +3,7 @@
 #include "_detail/activation.hpp"
 #include "_detail/audio.hpp"
 #include "_detail/clipboard.hpp"
-#include "_detail/drive.hpp"
+#include "_detail/drive-channel.hpp"
 #include "_detail/peer-link.hpp"
 #include "_detail/session-access.hpp"
 

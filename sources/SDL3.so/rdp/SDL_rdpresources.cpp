@@ -1,4 +1,5 @@
 #include "SDL_rdpresources.hpp"
+#include <stdexcept>
 namespace rdp {
 auto LockMutex(SDL_Mutex& mutex) -> SDL_Mutex& {
   SDL_LockMutex(&mutex);

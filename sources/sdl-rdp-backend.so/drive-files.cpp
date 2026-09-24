@@ -1,8 +1,10 @@
+#include "_detail/drive-channel.hpp"
 #include "_detail/drive-transfer.hpp"
-#include "_detail/drive.hpp"
 #include "_detail/file-request.hpp"
 #include "_detail/handle.hpp"
+#include "_detail/malformed-response.hpp"
 #include "_detail/peer.hpp"
+#include "_detail/sdlrdp-file.hpp"
 
 #include <array>
 #include <chrono>
@@ -35,12 +37,6 @@ template <std::invocable Operation> int Call(sdlrdp_handle* handle, Operation op
     SetError(handle, error.what());
     return -1;
   }
-}
-DrivePacket Exchange(sdlrdp_file& file, unsigned major, DrivePacket const& packet, unsigned minor = 0,
-                     bool end = false) {
-  Expects(file.Channel() != nullptr, "file retains its channel");
-  auto request = file.Channel()->Send(file.Drive(), file.Id(), major, packet, minor);
-  return file.Channel()->Wait(request, file.Path(), end);
 }
 std::unique_ptr<sdlrdp_file> Open(sdlrdp_handle* handle, unsigned drive, char const* path,
                                   FileRequest const& request) {
@@ -174,20 +170,6 @@ int Enumerate(sdlrdp_handle* handle, unsigned drive, char const* path, unsigned 
   file->Close();
   return int(count);
 }
-}
-void sdlrdp_file::Close() {
-  if (std::exchange(closed, true)) return;
-  DrivePacket        packet;
-  constexpr unsigned padding_after_request_header = 32;
-  packet.Zero(padding_after_request_header);
-  Exchange(*this, IRP_MJ_CLOSE, packet);
-}
-sdlrdp_file::~sdlrdp_file() {
-  try {
-    Close();
-  } catch (std::exception const& error) {
-    channel->Warn(std::format("Drive close '{}': {}", path, error.what()));
-  }
 }
 int sdlrdp_drive_list(sdlrdp_handle* handle, sdlrdp_drive* out, unsigned max) {
   return Call(handle, [&] {

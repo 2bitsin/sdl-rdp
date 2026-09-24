@@ -1,5 +1,7 @@
-#include "_detail/drive.hpp"
+#include "_detail/drive-channel.hpp"
+#include "_detail/transcode.hpp"
 
+#include <format>
 #include <freerdp/channels/rdpdr.h>
 
 namespace Backend {

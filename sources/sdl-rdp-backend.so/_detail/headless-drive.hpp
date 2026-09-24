@@ -1,5 +1,5 @@
 #pragma once
-#include "drive-wire.hpp"
+#include "drive-packet.hpp"
 #include "headless-client.hpp"
 
 #include <freerdp/channels/rdpdr.h>

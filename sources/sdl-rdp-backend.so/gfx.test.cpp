@@ -1,3 +1,4 @@
+#include "_detail/avc-encoder.hpp"
 #include "_detail/avc.hpp"
 #include "_detail/gfx-protocol.hpp"
 #include "_detail/headless-gfx.hpp"

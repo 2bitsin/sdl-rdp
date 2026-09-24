@@ -1,9 +1,9 @@
 #pragma once
 #include "SDL_rdpboundary.hpp"
+#include "SDL_rdpcheckedacquisition.hpp"
+#include "SDL_rdppointerstate.hpp"
 #include "_detail/scoped.hpp"
 #include <filesystem>
-#include <functional>
-#include <stdexcept>
 #include <tuple>
 namespace rdp {
 auto LockMutex(SDL_Mutex& mutex)                 -> SDL_Mutex&;
@@ -12,23 +12,6 @@ using ScopedMutexLock      = utilities::RAIIWrap<SDL_Mutex&, LockMutex, UnlockMu
 auto LockProperties(SDL_PropertiesID properties) -> SDL_PropertiesID;
 void UnlockProperties(SDL_PropertiesID properties) noexcept;
 using ScopedPropertiesLock = utilities::RAIIWrap<SDL_PropertiesID, LockProperties, UnlockProperties>;
-// SDL handles are C pointers; these two policies are the only place their null value is spelled.
-template<typename _Handle, auto _Projection = std::identity{ }>
-class PointerState {
-public:
-  static auto IsNull(_Handle const& value) noexcept -> bool { return std::invoke(_Projection, value) == nullptr; }
-  static void MakeNull(_Handle& value) noexcept { std::invoke(_Projection, value) = nullptr; }
-};
-template<auto _Acquire>
-class CheckedAcquisition {
-public:
-  template<typename... _Args> requires std::invocable<decltype(_Acquire), _Args...>
-  auto operator()(_Args&&... args) const {
-    auto value = std::invoke(_Acquire, std::forward<_Args>(args)...);
-    if (!value) throw std::runtime_error(SDL_GetError());
-    return value;
-  }
-};
 template<typename _Handle, auto _Acquire, auto _Release>
 using Resource = utilities::RAIIWrap<_Handle, CheckedAcquisition<_Acquire>{ }, _Release,
     PointerState<_Handle>::IsNull, PointerState<_Handle>::MakeNull>;

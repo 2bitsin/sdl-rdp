@@ -1,6 +1,4 @@
 #pragma once
-#include "contract.hpp"
-
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -19,14 +17,13 @@ struct WireSample {
   uint64_t delivery_rate{ };
 };
 WireSample SampleWire(int descriptor);
-struct Refresh {
+class Refresh {
+public:
   using Clock = std::chrono::steady_clock;
-  explicit Refresh(RefreshMode selected = RefreshMode::Fixed, unsigned limit = 60) : mode(selected), ceiling(limit) {
-    utilities::Expects(limit > 0, "refresh ceiling is positive");
-  }
-  unsigned         Rate() const { return rate; }
-  RefreshMode      Mode() const { return mode; }
-  bool             AwaitingEmpty() const { return awaiting_empty != 0; }
+  explicit         Refresh(RefreshMode selected = RefreshMode::Fixed, unsigned limit = 60);
+  unsigned         Rate() const;
+  RefreshMode      Mode() const;
+  bool             AwaitingEmpty() const;
   void             Restart();
   void             Step(Direction direction);
   Direction        FromLatency(Clock::duration latency) const;

@@ -1,4 +1,5 @@
 #include "_detail/test-drive.hpp"
+#include "_detail/transcode.hpp"
 
 #include <cstddef>
 namespace DriveGate {

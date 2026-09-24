@@ -1,5 +1,5 @@
 #pragma once
-#include "drive-wire.hpp"
+#include "drive-packet.hpp"
 #include "rdp-handles.hpp"
 #include "sdl-rdp-backend.h"
 
@@ -40,7 +40,7 @@ public:
   DriveChannel&                 operator = (DriveChannel&&)       = delete;
   bool                          Open();
   bool                          Pump(std::span<HANDLE const> signaled);
-  HANDLE                        Event() const { return event; }
+  HANDLE                        Event() const;
   void                          Disconnect();
   void                          Abort(std::string const& /*cause*/);
   int                           List(sdlrdp_drive* /*out*/, unsigned /*max*/);
@@ -86,25 +86,3 @@ private:
   std::condition_variable_any                             changed;
 };
 } // namespace Backend
-struct sdlrdp_file {
-public:
-                     sdlrdp_file(sdlrdp_file const&) = delete;
-                     sdlrdp_file(sdlrdp_file&&)      = delete;
-  sdlrdp_file(std::shared_ptr<Backend::DriveChannel> source, unsigned device, unsigned file, std::string name)
-      : channel { std::move(source) }, drive{ device }, wire{ file }, path{ std::move(name) } { }
-                     ~sdlrdp_file();
-  sdlrdp_file&       operator = (sdlrdp_file const&) = delete;
-  sdlrdp_file&       operator = (sdlrdp_file&&)      = delete;
-  void               Close();
-  auto const&        Channel() const { return channel; }
-  unsigned           Drive() const { return drive; }
-  unsigned           Id() const { return wire; }
-  std::string const& Path() const { return path; }
-
-private:
-  std::shared_ptr<Backend::DriveChannel> channel;
-  unsigned                               drive;
-  unsigned                               wire;
-  std::string                            path;
-  bool                                   closed { };
-};

@@ -1,4 +1,6 @@
 #pragma once
+#include "avc-encoder.hpp"
+#include "avc-regions.hpp"
 #include "avc.hpp"
 #include "extent.hpp"
 #include "gfx-protocol.hpp"

@@ -1,6 +1,8 @@
-#include "_detail/drive.hpp"
+#include "_detail/drive-channel.hpp"
+#include "_detail/contract.hpp"
 #include "_detail/peer-link.hpp"
 
+#include <format>
 #include <freerdp/channels/rdpdr.h>
 #include <algorithm>
 #include <utility>

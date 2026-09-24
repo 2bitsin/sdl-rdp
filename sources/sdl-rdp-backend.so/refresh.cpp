@@ -1,9 +1,16 @@
 #include "_detail/refresh.hpp"
+#include "_detail/contract.hpp"
 
 #include <algorithm>
 #include <cmath>
 
 namespace Backend {
+Refresh::Refresh(RefreshMode selected, unsigned limit) : mode(selected), ceiling(limit) {
+  utilities::Expects(limit > 0, "refresh ceiling is positive");
+}
+unsigned Refresh::Rate() const { return rate; }
+RefreshMode Refresh::Mode() const { return mode; }
+bool Refresh::AwaitingEmpty() const { return awaiting_empty != 0; }
 void Refresh::Restart() {
   utilities::Expects(ceiling > 0, "declared refresh is positive");
   rate           = ceiling;

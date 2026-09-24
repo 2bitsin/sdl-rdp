@@ -1,4 +1,4 @@
-#include "_detail/drive.hpp"
+#include "_detail/drive-channel.hpp"
 #include "_detail/diagnostics.hpp"
 #include "_detail/event-queue.hpp"
 #include "_detail/peer-link.hpp"
@@ -84,6 +84,7 @@ DriveChannel::DriveChannel(PeerLink& link, EventQueue& events, Diagnostics const
 DriveChannel::~DriveChannel() {
   Disconnect();
 }
+HANDLE DriveChannel::Event() const { return event; }
 bool DriveChannel::Open() {
   Expects(!channel, "drive channel opens once");
   try {
