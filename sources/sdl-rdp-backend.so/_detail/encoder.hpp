@@ -1,4 +1,5 @@
 #pragma once
+#include "extent.hpp"
 #include "rdp-handles.hpp"
 #include "release-stream.hpp"
 #include "sdl-rdp-backend.h"
@@ -12,6 +13,8 @@
 #include <vector>
 
 namespace Backend {
+using RemoteFxContext = std::unique_ptr<RFX_CONTEXT, Releases<rfx_context_free>>;
+using NsCodecContext  = std::unique_ptr<NSC_CONTEXT, Releases<nsc_context_free>>;
 class Encoder {
 public:
   bool                     SetupPlanar(rdpSettings const* settings, bool xrgb = false);
@@ -30,22 +33,27 @@ public:
 private:
   bool EncodeRemoteFx(std::span<BYTE const> pixels, unsigned width, unsigned height);
   bool InitializeCodec(rdpSettings const* settings);
-  bool ResetRemoteFx(unsigned width, unsigned height);
+  auto ResetRemoteFx(unsigned width, unsigned height) -> bool;
   using PlanarContext = std::unique_ptr<BITMAP_PLANAR_CONTEXT, Releases<freerdp_bitmap_planar_context_free>>;
-  sdlrdp_codec                                             codec        { SDLRDP_CODEC_RAW };
-  unsigned                                                 planar_width { };
-  unsigned                                                 rfx_width    { };
-  unsigned                                                 rfx_height   { };
-  bool                                                     skip_alpha   { };
-  bool                                                     dynamic_color{ };
-  std::chrono::nanoseconds                                 encode_time  { };
-  std::span<BYTE>                                          payload;
-  PlanarContext                                            planar;
-  PlanarContext                                            plain;
-  std::unique_ptr<RFX_CONTEXT, Releases<rfx_context_free>> rfx;
-  std::unique_ptr<NSC_CONTEXT, Releases<nsc_context_free>> nsc;
-  std::unique_ptr<wStream, ReleaseStream>                  stream;
-  std::vector<BYTE>                                        compressed;
-  std::vector<BYTE>                                        scratch;
+  struct PlanarState {
+    PlanarContext        context;
+    PlanarContext        fallback;
+    std::vector<uint8_t> compressed;
+    unsigned             width        { };
+    bool                 skip_alpha   { };
+    bool                 dynamic_color{ };
+  };
+  struct RemoteFxState {
+    RemoteFxContext context;
+    Extent          size;
+  };
+  sdlrdp_codec                            codec      { SDLRDP_CODEC_RAW };
+  std::chrono::nanoseconds                encode_time{ };
+  std::span<uint8_t>                      payload;
+  PlanarState                             planar;
+  RemoteFxState                           remote_fx;
+  NsCodecContext                          nsc;
+  std::unique_ptr<wStream, ReleaseStream> stream;
+  std::vector<uint8_t>                    scratch;
 };
 }

@@ -56,18 +56,19 @@ void Refresh::Blocked(Clock::time_point now) {
   last_blocked = now;
   Step(Direction::Down);
 }
-void Refresh::Acknowledge(Clock::time_point now, Clock::duration latency) {
+auto Refresh::Acknowledge(Clock::time_point now, Clock::duration latency) -> void {
   utilities::Expects(latency >= Clock::duration::zero(), "acknowledgement follows send");
-  if (mode == RefreshMode::Client) {
-    Step(FromLatency(latency));
-  } else if (mode == RefreshMode::Average) {
-    if (last_ack != Clock::time_point{ }) {
-      average = 0.8 * average + 0.2 * std::chrono::duration<double>(now - last_ack).count();
-      auto estimate = unsigned(std::clamp(std::round(1.0 / average), 10.0, double(ceiling)));
-      if (std::abs(double(estimate) - rate) > rate * 0.05) rate = estimate;
-    }
-    last_ack = now;
-  }
+  if (mode == RefreshMode::Client) Step(FromLatency(latency));
+  if (mode == RefreshMode::Average) Average(now);
+}
+auto Refresh::Average(Clock::time_point now) -> void {
+  if (last_ack != Clock::time_point{ }) Estimate(now - last_ack);
+  last_ack = now;
+}
+auto Refresh::Estimate(Clock::duration interval) -> void {
+  average = 0.8 * average + 0.2 * std::chrono::duration<double>(interval).count();
+  auto estimate = unsigned(std::clamp(std::round(1.0 / average), 10.0, double(ceiling)));
+  if (std::abs(double(estimate) - rate) > rate * 0.05) rate = estimate;
 }
 void Refresh::Written(WireSample const& wire, std::size_t bytes) {
   utilities::Expects(bytes > 0, "a frame was written");

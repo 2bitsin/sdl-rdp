@@ -17,6 +17,7 @@
 #include <openssl/pem.h>
 #include <openssl/rsa.h>
 #include <openssl/x509v3.h>
+#include <oxbox/utilities/span.hpp>
 #include <pwd.h>
 #include <stdexcept>
 #include <string>
@@ -34,6 +35,7 @@ using Key         = std::unique_ptr<EVP_PKEY, Releases<EVP_PKEY_free>>;
 using Certificate = std::unique_ptr<X509, Releases<X509_free>>;
 using ServerKey   = std::unique_ptr<rdpPrivateKey, Releases<freerdp_key_free>>;
 using ServerCert  = std::unique_ptr<rdpCertificate, Releases<freerdp_certificate_free>>;
+using Extension   = std::unique_ptr<X509_EXTENSION, Releases<X509_EXTENSION_free>>;
 class DirectoryLock {
 public:
   explicit DirectoryLock(std::filesystem::path const& directory)
@@ -64,13 +66,14 @@ bool Stamp(X509& cert) {
          X509_gmtime_adj(X509_getm_notBefore(&cert), 0) && X509_gmtime_adj(X509_getm_notAfter(&cert), Validity.count());
 }
 bool Identify(X509& cert, EVP_PKEY* key, std::string const& host) {
-  auto* const                                                          name      = X509_get_subject_name(&cert);
-  auto const                                                           san       = "DNS:" + host;
-  std::unique_ptr<X509_EXTENSION, Releases<X509_EXTENSION_free>> const extension(
+  auto* const     name      = X509_get_subject_name(&cert);
+  auto const      san       = "DNS:" + host;
+  Extension const extension(
       X509V3_EXT_conf_nid(nullptr, nullptr, NID_subject_alt_name, san.c_str()));
   return X509_set_pubkey(&cert, key) &&
-         X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC, reinterpret_cast<unsigned char const*>(host.c_str()), -1,
-                                    -1, 0) &&
+         X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC,
+                                    oxbox::utilities::SpanCast<unsigned char const>(std::span(host)).data(), -1, -1,
+                                    0) &&
          X509_set_issuer_name(&cert, name) && extension && X509_add_ext(&cert, extension.get(), -1);
 }
 Certificate SelfSigned(EVP_PKEY* key) {

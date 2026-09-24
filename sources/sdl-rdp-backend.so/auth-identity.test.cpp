@@ -12,11 +12,9 @@
 
 namespace {
 TEST(AuthenticationIdentity, UnicodeAndAnsi) {
-  std::array<UINT16, 5> unicode{ 0x017e, 0x0105, 's', 'i', 's' };
-  EXPECT_EQ(Backend::IdentityText(unicode.data(), 5, SEC_WINNT_AUTH_IDENTITY_UNICODE), "žąsis");
+  std::array<uint16_t, 5> unicode{ 0x017e, 0x0105, 's', 'i', 's' };
+  EXPECT_EQ(Backend::IdentityText(std::span<uint16_t const>(unicode)), "žąsis");
   auto ansi = std::to_array("Aé");
-  EXPECT_EQ(
-      Backend::IdentityText(reinterpret_cast<UINT16*>(ansi.data()), ansi.size() - 1, SEC_WINNT_AUTH_IDENTITY_ANSI),
-      "Aé");
+  EXPECT_EQ(Backend::IdentityText(std::span<char const>(ansi).first(ansi.size() - 1)), "Aé");
 }
 }

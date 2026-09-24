@@ -11,12 +11,12 @@
 namespace Backend {
 namespace {
 constexpr std::size_t InitialStreamCapacity = 64uz * 1024;
-bool PrepareRemoteFx(std::unique_ptr<RFX_CONTEXT, Releases<rfx_context_free>>& rfx) {
+auto PrepareRemoteFx(RemoteFxContext& rfx) -> bool {
   if (!rfx) rfx.reset(rfx_context_new_ex(TRUE, THREADING_FLAGS_DISABLE_THREADS));
   if (rfx) rfx_context_set_pixel_format(rfx.get(), PIXEL_FORMAT_BGRX32);
   return bool(rfx);
 }
-bool PrepareNsCodec(std::unique_ptr<NSC_CONTEXT, Releases<nsc_context_free>>& nsc) {
+auto PrepareNsCodec(NsCodecContext& nsc) -> bool {
   if (!nsc) nsc.reset(nsc_context_new());
   return nsc && nsc_context_set_parameters(nsc.get(), NSC_COLOR_FORMAT, PIXEL_FORMAT_BGRX32) &&
          nsc_context_set_parameters(nsc.get(), NSC_COLOR_LOSS_LEVEL, 1) &&
@@ -51,24 +51,24 @@ bool Available(rdpSettings const* settings, sdlrdp_codec codec) {
 bool Encoder::SetupPlanar(rdpSettings const* settings, bool xrgb) {
   utilities::Expects(settings != nullptr, "negotiated settings exist");
   auto alpha = xrgb || freerdp_settings_get_bool(settings, FreeRDP_DrawAllowSkipAlpha);
-  if (skip_alpha != alpha) {
-    planar.reset();
-    planar_width = 0;
+  if (planar.skip_alpha != alpha) {
+    planar.context.reset();
+    planar.width = 0;
   }
-  skip_alpha    = alpha;
-  dynamic_color = freerdp_settings_get_bool(settings, FreeRDP_DrawAllowDynamicColorFidelity);
+  planar.skip_alpha    = alpha;
+  planar.dynamic_color = freerdp_settings_get_bool(settings, FreeRDP_DrawAllowDynamicColorFidelity);
   if (!stream) stream.reset(Stream_New(nullptr, InitialStreamCapacity));
-  if (!planar)
-    planar.reset(
-        freerdp_bitmap_planar_context_new(PLANAR_FORMAT_HEADER_RLE | (skip_alpha ? PLANAR_FORMAT_HEADER_NA : 0), 1, 1));
-  return stream && planar;
+  if (!planar.context)
+    planar.context.reset(freerdp_bitmap_planar_context_new(
+        PLANAR_FORMAT_HEADER_RLE | (planar.skip_alpha ? PLANAR_FORMAT_HEADER_NA : 0), 1, 1));
+  return stream && planar.context;
 }
 bool Encoder::InitializeCodec(rdpSettings const* settings) {
   switch (codec) {
   case SDLRDP_CODEC_PLANAR:
     return SetupPlanar(settings);
   case SDLRDP_CODEC_REMOTEFX:
-    return PrepareRemoteFx(rfx);
+    return PrepareRemoteFx(remote_fx.context);
   case SDLRDP_CODEC_NSCODEC:
     return PrepareNsCodec(nsc);
   case SDLRDP_CODEC_RAW:
@@ -94,18 +94,16 @@ bool Encoder::Encode(std::span<BYTE const> pixels, unsigned width, unsigned heig
   Charge(std::chrono::steady_clock::now() - start);
   return result;
 }
-bool Encoder::ResetRemoteFx(unsigned width, unsigned height) {
-  if (width != rfx_width || height != rfx_height) {
-    if (!rfx_context_reset(rfx.get(), width, height)) return false;
-    rfx_width  = width;
-    rfx_height = height;
-  }
+auto Encoder::ResetRemoteFx(unsigned width, unsigned height) -> bool {
+  if (width == remote_fx.size.width && height == remote_fx.size.height) return true;
+  if (!rfx_context_reset(remote_fx.context.get(), width, height)) return false;
+  remote_fx.size = { .width = width, .height = height };
   return true;
 }
 bool Encoder::EncodeRemoteFx(std::span<BYTE const> pixels, unsigned width, unsigned height) {
   if (!ResetRemoteFx(width, height)) return false;
   RFX_RECT const rect{ 0, 0, UINT16(width), UINT16(height) };
-  return rfx_compose_message(rfx.get(), stream.get(), &rect, 1, pixels.data(), width, height, width * 4);
+  return rfx_compose_message(remote_fx.context.get(), stream.get(), &rect, 1, pixels.data(), width, height, width * 4);
 }
 bool Encoder::EncodePayload(std::span<BYTE const> pixels, unsigned width, unsigned height) {
   utilities::Expects(width, "encoder input is a packed band");
@@ -127,20 +125,21 @@ bool Encoder::EncodePayload(std::span<BYTE const> pixels, unsigned width, unsign
   return result;
 }
 bool Encoder::EncodePlanar(std::span<BYTE const> pixels, unsigned width) {
-  utilities::Expects(planar != nullptr, "planar context exists");
+  utilities::Expects(planar.context != nullptr, "planar context exists");
   utilities::Expects(pixels.size() == std::size_t{ width } * PixelBytes, "planar input is one row");
-  if (width > planar_width) {
-    if (!freerdp_bitmap_planar_context_reset(planar.get(), width, 1)) return false;
-    planar_width = width;
+  if (width > planar.width) {
+    if (!freerdp_bitmap_planar_context_reset(planar.context.get(), width, 1)) return false;
+    planar.width = width;
   }
+  auto& compressed = planar.compressed;
   compressed.resize(pixels.size() + 1024);
   UINT32 size   = compressed.size();
-  auto*  result = width < 4 ? nullptr : CompressRow(*planar, pixels, width, compressed, size);
+  auto*  result = width < 4 ? nullptr : CompressRow(*planar.context, pixels, width, compressed, size);
   if (!result) {
-    plain.reset(freerdp_bitmap_planar_context_new(skip_alpha ? PLANAR_FORMAT_HEADER_NA : 0, width, 1));
-    if (!plain) return false;
-    freerdp_planar_switch_bgr(plain.get(), dynamic_color);
-    result = CompressRow(*plain, pixels, width, compressed, size);
+    planar.fallback.reset(freerdp_bitmap_planar_context_new(planar.skip_alpha ? PLANAR_FORMAT_HEADER_NA : 0, width, 1));
+    if (!planar.fallback) return false;
+    freerdp_planar_switch_bgr(planar.fallback.get(), planar.dynamic_color);
+    result = CompressRow(*planar.fallback, pixels, width, compressed, size);
   }
   payload = { compressed.data(), size };
   if (result) utilities::Ensures(payload.size() <= pixels.size() + 2, "planar row fits bitmap length");

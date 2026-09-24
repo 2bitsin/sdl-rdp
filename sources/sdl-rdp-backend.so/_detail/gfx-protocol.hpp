@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <freerdp/channels/rdpgfx.h>
+#include <ranges>
 #include <span>
 #include <winpr/sysinfo.h>
 
@@ -19,22 +20,29 @@ inline bool AllowsAvc(RDPGFX_CAPSET const& cap) {
              ? (cap.flags & RDPGFX_CAPS_FLAG_AVC420_ENABLED) != 0
              : cap.version >= RDPGFX_CAPVERSION_10 && !(cap.flags & RDPGFX_CAPS_FLAG_AVC_DISABLED);
 }
-inline RDPGFX_CAPSET SelectCapability(std::span<RDPGFX_CAPSET const> caps, bool avc_available = false) {
-  RDPGFX_CAPSET selected{ };
-  for (auto const& cap : caps) {
-    if (std::ranges::find(versions, cap.version) != versions.end() && cap.version > selected.version &&
-        cap.length >= (cap.version == RDPGFX_CAPVERSION_101 ? Version101DataLength : FlagsDataLength))
-      selected = cap;
-  }
+inline auto CapabilityDataLength(uint32_t version) -> uint32_t {
+  return version == RDPGFX_CAPVERSION_101 ? Version101DataLength : FlagsDataLength;
+}
+inline auto Acceptable(RDPGFX_CAPSET const& cap) -> bool {
+  return std::ranges::contains(versions, cap.version) && cap.length >= CapabilityDataLength(cap.version);
+}
+inline auto Newest(std::span<RDPGFX_CAPSET const> caps) -> RDPGFX_CAPSET {
+  auto       acceptable = caps | std::views::filter(Acceptable);
+  auto const newest     = std::ranges::max_element(acceptable, { }, &RDPGFX_CAPSET::version);
+  return newest == acceptable.end() ? RDPGFX_CAPSET{ } : *newest;
+}
+inline auto AnsweredFlags(RDPGFX_CAPSET const& cap, bool avc) -> uint32_t {
+  if (cap.version == RDPGFX_CAPVERSION_101) return 0;
+  auto const kept =
+      cap.flags & (RDPGFX_CAPS_FLAG_THINCLIENT | RDPGFX_CAPS_FLAG_SMALL_CACHE | RDPGFX_CAPS_FLAG_SCALEDMAP_DISABLE);
+  if (cap.version == RDPGFX_CAPVERSION_81) return avc ? kept | RDPGFX_CAPS_FLAG_AVC420_ENABLED : kept;
+  return cap.version >= RDPGFX_CAPVERSION_10 && !avc ? kept | RDPGFX_CAPS_FLAG_AVC_DISABLED : kept;
+}
+inline auto SelectCapability(std::span<RDPGFX_CAPSET const> caps, bool avc_available = false) -> RDPGFX_CAPSET {
+  auto selected = Newest(caps);
   if (!selected.version) return selected;
-  selected.length = selected.version == RDPGFX_CAPVERSION_101 ? Version101DataLength : FlagsDataLength;
-  bool const avc = avc_available && AllowsAvc(selected);
-  selected.flags &= RDPGFX_CAPS_FLAG_THINCLIENT | RDPGFX_CAPS_FLAG_SMALL_CACHE | RDPGFX_CAPS_FLAG_SCALEDMAP_DISABLE;
-  if (selected.version == RDPGFX_CAPVERSION_101)
-    selected.flags = 0;
-  else if (selected.version >= RDPGFX_CAPVERSION_10 && !avc)
-    selected.flags |= RDPGFX_CAPS_FLAG_AVC_DISABLED;
-  if (avc && selected.version == RDPGFX_CAPVERSION_81) selected.flags |= RDPGFX_CAPS_FLAG_AVC420_ENABLED;
+  selected.length = CapabilityDataLength(selected.version);
+  selected.flags  = AnsweredFlags(selected, avc_available && AllowsAvc(selected));
   return selected;
 }
 inline UINT32 FrameTimestamp(SYSTEMTIME const& time) {

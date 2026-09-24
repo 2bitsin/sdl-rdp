@@ -29,11 +29,13 @@ public:
   Direction        FromLatency(Clock::duration latency) const;
   static Direction FromWire(WireSample const& wire, std::size_t bytes);
   void             Blocked(Clock::time_point now);
-  void             Acknowledge(Clock::time_point now, Clock::duration latency);
+  auto             Acknowledge(Clock::time_point now, Clock::duration latency) -> void;
   void             Written(WireSample const& wire, std::size_t bytes);
   void             Drained(WireSample const& wire);
 
 private:
+  auto Average(Clock::time_point now)     -> void;
+  auto Estimate(Clock::duration interval) -> void;
   RefreshMode       mode          { RefreshMode::Fixed };
   unsigned          ceiling       { 60                 };
   unsigned          rate          { 60                 };

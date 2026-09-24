@@ -23,15 +23,17 @@ private:
   void        InstallChannels();
   static UINT Advanced(ainput_server_context* context, UINT64 /*unused*/, UINT64 flags, INT32 x, INT32 y);
   static UINT Touch(RdpeiServerContext* context, RDPINPUT_TOUCH_EVENT const* event);
-  PeerLink&                                                                    _link;
-  InputEvents&                                                                 _events;
-  std::unique_ptr<ainput_server_context, Releases<ainput_server_context_free>> _advanced;
-  std::unique_ptr<RdpeiServerContext, Releases<rdpei_server_context_free>>     _touch;
-  HANDLE                                                                       _advanced_event{ };
-  std::optional<UINT32>                                                        _advanced_id;
-  std::optional<UINT32>                                                        _touch_id;
-  bool                                                                         _opened        { };
-  bool                                                                         _advanced_ready{ };
-  bool                                                                         _touch_ready   { };
+  using AdvancedInputContext = std::unique_ptr<ainput_server_context, Releases<ainput_server_context_free>>;
+  using TouchContext         = std::unique_ptr<RdpeiServerContext, Releases<rdpei_server_context_free>>;
+  PeerLink&             _link;
+  InputEvents&          _events;
+  AdvancedInputContext  _advanced;
+  TouchContext          _touch;
+  HANDLE                _advanced_event{ };
+  std::optional<UINT32> _advanced_id;
+  std::optional<UINT32> _touch_id;
+  bool                  _opened        { };
+  bool                  _advanced_ready{ };
+  bool                  _touch_ready   { };
 };
 }

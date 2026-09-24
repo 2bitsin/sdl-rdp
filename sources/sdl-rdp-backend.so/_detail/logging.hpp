@@ -13,7 +13,7 @@ inline constexpr unsigned SecurityTls = 0x01, SecurityNla = 0x02, SecurityRdstls
 void PeerNegotiationLogging(rdpSettings const* settings);
 bool NegotiationRefused();
 bool TlsHandshakeFailed();
-bool ExpectedDisconnect(unsigned code);
+auto ExpectedDisconnect(unsigned code) -> bool;
 void AuthenticationRejectedLogging();
 void ResetAuthenticationLogging();
 class LogRoute {
@@ -44,8 +44,9 @@ private:
     std::map<std::thread::id, Filter> filters;
   };
   static Routing& Shared();
-  static BOOL     Forward(wLogMessage const* message);
+  static auto     Forward(wLogMessage const* message)                     -> BOOL;
   static void     Install();
+  auto            Deliver(sdlrdp_log_level level, char const* text) const -> void;
   void  (*callback)(void*, sdlrdp_log_level, char const*);
   void* user;
 };

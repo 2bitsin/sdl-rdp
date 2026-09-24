@@ -86,8 +86,10 @@ PixelBand Scaler::Fill(sdlrdp_rect area, std::span<BYTE> buffer, std::size_t pit
   if (Scaled())
     Resample(area, buffer, pitch, order);
   else
-    CopyRows(snapshot.Row(unsigned(area.y)).subspan(std::size_t(area.x) * PixelBytes), snapshot.Stride(), buffer, pitch,
-             std::size_t(area.h), stride, order == RowOrder::BottomUp);
+    CopyRows({ .bytes = snapshot.Row(unsigned(area.y)).subspan(std::size_t(area.x) * PixelBytes),
+               .pitch = snapshot.Stride() },
+             { .bytes = buffer, .pitch = pitch }, { .rows = std::size_t(area.h), .row_bytes = stride },
+             order == RowOrder::BottomUp);
   return { area, buffer.first(size) };
 }
 void Scaler::Resample(sdlrdp_rect area, std::span<BYTE> buffer, std::size_t pitch, RowOrder order) {

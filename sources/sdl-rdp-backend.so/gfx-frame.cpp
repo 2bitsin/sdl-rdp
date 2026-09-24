@@ -21,6 +21,7 @@
 
 namespace Backend {
 namespace {
+using InitializedRegion = std::unique_ptr<REGION16, Releases<region16_uninit>>;
 constexpr std::size_t ProgressiveSyncBytes        = 12;
 constexpr std::size_t ProgressiveContextBytes     = 10;
 constexpr std::size_t ProgressiveBlockHeaderBytes = sizeof(UINT16) + sizeof(UINT32);
@@ -44,8 +45,20 @@ RDPGFX_SURFACE_COMMAND SurfaceCommand(sdlrdp_rect area, std::span<BYTE> data, UI
   command.data      = data.data();
   return command;
 }
-bool Persistent(sdlrdp_codec codec) {
-  return codec == SDLRDP_CODEC_PROGRESSIVE || codec == SDLRDP_CODEC_AVC420;
+auto Persistent(sdlrdp_codec codec) -> bool {
+  switch (codec) {
+  case SDLRDP_CODEC_PROGRESSIVE:
+  case SDLRDP_CODEC_AVC420:
+    return true;
+  case SDLRDP_CODEC_AUTO:
+  case SDLRDP_CODEC_PLANAR:
+  case SDLRDP_CODEC_REMOTEFX:
+  case SDLRDP_CODEC_NSCODEC:
+  case SDLRDP_CODEC_RAW:
+    return false;
+  default:
+    utilities::Unreachable(codec);
+  }
 }
 bool FellBack(sdlrdp_codec preference, sdlrdp_codec requested, sdlrdp_codec choice) {
   return preference == SDLRDP_CODEC_AVC420 && requested != preference && choice != preference;
@@ -215,7 +228,7 @@ bool GfxChannel::Progressive() {
   if (!_progressive) return false;
   REGION16 damage;
   region16_init(&damage);
-  std::unique_ptr<REGION16, Releases<region16_uninit>> const owned{ &damage };
+  InitializedRegion const owned{ &damage };
   return ProgressiveDamage(damage) && CompressProgressive(damage, start);
 }
 bool GfxChannel::ProgressivePayload(std::span<BYTE> data) {

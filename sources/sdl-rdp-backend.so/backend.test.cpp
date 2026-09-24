@@ -58,11 +58,13 @@ auto LoggingChild(Backend::Descriptor output) -> Headless::ChildProcess {
 TEST(CopyRows, PaddedRows) {
   std::array<BYTE, 8> source     { 1, 2, 9, 9, 3, 4, 9, 9 };
   std::array<BYTE, 6> destination{ 8, 8, 8, 8, 8, 8       };
-  Backend::CopyRows(source, 4, destination, 3, 2, 2);
+  Backend::CopyRows({ .bytes = source, .pitch = 4 }, { .bytes = destination, .pitch = 3 },
+                    { .rows = 2, .row_bytes = 2 });
   EXPECT_EQ(destination, (std::array<BYTE, 6>{ 1, 2, 8, 3, 4, 8 }));
-  Backend::CopyRows(source, 4, destination, 3, 2, 2, true);
+  Backend::CopyRows({ .bytes = source, .pitch = 4 }, { .bytes = destination, .pitch = 3 },
+                    { .rows = 2, .row_bytes = 2 }, true);
   EXPECT_EQ(destination, (std::array<BYTE, 6>{ 3, 4, 8, 1, 2, 8 }));
-  Backend::CopyRows({ }, 0, { }, 0, 0, 0);
+  Backend::CopyRows({ }, { }, { });
 }
 TEST(Errors, WidthAndBind) {
   CertificateDirectory const certificates;

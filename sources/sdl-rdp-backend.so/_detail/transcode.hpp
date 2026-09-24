@@ -1,6 +1,7 @@
 #pragma once
 #include <bit>
 #include <functional>
+#include <oxbox/utilities/span.hpp>
 #include <oxbox/utilities/transcode.hpp>
 #include <stdexcept>
 #include <vector>
@@ -22,7 +23,7 @@ Output TranscodeRange(std::span<std::byte const> input, oxbox::utilities::TextFo
     if (encoded.size() == size) throw std::runtime_error("Unrepresentable codepoint.");
   }
   if (encoded.empty()) return { };
-  auto data = reinterpret_cast<typename Output::value_type const*>(encoded.data());
-  return Output(data, data + encoded.size());
+  auto const text = SpanCast<typename Output::value_type const>(std::span(encoded));
+  return Output(text.begin(), text.end());
 }
 }

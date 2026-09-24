@@ -9,6 +9,7 @@
 #include <array>
 #include <cstring>
 #include <freerdp/channels/rdpdr.h>
+#include <oxbox/utilities/span.hpp>
 #include <span>
 #include <winpr/nt.h>
 
@@ -103,8 +104,8 @@ bool DriveChannel::Open() {
 void DriveChannel::Write(DrivePacket& packet) {
   Expects(channel != nullptr, "drive transport exists");
   ULONG written = 0;
-  if (!WTSVirtualChannelWrite(channel.get(), reinterpret_cast<char*>(packet.Bytes().data()), packet.Bytes().size(),
-                              &written) ||
+  if (!WTSVirtualChannelWrite(channel.get(), oxbox::utilities::SpanCast<char>(std::span(packet.Bytes())).data(),
+                              packet.Bytes().size(), &written) ||
       written != packet.Bytes().size())
     throw std::runtime_error("Drive transport disconnected.");
   _link.Signal();
@@ -289,7 +290,8 @@ bool DriveChannel::PumpAvailable() {
     if (!length) return true;
     DrivePacket packet;
     packet.Bytes().resize(length);
-    if (!WTSVirtualChannelRead(channel.get(), 0, reinterpret_cast<char*>(packet.Bytes().data()), length, &length))
+    if (!WTSVirtualChannelRead(channel.get(), 0, oxbox::utilities::SpanCast<char>(std::span(packet.Bytes())).data(),
+                               length, &length))
       throw std::runtime_error("Drive channel read failed.");
     packet.Bytes().resize(length);
     Receive(packet);

@@ -2,19 +2,30 @@
 #include "contract.hpp"
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <ranges>
 #include <span>
-#include <winpr/wtypes.h>
 namespace Backend {
-inline void CopyRows(std::span<BYTE const> source, std::size_t source_pitch, std::span<BYTE> destination,
-                     std::size_t destination_pitch, std::size_t rows, std::size_t bytes_per_row, bool flip = false) {
-  utilities::Expects(source_pitch >= bytes_per_row, "pitches cover copied bytes");
-  utilities::Expects(destination_pitch >= bytes_per_row, "pitches cover copied bytes");
-  if (rows) utilities::Expects(source.size() >= (rows - 1) * source_pitch + bytes_per_row, "source covers rows");
-  if (rows)
-    utilities::Expects(destination.size() >= (rows - 1) * destination_pitch + bytes_per_row, "destination covers rows");
-  for (auto row : std::views::iota(std::size_t{ 0 }, rows))
-    std::ranges::copy(source.subspan(row * source_pitch, bytes_per_row),
-                      destination.subspan((flip ? rows - row - 1 : row) * destination_pitch).begin());
+template <class Byte> struct Pitched {
+  std::span<Byte> bytes;
+  std::size_t     pitch{ };
+};
+struct RowBlock {
+  std::size_t rows     { };
+  std::size_t row_bytes{ };
+};
+template <class Byte> auto CoversRows(Pitched<Byte> image, RowBlock block) -> bool {
+  return block.rows == 0 || image.bytes.size() >= ((block.rows - 1) * image.pitch) + block.row_bytes;
+}
+inline auto CopyRows(Pitched<uint8_t const> source, Pitched<uint8_t> destination, RowBlock block, bool flip = false)
+    -> void {
+  utilities::Expects(source.pitch >= block.row_bytes, "pitches cover copied bytes");
+  utilities::Expects(destination.pitch >= block.row_bytes, "pitches cover copied bytes");
+  utilities::Expects(CoversRows(source, block), "source covers rows");
+  utilities::Expects(CoversRows(destination, block), "destination covers rows");
+  for (auto row : std::views::iota(std::size_t{ 0 }, block.rows))
+    std::ranges::copy(source.bytes.subspan(row * source.pitch, block.row_bytes),
+                      destination.bytes.subspan((flip ? block.rows - row - 1 : row) * destination.pitch).begin());
 }
 }

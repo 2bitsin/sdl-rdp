@@ -118,7 +118,7 @@ void SoundProtocol::Wave(SoundClient& self, wStream* stream, unsigned size, bool
     Stream_Seek(stream, 4);
     Expects(size >= 12, "wave PDU includes its fixed header");
     Expects(Stream_GetRemainingLength(stream) >= size - 12, "wave payload fits the remaining stream");
-    self.Capture({ reinterpret_cast<BYTE const*>(Stream_Pointer(stream)), size - 12 });
+    self.Capture({ static_cast<uint8_t const*>(Stream_Pointer(stream)), size - 12 });
   } else {
     Stream_Read(stream, self.first.data(), self.first.size());
     self.wave_bytes     = size - 8;

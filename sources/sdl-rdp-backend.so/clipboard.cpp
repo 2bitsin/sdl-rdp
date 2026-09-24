@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <freerdp/channels/wtsvc.h>
+#include <oxbox/utilities/span.hpp>
 #include <winpr/clipboard.h>
 
 namespace Backend {
@@ -121,7 +122,7 @@ UINT SendClipboardText(CliprdrServerContext* context, ClipboardStore const& clip
     response.common.dataLen      = clipboard.Unicode().size();
   } else if (format == CF_TEXT) {
     ansi                         = ClipboardAnsi(clipboard.Text());
-    response.requestedFormatData = reinterpret_cast<BYTE const*>(ansi.c_str());
+    response.requestedFormatData = oxbox::utilities::SpanCast<uint8_t const>(std::span(ansi)).data();
     response.common.dataLen      = ansi.size() + 1;
   } else
     response.common.msgFlags = CB_RESPONSE_FAIL;

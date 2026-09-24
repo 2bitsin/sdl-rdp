@@ -6,6 +6,18 @@
 #include <freerdp/channels/wtsvc.h>
 
 namespace Backend {
+namespace {
+auto TouchHandled(uint32_t result) -> bool {
+  switch (result) {
+  case CHANNEL_RC_OK:
+  // FreeRDP 3.15 channels/rdpei/server/rdpei_main.c:701 maps ERROR_NO_DATA to ERROR_READ_FAULT.
+  case ERROR_READ_FAULT:
+    return true;
+  default:
+    return false;
+  }
+}
+}
 Input::Input(PeerLink& link, InputEvents& events) noexcept : _link{ link }, _events{ events } { }
 void Input::InstallChannels() {
   _advanced->data              = this;
@@ -41,9 +53,7 @@ bool Input::Channels(std::span<HANDLE const> ready) {
       _advanced->Poll(_advanced.get()) != CHANNEL_RC_OK)
     return false;
   if (!_touch_ready || !std::ranges::contains(ready, rdpei_server_get_event_handle(_touch.get()))) return true;
-  auto const result = rdpei_server_handle_messages(_touch.get());
-  // FreeRDP 3.15 channels/rdpei/server/rdpei_main.c:701 maps ERROR_NO_DATA to ERROR_READ_FAULT.
-  return result == CHANNEL_RC_OK || result == ERROR_READ_FAULT;
+  return TouchHandled(rdpei_server_handle_messages(_touch.get()));
 }
 std::span<HANDLE> Input::Handles(std::span<HANDLE> out) const {
   Expects(out.size() >= InputHandleLimit, "handle span has room for the input channels");

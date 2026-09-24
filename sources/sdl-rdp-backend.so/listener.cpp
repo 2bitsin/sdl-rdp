@@ -45,13 +45,17 @@ sockaddr_in Address(sdlrdp_config const& config) {
     throw std::runtime_error("Listener address is not numeric IPv4.");
   return address;
 }
+auto Generic(sockaddr_in& address) -> sockaddr* {
+  // POSIX socket calls take an IPv4 address through the generic sockaddr it begins with.
+  return reinterpret_cast<sockaddr*>(&address);
+}
 void StartListening(Descriptor const& socket, sockaddr_in& address) {
   int reuse = 1;
   SystemCall(setsockopt(socket.Get(), SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)), "Socket options");
-  SystemCall(::bind(socket.Get(), reinterpret_cast<sockaddr*>(&address), sizeof(address)), "Listener bind");
+  SystemCall(::bind(socket.Get(), Generic(address), sizeof(address)), "Listener bind");
   SystemCall(::listen(socket.Get(), ListenBacklog), "Listener listen");
   socklen_t size = sizeof(address);
-  SystemCall(getsockname(socket.Get(), reinterpret_cast<sockaddr*>(&address), &size), "Listener socket name");
+  SystemCall(getsockname(socket.Get(), Generic(address), &size), "Listener socket name");
 }
 void AdoptListenerSocket(freerdp_listener& listener, Descriptor socket) {
   if (!listener.OpenFromSocket(&listener, socket.Get()))

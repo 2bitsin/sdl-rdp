@@ -39,6 +39,15 @@ AUDIO_FORMAT StereoPcm(UINT32 rate) {
            .cbSize          = 0,
            .data            = nullptr };
 }
+auto SoundHandled(uint32_t result) -> bool {
+  switch (result) {
+  case CHANNEL_RC_OK:
+  case ERROR_NO_DATA:
+    return true;
+  default:
+    return false;
+  }
+}
 } // namespace
 AudioChannel::AudioChannel(PeerLink& link, Diagnostics const& diagnostics, EventQueue& events, SessionAccess& session,
                            TraceQueue& traces)
@@ -67,8 +76,8 @@ AudioChannel::~AudioChannel() {
   freerdp_get_version(&major, &minor, &revision);
   if (major != 3 || minor != 15 || revision != 0) return;
   // FreeRDP 3.15.0 returns the existing static-channel handle from Open.
-  auto                                                          name    = std::to_array(RDPSND_CHANNEL_NAME);
-  std::unique_ptr<void, Releases<WTSVirtualChannelClose>> const channel {
+  auto                 name    = std::to_array(RDPSND_CHANNEL_NAME);
+  VirtualChannel const channel {
     WTSVirtualChannelOpen(_link.Channels(), WTS_CURRENT_SESSION, name.data())
   };
 }
@@ -81,7 +90,7 @@ bool AudioChannel::Pump() {
   auto result = rdpsnd_server_handle_messages(_sound.get());
   if (result == ERROR_INTERNAL_ERROR && !_ready && !_rejected && !_sound->num_client_formats)
     RejectFormats();
-  return !_rejected && (result == CHANNEL_RC_OK || result == ERROR_NO_DATA);
+  return !_rejected && SoundHandled(result);
 }
 HANDLE AudioChannel::Event() const {
   Expects(_sound != nullptr, "sound context exists");

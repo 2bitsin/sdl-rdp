@@ -1,13 +1,9 @@
 sdl-rdp-backend.so/_detail/audio.hpp: AudioChannel data members 24 > 10 # collaborators replace Peer&; split in #6
 sdl-rdp-backend.so/_detail/audio.hpp: AudioChannel member functions 26 > 15 # AudioProtocol friend folded in, C.21 deleted copy and move; split in #6
-sdl-rdp-backend.so/_detail/client.hpp:22: Until nesting 3 > 2 # size in #19
 sdl-rdp-backend.so/_detail/clipboard.hpp: ClipboardChannel data members 15 > 10 # collaborators replace Peer&; split in #6
 sdl-rdp-backend.so/_detail/clipboard.hpp: ClipboardChannel member functions 18 > 15 # split in #6
-sdl-rdp-backend.so/_detail/copy-rows.hpp:9: CopyRows parameters 7 > 5 # size in #19
 sdl-rdp-backend.so/_detail/drive-channel.hpp: DriveChannel data members 14 > 10 # collaborators replace Peer&; split in #6
 sdl-rdp-backend.so/_detail/drive-channel.hpp: DriveChannel member functions 31 > 15 # split in #6
-sdl-rdp-backend.so/_detail/encoder.hpp: Encoder data members 15 > 10 # size in #19
-sdl-rdp-backend.so/_detail/gfx-protocol.hpp:22: SelectCapability complexity 14 > 10 # size in #19
 sdl-rdp-backend.so/_detail/gfx.hpp: GfxChannel data members 31 > 10 # collaborators replace Peer&; split in #6
 sdl-rdp-backend.so/_detail/gfx.hpp: GfxChannel member functions 43 > 15 # C.21 deleted copy and move; split in #6
 sdl-rdp-backend.so/_detail/graphics-observer.hpp: GraphicsObserver data members 11 > 10 # split in #6
@@ -20,7 +16,6 @@ sdl-rdp-backend.so/_detail/test-pattern.hpp:24: GraphicsScene nesting 3 > 2 # si
 sdl-rdp-backend.so/activator.cpp:34: Activator::Activator parameters 6 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp-backend.so/arrival.cpp:34: Arrival::Arrival parameters 8 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp-backend.so/auth.test.cpp:14: RejectCertificate lambda@14 parameters 8 > 5 # size in #19
-sdl-rdp-backend.so/avc-encoder.cpp: Encoder data members 15 > 10 # size in #19
 sdl-rdp-backend.so/backend-audio.test.cpp:82: AudioGate.AudioSlowConfirmsBoundTenSeconds nesting 3 > 2 # size in #19
 sdl-rdp-backend.so/backend-graphics.test.cpp: long lines 2 > 0 # size in #19
 sdl-rdp-backend.so/backend-resize.test.cpp:125: ThenFinalLayout parameters 6 > 5 # size in #19
@@ -34,7 +29,7 @@ sdl-rdp-backend.so/capability-check.cpp:18: CapabilityCheck::CapabilityCheck par
 sdl-rdp-backend.so/channel-set.cpp:23: ChannelSet::ChannelSet parameters 6 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp-backend.so/departure.cpp:14: Departure::Departure parameters 6 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp-backend.so/drive-files.cpp:214: sdlrdp_drive_enumerate parameters 6 > 5 # frozen C ABI
-sdl-rdp-backend.so/drive-observer.test.cpp:48: DriveObserver::Receive parameters 6 > 5 # size in #19
+sdl-rdp-backend.so/drive-observer.test.cpp:48: DriveObserver::Receive parameters 6 > 5 # FreeRDP pReceiveChannelData signature is the ABI
 sdl-rdp-backend.so/drive-wire.test.cpp:122: DriveWire.MalformedInformationKeepsVideoSession body lines 21 > 20 # size in #19
 sdl-rdp-backend.so/frame-capture.cpp:14: FrameCapture::FrameCapture parameters 7 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp-backend.so/frame-gate.cpp:13: FrameGate::FrameGate parameters 7 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
@@ -52,17 +47,14 @@ sdl-rdp-backend.so/gfx.test.cpp:121: Frame parameters 6 > 5 # size in #19
 sdl-rdp-backend.so/gfx.test.cpp:29: Yuv420Reference body lines 22 > 20 # size in #19
 sdl-rdp-backend.so/graphics-link.cpp:15: GraphicsLink::GraphicsLink parameters 6 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp-backend.so/input-text.cpp:31: InputEvents::InputEvents parameters 7 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
-sdl-rdp-backend.so/logging.cpp:120: AuthenticationEcho complexity 12 > 10 # size in #19
-sdl-rdp-backend.so/logging.cpp:148: LogRoute::Forward complexity 12 > 10 # size in #19
 sdl-rdp-backend.so/peer-callbacks.cpp:24: PeerCallbacks::PeerCallbacks parameters 6 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp-backend.so/peer-callbacks.cpp:41: PeerCallbacks::InstallClient lambda@41 parameters 7 > 5 # FreeRDP SspiNtlmHashCallback signature is the ABI
 sdl-rdp-backend.so/peer-loop.cpp:71: PeerLoop::PeerLoop parameters 8 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp-backend.so/peer-pump.cpp:12: PeerPump::PeerPump parameters 7 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp-backend.so/peer.cpp:13: Peer::Peer parameters 8 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp-backend.so/redirection.cpp:15: Redirection::Redirection parameters 6 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
-sdl-rdp-backend.so/refresh.cpp:59: Refresh::Acknowledge nesting 3 > 2 # size in #19
 sdl-rdp-backend.so/refresh.test.cpp:85: RefreshEstimator.EmptyQueueRecoversOnlyOncePerCompletedFrame body lines 22 > 20 # size in #19
-sdl-rdp-backend.so/sound-protocol.test.cpp:88: SoundProtocol::Received parameters 7 > 5 # size in #19
+sdl-rdp-backend.so/sound-protocol.test.cpp:88: SoundProtocol::Received parameters 7 > 5 # WinPR PCHANNEL_OPEN_EVENT_EX_FN signature is the ABI
 sdl-rdp-backend.so/test-audio-session.test.cpp:29: ConfirmDelayedAudio nesting 3 > 2 # size in #19
 sdl-rdp-backend.so/test-authentication.test.cpp:23: ReceiveIdentity nesting 3 > 2 # size in #19
 sdl-rdp-backend.so/test-frame-checks.test.cpp:126: FrameChecks::ResizePicture parameters 6 > 5 # size in #19

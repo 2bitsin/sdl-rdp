@@ -9,6 +9,7 @@
 #include <cstring>
 #include <freerdp/settings.h>
 #include <openssl/crypto.h>
+#include <oxbox/utilities/span.hpp>
 #include <winpr/ntlm.h>
 
 namespace Backend {
@@ -71,8 +72,9 @@ bool NtlmResponseKey(AuthenticationState const& identity, BYTE* nt_hash_v1, BYTE
   auto domain_length = domain.size();
   user.resize(user_length + sizeof(WCHAR));
   domain.resize(domain_length + sizeof(WCHAR));
-  return NTOWFv2FromHashW(nt_hash_v1, reinterpret_cast<WCHAR*>(user.data()), user_length,
-                          reinterpret_cast<WCHAR*>(domain.data()), domain_length, response);
+  using oxbox::utilities::SpanCast;
+  return NTOWFv2FromHashW(nt_hash_v1, SpanCast<uint16_t>(std::span(user)).data(), user_length,
+                          SpanCast<uint16_t>(std::span(domain)).data(), domain_length, response);
 }
 }
 Authenticator::Authenticator(PeerLink& link, Configuration const& configuration,
@@ -136,8 +138,8 @@ bool Authenticator::VerifySettings() {
   }
 }
 bool Authenticator::ResponseKey(SEC_WINNT_AUTH_IDENTITY const& identity, BYTE* response) {
-  _state.Identify(IdentityText(identity.User, identity.UserLength, identity.Flags),
-                  IdentityText(identity.Domain, identity.DomainLength, identity.Flags));
+  auto const names = ClientNames(identity);
+  _state.Identify(names.user, names.domain);
   auto const& config = _configuration.Config();
   auto const* domain = _state.Domain().c_str();
   auto const* user   = _state.User().c_str();
@@ -163,10 +165,9 @@ void Authenticator::End() {
 void AuthenticationIdentity(freerdp_peer const& client, sdlrdp_event& event) {
   Expects(event.type == SDLRDP_CONNECTED, "identity is attached to a connection event");
   auto const& identity = client.identity;
-  auto        user     = IdentityText(identity.User, identity.UserLength, identity.Flags);
-  auto        domain   = IdentityText(identity.Domain, identity.DomainLength, identity.Flags);
-  std::strncpy(event.connected.user, user.c_str(), sizeof(event.connected.user) - 1);
-  std::strncpy(event.connected.domain, domain.c_str(), sizeof(event.connected.domain) - 1);
+  auto const  names    = ClientNames(identity);
+  std::strncpy(event.connected.user, names.user.c_str(), sizeof(event.connected.user) - 1);
+  std::strncpy(event.connected.domain, names.domain.c_str(), sizeof(event.connected.domain) - 1);
   event.connected.authenticated = client.authenticated != FALSE;
 }
 }

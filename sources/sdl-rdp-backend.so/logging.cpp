@@ -30,10 +30,18 @@ bool TlsHandshakeFailed() {
 void AuthenticationRejectedLogging() {
   LogRoute::WithFilter([](auto& filter) { filter.authentication_failed = true; });
 }
-bool ExpectedDisconnect(unsigned code) {
-  return code == FREERDP_ERROR_CONNECT_TRANSPORT_FAILED || code == FREERDP_ERROR_LOGOFF_BY_USER ||
-         code == FREERDP_ERROR_DISCONNECTED_BY_OTHER_CONNECTION || code == FREERDP_ERROR_RPC_INITIATED_DISCONNECT ||
-         code == FREERDP_ERROR_AUTHENTICATION_FAILED || code == FREERDP_ERROR_SERVER_DENIED_CONNECTION;
+auto ExpectedDisconnect(unsigned code) -> bool {
+  switch (code) {
+  case FREERDP_ERROR_CONNECT_TRANSPORT_FAILED:
+  case FREERDP_ERROR_LOGOFF_BY_USER:
+  case FREERDP_ERROR_DISCONNECTED_BY_OTHER_CONNECTION:
+  case FREERDP_ERROR_RPC_INITIATED_DISCONNECT:
+  case FREERDP_ERROR_AUTHENTICATION_FAILED:
+  case FREERDP_ERROR_SERVER_DENIED_CONNECTION:
+    return true;
+  default:
+    return false;
+  }
 }
 namespace {
 constexpr std::array<std::pair<std::string_view, std::string_view>, 9> KnownLibraryMessages{ {
@@ -62,21 +70,23 @@ bool ExpectedLibraryMessage(std::string_view prefix, std::string_view text) {
   }
   return false;
 }
-bool SspiRejectionEcho(LogRoute::Filter& filter, std::string_view prefix, std::string_view text) {
+auto ErrorName(std::string_view text) -> std::string_view {
+  return text.substr(0, text.find(' '));
+}
+auto SspiRejectionEcho(LogRoute::Filter const& filter, std::string_view prefix, std::string_view text) -> bool {
   static constexpr std::array<std::string_view, 2> sspi{
     "AcceptSecurityContext status SEC_E_MESSAGE_ALTERED [0x8009030F]",
     "AcceptSecurityContext status SEC_E_NO_CREDENTIALS [0x8009030E]"
   };
-  return filter.authentication_failed && prefix == "com.winpr.sspi" &&
-         std::ranges::any_of(sspi, [&](auto entry) { return text == entry; });
+  return filter.authentication_failed && prefix == "com.winpr.sspi" && std::ranges::contains(sspi, text);
 }
-bool DetectNegotiationRefusal(LogRoute::Filter& filter, std::string_view prefix, std::string_view text) {
+auto DetectNegotiationRefusal(LogRoute::Filter& filter, std::string_view prefix, std::string_view text) -> bool {
   static constexpr std::array<std::string_view, 4> refusal{ "server supports only Standard RDP Security",
                                                             "server supports only NLA Security",
                                                             "server supports only a SSL based Security (TLS or NLA)",
                                                             "Protocol security negotiation failure" };
   if (!filter.peer_settings || prefix != "com.freerdp.core.connection") return false;
-  if (!std::ranges::any_of(refusal, [&](auto entry) { return text == entry; })) return false;
+  if (!std::ranges::contains(refusal, text)) return false;
   filter.negotiation_failed = true;
   return true;
 }
@@ -86,7 +96,7 @@ bool DetectTlsHandshakeFailure(LogRoute::Filter& filter, std::string_view prefix
   filter.handshake_failed = true;
   return true;
 }
-bool NegotiationEcho(LogRoute::Filter& filter, std::string_view prefix, std::string_view text) {
+auto NegotiationEcho(LogRoute::Filter const& filter, std::string_view prefix, std::string_view text) -> bool {
   static constexpr std::array<std::string_view, 6> echoes{
     "server supports only", "Protocol security negotiation failure",
     "BIO_do_handshake failed", "rdp_server_accept_nego() fail",
@@ -96,44 +106,45 @@ bool NegotiationEcho(LogRoute::Filter& filter, std::string_view prefix, std::str
          (prefix.starts_with("com.freerdp.core") || prefix == "com.freerdp.api" || prefix == "com.freerdp.crypto") &&
          std::ranges::any_of(echoes, [&](auto entry) { return text.contains(entry); });
 }
-bool TransportEcho(std::string_view prefix, std::string_view text) {
-  auto name = text.substr(0, text.find(' '));
+auto TransportEcho(std::string_view prefix, std::string_view text) -> bool {
+  static constexpr std::array<std::string_view, 3> disconnects { "ERRINFO_LOGOFF_BY_USER",
+                                                                 "ERRINFO_DISCONNECTED_BY_OTHER_CONNECTION",
+                                                                 "ERRINFO_RPC_INITIATED_DISCONNECT" };
+  auto const                                       name        = ErrorName(text);
   if ((prefix == "com.freerdp.core" || prefix == "com.freerdp.core.peer") &&
       name == "ERRCONNECT_CONNECT_TRANSPORT_FAILED")
     return true;
-  return prefix == "com.freerdp.core.peer" &&
-         (name == "ERRINFO_LOGOFF_BY_USER" || name == "ERRINFO_DISCONNECTED_BY_OTHER_CONNECTION" ||
-          name == "ERRINFO_RPC_INITIATED_DISCONNECT");
+  return prefix == "com.freerdp.core.peer" && std::ranges::contains(disconnects, name);
 }
-constexpr std::array<std::string_view, 2> ntlm{ "Message Integrity Check (MIC) verification failed!",
-                                                "NtProofString verification failed!" };
-constexpr std::array<std::string_view, 1> nla { "SPNEGO failed with NTSTATUS:" };
-constexpr std::array<std::string_view, 8> core{ "STATE_RUN_FAILED",
-                                                "rdp_server_accept_nego() fail",
-                                                "freerdp_post_connect failed",
-                                                "AcceptSecurityContext",
-                                                "nla_recv_pdu() fail",
-                                                "client authentication failure",
-                                                "freerdp_peer::Capabilities() callback failed",
-                                                "freerdp_peer::Activate() callback failed" };
+constexpr std::array<std::string_view, 2> ntlm    { "Message Integrity Check (MIC) verification failed!",
+                                                    "NtProofString verification failed!" };
+constexpr std::array<std::string_view, 1> nla     { "SPNEGO failed with NTSTATUS:" };
+constexpr std::array<std::string_view, 3> rejected{ "ERRCONNECT_AUTHENTICATION_FAILED", "ERRCONNECT_LOGON_FAILURE",
+                                                    "ERRINFO_SERVER_DENIED_CONNECTION" };
+constexpr std::array<std::string_view, 8> core    { "STATE_RUN_FAILED",
+                                                    "rdp_server_accept_nego() fail",
+                                                    "freerdp_post_connect failed",
+                                                    "AcceptSecurityContext",
+                                                    "nla_recv_pdu() fail",
+                                                    "client authentication failure",
+                                                    "freerdp_peer::Capabilities() callback failed",
+                                                    "freerdp_peer::Activate() callback failed" };
 
-bool AuthenticationEcho(LogRoute::Filter& filter, std::string_view prefix, std::string_view text) {
-  if ((prefix == "com.winpr.sspi.NTLM" && std::ranges::any_of(ntlm, [&](auto entry) { return text == entry; })) ||
-      (prefix == "com.freerdp.core.nla" &&
-       std::ranges::any_of(nla, [&](auto entry) { return text.starts_with(entry); }))) {
-    filter.authentication_failed = true;
-    return true;
-  }
-  if (filter.authentication_failed && (prefix.starts_with("com.freerdp.core") || prefix == "com.freerdp.api") &&
-      std::ranges::any_of(core, [&](auto entry) { return text.contains(entry); }))
-    return true;
-  auto name = text.substr(0, text.find(' '));
-  if (name == "ERRCONNECT_AUTHENTICATION_FAILED" || name == "ERRCONNECT_LOGON_FAILURE" ||
-      name == "ERRINFO_SERVER_DENIED_CONNECTION") {
-    filter.authentication_failed = true;
-    return true;
-  }
-  return false;
+auto AuthenticationFailure(std::string_view prefix, std::string_view text) -> bool {
+  return (prefix == "com.winpr.sspi.NTLM" && std::ranges::contains(ntlm, text)) ||
+         (prefix == "com.freerdp.core.nla" &&
+          std::ranges::any_of(nla, [&](auto entry) { return text.starts_with(entry); })) ||
+         std::ranges::contains(rejected, ErrorName(text));
+}
+auto AuthenticationCoreEcho(LogRoute::Filter const& filter, std::string_view prefix, std::string_view text)
+    -> bool {
+  return filter.authentication_failed && (prefix.starts_with("com.freerdp.core") || prefix == "com.freerdp.api") &&
+         std::ranges::any_of(core, [&](auto entry) { return text.contains(entry); });
+}
+auto AuthenticationEcho(LogRoute::Filter& filter, std::string_view prefix, std::string_view text) -> bool {
+  if (!AuthenticationFailure(prefix, text)) return AuthenticationCoreEcho(filter, prefix, text);
+  filter.authentication_failed = true;
+  return true;
 }
 bool ExpectedPeerMessage(LogRoute::Filter& filter, wLogMessage const& message) {
   if (!message.PrefixString || !message.TextString) return false;
@@ -144,25 +155,30 @@ bool ExpectedPeerMessage(LogRoute::Filter& filter, wLogMessage const& message) {
          NegotiationEcho(filter, prefix, text) || TransportEcho(prefix, text) ||
          AuthenticationEcho(filter, prefix, text);
 }
+auto NtlmMessage(wLogMessage const& message) -> bool {
+  return message.PrefixString && std::string_view(message.PrefixString) == "com.winpr.sspi.NTLM";
 }
-BOOL LogRoute::Forward(wLogMessage const* message) {
+auto LibraryLevel(uint32_t level) -> sdlrdp_log_level {
+  if (level == WLOG_ERROR) return SDLRDP_LOG_ERROR;
+  return level == WLOG_WARN ? SDLRDP_LOG_WARN : SDLRDP_LOG_INFO;
+}
+}
+// WLog's wLogCallbacks table dictates the BOOL result.
+auto LogRoute::Forward(wLogMessage const* message) -> BOOL {
   utilities::Expects(message != nullptr, "WLog message exists");
   auto&                  routing = Shared();
   std::scoped_lock const lock(routing.guard);
   auto&                  filter  = routing.filters[std::this_thread::get_id()];
-  // SSPI debug output can contain credentials and hashes, including binary dump callbacks.
   if (message->Level < WLOG_INFO || message->Type != WLOG_MESSAGE_TEXT) return TRUE;
-  if (message->PrefixString && std::string_view(message->PrefixString) == "com.winpr.sspi.NTLM" &&
-      !ExpectedPeerMessage(filter, *message))
-    return TRUE;
-  auto* target = routing.active;
-  auto  level  = message->Level == WLOG_ERROR ? SDLRDP_LOG_ERROR
-                 : message->Level == WLOG_WARN ? SDLRDP_LOG_WARN
-                                               : SDLRDP_LOG_INFO;
-  if (ExpectedPeerMessage(filter, *message)) level = SDLRDP_LOG_INFO;
-  auto const* text = message->TextString;
-  if (target && target->callback && text) target->callback(target->user, level, text);
+  auto const expected = ExpectedPeerMessage(filter, *message);
+  // SSPI debug output can contain credentials and hashes, including binary dump callbacks.
+  if (NtlmMessage(*message) && !expected) return TRUE;
+  auto const level = expected ? SDLRDP_LOG_INFO : LibraryLevel(message->Level);
+  if (routing.active) routing.active->Deliver(level, message->TextString);
   return TRUE;
+}
+auto LogRoute::Deliver(sdlrdp_log_level level, char const* text) const -> void {
+  if (callback && text) callback(user, level, text);
 }
 void LogRoute::Install() {
   auto* root = WLog_GetRoot();

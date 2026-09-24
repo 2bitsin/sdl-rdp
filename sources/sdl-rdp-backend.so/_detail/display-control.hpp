@@ -20,12 +20,13 @@ public:
   UINT                Layout(DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const& pdu);
 
 private:
-  PeerLink&                                                              _link;
-  Activation const&                                                      _activation;
-  DesktopLayout const&                                                   _desktop;
-  EventQueue&                                                            _events;
-  std::unique_ptr<DispServerContext, Releases<disp_server_context_free>> _context;
-  std::optional<UINT32>                                                  _id;
-  bool                                                                   _open      { };
+  using DisplayContext = std::unique_ptr<DispServerContext, Releases<disp_server_context_free>>;
+  PeerLink&             _link;
+  Activation const&     _activation;
+  DesktopLayout const&  _desktop;
+  EventQueue&           _events;
+  DisplayContext        _context;
+  std::optional<UINT32> _id;
+  bool                  _open      { };
 };
 }

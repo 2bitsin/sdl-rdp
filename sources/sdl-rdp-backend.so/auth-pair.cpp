@@ -4,6 +4,7 @@
 
 #include <cstring>
 #include <openssl/crypto.h>
+#include <oxbox/utilities/span.hpp>
 #include <winpr/ntlm.h>
 
 namespace {
@@ -26,7 +27,7 @@ int sdlrdp_lookup_pair(sdlrdp_config const* config, char const* domain, char con
         std::as_bytes(std::span(config->password, std::strlen(config->password))), { }, Backend::Utf16Little);
     auto length = bytes.size();
     bytes.resize(length + sizeof(WCHAR));
-    auto result = NTOWFv1W(reinterpret_cast<WCHAR*>(bytes.data()), length, hash);
+    auto result = NTOWFv1W(oxbox::utilities::SpanCast<uint16_t>(std::span(bytes)).data(), length, hash);
     OPENSSL_cleanse(bytes.data(), bytes.size());
     return result;
   } catch (...) {

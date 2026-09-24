@@ -2,9 +2,11 @@
 #include "contract.hpp"
 #include "release-client.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <freerdp/freerdp.h>
 #include <memory>
+#include <ranges>
 #include <vector>
 
 namespace Headless {
@@ -19,13 +21,12 @@ public:
   bool     Matches(std::vector<UINT32> const& pixels);
   unsigned MaxError(std::vector<UINT32> const& pixels, std::vector<UINT32> const* reference = nullptr) const;
   UINT64   Received() const;
-  bool     Until(auto ready, std::chrono::milliseconds timeout = std::chrono::seconds(10)) {
+  auto     Until(auto ready, std::chrono::milliseconds timeout = std::chrono::seconds(10)) -> bool {
     Expects(timeout.count() > 0, "event deadline is positive");
     auto deadline = Clock::now() + timeout;
-    while (!ready() && Clock::now() < deadline) {
-      for (unsigned batch = 0; batch < 16; ++batch)
-        if (!Pump(batch ? 0 : 10)) return false;
-    }
+    while (!ready() && Clock::now() < deadline)
+      if (!std::ranges::all_of(std::views::iota(0u, 16u), [this](unsigned batch) { return Pump(batch ? 0 : 10); }))
+        return false;
     return ready();
   }
   std::unique_ptr<freerdp, ReleaseClient> const& Instance() const;
