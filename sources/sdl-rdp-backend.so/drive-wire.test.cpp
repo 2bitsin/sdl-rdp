@@ -30,7 +30,7 @@ void CompleteRead(Headless::DriveObserver& observer, size_t index) {
 }
 void AnnounceDriveNames(Headless::DriveObserver& observer) {
   std::string_view const label = "żółw";
-  auto wide                    = Backend::TranscodeRange<std::vector<uint8_t>>(
+  auto                   wide  = Backend::TranscodeRange<std::vector<uint8_t>>(
       std::as_bytes(std::span(label)), { },
       { .encoding = oxbox::utilities::Encoding::UTF16, .order = std::endian::little });
   wide.resize(wide.size() + 2);
@@ -120,9 +120,9 @@ TEST_F(DriveWire, MalformedInformationKeepsVideoSession) {
   if (::testing::Test::HasFatalFailure()) return;
   auto* file     = held_file;
   auto& observer = *this->observer;
-  auto stat      = std::async(std::launch::async, [&] {
-    sdlrdp_stat info   { };
-    auto        result = sdlrdp_drive_fstat(handle.get(), file, &info);
+  auto  stat     = std::async(std::launch::async, [&] {
+    sdlrdp_stat info { };
+    auto result = sdlrdp_drive_fstat(handle.get(), file, &info);
     return std::pair(result, std::string(sdlrdp_last_error()));
   });
   ASSERT_TRUE(client->Until([&] { return observer.Observed().requests == 1; }));

@@ -30,7 +30,7 @@ template <class Operation> int Call(sdlrdp_handle* handle, Operation operation) 
     return -1;
   }
 }
-enum class FileKind { File, Directory, Any };
+enum class FileKind{ File, Directory, Any };
 DrivePacket Exchange(sdlrdp_file& file, unsigned major, DrivePacket const& packet, unsigned minor = 0,
                      bool end = false) {
   Expects(file.Channel() != nullptr, "file retains its channel");

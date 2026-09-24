@@ -12,13 +12,13 @@ struct State;
 class  Peer;
 class AudioChannel {
 public:
-  using Clock                       = std::chrono::steady_clock;
-                AudioChannel(AudioChannel const&) = delete;
-                AudioChannel(AudioChannel&&) = delete;
+  using Clock = std::chrono::steady_clock;
+                AudioChannel(AudioChannel const&)      = delete;
+                AudioChannel(AudioChannel&&)           = delete;
   explicit      AudioChannel(Peer& peer);
                 ~AudioChannel();
-  AudioChannel& operator =(AudioChannel const&) = delete;
-  AudioChannel& operator =(AudioChannel&&) = delete;
+  AudioChannel& operator = (AudioChannel const&)       = delete;
+  AudioChannel& operator = (AudioChannel&&)            = delete;
   bool          Initialize();
   bool          Pump();
   HANDLE        Event() const;

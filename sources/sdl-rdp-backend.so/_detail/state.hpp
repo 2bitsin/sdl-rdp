@@ -53,12 +53,12 @@ struct Pointer {
 class Peer;
 struct State {
 public:
-                                     State(State const&) = delete;
-                                     State(State&&) = delete;
+  State(State const&) = delete;
+  State(State&&) = delete;
   explicit                           State(sdlrdp_config const& config, bool tracing = false);
                                      ~State();
-  State&                             operator =(State const&) = delete;
-  State&                             operator =(State&&) = delete;
+  State& operator = (State const&) = delete;
+  State& operator = (State&&) = delete;
   void                               Log(sdlrdp_log_level level, std::string const& text) const;
   void                               Listen(std::stop_token const& quit);
   void                               Push(sdlrdp_event event);
@@ -132,11 +132,11 @@ private:
 class Peer // NOLINT(clang-analyzer-optin.performance.Padding): Member teardown order.
 {
 public:
-        Peer(Peer const&) = delete;
-        Peer(Peer&&) = delete;
-  Peer& operator =(Peer const&) = delete;
-  Peer& operator =(Peer&&) = delete;
-  using Clock                  = std::chrono::steady_clock;
+Peer(Peer const&) = delete;
+Peer(Peer&&)      = delete;
+  Peer& operator = (Peer const&) = delete;
+  Peer& operator = (Peer&&)      = delete;
+  using Clock = std::chrono::steady_clock;
   struct Column {
     unsigned first;
     unsigned second;
@@ -147,8 +147,8 @@ public:
     uint64_t          sequence = 0;
     Clock::time_point sent;
   };
-                          Peer(PeerHandle accepted, State& state);
-                          ~Peer();
+Peer(PeerHandle accepted, State& state);
+~Peer();
   void                    Start();
   void                    Post(sdlrdp_rect area);
   void                    InstallCallbacks() const;
@@ -188,9 +188,9 @@ public:
   BOOL                    ActivateChannel(UINT32 id);
   bool                    GraphicsChannel(std::span<HANDLE const> ready);
   bool Graphics() const { return gfx && gfx->Confirmed(); }
-  void AnnounceConnection(sdlrdp_codec codec);
-  void EndAudio();
-  bool SoundChannel(std::span<HANDLE const> ready);
+  void                    AnnounceConnection(sdlrdp_codec codec);
+  void                    EndAudio();
+  bool                    SoundChannel(std::span<HANDLE const> ready);
   Refresh                                  refresh;
   std::atomic_uint                         effective_refresh       { 60 };
   uint64_t                                 outq_total              = 0;
@@ -276,7 +276,7 @@ private:
   static BOOL Mouse(rdpInput* input, UINT16 flags, UINT16 x, UINT16 y);
   static BOOL ExtendedMouse(rdpInput* input, UINT16 flags, UINT16 x, UINT16 y);
   void        RecordAcknowledgements(std::deque<Pending>::iterator const& last, Clock::time_point now);
-  enum class EncodeState { Idle, Legacy, Graphics, LegacyReady };
+  enum class EncodeState{ Idle, Legacy, Graphics, LegacyReady };
   void TransitionEncode(EncodeState next);
   bool PrepareFrame();
   EncodeState encode_state{ EncodeState::Idle };

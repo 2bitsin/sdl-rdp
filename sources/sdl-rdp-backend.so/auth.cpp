@@ -12,43 +12,43 @@ namespace Backend {
 namespace {
 struct NtHash {
 public:
-  NtHash(NtHash const&) = delete;
-  NtHash(NtHash&&) = delete;
-  NtHash() = default;
-  ~NtHash() { OPENSSL_cleanse(bytes.data(), bytes.size()); }
-  NtHash& operator =(NtHash const&) = delete;
-  NtHash& operator =(NtHash&&) = delete;
-  BYTE* Data() { return bytes.data(); }
+          NtHash(NtHash const&)      = delete;
+          NtHash(NtHash&&)           = delete;
+          NtHash()                   = default;
+          ~NtHash()                  { OPENSSL_cleanse(bytes.data(), bytes.size()); }
+  NtHash& operator = (NtHash const&) = delete;
+  NtHash& operator = (NtHash&&)      = delete;
+  BYTE*   Data()                     { return bytes.data(); }
 
 private:
   std::array<BYTE, 16> bytes{ };
 };
 struct SettingsPassword {
 public:
-  SettingsPassword(SettingsPassword const&) = delete;
-  SettingsPassword(SettingsPassword&&) = delete;
-  explicit SettingsPassword(rdpSettings* value) : settings{ value } { }
-  ~SettingsPassword() {
+           SettingsPassword(SettingsPassword const&) = delete;
+           SettingsPassword(SettingsPassword&&)      = delete;
+  explicit SettingsPassword(rdpSettings* value)      : settings{ value } { }
+           ~SettingsPassword()                       {
     auto* password = freerdp_settings_get_string_writable(settings, FreeRDP_Password);
     if (password) OPENSSL_cleanse(password, std::strlen(password));
     // FreeRDP 3.15 include/freerdp/settings.h: set_string copies input; NULL removes the old entry.
     Ensures(freerdp_settings_set_string(settings, FreeRDP_Password, nullptr), "password cleared");
   }
-  SettingsPassword& operator =(SettingsPassword const&) = delete;
-  SettingsPassword& operator =(SettingsPassword&&) = delete;
+  SettingsPassword& operator = (SettingsPassword const&) = delete;
+  SettingsPassword& operator = (SettingsPassword&&)      = delete;
 
 private:
   rdpSettings* settings;
 };
 struct PlainPassword {
 public:
-  PlainPassword(PlainPassword const&) = delete;
-  PlainPassword(PlainPassword&&) = delete;
-  explicit PlainPassword(char const* text) : value{ text } { }
-  ~PlainPassword() { OPENSSL_cleanse(value.data(), value.size()); }
-  PlainPassword& operator =(PlainPassword const&) = delete;
-  PlainPassword& operator =(PlainPassword&&) = delete;
-  char const* Text() const { return value.c_str(); }
+                 PlainPassword(PlainPassword const&) = delete;
+                 PlainPassword(PlainPassword&&)      = delete;
+  explicit       PlainPassword(char const* text)     : value{ text } { }
+                 ~PlainPassword()                    { OPENSSL_cleanse(value.data(), value.size()); }
+  PlainPassword& operator = (PlainPassword const&)   = delete;
+  PlainPassword& operator = (PlainPassword&&)        = delete;
+  char const*    Text() const                        { return value.c_str(); }
 
 private:
   std::string value;
@@ -72,8 +72,8 @@ bool Verify(Peer& peer, char const* domain, char const* user, char const* passwo
     Reject(peer);
     return false;
   }
-  PlainPassword const plain{ password };
-  bool const accepted = config.verify ? config.verify(config.auth_user, domain, user, plain.Text()) != 0
+  PlainPassword const plain    { password };
+  bool const          accepted = config.verify ? config.verify(config.auth_user, domain, user, plain.Text()) != 0
                                       : sdlrdp_verify_pair(&config, domain, user, plain.Text()) != 0;
   if (!accepted) Reject(peer);
   peer.client->authenticated = accepted;
@@ -135,10 +135,10 @@ void AuthenticationIdentity(freerdp_peer* client, sdlrdp_event& event) {
 namespace {
 bool NtlmResponseKey(AuthenticationState const& identity, BYTE* nt_hash_v1, BYTE* response) {
   // FreeRDP 3.15's NTLM callback consumes a response key and treats nonzero as success.
-  auto user = TranscodeRange<std::vector<BYTE>>(
+  auto user          = TranscodeRange<std::vector<BYTE>>(
       std::as_bytes(std::span(identity.user)), { },
       { .encoding = oxbox::utilities::Encoding::UTF16, .order = std::endian::little });
-  auto domain = TranscodeRange<std::vector<BYTE>>(
+  auto domain        = TranscodeRange<std::vector<BYTE>>(
       std::as_bytes(std::span(identity.domain)), { },
       { .encoding = oxbox::utilities::Encoding::UTF16, .order = std::endian::little });
   auto user_length   = user.size();
@@ -153,7 +153,7 @@ bool ResponseKey(Peer& peer, SEC_WINNT_AUTH_IDENTITY const& identity, BYTE* resp
   peer.authentication.domain = IdentityText(identity.Domain, identity.DomainLength, identity.Flags);
   auto const& config = peer.owner.authentication.Config();
   NtHash      hash;
-  bool const known = config.lookup ? config.lookup(config.auth_user, peer.authentication.domain.c_str(),
+  bool const  known  = config.lookup ? config.lookup(config.auth_user, peer.authentication.domain.c_str(),
                                                    peer.authentication.user.c_str(), hash.Data()) != 0
                                    : sdlrdp_lookup_pair(&config, peer.authentication.domain.c_str(),
                                                         peer.authentication.user.c_str(), hash.Data()) != 0;

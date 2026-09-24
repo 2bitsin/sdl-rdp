@@ -7,7 +7,7 @@ namespace Backend {
 bool Signalled(HANDLE event);
 class WakeEvent {
 public:
-  enum class Phase { Idle, Pending };
+  enum class Phase{ Idle, Pending };
   explicit WakeEvent(HANDLE value);
   HANDLE   get() const;
   explicit operator bool() const;

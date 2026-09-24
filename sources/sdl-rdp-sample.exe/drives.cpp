@@ -23,8 +23,8 @@ std::pair<std::string, std::string> SplitDrive(char const* value) {
 }
 SDL_IOStream* OpenDriveFile(char const* value, char const* mode) {
   auto [drive, path] = SplitDrive(value);
-  auto props = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
-  auto open =
+  auto props         = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
+  auto open          =
       reinterpret_cast<DriveOpen>(SDL_GetPointerProperty(props, SDL_PROP_DISPLAY_RDP_OPEN_FILE_POINTER, nullptr));
   Check(open != nullptr);
   return open(drive.c_str(), path.c_str(), mode);

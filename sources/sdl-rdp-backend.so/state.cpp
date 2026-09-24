@@ -24,15 +24,15 @@ namespace {
 struct Socket {
 public:
   Socket(Socket const&) = delete;
-  Socket(Socket&&) = delete;
-  Socket() = default;
-  ~Socket() {
+  Socket(Socket&&)      = delete;
+  Socket()              = default;
+  ~Socket()             {
     if (descriptor >= 0) ::close(descriptor);
   }
-  Socket& operator =(Socket const&) = delete;
-  Socket& operator =(Socket&&) = delete;
-  int Get() const { return descriptor; }
-  void Release() { descriptor = -1; }
+  Socket& operator = (Socket const&) = delete;
+  Socket& operator = (Socket&&)      = delete;
+  int     Get() const                { return descriptor; }
+  void    Release()                  { descriptor = -1; }
 
 private:
   int descriptor = ::socket(AF_INET, SOCK_STREAM, 0);
@@ -78,7 +78,7 @@ void ComposeRow(std::span<BYTE const> source, std::span<BYTE const> former, std:
     auto covered{ std::ranges::find_if(damage, [x](auto rect) { return rect.x <= x && x < rect.x + rect.w; }) };
     auto ahead  { damage | std::views::filter([x](auto rect) { return rect.x > x; })                          };
     auto nearest{ std::ranges::min_element(ahead, { }, &sdlrdp_rect::x)                                       };
-    auto end{ covered != damage.end()  ? covered->x + covered->w
+    auto end{ covered != damage.end() ? covered->x + covered->w
               : nearest != ahead.end() ? nearest->x
                                        : int(target.size() / 4) };
     auto output{ target.subspan(x * 4, (end - x) * 4)      };

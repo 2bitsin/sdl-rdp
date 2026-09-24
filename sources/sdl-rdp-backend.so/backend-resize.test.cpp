@@ -5,8 +5,8 @@
 namespace BackendGate {
 struct ResizeProbe {
 public:
-  ResizeProbe(ResizeProbe const&) = delete;
-  ResizeProbe(ResizeProbe&&) = delete;
+           ResizeProbe(ResizeProbe const&)    = delete;
+           ResizeProbe(ResizeProbe&&)         = delete;
   explicit ResizeProbe(Backend::State& state)
       : state(state), peer(*state.current), original(peer.client->context->update->DesktopResize) {
     std::scoped_lock const lock(state.session_guard);
@@ -24,9 +24,9 @@ public:
     peer.client->context->update->DesktopResize = original;
     active                                      = nullptr;
   }
-  ResizeProbe& operator =(ResizeProbe const&) = delete;
-  ResizeProbe& operator =(ResizeProbe&&) = delete;
-  bool Finalizing() {
+  ResizeProbe& operator = (ResizeProbe const&) = delete;
+  ResizeProbe& operator = (ResizeProbe&&)      = delete;
+  bool         Finalizing()                    {
     std::scoped_lock const lock(state.session_guard);
     auto current = freerdp_get_state(peer.client->context);
     return current >= CONNECTION_STATE_FINALIZATION_SYNC && current <= CONNECTION_STATE_FINALIZATION_FONT_LIST;
@@ -156,7 +156,7 @@ TEST_F(ResizeStorm, EqualLayoutDoesNotChangePicture) {
   auto presented = Presented(*backend->state);
   ASSERT_TRUE(display.Layout(640, 480));
   ASSERT_TRUE(display.Layout(800, 600));
-  auto events = EventsUntil(
+  auto events  = EventsUntil(
       [](auto const& events) {
         return std::ranges::any_of(events, [](auto event) { return event.type == SDLRDP_SCREEN; });
       },

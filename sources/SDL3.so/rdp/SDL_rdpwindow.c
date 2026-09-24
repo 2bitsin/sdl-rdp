@@ -57,9 +57,9 @@ SDL_FullscreenResult SDL_RDP_SetWindowFullscreen(SDL_VideoDevice* _this, SDL_Win
   SDL_assert(window);
   SDL_DisplayMode const* mode =
       window->requested_fullscreen_mode.w ? &window->requested_fullscreen_mode : &display->desktop_mode;
-  SDL_VideoData* data = _this->internal;
-  int            w    = fullscreen == SDL_FULLSCREEN_OP_LEAVE ? window->windowed.w : mode->w;
-  int            h    = fullscreen == SDL_FULLSCREEN_OP_LEAVE ? window->windowed.h : mode->h;
+  SDL_VideoData*         data = _this->internal;
+  int                    w    = fullscreen == SDL_FULLSCREEN_OP_LEAVE ? window->windowed.w : mode->w;
+  int                    h    = fullscreen == SDL_FULLSCREEN_OP_LEAVE ? window->windowed.h : mode->h;
   if (!SDL_RDP_ResizePicture(data, w, h)) {
     return SDL_FULLSCREEN_FAILED;
   }

@@ -69,7 +69,7 @@ UINT Input::Advanced(ainput_server_context* context, UINT64 /*unused*/, UINT64 f
       peer.owner.Push(
           { .type = SDLRDP_MOUSE_BUTTON, .mouse_button = { .button = i + 1, .down = !!(flags & AINPUT_FLAGS_DOWN) } });
   if (flags & AINPUT_FLAGS_WHEEL)
-    peer.owner.Push({ .type        = SDLRDP_MOUSE_WHEEL,
+    peer.owner.Push({ .type = SDLRDP_MOUSE_WHEEL,
                       .mouse_wheel = { .dx = float(x) / (120.0f * 65536), .dy = float(y) / (120.0f * 65536) } });
   return CHANNEL_RC_OK;
 }

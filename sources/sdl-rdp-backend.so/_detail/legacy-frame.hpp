@@ -32,11 +32,11 @@ private:
   bool Bands(Peer& peer, sdlrdp_rect area);
   void Describe(Packet& packet);
   bool Write(rdpUpdate* update, Packet& packet);
-  enum class                 Wire    { Bitmap, Planar, Surface };
+  enum class                 Wire   { Bitmap, Planar, Surface };
   std::vector<Packet>        packets;
   std::optional<std::size_t> next;
-  unsigned                   depth  { 32           };
-  unsigned                   codec  { 0            };
-  Wire                       wire   { Wire::Bitmap };
+  unsigned                   depth  { 32                      };
+  unsigned                   codec  { 0                       };
+  Wire                       wire   { Wire::Bitmap            };
 };
 }

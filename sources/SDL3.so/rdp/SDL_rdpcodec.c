@@ -3,10 +3,10 @@
 static struct {
   char const*  name;
   sdlrdp_codec codec;
-} const SDL_RDP_codecs[] = { { "auto", SDLRDP_CODEC_AUTO },         { "planar", SDLRDP_CODEC_PLANAR },
+} const SDL_RDP_codecs[] = { { "auto", SDLRDP_CODEC_AUTO }, { "planar", SDLRDP_CODEC_PLANAR },
                              { "remotefx", SDLRDP_CODEC_REMOTEFX }, { "nscodec", SDLRDP_CODEC_NSCODEC },
-                             { "raw", SDLRDP_CODEC_RAW },           { "progressive", SDLRDP_CODEC_PROGRESSIVE },
-                             { "avc420", SDLRDP_CODEC_AVC420 } };
+                             { "raw"     , SDLRDP_CODEC_RAW      }, { "progressive", SDLRDP_CODEC_PROGRESSIVE },
+                             { "avc420"  , SDLRDP_CODEC_AVC420   } };
 
 bool SDL_RDP_ParseCodec(char const* name, sdlrdp_codec* codec) {
   unsigned i = 0;

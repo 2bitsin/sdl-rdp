@@ -88,8 +88,8 @@ protected:
     observer.reset();
     Disconnect();
   }
-  unsigned Logged(sdlrdp_log_level level, std::string_view text) { return logs.Count(level, text); }
-  static std::string Pattern(size_t size, unsigned seed = 17) {
+  unsigned           Logged(sdlrdp_log_level level, std::string_view text) { return logs.Count(level, text); }
+  static std::string Pattern(size_t size, unsigned seed = 17)              {
     std::string bytes(size, '\0');
     std::ranges::transform(std::views::iota(0uz, size), bytes.begin(),
                            [=](size_t i) { return char((i * 31 + i / 251 + seed) & 255); });

@@ -92,7 +92,7 @@ void SDLCALL FeedTone(void* userdata, SDL_AudioStream* stream, int additional, i
     auto count = std::min(additional / int(2 * sizeof(Sint16)), 480);
     if (!count) return;
     for (int i = 0; i < count; ++i, ++frame) {
-      auto value       = Sint16(std::lround(32767 * std::pow(10.0, -12.0 / 20.0) *
+      auto value = Sint16(std::lround(32767 * std::pow(10.0, -12.0 / 20.0) *
                                             std::sin(2 * std::numbers::pi * 440 * double(frame) / 48000)));
       samples[2uz * i] = samples[(2uz * i) + 1] = value;
     }
@@ -143,7 +143,7 @@ void Fullscreen(SDL_Window* window, Options const& options) {
 
 bool FlagOption(std::string_view name, Options& options) {
   constexpr std::array<std::pair<std::string_view, bool Options::*>, 4> flags{ { { "--tone", &Options::tone },
-                                                                                 { "--tight", &Options::tight },
+                                                                                 { "--tight"  , &Options::tight   },
                                                                                  { "--partial", &Options::partial },
                                                                                  { "--fullscreen",
                                                                                    &Options::fullscreen } } };

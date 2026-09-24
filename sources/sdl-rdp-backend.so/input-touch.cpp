@@ -15,8 +15,8 @@ sdlrdp_event Contact(Peer const& peer, RDPINPUT_CONTACT_DATA const& contact) {
   float const pressure = (contact.fieldsPresent & CONTACT_DATA_PRESSURE_PRESENT)
                              ? float(std::min(contact.pressure, 1024u)) / 1024.0f
                              : 1.0f;
-  return { .type  = SDLRDP_TOUCH,
-           .touch = { .id       = contact.contactId,
+  return { .type = SDLRDP_TOUCH,
+           .touch = { .id = contact.contactId,
                       .x        = std::clamp(float(contact.x) / float(peer.desktop.w), 0.0f, 1.0f),
                       .y        = std::clamp(float(contact.y) / float(peer.desktop.h), 0.0f, 1.0f),
                       .pressure = pressure,

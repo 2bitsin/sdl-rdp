@@ -84,7 +84,7 @@ void ThenStreamWrite(SDL_IOStream* stream) {
 }
 void VerifyStream(SDL_PropertiesID properties, fs::path const& path) {
   using Open = SDL_IOStream*(SDLCALL*)(char const*, char const*, char const*);
-  auto open =
+  auto  open =
       reinterpret_cast<Open>(SDL_GetPointerProperty(properties, SDL_PROP_DISPLAY_RDP_OPEN_FILE_POINTER, nullptr));
   ASSERT_NE(open, nullptr);
   auto* stream = open("share", "whole", "r+b");

@@ -9,8 +9,8 @@
 namespace Backend {
 class ErrorStore {
 public:
-  static char const* Last() { return CallingThread().text->c_str(); }
-  static void Publish(ErrorStore* owner, std::string text) {
+  static char const* Last()                                       { return CallingThread().text->c_str(); }
+  static void        Publish(ErrorStore* owner, std::string text) {
     auto& caller = CallingThread();
     if (owner) {
       std::scoped_lock const lock(owner->guard);

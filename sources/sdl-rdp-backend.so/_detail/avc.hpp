@@ -20,15 +20,15 @@ unsigned     Aligned(unsigned dimension);
 void         ReplicateEdges(std::span<BYTE> pixels, unsigned width, unsigned height);
 struct Regions {
 public:
-  void Add(sdlrdp_rect area);
-  std::size_t Bytes() const {
+  void        Add(sdlrdp_rect area);
+  std::size_t Bytes() const         {
     utilities::Expects(rects.size() == quality.size(), "every region has quantization metadata");
     return 4 + (10 * rects.size());
   }
-  auto& Rects() { return rects; }
-  auto& Quality() { return quality; }
+  auto&       Rects()        { return rects; }
+  auto&       Quality()      { return quality; }
   sdlrdp_rect Bounds() const { return bounds; }
-  void Clear() {
+  void        Clear()        {
     rects.clear();
     quality.clear();
   }
@@ -46,11 +46,11 @@ struct EncodingTimes {
 class Encoder {
 public:
                         Encoder();
-                        Encoder(Encoder const&) = delete;
-                        Encoder(Encoder&&) = delete;
+  Encoder(Encoder const&) = delete;
+  Encoder(Encoder&&) = delete;
                         ~Encoder();
-  Encoder&              operator =(Encoder const&) = delete;
-  Encoder&              operator =(Encoder&&) = delete;
+  Encoder& operator = (Encoder const&) = delete;
+  Encoder& operator = (Encoder&&) = delete;
   static bool           Available();
   static std::string    UnavailableReason();
   bool                  Open(unsigned width, unsigned height, unsigned bitrate, unsigned fps);
@@ -62,7 +62,7 @@ public:
   EncodingTimes const& Timing() const { return times; }
 
 private:
-  EncodingTimes times;
+  EncodingTimes         times;
   struct                Impl;
   std::unique_ptr<Impl> impl;
 };

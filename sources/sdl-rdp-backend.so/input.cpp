@@ -13,7 +13,7 @@ BOOL Peer::Keyboard(rdpInput* input, UINT16 flags, UINT8 code) {
                          int(!(flags & KBD_FLAGS_RELEASE)));
     });
     self.owner.Push({ .type = SDLRDP_KEY,
-                      .key  = { .scancode = code,
+                      .key = { .scancode = code,
                                 .extended = !!(flags & KBD_FLAGS_EXTENDED),
                                 .down     = !(flags & KBD_FLAGS_RELEASE) } });
     return TRUE;
@@ -32,7 +32,7 @@ void PushMouseWheel(State& owner, UINT16 flags) {
     int rotation = flags & WheelRotationMask;
     if (flags & PTR_FLAGS_WHEEL_NEGATIVE) rotation -= 0x200;
     float const notches = float(rotation) / 120.0f;
-    owner.Push({ .type        = SDLRDP_MOUSE_WHEEL,
+    owner.Push({ .type = SDLRDP_MOUSE_WHEEL,
                  .mouse_wheel = { .dx = (flags & PTR_FLAGS_HWHEEL) ? notches : 0,
                                   .dy = (flags & PTR_FLAGS_WHEEL) ? notches : 0 } });
   }

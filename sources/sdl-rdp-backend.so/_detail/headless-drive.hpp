@@ -46,7 +46,7 @@ inline void ObserveDrive(DriveCapture& capture, std::span<BYTE const> bytes) {
 struct DriveObserver {
 public:
   DriveObserver(DriveObserver const&) = delete;
-  DriveObserver(DriveObserver&&) = delete;
+  DriveObserver(DriveObserver&&)      = delete;
   explicit DriveObserver(Client& client) : instance(client.Instance().get()), original(instance->ReceiveChannelData) {
     Expects(!active, "one drive observer per thread");
     active                       = this;
@@ -56,13 +56,13 @@ public:
     instance->ReceiveChannelData = original;
     active                       = nullptr;
   }
-  DriveObserver& operator =(DriveObserver const&) = delete;
-  DriveObserver& operator =(DriveObserver&&) = delete;
-  bool Send(Backend::DrivePacket const& packet) const {
+  DriveObserver& operator = (DriveObserver const&)              = delete;
+  DriveObserver& operator = (DriveObserver&&)                   = delete;
+  bool           Send(Backend::DrivePacket const& packet) const {
     auto id = freerdp_channels_get_id_by_name(instance, RDPDR_CHANNEL_NAME);
     return id && instance->SendChannelData(instance, id, packet.Bytes().data(), packet.Bytes().size());
   }
-  DriveCapture& Observed() { return observed; }
+  DriveCapture&       Observed()       { return observed; }
   DriveCapture const& Observed() const { return observed; }
 
 private:

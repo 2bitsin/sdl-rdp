@@ -27,7 +27,7 @@ protected:
     ASSERT_EQ(sdlrdp_open(&config, &handle), 0) << sdlrdp_last_error();
     backend.reset(handle);
   }
-  Client& GraphicsClient() { return *graphics_client; }
+  Client&                     GraphicsClient()   { return *graphics_client; }
   Headless::GraphicsObserver& GraphicsObserver() { return *graphics_observer; }
   void PresentProgressiveDamage(Client& client, std::vector<UINT32> const& pixels, sdlrdp_rect damage) {
     ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 640 * 4, 640, 480, &damage, 1), 0);
@@ -61,7 +61,7 @@ protected:
   }
   void ThenLegacyFallback(Client& client) {
     ASSERT_TRUE(freerdp_connect(client.Instance().get()));
-    auto events = EventsUntil(
+    auto events    = EventsUntil(
         [](auto const& events) {
           return std::ranges::any_of(events, [](auto event) { return event.type == SDLRDP_CONNECTED; });
         },

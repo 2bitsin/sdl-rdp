@@ -122,10 +122,10 @@ TEST_P(Gate, BlockedSinglePresent) {
   ASSERT_EQ(events.front().type, SDLRDP_CONNECTED);
   pixels.resize(2048uz * 1536);
   std::ranges::generate(pixels, [index = 0u]() mutable { return (index++ * 2654435761u) & 0x00ffffff; });
-  sdlrdp_rect area{ 0, 0, 2048, 1536 };
+  sdlrdp_rect area       { 0, 0, 2048, 1536 };
   // Keep the client unpumped until the presenter completes. Completion therefore
   // cannot depend on the client draining output; ten seconds is a progress bound.
-  auto presenting = std::async(std::launch::async,
+  auto        presenting = std::async(std::launch::async,
                                [&] { return sdlrdp_present(handle, pixels.data(), 2048 * 4, 2048, 1536, &area, 1); });
   ThenUnblockedPresent(presenting, client);
   if (::testing::Test::HasFatalFailure()) return;

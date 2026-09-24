@@ -20,8 +20,8 @@ using Certificate = std::unique_ptr<X509, Releases<X509_free>>;
 using Bio         = std::unique_ptr<BIO, Releases<BIO_free>>;
 struct DirectoryLock {
 public:
-  DirectoryLock(DirectoryLock const&) = delete;
-  DirectoryLock(DirectoryLock&&) = delete;
+           DirectoryLock(DirectoryLock const&)                   = delete;
+           DirectoryLock(DirectoryLock&&)                        = delete;
   explicit DirectoryLock(std::filesystem::path const& directory)
       : fd(open(directory.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC)) {
     if (fd < 0) throw std::runtime_error("Certificate directory open failed.");
@@ -30,9 +30,9 @@ public:
       throw std::runtime_error("Certificate directory lock failed.");
     }
   }
-  ~DirectoryLock() { close(fd); }
-  DirectoryLock& operator =(DirectoryLock const&) = delete;
-  DirectoryLock& operator =(DirectoryLock&&) = delete;
+                 ~DirectoryLock()                  { close(fd); }
+  DirectoryLock& operator = (DirectoryLock const&) = delete;
+  DirectoryLock& operator = (DirectoryLock&&)      = delete;
 
 private:
   int fd;

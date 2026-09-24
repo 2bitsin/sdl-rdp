@@ -20,8 +20,8 @@ inline ClipboardClient& HeldClipboard(CliprdrClientContext* context) {
 }
 class ClipboardClient {
 public:
-  ClipboardClient(ClipboardClient const&) = delete;
-  ClipboardClient(ClipboardClient&&) = delete;
+           ClipboardClient(ClipboardClient const&)                         = delete;
+           ClipboardClient(ClipboardClient&&)                              = delete;
   explicit ClipboardClient(Client& value, std::vector<BYTE> initial = { })
       : client(value), outgoing(std::move(initial)) {
     Expects(!attaching, "one clipboard client per connecting thread");
@@ -32,7 +32,7 @@ public:
     PubSub_SubscribeChannelConnected(context->pubSub, Connected);
     client.Instance()->LoadChannels = [](freerdp* instance) -> BOOL {
       auto* settings = instance->context->settings;
-      auto entry     = reinterpret_cast<PVIRTUALCHANNELENTRYEX>(freerdp_load_channel_addin_entry(
+      auto  entry    = reinterpret_cast<PVIRTUALCHANNELENTRYEX>(freerdp_load_channel_addin_entry(
           CLIPRDR_SVC_CHANNEL_NAME, nullptr, nullptr, FREERDP_ADDIN_CHANNEL_STATIC | FREERDP_ADDIN_CHANNEL_ENTRYEX));
       return entry && freerdp_channels_client_load_ex(instance->context->channels, settings, entry, settings) == 0;
     };
@@ -42,9 +42,9 @@ public:
     PubSub_UnsubscribeChannelConnected(client.Instance()->context->pubSub, Connected);
     attaching = nullptr;
   }
-  ClipboardClient& operator =(ClipboardClient const&) = delete;
-  ClipboardClient& operator =(ClipboardClient&&) = delete;
-  bool Received(std::vector<BYTE> const& bytes) {
+  ClipboardClient& operator = (ClipboardClient const&)      = delete;
+  ClipboardClient& operator = (ClipboardClient&&)           = delete;
+  bool             Received(std::vector<BYTE> const& bytes) {
     std::scoped_lock const lock(guard);
     return incoming == bytes && std::ranges::contains(formats, CF_UNICODETEXT) &&
            std::ranges::contains(formats, CF_TEXT);

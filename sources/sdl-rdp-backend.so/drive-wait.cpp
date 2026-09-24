@@ -68,8 +68,8 @@ DrivePacket DriveChannel::Wait(std::shared_ptr<DriveRequest> const& request, std
   if (request->status && (!end || (!std::cmp_equal(request->status, unsigned(STATUS_NO_MORE_FILES)) &&
                                    !std::cmp_equal(request->status, unsigned(STATUS_END_OF_FILE))))) {
     // WinPR owns the NTSTATUS name table; unknown client values retain their code.
-    auto const* name = NtStatus2Tag(static_cast<NTSTATUS>(request->status));
-    auto status =
+    auto const* name   = NtStatus2Tag(static_cast<NTSTATUS>(request->status));
+    auto        status =
         name ? std::format("{} (0x{:08x})", name, request->status) : std::format("NTSTATUS 0x{:08x}", request->status);
     throw std::runtime_error(std::format("Drive '{}' failed: {}", path, status));
   }

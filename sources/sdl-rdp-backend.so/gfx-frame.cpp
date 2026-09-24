@@ -51,7 +51,7 @@ bool GfxChannel::CompressProgressive(REGION16& damage, std::chrono::steady_clock
   UINT32 size    = 0;
   auto   picture { Picture()               };
   auto   stride  { Avc::Aligned(width) * 4 };
-  auto result = progressive_compress(progressive.get(), picture.data(), picture.size(), PIXEL_FORMAT_BGRX32, width,
+  auto   result  = progressive_compress(progressive.get(), picture.data(), picture.size(), PIXEL_FORMAT_BGRX32, width,
                                      height, stride, &damage, &data, &size);
   peer.encoder.encode_time += Peer::Clock::now() - start;
   region16_uninit(&damage);

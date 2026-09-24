@@ -10,15 +10,15 @@
 namespace Headless {
 struct Descriptor {
 public:
-  Descriptor(Descriptor const&) = delete;
-  Descriptor(Descriptor&&) = delete;
-  explicit Descriptor(int descriptor) : value{ descriptor } { }
-  ~Descriptor() {
+           Descriptor(Descriptor const&) = delete;
+           Descriptor(Descriptor&&)      = delete;
+  explicit Descriptor(int descriptor)    : value{ descriptor } { }
+           ~Descriptor()                 {
     if (value >= 0) close(value);
   }
-  Descriptor& operator =(Descriptor const&) = delete;
-  Descriptor& operator =(Descriptor&&) = delete;
-  int Get() const { return value; }
+  Descriptor& operator = (Descriptor const&) = delete;
+  Descriptor& operator = (Descriptor&&)      = delete;
+  int         Get() const                    { return value; }
 
 private:
   int value;

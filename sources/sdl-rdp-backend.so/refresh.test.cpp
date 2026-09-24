@@ -113,7 +113,7 @@ TEST_P(RefreshReset, RestartDropsHistory) {
   auto now = Refresh::Clock::now();
   for (int frame = 0; frame < 10; ++frame) {
     value.Acknowledge(now += 600ms, 100ms);
-    value.Written({ .available     = true,
+    value.Written({ .available = true,
                     .outq          = 20000,
                     .notsent       = 10000,
                     .unacked       = 20,

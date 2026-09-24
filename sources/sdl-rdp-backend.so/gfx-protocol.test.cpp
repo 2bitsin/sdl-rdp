@@ -9,9 +9,9 @@
 namespace {
 TEST(GraphicsCapability, HighestSupportedVersion) {
   std::array<RDPGFX_CAPSET, 4> caps{ { { .version = RDPGFX_CAPVERSION_81, .length = 4, .flags = 0 },
-                                       { .version = 0xffffffff, .length = 16, .flags = 0 },
-                                       { .version = RDPGFX_CAPVERSION_107, .length = 4, .flags = 0 },
-                                       { .version = RDPGFX_CAPVERSION_10, .length = 4, .flags = 0 } } };
+                                       { .version = 0xffffffff           , .length = 16, .flags = 0 },
+                                       { .version = RDPGFX_CAPVERSION_107, .length = 4 , .flags = 0 },
+                                       { .version = RDPGFX_CAPVERSION_10 , .length = 4 , .flags = 0 } } };
   EXPECT_EQ(Backend::SelectCapability(caps).version, RDPGFX_CAPVERSION_107);
   std::ranges::reverse(caps);
   EXPECT_EQ(Backend::SelectCapability(caps).version, RDPGFX_CAPVERSION_107);
@@ -70,7 +70,7 @@ TEST(Avc, Bitrate) {
   EXPECT_EQ(Backend::Avc::Bitrate(32766, 32766), UINT32_MAX);
 }
 TEST(Avc, ReplicatesPadding) {
-  std::array<BYTE, 32> source{ 1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 99, 99, 99, 99,
+  std::array<BYTE, 32> source{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 99, 99, 99, 99,
                                13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 99, 99, 99, 99 };
   std::vector<BYTE> padded(16uz * 16 * 4);
   std::copy_n(source.data(), 12, padded.data());

@@ -15,12 +15,12 @@ inline constexpr UINT32 GraphicsContextId = 1;
 class                   Peer;
 class GfxChannel {
 public:
-              GfxChannel(GfxChannel const&) = delete;
-              GfxChannel(GfxChannel&&) = delete;
+              GfxChannel(GfxChannel const&)  = delete;
+              GfxChannel(GfxChannel&&)       = delete;
   explicit    GfxChannel(Peer& value);
               ~GfxChannel();
-  GfxChannel& operator =(GfxChannel const&) = delete;
-  GfxChannel& operator =(GfxChannel&&) = delete;
+  GfxChannel& operator = (GfxChannel const&) = delete;
+  GfxChannel& operator = (GfxChannel&&)      = delete;
   bool        Open();
   bool        Pump();
   HANDLE      Event() const;
@@ -28,7 +28,7 @@ public:
   bool        Encode();
   bool        Send();
   unsigned    FrameWindow() const;
-  bool Confirmed() const { return confirmed; }
+  bool        Confirmed() const              { return confirmed; }
 
 private:
   bool                  CompressProgressive(REGION16& damage, std::chrono::steady_clock::time_point start);

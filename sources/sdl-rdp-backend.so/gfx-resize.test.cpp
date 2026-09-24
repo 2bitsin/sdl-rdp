@@ -49,11 +49,11 @@ protected:
 };
 void ThenBilinearPixels(rdpGdi const* gdi, std::vector<UINT32> const& pixels) {
   for (int y = 0; y < 240; ++y) {
-    auto position = std::clamp(((y + 0.5) * (200.0 / 240)) - 0.5, 0.0, 199.0);
-    auto first    = unsigned(position);
-    auto second   = std::min(first + 1, 199u);
-    auto weight   = float(position - first);
-    auto const* actual =
+    auto        position = std::clamp(((y + 0.5) * (200.0 / 240)) - 0.5, 0.0, 199.0);
+    auto        first    = unsigned(position);
+    auto        second   = std::min(first + 1, 199u);
+    auto        weight   = float(position - first);
+    auto const* actual   =
         reinterpret_cast<UINT32 const*>(gdi->primary_buffer + (static_cast<std::size_t>(y) * gdi->stride));
     for (int x = 0; x < 320; ++x) {
       UINT32 expected = 0;

@@ -19,19 +19,19 @@ void ThenReaders(std::span<std::future<bool>> readers) {
   }
 }
 std::array<std::pair<uint32_t, char const*>, 13> constexpr FailureStatusNames{ {
-    { STATUS_NO_SUCH_FILE, "STATUS_NO_SUCH_FILE (0xc000000f)" },
+    { STATUS_NO_SUCH_FILE         , "STATUS_NO_SUCH_FILE (0xc000000f)"          },
     { STATUS_OBJECT_NAME_NOT_FOUND, "STATUS_OBJECT_NAME_NOT_FOUND (0xc0000034)" },
     { STATUS_OBJECT_PATH_NOT_FOUND, "STATUS_OBJECT_PATH_NOT_FOUND (0xc000003a)" },
-    { STATUS_ACCESS_DENIED, "STATUS_ACCESS_DENIED (0xc0000022)" },
+    { STATUS_ACCESS_DENIED        , "STATUS_ACCESS_DENIED (0xc0000022)"         },
     { STATUS_OBJECT_NAME_COLLISION, "STATUS_OBJECT_NAME_COLLISION (0xc0000035)" },
-    { STATUS_NOT_A_DIRECTORY, "STATUS_NOT_A_DIRECTORY (0xc0000103)" },
-    { STATUS_FILE_IS_A_DIRECTORY, "STATUS_FILE_IS_A_DIRECTORY (0xc00000ba)" },
-    { STATUS_DIRECTORY_NOT_EMPTY, "STATUS_DIRECTORY_NOT_EMPTY (0xc0000101)" },
-    { STATUS_DISK_FULL, "STATUS_DISK_FULL (0xc000007f)" },
-    { STATUS_SHARING_VIOLATION, "STATUS_SHARING_VIOLATION (0xc0000043)" },
-    { STATUS_NOT_SUPPORTED, "STATUS_NOT_SUPPORTED (0xc00000bb)" },
-    { STATUS_UNSUCCESSFUL, "STATUS_UNSUCCESSFUL (0xc0000001)" },
-    { 0xdeadbeef, "NTSTATUS 0xdeadbeef" },
+    { STATUS_NOT_A_DIRECTORY      , "STATUS_NOT_A_DIRECTORY (0xc0000103)"       },
+    { STATUS_FILE_IS_A_DIRECTORY  , "STATUS_FILE_IS_A_DIRECTORY (0xc00000ba)"   },
+    { STATUS_DIRECTORY_NOT_EMPTY  , "STATUS_DIRECTORY_NOT_EMPTY (0xc0000101)"   },
+    { STATUS_DISK_FULL            , "STATUS_DISK_FULL (0xc000007f)"             },
+    { STATUS_SHARING_VIOLATION    , "STATUS_SHARING_VIOLATION (0xc0000043)"     },
+    { STATUS_NOT_SUPPORTED        , "STATUS_NOT_SUPPORTED (0xc00000bb)"         },
+    { STATUS_UNSUCCESSFUL         , "STATUS_UNSUCCESSFUL (0xc0000001)"          },
+    { 0xdeadbeef                  , "NTSTATUS 0xdeadbeef"                       },
 } };
 }
 
@@ -63,7 +63,7 @@ protected:
     while (sdlrdp_drive_list(handle.get(), &value, 1) && Headless::Clock::now() < deadline)
       std::this_thread::sleep_for(1ms);
     EXPECT_EQ(sdlrdp_drive_list(handle.get(), &value, 1), 0);
-    auto count = sdlrdp_poll(handle.get(), events.data(), 32);
+    auto count   = sdlrdp_poll(handle.get(), events.data(), 32);
     auto removed = std::ranges::find_if(std::span(events.data(), count), [&](auto const& event) {
       return event.type == SDLRDP_DRIVE && !event.drive.added && event.drive.id == old;
     });
@@ -106,8 +106,8 @@ protected:
     SCOPED_TRACE(text);
     observer.Observed().io.clear();
     auto open = std::async(std::launch::async, [&] {
-      sdlrdp_file* file   = nullptr;
-      auto         result = sdlrdp_drive_open(handle.get(), drive, "missing.bin", SDLRDP_FILE_READ, &file);
+      sdlrdp_file* file = nullptr;
+      auto result = sdlrdp_drive_open(handle.get(), drive, "missing.bin", SDLRDP_FILE_READ, &file);
       return std::pair(result, std::string(sdlrdp_last_error()));
     });
     ASSERT_TRUE(client->Until([&] { return !observer.Observed().io.empty(); }));
@@ -226,7 +226,7 @@ TEST_F(Drive, SparseOffsetAboveFourGiB) {
 TEST_F(Drive, AnnounceAndRemoveEvents) {
   std::array<sdlrdp_event, 32> events { };
   auto                         count  = sdlrdp_poll(handle.get(), events.data(), 32);
-  auto added = std::ranges::find_if(std::span(events.data(), count), [&](auto const& event) {
+  auto                         added  = std::ranges::find_if(std::span(events.data(), count), [&](auto const& event) {
     return event.type == SDLRDP_DRIVE && event.drive.added && event.drive.id == drive;
   });
   ASSERT_NE(added, std::span(events.data(), count).end());

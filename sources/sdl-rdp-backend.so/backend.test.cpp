@@ -195,8 +195,8 @@ TEST(Logging, NoFreerdpStdout) {
 struct ProcessEnvironment {
 public:
   ProcessEnvironment(ProcessEnvironment const&) = delete;
-  ProcessEnvironment(ProcessEnvironment&&) = delete;
-  ProcessEnvironment() {
+  ProcessEnvironment(ProcessEnvironment&&)      = delete;
+  ProcessEnvironment()                          {
     if (auto* value = getenv("XDG_DATA_HOME")) data = value;
   }
   ~ProcessEnvironment() {
@@ -206,8 +206,8 @@ public:
     else
       unsetenv("XDG_DATA_HOME");
   }
-  ProcessEnvironment& operator =(ProcessEnvironment const&) = delete;
-  ProcessEnvironment& operator =(ProcessEnvironment&&) = delete;
+  ProcessEnvironment& operator = (ProcessEnvironment const&) = delete;
+  ProcessEnvironment& operator = (ProcessEnvironment&&)      = delete;
 
 private:
   std::filesystem::path      cwd  = std::filesystem::current_path();

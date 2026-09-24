@@ -57,18 +57,18 @@ using utilities::Expects;
 struct CertificateDirectory {
 public:
   CertificateDirectory(CertificateDirectory const&) = delete;
-  CertificateDirectory(CertificateDirectory&&) = delete;
-  CertificateDirectory() {
+  CertificateDirectory(CertificateDirectory&&)      = delete;
+  CertificateDirectory()                            {
     std::array<char, 40> pattern{ };
     std::ranges::copy(std::string("/tmp/sdlrdp-gate-XXXXXX"), pattern.begin());
     auto* result = mkdtemp(pattern.data());
     Expects(result != nullptr, "temporary directory created");
     path = result;
   }
-  ~CertificateDirectory() { std::filesystem::remove_all(path); }
-  CertificateDirectory& operator =(CertificateDirectory const&) = delete;
-  CertificateDirectory& operator =(CertificateDirectory&&) = delete;
-  std::filesystem::path const& Path() const { return path; }
+                               ~CertificateDirectory()                  { std::filesystem::remove_all(path); }
+  CertificateDirectory&        operator = (CertificateDirectory const&) = delete;
+  CertificateDirectory&        operator = (CertificateDirectory&&)      = delete;
+  std::filesystem::path const& Path() const                             { return path; }
 
 private:
   std::filesystem::path path;
@@ -97,15 +97,15 @@ using Headless::Logs;
 struct Socket {
 public:
   Socket(Socket const&) = delete;
-  Socket(Socket&&) = delete;
-  Socket() = default;
-  ~Socket() {
+  Socket(Socket&&)      = delete;
+  Socket()              = default;
+  ~Socket()             {
     if (descriptor >= 0) close(descriptor);
   }
-  Socket& operator =(Socket const&) = delete;
-  Socket& operator =(Socket&&) = delete;
-  int Get() const { return descriptor; }
-  void Release() { descriptor = -1; }
+  Socket& operator = (Socket const&) = delete;
+  Socket& operator = (Socket&&)      = delete;
+  int     Get() const                { return descriptor; }
+  void    Release()                  { descriptor = -1; }
 
 private:
   int descriptor = socket(AF_INET, SOCK_STREAM, 0);
@@ -132,8 +132,8 @@ inline bool HasCookie(Client const& client) {
 }
 class FrameCounter {
 public:
-  FrameCounter(FrameCounter const&) = delete;
-  FrameCounter(FrameCounter&&) = delete;
+           FrameCounter(FrameCounter const&) = delete;
+           FrameCounter(FrameCounter&&)      = delete;
   explicit FrameCounter(Client& client)
       : update(client.Instance()->context->update), surface(update->SurfaceBits), bitmap(update->BitmapUpdate) {
     Expects(!active, "no observer is already installed");
@@ -148,9 +148,9 @@ public:
     update->BitmapUpdate = bitmap;
     active               = nullptr;
   }
-  FrameCounter& operator =(FrameCounter const&) = delete;
-  FrameCounter& operator =(FrameCounter&&) = delete;
-  static BOOL ReceiveSurface(rdpContext* context, SURFACE_BITS_COMMAND const* command) {
+  FrameCounter& operator = (FrameCounter const&)                                         = delete;
+  FrameCounter& operator = (FrameCounter&&)                                              = delete;
+  static BOOL   ReceiveSurface(rdpContext* context, SURFACE_BITS_COMMAND const* command) {
     Expects(active, "observer is installed");
     Expects(command, "wire command is supplied");
     auto result = active->surface(context, command);
@@ -168,7 +168,7 @@ public:
       ++active->frames;
     return result;
   }
-  unsigned Frames() const { return frames; }
+  unsigned Frames() const     { return frames; }
   unsigned BitmapPdus() const { return bitmap_pdus; }
 
 private:

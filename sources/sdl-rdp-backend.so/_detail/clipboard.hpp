@@ -18,11 +18,11 @@ struct Clipboard {
 class ClipboardChannel {
 public:
                     ClipboardChannel(ClipboardChannel const&) = delete;
-                    ClipboardChannel(ClipboardChannel&&) = delete;
+                    ClipboardChannel(ClipboardChannel&&)      = delete;
   explicit          ClipboardChannel(Peer& value);
                     ~ClipboardChannel();
-  ClipboardChannel& operator =(ClipboardChannel const&) = delete;
-  ClipboardChannel& operator =(ClipboardChannel&&) = delete;
+  ClipboardChannel& operator = (ClipboardChannel const&)      = delete;
+  ClipboardChannel& operator = (ClipboardChannel&&)           = delete;
   bool              Open();
   bool              Pump(std::span<HANDLE const> signaled);
   HANDLE            Event() const;

@@ -103,7 +103,7 @@ def align(text):
     pytest.param(
         'Thing& operator=(Thing const&) = delete;\nint operator()(int x) const;\n'
         'bool operator==(Thing const&) const;\n',
-        'Thing& operator=(Thing const&) = delete;\nint    operator()(int x) const;\n'
+        'Thing& operator=(Thing const&)        = delete;\nint    operator()(int x) const;\n'
         'bool   operator==(Thing const&) const;\n',
         id='operators_are_functions',
     ),
@@ -115,7 +115,7 @@ def align(text):
     ),
     pytest.param(
         'void Empty() {}\nvoid Defaults(Value value = {});\nreturn {};\n',
-        'void Empty() { }\nvoid Defaults(Value value = { });\nreturn { };\n',
+        'void Empty()                     { }\nvoid Defaults(Value value = { });\nreturn { };\n',
         id='empty_bodies_defaults_and_returns',
     ),
     pytest.param(
@@ -482,7 +482,7 @@ def test_pytest_guard_skips_without_pytest(tmp_path):
     ('explicit operator unsigned long() const;\n', 'explicit operator unsigned long() const;\n'),
     ('int operator[](int n);\n', 'int operator[](int n);\n'),
     ('void* operator new[](size_t size);\n', 'void* operator new[](size_t size);\n'),
-    ('Thing& operator = (Thing const&) = delete;\n', 'Thing& operator =(Thing const&) = delete;\n'),
+    ('Thing& operator = (Thing const&) = delete;\n', 'Thing& operator = (Thing const&) = delete;\n'),
 ])
 def test_all_operator_declarations(source, expected):
     item = MODULE.parse(source.rstrip(), MODULE.mask(source.rstrip()))
@@ -506,7 +506,7 @@ def test_all_operator_declarations(source, expected):
     ),
     (
         'auto t = f(g(x) ? a : b,   c);\n',
-        'auto t = f(g(x) ? a : b,   c);\n',
+        'auto t = f(g(x) ? a : b, c);\n',
     ),
     (
         'Thing() : alpha{1},   beta{22} {}\n',
@@ -581,3 +581,220 @@ def test_uppercase_calls_keep_control_flow_indentation():
               '}\n')
     assert align(source) == source
     assert align(align(source)) == source
+
+
+@pytest.mark.parametrize(('source', 'expected'), [
+    pytest.param(
+        'virtual void Short() override;\n'
+        'virtual bool Longer(int x) const noexcept final;\n'
+        'void Abstract() = 0;\n',
+        'virtual void Short()             override;\n'
+        'virtual bool Longer(int x) const noexcept final;\n'
+        'void         Abstract()          = 0;\n',
+        id='trailing_specifiers',
+    ),
+    pytest.param(
+        'Foo(Foo&&) noexcept = default;\n'
+        'Foo(Foo const&) = delete;\n'
+        '~Foo() = default;\n',
+        'Foo(Foo&&)      noexcept = default;\n'
+        'Foo(Foo const&) = delete;\n'
+        '~Foo()          = default;\n',
+        id='standalone_special_members',
+    ),
+    pytest.param(
+        'void Start();\n'
+        'Type const& Name() const { return x; }\n'
+        'bool Ready() const;\n',
+        'void        Start();\n'
+        'Type const& Name() const  { return x; }\n'
+        'bool        Ready() const;\n',
+        id='inline_bodies_in_function_run',
+    ),
+    pytest.param(
+        'int x;\n'
+        'using Callback = void (*)();\n'
+        'struct Impl;\n'
+        'enum class Mode { One, Two };\n'
+        'std::unique_ptr<Impl> impl;\n',
+        'int                   x;\n'
+        'using                 Callback = void (*)();\n'
+        'struct                Impl;\n'
+        'enum class            Mode     { One, Two };\n'
+        'std::unique_ptr<Impl> impl;\n',
+        id='alias_forward_and_enum_in_declarations',
+    ),
+    pytest.param(
+        'struct X* const x = get();\n'
+        'struct Longer* value = NULL;\n'
+        'unsigned n = 1;\n',
+        'struct X* const x     = get();\n'
+        'struct Longer*  value = NULL;\n'
+        'unsigned        n     = 1;\n',
+        id='c_elaborated_types',
+    ),
+    pytest.param(
+        'bool ready = false;\n'
+        'std::function<void()> finalizing;\n'
+        'unsigned desktops = 0;\n',
+        'bool                  ready      = false;\n'
+        'std::function<void()> finalizing;\n'
+        'unsigned              desktops   = 0;\n',
+        id='function_template_member',
+    ),
+    pytest.param(
+        'int x = 1;\n'
+        'auto const& [left, right] = pair;\n'
+        'long value = 2;\n',
+        'int         x             = 1;\n'
+        'auto const& [left, right] = pair;\n'
+        'long        value         = 2;\n',
+        id='structured_bindings',
+    ),
+    pytest.param(
+        'long first = 1;\n'
+        'auto result =\n'
+        '    Compute();\n'
+        'int last = 2;\n'
+        '\n'
+        'auto entry = cast(load(\n'
+        '    "plugin", flags));\n'
+        'long another = 3;\n',
+        'long first  = 1;\n'
+        'auto result =\n'
+        '    Compute();\n'
+        'int  last   = 2;\n'
+        '\n'
+        'auto entry   = cast(load(\n'
+        '    "plugin", flags));\n'
+        'long another = 3;\n',
+        id='multiline_equals_heads',
+    ),
+    pytest.param(
+        'struct Thing {\n'
+        '  Thing(Thing const&) = delete;\n'
+        '  Thing(int value)\n'
+        '      : value{ value } { }\n'
+        '  ~Thing();\n'
+        '  Thing& operator = (Thing&&) = delete;\n'
+        '  int Get() const { return value; }\n'
+        '};\n',
+        'struct Thing {\n'
+        '         Thing(Thing const&)  = delete;\n'
+        '         Thing(int value)\n'
+        '      : value{ value } { }\n'
+        '         ~Thing();\n'
+        '  Thing& operator = (Thing&&) = delete;\n'
+        '  int    Get() const          { return value; }\n'
+        '};\n',
+        id='constructor_multiline_initializer',
+    ),
+    pytest.param(
+        '  .rate = 48000,\n'
+        '  .channels = 2,\n'
+        '  .data = nullptr };\n',
+        '  .rate     = 48000,\n'
+        '  .channels = 2,\n'
+        '  .data     = nullptr };\n',
+        id='designated_initializers',
+    ),
+    pytest.param(
+        '  { "a", 1 },\n'
+        '  { "longer", 222 },\n'
+        '  { "z", 3 }\n',
+        '  { "a"     , 1   },\n'
+        '  { "longer", 222 },\n'
+        '  { "z"     , 3   }\n',
+        id='literal_table_rows',
+    ),
+    pytest.param(
+        'MethodFill::Shared();\n'
+        'x = ns::Make();\n'
+        'longer = other::Make();\n',
+        'MethodFill::Shared();\n'
+        'x      = ns::Make();\n'
+        'longer = other::Make();\n',
+        id='qualified_names',
+    ),
+    pytest.param(
+        'int a{1};\n'
+        '/* keep   this\n'
+        ' * block   intact */\n'
+        'long longer{22};\n',
+        'int  a     { 1  };\n'
+        '/* keep   this\n'
+        ' * block   intact */\n'
+        'long longer{ 22 };\n',
+        id='comment_block_continues_run',
+    ),
+    pytest.param(
+        'if  (ready)   Invoke("keep   this",  \' \');\n'
+        'return   value; // keep   comment\n'
+        'auto fn = [ = ](auto& x) { return x; };\n',
+        'if (ready) Invoke("keep   this", \' \');\n'
+        'return value; // keep   comment\n'
+        'auto fn = [ = ](auto& x) { return x; };\n',
+        id='stale_unparsed_padding',
+    ),
+    pytest.param(
+        '  GameSession(GameSession const&)                      = delete;\n'
+        '  GameSession(GameSession&&)                           = delete;\n'
+        '  auto operator=(GameSession const&) -> GameSession&   = delete;\n'
+        '  auto operator=(GameSession&&) -> GameSession&        = delete;\n'
+        '  ~GameSession()                                       = default;\n',
+        '       GameSession(GameSession const&)                 = delete;\n'
+        '       GameSession(GameSession&&)                      = delete;\n'
+        '  auto operator=(GameSession const&)   -> GameSession& = delete;\n'
+        '  auto operator=(GameSession&&)        -> GameSession& = delete;\n'
+        '       ~GameSession()                                  = default;\n',
+        id='scooby_game_session_specifiers',
+    ),
+])
+def test_review_round_four(source, expected):
+    assert align(source) == expected
+    assert align(expected) == expected
+
+
+def test_check_reports_unparsed_stale_padding(tmp_path):
+    path = tmp_path / 'stale.cpp'
+    path.write_text('return   value; // keep   comment\n')
+    checked = subprocess.run([sys.executable, MODULE.__file__, '--check', str(path)],
+                             capture_output=True, text=True)
+    assert (checked.returncode, checked.stdout, checked.stderr) == (1, f'{path}\n', '')
+    assert align(path.read_text()) == 'return value; // keep   comment\n'
+
+
+def test_writer_reports_whether_it_wrote(tmp_path):
+    path = tmp_path / 'one.cpp'
+    original = 'int x{};\n'
+    path.write_text(original)
+    result = MODULE.align(original)
+    assert MODULE.write_if_changed(path, original, result)
+    assert path.read_text() == 'int x{ };\n'
+    assert not MODULE.write_if_changed(path, path.read_text(), result)
+
+
+def test_tree_output_depends_on_collapsed_spacing():
+    root = pathlib.Path(__file__).resolve().parents[1]
+    for path in MODULE.source_files([root / 'sources']):
+        source = path.read_text()
+        hidden = MODULE.mask(source)
+        collapsed = ''.join(char for index, char in enumerate(source)
+                            if not (char in ' \t' and hidden[index] != '@' and index > 0
+                                    and hidden[index - 1] in ' \t' and hidden[:index].rpartition('\n')[2].strip()))
+        assert align(source) == align(collapsed), path
+
+
+def test_overflow_preserves_multiline_raw_literal():
+    expected = 'auto text = R"x(keep   these ' + 'a' * 125 + '\nand   these)x";\n'
+    result = MODULE.align(expected)
+    assert result.text == expected
+    assert result.exceptions == [MODULE.Overflow(1, expected.splitlines()[0])]
+    assert align(result.text) == expected
+
+
+def test_specifiers_after_noexcept_trailing_return():
+    source = 'auto F() noexcept -> bool override;\nauto Longer() -> Ret final;\n'
+    expected = 'auto F() noexcept -> bool override;\nauto Longer()     -> Ret  final;\n'
+    assert align(source) == expected
+    assert align(expected) == expected

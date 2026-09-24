@@ -45,8 +45,8 @@ TEST_F(Sample, WheelBothAxesPrecise) {
   auto* input  = client.Instance()->context->input;
   for (auto [flags, expected] : std::array<std::pair<UINT16, char const*>, 4>{
            { { PTR_FLAGS_WHEEL | 30, " x=0 y=0.25" },
-             { PTR_FLAGS_WHEEL | PTR_FLAGS_WHEEL_NEGATIVE | (0x200 - 60), " x=0 y=-0.5" },
-             { PTR_FLAGS_HWHEEL | 120, " x=1 y=0" },
+             { PTR_FLAGS_WHEEL | PTR_FLAGS_WHEEL_NEGATIVE | (0x200 - 60) , " x=0 y=-0.5"  },
+             { PTR_FLAGS_HWHEEL | 120                                    , " x=1 y=0"     },
              { PTR_FLAGS_HWHEEL | PTR_FLAGS_WHEEL_NEGATIVE | (0x200 - 30), " x=-0.25 y=0" } } }) {
     WhenPreciseWheel(input, flags, expected);
     if (::testing::Test::HasFatalFailure()) return;
@@ -186,8 +186,8 @@ TEST_F(Sample, RelativeIgnoredWarp) {
   if (::testing::Test::HasFatalFailure()) return;
   for (auto [x, y, delta] :
        std::array<std::tuple<UINT16, UINT16, char const*>, 4>{ { { 250, 200, " xrel=50 yrel=50 " },
-                                                                 { 300, 260, " xrel=50 yrel=60 " },
-                                                                 { 630, 260, " xrel=330 yrel=0 " },
+                                                                 { 300, 260, " xrel=50 yrel=60 "   },
+                                                                 { 630, 260, " xrel=330 yrel=0 "   },
                                                                  { 580, 200, " xrel=-50 yrel=-60 " } } }) {
     ThenIgnoredWarpMotion(client, input, x, y, delta);
     if (::testing::Test::HasFatalFailure()) return;

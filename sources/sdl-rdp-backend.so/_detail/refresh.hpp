@@ -6,8 +6,8 @@
 #include <cstdint>
 
 namespace Backend {
-enum class Direction   { Down, Hold, Up                 };
-enum class RefreshMode { Fixed, Client, Average, Sender };
+enum class Direction  { Down, Hold, Up                 };
+enum class RefreshMode{ Fixed, Client, Average, Sender };
 struct WireSample {
   bool     available     = false;
   unsigned outq          = 0;
@@ -23,9 +23,9 @@ struct Refresh {
   explicit Refresh(RefreshMode selected = RefreshMode::Fixed, unsigned limit = 60) : mode(selected), ceiling(limit) {
     utilities::Expects(limit > 0, "refresh ceiling is positive");
   }
-  unsigned Rate() const { return rate; }
-  RefreshMode Mode() const { return mode; }
-  bool AwaitingEmpty() const { return awaiting_empty != 0; }
+  unsigned         Rate() const                                                { return rate; }
+  RefreshMode      Mode() const                                                { return mode; }
+  bool             AwaitingEmpty() const                                       { return awaiting_empty != 0; }
   void             Restart();
   void             Step(Direction direction);
   Direction        FromLatency(Clock::duration latency) const;

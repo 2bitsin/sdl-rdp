@@ -88,7 +88,7 @@ inline void DisconnectGraphicsDecoder(void* raw, ChannelDisconnectedEventArgs co
 inline BOOL LoadGraphicsChannel(freerdp* instance) {
   std::array<char const*, 1> channel  { "rdpgfx" };
   auto*                      settings = instance->context->settings;
-  auto entry     = reinterpret_cast<PVIRTUALCHANNELENTRYEX>(freerdp_load_channel_addin_entry(
+  auto                       entry    = reinterpret_cast<PVIRTUALCHANNELENTRYEX>(freerdp_load_channel_addin_entry(
       "drdynvc", nullptr, nullptr, FREERDP_ADDIN_CHANNEL_STATIC | FREERDP_ADDIN_CHANNEL_ENTRYEX));
   return entry && freerdp_client_add_dynamic_channel(settings, 1, channel.data()) &&
          freerdp_channels_client_load_ex(instance->context->channels, settings, entry, settings) == 0;
@@ -176,9 +176,9 @@ public:
     }
     return ready();
   }
-  auto const& Instance() const { return instance; }
-  unsigned Tolerance() const { return tolerance; }
-  void Tolerance(unsigned value) { tolerance = value; }
+  auto const& Instance() const          { return instance; }
+  unsigned    Tolerance() const         { return tolerance; }
+  void        Tolerance(unsigned value) { tolerance = value; }
 
 private:
   std::unique_ptr<freerdp, ReleaseClient> instance  { freerdp_new() };
@@ -186,8 +186,8 @@ private:
 };
 struct FrameObserver {
 public:
-  FrameObserver(FrameObserver const&) = delete;
-  FrameObserver(FrameObserver&&) = delete;
+           FrameObserver(FrameObserver const&) = delete;
+           FrameObserver(FrameObserver&&)      = delete;
   explicit FrameObserver(Client& client)
       : update(client.Instance()->context->update), original(update->SurfaceFrameMarker) {
     Expects(!active, "one frame observer per thread");
@@ -198,8 +198,8 @@ public:
     update->SurfaceFrameMarker = original;
     active                     = nullptr;
   }
-  FrameObserver& operator =(FrameObserver const&) = delete;
-  FrameObserver& operator =(FrameObserver&&) = delete;
+  FrameObserver& operator = (FrameObserver const&) = delete;
+  FrameObserver& operator = (FrameObserver&&)      = delete;
 
   bool Ack() {
     if (ids.empty()) return false;
@@ -208,13 +208,13 @@ public:
     ack_times.push_back(sent);
     return true;
   }
-  auto const& Frames() const { return ids; }
-  auto const& ReceivedAt() const { return received; }
-  bool AckFrame(UINT32 id) { return update->SurfaceFrameAcknowledge(update->context, id); }
+  auto const& Frames() const           { return ids; }
+  auto const& ReceivedAt() const       { return received; }
+  bool        AckFrame(UINT32 id)      { return update->SurfaceFrameAcknowledge(update->context, id); }
   auto const& Acknowledgements() const { return ack_times; }
-  bool Coherent() const { return coherent; }
-  bool Installed() const { return update != nullptr; }
-  void Clear() { ids.clear(); }
+  bool        Coherent() const         { return coherent; }
+  bool        Installed() const        { return update != nullptr; }
+  void        Clear()                  { ids.clear(); }
 
 private:
   static BOOL Receive(rdpContext* context, SURFACE_FRAME_MARKER const* marker) {
@@ -238,14 +238,14 @@ private:
 struct DisplayCapture {
   bool                      echo_resize        = false;
   std::chrono::milliseconds finalization_delay { };
-  std::function<void()> finalizing;
-  unsigned desktops = 0;
-  unsigned echoes   = 0;
+  std::function<void()>     finalizing;
+  unsigned                  desktops           = 0;
+  unsigned                  echoes             = 0;
 };
 struct DisplayClient {
 public:
-  DisplayClient(DisplayClient const&) = delete;
-  DisplayClient(DisplayClient&&) = delete;
+           DisplayClient(DisplayClient const&) = delete;
+           DisplayClient(DisplayClient&&)      = delete;
   explicit DisplayClient(Client& client)
       : client(client), desktop_resize(client.Instance()->context->update->DesktopResize) {
     Expects(!active, "one display observer per thread");
@@ -263,7 +263,7 @@ public:
     client.Instance()->LoadChannels = [](freerdp* instance) -> BOOL {
       std::array<char const*, 1> channel  { "disp" };
       auto*                      settings = instance->context->settings;
-      auto entry     = reinterpret_cast<PVIRTUALCHANNELENTRYEX>(freerdp_load_channel_addin_entry(
+      auto                       entry    = reinterpret_cast<PVIRTUALCHANNELENTRYEX>(freerdp_load_channel_addin_entry(
           "drdynvc", nullptr, nullptr, FREERDP_ADDIN_CHANNEL_STATIC | FREERDP_ADDIN_CHANNEL_ENTRYEX));
       return entry && freerdp_client_add_dynamic_channel(settings, 1, channel.data()) &&
              freerdp_channels_client_load_ex(instance->context->channels, settings, entry, settings) == 0;
@@ -277,8 +277,8 @@ public:
     channel = nullptr;
     ready   = false;
   }
-  DisplayClient& operator =(DisplayClient const&) = delete;
-  DisplayClient& operator =(DisplayClient&&) = delete;
+  DisplayClient&                        operator = (DisplayClient const&)                                    = delete;
+  DisplayClient&                        operator = (DisplayClient&&)                                         = delete;
   static DISPLAY_CONTROL_MONITOR_LAYOUT Monitor(unsigned width, unsigned height, unsigned millimetres = 400) {
     DISPLAY_CONTROL_MONITOR_LAYOUT monitor{ };
     monitor.Flags              = DISPLAY_CONTROL_MONITOR_PRIMARY;
@@ -296,9 +296,9 @@ public:
     auto monitor = Monitor(width, height);
     return channel.load()->SendMonitorLayout(channel.load(), 1, &monitor) == CHANNEL_RC_OK;
   }
-  DisplayCapture& Observed() { return observed; }
-  static bool Ready() { return ready.load(); }
-  static DispClientContext* Channel() { return channel.load(); }
+  DisplayCapture&           Observed() { return observed; }
+  static bool               Ready()    { return ready.load(); }
+  static DispClientContext* Channel()  { return channel.load(); }
 
 private:
   static BOOL Resize(rdpContext* context) {

@@ -14,13 +14,13 @@ struct AuthenticationState {
 };
 struct Authentication {
 public:
-                  Authentication(Authentication const&) = delete;
-                  Authentication(Authentication&&) = delete;
-  explicit        Authentication(sdlrdp_config const& value);
-                  ~Authentication();
-  Authentication& operator =(Authentication const&) = delete;
-  Authentication& operator =(Authentication&&) = delete;
-  sdlrdp_config const& Config() const { return config; }
+                       Authentication(Authentication const&)      = delete;
+                       Authentication(Authentication&&)           = delete;
+  explicit             Authentication(sdlrdp_config const& value);
+                       ~Authentication();
+  Authentication&      operator = (Authentication const&)         = delete;
+  Authentication&      operator = (Authentication&&)              = delete;
+  sdlrdp_config const& Config() const                             { return config; }
 
 private:
   sdlrdp_config config;

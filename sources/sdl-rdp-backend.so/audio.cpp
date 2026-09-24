@@ -59,7 +59,7 @@ AudioChannel::AudioChannel(Peer& peer)
   if (!sound->server_formats) throw std::runtime_error("Audio format allocation failed.");
   sound->num_server_formats = 2;
   // mstsc plays 48 kHz at its 44.1 kHz device rate (measured 2026-09-23).
-  sound->server_formats[0]           = { .wFormatTag      = WAVE_FORMAT_PCM,
+  sound->server_formats[0] = { .wFormatTag = WAVE_FORMAT_PCM,
                                          .nChannels       = 2,
                                          .nSamplesPerSec  = 44100,
                                          .nAvgBytesPerSec = 176400,
@@ -67,7 +67,7 @@ AudioChannel::AudioChannel(Peer& peer)
                                          .wBitsPerSample  = 16,
                                          .cbSize          = 0,
                                          .data            = nullptr };
-  sound->server_formats[1]           = { .wFormatTag      = WAVE_FORMAT_PCM,
+  sound->server_formats[1] = { .wFormatTag = WAVE_FORMAT_PCM,
                                          .nChannels       = 2,
                                          .nSamplesPerSec  = 48000,
                                          .nAvgBytesPerSec = 192000,

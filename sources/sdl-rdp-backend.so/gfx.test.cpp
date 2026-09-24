@@ -77,9 +77,9 @@ protected:
     auto pattern = std::to_array("/tmp/sdlrdp-avc-XXXXXX");
     OpenGraphics(pattern.data(), width, height, codec);
   }
-  Headless::Client& ClientSession() { return *graphics_client; }
-  Headless::GraphicsObserver& ObserverSession() { return *graphics_observer; }
-  void ThenProgressiveOnly() {
+  Headless::Client&           ClientSession()       { return *graphics_client; }
+  Headless::GraphicsObserver& ObserverSession()     { return *graphics_observer; }
+  void                        ThenProgressiveOnly() {
     EXPECT_TRUE(ObserverSession().Observed().avc_nals.empty());
     EXPECT_EQ(ObserverSession().Observed().progressive_headers, 1u);
   }
@@ -359,8 +359,8 @@ TEST(AvcConfiguration, IntraRefreshUsesConfiguredFrameRate) {
     unsigned count;
   };
   constexpr std::array cases{
-    Case{ .fps = 1, .period = 2, .count = 1 },     Case{ .fps = 24, .period = 48, .count = 12 },
-    Case{ .fps = 30, .period = 60, .count = 15 },  Case{ .fps = 59, .period = 118, .count = 29 },
+    Case{ .fps = 1, .period = 2, .count = 1 }, Case{ .fps = 24, .period = 48, .count = 12 },
+    Case{ .fps = 30, .period = 60, .count = 15 }, Case{ .fps = 59, .period = 118, .count = 29 },
     Case{ .fps = 60, .period = 120, .count = 30 }, Case{ .fps = 144, .period = 288, .count = 72 }
   };
   std::ranges::for_each(cases, [](auto value) {

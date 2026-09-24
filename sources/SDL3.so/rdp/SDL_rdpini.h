@@ -26,7 +26,7 @@ enum { SDL_RDP_SETTING_NAMES(SDL_RDP_SETTING_ENUM) SDL_RDP_SETTING_COUNT };
 #undef SDL_RDP_SETTING_ENUM
 
 extern char const* const SDL_RDP_SettingNames[SDL_RDP_SETTING_COUNT];
-typedef void (*SDL_RDP_IniCallback)(
+typedef void             (*SDL_RDP_IniCallback)                     (
     void* user, int index, char const* key, char const* value,
     unsigned line); // NOLINT(modernize-use-using): This callback declaration must also compile as C.
 /* Splits text in place; callback strings live in text. -1: unknown key, -2: malformed. */

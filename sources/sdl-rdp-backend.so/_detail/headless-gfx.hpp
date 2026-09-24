@@ -25,9 +25,9 @@ struct GraphicsCapture {
 };
 class GraphicsObserver {
 public:
-  using Reset                               = GraphicsCapture::Reset;
-  GraphicsObserver(GraphicsObserver const&) = delete;
-  GraphicsObserver(GraphicsObserver&&) = delete;
+  using Reset = GraphicsCapture::Reset;
+           GraphicsObserver(GraphicsObserver const&) = delete;
+           GraphicsObserver(GraphicsObserver&&)      = delete;
   explicit GraphicsObserver(Client& target)
       : client(target), desktop_resize(client.Instance()->context->update->DesktopResize) {
     Expects(!active, "one graphics observer per thread");
@@ -46,9 +46,9 @@ public:
     client.Instance()->context->update->DesktopResize = desktop_resize;
     active                                            = nullptr;
   }
-  GraphicsObserver& operator =(GraphicsObserver const&) = delete;
-  GraphicsObserver& operator =(GraphicsObserver&&) = delete;
-  bool Ack(UINT32 depth = 0) {
+  GraphicsObserver& operator = (GraphicsObserver const&) = delete;
+  GraphicsObserver& operator = (GraphicsObserver&&)      = delete;
+  bool              Ack(UINT32 depth = 0)                {
     Expects(channel, "channel is installed");
     Expects(!observed.frames.empty(), "observer has received a frame");
     return AckFrame(observed.frames.size() - 1, depth);
@@ -60,8 +60,8 @@ public:
     ack.queueDepth = depth;
     return original(channel, &ack) == CHANNEL_RC_OK;
   }
-  RdpgfxClientContext* Channel() const { return channel; }
-  GraphicsCapture& Observed() { return observed; }
+  RdpgfxClientContext*   Channel() const  { return channel; }
+  GraphicsCapture&       Observed()       { return observed; }
   GraphicsCapture const& Observed() const { return observed; }
 
 private:

@@ -60,10 +60,10 @@ static bool SDL_RDP_InitDisplay(SDL_VideoData* data, sdlrdp_config const* config
                                                 SDL_PROP_DISPLAY_RDP_PORT_NUMBER, data->backend.port(data->handle));
 }
 
-static int const SDL_RDP_EmulatorModes[][2] = { { 320, 200 },   { 320, 240 },  { 320, 256 },   { 400, 300 },
-                                                { 512, 384 },   { 640, 350 },  { 640, 400 },   { 640, 480 },
-                                                { 720, 400 },   { 720, 480 },  { 800, 600 },   { 1024, 768 },
-                                                { 1280, 720 },  { 1280, 800 }, { 1920, 1080 }, { 1920, 1200 },
+static int const SDL_RDP_EmulatorModes[][2] = { { 320, 200 }, { 320, 240 }, { 320, 256 }, { 400, 300 },
+                                                { 512, 384 }, { 640, 350 }, { 640, 400 }, { 640, 480 },
+                                                { 720, 400 }, { 720, 480 }, { 800, 600 }, { 1024, 768 },
+                                                { 1280, 720 }, { 1280, 800 }, { 1920, 1080 }, { 1920, 1200 },
                                                 { 2560, 1440 }, { 3840, 2160 } };
 
 static bool SDL_RDP_GetDisplayModes(SDL_VideoDevice* _this, SDL_VideoDisplay* display) {
@@ -104,7 +104,7 @@ static bool SDL_RDP_VideoInit(SDL_VideoDevice* _this) {
   }
   SDL_AddKeyboard(SDL_DEFAULT_KEYBOARD_ID, NULL);
   SDL_AddMouse(SDL_DEFAULT_MOUSE_ID, NULL);
-  SDL_GetMouse()->SetRelativeMouseMode = SDL_RDP_RelativeMouse;
+SDL_GetMouse() -> SetRelativeMouseMode = SDL_RDP_RelativeMouse;
   SDL_RDP_InitMouse();
   return true;
 }

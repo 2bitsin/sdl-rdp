@@ -151,7 +151,7 @@ static void SDL_RDP_Touch(SDL_Window* window, sdlrdp_event const* event) {
                         event->touch.pressure);
     return;
   }
-  type = event->touch.phase == SDLRDP_TOUCH_DOWN     ? SDL_EVENT_FINGER_DOWN
+  type = event->touch.phase == SDLRDP_TOUCH_DOWN ? SDL_EVENT_FINGER_DOWN
          : event->touch.phase == SDLRDP_TOUCH_CANCEL ? SDL_EVENT_FINGER_CANCELED
                                                      : SDL_EVENT_FINGER_UP;
   SDL_SendTouch(0, SDL_RDP_TOUCH_ID, event->touch.id + 1, window, type, event->touch.x, event->touch.y,

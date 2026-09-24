@@ -59,9 +59,9 @@ public:
     auto secret = std::to_array("property-secret");
     return NTOWFv1A(secret.data(), secret.size() - 1, hash);
   }
-  unsigned Verified() const { return verified.load(); }
-  unsigned LookedUp() const { return looked_up.load(); }
-  bool Arguments() const { return arguments.load(); }
+  unsigned Verified() const  { return verified.load(); }
+  unsigned LookedUp() const  { return looked_up.load(); }
+  bool     Arguments() const { return arguments.load(); }
 
 private:
   std::atomic<unsigned> verified  = 0;
@@ -73,14 +73,14 @@ namespace {
 struct Quit {
 public:
   Quit(Quit const&) = delete;
-  Quit(Quit&&) = delete;
-  Quit() = default;
-  ~Quit() {
+  Quit(Quit&&)      = delete;
+  Quit()            = default;
+  ~Quit()           {
     SDL_Quit();
     SDL_ResetHints();
   }
-  Quit& operator =(Quit const&) = delete;
-  Quit& operator =(Quit&&) = delete;
+  Quit& operator = (Quit const&) = delete;
+  Quit& operator = (Quit&&)      = delete;
 };
 void GivenAuthenticationHints(fs::path const& certificates) {
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));

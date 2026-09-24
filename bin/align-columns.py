@@ -6,16 +6,18 @@ import re
 from types import SimpleNamespace
 from typing import NamedTuple
 
-PROTECTED    = re.compile(r'R"(?P<d>[^ ()\\\t\r\n]{0,16})\(.*?\)(?P=d)"'
-                         r'|"(?:\\.|[^"\\])*"|(?<![0-9])\'(?:\\.|[^\'\\\n])*\'|//[^\n]*|/\*.*?\*/'
-                         r'|^[ \t]*\#(?:[^\n]*\\\n)*[^\n]*', re.S | re.M)
-DECL         = r'(.+?[\s*&])([A-Za-z_]\w*(?:\s*\[[^\]]*\])*)\s*(?:([={]|:(?!:))(.*))?;'
-FORBIDDEN    = {'return', 'co_return', 'throw', 'delete', 'using', 'typedef', 'case', 'goto',
-                'else', 'break', 'class', 'struct', 'enum', 'if', 'while', 'for', 'switch'}
-FROZEN       = 'sources/sdl-rdp-backend.so/sdl-rdp-backend.h'
-COLUMN_LIMIT = 120
-COMMENT_GAP  = 2
-CLOSER_OF    = dict(zip(')]}>', '([{<'))
+RAW_DELIMITER_LIMIT = 16  # C++ raw-string delimiters have at most 16 characters.
+PROTECTED           = re.compile(r'R"(?P<d>[^ ()\\\t\r\n]{0,' + str(RAW_DELIMITER_LIMIT) + r'})\(.*?\)(?P=d)"'
+                                 r'|"(?:\\.|[^"\\])*"|(?<![0-9])\'(?:\\.|[^\'\\\n])*\'|//[^\n]*|/\*.*?\*/'
+                                 r'|^[ \t]*\#(?:[^\n]*\\\n)*[^\n]*', re.S | re.M)
+DECL                = r'(.+?[\s*&])([A-Za-z_]\w*(?:\s*\[[^\]]*\])*)\s*(?:([={]|:(?!:))(.*))?;'
+FORBIDDEN           = {'return', 'co_return', 'throw', 'delete', 'using', 'typedef', 'case', 'goto',
+                       'else', 'break', 'if', 'while', 'for', 'switch'}
+FROZEN              = 'sources/sdl-rdp-backend.so/sdl-rdp-backend.h'
+COLUMN_LIMIT        = 120
+COMMENT_GAP         = 2
+INDENT_WIDTH        = 2
+CLOSER_OF           = dict(zip(')]}>', '([{<'))
 
 
 class CaseFields(NamedTuple):
@@ -58,10 +60,17 @@ class FunctionFields(NamedTuple):
     signature: str
     arrow: str
     result: str
+    specifier: str = ''
     tail: str = ';'
 
 
-Fields = CaseFields | AssignmentFields | EnumeratorFields | InitialiserFields | DeclarationFields | FunctionFields
+class TableFields(NamedTuple):
+    cells: tuple[str, ...]
+    tail: str
+
+
+Fields = (CaseFields | AssignmentFields | EnumeratorFields | InitialiserFields
+          | DeclarationFields | FunctionFields | TableFields)
 
 
 class Overflow(NamedTuple):
@@ -91,18 +100,27 @@ def mask(text):
     return PROTECTED.sub(lambda m: re.sub(r'[^\n]', '@', m[0]), text)
 
 
+def opens_bracket(code, index):
+    char = code[index]
+    return char in '([{' or (char == '<' and re.search(r'[\w:>]$', code[:index])
+                            and re.match(r'[\w:]', code[index + 1:]))
+
+
+def update_brackets(stack, code, index):
+    char = code[index]
+    if opens_bracket(code, index):
+        stack.append(char)
+    elif char in CLOSER_OF and stack and stack[-1] == CLOSER_OF[char]:
+        stack.pop()
+
+
 def split_top_level_commas(text):
     hidden, stack, start, result = mask(text), [], 0, []
-    for i, char in enumerate(hidden):
-        if char in '([{':
-            stack.append(char)
-        elif char == '<' and re.search(r'[\w:>]$', hidden[:i]) and re.match(r'[\w:]', hidden[i + 1:]):
-            stack.append(char)
-        elif char in ')]}>' and stack and stack[-1] == CLOSER_OF[char]:
-            stack.pop()
-        elif char == ',' and not stack:
-            result.append(text[start:i].strip())
-            start = i + 1
+    for index, char in enumerate(hidden):
+        update_brackets(stack, hidden, index)
+        if char == ',' and not stack:
+            result.append(text[start:index].strip())
+            start = index + 1
     return result + [text[start:].strip()]
 
 
@@ -126,13 +144,17 @@ def parse_case(body, code):
     return None
 
 
-def closing_brace(code, start):
+def closing_delimiter(code, start, opener, closer):
     depth = 0
     for index in range(start, len(code)):
-        depth += (code[index] == '{') - (code[index] == '}')
+        depth += (code[index] == opener) - (code[index] == closer)
         if depth == 0:
             return index
     return None
+
+
+def closing_brace(code, start):
+    return closing_delimiter(code, start, '{', '}')
 
 
 def parse_initialiser(body, code):
@@ -155,21 +177,60 @@ def parse_function_pointer(body, code):
     return None
 
 
+def function_suffix(suffix):
+    arrow = suffix.find('->')
+    start = arrow + 2 if arrow >= 0 else 0
+    match = re.search(r'\b(?:override|final|noexcept)\b|(?<![=])=(?!=)', mask(suffix)[start:])
+    if match:
+        position = start + match.start()
+        return suffix[:position].strip(), suffix[position:].strip()
+    return suffix, ''
+
+
+def function_parts(body, code):
+    pattern = r'(.*?)(?<![\w:])(operator\s*(?:\(\)|\[\]|[^ (][^(]*?)|[~\w]+)(\s*\()'
+    match = re.match(pattern, code)
+    if not match:
+        return None
+    start = match.end() - 1
+    end = closing_delimiter(code, start, '(', ')')
+    if end is None:
+        return None
+    typ = body[:match.start(2)].strip()
+    signature = body[match.start(2):end + 1]
+    return typ, signature, body[end + 1:].strip()
+
+
+def function_tail(suffix):
+    if suffix.endswith(';'):
+        return suffix[:-1], ';'
+    match = re.search(r'(?<!:):(?!:)|\{', mask(suffix))
+    if match:
+        return suffix[:match.start()].strip(), ' ' + suffix[match.start():]
+    return suffix, ''
+
+
 def parse_function(body, code):
-    pattern = r'(.*?)(?<!\w)(operator\s*(?:\(\)|\[\]|[^ (][^(]*?)|[~\w]+)\s*(\(.*\))\s*(.*);'
-    fields = match_fields(pattern, body, code)
-    if not fields:
+    parts = function_parts(body, code)
+    if not parts:
         return None
-    typ, name, params, suffix = fields
-    if not name.startswith('operator') and typ and not is_declaration_type(typ):
+    typ, signature, suffix = parts
+    name = signature.split('(', 1)[0].strip()
+    if name in FORBIDDEN or (typ and not is_declaration_type(typ)):
         return None
+    suffix, tail = function_tail(suffix)
+    suffix, specifier = function_suffix(suffix)
     qualifiers, arrow, result = suffix.partition('->')
-    signature = name + params + (' ' + qualifiers.strip() if qualifiers.strip() else '')
-    return 'function', FunctionFields(typ, signature, arrow, result.strip())
+    qualifier_pattern = r'(?:const|volatile|noexcept(?:\([^)]*\))?|[& ])+'
+    if qualifiers and not re.fullmatch(qualifier_pattern, qualifiers.strip()):
+        return None
+    signature += ' ' + qualifiers.strip() if qualifiers.strip() else ''
+    return 'function', FunctionFields(typ, signature, arrow, result.strip(), specifier, tail)
 
 
 def is_declaration_type(typ):
     code = re.sub(r'\b(?:alignas|decltype)\([^)]*\)', 'type', mask(typ))
+    code = re.sub(r'\([^()]*\)', '', code)
     return bool(code and not code.endswith('::') and not re.search(r'(?<!:):(?!:)', code)
                 and code.count('<') == code.count('>') and len(split_top_level_commas(code)) == 1
                 and code.split()[0] not in FORBIDDEN
@@ -189,6 +250,8 @@ def parse_declaration(body, code):
     if not fields:
         return None
     typ, name, opener, value = fields
+    if typ in ('class', 'struct') and opener == ':':
+        return None
     if not is_declaration_type(typ) or name == 'operator':
         return None
     parsed = declaration_fields(re.sub(r'\s+', ' ', typ), name, opener, value, code)
@@ -215,25 +278,82 @@ def parse_enumerator(body, code):
     return None
 
 
-PARSERS = (parse_case, parse_initialiser, parse_function_pointer, parse_function,
+def parse_table(body, code):
+    if not code.startswith('{'):
+        return None
+    end = closing_brace(code, 0)
+    if end is None:
+        return None
+    cells = split_top_level_commas(body[1:end])
+    if len(cells) < 2 or any('{' in mask(cell) for cell in cells):
+        return None
+    return 'table', TableFields(tuple(cells), body[end + 1:])
+
+
+def parse_alias(body, code):
+    if fields := match_fields(r'(using)\s+(\w+)\s*(=)\s*(.*);', body, code):
+        return 'decl', DeclarationFields(*fields)
+    return None
+
+
+def parse_enum_class(body, code):
+    if fields := match_fields(r'(enum(?:\s+class)?)\s+(\w+)\s*(\{.*\});', body, code):
+        typ, name, value = fields
+        return 'decl', DeclarationFields(typ, name, '{', value[1:-1].strip(), '}')
+    return None
+
+
+def parse_binding(body, code):
+    if fields := match_fields(r'(auto(?:[ &]|const)*)\s*(\[[^]]+\])\s*(=)\s*(.*);', body, code):
+        return 'decl', DeclarationFields(*fields)
+    return None
+
+
+def parse_designated(body, code):
+    if fields := match_fields(r'(\.\w+)\s*(=)\s*(.*?)(,?)', body, code):
+        return 'enum', EnumeratorFields(*fields)
+    return None
+
+
+PARSERS = (parse_table, parse_alias, parse_enum_class, parse_binding, parse_designated, parse_case,
+           parse_initialiser, parse_function_pointer, parse_function,
            parse_declaration, parse_assignment, parse_enumerator)
 
 
+def indentation(line):
+    return line[:len(line) - len(line.lstrip())]
+
+
+def is_function_declaration(fields, constructors):
+    if fields.typ or constructors is None or fields.signature.startswith(('operator', '~')):
+        return True
+    name = fields.signature.split('(', 1)[0]
+    return name in constructors or bool(fields.specifier) or name in fields.signature[len(name) + 1:]
+
+
+def accepted_kind(item, constructors):
+    kind, fields = item
+    return kind != 'function' or is_function_declaration(fields, constructors)
+
+
+def parse_body(body, code, constructors):
+    for parser in PARSERS:
+        item = parser(body, code)
+        if item and accepted_kind(item, constructors):
+            return item
+    return None
+
+
 def parse(line, hidden, constructors=None):
-    indent = line[:len(line) - len(line.lstrip())]
+    indent = indentation(line)
     body, code = line[len(indent):], hidden[len(indent):]
     comment = trailing_comment(body)
     if comment:
         end = body.rfind(comment)
         body, code = body[:end].rstrip(), code[:end].rstrip()
-    for parser in PARSERS:
-        if item := parser(body, code):
-            kind, fields = item
-            if kind == 'function' and not fields.typ and constructors is not None:
-                name = fields.signature.split('(', 1)[0].lstrip('~')
-                if not name.startswith('operator') and name not in constructors:
-                    continue
-            return Item(indent, kind, fields, comment)
+    if item := parse_body(body, code, constructors):
+        kind, fields = item
+        return Item(indent, kind, fields, comment)
     return None
 
 
@@ -253,7 +373,7 @@ def render_declaration(fields, widths):
         body += render_braced_value(fields.value, widths.value) if fields.closer else fields.value
     else:
         body += name
-    return body + fields.tail
+    return body.rstrip() + fields.tail
 
 
 def render_initialiser(fields, widths):
@@ -264,9 +384,16 @@ def render_initialiser(fields, widths):
 
 def render_function(fields, widths):
     prefix = fields.typ.ljust(widths.typ) + ' ' if widths.typ else ''
+    signature = fields.signature
     if fields.arrow:
-        return prefix + fields.signature.ljust(widths.signature) + ' -> ' + fields.result + fields.tail
-    return prefix + fields.signature + fields.tail
+        signature = signature.ljust(widths.signature) + ' -> ' + fields.result
+    if fields.specifier:
+        width = widths.signature + (4 + widths.result if widths.arrow else 0)
+        signature = signature.ljust(width) + ' ' + fields.specifier
+    if fields.tail.startswith(' '):
+        width = widths.signature + (4 + widths.result if widths.arrow else 0)
+        signature = signature.ljust(width)
+    return prefix + signature + fields.tail
 
 
 def render_case(fields, widths):
@@ -283,7 +410,13 @@ def render_enumerator(fields, widths):
     return fields.name + fields.tail
 
 
+def render_table(fields, widths):
+    cells = [cell.ljust(width) for cell, width in zip(fields.cells, widths.cells)]
+    return '{ ' + ', '.join(cells) + ' }' + fields.tail
+
+
 RENDERERS = {
+    'table': render_table,
     'decl': render_declaration,
     'ctor': render_initialiser,
     'function': render_function,
@@ -298,11 +431,11 @@ def render(item, widths):
 
 
 def expand_declarators(line, parts, typ, comment):
-    indent = line[:len(line) - len(line.lstrip())]
+    indent = indentation(line)
     base = re.sub(r'(?:[*&]\s*(?:(?:const|volatile)\s*)?)+$', '', typ).rstrip()
     declarations = [indent + part + ';' for part in [parts[0]] + [base + ' ' + p for p in parts[1:]]]
     if comment:
-        declarations[-1] += ' ' * COMMENT_GAP + comment
+        declarations[-1] += ' ' + comment
     return [(declaration, mask(declaration)) for declaration in declarations]
 
 
@@ -322,13 +455,24 @@ def split_declarators(lines):
     return [part for line, code in lines for part in split_declarator(line, code)]
 
 
+def declaration_gap(fields):
+    return ' ' if any(f.opener in ('=', ':') for f in fields) else ''
+
+
+def measure_table(fields):
+    columns = zip(*(field.cells for field in fields))
+    return SimpleNamespace(cells=[max(map(len, column)) for column in columns])
+
+
 def measure(fields):
     if not fields:
         return SimpleNamespace()
+    if isinstance(fields[0], TableFields):
+        return measure_table(fields)
     widths = {name: max(len(getattr(f, name)) for f in fields) for name in fields[0]._fields}
     if isinstance(fields[0], DeclarationFields):
         widths['value'] = max((len(f.value) for f in fields if f.closer), default=0)
-        widths['gap'] = ' ' if any(f.opener in ('=', ':') for f in fields) else ''
+        widths['gap'] = declaration_gap(fields)
     return SimpleNamespace(**widths)
 
 
@@ -340,7 +484,8 @@ def group_key(item):
     indent = item.indent
     if item.kind == 'ctor' and item.fields.prefix:
         indent += ' ' * (len(item.fields.prefix) + 1)
-    return indent, item.kind
+    kind = ('table', len(item.fields.cells)) if item.kind == 'table' else item.kind
+    return indent, kind
 
 
 class Group:
@@ -378,28 +523,25 @@ class Group:
         excluded = {}
         while over_limit := [index for index, line in proposed.items() if len(line) > COLUMN_LIMIT]:
             index = max(over_limit, key=self.unaligned_width)
-            excluded[index] = single_spacing(self.entries[index].line)
+            excluded[index] = self.entries[index].line
             exceptions.append(Overflow(offset + index + 1, excluded[index]))
             self.active.remove(index)
             proposed = self.render()
         return [proposed.get(index, excluded.get(index, entry.line)) for index, entry in enumerate(self.entries)]
 
 
-def single_spacing(line):
-    indent = line[:len(line) - len(line.lstrip())]
-    body = line[len(indent):]
-    hidden = mask(body)
-    for match in reversed(list(re.finditer(r'[ \t]+', hidden))):
-        body = body[:match.start()] + ' ' + body[match.end():]
-    return indent + body.rstrip()
+def replace_outside_protected(text, pattern, replacement):
+    for match in reversed(list(re.finditer(pattern, mask(text)))):
+        text = text[:match.start()] + replacement + text[match.end():]
+    return text
+
+
+def normalise_spacing(text):
+    return replace_outside_protected(text, r'(?<=\S)[ \t]+', ' ')
 
 
 def normalise_empty(text):
-    hidden = mask(text)
-    spans = list(re.finditer(r'\{[ \t]*\}', hidden))
-    for match in reversed(spans):
-        text = text[:match.start()] + '{ }' + text[match.end():]
-    return text
+    return replace_outside_protected(text, r'\{[ \t]*\}', '{ }')
 
 
 def normalise_initialiser_part(part):
@@ -424,68 +566,125 @@ def normalise_initialiser_list(line, code):
     return line[:match.end()] + ' ' + ', '.join(map(normalise_initialiser_part, parts))
 
 
+def continuation_end(lines, start):
+    line, code = lines[start]
+    for end in range(start + 1, len(lines)):
+        following, hidden = lines[end]
+        if not following.strip() or len(indentation(following)) <= len(indentation(line)):
+            return None
+        code += ' ' + hidden.strip()
+        if code.count('(') == code.count(')'):
+            return end
+    return None
+
+
+def declaration_head(item, line):
+    fields = item.fields
+    if item.kind == 'decl' and fields.params:
+        params = line[line.index(')', line.index('(*')) + 1:].lstrip()
+        return item._replace(fields=fields._replace(params=params, tail=''))
+    if item.kind == 'function':
+        signature = line.strip()[len(fields.typ):].lstrip()
+        fields = fields._replace(signature=signature, arrow='', result='', specifier='', tail='')
+        return item._replace(fields=fields)
+    return None
+
+
+def without_comment(line):
+    comment = trailing_comment(line)
+    return line[:line.rfind(comment)].rstrip() if comment else line
+
+
 def multiline_declaration(lines, start, constructors):
     line, code = lines[start]
     if code.count('(') <= code.count(')') or code.rstrip().endswith(';'):
         return None
-    indent = len(line) - len(line.lstrip())
-    for end in range(start + 1, len(lines)):
-        following, hidden = lines[end]
-        if not following.strip() or len(following) - len(following.lstrip()) <= indent:
-            return None
-        code += ' ' + hidden.strip()
-        if code.count('(') != code.count(')'):
-            continue
-        combined = ' '.join(text.strip() for text, _ in lines[start:end + 1])
-        item = parse(' ' * indent + combined, ' ' * indent + code.strip(), constructors)
-        if not item or item.kind not in ('decl', 'function'):
-            return None
-        fields = item.fields
-        if item.kind == 'decl' and fields.params:
-            params = line[line.index(')', line.index('(*')) + 1:].lstrip()
-            fields = fields._replace(params=params, tail='')
-        elif item.kind == 'function':
-            signature = line.strip()[len(fields.typ):].lstrip()
-            fields = fields._replace(signature=signature, arrow='', result='', tail='')
-        else:
-            return None
-        return item._replace(fields=fields), end
+    end = continuation_end(lines, start)
+    if end is None:
+        return None
+    combined = indentation(line) + ' '.join(without_comment(text).strip() for text, _ in lines[start:end + 1])
+    item = parse(combined, mask(combined), constructors)
+    head = declaration_head(item, without_comment(line)) if item else None
+    if head:
+        head = head._replace(comment=trailing_comment(line))
+    return (head, end) if head else None
+
+
+def equals_head(line, code, constructors):
+    if code.rstrip().endswith(';'):
+        return None
+    parsed = parse_declaration(line.strip() + ';', code.strip() + ';')
+    if parsed and parsed[1].opener == '=':
+        return Item(indentation(line), 'decl', parsed[1]._replace(tail=''), '')
     return None
 
 
-def restore_function_indent(item, group, following_lines, constructors):
-    if not item or item.kind != 'function' or item.fields.typ:
-        return item
-    indents = [item.indent]
-    if group.key and group.key[1] == 'function':
-        indents.append(group.key[0])
-    for index, (following, hidden) in enumerate(following_lines):
-        if is_comment_only(following, hidden):
+def constructor_tail_end(lines, index):
+    if index + 1 >= len(lines):
+        return index
+    _, code = lines[index + 1]
+    return index + 1 if code.lstrip().startswith(':') and code.rstrip().endswith('{ }') else index
+
+
+def constructor_indents(lines):
+    functions = [(indentation(line), parse_function(line.strip(), code.strip())) for line, code in lines]
+    functions = [(indent, parsed[1]) for indent, parsed in functions if parsed]
+    base = min((indent for indent, _ in functions), key=len, default='')
+    owners = {fields.signature.split('(', 1)[0].lstrip('~'): base for _, fields in functions
+              if not fields.typ and is_function_declaration(fields, set())}
+    for line, code in lines:
+        if match := re.match(r'\s*(?:class|struct)\s+(\w+).*\{', code):
+            owners[match[1]] = indentation(line) + ' ' * INDENT_WIDTH
+    return owners
+
+
+def normalise_member_indents(lines):
+    owners = constructor_indents(lines)
+    for line, code in lines:
+        match = re.match(r'\s*~?(\w+)\(', code)
+        if match and match[1] in owners:
+            line = owners[match[1]] + line.lstrip()
+            code = owners[match[1]] + code.lstrip()
+        yield line, code
+
+
+def initializer_end(lines, start):
+    code = ''
+    for end in range(start, len(lines)):
+        code += lines[end][1]
+        balanced = all(code.count(a) == code.count(b) for a, b in [('(', ')'), ('[', ']'), ('{', '}')])
+        if balanced and code.rstrip().endswith(';'):
+            return end
+    return start
+
+
+def parsed_lines(lines, constructors):
+    continuation = -1
+    for index, (line, code) in enumerate(lines):
+        if index <= continuation:
+            yield line, code, None, True
             continue
-        other = parse(following, hidden, constructors)
-        if not other and (multiline := multiline_declaration(following_lines, index, constructors)):
-            other, _ = multiline
-        if not other or other.kind != 'function':
-            break
-        indents.append(other.indent)
-        if other.fields.typ:
-            break
-    return item._replace(indent=min(indents, key=len))
+        item = equals_head(line, code, constructors)
+        if item:
+            continuation = initializer_end(lines, index)
+        item = item or parse(line, code, constructors)
+        multiline = multiline_declaration(lines, index, constructors) if not item else None
+        if multiline:
+            item, continuation = multiline
+        if item and item.kind == 'function':
+            continuation = max(continuation, constructor_tail_end(lines, index))
+        yield line, code, item, False
+
+
+def ends_group(group, item, continuation):
+    return not continuation and group.entries and (not item or group_key(item) != group.key)
 
 
 def grouped_lines(lines, constructors):
     group = Group()
-    continuation_end = -1
-    for index, (line, code) in enumerate(lines):
-        if index <= continuation_end:
-            group.add(line, None)
-            continue
-        item = parse(line, code, constructors)
-        if not item and (multiline := multiline_declaration(lines, index, constructors)):
-            item, continuation_end = multiline
-        item = restore_function_indent(item, group, lines[index + 1:], constructors)
-        continuation = is_comment_only(line, code) and group.entries
-        if not continuation and group.entries and (not item or group_key(item) != group.key):
+    for line, code, item, continued in parsed_lines(lines, constructors):
+        continuation = continued or (is_comment_only(line, code) and group.entries)
+        if ends_group(group, item, continuation):
             yield group
             group = Group()
         group.add(line, item)
@@ -501,12 +700,13 @@ def constructor_names(code):
 
 
 def align(text):
-    normalised = normalise_empty(text)
+    normalised = normalise_empty(normalise_spacing(text))
     original = zip(normalised.splitlines(), mask(normalised).splitlines())
     lines = [normalise_initialiser_list(line, code) for line, code in original]
     pairs = zip(lines, mask('\n'.join(lines)).splitlines())
     output, exceptions, count = [], [], 0
-    for group in grouped_lines(split_declarators(pairs), constructor_names(mask(normalised))):
+    declarations = split_declarators(normalise_member_indents(list(pairs)))
+    for group in grouped_lines(declarations, constructor_names(mask(normalised))):
         count += bool(group.active)
         output.extend(group.exclude_over_limit(len(output), exceptions))
     result = '\n'.join(output) + ('\n' if text.endswith('\n') else '')
@@ -544,9 +744,10 @@ def arguments():
 
 
 def write_if_changed(path, original, result):
-    if result.text != original:
-        path.write_text(result.text)
-    return False
+    if result.text == original:
+        return False
+    path.write_text(result.text)
+    return True
 
 
 def report_if_changed(path, original, result):
@@ -568,7 +769,7 @@ def main():
         if args.report:
             print_statistics(path, result)
         failed |= update(path, original, result)
-    return int(failed)
+    return int(failed and args.check)
 
 
 if __name__ == '__main__':

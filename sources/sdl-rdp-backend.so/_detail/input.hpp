@@ -21,7 +21,7 @@ public:
   static void   Relative(Peer& /*peer*/, int dx, int dy);
   static bool   Motion(Peer& /*peer*/, int x, int y);
   static bool   Center(Peer& /*peer*/);
-  void RelativeMode(bool enabled) {
+  void          RelativeMode(bool enabled)                          {
     relative       = enabled;
     warp_requested = false;
   }

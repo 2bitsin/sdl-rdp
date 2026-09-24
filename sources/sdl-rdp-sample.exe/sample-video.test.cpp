@@ -22,11 +22,11 @@ protected:
   }
   void GivenVideoHints() {
     for (auto [name, value] : { std::pair{ SDL_HINT_VIDEO_DRIVER, "rdp" },
-                                { "SDL_RDP_PORT", "0" },
-                                { "SDL_RDP_BIND", "127.0.0.1" },
-                                { "SDL_RDP_CODEC", "planar" },
-                                { "SDL_RDP_WIDTH", "1280" },
-                                { "SDL_RDP_HEIGHT", "800" } })
+                                { "SDL_RDP_PORT"  , "0"         },
+                                { "SDL_RDP_BIND"  , "127.0.0.1" },
+                                { "SDL_RDP_CODEC" , "planar"    },
+                                { "SDL_RDP_WIDTH" , "1280"      },
+                                { "SDL_RDP_HEIGHT", "800"       } })
       ASSERT_TRUE(SDL_SetHint(name, value));
     ASSERT_TRUE(SDL_SetHint("SDL_RDP_CERT_DIR", certificates.Path().c_str()));
     auto library = BuildRoot() / "sources/sdl-rdp-backend.so/libsdl-rdp-backend.so";
@@ -38,7 +38,7 @@ protected:
     SDL_SetLogOutputFunction(
         [](void* user, int, SDL_LogPriority priority, char const* message) {
           Headless::Logs::Collect(user,
-                                  priority >= SDL_LOG_PRIORITY_ERROR  ? SDLRDP_LOG_ERROR
+                                  priority >= SDL_LOG_PRIORITY_ERROR ? SDLRDP_LOG_ERROR
                                   : priority == SDL_LOG_PRIORITY_WARN ? SDLRDP_LOG_WARN
                                                                       : SDLRDP_LOG_INFO,
                                   message);

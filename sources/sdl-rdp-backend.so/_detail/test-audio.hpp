@@ -129,7 +129,7 @@ protected:
           return std::ranges::any_of(events, [](auto const& e) { return e.type == SDLRDP_AUDIO; });
         },
         true, &client);
-    auto event = std::ranges::find(events, SDLRDP_AUDIO, &sdlrdp_event::type);
+    auto event  = std::ranges::find(events, SDLRDP_AUDIO, &sdlrdp_event::type);
     ASSERT_NE(event, events.end()) << logs.Text();
     EXPECT_EQ(event->audio.connected, 0u);
     EXPECT_EQ(sdlrdp_audio_rate(backend.get()), 0u);
@@ -201,7 +201,7 @@ protected:
     EXPECT_EQ(sdlrdp_audio_wait(backend.get(), 0), 0);
   }
   void WhenIdleAudioBurst(std::vector<INT16> const& pcm, unsigned burst) {
-    auto started = Clock::now();
+    auto started  = Clock::now();
     auto writing = std::async(std::launch::async, [&] { return sdlrdp_audio_write(backend.get(), pcm.data(), 48000); });
     auto captured =
         ClientSession().Until([&] { return AudioSession().CaptureState().samples.size() == burst * pcm.size(); });
@@ -254,8 +254,8 @@ protected:
     connected_audio  = std::make_unique<SoundClient>(*connected_client);
     GivenUnconfirmedAudio(*connected_client, *connected_audio);
   }
-  Client& ClientSession() { return *connected_client; }
-  SoundClient& AudioSession() { return *connected_audio; }
+  Client&      ClientSession() { return *connected_client; }
+  SoundClient& AudioSession()  { return *connected_audio; }
 
 private:
   std::unique_ptr<Client>      connected_client;

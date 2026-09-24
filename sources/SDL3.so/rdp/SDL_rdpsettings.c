@@ -54,7 +54,7 @@ static char* SDL_RDP_LibraryIni(void) {
 
 static void SDL_RDP_IniEntry(void* user, int index, char const* key, char const* value, unsigned line) {
   struct SDL_RDP_Registry* const state = SDL_RDP_Registry();
-  char const* path = user;
+  char const*                    path  = user;
   if (index == -2) {
     SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "%s:%u: malformed ini line (missing '=')", path, line);
   } else if (index < 0) {
@@ -66,7 +66,7 @@ static void SDL_RDP_IniEntry(void* user, int index, char const* key, char const*
 
 static bool SDL_RDP_ReadIni(char const* path, bool required) {
   struct SDL_RDP_Registry* const state = SDL_RDP_Registry();
-  SDL_PathInfo info;
+  SDL_PathInfo                   info;
   state->ini_text = SDL_LoadFile(path, NULL);
   if (state->ini_text) {
     SDL_RDP_IniParse(state->ini_text, SDL_RDP_IniEntry, (void*)path);
@@ -105,7 +105,7 @@ bool SDL_RDP_SettingsReady(void) {
 
 static char const* SDL_RDP_SettingFallback(char const* name) {
   struct SDL_RDP_Registry* const state = SDL_RDP_Registry();
-  int index = SDL_RDP_IniIndex(name);
+  int                            index = SDL_RDP_IniIndex(name);
   if (index >= 0 && index != SDL_RDP_SETTING_INI && state->ini_values[index]) return state->ini_values[index];
   return SDL_getenv(name);
 }

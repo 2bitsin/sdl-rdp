@@ -8,7 +8,7 @@ namespace SampleGate {
 namespace {
 void ThenBlockCadence(Headless::SoundClient const& audio, bool tight) {
   std::ranges::for_each(std::views::iota(0, 3), [&](int second) {
-    auto start = audio.CaptureState().received.front() + std::chrono::seconds(second);
+    auto start  = audio.CaptureState().received.front() + std::chrono::seconds(second);
     auto blocks = std::ranges::count_if(audio.CaptureState().received,
                                         [&](auto time) { return time >= start && time < start + 1s; });
     EXPECT_GE(blocks, 45) << "tight=" << tight << " second=" << second;
@@ -45,7 +45,7 @@ void ThenLeadCadence(Headless::SoundClient const& audio, size_t first, size_t fr
                                                                                   audio.CaptureState().received[i - 1])
                                             .count());
   auto sent_frames = (audio.CaptureState().samples.size() / 2) - frames;
-  auto block_ms =
+  auto block_ms    =
       1000.0 * double(sent_frames) / double(audio.CaptureState().received.size() - first) / audio.CaptureState().rate;
   EXPECT_LE(maximum_gap, (2 * block_ms) + 10);
   auto elapsed =
@@ -181,8 +181,8 @@ protected:
     SDL_GetLogOutputFunction(&previous_log, &previous_log_user);
     SDL_SetLogOutputFunction(
         [](void* user, int category, SDL_LogPriority priority, char const* text) {
-          auto& self = *static_cast<AudioDriver*>(user);
-          auto level = priority >= SDL_LOG_PRIORITY_ERROR  ? SDLRDP_LOG_ERROR
+          auto& self  = *static_cast<AudioDriver*>(user);
+          auto  level = priority >= SDL_LOG_PRIORITY_ERROR ? SDLRDP_LOG_ERROR
                        : priority == SDL_LOG_PRIORITY_WARN ? SDLRDP_LOG_WARN
                                                            : SDLRDP_LOG_INFO;
           Headless::Logs::Collect(&self.logs, level, text);

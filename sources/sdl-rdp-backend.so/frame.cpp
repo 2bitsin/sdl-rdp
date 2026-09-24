@@ -90,8 +90,8 @@ bool LegacyFrame::Prepare(Peer& peer) {
   if (!SelectEncoder(peer)) return false;
   auto* settings = peer.client->context->settings;
   depth = freerdp_settings_get_uint32(settings, FreeRDP_ColorDepth);
-  wire = depth != 32                                                           ? Wire::Bitmap
-                   : peer.encoder.Codec() == SDLRDP_CODEC_PLANAR                         ? Wire::Planar
+  wire = depth != 32 ? Wire::Bitmap
+                   : peer.encoder.Codec() == SDLRDP_CODEC_PLANAR ? Wire::Planar
                    : freerdp_settings_get_bool(settings, FreeRDP_SurfaceCommandsEnabled) ? Wire::Surface
                                                                                          : Wire::Bitmap;
   codec = wire == Wire::Surface ? peer.encoder.Id(settings) : 0;
@@ -139,7 +139,7 @@ bool LegacyFrame::AppendBand(Encoder& encoder, Frame band) {
 }
 bool LegacyFrame::Bands(Peer& peer, sdlrdp_rect area) {
   auto& encoder = peer.encoder;
-  auto lines    = encoder.codec == SDLRDP_CODEC_REMOTEFX
+  auto  lines   = encoder.codec == SDLRDP_CODEC_REMOTEFX
                       ? 64
                       : std::max(1, int((BITMAP_RECTANGLE_LIMIT - 1024) / (std::size_t(area.w) * 4)));
   for (int row = 0; row < area.h; row += lines) {

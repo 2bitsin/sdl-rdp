@@ -218,12 +218,12 @@ protected:
   }
   void GivenRendererHints() {
     for (auto [key, value] : { std::pair{ SDL_HINT_VIDEO_DRIVER, "rdp" },
-                               { "SDL_RDP_PORT", "0" },
-                               { "SDL_RDP_BIND", "127.0.0.1" },
-                               { "SDL_RDP_CODEC", "raw" },
-                               { "SDL_RDP_WIDTH", "1280" },
-                               { "SDL_RDP_HEIGHT", "800" },
-                               { "SDL_RDP_VSYNC", "0" } })
+                               { "SDL_RDP_PORT"  , "0"         },
+                               { "SDL_RDP_BIND"  , "127.0.0.1" },
+                               { "SDL_RDP_CODEC" , "raw"       },
+                               { "SDL_RDP_WIDTH" , "1280"      },
+                               { "SDL_RDP_HEIGHT", "800"       },
+                               { "SDL_RDP_VSYNC" , "0"         } })
       ASSERT_TRUE(SDL_SetHint(key, value));
     ASSERT_TRUE(SDL_SetHint("SDL_RDP_CERT_DIR", certificates.Path().c_str()));
     ASSERT_TRUE(
@@ -256,7 +256,7 @@ protected:
   }
   void Run(int scenario) {
     Expects(renderer != nullptr, "vsync renderer exists");
-    auto port =
+    auto     port   =
         SDL_GetNumberProperty(SDL_GetDisplayProperties(SDL_GetPrimaryDisplay()), SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0);
     auto     client = std::async(std::launch::async, Exercise, unsigned(port), scenario, std::string_view(GetParam()));
     unsigned frame  = 0;
@@ -328,7 +328,7 @@ TEST_P(SenderRecovery, SocketPauseDropAndRecover) {
   auto        trace    = logs.Text(true);
   auto const& observed = observations.front();
   auto        times    = PresentTimes(trace);
-  auto count           = [&](int64_t begin) {
+  auto        count    = [&](int64_t begin) {
     return std::ranges::count_if(times, [&](auto time) { return time >= begin && time < begin + 1000; });
   };
   RecordProperty("stalled_second", count(observed.resumed - 1000));

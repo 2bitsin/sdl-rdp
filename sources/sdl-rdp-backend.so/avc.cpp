@@ -239,7 +239,7 @@ int ConvertInput(NV_ENC_LOCK_INPUT_BUFFER const& lock, prim_size_t const& size, 
 bool Encoder::Impl::Fill(std::span<BYTE const> bgrx, unsigned stride, Encoder& timing) {
   Expects(session != nullptr, "encoder session exists");
   Expects(input != nullptr, "encoder input buffer exists");
-  using Clock = std::chrono::steady_clock;
+  using                    Clock = std::chrono::steady_clock;
   auto                     start = Clock::now();
   NV_ENC_LOCK_INPUT_BUFFER lock  { };
   lock.version     = NV_ENC_LOCK_INPUT_BUFFER_VER;
@@ -287,7 +287,7 @@ std::string Encoder::UnavailableReason() {
   static std::string const reason = [] {
     Impl probe;
     auto available = probe.Load();
-    auto error     = probe.error;
+    auto error = probe.error;
     probe.Close();
     return available ? std::string{ } : error;
   }();

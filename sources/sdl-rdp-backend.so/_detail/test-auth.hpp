@@ -39,7 +39,7 @@ inline void ThenSafeAuthenticationLog(sdlrdp_log_level level, std::string const&
 }
 class Authentication : public testing::Test {
 protected:
-  void TearDown() override { handle.reset(); }
+  void TearDown()                                override { handle.reset(); }
   void Open(sdlrdp_auth mode, bool fixed = true) {
     auto directory = certificates.Path().string();
     config.bind      = "127.0.0.1";

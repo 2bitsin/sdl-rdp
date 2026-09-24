@@ -15,7 +15,7 @@ WireSample SampleWire(int descriptor) {
   if (getsockopt(descriptor, IPPROTO_TCP, TCP_INFO, &info, &length) != 0 || ioctl(descriptor, SIOCOUTQ, &outq) != 0)
     return { };
   if (length < offsetof(tcp_info, tcpi_delivery_rate) + sizeof(info.tcpi_delivery_rate)) return { };
-  return { .available     = true,
+  return { .available = true,
            .outq          = unsigned(outq),
            .notsent       = info.tcpi_notsent_bytes,
            .unacked       = info.tcpi_unacked,

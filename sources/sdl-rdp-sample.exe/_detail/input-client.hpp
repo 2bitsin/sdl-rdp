@@ -23,7 +23,7 @@ public:
     };
   }
   static auto const& Advanced() { return advanced; }
-  static auto const& Touch() { return touch; }
+  static auto const& Touch()    { return touch; }
 
 private:
   static void Connected(void* /*unused*/, ChannelConnectedEventArgs const* event) {
@@ -39,19 +39,19 @@ private:
 
 struct PositionObserver {
 public:
-  PositionObserver(PositionObserver const&) = delete;
-  PositionObserver(PositionObserver&&) = delete;
-  explicit PositionObserver(Client& client) {
+           PositionObserver(PositionObserver const&) = delete;
+           PositionObserver(PositionObserver&&)      = delete;
+  explicit PositionObserver(Client& client)          {
     Expects(!active, "one pointer observer per thread");
     active                                                       = this;
     client.Instance()->context->update->pointer->PointerPosition = Receive;
   }
-  ~PositionObserver() { active = nullptr; }
-  PositionObserver& operator =(PositionObserver const&) = delete;
-  PositionObserver& operator =(PositionObserver&&) = delete;
-  unsigned Count() const { return count; }
-  unsigned X() const { return x; }
-  unsigned Y() const { return y; }
+                    ~PositionObserver()                  { active = nullptr; }
+  PositionObserver& operator = (PositionObserver const&) = delete;
+  PositionObserver& operator = (PositionObserver&&)      = delete;
+  unsigned          Count() const                        { return count; }
+  unsigned          X() const                            { return x; }
+  unsigned          Y() const                            { return y; }
 
 private:
   static BOOL Receive(rdpContext* /*unused*/, POINTER_POSITION_UPDATE const* position) {
@@ -88,9 +88,9 @@ private:
 };
 class FirstFrameSize {
 public:
-  FirstFrameSize(FirstFrameSize const&) = delete;
-  FirstFrameSize(FirstFrameSize&&) = delete;
-  explicit FirstFrameSize(Client& value) : client(value), original_connect(value.Instance()->PostConnect) {
+           FirstFrameSize(FirstFrameSize const&) = delete;
+           FirstFrameSize(FirstFrameSize&&)      = delete;
+  explicit FirstFrameSize(Client& value)         : client(value), original_connect(value.Instance()->PostConnect) {
     Expects(!active, "no observer is already installed");
     Expects(original_connect, "original connection callback is installed");
     active                         = this;
@@ -101,11 +101,11 @@ public:
     if (paint_installed) client.Instance()->context->update->EndPaint = original_paint;
     active = nullptr;
   }
-  FirstFrameSize& operator =(FirstFrameSize const&) = delete;
-  FirstFrameSize& operator =(FirstFrameSize&&) = delete;
-  bool Received() const { return received; }
-  int Width() const { return width; }
-  int Height() const { return height; }
+  FirstFrameSize& operator = (FirstFrameSize const&) = delete;
+  FirstFrameSize& operator = (FirstFrameSize&&)      = delete;
+  bool            Received() const                   { return received; }
+  int             Width() const                      { return width; }
+  int             Height() const                     { return height; }
 
 private:
   static BOOL Connect(freerdp* instance) {

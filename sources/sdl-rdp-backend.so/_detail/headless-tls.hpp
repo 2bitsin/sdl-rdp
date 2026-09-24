@@ -11,15 +11,15 @@ namespace Headless {
 struct TlsSocket {
 public:
   TlsSocket(TlsSocket const&) = delete;
-  TlsSocket(TlsSocket&&) = delete;
-  TlsSocket() = default;
-  ~TlsSocket() {
+  TlsSocket(TlsSocket&&)      = delete;
+  TlsSocket()                 = default;
+  ~TlsSocket()                {
     if (descriptor >= 0) close(descriptor);
   }
-  TlsSocket& operator =(TlsSocket const&) = delete;
-  TlsSocket& operator =(TlsSocket&&) = delete;
-  int Get() const { return descriptor; }
-  void Release() { descriptor = -1; }
+  TlsSocket& operator = (TlsSocket const&) = delete;
+  TlsSocket& operator = (TlsSocket&&)      = delete;
+  int        Get() const                   { return descriptor; }
+  void       Release()                     { descriptor = -1; }
 
 private:
   int descriptor = socket(AF_INET, SOCK_STREAM, 0);

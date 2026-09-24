@@ -51,7 +51,7 @@ protected:
     ASSERT_TRUE(update->SuppressOutput(client.Instance()->context, 0, nullptr));
     ASSERT_EQ(Events(2).size(), 2u);
     ASSERT_TRUE(freerdp_input_send_keyboard_event(client.Instance()->context->input, KBD_FLAGS_DOWN, 0x1e));
-    auto suppressed = Events(1);  // Input follows SuppressOutput on the same connection.
+    auto suppressed = Events(1); // Input follows SuppressOutput on the same connection.
     ASSERT_EQ(suppressed.size(), 1u);
     ASSERT_EQ(suppressed.front().type, SDLRDP_KEY);
   }
@@ -68,9 +68,9 @@ protected:
     ThenDesktopGeometry(client, 640, 480);
   }
   static void ThenScaledHighlight(Client& client) {
-    auto* actual = reinterpret_cast<UINT32*>(client.Instance()->context->gdi->primary_buffer);
-    auto  rows   = std::views::iota(0, 480);
-    auto brightest =
+    auto* actual    = reinterpret_cast<UINT32*>(client.Instance()->context->gdi->primary_buffer);
+    auto  rows      = std::views::iota(0, 480);
+    auto  brightest =
         std::ranges::max_element(rows, { }, [&](int y) { return actual[static_cast<std::ptrdiff_t>(y) * 640] & 255; });
     EXPECT_LE(std::abs(*brightest - 240), 1);
   }

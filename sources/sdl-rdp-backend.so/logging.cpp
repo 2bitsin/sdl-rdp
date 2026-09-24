@@ -40,9 +40,9 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 5> KnownLibr
     { "com.freerdp.core.transport", "BIO_read retries exceeded" },
     { "com.freerdp.core.transport",
       "BIO_should_retry returned an error: error:80000068:system library::Connection reset by peer" },
-    { "com.freerdp.core.transport", "BIO_write returned a system error 32: Broken pipe" },
+    { "com.freerdp.core.transport"        , "BIO_write returned a system error 32: Broken pipe" },
     { "com.freerdp.core.transport", "BIO_should_retry returned an error: error:80000020:system library::Broken pipe" },
-    { "com.freerdp.channels.rdpsnd.server", "client doesn't support any format!" },
+    { "com.freerdp.channels.rdpsnd.server", "client doesn't support any format!"                },
 } };
 bool ExpectedLibraryMessage(std::string_view prefix, std::string_view text) {
   if (std::ranges::any_of(KnownLibraryMessages,
@@ -52,8 +52,8 @@ bool ExpectedLibraryMessage(std::string_view prefix, std::string_view text) {
     constexpr std::string_view system_error = "BIO_read returned a system error ";
     if (!text.starts_with(system_error)) return false;
     text.remove_prefix(system_error.size());
-    unsigned error = 0;
-    auto [end, status] = std::from_chars(text.data(), text.data() + text.size(), error);
+    unsigned error         = 0;
+    auto     [end, status] = std::from_chars(text.data(), text.data() + text.size(), error);
     return status == std::errc{ } && std::string_view(end, text.data() + text.size()).starts_with(": ");
   }
   return false;
@@ -84,9 +84,9 @@ bool DetectTlsHandshakeFailure(LogRoute::Filter& filter, std::string_view prefix
 }
 bool NegotiationEcho(LogRoute::Filter& filter, std::string_view prefix, std::string_view text) {
   static constexpr std::array<std::string_view, 6> echoes{
-    "server supports only",    "Protocol security negotiation failure",
+    "server supports only", "Protocol security negotiation failure",
     "BIO_do_handshake failed", "rdp_server_accept_nego() fail",
-    "STATE_RUN_FAILED",        "ERRCONNECT_CONNECT_TRANSPORT_FAILED"
+    "STATE_RUN_FAILED", "ERRCONNECT_CONNECT_TRANSPORT_FAILED"
   };
   return (filter.negotiation_failed || filter.handshake_failed) &&
          (prefix.starts_with("com.freerdp.core") || prefix == "com.freerdp.api" || prefix == "com.freerdp.crypto") &&
@@ -152,7 +152,7 @@ BOOL LogRoute::Forward(wLogMessage const* message) {
       !ExpectedPeerMessage(filter, *message))
     return TRUE;
   auto* target = routing.active;
-  auto level   = message->Level == WLOG_ERROR  ? SDLRDP_LOG_ERROR
+  auto  level  = message->Level == WLOG_ERROR ? SDLRDP_LOG_ERROR
                  : message->Level == WLOG_WARN ? SDLRDP_LOG_WARN
                                                : SDLRDP_LOG_INFO;
   if (ExpectedPeerMessage(filter, *message)) level = SDLRDP_LOG_INFO;

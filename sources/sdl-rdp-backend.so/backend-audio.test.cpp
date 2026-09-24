@@ -187,7 +187,7 @@ TEST_F(AudioGate, AudioOneMillisecondPartialBlock) {
   if (::testing::Test::HasFatalFailure()) return;
   std::array<INT16, 1920> pcm{ };
   ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 48), 48);
-  auto writing =
+  auto writing  =
       std::async(std::launch::async, [&] { return sdlrdp_audio_write(backend.get(), pcm.data() + 96, 912); });
   auto captured = client.Until([&] { return audio.CaptureState().samples.size() == pcm.size(); });
   if (!captured) sdlrdp_audio_close(backend.get());

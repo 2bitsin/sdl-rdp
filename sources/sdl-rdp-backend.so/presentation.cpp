@@ -91,7 +91,7 @@ void Peer::FrameSent(std::size_t bytes) {
 void Peer::LogFrames() {
   Expects(activated, "statistics belong to an activated connection");
   using Milliseconds = std::chrono::duration<double, std::milli>;
-  auto phases        = avc_frames ? std::format(" (convert {:.1f}, upload {:.1f}, nvenc {:.1f})",
+  auto  phases       = avc_frames ? std::format(" (convert {:.1f}, upload {:.1f}, nvenc {:.1f})",
                                                 Milliseconds(avc_convert).count() / double(avc_frames),
                                                 Milliseconds(avc_upload).count() / double(avc_frames),
                                                 Milliseconds(avc_encode).count() / double(avc_frames))

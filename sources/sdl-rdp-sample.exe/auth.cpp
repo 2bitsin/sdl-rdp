@@ -31,7 +31,7 @@ bool Authenticator::Option(std::string_view option, int& index, int argc, char**
   }
   constexpr std::array<std::pair<std::string_view, char const*>, 4> hints{ { { "--user", SDL_HINT_RDP_USER },
                                                                              { "--password", SDL_HINT_RDP_PASSWORD },
-                                                                             { "--domain", SDL_HINT_RDP_DOMAIN },
+                                                                             { "--domain"  , SDL_HINT_RDP_DOMAIN   },
                                                                              { "--auth", SDL_HINT_RDP_AUTH } } };
   auto const* found = std::ranges::find(hints, option, &decltype(hints)::value_type::first);
   if (found == hints.end()) return false;

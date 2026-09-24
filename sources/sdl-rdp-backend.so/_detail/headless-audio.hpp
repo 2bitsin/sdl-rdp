@@ -81,14 +81,14 @@ public:
     };
   }
   SoundClient(SoundClient const&) = delete;
-  SoundClient(SoundClient&&) = delete;
-  ~SoundClient() {
+  SoundClient(SoundClient&&)      = delete;
+  ~SoundClient()                  {
     freerdp_disconnect(client.Instance().get());
     client.Instance()->LoadChannels = previous_load;
     active                          = nullptr;
   }
-  SoundClient& operator =(SoundClient const&) = delete;
-  SoundClient& operator =(SoundClient&&) = delete;
+  SoundClient& operator = (SoundClient const&) = delete;
+  SoundClient& operator = (SoundClient&&)      = delete;
 
   bool Send(std::span<BYTE const> bytes) const {
     Expects(!bytes.empty(), "sound PDU is nonempty");
@@ -120,7 +120,7 @@ public:
     return true;
   }
 
-  SoundCapture& CaptureState() { return capture; }
+  SoundCapture&       CaptureState()       { return capture; }
   SoundCapture const& CaptureState() const { return capture; }
 
 private:

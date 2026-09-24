@@ -65,9 +65,9 @@ inline pid_t Spawn(std::vector<std::string> arguments, int& output) {
 class Process {
 public:
   explicit Process(std::vector<std::string> arguments) : pid(Spawn(std::move(arguments), output)) { }
-  Process(Process const&) = delete;
-  Process(Process&&) = delete;
-  ~Process() {
+           Process(Process const&)                     = delete;
+           Process(Process&&)                          = delete;
+           ~Process()                                  {
     if (pid > 0) {
       kill(pid, SIGKILL);
       while (waitpid(pid, nullptr, 0) < 0 && errno == EINTR) {
@@ -75,9 +75,9 @@ public:
     }
     close(output);
   }
-  Process& operator =(Process const&) = delete;
-  Process& operator =(Process&&) = delete;
-  bool Line(std::string& line, Clock::time_point deadline) {
+  Process& operator = (Process const&)                         = delete;
+  Process& operator = (Process&&)                              = delete;
+  bool     Line(std::string& line, Clock::time_point deadline) {
     Expects(output >= 0, "stdout pipe open");
     for (;;) {
       if (auto end = pending.find('\n'); end != std::string::npos) {
@@ -138,8 +138,8 @@ inline std::vector<std::string> Arguments(fs::path const& certificates, bool wai
 inline unsigned Number(std::string_view text, int base = 10) {
   Expects(base >= 2, "integer base is at least binary");
   Expects(base <= 36, "integer base fits the supported digit alphabet");
-  unsigned value = 0;
-  auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value, base);
+  unsigned value        = 0;
+  auto     [end, error] = std::from_chars(text.data(), text.data() + text.size(), value, base);
   return error == std::errc{ } && end == text.data() + text.size() ? value : 0;
 }
 

@@ -20,7 +20,7 @@ public:
 struct DrivePacket {
 public:
   [[noreturn]] void Invalid(std::string const& cause) const { throw MalformedResponse(cause, origin); }
-  uint64_t Get(unsigned count) {
+  uint64_t          Get(unsigned count)                     {
     utilities::Expects(count <= 8, "integer fits uint64");
     utilities::Expects(position <= bytes.size(), "packet cursor is bounded");
     if (count > bytes.size() - position) Invalid("Truncated drive response.");
@@ -34,9 +34,9 @@ public:
     for (unsigned i = 0; i < count; ++i)
       bytes.push_back(uint8_t(value >> (i * 8)));
   }
-  void Zero(size_t count) { bytes.resize(bytes.size() + count); }
+  void Zero(size_t count)                    { bytes.resize(bytes.size() + count); }
   void Append(std::span<uint8_t const> data) { bytes.insert(bytes.end(), data.begin(), data.end()); }
-  void Skip(size_t count) {
+  void Skip(size_t count)                    {
     utilities::Expects(position <= bytes.size(), "packet cursor is bounded");
     if (count > bytes.size() - position) Invalid("Truncated drive response.");
     position += count;
@@ -54,10 +54,10 @@ public:
       Invalid(error.what());
     }
   }
-  auto& Bytes() { return bytes; }
-  auto const& Bytes() const { return bytes; }
-  size_t Position() const { return position; }
-  void Seek(size_t offset) {
+  auto&       Bytes()             { return bytes; }
+  auto const& Bytes() const       { return bytes; }
+  size_t      Position() const    { return position; }
+  void        Seek(size_t offset) {
     utilities::Expects(offset <= bytes.size(), "packet cursor is bounded");
     position = offset;
   }
