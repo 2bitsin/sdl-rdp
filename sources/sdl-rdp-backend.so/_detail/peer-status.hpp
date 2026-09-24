@@ -1,0 +1,25 @@
+#pragma once
+#include "graphics-timing.hpp"
+#include "sdl-rdp-backend.h"
+
+#include <chrono>
+#include <cstdint>
+#include <freerdp/peer.h>
+#include <freerdp/server/disp.h>
+#include <optional>
+
+namespace Backend {
+struct PeerStatus {
+  freerdp_peer*                         client          { };
+  DispServerContext*                    display         { };
+  sdlrdp_rect                           desktop         { };
+  bool                                  resizing        { };
+  bool                                  holding         { };
+  std::chrono::steady_clock::time_point activated_at;
+  std::optional<GraphicsTiming>         graphics;
+  UINT32                                frame           { };
+  uint64_t                              acknowledged    { };
+  uint64_t                              acknowledgements{ };
+  std::chrono::nanoseconds              encode_time     { };
+};
+}

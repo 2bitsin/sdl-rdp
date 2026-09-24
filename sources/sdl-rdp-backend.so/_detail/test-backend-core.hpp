@@ -6,10 +6,12 @@
 #include "headless-gfx.hpp"
 #include "rect.hpp"
 #include "sdl-rdp-backend.h"
-#include "state.hpp"
+#include "handle.hpp"
+#include "peer.hpp"
 #include "test-io.hpp"
 #include "test-logs.hpp"
 #include "test-pattern.hpp"
+#include "test-peer-status.hpp"
 
 #include <algorithm>
 #include <arpa/inet.h>
@@ -34,6 +36,7 @@
 #include <gtest/gtest.h>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <openssl/pem.h>
 #include <openssl/x509v3.h>
 #include <random>
@@ -160,8 +163,8 @@ struct BackendEvents {
 protected:
   bool Acknowledged() const {
     Expects(backend != nullptr, "backend exists");
-    std::scoped_lock const lock(backend->state->frame_guard);
-    return backend->state->current && backend->state->current->acknowledged >= backend->state->presented;
+    auto const status = CurrentStatus(*backend);
+    return status && status->acknowledged >= Presented(*backend);
   }
   std::vector<sdlrdp_event> Events() const {
     std::array<sdlrdp_event, 256> batch { };

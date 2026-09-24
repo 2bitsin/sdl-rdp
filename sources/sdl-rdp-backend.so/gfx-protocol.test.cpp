@@ -63,11 +63,11 @@ TEST(GraphicsTimestamp, PacksIndependentFields) {
   EXPECT_EQ(Backend::FrameTimestamp(time), 0x05fbefe7u);
 }
 TEST(Avc, Bitrate) {
-  EXPECT_EQ(Backend::Avc::Bitrate(1920, 1080), 16000000u);
-  EXPECT_EQ(Backend::Avc::Bitrate(960, 540), 4000000u);
-  EXPECT_EQ(Backend::Avc::Bitrate(320, 200), 2000000u);
-  EXPECT_EQ(Backend::Avc::Bitrate(320, 200, 1234), 1234000u);
-  EXPECT_EQ(Backend::Avc::Bitrate(32766, 32766), UINT32_MAX);
+  EXPECT_EQ(Backend::Avc::Bitrate({ 1920, 1080 }), 16000000u);
+  EXPECT_EQ(Backend::Avc::Bitrate({ 960, 540 }), 4000000u);
+  EXPECT_EQ(Backend::Avc::Bitrate({ 320, 200 }), 2000000u);
+  EXPECT_EQ(Backend::Avc::Bitrate({ 320, 200 }, 1234), 1234000u);
+  EXPECT_EQ(Backend::Avc::Bitrate({ 32766, 32766 }), UINT32_MAX);
 }
 TEST(Avc, ReplicatesPadding) {
   std::array<BYTE, 32> source{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 99, 99, 99, 99,
@@ -75,7 +75,7 @@ TEST(Avc, ReplicatesPadding) {
   std::vector<BYTE>    padded(16uz * 16 * 4);
   std::copy_n(source.data(), 12, padded.data());
   std::copy_n(source.data() + 16, 12, padded.data() + 64);
-  Backend::Avc::ReplicateEdges(padded, 3, 2);
+  Backend::Avc::ReplicateEdges(padded, { .width = 3, .height = 2 });
   ASSERT_EQ(padded.size(), 16u * 16 * 4);
   for (unsigned y = 0; y < 16; ++y)
     for (unsigned x = 0; x < 16; ++x)

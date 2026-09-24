@@ -1,56 +1,37 @@
 #pragma once
+#include "pinned.hpp"
 #include "rdp-handles.hpp"
 
-#include <array>
-#include <freerdp/freerdp.h>
-#include <freerdp/peer.h>
 #include <freerdp/server/ainput.h>
 #include <freerdp/server/rdpei.h>
-#include <oxbox/utilities/utf-decode.hpp>
+#include <optional>
 #include <span>
 
 namespace Backend {
-class Peer;
-struct Input {
+inline constexpr unsigned InputHandleLimit = 2;
+class InputEvents;
+class PeerLink;
+class Input : private Pinned {
 public:
-  static Input& Held(Peer& /*peer*/);
-  bool          Channels(Peer& peer, std::span<HANDLE const> ready);
-  bool          Open(Peer& peer);
-  unsigned      Handles(HANDLE* handles) const;
-  void          Close();
-  static void   Relative(Peer& /*peer*/, int dx, int dy);
-  static bool   Motion(Peer& /*peer*/, int x, int y);
-  static bool   Center(Peer& /*peer*/);
-  void          RelativeMode(bool enabled) {
-    relative       = enabled;
-    warp_requested = false;
-  }
+                      Input(PeerLink& link, InputEvents& events) noexcept;
+  bool                Channels(std::span<HANDLE const> ready);
+  std::span<HANDLE>   Handles(std::span<HANDLE> out) const;
+  std::optional<BOOL> Activate(UINT32 channel_id);
 
 private:
-  static BOOL Create(freerdp_peer* /*unused*/, rdpContext* /*context*/);
-  static void Free(freerdp_peer* /*unused*/, rdpContext* /*context*/);
-  static BOOL Unicode(rdpInput* /*input*/, UINT16 flags, UINT16 code);
-  static UINT Advanced(ainput_server_context* /*context*/, UINT64 /*unused*/, UINT64 flags, INT32 x, INT32 y);
-  static UINT Touch(RdpeiServerContext* /*context*/, RDPINPUT_TOUCH_EVENT const* /*event*/);
-  void        InstallChannels(Peer& peer);
-  friend class                                                                 Peer;
-  static constexpr unsigned                                                    MaxHandles     = 2;
-  std::array<oxbox::utilities::UtfDecodeState, 2>                              unicode        { };
-  std::unique_ptr<ainput_server_context, Releases<ainput_server_context_free>> advanced;
-  std::unique_ptr<RdpeiServerContext, Releases<rdpei_server_context_free>>     touch;
-  HANDLE                                                                       advanced_event { nullptr };
-  bool                                                                         opened         = false;
-  bool                                                                         have_relative  = false;
-  bool                                                                         relative       = false;
-  UINT32                                                                       advanced_id    = UINT32_MAX;
-  UINT32                                                                       touch_id       = UINT32_MAX;
-  bool                                                                         advanced_ready = false;
-  bool                                                                         touch_ready    = false;
-  bool                                                                         warp_requested = false;
-  int                                                                          last_x         = 0;
-  int                                                                          last_y         = 0;
+  bool        Open();
+  void        InstallChannels();
+  static UINT Advanced(ainput_server_context* context, UINT64 /*unused*/, UINT64 flags, INT32 x, INT32 y);
+  static UINT Touch(RdpeiServerContext* context, RDPINPUT_TOUCH_EVENT const* event);
+  PeerLink&                                                                    _link;
+  InputEvents&                                                                 _events;
+  std::unique_ptr<ainput_server_context, Releases<ainput_server_context_free>> _advanced;
+  std::unique_ptr<RdpeiServerContext, Releases<rdpei_server_context_free>>     _touch;
+  HANDLE                                                                       _advanced_event{ };
+  std::optional<UINT32>                                                        _advanced_id;
+  std::optional<UINT32>                                                        _touch_id;
+  bool                                                                         _opened        { };
+  bool                                                                         _advanced_ready{ };
+  bool                                                                         _touch_ready   { };
 };
-struct InputContext : rdpContext {
-  Input* state;
-};
-} // namespace Backend
+}

@@ -133,7 +133,7 @@ protected:
   void WhenAcknowledgedFrame(Client& client, FrameObserver& observer, std::vector<UINT32> const& pixels, unsigned i,
                              auto wait) {
     Present(pixels, 320, 200);
-    auto waiting = std::async(std::launch::async, wait, std::ref(*backend->state));
+    auto waiting = std::async(std::launch::async, wait, std::ref(*backend));
     ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == i; }));
     EXPECT_EQ(waiting.wait_for(std::chrono::milliseconds(0)), std::future_status::timeout);
     ASSERT_TRUE(observer.Ack());
@@ -169,10 +169,7 @@ protected:
   void ThenGraphicsAcknowledgementsCounted() {
     ASSERT_TRUE(GraphicsObserver().Ack());
     ASSERT_TRUE(GraphicsClient().Until([&] { return Acknowledged(); }));
-    {
-      std::scoped_lock const lock(backend->state->frame_guard);
-      EXPECT_EQ(backend->state->current->ack_count, 3u);
-    }
+    EXPECT_EQ(RequiredStatus(*backend).acknowledgements, 3u);
   }
   void ThenGraphicsWindowReleases(std::vector<UINT32> const& pixels) {
     ASSERT_TRUE(GraphicsObserver().AckFrame(0, 0));

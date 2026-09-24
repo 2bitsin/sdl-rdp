@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cerrno>
+#include <chrono>
 #include <cstdlib>
 #include <freerdp/crypto/certificate.h>
 #include <freerdp/crypto/privatekey.h>
@@ -56,36 +57,39 @@ std::string Hostname() {
   if (gethostname(name.data(), name.size() - 1)) throw std::runtime_error("Hostname unavailable.");
   return name.data();
 }
+bool Stamp(X509& cert) {
+  constexpr long X509Version3 = 2;
+  constexpr auto Validity     = std::chrono::seconds(std::chrono::days(3650));
+  return X509_set_version(&cert, X509Version3) && ASN1_INTEGER_set(X509_get_serialNumber(&cert), 1) &&
+         X509_gmtime_adj(X509_getm_notBefore(&cert), 0) && X509_gmtime_adj(X509_getm_notAfter(&cert), Validity.count());
+}
+bool Identify(X509& cert, EVP_PKEY* key, std::string const& host) {
+  auto* const                                                          name      = X509_get_subject_name(&cert);
+  auto const                                                           san       = "DNS:" + host;
+  std::unique_ptr<X509_EXTENSION, Releases<X509_EXTENSION_free>> const extension(
+      X509V3_EXT_conf_nid(nullptr, nullptr, NID_subject_alt_name, san.c_str()));
+  return X509_set_pubkey(&cert, key) &&
+         X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC, reinterpret_cast<unsigned char const*>(host.c_str()), -1,
+                                    -1, 0) &&
+         X509_set_issuer_name(&cert, name) && extension && X509_add_ext(&cert, extension.get(), -1);
+}
 Certificate SelfSigned(EVP_PKEY* key) {
   Expects(key != nullptr, "RSA key exists");
   Certificate cert(X509_new());
   if (!cert) throw std::runtime_error("Certificate allocation failed.");
-  auto*                                                                name      = X509_get_subject_name(cert.get());
-  auto                                                                 host      = Hostname();
-  auto                                                                 san       = "DNS:" + host;
-  std::unique_ptr<X509_EXTENSION, Releases<X509_EXTENSION_free>> const extension(
-      X509V3_EXT_conf_nid(nullptr, nullptr, NID_subject_alt_name, san.c_str()));
-  if (!X509_set_version(cert.get(), 2) || !ASN1_INTEGER_set(X509_get_serialNumber(cert.get()), 1) ||
-      !X509_gmtime_adj(X509_getm_notBefore(cert.get()), 0) ||
-      !X509_gmtime_adj(X509_getm_notAfter(cert.get()), 3650L * 86400) || !X509_set_pubkey(cert.get(), key) ||
-      !X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC, reinterpret_cast<unsigned char const*>(host.c_str()), -1,
-                                  -1, 0) ||
-      !X509_set_issuer_name(cert.get(), name) || !extension || !X509_add_ext(cert.get(), extension.get(), -1) ||
-      !X509_sign(cert.get(), key, EVP_sha256()))
+  if (!Stamp(*cert) || !Identify(*cert, key, Hostname()) || !X509_sign(cert.get(), key, EVP_sha256()))
     throw std::runtime_error("Certificate signing failed.");
   return cert;
 }
 void Generate(Credentials const& paths) {
-  Expects(!paths.key.empty(), "private key path is supplied");
-  Expects(!paths.certificate.empty(), "certificate path is supplied");
   Key const key(EVP_RSA_gen(2048));
   if (!key) throw std::runtime_error("RSA key generation failed.");
   auto      cert     = SelfSigned(key.get());
-  auto      fd       = open(paths.key.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+  auto      fd       = open(paths.Key().c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
   Bio const key_file(fd < 0 ? nullptr : BIO_new_fd(fd, BIO_CLOSE));
   if (key_file)
-    std::filesystem::permissions(paths.key, std::filesystem::perms::owner_read | std::filesystem::perms::owner_write);
-  Bio const cert_file(BIO_new_file(paths.certificate.c_str(), "w"));
+    std::filesystem::permissions(paths.Key(), std::filesystem::perms::owner_read | std::filesystem::perms::owner_write);
+  Bio const cert_file(BIO_new_file(paths.Certificate().c_str(), "w"));
   if (!key_file || !cert_file ||
       !PEM_write_bio_PrivateKey(key_file.get(), key.get(), nullptr, nullptr, 0, nullptr, nullptr) ||
       !PEM_write_bio_X509(cert_file.get(), cert.get()))
@@ -111,18 +115,16 @@ Credentials EnsureCertificate(std::filesystem::path const& directory) {
     throw std::runtime_error("Certificate directory creation failed.");
   DirectoryLock const process_lock(directory);
   std::filesystem::permissions(directory, std::filesystem::perms::owner_all);
-  Credentials result{ .certificate = directory / "server.crt", .key = directory / "server.key" };
-  if (!exists(result.certificate) || !exists(result.key)) Generate(result);
-  std::filesystem::permissions(result.key, std::filesystem::perms::owner_read | std::filesystem::perms::owner_write);
-  Ensures(exists(result.certificate), "credentials exist");
-  Ensures(exists(result.key), "credentials exist");
+  Credentials const result{ directory };
+  if (!result.Exist()) Generate(result);
+  std::filesystem::permissions(result.Key(), std::filesystem::perms::owner_read | std::filesystem::perms::owner_write);
+  Ensures(exists(result.Certificate()), "certificate exists");
+  Ensures(exists(result.Key()), "private key exists");
   return result;
 }
 auto InstallServerCredentials(rdpSettings& settings, Credentials const& credentials) -> void {
-  Expects(!credentials.key.empty(), "a private key path is supplied");
-  Expects(!credentials.certificate.empty(), "a certificate path is supplied");
-  ServerKey  key        { freerdp_key_new_from_file(credentials.key.c_str())                 };
-  ServerCert certificate{ freerdp_certificate_new_from_file(credentials.certificate.c_str()) };
+  ServerKey  key        { freerdp_key_new_from_file(credentials.Key().c_str())                 };
+  ServerCert certificate{ freerdp_certificate_new_from_file(credentials.Certificate().c_str()) };
   if (!key) throw std::runtime_error("Server private key failed to load.");
   if (!certificate) throw std::runtime_error("Server certificate failed to load.");
   Adopt<FreeRDP_RdpServerRsaKey>(settings, std::move(key));

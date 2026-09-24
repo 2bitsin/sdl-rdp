@@ -6,22 +6,21 @@ protected:
   void RecordGraphicsTiming(Client& client, sdlrdp_codec codec) {
     if (codec != SDLRDP_CODEC_PROGRESSIVE) return;
     ASSERT_TRUE(client.Until([&] {
-      std::scoped_lock const lock(backend->state->session_guard);
-      auto const&            peer = *backend->state->current;
-      return peer.graphics_qoe.frameId == peer.frame_id;
+      auto const status = CurrentStatus(*backend);
+      if (!status.has_value()) return false;
+      auto const& graphics = status->graphics;
+      return graphics.has_value() && graphics->Qoe().frameId == status->frame;
     }));
-    std::scoped_lock const lock(backend->state->session_guard);
-    auto const&            peer = *backend->state->current;
+    auto const timing = RequiredGraphics(*backend);
     RecordProperty("activation_to_gfx_ms",
-                   std::to_string(std::chrono::duration<double, std::milli>(peer.graphics_ready_time).count()));
-    RecordProperty("client_decode_ms", peer.graphics_qoe.timeDiffSE);
-    RecordProperty("client_render_ms", peer.graphics_qoe.timeDiffEDR);
-    RecordProperty("client_qoe_frame", peer.graphics_qoe.frameId);
+                   std::to_string(std::chrono::duration<double, std::milli>(timing.ReadyTime()).count()));
+    RecordProperty("client_decode_ms", timing.Qoe().timeDiffSE);
+    RecordProperty("client_render_ms", timing.Qoe().timeDiffEDR);
+    RecordProperty("client_qoe_frame", timing.Qoe().frameId);
     EXPECT_FALSE(logs.Contains("GFX QoE"));
   }
   auto EncodeDuration() {
-    std::scoped_lock const lock(backend->state->session_guard);
-    return backend->state->current->encoder.EncodeTime();
+    return RequiredStatus(*backend).encode_time;
   }
   void PrepareMeasurement(Client& client, sdlrdp_codec codec, bool noise) {
     if (codec == SDLRDP_CODEC_PROGRESSIVE) client.EnableGraphics();

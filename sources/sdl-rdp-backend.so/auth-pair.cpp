@@ -6,20 +6,6 @@
 #include <openssl/crypto.h>
 #include <winpr/ntlm.h>
 
-namespace Backend {
-Authentication::Authentication(sdlrdp_config const& value)
-    : config(value), user(value.user ? value.user : ""), password(value.password ? value.password : ""),
-      domain(value.domain ? value.domain : "") {
-  utilities::Expects(value.auth >= SDLRDP_AUTH_NONE, "valid authentication mode");
-  utilities::Expects(value.auth <= SDLRDP_AUTH_NLA, "valid authentication mode");
-  config.user     = value.user ? user.c_str() : nullptr;
-  config.password = value.password ? password.c_str() : nullptr;
-  config.domain   = value.domain ? domain.c_str() : nullptr;
-}
-Authentication::~Authentication() {
-  OPENSSL_cleanse(password.data(), password.size());
-}
-}
 namespace {
 bool PairName(sdlrdp_config const& config, char const* domain, char const* user) {
   utilities::Expects(domain, "credential names exist");
@@ -37,8 +23,7 @@ int sdlrdp_lookup_pair(sdlrdp_config const* config, char const* domain, char con
   if (!config || !domain || !user || !hash || !PairName(*config, domain, user)) return 0;
   try {
     auto bytes  = Backend::TranscodeRange<std::vector<BYTE>>(
-        std::as_bytes(std::span(config->password, std::strlen(config->password))), { },
-        { .encoding = oxbox::utilities::Encoding::UTF16, .order = std::endian::little });
+        std::as_bytes(std::span(config->password, std::strlen(config->password))), { }, Backend::Utf16Little);
     auto length = bytes.size();
     bytes.resize(length + sizeof(WCHAR));
     auto result = NTOWFv1W(reinterpret_cast<WCHAR*>(bytes.data()), length, hash);

@@ -1,8 +1,15 @@
-#include "_detail/state.hpp"
+#include "_detail/drive.hpp"
+#include "_detail/diagnostics.hpp"
+#include "_detail/event-queue.hpp"
+#include "_detail/peer-link.hpp"
+#include "_detail/session-access.hpp"
 
+#include <algorithm>
+#include <ranges>
 #include <array>
 #include <cstring>
 #include <freerdp/channels/rdpdr.h>
+#include <span>
 #include <winpr/nt.h>
 
 namespace Backend {
@@ -22,14 +29,16 @@ HANDLE ChannelEvent(HANDLE channel) {
   WTSFreeMemory(data);
   return event;
 }
-DrivePacket IoRequest(unsigned wire, unsigned file, unsigned id, unsigned major, unsigned minor,
-                      DrivePacket const& body) {
+DrivePacket Announcement(unsigned type, unsigned client_id) {
+  auto packet = Header(type);
+  packet.Put(RDPDR_VERSION_MAJOR, 2);
+  packet.Put(RDPDR_VERSION_MINOR_RDP6X, 2);
+  packet.Put(client_id);
+  return packet;
+}
+DrivePacket IoRequest(std::span<unsigned const> header, DrivePacket const& body) {
   auto packet = Header(PAKID_CORE_DEVICE_IOREQUEST);
-  packet.Put(wire);
-  packet.Put(file);
-  packet.Put(id);
-  packet.Put(major);
-  packet.Put(minor);
+  std::ranges::for_each(header, [&packet](unsigned field) { packet.Put(field); });
   packet.Append(body.Bytes());
   return packet;
 }
@@ -69,7 +78,9 @@ void DriveChannel::Abort(std::string const& cause) {
   std::scoped_lock const lock(mutex);
   Fail(cause);
 }
-DriveChannel::DriveChannel(Peer& value) : peer(value) { }
+DriveChannel::DriveChannel(PeerLink& link, EventQueue& events, Diagnostics const& diagnostics,
+                           SessionAccess& session) noexcept
+    : _link { link }, _events{ events }, _diagnostics{ diagnostics }, _session{ session } { }
 DriveChannel::~DriveChannel() {
   Disconnect();
 }
@@ -77,13 +88,10 @@ bool DriveChannel::Open() {
   Expects(!channel, "drive channel opens once");
   try {
     auto name = std::to_array(RDPDR_CHANNEL_NAME);
-    channel = WTSVirtualChannelOpen(peer.channels, WTS_CURRENT_SESSION, name.data());
+    channel.reset(WTSVirtualChannelOpen(_link.Channels(), WTS_CURRENT_SESSION, name.data()));
     if (!channel) throw std::runtime_error("Drive channel open failed.");
-    event = ChannelEvent(channel);
-    auto packet = Header(PAKID_CORE_SERVER_ANNOUNCE);
-    packet.Put(RDPDR_VERSION_MAJOR, 2);
-    packet.Put(RDPDR_VERSION_MINOR_RDP6X, 2);
-    packet.Put(client_id);
+    event = ChannelEvent(channel.get());
+    auto packet = Announcement(PAKID_CORE_SERVER_ANNOUNCE, client_id);
     Write(packet);
     return true;
   } catch (std::exception const& error) {
@@ -94,11 +102,11 @@ bool DriveChannel::Open() {
 void DriveChannel::Write(DrivePacket& packet) {
   Expects(channel != nullptr, "drive transport exists");
   ULONG written = 0;
-  if (!WTSVirtualChannelWrite(channel, reinterpret_cast<char*>(packet.Bytes().data()), packet.Bytes().size(),
+  if (!WTSVirtualChannelWrite(channel.get(), reinterpret_cast<char*>(packet.Bytes().data()), packet.Bytes().size(),
                               &written) ||
       written != packet.Bytes().size())
     throw std::runtime_error("Drive transport disconnected.");
-  peer.wake.Transition(WakeEvent::Phase::Pending);
+  _link.Signal();
 }
 void DriveChannel::Capabilities() {
   auto               packet           = Header(PAKID_CORE_SERVER_CAPABILITY);
@@ -108,10 +116,7 @@ void DriveChannel::Capabilities() {
   GeneralCapability(packet);
   DriveCapability(packet);
   Write(packet);
-  packet = Header(PAKID_CORE_CLIENTID_CONFIRM);
-  packet.Put(RDPDR_VERSION_MAJOR, 2);
-  packet.Put(RDPDR_VERSION_MINOR_RDP6X, 2);
-  packet.Put(client_id);
+  packet = Announcement(PAKID_CORE_CLIENTID_CONFIRM, client_id);
   Write(packet);
   auto logged_on = Header(PAKID_CORE_USER_LOGGEDON);
   Write(logged_on);
@@ -156,7 +161,7 @@ void DriveChannel::ClientCapabilities(DrivePacket& packet) {
   }
 }
 void DriveChannel::Warn(std::string const& cause) const {
-  if (connected) peer.owner.Log(SDLRDP_LOG_WARN, cause);
+  if (connected) _diagnostics.Log(SDLRDP_LOG_WARN, cause);
 }
 void DriveChannel::Fail(std::string const& cause) {
   if (!connected) return;
@@ -171,10 +176,11 @@ void DriveChannel::Remove(unsigned wire) {
     }
     sdlrdp_event removed{ .type = SDLRDP_DRIVE, .drive = { .added = 0, .id = it->first, .name = { } } };
     std::strncpy(removed.drive.name, it->second.drive.name, sizeof(removed.drive.name) - 1);
-    peer.owner.Push(removed);
-    for (auto const& [id, request] : pending) {
-      if (request->drive == it->first) request->removed = true;
-    }
+    _events.Push(removed);
+    for (auto const& request : pending | std::views::values | std::views::filter([&](auto const& candidate) {
+                                 return candidate->drive == it->first;
+                               }))
+      request->removed = true;
     changed.notify_all();
     it = devices.erase(it);
   }
@@ -239,7 +245,7 @@ std::shared_ptr<DriveRequest> DriveChannel::Send(unsigned drive, unsigned file, 
   auto request = std::make_shared<DriveRequest>();
   request->drive = drive;
   pending.emplace(id, request);
-  auto packet = IoRequest(wire, file, id, major, minor, body);
+  auto packet = IoRequest(std::array{ wire, file, id, major, minor }, body);
   try {
     Write(packet);
   } catch (std::exception const& error) {
@@ -249,13 +255,13 @@ std::shared_ptr<DriveRequest> DriveChannel::Send(unsigned drive, unsigned file, 
   return request;
 }
 void DriveChannel::AnnounceDevice(unsigned wire, std::string const& label) {
-  auto        id    = peer.owner.next_drive.fetch_add(1);
+  auto        id    = _session.NextDrive();
   DeviceEntry entry { .wire = wire, .drive = { id, { } } };
   std::strncpy(entry.drive.name, label.c_str(), sizeof(entry.drive.name) - 1);
   devices.emplace(id, entry);
   sdlrdp_event added{ .type = SDLRDP_DRIVE, .drive = { .added = 1, .id = id, .name = { } } };
   std::strncpy(added.drive.name, label.c_str(), sizeof(added.drive.name) - 1);
-  peer.owner.Push(added);
+  _events.Push(added);
 }
 void DriveChannel::GeneralClientCapability(DrivePacket& packet, std::size_t start, std::size_t length,
                                            unsigned version) const {
@@ -268,7 +274,7 @@ void DriveChannel::GeneralClientCapability(DrivePacket& packet, std::size_t star
   auto minor = packet.Get(2);
   packet.Skip(io_code_fields_size);
   auto flags = packet.Get(4);
-  peer.owner.Log(
+  _diagnostics.Log(
       SDLRDP_LOG_INFO,
       std::format("Drive client version {}.{}, general capability {}, extended PDU 0x{:08x}, device removal {}.", major,
                   minor, version, flags, bool(flags & RDPDR_DEVICE_REMOVE_PDUS)));
@@ -277,11 +283,12 @@ bool DriveChannel::PumpAvailable() {
   for (;;) {
     if (!Signalled(event)) return true;
     ULONG length = 0;
-    if (!WTSVirtualChannelRead(channel, 0, nullptr, 0, &length)) throw std::runtime_error("Drive channel read failed.");
+    if (!WTSVirtualChannelRead(channel.get(), 0, nullptr, 0, &length))
+      throw std::runtime_error("Drive channel read failed.");
     if (!length) return true;
     DrivePacket packet;
     packet.Bytes().resize(length);
-    if (!WTSVirtualChannelRead(channel, 0, reinterpret_cast<char*>(packet.Bytes().data()), length, &length))
+    if (!WTSVirtualChannelRead(channel.get(), 0, reinterpret_cast<char*>(packet.Bytes().data()), length, &length))
       throw std::runtime_error("Drive channel read failed.");
     packet.Bytes().resize(length);
     Receive(packet);

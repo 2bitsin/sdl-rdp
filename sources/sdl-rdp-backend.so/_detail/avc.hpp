@@ -1,5 +1,6 @@
 #pragma once
 #include "contract.hpp"
+#include "extent.hpp"
 #include "sdl-rdp-backend.h"
 
 #include <chrono>
@@ -15,9 +16,9 @@ struct IntraRefresh {
   unsigned count;
 };
 IntraRefresh IntraRefreshFor(unsigned fps);
-unsigned     Bitrate(unsigned width, unsigned height, unsigned kbps = 0);
+unsigned     Bitrate(Extent size, unsigned kbps = 0);
 unsigned     Aligned(unsigned dimension);
-void         ReplicateEdges(std::span<BYTE> pixels, unsigned width, unsigned height);
+void         ReplicateEdges(std::span<BYTE> pixels, Extent size);
 struct Regions {
 public:
   void        Add(sdlrdp_rect area);
@@ -43,6 +44,7 @@ struct EncodingTimes {
   std::chrono::nanoseconds upload { };
   std::chrono::nanoseconds encode { };
 };
+EncodingTimes& operator += (EncodingTimes& total, EncodingTimes const& frame) noexcept;
 class Encoder {
 public:
                         Encoder();
@@ -53,7 +55,7 @@ public:
   Encoder&              operator = (Encoder&&)      = delete;
   static bool           Available();
   static std::string    UnavailableReason();
-  bool                  Open(unsigned width, unsigned height, unsigned bitrate, unsigned fps);
+  bool                  Open(Extent size, unsigned bitrate, unsigned fps);
   std::span<BYTE const> Encode(std::span<BYTE const> bgrx, unsigned stride, bool force_idr, std::vector<BYTE>& encoded);
   void                  Close();
   bool                  IsOpen() const;

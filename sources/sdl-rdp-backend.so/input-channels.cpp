@@ -1,81 +1,75 @@
+#include "_detail/callback-owner.hpp"
+#include "_detail/input-events.hpp"
 #include "_detail/input.hpp"
-#include "_detail/state.hpp"
+#include "_detail/peer-link.hpp"
 
 #include <freerdp/channels/wtsvc.h>
-#include <new>
 
 namespace Backend {
-Input& Input::Held(Peer& peer) {
-  Expects(peer.client != nullptr, "peer owns its transport");
-  Expects(peer.client->context, "peer transport has a context");
-  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast): FreeRDP uses our ContextSize.
-  auto* context = static_cast<InputContext*>(peer.client->context);
-  Expects(context->state != nullptr, "input state exists");
-  return *context->state;
-}
-BOOL Input::Create(freerdp_peer* /*unused*/, rdpContext* context) {
-  Expects(context != nullptr, "context exists");
-  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast): FreeRDP uses our ContextSize.
-  auto* extended = static_cast<InputContext*>(context);
-  extended->state = new (std::nothrow) Input;
-  return extended->state != nullptr;
-}
-void Input::Free(freerdp_peer* /*unused*/, rdpContext* context) {
-  Expects(context != nullptr, "context exists");
-  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast): FreeRDP uses our ContextSize.
-  delete static_cast<InputContext*>(context)->state;
-}
-
-void Input::InstallChannels(Peer& peer) {
-  advanced->data              = &peer;
-  advanced->rdpcontext        = peer.client->context;
-  advanced->MouseEvent        = Advanced;
-  advanced->ChannelIdAssigned = [](ainput_server_context* context, UINT32 id) -> BOOL {
-    Held(*static_cast<Peer*>(context->data)).advanced_id = id;
+Input::Input(PeerLink& link, InputEvents& events) noexcept : _link{ link }, _events{ events } { }
+void Input::InstallChannels() {
+  _advanced->data              = this;
+  _advanced->rdpcontext        = &_link.Context();
+  _advanced->MouseEvent        = Advanced;
+  _advanced->ChannelIdAssigned = [](ainput_server_context* context, UINT32 id) -> BOOL {
+    CallbackOwner<Input>(context->data)._advanced_id = id;
     return TRUE;
   };
-  touch->user_data            = &peer;
-  touch->onTouchEvent         = Touch;
-  touch->onChannelIdAssigned  = [](RdpeiServerContext* context, UINT32 id) -> BOOL {
-    Held(*static_cast<Peer*>(context->user_data)).touch_id = id;
+  _touch->user_data            = this;
+  _touch->onTouchEvent         = Touch;
+  _touch->onChannelIdAssigned  = [](RdpeiServerContext* context, UINT32 id) -> BOOL {
+    CallbackOwner<Input>(context->user_data)._touch_id = id;
     return TRUE;
   };
 }
-bool Input::Open(Peer& peer) {
-  Expects(peer.channels != nullptr, "channel manager exists");
-  opened            = true;
-  peer.handle_count = 0;
-  advanced.reset(ainput_server_context_new(peer.channels));
-  touch.reset(rdpei_server_context_new(peer.channels));
-  if (!advanced || !touch) return false;
-  InstallChannels(peer);
-  return advanced->Initialize(advanced.get(), TRUE) == CHANNEL_RC_OK &&
-         advanced->Open(advanced.get()) == CHANNEL_RC_OK && advanced->Poll(advanced.get()) == CHANNEL_RC_OK &&
-         advanced->ChannelHandle(advanced.get(), &advanced_event) && rdpei_server_init(touch.get()) == CHANNEL_RC_OK;
+bool Input::Open() {
+  _opened = true;
+  _link.Invalidate();
+  _advanced.reset(ainput_server_context_new(_link.Channels()));
+  _touch.reset(rdpei_server_context_new(_link.Channels()));
+  if (!_advanced || !_touch) return false;
+  InstallChannels();
+  return _advanced->Initialize(_advanced.get(), TRUE) == CHANNEL_RC_OK &&
+         _advanced->Open(_advanced.get()) == CHANNEL_RC_OK && _advanced->Poll(_advanced.get()) == CHANNEL_RC_OK &&
+         _advanced->ChannelHandle(_advanced.get(), &_advanced_event) &&
+         rdpei_server_init(_touch.get()) == CHANNEL_RC_OK;
 }
-bool Input::Channels(Peer& peer, std::span<HANDLE const> ready) {
-  Expects(peer.channels != nullptr, "channel manager exists");
-  if (WTSVirtualChannelManagerGetDrdynvcState(peer.channels) != DRDYNVC_STATE_READY) return true;
-  if (!opened) return Open(peer);
-  if (advanced_ready && std::ranges::contains(ready, advanced_event) && advanced->Poll(advanced.get()) != CHANNEL_RC_OK)
+bool Input::Channels(std::span<HANDLE const> ready) {
+  if (!DynamicChannelsReady(_link)) return true;
+  if (!_opened) return Open();
+  if (_advanced_ready && std::ranges::contains(ready, _advanced_event) &&
+      _advanced->Poll(_advanced.get()) != CHANNEL_RC_OK)
     return false;
-  if (touch_ready && std::ranges::contains(ready, rdpei_server_get_event_handle(touch.get()))) {
-    auto result = rdpei_server_handle_messages(touch.get());
-    // FreeRDP 3.15 channels/rdpei/server/rdpei_main.c:701 maps ERROR_NO_DATA to ERROR_READ_FAULT.
-    if (result != CHANNEL_RC_OK && result != ERROR_READ_FAULT) return false;
+  if (!_touch_ready || !std::ranges::contains(ready, rdpei_server_get_event_handle(_touch.get()))) return true;
+  auto const result = rdpei_server_handle_messages(_touch.get());
+  // FreeRDP 3.15 channels/rdpei/server/rdpei_main.c:701 maps ERROR_NO_DATA to ERROR_READ_FAULT.
+  return result == CHANNEL_RC_OK || result == ERROR_READ_FAULT;
+}
+std::span<HANDLE> Input::Handles(std::span<HANDLE> out) const {
+  Expects(out.size() >= InputHandleLimit, "handle span has room for the input channels");
+  auto next = out.begin();
+  if (_advanced_ready) *next++ = _advanced_event;
+  if (_touch_ready) *next++ = rdpei_server_get_event_handle(_touch.get());
+  return { next, out.end() };
+}
+std::optional<BOOL> Input::Activate(UINT32 channel_id) {
+  if (_advanced_id == channel_id) {
+    _advanced_ready = true;
+    return _advanced->Poll(_advanced.get()) == CHANNEL_RC_OK;
   }
-  return true;
+  if (_touch_id == channel_id) {
+    _touch_ready = true;
+    return rdpei_server_send_sc_ready(_touch.get(), RDPINPUT_PROTOCOL_V10, 0) == CHANNEL_RC_OK;
+  }
+  return std::nullopt;
 }
-unsigned Input::Handles(HANDLE* handles) const {
-  Expects(handles != nullptr, "space for two channel handles exists");
-  unsigned count = 0;
-  if (advanced_ready) handles[count++] = advanced_event;
-  if (touch_ready) handles[count++] = rdpei_server_get_event_handle(touch.get());
-  return count;
+UINT Input::Advanced(ainput_server_context* context, UINT64 /*unused*/, UINT64 flags, INT32 x, INT32 y) {
+  Expects(context != nullptr, "callback context exists");
+  return CallbackOwner<Input>(context->data)._events.Pointer(flags, x, y);
 }
-void Input::Close() {
-  advanced_event = nullptr;
-  advanced.reset();
-  touch.reset();
+UINT Input::Touch(RdpeiServerContext* context, RDPINPUT_TOUCH_EVENT const* event) {
+  Expects(context != nullptr, "callback context exists");
+  Expects(event != nullptr, "event is supplied");
+  return CallbackOwner<Input>(context->user_data)._events.Touch(*event);
 }
-} // namespace Backend
+}

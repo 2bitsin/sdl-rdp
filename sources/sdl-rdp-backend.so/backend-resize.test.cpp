@@ -7,58 +7,62 @@ struct ResizeProbe {
 public:
            ResizeProbe(ResizeProbe const&) = delete;
            ResizeProbe(ResizeProbe&&)      = delete;
-  explicit ResizeProbe(Backend::State& state)
-      : state(state), peer(*state.current), original(peer.client->context->update->DesktopResize) {
-    std::scoped_lock const lock(state.session_guard);
-    Expects(!active, "one resize probe exists");
+  explicit ResizeProbe(sdlrdp_handle& handle)
+      : _handle{ handle }, _client{ CurrentClient(handle) }, _original{ _client.context->update->DesktopResize } {
+    auto const held = _handle.Session().Lock();
+    Expects(active == nullptr, "one resize probe exists");
     active = this;
 
-    peer.client->context->update->DesktopResize = [](rdpContext* context) -> BOOL {
+    _client.context->update->DesktopResize = [](rdpContext* context) -> BOOL {
       EXPECT_TRUE(freerdp_is_active_state(context));
-      ++active->calls;
-      return active->original(context);
+      ++active->_calls;
+      return active->_original(context);
     };
   }
   ~ResizeProbe() {
-    std::scoped_lock const lock(state.session_guard);
-    peer.client->context->update->DesktopResize = original;
-    active                                      = nullptr;
+    auto const held = _handle.Session().Lock();
+    _client.context->update->DesktopResize = _original;
+    active                                 = nullptr;
   }
   ResizeProbe& operator = (ResizeProbe const&) = delete;
   ResizeProbe& operator = (ResizeProbe&&)      = delete;
   bool         Finalizing() {
-    std::scoped_lock const lock(state.session_guard);
-    auto                   current = freerdp_get_state(peer.client->context);
+    auto const held    = _handle.Session().Lock();
+    auto const current = freerdp_get_state(_client.context);
     return current >= CONNECTION_STATE_FINALIZATION_SYNC && current <= CONNECTION_STATE_FINALIZATION_FONT_LIST;
   }
   void MatchingLayout() {
-    std::scoped_lock const lock(state.session_guard);
-    Expects(peer.resizing, "peer has an in-flight resize");
-    Expects(peer.disp != nullptr, "peer has a display channel");
+    auto const held   = _handle.Session().Lock();
+    auto const status = RequiredStatus(_handle);
+    Expects(status.resizing, "peer has an in-flight resize");
+    Expects(status.display != nullptr, "peer has a display channel");
     DISPLAY_CONTROL_MONITOR_LAYOUT monitor{ };
     monitor.Flags  = DISPLAY_CONTROL_MONITOR_PRIMARY;
-    monitor.Width  = peer.desktop.w;
-    monitor.Height = peer.desktop.h;
+    monitor.Width  = status.desktop.w;
+    monitor.Height = status.desktop.h;
     DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const layout{ sizeof(monitor), 1, &monitor };
-    EXPECT_EQ(peer.disp->DispMonitorLayout(peer.disp.get(), &layout), CHANNEL_RC_OK);
+    EXPECT_EQ(status.display->DispMonitorLayout(status.display, &layout), CHANNEL_RC_OK);
   }
   void ConfirmActiveCallback() {
-    std::scoped_lock const lock(state.session_guard);
-    ASSERT_FALSE(freerdp_is_active_state(peer.client->context));
-    ASSERT_TRUE(peer.client->Activate(peer.client.get()));
-    EXPECT_TRUE(peer.resizing);
+    auto const held = _handle.Session().Lock();
+    ASSERT_FALSE(freerdp_is_active_state(_client.context));
+    ASSERT_TRUE(_client.Activate(&_client));
+    EXPECT_TRUE(RequiredStatus(_handle).resizing);
   }
   unsigned Calls() {
-    std::scoped_lock const lock(state.session_guard);
-    return calls;
+    auto const held = _handle.Session().Lock();
+    return _calls;
   }
 
 private:
-  inline static ResizeProbe* active   = nullptr;
-  Backend::State&            state;
-  Backend::Peer&             peer;
-  pDesktopResize             original;
-  unsigned                   calls    = 0;
+  static freerdp_peer& CurrentClient(sdlrdp_handle& handle) {
+    return *RequiredStatus(handle).client;
+  }
+  inline static ResizeProbe* active    = nullptr;
+  sdlrdp_handle&             _handle;
+  freerdp_peer&              _client;
+  pDesktopResize             _original;
+  unsigned                   _calls    = 0;
 };
 class ResizeStorm : public RoundFive {
 protected:
@@ -123,7 +127,7 @@ protected:
     Connect(client, false);
     ASSERT_TRUE(client.Until([&] { return Headless::DisplayClient::Ready(); }));
     Events();
-    ResizeProbe probe(*backend->state);
+    ResizeProbe probe(*backend);
     display.Observed().finalizing = [&] {
       if (display.Observed().desktops == 1) DuringFinalization(probe, last_width, last_height);
     };
@@ -153,7 +157,7 @@ TEST_F(ResizeStorm, EqualLayoutDoesNotChangePicture) {
   Connect(client, false);
   ASSERT_TRUE(client.Until([&] { return Headless::DisplayClient::Ready(); }));
   Events();
-  auto presented = Presented(*backend->state);
+  auto presented = Presented(*backend);
   ASSERT_TRUE(display.Layout(640, 480));
   ASSERT_TRUE(display.Layout(800, 600));
   auto events  = EventsUntil(
@@ -165,7 +169,7 @@ TEST_F(ResizeStorm, EqualLayoutDoesNotChangePicture) {
   ASSERT_EQ(std::ranges::distance(screens), 1);
   EXPECT_EQ(screens.front().screen.width, 800u);
   EXPECT_EQ(screens.front().screen.height, 600u);
-  EXPECT_EQ(Presented(*backend->state), presented);
+  EXPECT_EQ(Presented(*backend), presented);
   RecordProperty("equal_layout_screen_events", 0);
   RecordProperty("equal_layout_picture_resizes", 0);
 }

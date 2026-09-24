@@ -1,7 +1,7 @@
 #include "_detail/auth-identity.hpp"
 
 #include "_detail/headless-client.hpp"
-#include "_detail/state.hpp"
+#include "_detail/handle.hpp"
 #include "sdl-rdp-backend.h"
 
 #include <condition_variable>

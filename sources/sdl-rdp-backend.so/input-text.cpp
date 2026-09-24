@@ -1,17 +1,82 @@
+#include "_detail/callback-owner.hpp"
+#include "_detail/diagnostics.hpp"
 #include "_detail/input-dispatch.hpp"
-#include "_detail/input.hpp"
 
+#include <array>
+#include <format>
 #include <freerdp/input.h>
 
 namespace Backend {
-BOOL Input::Unicode(rdpInput* input, UINT16 flags, UINT16 code) {
-  return DispatchInput(input, [&](Peer& peer) {
-    bool down  = !(flags & KBD_FLAGS_RELEASE);
-    auto point = oxbox::utilities::UtfDecode(Held(peer).unicode[down], code);
-    if (point && *point != oxbox::utilities::INVALID_CODEPOINT<>) {
-      peer.owner.trace.Line("key", [&] { return std::format("codepoint={} down={}", uint32_t(*point), int(down)); });
-      peer.owner.Push({ .type = SDLRDP_TEXT, .text = { .codepoint = *point, .down = down } });
-    }
+namespace {
+constexpr unsigned              FirstButton         = 1;
+constexpr unsigned              FirstExtendedButton = 4;
+constexpr int                   WheelSignExtension  = 0x200;
+constexpr float                 WheelNotch          = 120.0F;
+constexpr std::array<UINT16, 3> Buttons             { PTR_FLAGS_BUTTON1, PTR_FLAGS_BUTTON3, PTR_FLAGS_BUTTON2 };
+constexpr std::array<UINT16, 2> ExtendedButtons     { PTR_XFLAGS_BUTTON1, PTR_XFLAGS_BUTTON2                  };
+void PushMouseWheel(EventQueue& events, UINT16 flags) {
+  if (!(flags & (PTR_FLAGS_WHEEL | PTR_FLAGS_HWHEEL))) return;
+  int rotation = flags & WheelRotationMask;
+  if (flags & PTR_FLAGS_WHEEL_NEGATIVE) rotation -= WheelSignExtension;
+  float const notches = float(rotation) / WheelNotch;
+  events.Push({ .type        = SDLRDP_MOUSE_WHEEL,
+                .mouse_wheel = { .dx = (flags & PTR_FLAGS_HWHEEL) ? notches : 0,
+                                 .dy = (flags & PTR_FLAGS_WHEEL) ? notches : 0 } });
+}
+InputEvents& Owner(rdpInput* input) {
+  Expects(input != nullptr, "input object exists");
+  return CallbackOwner<InputEvents>(input->param1);
+}
+}
+InputEvents::InputEvents(PeerLink& link, Activation const& activation, DesktopLayout const& desktop,
+                         EventQueue& events, FrameStore& store, Diagnostics const& diagnostics,
+                         SessionAccess& session) noexcept
+    : _link { link }, _activation{ activation }, _desktop{ desktop }, _events{ events }, _store{ store },
+      _diagnostics{ diagnostics }, _session{ session } { }
+void InputEvents::Install(rdpInput& input) {
+  input.param1               = this;
+  input.KeyboardEvent        = [](rdpInput* in, UINT16 flags, UINT8 code) { return Owner(in).Key(flags, code); };
+  input.UnicodeKeyboardEvent = [](rdpInput* in, UINT16 flags, UINT16 code) { return Owner(in).Text(flags, code); };
+  input.MouseEvent           = [](rdpInput* in, UINT16 flags, UINT16 x, UINT16 y) {
+    return Owner(in).Mouse(flags, x, y);
+  };
+  input.ExtendedMouseEvent   = [](rdpInput* in, UINT16 flags, UINT16, UINT16) {
+    return Owner(in).ExtendedMouse(flags);
+  };
+}
+BOOL InputEvents::Key(UINT16 flags, UINT8 code) {
+  return WhenActive(BOOL{ TRUE }, [&] {
+    bool const extended = flags & KBD_FLAGS_EXTENDED;
+    bool const down     = !(flags & KBD_FLAGS_RELEASE);
+    _diagnostics.Line("key",
+                      [&] { return std::format("code={} extended={} down={}", code, int(extended), int(down)); });
+    _events.Push({ .type = SDLRDP_KEY, .key = { .scancode = code, .extended = extended, .down = down } });
+    return TRUE;
+  });
+}
+BOOL InputEvents::Text(UINT16 flags, UINT16 code) {
+  return WhenActive(BOOL{ TRUE }, [&] {
+    bool const down  = !(flags & KBD_FLAGS_RELEASE);
+    auto const point = oxbox::utilities::UtfDecode(_unicode[down], code);
+    if (!point || *point == oxbox::utilities::INVALID_CODEPOINT<>) return TRUE;
+    _diagnostics.Line("key", [&] { return std::format("codepoint={} down={}", uint32_t(*point), int(down)); });
+    _events.Push({ .type = SDLRDP_TEXT, .text = { .codepoint = *point, .down = down } });
+    return TRUE;
+  });
+}
+BOOL InputEvents::Mouse(UINT16 flags, UINT16 x, UINT16 y) {
+  return WhenActive(BOOL{ TRUE }, [&] {
+    if (flags & (PTR_FLAGS_BUTTON1 | PTR_FLAGS_BUTTON2 | PTR_FLAGS_BUTTON3))
+      _diagnostics.Line("mouse", [&] { return std::format("flags={} x={} y={}", flags, x, y); });
+    if ((flags & PTR_FLAGS_MOVE) && !Motion(x, y)) return FALSE;
+    PushButtons<UINT16>(_events, Buttons, flags, FirstButton, flags & PTR_FLAGS_DOWN);
+    PushMouseWheel(_events, flags);
+    return TRUE;
+  });
+}
+BOOL InputEvents::ExtendedMouse(UINT16 flags) {
+  return WhenActive(BOOL{ TRUE }, [&] {
+    PushButtons<UINT16>(_events, ExtendedButtons, flags, FirstExtendedButton, flags & PTR_XFLAGS_DOWN);
     return TRUE;
   });
 }

@@ -1,6 +1,7 @@
 #include "_detail/encoder.hpp"
 
 #include "_detail/contract.hpp"
+#include "_detail/extent.hpp"
 
 #include <algorithm>
 #include <array>
@@ -10,6 +11,22 @@
 namespace Backend {
 namespace {
 constexpr std::size_t InitialStreamCapacity = 64uz * 1024;
+bool PrepareRemoteFx(std::unique_ptr<RFX_CONTEXT, Releases<rfx_context_free>>& rfx) {
+  if (!rfx) rfx.reset(rfx_context_new_ex(TRUE, THREADING_FLAGS_DISABLE_THREADS));
+  if (rfx) rfx_context_set_pixel_format(rfx.get(), PIXEL_FORMAT_BGRX32);
+  return bool(rfx);
+}
+bool PrepareNsCodec(std::unique_ptr<NSC_CONTEXT, Releases<nsc_context_free>>& nsc) {
+  if (!nsc) nsc.reset(nsc_context_new());
+  return nsc && nsc_context_set_parameters(nsc.get(), NSC_COLOR_FORMAT, PIXEL_FORMAT_BGRX32) &&
+         nsc_context_set_parameters(nsc.get(), NSC_COLOR_LOSS_LEVEL, 1) &&
+         nsc_context_set_parameters(nsc.get(), NSC_ALLOW_SUBSAMPLING, 0);
+}
+BYTE* CompressRow(BITMAP_PLANAR_CONTEXT& context, std::span<BYTE const> pixels, unsigned width, std::span<BYTE> out,
+                  UINT32& size) {
+  return freerdp_bitmap_compress_planar(&context, pixels.data(), PIXEL_FORMAT_BGRA32, width, 1, width * PixelBytes,
+                                        out.data(), &size);
+}
 bool Available(rdpSettings const* settings, sdlrdp_codec codec) {
   utilities::Expects(settings != nullptr, "negotiated settings exist");
   auto surface = freerdp_settings_get_bool(settings, FreeRDP_SurfaceCommandsEnabled);
@@ -51,14 +68,9 @@ bool Encoder::InitializeCodec(rdpSettings const* settings) {
   case SDLRDP_CODEC_PLANAR:
     return SetupPlanar(settings);
   case SDLRDP_CODEC_REMOTEFX:
-    if (!rfx) rfx.reset(rfx_context_new_ex(TRUE, THREADING_FLAGS_DISABLE_THREADS));
-    if (rfx) rfx_context_set_pixel_format(rfx.get(), PIXEL_FORMAT_BGRX32);
-    return bool(rfx);
+    return PrepareRemoteFx(rfx);
   case SDLRDP_CODEC_NSCODEC:
-    if (!nsc) nsc.reset(nsc_context_new());
-    return nsc && nsc_context_set_parameters(nsc.get(), NSC_COLOR_FORMAT, PIXEL_FORMAT_BGRX32) &&
-           nsc_context_set_parameters(nsc.get(), NSC_COLOR_LOSS_LEVEL, 1) &&
-           nsc_context_set_parameters(nsc.get(), NSC_ALLOW_SUBSAMPLING, 0);
+    return PrepareNsCodec(nsc);
   case SDLRDP_CODEC_RAW:
     return true;
   default:
@@ -79,7 +91,7 @@ bool Encoder::Select(rdpSettings const* settings, sdlrdp_codec preference) {
 bool Encoder::Encode(std::span<BYTE const> pixels, unsigned width, unsigned height) {
   auto start  = std::chrono::steady_clock::now();
   auto result = EncodePayload(pixels, width, height);
-  encode_time += std::chrono::steady_clock::now() - start;
+  Charge(std::chrono::steady_clock::now() - start);
   return result;
 }
 bool Encoder::ResetRemoteFx(unsigned width, unsigned height) {
@@ -115,23 +127,20 @@ bool Encoder::EncodePayload(std::span<BYTE const> pixels, unsigned width, unsign
   return result;
 }
 bool Encoder::EncodePlanar(std::span<BYTE const> pixels, unsigned width) {
-  utilities::Expects(planar != nullptr, "planar input is one row");
-  utilities::Expects(pixels.size() == static_cast<std::size_t>(width) * 4u, "planar input is one row");
+  utilities::Expects(planar != nullptr, "planar context exists");
+  utilities::Expects(pixels.size() == std::size_t{ width } * PixelBytes, "planar input is one row");
   if (width > planar_width) {
     if (!freerdp_bitmap_planar_context_reset(planar.get(), width, 1)) return false;
     planar_width = width;
   }
   compressed.resize(pixels.size() + 1024);
   UINT32 size   = compressed.size();
-  auto*  result = width < 4 ? nullptr
-                            : freerdp_bitmap_compress_planar(planar.get(), pixels.data(), PIXEL_FORMAT_BGRA32, width, 1,
-                                                             width * 4, compressed.data(), &size);
+  auto*  result = width < 4 ? nullptr : CompressRow(*planar, pixels, width, compressed, size);
   if (!result) {
     plain.reset(freerdp_bitmap_planar_context_new(skip_alpha ? PLANAR_FORMAT_HEADER_NA : 0, width, 1));
     if (!plain) return false;
     freerdp_planar_switch_bgr(plain.get(), dynamic_color);
-    result = freerdp_bitmap_compress_planar(plain.get(), pixels.data(), PIXEL_FORMAT_BGRA32, width, 1, width * 4,
-                                            compressed.data(), &size);
+    result = CompressRow(*plain, pixels, width, compressed, size);
   }
   payload = { compressed.data(), size };
   if (result) utilities::Ensures(payload.size() <= pixels.size() + 2, "planar row fits bitmap length");
@@ -149,5 +158,24 @@ unsigned Encoder::Id(rdpSettings const* settings) const {
   default:
     utilities::Unreachable(codec);
   }
+}
+sdlrdp_codec Encoder::Codec() const noexcept {
+  return codec;
+}
+void Encoder::Use(sdlrdp_codec value) noexcept {
+  codec = value;
+}
+std::span<BYTE const> Encoder::Payload() const noexcept {
+  return payload;
+}
+std::chrono::nanoseconds Encoder::EncodeTime() const noexcept {
+  return encode_time;
+}
+void Encoder::Charge(std::chrono::nanoseconds elapsed) noexcept {
+  encode_time += elapsed;
+}
+std::span<BYTE> Encoder::Scratch(std::size_t size) {
+  scratch.resize(size);
+  return scratch;
 }
 }

@@ -2,7 +2,9 @@
 #include "../sdl-rdp-backend.h"
 #include "auth-identity.hpp"
 #include "headless-client.hpp"
-#include "state.hpp"
+#include "handle.hpp"
+#include "peer.hpp"
+#include "test-peer-status.hpp"
 
 #include <condition_variable>
 #include <format>
@@ -12,6 +14,9 @@
 #include <thread>
 
 namespace AuthenticationGate {
+using BackendGate::CurrentStatus;
+using BackendGate::RequiredStatus;
+using utilities::Expects;
 inline void ThenIdentity(sdlrdp_event const& event, char const* user, char const* domain, bool authenticated) {
   EXPECT_STREQ(event.connected.user, user);
   EXPECT_STREQ(event.connected.domain, domain);
@@ -106,10 +111,8 @@ protected:
     if (connected) PasswordCleared();
   }
   void PasswordCleared() {
-    auto&                  state = *handle->state;
-    std::scoped_lock const lock(state.session_guard);
-    ASSERT_NE(state.current, nullptr);
-    auto const* password = freerdp_settings_get_string(state.current->client->context->settings, FreeRDP_Password);
+    auto const  status   = RequiredStatus(*handle);
+    auto const* password = freerdp_settings_get_string(status.client->context->settings, FreeRDP_Password);
     EXPECT_TRUE(!password || !*password);
   }
   void ThenRejection(sdlrdp_log_level level, std::string const& text, unsigned rejected) {

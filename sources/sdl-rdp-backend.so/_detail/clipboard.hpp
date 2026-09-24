@@ -8,18 +8,17 @@
 #include <vector>
 
 namespace Backend {
-class Peer;
-struct Clipboard {
-  std::string       text;
-  std::string       exported;
-  std::vector<BYTE> unicode    { 0, 0 };
-  uint64_t          generation = 0;
-};
+class Activation;
+class ClipboardStore;
+class Diagnostics;
+class EventQueue;
+class PeerLink;
 class ClipboardChannel {
 public:
                     ClipboardChannel(ClipboardChannel const&) = delete;
                     ClipboardChannel(ClipboardChannel&&)      = delete;
-  explicit          ClipboardChannel(Peer& value);
+  ClipboardChannel(PeerLink& link, Activation const& activation, ClipboardStore& store, EventQueue& events,
+                   Diagnostics const& diagnostics) noexcept;
                     ~ClipboardChannel();
   ClipboardChannel& operator = (ClipboardChannel const&)      = delete;
   ClipboardChannel& operator = (ClipboardChannel&&)           = delete;
@@ -37,17 +36,21 @@ private:
   static UINT Formats(CliprdrServerContext* /*context*/, CLIPRDR_FORMAT_LIST const* /*list*/);
   static UINT DataRequest(CliprdrServerContext* /*context*/, CLIPRDR_FORMAT_DATA_REQUEST const* /*request*/);
   static UINT DataResponse(CliprdrServerContext* /*context*/, CLIPRDR_FORMAT_DATA_RESPONSE const* /*response*/);
-  Peer&                                                                        peer;
-  std::unique_ptr<CliprdrServerContext, Releases<cliprdr_server_context_free>> context;
-  uint64_t                                                                     announced            = 0;
-  uint64_t                                                                     requested            = 0;
-  uint64_t                                                                     offered              = 0;
-  uint64_t                                                                     requested_generation = 0;
-  uint64_t                                                                     offered_generation   = 0;
-  bool                                                                         ready                = false;
-  bool                                                                         opened               = false;
-  bool                                                                         pending              = false;
-  bool                                                                         has_unicode          = false;
+  PeerLink&                                                                    _link;
+  Activation const&                                                            _activation;
+  ClipboardStore&                                                              _store;
+  EventQueue&                                                                  _events;
+  Diagnostics const&                                                           _diagnostics;
+  std::unique_ptr<CliprdrServerContext, Releases<cliprdr_server_context_free>> _context;
+  uint64_t                                                                     _announced           { };
+  uint64_t                                                                     _requested           { };
+  uint64_t                                                                     _offered             { };
+  uint64_t                                                                     _requested_generation{ };
+  uint64_t                                                                     _offered_generation  { };
+  bool                                                                         _ready               { };
+  bool                                                                         _opened              { };
+  bool                                                                         _pending             { };
+  bool                                                                         _has_unicode         { };
 };
 std::string       ClipboardAnsi(std::string_view text);
 std::vector<BYTE> ClipboardUnicode(std::string_view text);

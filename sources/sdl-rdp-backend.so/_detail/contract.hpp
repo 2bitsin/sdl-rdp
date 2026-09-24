@@ -44,3 +44,8 @@ using detail::contract::Expects;
 using detail::contract::NotImplemented;
 using detail::contract::Unreachable;
 }
+
+namespace Backend {
+using utilities::Ensures;
+using utilities::Expects;
+}

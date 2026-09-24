@@ -5,10 +5,18 @@
 #include <algorithm>
 #include <cstdint>
 #include <optional>
+#include <ranges>
 #include <vector>
 
 namespace Backend {
 using utilities::Expects;
+inline auto Rows(sdlrdp_rect area) {
+  return std::views::iota(area.y, area.y + area.h) |
+         std::views::transform([area](int y) { return sdlrdp_rect{ area.x, y, area.w, 1 }; });
+}
+constexpr bool SameSize(sdlrdp_rect left, sdlrdp_rect right) noexcept {
+  return left.w == right.w && left.h == right.h;
+}
 inline void Merge(std::optional<sdlrdp_rect>& region, sdlrdp_rect area) {
   Expects(area.w > 0, "band width is positive");
   Expects(area.h > 0, "band height is positive");
@@ -39,7 +47,7 @@ public:
   void Add(sdlrdp_rect area) {
     Expects(area.w > 0, "band width is positive");
     Expects(area.h > 0, "band height is positive");
-    std::optional<sdlrdp_rect> merged = area;
+    std::optional<sdlrdp_rect> merged{ area };
     for (std::size_t i = 0; i < rects.size();) {
       auto r = rects[i];
       if (r.x <= merged->x + merged->w && merged->x <= r.x + r.w && r.y <= merged->y + merged->h &&

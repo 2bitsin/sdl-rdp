@@ -1,6 +1,9 @@
-#include "_detail/state.hpp"
+#include "_detail/handle.hpp"
+#include "_detail/peer.hpp"
+#include "_detail/picture-geometry.hpp"
 
 #include <algorithm>
+#include <climits>
 #include <cstdlib>
 #include <format>
 #include <span>
@@ -9,27 +12,29 @@
 #include <utility>
 
 namespace {
-// A 32-bit row must fit BitmapUpdate bitmapLength (UINT16); height is UINT16.
-constexpr unsigned MAX_WIDTH  = 65535 / 4;
-constexpr unsigned MAX_HEIGHT = 65535;
-void Dimensions(unsigned width, unsigned height) {
-  if (!width || width > MAX_WIDTH) throw std::runtime_error("Desktop width must be 1..16383.");
-  if (!height || height > MAX_HEIGHT) throw std::runtime_error("Desktop height must be 1..65535.");
+using Backend::Extent;
+using Backend::PixelBytes;
+constexpr unsigned MaximumRefreshMode  = 3;
+constexpr unsigned MinimumPacedRefresh = 10;
+constexpr unsigned MaximumPort         = 65535;
+constexpr unsigned StereoChannels      = 2;
+Extent Dimensions(unsigned width, unsigned height) {
+  if (!width || width > Backend::MaximumPictureWidth) throw std::runtime_error("Desktop width must be 1..16383.");
+  if (!height || height > Backend::MaximumPictureHeight) throw std::runtime_error("Desktop height must be 1..65535.");
+  return { .width = width, .height = height };
 }
+template <class Result> Result Guarded(sdlrdp_handle* handle, Result failure, std::invocable auto operation) {
+  try {
+    return operation();
+  } catch (std::exception const& error) {
+    Backend::SetError(handle, error.what());
+    return failure;
+  }
 }
-namespace Backend {
-void SetError(sdlrdp_handle* handle, std::string text) {
-  ErrorStore::Publish(handle ? &handle->errors : nullptr, std::move(text));
+sdlrdp_handle& Opened(sdlrdp_handle* handle, char const* failure) {
+  if (!handle) throw std::runtime_error(failure);
+  return *handle;
 }
-}
-char const* sdlrdp_last_error() {
-  return Backend::ErrorStore::Last();
-}
-
-unsigned sdlrdp_version() {
-  return SDLRDP_ABI_VERSION;
-}
-namespace {
 void ValidateConfiguration(sdlrdp_config const& config) {
   if (config.auth < SDLRDP_AUTH_NONE || config.auth > SDLRDP_AUTH_NLA)
     throw std::runtime_error("Invalid authentication mode.");
@@ -37,8 +42,35 @@ void ValidateConfiguration(sdlrdp_config const& config) {
   if (config.avc_bitrate_kbps > UINT32_MAX / 1000) throw std::runtime_error("AVC bitrate exceeds NVENC range");
   if (config.codec < SDLRDP_CODEC_AUTO || config.codec > SDLRDP_CODEC_AVC420)
     throw std::runtime_error("Invalid codec preference.");
-  if (config.port > 65535) throw std::runtime_error("Open failed: port exceeds 65535.");
+  if (config.port > MaximumPort) throw std::runtime_error("Open failed: port exceeds 65535.");
 }
+bool Inside(sdlrdp_rect area, Extent size) {
+  return area.x >= 0 && area.y >= 0 && area.w > 0 && area.h > 0 && std::cmp_less_equal(area.x, size.width) &&
+         unsigned(area.w) <= size.width - unsigned(area.x) && std::cmp_less_equal(area.y, size.height) &&
+         unsigned(area.h) <= size.height - unsigned(area.y);
+}
+void ValidateDamage(std::span<sdlrdp_rect const> damage, Extent size) {
+  if (!std::ranges::all_of(damage, [=](sdlrdp_rect area) { return Inside(area, size); }))
+    throw std::runtime_error("Present failed: damage rectangle exceeds framebuffer bounds.");
+}
+bool Tracing() {
+  auto const* trace = std::getenv("SDL_RDP_TRACE");
+  return trace && std::string_view(trace) == "1";
+}
+bool ValidPointer(unsigned w, unsigned h, unsigned x, unsigned y, void const* argb) {
+  if (w > Backend::LargePointerLimit || h > Backend::LargePointerLimit) return false;
+  return !(w || h) || (w && h && argb && x < w && y < h);
+}
+bool ValidRefresh(unsigned mode, unsigned ceiling) {
+  return mode <= MaximumRefreshMode && ceiling && ceiling <= unsigned(INT32_MAX) / Backend::MillihertzPerHz &&
+         (!mode || ceiling >= MinimumPacedRefresh);
+}
+}
+char const* sdlrdp_last_error() {
+  return Backend::ErrorStore::Last();
+}
+unsigned sdlrdp_version() {
+  return SDLRDP_ABI_VERSION;
 }
 int sdlrdp_open(sdlrdp_config const* config, sdlrdp_handle** out) {
   try {
@@ -46,10 +78,8 @@ int sdlrdp_open(sdlrdp_config const* config, sdlrdp_handle** out) {
     *out = nullptr;
     if (!config) throw std::runtime_error("Open failed: configuration is null.");
     ValidateConfiguration(*config);
-    auto  handle = std::make_unique<sdlrdp_handle>();
-    auto* trace  = std::getenv("SDL_RDP_TRACE");
-    handle->state = std::make_unique<Backend::State>(*config, trace && std::string_view(trace) == "1");
-    if (config->wait_for_client) handle->state->Wait(-1);
+    auto handle = std::make_unique<sdlrdp_handle>(*config, Tracing());
+    if (config->wait_for_client) handle->Events().Wait(-1);
     *out = handle.release();
     return 0;
   } catch (std::exception const& error) {
@@ -58,199 +88,135 @@ int sdlrdp_open(sdlrdp_config const* config, sdlrdp_handle** out) {
   }
 }
 void sdlrdp_close(sdlrdp_handle* handle) {
-  delete handle;
+  std::unique_ptr<sdlrdp_handle> const closed{ handle };
 }
 unsigned sdlrdp_port(sdlrdp_handle const* handle) {
   Backend::Expects(handle != nullptr, "backend is open");
-  return handle->state->port;
-}
-namespace {
-void ValidateDamage(std::span<sdlrdp_rect const> damage, unsigned width, unsigned height) {
-  auto valid = [=](sdlrdp_rect area) {
-    return area.x >= 0 && area.y >= 0 && area.w > 0 && area.h > 0 && std::cmp_less_equal(area.x, width) &&
-           unsigned(area.w) <= width - unsigned(area.x) && std::cmp_less_equal(area.y, height) &&
-           unsigned(area.h) <= height - unsigned(area.y);
-  };
-  if (!std::ranges::all_of(damage, valid))
-    throw std::runtime_error("Present failed: damage rectangle exceeds framebuffer bounds.");
-}
+  return handle->Port();
 }
 int sdlrdp_present(sdlrdp_handle* handle, void const* pixels, int pitch, unsigned width, unsigned height,
                    sdlrdp_rect const* rects, unsigned count) {
-  try {
-    Dimensions(width, height);
-    if (!handle || !pixels || (!rects && count) || std::cmp_less(pitch, width * 4))
+  return Guarded(handle, -1, [&] {
+    auto const size = Dimensions(width, height);
+    if (!handle || !pixels || (!rects && count) || std::cmp_less(pitch, width * PixelBytes))
       throw std::runtime_error("Present failed: invalid handle, pixels, rectangles or pitch.");
     std::span const damage{ rects, count };
-    ValidateDamage(damage, width, height);
-    handle->state->trace.Line("present", [&] { return std::format("dirty={}", count); });
-    handle->state->Present(pixels, pitch, width, height, damage);
+    ValidateDamage(damage, size);
+    auto const bytes = (std::size_t(pitch) * (height - 1)) + (std::size_t(width) * PixelBytes);
+    handle->Presentation().Present({ static_cast<BYTE const*>(pixels), bytes }, unsigned(pitch), size, damage);
     return 0;
-  } catch (std::exception const& error) {
-    Backend::SetError(handle, error.what());
-    return -1;
-  }
+  });
 }
 unsigned sdlrdp_poll(sdlrdp_handle* handle, sdlrdp_event* out, unsigned max) {
   Backend::Expects(handle != nullptr, "backend is open");
-  return handle->state->Poll(out, max);
+  return handle->Events().Poll({ out, max });
 }
 int sdlrdp_wait(sdlrdp_handle* handle, int timeout) {
   Backend::Expects(handle != nullptr, "backend is open");
-  try {
-    return handle->state->Wait(timeout);
-  } catch (std::exception const& error) {
-    Backend::SetError(handle, error.what());
-    return -1;
-  }
+  return Guarded(handle, -1, [&] { return handle->Events().Wait(timeout); });
 }
 void sdlrdp_wakeup(sdlrdp_handle* handle) {
   Backend::Expects(handle != nullptr, "backend is open");
-  handle->state->Wakeup();
+  handle->Events().Wakeup();
 }
-
 int sdlrdp_set_codec(sdlrdp_handle* handle, sdlrdp_codec codec) {
   if (!handle || codec < SDLRDP_CODEC_AUTO || codec > SDLRDP_CODEC_AVC420) {
     Backend::SetError(handle, "Invalid handle or codec preference.");
     return -1;
   }
-  handle->state->codec.store(codec);
+  handle->Presentation().SetCodec(codec);
   return 0;
 }
 int sdlrdp_resize(sdlrdp_handle* handle, unsigned width, unsigned height) {
-  try {
-    if (!handle) throw std::runtime_error("Invalid handle.");
-    Dimensions(width, height);
-    handle->state->Resize(width, height);
+  return Guarded(handle, -1, [&] {
+    auto& opened = Opened(handle, "Invalid handle.");
+    opened.Presentation().Resize(Dimensions(width, height));
     return 0;
-  } catch (std::exception const& error) {
-    Backend::SetError(handle, error.what());
-    return -1;
-  }
+  });
 }
 int sdlrdp_set_aspect(sdlrdp_handle* handle, sdlrdp_aspect aspect) {
-  try {
-    if (!handle) throw std::runtime_error("Invalid handle.");
-    handle->state->SetAspect(aspect);
+  return Guarded(handle, -1, [&] {
+    Opened(handle, "Invalid handle.").Presentation().SetAspect(aspect);
     return 0;
-  } catch (std::exception const& error) {
-    Backend::SetError(handle, error.what());
-    return -1;
-  }
+  });
 }
 int sdlrdp_wait_frame(sdlrdp_handle* handle, int timeout) {
-  try {
-    if (!handle) throw std::runtime_error("Invalid handle.");
-    return handle->state->WaitFrame(timeout);
-  } catch (std::exception const& error) {
-    Backend::SetError(handle, error.what());
-    return -1;
-  }
+  return Guarded(handle, -1,
+                 [&] { return Opened(handle, "Invalid handle.").Presentation().WaitFrame(timeout); });
 }
-
 int sdlrdp_set_pointer(sdlrdp_handle* handle, unsigned w, unsigned h, unsigned x, unsigned y, void const* argb) {
-  try {
-    if (!handle || w > 384 || h > 384 || ((w || h) && (!w || !h || !argb || x >= w || y >= h)))
+  return Guarded(handle, -1, [&] {
+    if (!handle || !ValidPointer(w, h, x, y, argb))
       throw std::runtime_error("Invalid pointer dimensions, hotspot, pixels or handle.");
-    handle->state->SetPointer(w, h, x, y, argb);
+    std::span const pixels{ static_cast<BYTE const*>(argb), argb ? std::size_t(w) * h * PixelBytes : 0 };
+    handle->Presentation().SetPointer(Backend::PointerShape{ { .width = w, .height = h }, x, y, pixels });
     return 0;
-  } catch (std::exception const& error) {
-    Backend::SetError(handle, error.what());
-    return -1;
-  }
+  });
 }
-
 int sdlrdp_set_clipboard_text(sdlrdp_handle* handle, char const* utf8) {
-  try {
+  return Guarded(handle, -1, [&] {
     if (!handle || !utf8) throw std::runtime_error("Invalid clipboard handle or text.");
-    std::string            copied(utf8);
-    auto                   unicode = Backend::ClipboardUnicode(copied);
-    auto&                  state   = *handle->state;
-    std::scoped_lock const lock(state.session_guard);
-    state.clipboard.text    = std::move(copied);
-    state.clipboard.unicode = std::move(unicode);
-    ++state.clipboard.generation;
-    if (state.current) state.current->wake.Transition(Backend::WakeEvent::Phase::Pending);
+    auto const held = handle->Session().Lock();
+    std::ignore = handle->Clipboard().Replace(utf8);
+    OnCurrent(handle->Session(), [](Backend::Peer& current) { current.Signal(); });
     return 0;
-  } catch (std::exception const& error) {
-    Backend::SetError(handle, error.what());
-    return -1;
-  }
+  });
 }
 char const* sdlrdp_get_clipboard_text(sdlrdp_handle* handle) {
-  try {
-    if (!handle) throw std::runtime_error("Invalid clipboard handle.");
-    auto&                  state = *handle->state;
-    std::scoped_lock const lock(state.session_guard);
-    state.clipboard.exported = state.clipboard.text;
-    return state.clipboard.exported.c_str();
-  } catch (std::exception const& error) {
-    Backend::SetError(handle, error.what());
-    return nullptr;
-  }
+  return Guarded(handle, static_cast<char const*>(nullptr), [&] {
+    auto&      opened = Opened(handle, "Invalid clipboard handle.");
+    auto const held   = opened.Session().Lock();
+    return opened.Clipboard().Export();
+  });
 }
 int sdlrdp_has_clipboard_text(sdlrdp_handle* handle) {
   if (!handle) {
     Backend::SetError(handle, "Invalid clipboard handle.");
     return -1;
   }
-  auto&                  state = *handle->state;
-  std::scoped_lock const lock(state.session_guard);
-  return !state.clipboard.text.empty();
+  auto const held = handle->Session().Lock();
+  return !handle->Clipboard().Text().empty();
 }
 int sdlrdp_audio_open(sdlrdp_handle* handle) {
-  try {
-    if (!handle) throw std::runtime_error("Invalid audio handle.");
-    handle->state->OpenAudio();
+  return Guarded(handle, -1, [&] {
+    Opened(handle, "Invalid audio handle.").Audio().Open();
     return 0;
-  } catch (std::exception const& error) {
-    Backend::SetError(handle, error.what());
-    return -1;
-  }
+  });
 }
 unsigned sdlrdp_audio_rate(sdlrdp_handle* handle) {
-  try {
-    if (!handle) throw std::runtime_error("Invalid audio handle.");
-    return handle->state->AudioRate();
-  } catch (std::exception const& error) {
-    Backend::SetError(handle, error.what());
-    return 0;
-  }
+  return Guarded(handle, 0U, [&] { return Opened(handle, "Invalid audio handle.").Audio().Rate(); });
 }
 int sdlrdp_audio_write(sdlrdp_handle* handle, void const* frames, unsigned count) {
-  try {
+  return Guarded(handle, -1, [&] {
     if (!handle || (!frames && count) || count > unsigned(INT_MAX))
       throw std::runtime_error("Invalid audio handle, frames or count.");
-    return handle->state->WriteAudio(frames, count);
-  } catch (std::exception const& error) {
-    Backend::SetError(handle, error.what());
-    return -1;
-  }
+    return handle->Audio().Write(
+        { static_cast<int16_t const*>(frames), std::size_t(count) * StereoChannels });
+  });
 }
 int sdlrdp_audio_wait(sdlrdp_handle* handle, int timeout) {
-  try {
-    if (!handle) throw std::runtime_error("Invalid audio handle.");
-    return handle->state->WaitAudio(timeout);
-  } catch (std::exception const& error) {
-    Backend::SetError(handle, error.what());
-    return -1;
-  }
+  return Guarded(handle, -1,
+                 [&] { return Opened(handle, "Invalid audio handle.").Audio().Wait(timeout); });
 }
 void sdlrdp_audio_close(sdlrdp_handle* handle) {
   if (!handle) return;
-  try {
-    handle->state->CloseAudio();
-  } catch (std::exception const& error) {
-    Backend::SetError(handle, error.what());
-  }
+  std::ignore = Guarded(handle, 0, [&] {
+    handle->Audio().Close();
+    return 0;
+  });
 }
-
 int sdlrdp_set_refresh(sdlrdp_handle* handle, unsigned mode, unsigned ceiling) {
   Backend::Expects(handle != nullptr, "backend is open");
-  if (mode > 3 || !ceiling || ceiling > unsigned(INT32_MAX) / 1000 || (mode && ceiling < 10)) {
+  if (!ValidRefresh(mode, ceiling)) {
     Backend::SetError(handle, "Invalid refresh mode or ceiling.");
     return -1;
   }
-  handle->state->SetRefresh(Backend::RefreshMode(mode), ceiling);
+  handle->Presentation().SetRefresh(Backend::RefreshMode(mode), ceiling);
+  return 0;
+}
+int sdlrdp_set_relative_mouse(sdlrdp_handle* handle, int enabled) {
+  Backend::Expects(handle != nullptr, "backend is open");
+  auto const mode = enabled ? Backend::MouseMode::Relative : Backend::MouseMode::Absolute;
+  OnCurrent(handle->Session(), [mode](Backend::Peer& current) { current.Point(mode); });
   return 0;
 }

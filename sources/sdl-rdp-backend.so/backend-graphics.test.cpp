@@ -244,12 +244,11 @@ TEST_F(RoundFive, GraphicsWithoutDynamicChannelsUsesLegacy) {
   ThenLegacyFallback(client);
   if (::testing::Test::HasFatalFailure()) return;
   {
-    std::scoped_lock const lock(backend->state->session_guard);
-    auto const&            peer    = *backend->state->current;
-    auto                   elapsed = Clock::now() - peer.activated_at;
-    EXPECT_GE(elapsed, Backend::Peer::GraphicsConnectionWait);
-    EXPECT_FALSE(peer.gfx);
-    EXPECT_FALSE(peer.connection);
+    auto const status  = RequiredStatus(*backend);
+    auto const elapsed = Clock::now() - status.activated_at;
+    EXPECT_GE(elapsed, Backend::GraphicsConnectionWait);
+    EXPECT_FALSE(status.graphics.has_value());
+    EXPECT_FALSE(status.holding);
     RecordProperty("activation_to_legacy_ms",
                    std::to_string(std::chrono::duration<double, std::milli>(elapsed).count()));
   }

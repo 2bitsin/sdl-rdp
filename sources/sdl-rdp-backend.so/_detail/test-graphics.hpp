@@ -1,6 +1,6 @@
 #pragma once
 #include "headless-gfx.hpp"
-#include "state.hpp"
+#include "handle.hpp"
 #include "test-logs.hpp"
 
 #include <filesystem>

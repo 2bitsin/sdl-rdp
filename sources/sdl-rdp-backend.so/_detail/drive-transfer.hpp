@@ -34,8 +34,8 @@ size_t Finish(sdlrdp_file& file, std::shared_ptr<DriveRequest> const& request, s
   return received;
 }
 struct TransferProgress {
-  std::size_t        submitted = 0;
-  std::size_t        active    = 0;
+  std::size_t        submitted{ };
+  std::size_t        active   { };
   std::size_t        limit;
   std::exception_ptr failure;
 };

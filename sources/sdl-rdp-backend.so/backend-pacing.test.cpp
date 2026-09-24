@@ -93,11 +93,14 @@ TEST_F(RoundFive, SparseRegions) {
 }
 
 namespace {
-bool WaitForAcknowledgement(Backend::State& state) {
-  Expects(state.current != nullptr, "active peer owns the pending frame");
-  std::unique_lock lock(state.frame_guard);
-  return state.frame_changed.wait_for(lock, std::chrono::seconds(10),
-                                      [&] { return state.current->acknowledged >= state.presented; });
+bool WaitForAcknowledgement(sdlrdp_handle& handle) {
+  auto& frames = handle.Frames();
+  auto  lock   = frames.Lock();
+  Expects(handle.Session().Current(lock) != nullptr, "active peer owns the pending frame");
+  return frames.WaitFor(lock, 10000, [&] {
+    auto const* current = handle.Session().Current(lock);
+    return current != nullptr && current->Status(lock).acknowledged >= frames.Presented(lock);
+  });
 }
 }
 TEST_F(RoundFive, WaitWithoutRefreshFeedback) {

@@ -1,8 +1,8 @@
 #include "_detail/avc.hpp"
 #include "_detail/gfx-protocol.hpp"
 #include "_detail/headless-gfx.hpp"
-#include "_detail/state.hpp"
 #include "_detail/test-graphics.hpp"
+#include "_detail/test-peer-status.hpp"
 #include "_detail/test-pattern.hpp"
 
 #include <array>
@@ -153,8 +153,8 @@ protected:
   }
   void AwaitAcknowledgement(Headless::Client& client, uint64_t sequence) {
     ASSERT_TRUE(client.Until([&] {
-      std::scoped_lock const lock(backend->state->frame_guard);
-      return backend->state->current->acknowledged == sequence;
+      auto const status = BackendGate::CurrentStatus(*backend);
+      return status && status->acknowledged == sequence;
     })) << logs.Text(true);
   }
 

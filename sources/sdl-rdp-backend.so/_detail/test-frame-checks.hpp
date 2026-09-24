@@ -1,10 +1,6 @@
 #pragma once
 #include "test-backend-core.hpp"
 namespace BackendGate {
-inline uint64_t Presented(Backend::State& state) {
-  std::scoped_lock const lock(state.frame_guard);
-  return state.presented;
-}
 inline void ThenMonitor(auto const& monitor, unsigned w, unsigned h) {
   EXPECT_EQ(monitor.left, 0);
   EXPECT_EQ(monitor.top, 0);
@@ -109,8 +105,7 @@ protected:
     RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU qoe{ observer.Observed().frames.back().frameId, 1234, 7, 9 };
     ASSERT_EQ(observer.Channel()->QoeFrameAcknowledge(observer.Channel(), &qoe), CHANNEL_RC_OK);
     ASSERT_TRUE(client.Until([&] {
-      std::scoped_lock const lock(backend->state->session_guard);
-      auto const&            received = backend->state->current->graphics_qoe;
+      auto const received = RequiredGraphics(*backend).Qoe();
       return received.timestamp == qoe.timestamp && received.timeDiffSE == 7 && received.timeDiffEDR == 9;
     }));
     EXPECT_FALSE(logs.Contains("GFX QoE"));

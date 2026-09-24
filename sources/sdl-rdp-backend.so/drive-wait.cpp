@@ -1,8 +1,9 @@
-#include "_detail/state.hpp"
+#include "_detail/drive.hpp"
+#include "_detail/peer-link.hpp"
 
-#include <array>
-#include <cstring>
 #include <freerdp/channels/rdpdr.h>
+#include <algorithm>
+#include <utility>
 #include <winpr/nt.h>
 
 namespace Backend {
@@ -18,15 +19,12 @@ void DriveChannel::Shutdown() {
     Remove(devices.begin()->second.wire);
   pending.clear();
   changed.notify_all();
-  peer.wake.Transition(WakeEvent::Phase::Pending);
+  _link.Signal();
 }
 void DriveChannel::CloseTransport() {
-  if (channel) {
-    peer.handle_count = 0;
-    WTSVirtualChannelClose(channel);
-  }
-  channel = nullptr;
-  event   = nullptr;
+  if (channel) _link.Invalidate();
+  channel.reset();
+  event = nullptr;
 }
 unsigned DriveChannel::Device(unsigned id) {
 
@@ -50,13 +48,11 @@ size_t DriveChannel::WaitAny(std::span<Slot const> slots) {
   std::unique_lock lock(mutex);
   size_t           ready = slots.size();
   changed.wait(lock, [&] {
-    for (size_t i = 0; i < slots.size(); ++i) {
-      if (slots[i].request && (slots[i].request->done || slots[i].request->removed || !connected)) {
-        ready = i;
-        return true;
-      }
-    }
-    return false;
+    auto const found = std::ranges::find_if(slots, [&](Slot const& slot) {
+      return slot.request && (slot.request->done || slot.request->removed || !connected);
+    });
+    ready = size_t(found - slots.begin());
+    return found != slots.end();
   });
   return ready;
 }

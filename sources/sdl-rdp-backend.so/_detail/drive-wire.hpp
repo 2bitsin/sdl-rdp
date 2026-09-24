@@ -24,7 +24,7 @@ public:
     utilities::Expects(count <= 8, "integer fits uint64");
     utilities::Expects(position <= bytes.size(), "packet cursor is bounded");
     if (count > bytes.size() - position) Invalid("Truncated drive response.");
-    uint64_t value = 0;
+    uint64_t value{ };
     for (unsigned i = 0; i < count; ++i)
       value |= uint64_t(bytes[position++]) << (i * 8);
     return value;
@@ -47,7 +47,7 @@ public:
     try {
       auto result = TranscodeRange<std::string>(
           std::as_bytes(std::span(bytes).subspan(position, count)),
-          { .encoding = oxbox::utilities::Encoding::UTF16, .order = std::endian::little }, { });
+          Utf16Little, { });
       position += count;
       return result;
     } catch (std::exception const& error) {
@@ -66,7 +66,7 @@ public:
 private:
   std::weak_ptr<DriveChannel> origin;
   std::vector<uint8_t>        bytes;
-  size_t                      position = 0;
+  size_t                      position{ };
 };
 inline std::vector<uint8_t> DrivePath(char const* path) {
   if (!path) throw std::runtime_error("Drive path is null.");
@@ -74,7 +74,7 @@ inline std::vector<uint8_t> DrivePath(char const* path) {
   if (text.empty() || text.front() != '/') text.insert(text.begin(), '/');
   auto encoded = TranscodeRange<std::vector<uint8_t>>(
       std::as_bytes(std::span(text)), { },
-      { .encoding = oxbox::utilities::Encoding::UTF16, .order = std::endian::little },
+      Utf16Little,
       [](char32_t point) { return point == U'/' ? U'\\' : point; });
   encoded.resize(encoded.size() + 2);
   return encoded;

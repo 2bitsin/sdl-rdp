@@ -1,5 +1,6 @@
 #pragma once
 #include "drive-wire.hpp"
+#include "rdp-handles.hpp"
 #include "sdl-rdp-backend.h"
 
 #include <atomic>
@@ -8,28 +9,32 @@
 #include <memory>
 #include <mutex>
 #include <span>
+#include <winpr/wtsapi.h>
 #include <winpr/wtypes.h>
 
 namespace Backend {
-class Peer;
+class Diagnostics;
+class EventQueue;
+class PeerLink;
+class SessionAccess;
 struct DriveRequest {
-  bool        done     = false;
-  bool        removed  = false;
-  unsigned    drive    = 0;
-  uint32_t    status   = 0;
+  bool        done    { };
+  bool        removed { };
+  unsigned    drive   { };
+  uint32_t    status  { };
   DrivePacket response;
 };
 struct Slot {
   std::shared_ptr<DriveRequest> request;
-  size_t                        offset  = 0;
-  size_t                        count   = 0;
+  size_t                        offset { };
+  size_t                        count  { };
 };
 // FreeRDP 3.15 Drive* uses 32-bit offsets and a private reader; this peer owns both directions.
 class DriveChannel : public std::enable_shared_from_this<DriveChannel> {
 public:
                                 DriveChannel(DriveChannel const&) = delete;
                                 DriveChannel(DriveChannel&&)      = delete;
-  explicit                      DriveChannel(Peer& /*value*/);
+  DriveChannel(PeerLink& link, EventQueue& events, Diagnostics const& diagnostics, SessionAccess& session) noexcept;
                                 ~DriveChannel();
   DriveChannel&                 operator = (DriveChannel const&)  = delete;
   DriveChannel&                 operator = (DriveChannel&&)       = delete;
@@ -65,17 +70,20 @@ private:
   void        Announce(DrivePacket& /*packet*/);
   void        Remove(unsigned /*wire*/);
   void        Complete(DrivePacket& /*packet*/);
-  std::mutex                                        mutex;
-  Peer&                                             peer;
-  HANDLE                                            channel       = nullptr;
-  HANDLE                                            event         = nullptr;
-  std::atomic<bool>                                 connected     = true;
-  unsigned                                          next          = 1;
-  unsigned                                          client_id     = 1;
-  unsigned                                          drive_version = 0;
-  std::map<unsigned, DeviceEntry>                   devices;
-  std::map<unsigned, std::shared_ptr<DriveRequest>> pending;
-  std::condition_variable_any                       changed;
+  std::mutex                                              mutex;
+  PeerLink&                                               _link;
+  EventQueue&                                             _events;
+  Diagnostics const&                                      _diagnostics;
+  SessionAccess&                                          _session;
+  std::unique_ptr<void, Releases<WTSVirtualChannelClose>> channel;
+  HANDLE                                                  event        { };
+  std::atomic<bool>                                       connected    { true };
+  unsigned                                                next         { 1    };
+  unsigned                                                client_id    { 1    };
+  unsigned                                                drive_version{ };
+  std::map<unsigned, DeviceEntry>                         devices;
+  std::map<unsigned, std::shared_ptr<DriveRequest>>       pending;
+  std::condition_variable_any                             changed;
 };
 } // namespace Backend
 struct sdlrdp_file {
@@ -83,7 +91,7 @@ public:
                      sdlrdp_file(sdlrdp_file const&) = delete;
                      sdlrdp_file(sdlrdp_file&&)      = delete;
   sdlrdp_file(std::shared_ptr<Backend::DriveChannel> source, unsigned device, unsigned file, std::string name)
-      : channel{ std::move(source) }, drive{ device }, wire{ file }, path{ std::move(name) } { }
+      : channel { std::move(source) }, drive{ device }, wire{ file }, path{ std::move(name) } { }
                      ~sdlrdp_file();
   sdlrdp_file&       operator = (sdlrdp_file const&) = delete;
   sdlrdp_file&       operator = (sdlrdp_file&&)      = delete;
@@ -98,5 +106,5 @@ private:
   unsigned                               drive;
   unsigned                               wire;
   std::string                            path;
-  bool                                   closed  = false;
+  bool                                   closed { };
 };

@@ -143,18 +143,16 @@ TEST_F(Authentication, NlaMissingLookup) {
   RejectionLogs("missing-secret");
 }
 namespace {
-void DisconnectWithPending(Backend::State& state, UINT32 code) {
-  {
-    std::scoped_lock const lock(state.session_guard);
-    auto&                  peer = *state.current;
-    {
-      std::scoped_lock const frame(state.frame_guard);
-      peer.dirty.Add({ 0, 0, 1, 1 });
-    }
-    freerdp_set_last_error(peer.client->context, code);
-    peer.client->CheckFileDescriptor = [](freerdp_peer*) -> BOOL { return FALSE; };
-    peer.wake.Transition(Backend::WakeEvent::Phase::Pending);
-  }
+void DisconnectWithPending(sdlrdp_handle& handle, UINT32 code) {
+  auto const session = handle.Session().Lock();
+  auto const frame   = handle.Frames().Lock();
+  auto*      current = handle.Session().Current(frame);
+  Expects(current != nullptr, "a client is current");
+  current->Repaint(frame, { 0, 0, 1, 1 });
+  auto* const client = current->Status(frame).client;
+  freerdp_set_last_error(client->context, code);
+  client->CheckFileDescriptor = [](freerdp_peer*) -> BOOL { return FALSE; };
+  current->Signal();
 }
 }
 TEST_F(Authentication, RefusedSecurityLogs) {
@@ -199,12 +197,8 @@ TEST_F(Authentication, PendingDisconnectLogLevels) {
     Headless::Client client(sdlrdp_port(handle.get()), false);
     client.Credentials("alice", "correct-secret", "LAB");
     ASSERT_TRUE(freerdp_connect(client.Instance().get()));
-    auto& state = *handle->state;
-    ASSERT_TRUE(client.Until([&] {
-      std::scoped_lock const lock(state.session_guard);
-      return state.current != nullptr;
-    }));
-    DisconnectWithPending(state, code);
+    ASSERT_TRUE(client.Until([&] { return CurrentStatus(*handle).has_value(); }));
+    DisconnectWithPending(*handle, code);
     ThenPendingDisconnect(code);
     handle.reset();
     logs.clear();

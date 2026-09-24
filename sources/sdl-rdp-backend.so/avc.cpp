@@ -32,18 +32,25 @@ unsigned Aligned(unsigned dimension) {
   Expects(dimension <= 32766, "surface dimension fits the graphics protocol");
   return oxbox::utilities::AlignUp<16>(dimension);
 }
-unsigned Bitrate(unsigned width, unsigned height, unsigned kbps) {
-  Expects(width > 0, "surface width is positive");
-  Expects(height > 0, "surface height is positive");
-  Expects(width <= 32766, "surface width fits the graphics protocol");
-  Expects(height <= 32766, "surface height fits the graphics protocol");
+unsigned Bitrate(Extent size, unsigned kbps) {
+  Expects(size.width > 0, "surface width is positive");
+  Expects(size.height > 0, "surface height is positive");
+  Expects(size.width <= 32766, "surface width fits the graphics protocol");
+  Expects(size.height <= 32766, "surface height fits the graphics protocol");
   Expects(kbps <= UINT32_MAX / 1000, "bitrate fits NVENC");
-  auto rate =
-      kbps ? uint64_t(kbps) * 1000 : std::max(uint64_t(2000000), uint64_t(16000000) * width * height / (1920uz * 1080));
+  auto const scaled = uint64_t(16000000) * size.width * size.height / (1920uz * 1080);
+  auto const rate   = kbps ? uint64_t(kbps) * 1000 : std::max(uint64_t(2000000), scaled);
   return unsigned(std::clamp<uint64_t>(rate, 1, UINT32_MAX));
 }
-void ReplicateEdges(std::span<BYTE> pixels, unsigned width, unsigned height) {
-  auto stride = Aligned(width) * 4;
+EncodingTimes& operator += (EncodingTimes& total, EncodingTimes const& frame) noexcept {
+  total.convert += frame.convert;
+  total.upload  += frame.upload;
+  total.encode  += frame.encode;
+  return total;
+}
+void ReplicateEdges(std::span<BYTE> pixels, Extent size) {
+  auto const [width, height] = size;
+  auto       stride          = Aligned(width) * 4;
   Expects(pixels.size() >= std::size_t(stride) * Aligned(height), "picture includes aligned storage");
   std::ranges::for_each(std::views::iota(0u, height), [&](unsigned row) {
     auto line = pixels.subspan(std::size_t(row) * stride, stride);
@@ -309,7 +316,8 @@ bool Encoder::Impl::MinimumSize() {
   if (small) error = "surface below NVENC minimum picture size";
   return ok;
 }
-bool Encoder::Open(unsigned width, unsigned height, unsigned bitrate, unsigned fps) {
+bool Encoder::Open(Extent size, unsigned bitrate, unsigned fps) {
+  auto const [width, height] = size;
   Expects(width > 0, "picture width is positive");
   Expects(height > 0, "picture height is positive");
   Expects(bitrate > 0, "encoder bitrate is positive");
