@@ -39,6 +39,9 @@ auto PeerLink::Settings() const noexcept -> rdpSettings& {
 auto PeerLink::Channels() const noexcept -> HANDLE {
   return _channels.get();
 }
+auto PeerLink::Dynamic() noexcept -> DynamicChannels& {
+  return _dynamic;
+}
 auto PeerLink::Socket() const noexcept -> int {
   return _socket;
 }

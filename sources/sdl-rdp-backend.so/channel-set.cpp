@@ -9,6 +9,7 @@
 
 namespace Backend {
 namespace {
+// abi: psDVCCreationStatusCallback
 auto ChannelCreated(void* user, UINT32 channel_id, INT32 status) -> BOOL {
   return CallbackOwner<ChannelSet>(user).Created(channel_id, status);
 }
@@ -33,13 +34,10 @@ auto ChannelSet::Handles(std::span<HANDLE> out) const -> std::span<HANDLE> {
   Expects(out.size() >= ChannelHandleLimit, "handle span has room for every channel");
   return _graphics.Handles(_redirection.Handles(_input.Handles(out)));
 }
-auto ChannelSet::Created(UINT32 channel_id, INT32 status) -> BOOL {
+auto ChannelSet::Created(std::uint32_t channel_id, std::int32_t status) -> bool {
   _link.Invalidate();
-  if (status < 0) {
-    _graphics.Rejected(channel_id);
-    return TRUE;
-  }
-  if (auto activated = _input.Activate(channel_id)) return *activated;
-  return _display.Activate(channel_id).value_or(TRUE);
+  if (status >= 0) return _link.Dynamic().Activate(channel_id);
+  _link.Dynamic().Reject(channel_id);
+  return true;
 }
 }

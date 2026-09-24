@@ -20,9 +20,11 @@ Peer::Peer(PeerHandle accepted, Diagnostics const& diagnostics, EventQueue& even
                  _activation,
                  _pacing,
                  _encoder,
-                 [&, this] {
-                   return std::make_unique<GfxChannel>(_link, diagnostics, configuration, _activation, _frames, _pacing,
-                                                       _encoder, _scaler);
+                 [&, this](DynamicChannel& owner) {
+                   auto const sources = FrameSources{
+                     .frames = _frames, .pacing = _pacing, .encoder = _encoder, .scaler = _scaler
+                   };
+                   return std::make_unique<GfxChannel>(_link, diagnostics, configuration, _activation, sources, owner);
                  } },
       _display     { _link, _activation, _desktop, events                              },
       _input_events{ _link, _activation, _desktop, events, store, diagnostics, session },

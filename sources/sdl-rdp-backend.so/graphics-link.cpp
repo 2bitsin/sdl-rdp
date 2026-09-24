@@ -14,7 +14,7 @@
 namespace Backend {
 GraphicsLink::GraphicsLink(PeerLink& link, Diagnostics const& diagnostics, Activation& activation,
                            FramePacing const& pacing, Encoder const& encoder,
-                           Factory<std::unique_ptr<GfxChannel>> make) noexcept
+                           Factory<std::unique_ptr<GfxChannel>, DynamicChannel&> make) noexcept
     : _link{ link }, _diagnostics{ diagnostics }, _activation{ activation }, _pacing{ pacing }, _encoder{ encoder },
       _make{ std::move(make) } { }
 auto GraphicsLink::Pump(std::span<HANDLE const> ready) -> bool {
@@ -24,7 +24,7 @@ auto GraphicsLink::Pump(std::span<HANDLE const> ready) -> bool {
     return true;
   _attempted = true;
   _link.Invalidate();
-  _channel = _make();
+  _channel = _make(*this);
   if (!_channel->Open()) Abandon("GFX channel open failed; using legacy surface bits.");
   return true;
 }
@@ -51,8 +51,12 @@ auto GraphicsLink::Handles(std::span<HANDLE> out) const -> std::span<HANDLE> {
   out.front() = _channel->Event();
   return out.subspan(GraphicsHandleLimit);
 }
-auto GraphicsLink::Rejected(UINT32 channel_id) -> void {
-  if (_channel && _channel->Assigned(channel_id)) Abandon("GFX channel rejected; using legacy surface bits.");
+auto GraphicsLink::Activate() -> bool {
+  return true;
+}
+auto GraphicsLink::Reject() -> void {
+  Expects(_channel != nullptr, "a rejected graphics channel is open");
+  Abandon("GFX channel rejected; using legacy surface bits.");
 }
 auto GraphicsLink::Timing() const noexcept -> GraphicsTiming const* {
   return _channel ? &_channel->Timing() : nullptr;

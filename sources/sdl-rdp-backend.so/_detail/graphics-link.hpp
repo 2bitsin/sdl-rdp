@@ -1,7 +1,7 @@
 #pragma once
+#include "dynamic-channel.hpp"
 #include "factory.hpp"
 #include "gfx.hpp"
-#include "pinned.hpp"
 
 #include <winpr/wtypes.h>
 #include <chrono>
@@ -16,28 +16,29 @@ class Diagnostics;
 class Encoder;
 class FramePacing;
 class PeerLink;
-class GraphicsLink : private Pinned {
+class GraphicsLink final : public DynamicChannel {
 public:
        GraphicsLink(PeerLink& link, Diagnostics const& diagnostics, Activation& activation, FramePacing const& pacing,
-                    Encoder const& encoder, Factory<std::unique_ptr<GfxChannel>> make) noexcept;
+                    Encoder const& encoder, Factory<std::unique_ptr<GfxChannel>, DynamicChannel&> make) noexcept;
   auto Pump(std::span<HANDLE const> ready)  -> bool;
   auto ExpireConfirmation()                 -> void;
   auto Confirmed() const                    -> bool;
   auto Capacity() const                     -> unsigned;
   auto Channel() const                      -> GfxChannel&;
   auto Handles(std::span<HANDLE> out) const -> std::span<HANDLE>;
-  auto Rejected(UINT32 channel_id)          -> void;
+  auto Activate()                           -> bool override;
+  auto Reject()                             -> void override;
   auto Timing() const noexcept              -> GraphicsTiming const*;
 
 private:
   auto Abandon(char const* reason) -> void;
-  PeerLink&                            _link;
-  Diagnostics const&                   _diagnostics;
-  Activation&                          _activation;
-  FramePacing const&                   _pacing;
-  Encoder const&                       _encoder;
-  Factory<std::unique_ptr<GfxChannel>> _make;
-  std::unique_ptr<GfxChannel>          _channel;
-  bool                                 _attempted  { };
+  PeerLink&                                             _link;
+  Diagnostics const&                                    _diagnostics;
+  Activation&                                           _activation;
+  FramePacing const&                                    _pacing;
+  Encoder const&                                        _encoder;
+  Factory<std::unique_ptr<GfxChannel>, DynamicChannel&> _make;
+  std::unique_ptr<GfxChannel>                           _channel;
+  bool                                                  _attempted  { };
 };
 }

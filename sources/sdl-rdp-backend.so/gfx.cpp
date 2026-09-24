@@ -34,17 +34,16 @@ auto FitsProtocol(sdlrdp_rect desktop) -> bool {
 }
 }
 GfxChannel::GfxChannel(PeerLink& link, Diagnostics const& diagnostics, Configuration const& configuration,
-                       Activation& activation, PeerFrames& frames, FramePacing& pacing, Encoder& encoder,
-                       Scaler& scaler)
+                       Activation& activation, FrameSources sources, DynamicChannel& owner)
     : _link{ link }, _diagnostics{ diagnostics }, _configuration{ configuration }, _activation{ activation },
-      _frames{ frames }, _pacing{ pacing }, _encoder{ encoder }, _scaler{ scaler },
-      _context{ rdpgfx_server_context_new(link.Channels()) } { }
+      _sources{ sources }, _context{ rdpgfx_server_context_new(link.Channels()) }, _slot{ link.Dynamic(), owner } { }
 GfxChannel::~GfxChannel() = default;
 auto GfxChannel::Open() -> bool {
   if (!BindContext(_context.get(), this, _link.Context())) return false;
-  _context->ChannelIdAssigned   = [](RdpgfxServerContext* assigned, UINT32 id) -> BOOL {
-    Held(assigned)._id = id;
-    return TRUE;
+  // abi: psRdpgfxServerChannelIdAssigned
+  _context->ChannelIdAssigned   = [](RdpgfxServerContext* assigned, UINT32 id) noexcept -> BOOL {
+    Held(assigned)._slot.Assign(id);
+    return true;
   };
   _context->CapsAdvertise       = Caps;
   _context->FrameAcknowledge    = Ack;
@@ -61,9 +60,6 @@ auto GfxChannel::Pump() -> bool {
 auto GfxChannel::Confirmed() const noexcept -> bool {
   return _confirmed;
 }
-auto GfxChannel::Assigned(UINT32 channel_id) const noexcept -> bool {
-  return _id == channel_id;
-}
 auto GfxChannel::Timing() const noexcept -> GraphicsTiming const& {
   return _timing;
 }
@@ -79,12 +75,12 @@ auto GfxChannel::LogCapabilities(std::span<RDPGFX_CAPSET const> advertised) cons
   _diagnostics.Log(SDLRDP_LOG_INFO, "GFX advertised sets:" + sets);
 }
 auto GfxChannel::ActivateCapabilities(RDPGFX_CAPSET const& selected, bool wanted) -> UINT {
-  auto const codec      = _encoder.Codec();
+  auto const codec      = _sources.encoder.get().Codec();
   bool const announcing = _activation.Holding();
-  _activation.Announce(codec, _pacing.Effective());
+  _activation.Announce(codec, _sources.pacing.get().Effective());
   if (announcing && wanted && codec != SDLRDP_CODEC_AVC420) _activation.CodecChanged(codec);
-  _pacing.Acknowledgements(AcknowledgementMode::Restarted);
-  _frames.Refresh();
+  _sources.pacing.get().Acknowledgements(AcknowledgementMode::Restarted);
+  _sources.frames.get().Refresh();
   if (!_logged)
     _diagnostics.Log(SDLRDP_LOG_INFO,
                      std::format("GFX confirmed version=0x{:08x} flags=0x{:08x}.", selected.version, selected.flags));
@@ -99,7 +95,7 @@ auto GfxChannel::ResetSurface() -> bool {
   if (_surface.width && !Check(_context->DeleteSurface(_context.get(), &remove), "delete surface")) return false;
   constexpr UINT32                       PrimaryMonitor = 1;
   constexpr UINT32                       MonitorCount   = 1;
-  auto const                             desktop        = _scaler.Target();
+  auto const                             desktop        = _sources.scaler.get().Target();
   MONITOR_DEF                            monitor        { 0, 0, desktop.w - 1, desktop.h - 1, PrimaryMonitor };
   RDPGFX_RESET_GRAPHICS_PDU const reset{ unsigned(desktop.w), unsigned(desktop.h), MonitorCount, &monitor };
   RDPGFX_CREATE_SURFACE_PDU const        create         { GraphicsSurfaceId, UINT16(desktop.w), UINT16(desktop.h),
@@ -145,9 +141,9 @@ auto GfxChannel::ConfirmedCapability(RDPGFX_CAPSET const& cap) -> void {
 auto GfxChannel::Ack(RdpgfxServerContext* context, RDPGFX_FRAME_ACKNOWLEDGE_PDU const* ack) -> UINT {
   Expects(ack, "acknowledgement is supplied");
   auto& self = Held(context);
-  self._pacing.Accept(ack->frameId);
+  self._sources.pacing.get().Accept(ack->frameId);
   self._queue_depth = ack->queueDepth;
-  self._pacing.Acknowledgements(Mode(ack->queueDepth));
+  self._sources.pacing.get().Acknowledgements(Mode(ack->queueDepth));
   return CHANNEL_RC_OK;
 }
 auto GfxChannel::Qoe(RdpgfxServerContext* context, RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU const* ack) -> UINT {
@@ -162,7 +158,7 @@ auto GfxChannel::FrameWindow() const -> unsigned {
 }
 auto GfxChannel::Surface() -> bool {
   Expects(_confirmed, "surface follows capability confirmation");
-  auto const desktop = _scaler.Target();
+  auto const desktop = _sources.scaler.get().Target();
   if (SameSize(Whole(_surface), desktop)) return true;
   if (!FitsProtocol(desktop)) {
     _diagnostics.Log(SDLRDP_LOG_ERROR, "GFX desktop exceeds the 32766-pixel protocol limit.");
@@ -174,7 +170,7 @@ auto GfxChannel::Surface() -> bool {
   _headers = false;
   _progressive.reset();
   ResetAvc();
-  _frames.Resend();
+  _sources.frames.get().Resend();
   Ensures(SameSize(Whole(_surface), desktop), "surface matches the desktop");
   return true;
 }

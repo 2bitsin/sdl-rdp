@@ -1,4 +1,5 @@
 #pragma once
+#include "dynamic-channels.hpp"
 #include "pinned.hpp"
 #include "rdp-handles.hpp"
 #include "releases-peer.hpp"
@@ -17,6 +18,7 @@ public:
   auto     Context() const noexcept             -> rdpContext&;
   auto     Settings() const noexcept            -> rdpSettings&;
   auto     Channels() const noexcept            -> HANDLE;
+  auto     Dynamic() noexcept                   -> DynamicChannels&;
   auto     Socket() const noexcept              -> int;
   auto     WriteBlocked() const                 -> bool;
   auto     Signal()                             -> void;
@@ -31,11 +33,12 @@ public:
   auto Close()               -> void;
 
 private:
-  PeerHandle     _client;
-  int            _socket;
-  WakeEvent      _wake;
-  ChannelManager _channels;
-  DWORD          _handle_count{ };
+  PeerHandle      _client;
+  int             _socket;
+  WakeEvent       _wake;
+  ChannelManager  _channels;
+  DynamicChannels _dynamic;
+  DWORD           _handle_count{ };
 };
 auto DynamicChannelsReady(PeerLink const& link)     -> bool;
 auto Joined(PeerLink const& link, char const* name) -> bool;

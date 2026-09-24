@@ -5,6 +5,7 @@
 #include "rdp-handles.hpp"
 #include "redirection.hpp"
 
+#include <cstdint>
 #include <span>
 
 namespace Backend {
@@ -18,9 +19,9 @@ class ChannelSet : private Pinned {
 public:
        ChannelSet(PeerLink& link, Activation const& activation, GraphicsLink& graphics, DisplayControl& display,
                   Redirection& redirection, Input& input);
-  auto Pump(std::span<HANDLE const> ready)      -> bool;
-  auto Handles(std::span<HANDLE> out) const     -> std::span<HANDLE>;
-  auto Created(UINT32 channel_id, INT32 status) -> BOOL;
+  auto Pump(std::span<HANDLE const> ready)                    -> bool;
+  auto Handles(std::span<HANDLE> out) const                   -> std::span<HANDLE>;
+  auto Created(std::uint32_t channel_id, std::int32_t status) -> bool;
 
 private:
   PeerLink&            _link;

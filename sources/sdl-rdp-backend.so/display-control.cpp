@@ -43,7 +43,8 @@ auto Covering(std::span<Monitor const> monitors) -> sdlrdp_rect {
 }
 DisplayControl::DisplayControl(PeerLink& link, Activation const& activation, DesktopLayout const& desktop,
                                EventQueue& events) noexcept
-    : _link{ link }, _activation{ activation }, _desktop{ desktop }, _events{ events } { }
+    : _link{ link }, _activation{ activation }, _desktop{ desktop }, _events{ events }, _slot{ link.Dynamic(), *this } {
+}
 auto DisplayControl::Open() -> bool {
   if (_open || !freerdp_settings_get_bool(&_link.Settings(), FreeRDP_SupportDisplayControl)
       || !DynamicChannelsReady(_link))
@@ -51,9 +52,10 @@ auto DisplayControl::Open() -> bool {
   _context.reset(disp_server_context_new(_link.Channels()));
   if (!BindContext(_context.get(), this, _link.Context())) return false;
   _context->DispMonitorLayout     = Backend::Layout;
-  _context->ChannelIdAssigned     = [](DispServerContext* assigned, UINT32 channel_id) -> BOOL {
-    Held(assigned)._id = channel_id;
-    return TRUE;
+  // abi: psDispChannelIdAssigned
+  _context->ChannelIdAssigned     = [](DispServerContext* assigned, UINT32 channel_id) noexcept -> BOOL {
+    Held(assigned)._slot.Assign(channel_id);
+    return true;
   };
   _context->MaxNumMonitors        = MonitorLimit;
   _context->MaxMonitorAreaFactorA = _context->MaxMonitorAreaFactorB = MonitorAreaFactor;
@@ -63,10 +65,11 @@ auto DisplayControl::Open() -> bool {
 auto DisplayControl::Opened() const noexcept -> DispServerContext* {
   return _open ? _context.get() : nullptr;
 }
-auto DisplayControl::Activate(UINT32 channel_id) -> std::optional<BOOL> {
-  if (_id != channel_id) return std::nullopt;
+auto DisplayControl::Activate() -> bool {
+  Expects(_context != nullptr, "an activated display channel is open");
   return _context->DisplayControlCaps(_context.get()) == CHANNEL_RC_OK;
 }
+auto DisplayControl::Reject() -> void { }
 auto DisplayControl::Layout(DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const& pdu) -> UINT {
   if (!pdu.NumMonitors || !_activation.Active()) return CHANNEL_RC_OK;
   auto const extent = Covering({ pdu.Monitors, pdu.NumMonitors });
