@@ -1,9 +1,22 @@
-#include "_detail/sample-fixture.hpp"
+#include "support.test/process.hpp"
+#include "support.test/sample-launch.hpp"
+#include "support.test/sample.hpp"
+#include "support.test/wall-milliseconds.hpp"
 #include "_detail/trace-number.hpp"
 
+#include <SDL3/SDL.h>
+#include <algorithm>
+#include <filesystem>
+#include <format>
+#include <ranges>
 #include <sdl-rdp-backend.so/_detail/clipboard-client.hpp>
 #include <sdl-rdp-backend.so/_detail/frame-observer.hpp>
 #include <sdl-rdp-backend.so/_detail/sound-client.hpp>
+#include <span>
+#include <sstream>
+#include <string>
+#include <thread>
+#include <vector>
 
 namespace SampleGate {
 namespace {

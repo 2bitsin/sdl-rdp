@@ -1,6 +1,20 @@
-#include "_detail/sample-fixture.hpp"
+#include "support.test/client-steps.hpp"
+#include "support.test/first-frame-size.hpp"
+#include "support.test/full-desktop-frames.hpp"
+#include "support.test/process.hpp"
+#include "support.test/sample-launch.hpp"
+#include "support.test/sample.hpp"
 
+
+#include <SDL3/SDL.h>
+#include <algorithm>
+#include <fstream>
+#include <memory>
+#include <ranges>
+#include <sdl-rdp-backend.so/_detail/display-client.hpp>
 #include <sdl-rdp-backend.so/_detail/frame-observer.hpp>
+#include <string>
+#include <thread>
 
 namespace SampleGate {
 namespace {

@@ -1,9 +1,16 @@
-#include "_detail/sample-fixture.hpp"
+#include "support.test/frame-pattern.hpp"
+#include "support.test/process.hpp"
+#include "support.test/sample-launch.hpp"
+#include "support.test/sample.hpp"
 
+#include <SDL3/SDL.h>
 #include <cstddef>
+#include <filesystem>
+#include <fstream>
 #include <sdl-rdp-backend.so/_detail/drive-observer.hpp>
 #include <sdl-rdp-backend.so/_detail/frame-observer.hpp>
 #include <sdl-rdp-backend.so/_detail/share-drive.hpp>
+#include <string>
 
 namespace SampleGate {
 namespace {

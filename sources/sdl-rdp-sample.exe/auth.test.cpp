@@ -1,6 +1,9 @@
-#include "_detail/sample-fixture.hpp"
+#include "support.test/sample-launch.hpp"
+#include "support.test/sample.hpp"
 
+#include <SDL3/SDL.h>
 #include <atomic>
+#include <filesystem>
 #include <winpr/ntlm.h>
 
 namespace SampleGate {

@@ -60,24 +60,9 @@ sdl-rdp-backend.so/test-authentication.test.cpp:23: ReceiveIdentity nesting 3 > 
 sdl-rdp-backend.so/test-frame-checks.test.cpp:126: FrameChecks::ResizePicture parameters 6 > 5 # size in #19
 sdl-rdp-backend.so/test-frame-checks.test.cpp:31: ThenGraphicsReset parameters 6 > 5 # size in #19
 sdl-rdp-backend.so/transport-end.cpp:56: TransportEnd::TransportEnd parameters 6 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
-sdl-rdp-sample.exe/_detail/input-client.hpp: FirstFrameSize bodies in header 7 > 0 # moved to .cpp in #7
-sdl-rdp-sample.exe/_detail/input-client.hpp: InputClient bodies in header 4 > 0 # moved to .cpp in #7
-sdl-rdp-sample.exe/_detail/input-client.hpp: PointerObserver bodies in header 3 > 0 # moved to .cpp in #7
-sdl-rdp-sample.exe/_detail/input-client.hpp: PositionObserver bodies in header 6 > 0 # moved to .cpp in #7
-sdl-rdp-sample.exe/_detail/input-client.hpp: classes with member functions 4 > 1 # split in #6
-sdl-rdp-sample.exe/_detail/sample-checks.hpp: SampleChecks bodies in header 15 > 0 # moved to .cpp in #7
-sdl-rdp-sample.exe/_detail/sample-fixture.hpp: Sample bodies in header 12 > 0 # moved to .cpp in #7
-sdl-rdp-sample.exe/_detail/sample-fixture.hpp: SampleDesktopSteps bodies in header 14 > 0 # moved to .cpp in #7
-sdl-rdp-sample.exe/_detail/sample-fixture.hpp: SampleSession bodies in header 15 > 0 # moved to .cpp in #7
-sdl-rdp-sample.exe/_detail/sample-fixture.hpp: classes with member functions 3 > 1 # split in #6
-sdl-rdp-sample.exe/_detail/sample-process.hpp: Process bodies in header 5 > 0 # moved to .cpp in #7
-sdl-rdp-sample.exe/_detail/sample-process.hpp:80: Line nesting 3 > 2 # size in #19
-sdl-rdp-sample.exe/_detail/sample-session.hpp: FullDesktopFrames bodies in header 7 > 0 # moved to .cpp in #7
-sdl-rdp-sample.exe/_detail/sample-session.hpp: NextFrame bodies in header 7 > 0 # moved to .cpp in #7
-sdl-rdp-sample.exe/_detail/sample-session.hpp: SampleProcess bodies in header 14 > 0 # moved to .cpp in #7
-sdl-rdp-sample.exe/_detail/sample-session.hpp: classes with member functions 3 > 1 # split in #6
 sdl-rdp-sample.exe/drives.cpp:64: ReadDigest nesting 3 > 2 # size in #19
-sdl-rdp-sample.exe/latency.test.cpp:101: Sample.InputAndClipboardUnderTightVideo body lines 21 > 20 # size in #19
-sdl-rdp-sample.exe/latency.test.cpp:54: SampleLatency parameters 6 > 5 # size in #19
+sdl-rdp-sample.exe/latency.test.cpp:114: Sample.InputAndClipboardUnderTightVideo body lines 21 > 20 # size in #19
+sdl-rdp-sample.exe/latency.test.cpp:67: SampleLatency parameters 6 > 5 # size in #19
 sdl-rdp-sample.exe/main.cpp:68: DrawScheduled parameters 6 > 5 # size in #19
-sdl-rdp-sample.exe/sample-drive.test.cpp:40: DriveSample.DriveDisconnectDuringCat body lines 21 > 20 # size in #19
+sdl-rdp-sample.exe/sample-drive.test.cpp:47: DriveSample.DriveDisconnectDuringCat body lines 21 > 20 # size in #19
+sdl-rdp-sample.exe/support.test/process.cpp:52: Process::Line nesting 3 > 2 # size in #19

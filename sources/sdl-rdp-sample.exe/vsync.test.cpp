@@ -1,9 +1,13 @@
-#include "_detail/sample-fixture.hpp"
+#include "support.test/sample-launch.hpp"
+#include "support.test/sample.hpp"
 
 #include "_detail/rate-exercise.hpp"
 
+#include <SDL3/SDL.h>
 #include <future>
 #include <ostream>
+#include <string>
+#include <utility>
 
 namespace SampleGate {
 namespace {

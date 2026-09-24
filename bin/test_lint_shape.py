@@ -339,3 +339,11 @@ def test_header_classes_and_bodies(tmp_path, source, expected):
 
 def test_sources_are_not_measured_as_headers(tmp_path):
     assert labels(tmp_path, 'class A {\n  void F() { }\n};\nclass B {\n  void G() { }\n};\n') == []
+
+
+@pytest.mark.parametrize(('directory', 'expected'), [('support.test', {'Suite', 'Steps'}), ('support', {'Suite'})])
+def test_fixture_helpers_live_in_test_directories(tmp_path, directory, expected):
+    (tmp_path / directory).mkdir()
+    helper  = write(tmp_path, 'class Steps {\nprotected:\n  void Given();\n};\n', f'{directory}/steps.hpp')
+    fixture = write(tmp_path, 'class Suite : public Steps, public Test { };\n', 'suite.cpp')
+    assert LINT.fixture_classes([LINT.Source(helper), LINT.Source(fixture)]) == LINT.FIXTURE_ROOTS | expected

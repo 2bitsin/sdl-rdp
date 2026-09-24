@@ -1,8 +1,19 @@
-#include "_detail/sample-fixture.hpp"
+#include "support.test/frame-pattern.hpp"
+#include "support.test/process.hpp"
+#include "support.test/sample-launch.hpp"
+#include "support.test/sample.hpp"
 #include <sdl-rdp-backend.so/_detail/scoped.hpp>
 
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <SDL3/SDL.h>
+#include <fstream>
+#include <string>
+#include <vector>
+#include <memory>
+#include <utility>
+#include <optional>
+#include <filesystem>
 
 namespace SampleGate {
 namespace {

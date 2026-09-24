@@ -1,9 +1,12 @@
 #include "_detail/rate-exercise.hpp"
-#include "_detail/sample-fixture.hpp"
+#include "support.test/sample.hpp"
 #include "_detail/bounded-connect.hpp"
 #include "_detail/trace-number.hpp"
 
+#include <sdl-rdp-backend.so/_detail/display-client.hpp>
 #include <sdl-rdp-backend.so/_detail/frame-observer.hpp>
+#include <string>
+#include <utility>
 
 namespace SampleGate {
 namespace {

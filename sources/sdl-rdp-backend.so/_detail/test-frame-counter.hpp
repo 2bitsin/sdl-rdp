@@ -1,28 +1,18 @@
 #pragma once
 #include "client.hpp"
-
-#include <freerdp/freerdp.h>
+#include "test-picture-update-hook.hpp"
 
 namespace BackendGate {
 class FrameCounter {
 public:
-                FrameCounter(FrameCounter const&) = delete;
-                FrameCounter(FrameCounter&&)      = delete;
-  explicit      FrameCounter(Headless::Client& client);
-                ~FrameCounter();
-  FrameCounter& operator = (FrameCounter const&)  = delete;
-  FrameCounter& operator = (FrameCounter&&)       = delete;
-  static BOOL   ReceiveSurface(rdpContext* context, SURFACE_BITS_COMMAND const* command);
-  static BOOL   ReceiveBitmap(rdpContext* context, BITMAP_UPDATE const* command);
-  unsigned      Frames() const;
-  unsigned      BitmapPdus() const;
+  explicit FrameCounter(Headless::Client& client);
+  auto     Frames() const     -> unsigned;
+  auto     BitmapPdus() const -> unsigned;
 
 private:
-  unsigned                                 frames      = 0;
-  unsigned                                 bitmap_pdus = 0;
-  inline static thread_local FrameCounter* active      = nullptr;
-  rdpUpdate*                               update;
-  pSurfaceBits                             surface;
-  pBitmapUpdate                            bitmap;
+  auto Count(Headless::PictureUpdate const& update) -> void;
+  unsigned                    frames      = 0;
+  unsigned                    bitmap_pdus = 0;
+  Headless::PictureUpdateHook hook;
 };
 }

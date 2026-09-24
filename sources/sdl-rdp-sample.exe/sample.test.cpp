@@ -1,7 +1,20 @@
-#include "_detail/sample-fixture.hpp"
+#include "support.test/client-steps.hpp"
+#include "support.test/first-frame-size.hpp"
+#include "support.test/frame-pattern.hpp"
+#include "support.test/pointer-observer.hpp"
+#include "support.test/process.hpp"
+#include "support.test/procfs.hpp"
+#include "support.test/sample-launch.hpp"
+#include "support.test/sample.hpp"
 
+#include <SDL3/SDL.h>
+#include <filesystem>
+#include <memory>
 #include <sdl-rdp-backend.so/_detail/avc-encoder.hpp>
 #include <sdl-rdp-backend.so/_detail/display-client.hpp>
+#include <string>
+#include <thread>
+#include <vector>
 
 namespace SampleGate {
 namespace {

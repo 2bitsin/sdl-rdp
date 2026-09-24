@@ -1,11 +1,20 @@
-#include "_detail/sample-fixture.hpp"
+#include "support.test/client-steps.hpp"
+#include "support.test/sample-launch.hpp"
+#include "support.test/sample.hpp"
 
+#include <SDL3/SDL.h>
+#include <array>
 #include <cstddef>
+#include <filesystem>
 #include <format>
+#include <memory>
 #include <openssl/evp.h>
 #include <oxbox/platform/file-writer.hpp>
 #include <sdl-rdp-backend.so/_detail/client.hpp>
 #include <sdl-rdp-backend.so/_detail/test-io.hpp>
+#include <span>
+#include <string>
+#include <thread>
 
 namespace SampleGate {
 namespace {

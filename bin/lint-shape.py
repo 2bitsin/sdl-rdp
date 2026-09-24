@@ -934,9 +934,14 @@ def fixture_classes(sources):
         declared = [(item.name, base_names(source, item.start)) for item in classes(source)]
         for name, parents in declared:
             bases.setdefault(name, set()).update(parents)
-        if source.path.name.startswith('test-') or source.path.name.endswith('.test.cpp'):
+        if test_support(source.path):
             helpers.update(name for name, _ in declared)
     return fixture_closure(bases, helpers)
+
+
+def test_support(path):
+    return (path.name.startswith('test-') or path.name.endswith('.test.cpp')
+            or any(part.endswith('.test') for part in path.parent.parts))
 
 
 def base_names(source, start):

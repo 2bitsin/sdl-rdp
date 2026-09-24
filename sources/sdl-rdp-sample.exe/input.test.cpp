@@ -1,5 +1,12 @@
-#include "_detail/input-client.hpp"
-#include "_detail/sample-fixture.hpp"
+#include "support.test/client-steps.hpp"
+#include "support.test/input-client.hpp"
+#include "support.test/sample-launch.hpp"
+#include "support.test/sample.hpp"
+
+#include <SDL3/SDL.h>
+#include <array>
+#include <string>
+#include <utility>
 
 namespace SampleGate {
 
