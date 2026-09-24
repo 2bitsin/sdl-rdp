@@ -206,7 +206,7 @@ TEST_P(Gate, TinyDamage) {
 TEST_P(Gate, ProbeClosesBeforeActivation) {
   {
     Backend::Descriptor const socket { Backend::SystemCall(::socket(AF_INET, SOCK_STREAM, 0), "probe socket") };
-    sockaddr_in               address{                                                                        };
+    sockaddr_in               address{ };
     address.sin_family      = AF_INET;
     address.sin_port        = htons(sdlrdp_port(backend.get()));
     address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);

@@ -46,7 +46,7 @@ auto Read(BIO* bio, char* data, int size) noexcept -> int {
 auto Adopt(BIO* bio, int socket, long closing) -> long {
   Expects(socket >= 0, "the socket is open");
   Expects(closing == BIO_NOCLOSE, "the caller closes the socket");
-     Slot(bio) = socket;
+  Slot(bio) = socket;
   BIO_set_init(bio, 1);
   return 1;
 }

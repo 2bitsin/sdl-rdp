@@ -63,7 +63,7 @@ void FinishSlot(sdlrdp_file& file, std::span<Byte> bytes, TransferProgress& prog
   --progress.active;
 }
 template <class Byte> int Transfer(sdlrdp_file* file, uint64_t offset, Byte* buffer, size_t size) {
-  std::array<Slot, 8> slots    {               };
+  std::array<Slot, 8> slots    { };
   TransferProgress    progress { .limit = size };
   auto                bytes    = std::span(buffer, size);
   std::ranges::for_each(slots, [&](Slot& slot) { SubmitSlot(*file, offset, bytes, progress, slot); });

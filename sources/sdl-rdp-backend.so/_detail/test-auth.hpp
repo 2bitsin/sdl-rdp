@@ -173,7 +173,7 @@ protected:
   }
   oxbox::platform::ScratchArea                            certificates    { "auth", "sdl-rdp"     };
   std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> handle          { nullptr, sdlrdp_close };
-  sdlrdp_config                                           config          {                       };
+  sdlrdp_config                                           config          { };
   std::mutex                                              guard;
   std::condition_variable                                 logged;
   std::vector<std::pair<sdlrdp_log_level, std::string>>   logs;

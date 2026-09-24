@@ -97,7 +97,7 @@ public:
   unsigned                                        width;
   unsigned                                        height;
   unsigned                                        port               = 0;
-  sdlrdp_aspect                                   aspect             {                                            };
+  sdlrdp_aspect                                   aspect             { };
   uint64_t                                        presented          = 0;
   Peer*                                           current            = nullptr;
   std::condition_variable                         frame_changed;
@@ -203,8 +203,8 @@ Peer(PeerHandle accepted, State& state);
   UINT32                                   gfx_id                  = UINT32_MAX;
   static constexpr auto                    GraphicsConnectionWait  = std::chrono::seconds(3);
   Clock::time_point                        activated_at;
-  std::chrono::nanoseconds                 graphics_ready_time     {    };
-  RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU         graphics_qoe            {    };
+  std::chrono::nanoseconds                 graphics_ready_time     { };
+  RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU         graphics_qoe            { };
   std::optional<sdlrdp_event>              connection;
   bool                                     sound_attempted         = false;
   std::unique_ptr<AudioChannel>            sound;
@@ -275,7 +275,7 @@ private:
   void        TransitionEncode(EncodeState next);
   bool        PrepareFrame();
   EncodeState encode_state{ EncodeState::Idle };
-  LegacyFrame legacy      {                   };
+  LegacyFrame legacy      { };
 };
 }
 struct sdlrdp_handle {

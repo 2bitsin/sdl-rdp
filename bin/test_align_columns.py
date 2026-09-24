@@ -2,6 +2,7 @@
 import importlib.util
 import os
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -199,7 +200,7 @@ def align(text):
     pytest.param(
         'std::pair<int,int> a{1,2}, b{};\n',
         'std::pair<int,int> a{ 1,2 };\n'
-        'std::pair<int,int> b{     };\n',
+        'std::pair<int,int> b{ };\n',
         id='top_level_commas_only',
     ),
     pytest.param(
@@ -376,8 +377,8 @@ PEER_EXPECTED = '''
   UINT32                                   gfx_id                 = UINT32_MAX;
   static constexpr auto                    GraphicsConnectionWait = std::chrono::seconds(3);
   Clock::time_point                        activated_at;
-  std::chrono::nanoseconds                 graphics_ready_time    {   };
-  RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU         graphics_qoe           {   };
+  std::chrono::nanoseconds                 graphics_ready_time    { };
+  RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU         graphics_qoe           { };
   std::optional<sdlrdp_event>              connection;
   bool                                     sound_attempted        = false;
   std::unique_ptr<AudioChannel>            sound;
@@ -468,14 +469,13 @@ def test_check_enforces_python_column_limit(tmp_path, filename):
     assert result.stderr == ''
 
 
-def test_pytest_guard_skips_without_pytest(tmp_path):
+def test_gate_fails_without_pytest(tmp_path):
     environment = tmp_path / 'python'
     subprocess.run([sys.executable, '-m', 'venv', '--without-pip', str(environment)], check=True)
     runner = pathlib.Path(__file__).with_name('test-align-columns.sh')
     result = subprocess.run([str(runner), str(environment / 'bin/python')], capture_output=True, text=True)
-    assert result.returncode == 77
-    assert result.stdout == 'align-columns-test skipped: pytest is not importable\n'
-    assert result.stderr == ''
+    assert result.returncode == 1
+    assert 'No module named pytest' in result.stderr
 
 
 @pytest.mark.parametrize(('source', 'expected'), [
@@ -1090,7 +1090,7 @@ STATE_EXPECTED = '''\
   void        TransitionEncode(EncodeState next);
   bool        PrepareFrame();
   EncodeState encode_state{ EncodeState::Idle };
-  LegacyFrame legacy      {                   };
+  LegacyFrame legacy      { };
 '''
 
 
@@ -1194,3 +1194,68 @@ def test_baseline_reformat_equals_tree():
         shown    = subprocess.run(['git', 'show', f'{baseline}:{relative}'], cwd=root, capture_output=True, text=True)
         if shown.returncode == 0:
             assert without_preprocessor(align(shown.stdout)) == without_preprocessor(path.read_text()), relative
+
+
+@pytest.mark.parametrize('operator', ['==', '!=', '<='])
+def test_comparison_at_continuation_end(operator):
+    source = f'return b && d &&\n    x * d {operator}\n    y * b;\n'
+    assert align(source) == source
+
+
+@pytest.mark.parametrize('body_start', ['\n  ', ' '])
+def test_return_comparison_in_function(body_start):
+    source = 'bool Equal() {' + body_start + 'return x * d ==\n      y * b;\n}\n'
+    assert align(source) == source
+
+
+@pytest.mark.parametrize('value', ['socket', '0'])
+def test_call_assignment_keeps_statement_indent(value):
+    source = 'void Set() {\n  Slot(bio) = ' + value + ';\n}\n'
+    assert align(source) == source
+
+
+def test_empty_braces_ignore_peer_value_width():
+    source = 'Thing first{ some_long_value };\nThing other{ };\n'
+    assert align(source) == source
+
+
+def collapsed_outside_literals(text):
+    pieces, start = [], 0
+    for match in re.finditer(MODULE.PROTECTED.pattern.split('|//', 1)[0], text, re.S):
+        pieces.append(''.join(text[start:match.start()].split()))
+        pieces.append(match[0])
+        start = match.end()
+    return ''.join(pieces) + ''.join(text[start:].split())
+
+
+def test_sources_preserve_non_whitespace_text():
+    root = pathlib.Path(__file__).resolve().parents[1]
+    paths = MODULE.source_files([root / 'sources'])
+    assert paths, 'source files must be available to the gate'
+    for path in paths:
+        before = path.read_text()
+        assert collapsed_outside_literals(before) == collapsed_outside_literals(align(before)), str(path)
+
+
+@pytest.mark.parametrize('operator', ['==', '!=', '<=', '>=', '+=', '-=', '*=', '/=', '%=',
+                                     '&=', '|=', '^=', '<<=', '>>=', '<=>'])
+def test_operator_is_not_a_declaration_equals(operator):
+    source = f'x * d {operator};'
+    assert MODULE.parse_declaration(source, MODULE.mask(source)) is None
+
+
+@pytest.mark.parametrize('head', ['return b && d &&', 'Consume(', 'return'])
+def test_unclosed_expression_cannot_start_declaration(head):
+    source = f'{head}\n    x * d =\n    y * b);\n'
+    assert align(source) == source
+
+
+@pytest.mark.parametrize('literal', ['"a  b"', "' '", 'R"tag(a  b)tag"'])
+def test_token_invariant_preserves_literal_whitespace(literal):
+    assert collapsed_outside_literals('  ' + literal + '  ') == literal
+
+
+def test_scope_head_is_not_an_expression_continuation():
+    source = 'class Peer\n{\n  int a;\n  long b;\n};\n'
+    expected = 'class Peer\n{\n  int  a;\n  long b;\n};\n'
+    assert align(source) == expected

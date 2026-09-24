@@ -10,7 +10,8 @@ RAW_DELIMITER_LIMIT = 16  # C++ raw-string delimiters have at most 16 characters
 PROTECTED           = re.compile(r'R"(?P<d>[^ ()\\\t\r\n]{0,' + str(RAW_DELIMITER_LIMIT) + r'})\(.*?\)(?P=d)"'
                                  r'|"(?:\\.|[^"\\])*"|(?<![0-9])\'(?:\\.|[^\'\\\n])*\'|//[^\n]*|/\*.*?\*/'
                                  r'|^[ \t]*\#(?:[^\n]*\\\n)*[^\n]*', re.S | re.M)
-DECL                = r'(.+?[\s*&])([A-Za-z_]\w*(?:\s*\[[^\]]*\])*)\s*(?:([={]|:(?!:))(.*))?;'
+EQUALS              = r'(?<![=!<>+*/%&|^\-])=(?!=|>)'
+DECL                = r'(.+?[\s*&])([A-Za-z_]\w*(?:\s*\[[^\]]*\])*)\s*(?:(' + EQUALS + r'|[{]|:(?!:))(.*))?;'
 FORBIDDEN           = {'return', 'co_return', 'throw', 'delete', 'using', 'typedef', 'case', 'goto',
                        'else', 'break', 'if', 'while', 'for', 'switch'}
 FROZEN              = 'sources/sdl-rdp-backend.so/sdl-rdp-backend.h'
@@ -311,8 +312,14 @@ def parse_function(body, code):
         return None
     if suffix == ';' and (local := paren_initialised(typ, signature)):
         return local
+    return function_fields(typ, signature, suffix)
+
+
+def function_fields(typ, signature, suffix):
     suffix, tail = function_tail(suffix)
     suffix, specifier = function_suffix(suffix)
+    if specifier.startswith('=') and not re.fullmatch(r'=\s*(?:0|default|delete)', specifier):
+        return None
     qualifiers, arrow, result = suffix.partition(ARROW)
     qualifier_pattern = r'(?:const|volatile|noexcept(?:\([^)]*\))?|[& ])+'
     if qualifiers and not re.fullmatch(qualifier_pattern, qualifiers.strip()):
@@ -357,7 +364,7 @@ def parse_declaration(body, code):
 
 
 def parse_assignment(body, code):
-    pattern = r'([\w:*&][\w:.>\-\[\]()@ *&]*?)\s*(<<=|>>=|[+*/%&|^\-]?=)\s*(?![=])(.*);'
+    pattern = r'([\w:*&][\w:.>\-\[\]()@ *&]*?)\s*(<<=|>>=|[+*/%&|^\-]=|' + EQUALS + r')\s*(.*);'
     if fields := match_fields(pattern, body, code):
         target, operator, value = fields
         lhs = mask(target)
@@ -425,7 +432,8 @@ def is_function_declaration(fields, constructors):
     if fields.typ or constructors is None or fields.signature.startswith(('operator', '~')):
         return True
     name = fields.signature.split('(', 1)[0]
-    return name in constructors or bool(fields.specifier) or name in fields.signature[len(name) + 1:]
+    special = re.fullmatch(r'=\s*(?:default|delete)', fields.specifier)
+    return name in constructors or bool(special) or name in fields.signature[len(name) + 1:]
 
 
 def accepted_kind(item, constructors):
@@ -500,7 +508,7 @@ def head_item(line, code, constructors):
 
 
 def render_braced_value(value, width):
-    return value.ljust(width) + (' }' if width else '}')
+    return value.ljust(width) + ' }' if value else '}'
 
 
 def render_declaration(fields, widths):
@@ -818,7 +826,8 @@ def statement_extent(physical, start, kind):
     stack, depth, skipped = scan_line(physical[start].code, []), len(indentation(physical[start].line)), {}
     for end in range(start + 1, len(physical)):
         line = physical[end]
-        if statement_closed(stack, physical[end - 1].code, kind) or is_new_statement(line, stack, depth):
+        closed = statement_closed(stack, physical[end - 1].code, kind)
+        if closed or (kind != 'expression' and is_new_statement(line, stack, depth)):
             return skipped
         before, stack = stack.count('B'), scan_line(line.code, stack)
         if not before or stack.count('B') < before:
@@ -918,6 +927,10 @@ def open_statement(physical, logical, constructors):
     index = logical.key[0]
     item = head_item(logical.text, logical.code, constructors)
     if not item:
+        unfinished = code_end(logical.code).strip()
+        boundary = not unfinished or unfinished.endswith((';', '{', '}', ':')) or unfinished.startswith('@')
+        if not boundary and unfinished.split()[0] not in SCOPE_WORDS:
+            return None, statement_extent(physical, index, 'expression')
         return None, {}
     skipped = statement_extent(physical, index, item.kind)
     return local_head(item, statement_text(physical, index, skipped)), skipped

@@ -52,7 +52,7 @@ auto RehearseTlsOnce(Credentials const& credentials) -> void {
 unsigned Bind(freerdp_listener* listener, sdlrdp_config const& config) {
   Expects(listener != nullptr, "listener exists");
   Descriptor  socket { SystemCall(::socket(AF_INET, SOCK_STREAM, 0), "Socket creation") };
-  sockaddr_in address{                                                                  };
+  sockaddr_in address{ };
   address.sin_family = AF_INET;
   address.sin_port   = htons(config.port);
   PrepareListenerSocket(socket.Get());
