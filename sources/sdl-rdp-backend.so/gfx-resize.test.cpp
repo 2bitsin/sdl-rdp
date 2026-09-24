@@ -1,4 +1,5 @@
 #include "_detail/avc-encoder.hpp"
+#include "_detail/extent.hpp"
 #include "_detail/gfx-protocol.hpp"
 #include "_detail/graphics-observer.hpp"
 #include "_detail/test-graphics-backend.hpp"
@@ -7,12 +8,14 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
-#include <freerdp/primitives.h>
 #include <gtest/gtest.h>
-#include <iostream>
+#include <oxbox/utilities/span.hpp>
 #include <random>
+#include <ranges>
 #include <regex>
+#include <span>
 
 namespace {
 class GraphicsResize : public testing::Test {
@@ -31,12 +34,14 @@ protected:
     backend.reset();
     if (!certificates.empty()) std::filesystem::remove_all(certificates);
   }
-  void PresentProgressivePixel(Headless::Client& client, Headless::GraphicsObserver& observer,
-                               std::vector<UINT32>& pixels, unsigned w, unsigned h, unsigned generations) {
+  auto PresentProgressivePixel(Headless::Client& client, Headless::GraphicsObserver& observer,
+                               std::vector<std::uint32_t>& pixels, Backend::Extent size, std::size_t generations)
+      -> void {
     auto              frames = observer.Observed().frames.size();
     sdlrdp_rect const damage = { .x = 0, .y = 0, .w = 1, .h = 1 };
     pixels.front() ^= 0x222222;
-    ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), w * 4, w, h, &damage, 1), 0);
+    auto const pitch = static_cast<int>(size.width * Backend::PixelBytes);
+    ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), pitch, size.width, size.height, &damage, 1), 0);
     ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() > frames; })) << logs.Text(true);
     EXPECT_LE(client.MaxError(pixels), client.Tolerance());
     EXPECT_EQ(observer.Observed().progressive_headers, generations);
@@ -45,24 +50,38 @@ protected:
   Headless::Logs                                          logs;
   std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> backend     { nullptr, sdlrdp_close };
 };
-void ThenBilinearPixels(rdpGdi const* gdi, std::vector<UINT32> const& pixels) {
-  for (int y = 0; y < 240; ++y) {
-    auto        position = std::clamp(((y + 0.5) * (200.0 / 240)) - 0.5, 0.0, 199.0);
-    auto        first    = unsigned(position);
-    auto        second   = std::min(first + 1, 199u);
-    auto        weight   = float(position - first);
-    auto const* actual   =
-        reinterpret_cast<UINT32 const*>(gdi->primary_buffer + (static_cast<std::size_t>(y) * gdi->stride));
-    for (int x = 0; x < 320; ++x) {
-      UINT32 expected = 0;
-      for (unsigned c = 0; c < 3; ++c) {
-        auto const a = float((pixels[(first * 320) + x] >> (c * 8)) & 255);
-        auto const b = float((pixels[(second * 320) + x] >> (c * 8)) & 255);
-        // NOLINTNEXTLINE(bugprone-incorrect-roundings): Nonnegative wire-channel rounding.
-        expected |= UINT32(BYTE(a + ((b - a) * weight) + 0.5f)) << (c * 8);
-      }
-      ASSERT_EQ(actual[x] & 0xffffff, expected) << x << ',' << y;
-    }
+auto Blend(std::uint32_t top, std::uint32_t bottom, float weight) -> std::uint32_t {
+  std::uint32_t blended = 0;
+  for (std::size_t c = 0; c < 3; ++c) {
+    auto const a = static_cast<float>((top >> (c * 8)) & 255);
+    auto const b = static_cast<float>((bottom >> (c * 8)) & 255);
+    // NOLINTNEXTLINE(bugprone-incorrect-roundings): Nonnegative wire-channel rounding.
+    blended |= std::uint32_t{ static_cast<std::uint8_t>(a + ((b - a) * weight) + 0.5f) } << (c * 8);
+  }
+  return blended;
+}
+auto BilinearRow(std::vector<std::uint32_t> const& pixels, std::size_t y) -> std::vector<std::uint32_t> {
+  auto const position = std::clamp(((static_cast<double>(y) + 0.5) * (200.0 / 240)) - 0.5, 0.0, 199.0);
+  auto const first    = static_cast<std::size_t>(position);
+  auto const second   = std::min(first + 1, 199uz);
+  auto const weight   = static_cast<float>(position - static_cast<double>(first));
+  auto const top      = std::span(pixels).subspan(first * 320, 320);
+  auto const bottom   = std::span(pixels).subspan(second * 320, 320);
+  return std::views::zip_transform([=](std::uint32_t a, std::uint32_t b) { return Blend(a, b, weight); }, top, bottom) |
+         std::ranges::to<std::vector>();
+}
+auto ThenBilinearRow(rdpGdi const& gdi, std::vector<std::uint32_t> const& pixels, std::size_t y) -> void {
+  auto const frame    = std::span(gdi.primary_buffer, std::size_t{ gdi.stride } * static_cast<std::size_t>(gdi.height));
+  auto const row      = frame.subspan(y * gdi.stride, 320 * Backend::PixelBytes);
+  auto const actual   = oxbox::utilities::SpanCast<std::uint32_t const>(row);
+  auto const expected = BilinearRow(pixels, y);
+  for (std::size_t x = 0; x < 320; ++x)
+    ASSERT_EQ(actual[x] & 0xffffff, expected[x]) << x << ',' << y;
+}
+auto ThenBilinearPixels(rdpGdi const& gdi, std::vector<std::uint32_t> const& pixels) -> void {
+  for (std::size_t y = 0; y < 240; ++y) {
+    ThenBilinearRow(gdi, pixels, y);
+    if (::testing::Test::HasFatalFailure()) return;
   }
 }
 void ThenProgressiveGeneration(Headless::GraphicsObserver const& observer, unsigned generations, unsigned w,
@@ -82,7 +101,8 @@ void RecordProgressiveCost(Headless::Logs& logs) {
   std::smatch match;
   MatchCostStatistics(
       text, match,
-      R"(Frames: 1 sent, 0 coalesced; encode ([0-9.]+) ms mean, ([0-9.]+) ms max; acknowledgement ([0-9.]+) ms mean, ([0-9.]+) ms max, ([0-9]+) over 100 ms, [0-9]+ timed out\.)");
+      R"(Frames: 1 sent, 0 coalesced; encode ([0-9.]+) ms mean, ([0-9.]+) ms max; )"
+      R"(acknowledgement ([0-9.]+) ms mean, ([0-9.]+) ms max, ([0-9]+) over 100 ms, [0-9]+ timed out\.)");
   if (::testing::Test::HasFatalFailure()) return;
   auto milliseconds = std::stod(match[1]);
   testing::Test::RecordProperty("encode_ms", milliseconds);
@@ -91,15 +111,6 @@ void RecordProgressiveCost(Headless::Logs& logs) {
   EXPECT_EQ(match[1], match[2]);
   EXPECT_EQ(match[3], match[4]);
   EXPECT_GT(milliseconds, 0.0);
-  std::cout << match.str() << '\n';
-}
-void PresentPlanar(sdlrdp_handle* backend, Headless::Client& client, Headless::GraphicsObserver& observer,
-                   std::vector<UINT32> const& pixels, std::vector<UINT32> const& expected, sdlrdp_rect area) {
-
-  auto count = observer.Observed().frames.size();
-  EXPECT_EQ(sdlrdp_present(backend, pixels.data(), 354 * 4, 354, 226, &area, 1), 0);
-  EXPECT_TRUE(client.Until([&] { return observer.Observed().frames.size() > count; }));
-  EXPECT_EQ(client.MaxError(expected, &expected), 0u);
 }
 TEST_F(GraphicsResize, RawAspectMatchesBilinear) {
   ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_RAW), 0);
@@ -118,7 +129,7 @@ TEST_F(GraphicsResize, RawAspectMatchesBilinear) {
   ASSERT_EQ(gdi->width, 320);
   ASSERT_EQ(gdi->height, 240);
   ASSERT_EQ(observer.Observed().frames.size(), 1u);
-  ThenBilinearPixels(gdi, pixels);
+  ThenBilinearPixels(*gdi, pixels);
 }
 TEST_F(GraphicsResize, ProgressiveContextAndFullDamage) {
   Headless::Client client(sdlrdp_port(backend.get()), true, 640, 480);
@@ -136,7 +147,7 @@ TEST_F(GraphicsResize, ProgressiveContextAndFullDamage) {
     ++generations;
     ThenProgressiveGeneration(observer, generations, w, h);
     if (::testing::Test::HasFatalFailure()) return;
-    PresentProgressivePixel(client, observer, pixels, w, h, generations);
+    PresentProgressivePixel(client, observer, pixels, { .width = w, .height = h }, generations);
     if (::testing::Test::HasFatalFailure()) return;
   }
 }
@@ -162,7 +173,29 @@ protected:
     auto pattern = std::to_array("/tmp/sdlrdp-cost-XXXXXX");
     OpenGraphics(pattern.data(), width, height, codec);
   }
+  auto PresentMovingTiles(Headless::Client& client, std::uint32_t frames) -> void;
+  auto PresentPlanar(Headless::Client& client, Headless::GraphicsObserver& observer,
+                     std::vector<std::uint32_t> const& pixels, std::vector<std::uint32_t> const& expected,
+                     sdlrdp_rect area) -> void;
 };
+auto GraphicsCost::PresentMovingTiles(Headless::Client& client, std::uint32_t frames) -> void {
+  std::vector<std::uint32_t> pixels(1920uz * 1080);
+  sdlrdp_rect const          full  { 0, 0, 1920, 1080 };
+  for (std::uint32_t frame = 0; frame < frames; ++frame) {
+    Headless::MovingTilePattern(pixels, 1920, 1080, frame);
+    ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 7680, 1920, 1080, &full, 1), 0);
+    AwaitAcknowledgement(client, frame + 1);
+    if (::testing::Test::HasFatalFailure()) return;
+  }
+}
+auto GraphicsCost::PresentPlanar(Headless::Client& client, Headless::GraphicsObserver& observer,
+                                 std::vector<std::uint32_t> const& pixels, std::vector<std::uint32_t> const& expected,
+                                 sdlrdp_rect area) -> void {
+  auto count = observer.Observed().frames.size();
+  EXPECT_EQ(sdlrdp_present(backend.get(), pixels.data(), 354 * 4, 354, 226, &area, 1), 0);
+  EXPECT_TRUE(client.Until([&] { return observer.Observed().frames.size() > count; }));
+  EXPECT_EQ(client.MaxError(expected, &expected), 0u);
+}
 TEST_F(GraphicsCost, FullRandomFrame) {
   Open();
   if (::testing::Test::HasFatalFailure()) return;
@@ -186,14 +219,14 @@ void RecordAvcCost(Headless::Logs& logs) {
   std::smatch match;
   MatchCostStatistics(
       text, match,
-      R"(Frames: 10 sent, 0 coalesced; encode ([0-9.]+) ms mean, ([0-9.]+) ms max \(convert ([0-9.]+), upload ([0-9.]+), nvenc ([0-9.]+)\); acknowledgement)");
+      R"(Frames: 10 sent, 0 coalesced; encode ([0-9.]+) ms mean, ([0-9.]+) ms max )"
+      R"(\(convert ([0-9.]+), upload ([0-9.]+), nvenc ([0-9.]+)\); acknowledgement)");
   if (::testing::Test::HasFatalFailure()) return;
   for (auto [name, index] : { std::pair{ "encode_ms", 1 }, { "convert_ms", 3 }, { "upload_ms", 4 }, { "nvenc_ms", 5 } })
     testing::Test::RecordProperty(name, match[index].str());
   testing::Test::RecordProperty("statistics", match.str());
   // measured 2026-09-23 on an RTX 3090 at 1920x1080: 8.8 ms mean, 16.4 ms max after the row-copy dispatch (45.2 before)
   EXPECT_LT(std::stod(match[1]), 20.0);
-  std::cout << match.str() << '\n';
 }
 TEST_F(GraphicsCost, AvcFullFrame) {
   if (!Backend::Avc::Encoder::Available()) GTEST_SKIP() << Backend::Avc::Encoder::UnavailableReason();
@@ -204,14 +237,8 @@ TEST_F(GraphicsCost, AvcFullFrame) {
   Headless::GraphicsObserver observer(client);
   ConnectGraphics(client);
   if (::testing::Test::HasFatalFailure()) return;
-  std::vector<UINT32> pixels(1920uz * 1080);
-  sdlrdp_rect const   full  { 0, 0, 1920, 1080 };
-  for (unsigned frame = 0; frame < 10; ++frame) {
-    Headless::MovingTilePattern(pixels, 1920, 1080, frame);
-    ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), 7680, 1920, 1080, &full, 1), 0);
-    AwaitAcknowledgement(client, frame + 1);
-    if (::testing::Test::HasFatalFailure()) return;
-  }
+  PresentMovingTiles(client, 10);
+  if (::testing::Test::HasFatalFailure()) return;
   ASSERT_EQ(observer.Observed().avc_nals.size(), 10u);
   ASSERT_EQ(observer.Observed().frames.size(), 10u);
   freerdp_disconnect(client.Instance().get());
@@ -240,13 +267,13 @@ TEST_F(GraphicsCost, PlanarPartialMatchesFull) {
   sdlrdp_rect const full     { 0, 0, 354, 226   };
   sdlrdp_rect const part     { 17, 19, 177, 113 };
   auto              expected = pixels;
-  PresentPlanar(backend.get(), client, observer, pixels, expected, full);
+  PresentPlanar(client, observer, pixels, expected, full);
   ApplyPlanarDamage(pixels, expected, part);
-  PresentPlanar(backend.get(), client, observer, pixels, expected, part);
+  PresentPlanar(client, observer, pixels, expected, part);
   pixels = expected;
   auto*             gdi     = client.Instance()->context->gdi;
   std::vector<BYTE> partial(gdi->primary_buffer, gdi->primary_buffer + (std::size_t(gdi->stride) * gdi->height));
-  PresentPlanar(backend.get(), client, observer, pixels, expected, full);
+  PresentPlanar(client, observer, pixels, expected, full);
   EXPECT_TRUE(std::ranges::equal(partial, std::span(gdi->primary_buffer, partial.size())));
 }
 }

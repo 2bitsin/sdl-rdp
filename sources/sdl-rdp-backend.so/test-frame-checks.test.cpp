@@ -4,10 +4,12 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <cstdlib>
 #include <freerdp/gdi/gdi.h>
 #include <freerdp/input.h>
 #include <gtest/gtest.h>
+#include <oxbox/utilities/span.hpp>
 #include <ranges>
 #include <string>
 #include <utility>
@@ -15,27 +17,37 @@
 
 namespace BackendGate {
 namespace {
-void ThenMonitor(auto const& monitor, unsigned w, unsigned h) {
+struct GraphicsCounts {
+  std::size_t desktops;
+  std::size_t resets;
+  std::size_t frames;
+};
+auto ThenMonitor(MONITOR_DEF const& monitor, Backend::Extent size) -> void {
   EXPECT_EQ(monitor.left, 0);
   EXPECT_EQ(monitor.top, 0);
-  EXPECT_EQ(monitor.right, int(w) - 1);
-  EXPECT_EQ(monitor.bottom, int(h) - 1);
+  EXPECT_EQ(monitor.right, static_cast<std::int32_t>(size.width) - 1);
+  EXPECT_EQ(monitor.bottom, static_cast<std::int32_t>(size.height) - 1);
   EXPECT_EQ(monitor.flags, 1u);
 }
-void ThenResetGeometry(auto const& reset, std::size_t desktops, std::size_t frames, unsigned w, unsigned h) {
-  EXPECT_EQ(reset.width, w);
-  EXPECT_EQ(reset.height, h);
-  EXPECT_EQ(reset.desktops, desktops + 1);
-  EXPECT_EQ(reset.frames, frames);
+auto CountsOf(Headless::GraphicsObserver const& observer) -> GraphicsCounts {
+  return { .desktops = observer.Observed().desktops.size(), .resets = observer.Observed().resets.size(),
+           .frames   = observer.Observed().frames.size() };
 }
-void ThenGraphicsReset(Headless::GraphicsObserver const& observer, std::size_t desktops, std::size_t resets,
-                       std::size_t frames, unsigned w, unsigned h) {
-  ASSERT_EQ(observer.Observed().resets.size(), resets + 1);
+auto ThenResetGeometry(Headless::GraphicsObserver::Reset const& reset, GraphicsCounts before, Backend::Extent size)
+    -> void {
+  EXPECT_EQ(reset.width, size.width);
+  EXPECT_EQ(reset.height, size.height);
+  EXPECT_EQ(reset.desktops, before.desktops + 1);
+  EXPECT_EQ(reset.frames, before.frames);
+}
+auto ThenGraphicsReset(Headless::GraphicsObserver const& observer, GraphicsCounts before, Backend::Extent size)
+    -> void {
+  ASSERT_EQ(observer.Observed().resets.size(), before.resets + 1);
   auto const& reset = observer.Observed().resets.back();
-  ThenResetGeometry(reset, desktops, frames, w, h);
+  ThenResetGeometry(reset, before, size);
   ASSERT_EQ(reset.monitors.size(), 1u);
-  ThenMonitor(reset.monitors[0], w, h);
-  EXPECT_EQ(observer.Observed().frames.size(), frames + 1);
+  ThenMonitor(reset.monitors[0], size);
+  EXPECT_EQ(observer.Observed().frames.size(), before.frames + 1);
 }
 }
 void FrameChecks::Present(std::vector<UINT32> const& pixels, unsigned w, unsigned h) {
@@ -77,10 +89,11 @@ void FrameChecks::ThenAspectGeometry(Client& client) {
   ThenDesktopGeometry(client, 640, 480);
 }
 void FrameChecks::ThenScaledHighlight(Client& client) {
-  auto* actual    = reinterpret_cast<UINT32*>(client.Instance()->context->gdi->primary_buffer);
-  auto  rows      = std::views::iota(0, 480);
-  auto  brightest =
-      std::ranges::max_element(rows, { }, [&](int y) { return actual[static_cast<std::ptrdiff_t>(y) * 640] & 255; });
+  auto actual    = oxbox::utilities::SpanCast<std::uint32_t const>(
+      std::span(client.Instance()->context->gdi->primary_buffer, 640uz * 480 * 4));
+  auto rows      = std::views::iota(0, 480);
+  auto brightest =
+      std::ranges::max_element(rows, { }, [&](int y) { return actual[static_cast<std::size_t>(y) * 640] & 255; });
   EXPECT_LE(std::abs(*brightest - 240), 1);
 }
 void FrameChecks::ThenSparseDamage(Client& client, FrameObserver& observer, std::vector<UINT32> const& pixels,
@@ -123,18 +136,16 @@ void FrameChecks::ThenQoe(Client& client, Headless::GraphicsObserver& observer) 
   }));
   EXPECT_FALSE(logs.Contains("GFX QoE"));
 }
-void FrameChecks::ResizePicture(Client& client, Headless::GraphicsObserver& observer, std::vector<UINT32>& pixels,
-                                unsigned w, unsigned h, bool graphics) {
-  auto desktops = observer.Observed().desktops.size();
-  auto resets   = observer.Observed().resets.size();
-  auto frames   = observer.Observed().frames.size();
-  pixels.assign(static_cast<std::size_t>(w) * h, 0x654321);
-  Present(pixels, w, h);
+auto FrameChecks::ResizePicture(Client& client, Headless::GraphicsObserver& observer,
+                                std::vector<std::uint32_t>& pixels, Backend::Extent size, bool graphics) -> void {
+  auto const before = CountsOf(observer);
+  pixels.assign(static_cast<std::size_t>(size.width) * size.height, 0x654321);
+  Present(pixels, size.width, size.height);
   ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text(true);
-  ASSERT_GT(observer.Observed().desktops.size(), desktops);
-  EXPECT_EQ(observer.Observed().desktops.back(), (std::pair{ w, h }));
-  ThenDesktopGeometry(client, w, h);
+  ASSERT_GT(observer.Observed().desktops.size(), before.desktops);
+  EXPECT_EQ(observer.Observed().desktops.back(), (std::pair{ size.width, size.height }));
+  ThenDesktopGeometry(client, size.width, size.height);
   if (!graphics) return;
-  ThenGraphicsReset(observer, desktops, resets, frames, w, h);
+  ThenGraphicsReset(observer, before, size);
 }
 }

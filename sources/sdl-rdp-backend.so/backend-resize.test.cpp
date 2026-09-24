@@ -1,9 +1,12 @@
+#include "_detail/extent.hpp"
 #include "_detail/graphics-observer.hpp"
 #include "_detail/test-peer-status.hpp"
 #include "_detail/test-round-five.hpp"
 
+#include <array>
 #include <condition_variable>
 #include <cstddef>
+#include <cstdint>
 #include <vector>
 
 namespace BackendGate {
@@ -97,47 +100,49 @@ protected:
     RecordProperty("DesktopResize_calls", probe.Calls());
     RecordProperty("SDLRDP_SCREEN_events", 0);
   }
-  static void ThenResizeCounts(Headless::DisplayClient& display, ResizeProbe& probe, unsigned expected) {
+  static auto ThenResizeCounts(Headless::DisplayClient& display, ResizeProbe& probe, std::size_t expected) -> void {
     EXPECT_EQ(probe.Calls(), expected);
     EXPECT_EQ(display.Observed().desktops, expected);
     EXPECT_EQ(display.Observed().echoes, display.Observed().echo_resize ? expected : 0u);
   }
-  static void ThenFinalDesktop(Client const& client, unsigned last_width, unsigned last_height) {
-    EXPECT_EQ(client.Instance()->context->gdi->width, int(last_width));
-    EXPECT_EQ(client.Instance()->context->gdi->height, int(last_height));
+  static auto ThenFinalDesktop(Client const& client, Backend::Extent last) -> void {
+    EXPECT_EQ(client.Instance()->context->gdi->width, static_cast<std::int32_t>(last.width));
+    EXPECT_EQ(client.Instance()->context->gdi->height, static_cast<std::int32_t>(last.height));
     EXPECT_FALSE(freerdp_shall_disconnect_context(client.Instance()->context));
   }
-  void WhenResizeBurst(ResizeProbe& probe, unsigned last_width, unsigned last_height) {
-    for (auto [w, h] : { std::pair{ 1600u, 900u }, { 1920u, 1080u }, { last_width, last_height } }) {
-      ASSERT_EQ(sdlrdp_resize(backend.get(), w, h), 0);
+  auto WhenResizeBurst(ResizeProbe& probe, Backend::Extent last) -> void {
+    std::array const burst{ Backend::Extent{ .width = 1600, .height = 900 },
+                            Backend::Extent{ .width = 1920, .height = 1080 }, last };
+    for (auto size : burst) {
+      ASSERT_EQ(sdlrdp_resize(backend.get(), size.width, size.height), 0);
       EXPECT_EQ(probe.Calls(), 1u);
       EXPECT_TRUE(probe.Finalizing());
     }
   }
-  void DuringFinalization(ResizeProbe& probe, unsigned last_width, unsigned last_height) {
+  auto DuringFinalization(ResizeProbe& probe, Backend::Extent last) -> void {
     ASSERT_TRUE(probe.AwaitFinalizing());
     probe.ConfirmActiveCallback();
-    WhenResizeBurst(probe, last_width, last_height);
+    WhenResizeBurst(probe, last);
     if (::testing::Test::HasFatalFailure()) return;
     probe.MatchingLayout();
     EXPECT_TRUE(probe.Finalizing());
   }
-  void ThenFinalLayout(Client& client, Headless::DisplayClient& display, ResizeProbe& probe, unsigned last_width,
-                       unsigned last_height, unsigned expected) {
-    std::vector<UINT32> pixels(static_cast<std::size_t>(last_width) * last_height, 0);
+  auto ThenFinalLayout(Client& client, Headless::DisplayClient& display, ResizeProbe& probe, Backend::Extent last,
+                       std::size_t expected) -> void {
+    std::vector<std::uint32_t> pixels(static_cast<std::size_t>(last.width) * last.height, 0);
     ASSERT_TRUE(client.Until([&] { return display.Observed().desktops && client.Matches(pixels); }))
         << "server calls=" << probe.Calls() << " client calls=" << display.Observed().desktops
         << " GDI=" << client.Instance()->context->gdi->width << "x" << client.Instance()->context->gdi->height << "\n"
         << logs.Text(true);
     for (unsigned i = 0; i < 20; ++i)
       ASSERT_TRUE(client.Pump(5));
-    ThenFinalDesktop(client, last_width, last_height);
+    ThenFinalDesktop(client, last);
     if (::testing::Test::HasFatalFailure()) return;
     ThenResizeCounts(display, probe, expected);
     if (::testing::Test::HasFatalFailure()) return;
     ThenQuietResize(probe);
   }
-  void Run(unsigned last_width, unsigned last_height, unsigned expected) {
+  auto Run(Backend::Extent last, std::size_t expected) -> void {
     Open(640, 480, { }, SDLRDP_CODEC_PLANAR);
     Client                  client(sdlrdp_port(backend.get()), true, 640, 480);
     Headless::DisplayClient display(client);
@@ -146,10 +151,10 @@ protected:
     if (::testing::Test::HasFatalFailure()) return;
     ResizeProbe probe(*backend);
     display.Observed().finalizing = [&] {
-      if (display.Observed().desktops == 1) DuringFinalization(probe, last_width, last_height);
+      if (display.Observed().desktops == 1) DuringFinalization(probe, last);
     };
     ASSERT_EQ(sdlrdp_resize(backend.get(), 1280, 800), 0);
-    ThenFinalLayout(client, display, probe, last_width, last_height, expected);
+    ThenFinalLayout(client, display, probe, last, expected);
   }
 };
 namespace {
@@ -165,10 +170,10 @@ void ThenOriginalPicture(Client& client) {
 }
 }
 TEST_F(ResizeStorm, CoalescesThreeSizesDuringFinalization) {
-  Run(1024, 768, 2);
+  Run({ .width = 1024, .height = 768 }, 2);
 }
 TEST_F(ResizeStorm, AlternatingAppSizesWithLayoutEcho) {
-  Run(1280, 800, 1);
+  Run({ .width = 1280, .height = 800 }, 1);
 }
 TEST_F(ResizeStorm, EqualLayoutDoesNotChangePicture) {
   Open();
@@ -207,18 +212,8 @@ TEST_F(RoundFive, ResizeDesktop) {
 }
 TEST_F(RoundFive, PictureSizeReactivatesDesktop) {
   for (bool const graphics : { false, true }) {
-    Open();
-    Client client(sdlrdp_port(backend.get()), true, 640, 480);
-    if (graphics) client.EnableGraphics();
-    Headless::GraphicsObserver observer(client);
-    Connect(client, false);
-    std::vector<UINT32> pixels(640uz * 480, 0x123456);
-    Present(pixels, 640, 480);
-    ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text(true);
-    for (auto [w, h] : { std::pair{ 320u, 200u }, std::pair{ 640u, 480u } }) {
-      ResizePicture(client, observer, pixels, w, h, graphics);
-      if (::testing::Test::HasFatalFailure()) return;
-    }
+    RunPictureSizes(graphics);
+    if (::testing::Test::HasFatalFailure()) return;
   }
 }
 

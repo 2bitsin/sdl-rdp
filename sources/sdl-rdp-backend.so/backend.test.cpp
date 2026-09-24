@@ -8,11 +8,14 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <fcntl.h>
 #include <future>
 #include <gtest/gtest.h>
 #include <openssl/pem.h>
 #include <openssl/x509v3.h>
+#include <oxbox/utilities/span.hpp>
+#include <span>
 #include <system_error>
 
 namespace BackendGate {
@@ -110,8 +113,9 @@ void WhenFullFrameMeasured(CertificateDirectory const& certificates, Logs& logs,
 }
 void CompressSignedDelta(BITMAP_PLANAR_CONTEXT* encoder, std::vector<UINT32>& pixels, std::vector<BYTE>& compressed,
                          UINT32& size) {
-  ASSERT_NE(freerdp_bitmap_compress_planar(encoder, reinterpret_cast<BYTE*>(pixels.data()), PIXEL_FORMAT_BGRA32, 64, 64,
-                                           64 * 4, compressed.data(), &size),
+  auto const source = oxbox::utilities::SpanCast<std::uint8_t const>(std::span(pixels));
+  ASSERT_NE(freerdp_bitmap_compress_planar(encoder, source.data(), PIXEL_FORMAT_BGRA32, 64, 64, 64 * 4,
+                                           compressed.data(), &size),
             nullptr);
   ASSERT_NE(compressed.front() & PLANAR_FORMAT_HEADER_RLE, 0);
 }
@@ -155,9 +159,9 @@ TEST(Planar, SignedDelta64Rows) {
   UINT32            size       = compressed.size();
   CompressSignedDelta(encoder.get(), pixels, compressed, size);
   if (::testing::Test::HasFatalFailure()) return;
-  ASSERT_TRUE(planar_decompress(decoder.get(), compressed.data(), size, width, height,
-                                reinterpret_cast<BYTE*>(decoded.data()), PIXEL_FORMAT_BGRA32, width * 4, 0, 0, width,
-                                height, FALSE));
+  auto const target = oxbox::utilities::SpanCast<std::uint8_t>(std::span(decoded));
+  ASSERT_TRUE(planar_decompress(decoder.get(), compressed.data(), size, width, height, target.data(),
+                                PIXEL_FORMAT_BGRA32, width * 4, 0, 0, width, height, FALSE));
   ThenSignedDelta(decoded, pixels);
 }
 TEST(Logging, ListenerCallback) {
@@ -253,14 +257,15 @@ TEST(Planar, Noisy640Rows) {
       freerdp_bitmap_planar_context_new(0, 640, 1));
   std::vector<UINT32>                                                                                 pixels(640);
   std::vector<UINT32>                                                                                 decoded(640);
+  auto const source = oxbox::utilities::SpanCast<std::uint8_t const>(std::span(pixels));
+  auto const target = oxbox::utilities::SpanCast<std::uint8_t>(std::span(decoded));
   for (unsigned y = 0; y < 480; ++y) {
     std::ranges::generate(pixels, [i = y * 640]() mutable { return (i++ * 2654435761u) & 0xffffff; });
     UINT32 size = payload.size();
-    ASSERT_TRUE(freerdp_bitmap_compress_planar(encoder.get(), reinterpret_cast<BYTE const*>(pixels.data()),
-                                               PIXEL_FORMAT_BGRA32, 640, 1, 2560, payload.data(), &size));
-    ASSERT_TRUE(planar_decompress(decoder.get(), payload.data(), size, 640, 1, reinterpret_cast<BYTE*>(decoded.data()),
-                                  PIXEL_FORMAT_BGRX32, 2560, 0, 0, 640, 1, TRUE))
-        << y;
+    ASSERT_TRUE(freerdp_bitmap_compress_planar(encoder.get(), source.data(), PIXEL_FORMAT_BGRA32, 640, 1, 2560,
+                                               payload.data(), &size));
+    ASSERT_TRUE(planar_decompress(decoder.get(), payload.data(), size, 640, 1, target.data(), PIXEL_FORMAT_BGRX32,
+                                  2560, 0, 0, 640, 1, TRUE)) << y;
   }
 }
 }

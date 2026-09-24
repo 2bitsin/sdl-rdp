@@ -20,6 +20,13 @@ namespace AuthenticationGate {
 using BackendGate::CurrentStatus;
 using BackendGate::RequiredStatus;
 using utilities::Expects;
+struct CallbackRecord {
+  std::string     order;
+  std::string     user;
+  std::string     domain;
+  std::string     password;
+  std::thread::id thread;
+};
 class Authentication : public testing::Test {
 protected:
   void        TearDown() override;
@@ -38,19 +45,15 @@ protected:
   void       ThenSecurityWarning(bool nla);
   void       ThenCertificateDisconnect(std::string_view closed);
   void       ThenPendingDisconnect(UINT32 code);
-  oxbox::platform::ScratchArea                            certificates    { "auth", "sdl-rdp"     };
-  std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> handle          { nullptr, sdlrdp_close };
-  sdlrdp_config                                           config          { };
+  oxbox::platform::ScratchArea                            certificates  { "auth", "sdl-rdp"     };
+  std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> handle        { nullptr, sdlrdp_close };
+  sdlrdp_config                                           config        { };
   std::mutex                                              guard;
   std::condition_variable                                 logged;
   std::vector<std::pair<sdlrdp_log_level, std::string>>   logs;
-  std::string                                             order;
-  std::string                                             seen_user;
-  std::string                                             seen_domain;
-  std::string                                             seen_password;
+  CallbackRecord                                          seen;
   std::vector<std::string>                                rejections;
-  bool                                                    permit          = true;
-  std::thread::id                                         callback_thread;
-  std::thread::id                                         client_thread   = std::this_thread::get_id();
+  bool                                                    permit        = true;
+  std::thread::id                                         client_thread = std::this_thread::get_id();
 };
 }

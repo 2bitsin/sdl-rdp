@@ -3,6 +3,7 @@
 #include "_detail/test-peer-status.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <format>
 #include <freerdp/input.h>
 #include <freerdp/settings.h>
@@ -94,5 +95,19 @@ void RoundFive::ThenLegacyWindowReleases(Client& client, FrameObserver const& ob
   EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 10000), 1);
   Present(pixels, 320, 200);
   EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 1), 0);
+}
+auto RoundFive::RunPictureSizes(bool graphics) -> void {
+  Open();
+  Client client(sdlrdp_port(backend.get()), true, 640, 480);
+  if (graphics) client.EnableGraphics();
+  Headless::GraphicsObserver observer(client);
+  Connect(client, false);
+  std::vector<std::uint32_t> pixels(640uz * 480, 0x123456);
+  Present(pixels, 640, 480);
+  ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text(true);
+  for (auto size : { Backend::Extent{ .width = 320, .height = 200 }, Backend::Extent{ .width = 640, .height = 480 } }) {
+    ResizePicture(client, observer, pixels, size, graphics);
+    if (::testing::Test::HasFatalFailure()) return;
+  }
 }
 }

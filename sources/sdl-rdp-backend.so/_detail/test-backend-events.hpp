@@ -28,21 +28,19 @@ class BackendEvents {
 protected:
   bool                      Acknowledged() const;
   std::vector<sdlrdp_event> Events() const;
-  std::vector<sdlrdp_event> EventsUntil(auto predicate, bool include_refresh = true, Client* client = nullptr) {
+  auto                      EventsUntil(auto predicate, bool include_refresh = true, Client* client = nullptr)
+      -> std::vector<sdlrdp_event> {
     std::vector<sdlrdp_event> result;
     auto                      deadline = Clock::now() + std::chrono::seconds(10);
     do {
-      for (auto event : Events())
-        if (include_refresh || event.type != SDLRDP_REFRESH) result.push_back(event);
-      if (predicate(result)) break;
-      if (client) {
-        if (!client->Pump()) break;
-      } else
-        sdlrdp_wait(backend.get(), 50);
+      Accumulate(result, include_refresh);
+      if (predicate(result) || !Await(client)) break;
     } while (Clock::now() < deadline);
     return result;
   }
   std::vector<sdlrdp_event> Events(unsigned wanted);
+  auto                      Accumulate(std::vector<sdlrdp_event>& result, bool include_refresh) const -> void;
+  auto                      Await(Client* client) const                                               -> bool;
   CertificateDirectory                                    certificates;
   Logs                                                    logs;
   std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> backend     { nullptr, sdlrdp_close };

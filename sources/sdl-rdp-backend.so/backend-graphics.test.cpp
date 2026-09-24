@@ -17,9 +17,8 @@ protected:
     EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 0);
     ASSERT_TRUE(observer.Ack());
     ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0) == 1; }));
-    RecordProperty(
-        "trace",
-        "two unacknowledged frames exhaust the window; suspend releases third; resume waits; cumulative ack releases wait");
+    RecordProperty("trace", "two unacknowledged frames exhaust the window; suspend releases third; resume waits; "
+                            "cumulative ack releases wait");
   }
   void ThenGraphicsTakeover(Client& graphics) {
     Client next(sdlrdp_port(backend.get()), true);
@@ -116,9 +115,8 @@ namespace {
 void RecordDamageCost(Client& client, std::vector<UINT32> const& pixels, uint64_t before) {
   testing::Test::RecordProperty("damage_wire_bytes", std::to_string(client.Received() - before));
   testing::Test::RecordProperty("maximum_channel_error", client.MaxError(pixels));
-  testing::Test::RecordProperty(
-      "trace",
-      "7x5 damage at 17,19; one progressive header over two frames; QoE timestamp=1234 decode=7 render=9 retained without logging");
+  testing::Test::RecordProperty("trace", "7x5 damage at 17,19; one progressive header over two frames; "
+                                         "QoE timestamp=1234 decode=7 render=9 retained without logging");
 }
 }
 TEST_P(GraphicsGate, DecodesAndResizes) {

@@ -1,5 +1,6 @@
 #include "_detail/avc-encoder.hpp"
 #include "_detail/avc.hpp"
+#include "_detail/extent.hpp"
 #include "_detail/gfx-protocol.hpp"
 #include "_detail/graphics-observer.hpp"
 #include "_detail/handle.hpp"
@@ -9,51 +10,69 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
-#include <cstring>
-#include <filesystem>
+#include <cstdint>
 #include <freerdp/primitives.h>
 #include <gtest/gtest.h>
+#include <oxbox/utilities/span.hpp>
+#include <ranges>
+#include <span>
 
 namespace {
-std::vector<BYTE> PadReference(std::vector<UINT32> const& pixels, unsigned width, unsigned height, unsigned w,
-                               unsigned h) {
-  auto padded{ std::vector<BYTE>(std::size_t(w) * h * 4) };
-  std::ranges::for_each(std::views::iota(0u, h), [&](unsigned y) {
-    std::ranges::for_each(std::views::iota(0u, w), [&](unsigned x) {
-      auto pixel = pixels[(std::min(y, height - 1) * width) + std::min(x, width - 1)];
-      std::memcpy(padded.data() + ((std::size_t(y) * w + x) * 4), &pixel, 4);
-    });
-  });
-  return padded;
+auto PadReference(std::vector<std::uint32_t> const& pixels, Backend::Extent size, Backend::Extent padded)
+    -> std::vector<std::uint32_t> {
+  auto const rows    = std::views::iota(0uz, std::size_t{ padded.height });
+  auto const columns = std::views::iota(0uz, std::size_t{ padded.width });
+  auto const edge    = [&](auto position) {
+    auto const [y, x] = position;
+    return pixels[(std::min<std::size_t>(y, size.height - 1) * size.width) + std::min<std::size_t>(x, size.width - 1)];
+  };
+  return std::views::cartesian_product(rows, columns) | std::views::transform(edge) | std::ranges::to<std::vector>();
 }
-std::vector<UINT32> Yuv420Reference(std::vector<UINT32> const& pixels, unsigned width, unsigned height) {
-  auto                  w       { Backend::Avc::Aligned(width)                  };
-  auto                  h       { Backend::Avc::Aligned(height)                 };
-  auto                  padded  = PadReference(pixels, width, height, w, h);
-  auto                  yuv     { std::vector<BYTE>(std::size_t(w) * h * 3 / 2) };
-  std::array<BYTE*, 3>  planes  { yuv.data(), yuv.data() + (std::size_t(w) * h),
-                                  yuv.data() + (std::size_t(w) * h * 5 / 4) };
-  std::array<UINT32, 3> strides { w, w / 2, w / 2                               };
-  prim_size_t const     size    { w, h                                          };
-  EXPECT_EQ(primitives_get()->RGBToYUV420_8u_P3AC4R(padded.data(), PIXEL_FORMAT_BGRX32, w * 4, planes.data(),
-                                                    strides.data(), &size),
+template <typename Byte>
+auto Yuv420Planes(std::span<Byte> yuv, Backend::Extent size) -> std::array<Byte*, 3> {
+  auto const luma = std::size_t{ size.width } * size.height;
+  return { yuv.data(), yuv.subspan(luma).data(), yuv.subspan(luma * 5 / 4).data() };
+}
+auto Yuv420Strides(Backend::Extent size) -> std::array<std::uint32_t, 3> {
+  return { size.width, size.width / 2, size.width / 2 };
+}
+auto EncodeYuv420(std::vector<std::uint32_t> const& bgrx, Backend::Extent size) -> std::vector<std::uint8_t> {
+  auto              yuv     { std::vector<std::uint8_t>(std::size_t{ size.width } * size.height * 3 / 2) };
+  auto              planes  = Yuv420Planes(std::span(yuv), size);
+  auto const        strides = Yuv420Strides(size);
+  prim_size_t const area    { size.width, size.height                                                    };
+  auto const        bytes   = oxbox::utilities::SpanCast<std::uint8_t const>(std::span(bgrx));
+  EXPECT_EQ(primitives_get()->RGBToYUV420_8u_P3AC4R(bytes.data(), PIXEL_FORMAT_BGRX32, size.width * Backend::PixelBytes,
+                                                    planes.data(), strides.data(), &area),
             0);
-  std::array<BYTE const*, 3> source { planes[0], planes[1], planes[2]         };
-  auto                       decoded{ std::vector<UINT32>(std::size_t(w) * h) };
-  auto                       cropped{ std::vector<UINT32>(pixels.size())      };
-  EXPECT_EQ(primitives_get()->YUV420ToRGB_8u_P3AC4R(source.data(), strides.data(),
-                                                    reinterpret_cast<BYTE*>(decoded.data()), w * 4, PIXEL_FORMAT_BGRX32,
-                                                    &size),
+  return yuv;
+}
+auto DecodeYuv420(std::vector<std::uint8_t> const& yuv, Backend::Extent size) -> std::vector<std::uint32_t> {
+  auto              decoded { std::vector<std::uint32_t>(std::size_t{ size.width } * size.height) };
+  auto              planes  = Yuv420Planes(std::span(yuv), size);
+  auto const        strides = Yuv420Strides(size);
+  prim_size_t const area    { size.width, size.height                                             };
+  EXPECT_EQ(primitives_get()->YUV420ToRGB_8u_P3AC4R(planes.data(), strides.data(),
+                                                    oxbox::utilities::SpanCast<std::uint8_t>(std::span(decoded)).data(),
+                                                    size.width * Backend::PixelBytes, PIXEL_FORMAT_BGRX32, &area),
             0);
-  std::ranges::for_each(std::views::iota(0u, height), [&](unsigned y) {
-    std::copy_n(decoded.data() + (std::size_t(y) * w), width, cropped.data() + (std::size_t(y) * width));
-  });
-  return cropped;
+  return decoded;
+}
+auto Cropped(std::span<std::uint32_t const> pixels, std::size_t stride, Backend::Extent size)
+    -> std::vector<std::uint32_t> {
+  return pixels | std::views::chunk(stride) | std::views::take(size.height) |
+         std::views::transform([=](auto row) { return row | std::views::take(size.width); }) | std::views::join |
+         std::ranges::to<std::vector>();
+}
+auto Yuv420Reference(std::vector<std::uint32_t> const& pixels, Backend::Extent size) -> std::vector<std::uint32_t> {
+  Backend::Extent const aligned { .width  = Backend::Avc::Aligned(size.width),
+                                  .height = Backend::Avc::Aligned(size.height) };
+  auto const            yuv     = EncodeYuv420(PadReference(pixels, size, aligned), aligned);
+  return Cropped(DecodeYuv420(yuv, aligned), aligned.width, size);
 }
 void ThenScaledError(Headless::Client& client, std::vector<UINT32> const& scaled,
                      std::vector<UINT32> const& reference) {
   auto error = client.MaxError(scaled, &reference);
-  std::cout << "Scaled maximum channel error: " << error << '\n';
   testing::Test::RecordProperty("scaled_maximum_channel_error", error);
   EXPECT_LE(error, 8u);
 }
@@ -73,7 +92,8 @@ protected:
     PresentFrame(std::vector<UINT32>(320uz * 200, 0x55aaff));
   }
   void PresentFrame(std::vector<UINT32> const& pixels, unsigned width = 320, unsigned height = 200) {
-    Frame(ClientSession(), ObserverSession(), pixels, width, height, { 0, 0, int(width), int(height) });
+    Backend::Extent const size{ .width = width, .height = height };
+    Frame(pixels, size, Backend::Whole(size));
   }
   void Open(sdlrdp_codec codec = SDLRDP_CODEC_AVC420, unsigned width = 320, unsigned height = 200) {
     auto pattern = std::to_array("/tmp/sdlrdp-avc-XXXXXX");
@@ -108,25 +128,25 @@ protected:
       return reported;
     }));
   }
-  static void ReadScaledPixels(Headless::Client& client, std::vector<UINT32>& scaled) {
-    auto* gdi = client.Instance()->context->gdi;
-    ASSERT_EQ(gdi->width, 321);
-    ASSERT_EQ(gdi->height, 214);
-    std::ranges::for_each(std::views::iota(0, 214), [&](int y) {
-      std::copy_n(reinterpret_cast<UINT32 const*>(gdi->primary_buffer + (std::size_t(y) * gdi->stride)), 321,
-                  scaled.data() + (std::size_t(y) * 321));
-    });
+  static auto ReadScaledPixels(Headless::Client& client, std::vector<std::uint32_t>& scaled) -> void {
+    auto const& gdi = *client.Instance()->context->gdi;
+    ASSERT_EQ(gdi.width, 321);
+    ASSERT_EQ(gdi.height, 214);
+    auto const frame = std::span(gdi.primary_buffer, std::size_t{ gdi.stride } * 214);
+    scaled = Cropped(oxbox::utilities::SpanCast<std::uint32_t const>(frame), gdi.stride / Backend::PixelBytes,
+                     { .width = 321, .height = 214 });
   }
 
-  void Frame(Headless::Client& client, Headless::GraphicsObserver& observer, std::vector<UINT32> const& pixels,
-             unsigned width, unsigned height, sdlrdp_rect damage) {
-    auto before    { observer.Observed().frames.size()   };
-    auto avc_before{ observer.Observed().avc_nals.size() };
-    ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), width * 4, width, height, &damage, 1), 0);
+  auto Frame(std::vector<std::uint32_t> const& pixels, Backend::Extent size, sdlrdp_rect damage) -> void {
+    auto&      client     = ClientSession();
+    auto&      observer   = ObserverSession();
+    auto       before     { observer.Observed().frames.size()   };
+    auto       avc_before { observer.Observed().avc_nals.size() };
+    auto const pitch      = static_cast<int>(size.width * Backend::PixelBytes);
+    ASSERT_EQ(sdlrdp_present(backend.get(), pixels.data(), pitch, size.width, size.height, &damage, 1), 0);
     ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() > before; })) << logs.Text(true);
-    auto reference = observer.Observed().avc_nals.size() > avc_before ? Yuv420Reference(pixels, width, height) : pixels;
+    auto reference = observer.Observed().avc_nals.size() > avc_before ? Yuv420Reference(pixels, size) : pixels;
     auto error     = client.MaxError(pixels, &reference);
-    std::cout << "Graphics maximum channel error: " << error << '\n';
     RecordProperty("maximum_channel_error_" + std::to_string(observer.Observed().frames.size()), error);
     EXPECT_LE(error, 8u) << logs.Text(true);
     ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0) == 1; }));
@@ -162,7 +182,7 @@ protected:
   void WhenProgressiveSwitchesToAvc(std::vector<UINT32> const& pixels) {
     auto commands = ObserverSession().Observed().commands;
     ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_AVC420), 0);
-    Frame(ClientSession(), ObserverSession(), pixels, 320, 200, { 18, 20, 8, 6 });
+    Frame(pixels, { .width = 320, .height = 200 }, { 18, 20, 8, 6 });
     if (::testing::Test::HasFatalFailure()) return;
     EXPECT_EQ(ObserverSession().Observed().commands, commands + 1);
     ASSERT_EQ(ObserverSession().Observed().avc_nals.size(), 1u);
@@ -203,7 +223,7 @@ protected:
   }
   void ThenScaledAvc(Headless::Client& client, Headless::GraphicsObserver& observer, std::vector<UINT32> const& pixels,
                      std::vector<UINT32> const& scaled, sdlrdp_rect full) {
-    auto reference = Yuv420Reference(scaled, 321, 214);
+    auto reference = Yuv420Reference(scaled, { .width = 321, .height = 214 });
     ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0) == 1; }));
     ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_AVC420), 0);
     auto avc_before = observer.Observed().avc_nals.size();
@@ -279,7 +299,7 @@ TEST_F(AvcGraphics, DecodesPFrameAndResize) {
   sdlrdp_rect const damage{ 18, 20, 8, 6 };
   std::ranges::for_each(std::views::iota(20, 26),
                         [&](int y) { std::ranges::fill(std::span(pixels).subspan((y * 320) + 18, 8), 0x55aaffu); });
-  Frame(ClientSession(), ObserverSession(), pixels, 320, 200, damage);
+  Frame(pixels, { .width = 320, .height = 200 }, damage);
   if (::testing::Test::HasFatalFailure()) return;
   ThenPFrameDamage();
   if (::testing::Test::HasFatalFailure()) return;
@@ -340,7 +360,7 @@ TEST_F(AvcGraphics, CodecSwitchRestoresFullSurfaceAndIdr) {
   PresentFrame(pixels);
   if (::testing::Test::HasFatalFailure()) return;
   ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_AVC420), 0);
-  Frame(ClientSession(), ObserverSession(), pixels, 320, 200, { 18, 20, 8, 6 });
+  Frame(pixels, { .width = 320, .height = 200 }, { 18, 20, 8, 6 });
   if (::testing::Test::HasFatalFailure()) return;
   ThenFullSurfaceIdr();
 }

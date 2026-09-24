@@ -56,5 +56,6 @@ protected:
   void ThenGraphicsAcknowledgementsCounted();
   void ThenGraphicsWindowReleases(std::vector<UINT32> const& pixels);
   void ThenLegacyWindowReleases(Client& client, FrameObserver const& observer, std::vector<UINT32> const& pixels);
+  auto RunPictureSizes(bool graphics) -> void;
 };
 }

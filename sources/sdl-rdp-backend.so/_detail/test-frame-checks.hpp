@@ -1,9 +1,11 @@
 #pragma once
+#include "extent.hpp"
 #include "graphics-observer.hpp"
 #include "test-backend-events.hpp"
 
 #include <atomic>
 #include <cstddef>
+#include <cstdint>
 #include <vector>
 
 namespace BackendGate {
@@ -20,7 +22,7 @@ protected:
   static void ThenProducerFrame(Client& client, FrameObserver& observer, std::atomic<unsigned> const& presents);
   static void ThenReadable(Client const& client);
   void        ThenQoe(Client& client, Headless::GraphicsObserver& observer);
-  void        ResizePicture(Client& client, Headless::GraphicsObserver& observer, std::vector<UINT32>& pixels,
-                            unsigned w, unsigned h, bool graphics);
+  auto        ResizePicture(Client& client, Headless::GraphicsObserver& observer,
+                            std::vector<std::uint32_t>& pixels, Backend::Extent size, bool graphics) -> void;
 };
 }

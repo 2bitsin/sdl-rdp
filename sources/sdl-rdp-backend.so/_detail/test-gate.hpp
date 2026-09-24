@@ -9,5 +9,8 @@ protected:
   static void ThenInitialScreen(sdlrdp_event const& event);
   void        ThenResizedConnection();
   void        ThenCleanDisconnect();
+  auto        PresentMeasuredFrame(Client& client)  -> void;
+  auto        WhenDamagedBlock(Client& client)      -> void;
+  auto        ThenClientDisconnects(Client& client) -> void;
 };
 }

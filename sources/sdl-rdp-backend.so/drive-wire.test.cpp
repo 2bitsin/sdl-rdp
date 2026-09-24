@@ -7,6 +7,8 @@
 #include <cstddef>
 #include <freerdp/channels/rdpdr.h>
 #include <future>
+#include <string>
+#include <utility>
 namespace DriveGate {
 namespace {
 void SendMalformedDrivePacket(Headless::Client& client) {
@@ -51,6 +53,11 @@ namespace {
 int ReadLargeFile(sdlrdp_handle* handle, sdlrdp_file* file) {
   std::string bytes(static_cast<std::ptrdiff_t>(3 * 1024) * 1024, '\0');
   return sdlrdp_drive_read(handle, file, 0, bytes.data(), bytes.size());
+}
+auto StatWithError(sdlrdp_handle* handle, sdlrdp_file* file) -> std::pair<int, std::string> {
+  sdlrdp_stat info   { };
+  auto        result = sdlrdp_drive_fstat(handle, file, &info);
+  return { result, sdlrdp_last_error() };
 }
 }
 namespace {
@@ -124,11 +131,7 @@ TEST_F(DriveWire, MalformedInformationKeepsVideoSession) {
   if (::testing::Test::HasFatalFailure()) return;
   auto* file     = held_file;
   auto& observer = *this->observer;
-  auto  stat     = std::async(std::launch::async, [&] {
-    sdlrdp_stat info   { };
-    auto        result = sdlrdp_drive_fstat(handle.get(), file, &info);
-    return std::pair(result, std::string(sdlrdp_last_error()));
-  });
+  auto  stat     = std::async(std::launch::async, StatWithError, handle.get(), file);
   ASSERT_TRUE(client->Until([&] { return observer.Observed().requests == 1; }));
   auto response = EmptyBasicInformation(observer);
   auto warnings = Logged(SDLRDP_LOG_WARN, "");

@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <gtest/gtest.h>
+#include <ranges>
 
 namespace {
 TEST(GraphicsCapability, HighestSupportedVersion) {
@@ -78,10 +79,10 @@ TEST(Avc, ReplicatesPadding) {
   std::copy_n(source.data() + 16, 12, padded.data() + 64);
   Backend::Avc::ReplicateEdges(padded, { .width = 3, .height = 2 });
   ASSERT_EQ(padded.size(), 16u * 16 * 4);
-  for (unsigned y = 0; y < 16; ++y)
-    for (unsigned x = 0; x < 16; ++x)
-      for (unsigned c = 0; c < 4; ++c)
-        EXPECT_EQ(padded[(((y * 16) + x) * 4) + c], source[(std::min(y, 1u) * 16) + (std::min(x, 2u) * 4) + c]);
+  auto const axis    = std::views::iota(0uz, 16uz);
+  auto const channel = std::views::iota(0uz, 4uz);
+  for (auto [y, x, c] : std::views::cartesian_product(axis, axis, channel))
+    EXPECT_EQ(padded[(((y * 16) + x) * 4) + c], source[(std::min(y, 1uz) * 16) + (std::min(x, 2uz) * 4) + c]);
 }
 void ThenRegionBounds(Backend::Avc::Regions const& regions) {
   EXPECT_EQ(regions.Bounds().x, 2);
@@ -129,6 +130,3 @@ TEST(GraphicsCapability, AllowsAvcWhenOfferedAndAvailable) {
   }
 }
 }
-
-#include <freerdp/primitives.h>
-#include <iostream>

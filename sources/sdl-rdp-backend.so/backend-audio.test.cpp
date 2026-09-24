@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <numeric>
 
 namespace BackendGate {
@@ -82,15 +83,11 @@ TEST_F(AudioGate, AudioInitialVolume) {
 TEST_F(AudioGate, AudioSlowConfirmsBoundTenSeconds) {
   GivenConfirmingSession();
   if (::testing::Test::HasFatalFailure()) return;
-  std::vector<INT16> pcm(480000uz * 2, 1234);
+  std::vector<std::int16_t> pcm(480000uz * 2, 1234);
+  ConfirmationPace const    pace{ .frames  = 480000, .delay = std::chrono::milliseconds(80),
+                                  .timeout = std::chrono::seconds(15) };
   auto writing = std::async(std::launch::async, [&] { return sdlrdp_audio_write(backend.get(), pcm.data(), 480000); });
-  auto               deadline = Clock::now() + std::chrono::seconds(15);
-  while (AudioSession().CaptureState().confirmed_frames < 480000 && Clock::now() < deadline) {
-    if (!ClientSession().Pump(2)) break;
-    while (!AudioSession().CaptureState().pending.empty() &&
-           Clock::now() - AudioSession().CaptureState().pending.front().received >= std::chrono::milliseconds(80))
-      if (!AudioSession().Confirm()) break;
-  }
+  ConfirmDelayedAudio(ClientSession(), AudioSession(), pace);
   ThenSlowAudioConfirms(writing);
 }
 TEST_F(AudioGate, AudioPlaybackConfirmsKeepRealtimeStreamContinuous) {

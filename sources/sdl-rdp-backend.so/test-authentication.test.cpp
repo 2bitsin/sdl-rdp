@@ -7,28 +7,36 @@
 #include <algorithm>
 #include <array>
 #include <format>
+#include <ranges>
 #include <span>
+#include <string_view>
 
 namespace AuthenticationGate {
 namespace {
-void ThenIdentity(sdlrdp_event const& event, char const* user, char const* domain, bool authenticated) {
-  EXPECT_STREQ(event.connected.user, user);
-  EXPECT_STREQ(event.connected.domain, domain);
-  EXPECT_EQ(event.connected.authenticated, authenticated);
+struct Identity {
+  std::string_view user;
+  std::string_view domain;
+  bool             authenticated;
+};
+auto ThenIdentity(sdlrdp_event const& event, Identity expected) -> void {
+  EXPECT_EQ(std::string_view(event.connected.user), expected.user);
+  EXPECT_EQ(std::string_view(event.connected.domain), expected.domain);
+  EXPECT_EQ(event.connected.authenticated, static_cast<int>(expected.authenticated));
 }
 void ThenInformational(sdlrdp_log_level level, std::string const& text) {
   EXPECT_NE(level, SDLRDP_LOG_WARN) << text;
   EXPECT_NE(level, SDLRDP_LOG_ERROR) << text;
 }
-bool ReceiveIdentity(sdlrdp_handle* handle, char const* user, char const* domain, bool authenticated) {
+auto AnyConnectedIdentity(std::span<sdlrdp_event const> events, Identity expected) -> bool {
+  auto connections = events | std::views::filter([](auto const& event) { return event.type == SDLRDP_CONNECTED; });
+  std::ranges::for_each(connections, [=](auto const& event) { ThenIdentity(event, expected); });
+  return !std::ranges::empty(connections);
+}
+auto ReceiveIdentity(sdlrdp_handle& handle, Identity expected) -> bool {
   std::array<sdlrdp_event, 32> events    { };
   bool                         connected = false;
-  while (auto count = sdlrdp_poll(handle, events.data(), 32))
-    for (auto const& event : std::span(events.data(), count)) {
-      if (event.type != SDLRDP_CONNECTED) continue;
-      connected = true;
-      ThenIdentity(event, user, domain, authenticated);
-    }
+  while (auto count = sdlrdp_poll(&handle, events.data(), events.size()))
+    connected = AnyConnectedIdentity(std::span(events.data(), count), expected) || connected;
   return connected;
 }
 void ThenSafeAuthenticationLog(sdlrdp_log_level level, std::string const& text, char const* password) {
@@ -69,17 +77,17 @@ void Authentication::Log(void* raw, sdlrdp_log_level level, char const* text) {
 }
 int Authentication::Verify(void* raw, char const* domain, char const* user, char const* password) {
   auto& self = *static_cast<Authentication*>(raw);
-  self.order           += 'V';
-  self.seen_domain     =  domain;
-  self.seen_user       =  user;
-  self.seen_password   =  password;
-  self.callback_thread =  std::this_thread::get_id();
+  self.seen.order    += 'V';
+  self.seen.domain   =  domain;
+  self.seen.user     =  user;
+  self.seen.password =  password;
+  self.seen.thread   =  std::this_thread::get_id();
   return self.permit;
 }
 int Authentication::Lookup(void* raw, char const* domain, char const* user, unsigned char* hash) {
   auto& self = *static_cast<Authentication*>(raw);
-  self.order += 'L';
-  EXPECT_TRUE(self.seen_password.empty());
+  self.seen.order += 'L';
+  EXPECT_TRUE(self.seen.password.empty());
   return sdlrdp_lookup_pair(&self.config, domain, user, hash);
 }
 void Authentication::Attempt(char const* user, char const* password, char const* domain, bool nla, bool accepted) {
@@ -89,9 +97,10 @@ void Authentication::Attempt(char const* user, char const* password, char const*
   if (!accepted)
     rejections.push_back(
         std::format("Authentication rejected: user \"{}\" from 127.0.0.1", Backend::QualifiedName(domain, user)));
-  bool connected = false;
-  auto receive   = [&] {
-    connected = ReceiveIdentity(handle.get(), user, domain, config.auth != SDLRDP_AUTH_NONE) || connected;
+  Identity const expected  { .user = user, .domain = domain, .authenticated = config.auth != SDLRDP_AUTH_NONE };
+  bool           connected = false;
+  auto           receive   = [&] {
+    connected = ReceiveIdentity(*handle, expected) || connected;
     return connected;
   };
   if (accepted)

@@ -1,5 +1,7 @@
 #include "_detail/test-gate.hpp"
 
+#include "_detail/test-frame-counter.hpp"
+#include "_detail/test-has-cookie.hpp"
 #include "_detail/test-io.hpp"
 
 #include <algorithm>
@@ -8,6 +10,8 @@
 #include <freerdp/gdi/gdi.h>
 #include <oxbox/utilities/number-text.hpp>
 #include <oxbox/utilities/text.hpp>
+#include <ranges>
+#include <span>
 #include <string>
 #include <unistd.h>
 
@@ -53,5 +57,30 @@ void Gate::ThenCleanDisconnect() {
   EXPECT_TRUE(logs.Contains("accepted"));
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, "disconnected"));
   EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, "Peer transport failed")) << logs.Text();
+}
+auto Gate::PresentMeasuredFrame(Client& client) -> void {
+  ASSERT_TRUE(client.Until([&] { return HasCookie(client); }));
+  FrameCounter const counter(client);
+  auto               bytes   = client.Received();
+  Frame(client, { 0, 0, 320, 200 });
+  if (::testing::Test::HasFatalFailure()) return;
+  if (GetParam().codec == SDLRDP_CODEC_PLANAR)
+    EXPECT_LE(counter.BitmapPdus(), 1 + ((client.Received() - bytes) / 0xFFFF));
+  RecordFrameCost(client, bytes);
+}
+auto Gate::WhenDamagedBlock(Client& client) -> void {
+  sdlrdp_rect const block { .x = 73, .y = 51, .w = 40, .h = 30 };
+  auto const        left  = static_cast<std::size_t>(block.x);
+  auto const        width = static_cast<std::size_t>(block.w);
+  std::ranges::for_each(std::views::iota(block.y, block.y + block.h), [&](int y) {
+    std::ranges::fill(std::span(pixels).subspan((static_cast<std::size_t>(y) * 320) + left, width), 0x00020202u);
+  });
+  Frame(client, block);
+}
+auto Gate::ThenClientDisconnects(Client& client) -> void {
+  ASSERT_TRUE(freerdp_disconnect(client.Instance().get()));
+  ThenDisconnected();
+  if (::testing::Test::HasFatalFailure()) return;
+  ThenCleanDisconnect();
 }
 }

@@ -64,10 +64,10 @@ TEST_F(Authentication, VerifyDecides) {
   config.verify = Verify;
   Open(SDLRDP_AUTH_TLS, false);
   Attempt("žąsis", "callback-secret", "ŽEMĖ", false, true);
-  EXPECT_EQ(seen_user, "žąsis");
-  EXPECT_EQ(seen_domain, "ŽEMĖ");
-  EXPECT_TRUE(seen_password == "callback-secret");
-  EXPECT_NE(callback_thread, std::this_thread::get_id());
+  EXPECT_EQ(seen.user, "žąsis");
+  EXPECT_EQ(seen.domain, "ŽEMĖ");
+  EXPECT_TRUE(seen.password == "callback-secret");
+  EXPECT_NE(seen.thread, std::this_thread::get_id());
   permit = false;
   Attempt("žąsis", "callback-secret", "ŽEMĖ", false, false);
   RejectionLogs("callback-secret");
@@ -97,7 +97,7 @@ TEST_F(Authentication, NlaVerifyDenies) {
   Open(SDLRDP_AUTH_NLA);
   Attempt("alice", "correct-secret", "LAB", true, false);
   handle.reset();
-  EXPECT_EQ(order, "LV");
+  EXPECT_EQ(seen.order, "LV");
   RejectionLogs("correct-secret");
 }
 TEST_F(Authentication, NlaWrongPassword) {
@@ -111,8 +111,8 @@ TEST_F(Authentication, NlaHashBeforePassword) {
   Open(SDLRDP_AUTH_NLA);
   Attempt("alice", "wrong-secret", "LAB", true, false);
   handle.reset();
-  EXPECT_EQ(order, "L");
-  EXPECT_TRUE(seen_password.empty());
+  EXPECT_EQ(seen.order, "L");
+  EXPECT_TRUE(seen.password.empty());
   RejectionLogs("wrong-secret");
 }
 TEST_F(Authentication, NlaCallbackOrder) {
@@ -121,8 +121,8 @@ TEST_F(Authentication, NlaCallbackOrder) {
   Open(SDLRDP_AUTH_NLA);
   Attempt("alice", "correct-secret", "LAB", true, true);
   handle.reset();
-  EXPECT_EQ(order, "LV");
-  EXPECT_TRUE(seen_password == "correct-secret");
+  EXPECT_EQ(seen.order, "LV");
+  EXPECT_TRUE(seen.password == "correct-secret");
   RecordProperty("trace", "nla: lookup -> hash check -> verify; authenticated=1");
 }
 TEST_F(Authentication, NlaAcceptsTls) {
@@ -130,17 +130,17 @@ TEST_F(Authentication, NlaAcceptsTls) {
   Open(SDLRDP_AUTH_NLA);
   Attempt("alice", "correct-secret", "LAB", false, true);
   handle.reset();
-  EXPECT_EQ(order, "V");
+  EXPECT_EQ(seen.order, "V");
   RecordProperty("trace", "nla server + tls client: verify only; authenticated=1");
 }
 TEST_F(Authentication, NlaMissingLookup) {
   config.verify = Verify;
   Open(SDLRDP_AUTH_NLA, false);
   Attempt("alice", "missing-secret", "LAB", true, false);
-  EXPECT_TRUE(order.empty());
+  EXPECT_TRUE(seen.order.empty());
   Attempt("alice", "missing-secret", "LAB", false, true);
   handle.reset();
-  EXPECT_EQ(order, "V");
+  EXPECT_EQ(seen.order, "V");
   RejectionLogs("missing-secret");
 }
 namespace {

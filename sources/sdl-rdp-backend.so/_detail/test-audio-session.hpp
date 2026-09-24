@@ -2,10 +2,19 @@
 #include "sound-client.hpp"
 #include "test-round-five.hpp"
 
+#include <chrono>
+#include <cstddef>
+
 namespace BackendGate {
 using Headless::SoundClient;
+struct ConfirmationPace {
+  std::size_t               frames;
+  std::chrono::milliseconds delay;
+  std::chrono::seconds      timeout;
+};
 class AudioSession : public RoundFive {
 protected:
+  static auto ConfirmDelayedAudio(Client& client, SoundClient& audio, ConfirmationPace pace) -> void;
   void        ThenLiveInput(Client& client);
   void        ThenRealtimeCounts(SoundClient const& audio);
   void        GivenAudioServer();

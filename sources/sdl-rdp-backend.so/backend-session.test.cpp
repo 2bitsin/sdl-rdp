@@ -1,7 +1,5 @@
 #include "_detail/system-call.hpp"
-#include "_detail/test-frame-counter.hpp"
 #include "_detail/test-gate.hpp"
-#include "_detail/test-has-cookie.hpp"
 #include "_detail/test-mode.hpp"
 #include "_detail/waiting-open.hpp"
 
@@ -29,6 +27,32 @@ void ThenTakeoverEvents(std::span<sdlrdp_event const> events) {
   ThenTakeoverGeometry(events[1]);
   EXPECT_EQ(events[2].type, SDLRDP_SCREEN);
 }
+auto ThenDisplaced(Client const& first) -> void {
+  ASSERT_TRUE(freerdp_input_send_keyboard_event(first.Instance()->context->input, KBD_FLAGS_DOWN, 0x30));
+  auto deadline  = Clock::now() + std::chrono::seconds(10);
+  bool connected = true;
+  while (connected && Clock::now() < deadline)
+    connected = first.Pump();
+  ASSERT_FALSE(connected);
+  EXPECT_EQ(freerdp_get_last_error(first.Instance()->context), FREERDP_ERROR_DISCONNECTED_BY_OTHER_CONNECTION);
+}
+auto CodecTolerance(sdlrdp_codec codec, bool surface) -> std::uint32_t {
+  switch (codec) {
+  case SDLRDP_CODEC_REMOTEFX:
+  case SDLRDP_CODEC_AUTO: return surface ? 40 : 0;
+  default: return 0;
+  }
+}
+auto NegotiatedCodec(sdlrdp_codec requested, bool surface) -> sdlrdp_codec {
+  switch (requested) {
+  case SDLRDP_CODEC_AUTO: return surface ? SDLRDP_CODEC_REMOTEFX : SDLRDP_CODEC_PLANAR;
+  case SDLRDP_CODEC_REMOTEFX:
+  case SDLRDP_CODEC_NSCODEC: return surface ? requested : SDLRDP_CODEC_PLANAR;
+  case SDLRDP_CODEC_PLANAR:
+  case SDLRDP_CODEC_RAW: return requested;
+  default: utilities::Unreachable(requested);
+  }
+}
 }
 TEST_P(Gate, FramesAndInput) {
   Client client(sdlrdp_port(backend.get()), GetParam().surface);
@@ -36,25 +60,13 @@ TEST_P(Gate, FramesAndInput) {
   if (::testing::Test::HasFatalFailure()) return;
   ThenConnected();
   if (::testing::Test::HasFatalFailure()) return;
-  ASSERT_TRUE(client.Until([&] { return HasCookie(client); }));
-  FrameCounter const counter(client);
-  auto               bytes   = client.Received();
-  Frame(client, { 0, 0, 320, 200 });
+  PresentMeasuredFrame(client);
   if (::testing::Test::HasFatalFailure()) return;
-  if (GetParam().codec == SDLRDP_CODEC_PLANAR)
-    EXPECT_LE(counter.BitmapPdus(), 1 + ((client.Received() - bytes) / 0xFFFF));
-  RecordFrameCost(client, bytes);
-  std::ranges::for_each(std::views::iota(51u, 81u), [&](unsigned y) {
-    std::ranges::fill(std::span(pixels).subspan((y * 320) + 73, 40), 0x00020202u);
-  });
-  Frame(client, { 73, 51, 40, 30 });
+  WhenDamagedBlock(client);
   if (::testing::Test::HasFatalFailure()) return;
   Input(client);
   if (::testing::Test::HasFatalFailure()) return;
-  ASSERT_TRUE(freerdp_disconnect(client.Instance().get()));
-  ThenDisconnected();
-  if (::testing::Test::HasFatalFailure()) return;
-  ThenCleanDisconnect();
+  ThenClientDisconnects(client);
 }
 TEST_P(Gate, ResizeAndWakeup) {
   Reopen(640, 480);
@@ -145,13 +157,8 @@ TEST_P(Gate, NewestClientTakesOver) {
   auto events = Events(3);
   ThenTakeoverEvents(events);
   if (::testing::Test::HasFatalFailure()) return;
-  freerdp_input_send_keyboard_event(first.Instance()->context->input, KBD_FLAGS_DOWN, 0x30);
-  auto deadline  = Clock::now() + std::chrono::seconds(10);
-  bool connected = true;
-  while (connected && Clock::now() < deadline)
-    connected = first.Pump();
-  ASSERT_FALSE(connected);
-  EXPECT_EQ(freerdp_get_last_error(first.Instance()->context), FREERDP_ERROR_DISCONNECTED_BY_OTHER_CONNECTION);
+  ThenDisplaced(first);
+  if (::testing::Test::HasFatalFailure()) return;
   Input(second);
   if (::testing::Test::HasFatalFailure()) return;
   ASSERT_TRUE(freerdp_disconnect(second.Instance().get()));
@@ -167,15 +174,11 @@ TEST_P(Gate, LiveCodecChange) {
   for (auto codec :
        { SDLRDP_CODEC_RAW, SDLRDP_CODEC_PLANAR, SDLRDP_CODEC_REMOTEFX, SDLRDP_CODEC_NSCODEC, SDLRDP_CODEC_AUTO }) {
     ASSERT_EQ(sdlrdp_set_codec(backend.get(), codec), 0);
-    client.Tolerance((codec == SDLRDP_CODEC_REMOTEFX || codec == SDLRDP_CODEC_AUTO) && GetParam().surface ? 40 : 0);
+    client.Tolerance(CodecTolerance(codec, GetParam().surface));
     std::ranges::fill(pixels, 0x00404040u + (unsigned(codec) * 0x00040404u));
     Frame(client, { 0, 0, 320, 200 });
     if (::testing::Test::HasFatalFailure()) return;
-    auto expected = (!GetParam().surface && (codec == SDLRDP_CODEC_REMOTEFX || codec == SDLRDP_CODEC_NSCODEC))
-                        ? SDLRDP_CODEC_PLANAR
-                    : codec == SDLRDP_CODEC_AUTO ? (GetParam().surface ? SDLRDP_CODEC_REMOTEFX : SDLRDP_CODEC_PLANAR)
-                                                 : codec;
-
+    auto expected = NegotiatedCodec(codec, GetParam().surface);
     ThenCodecChange(expected, previous);
     if (::testing::Test::HasFatalFailure()) return;
     previous = expected;

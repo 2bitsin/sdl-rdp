@@ -82,9 +82,8 @@ TEST(RefreshEstimator, BlockedTransportDoesNotChangeOtherModes) {
     EXPECT_EQ(value.Rate(), 60u);
   }
 }
-TEST(RefreshEstimator, EmptyQueueRecoversOnlyOncePerCompletedFrame) {
-  Refresh value{ RefreshMode::Sender };
-  value.Restart();
+namespace {
+auto ThenOnlyEmptyQueueRecovers(Refresh& value) -> void {
   value.Blocked(Refresh::Clock::now());
   value.Written({ .available = true, .outq = 36 }, 10000);
   value.Drained({ .available = true, .outq = 36 });
@@ -93,6 +92,8 @@ TEST(RefreshEstimator, EmptyQueueRecoversOnlyOncePerCompletedFrame) {
   EXPECT_EQ(value.Rate(), 50u);
   value.Drained({ .available = true });
   EXPECT_EQ(value.Rate(), 60u);
+}
+auto ThenRecoversOncePerCompletedFrame(Refresh& value) -> void {
   value.Step(Direction::Down);
   value.Drained({ .available = true });
   EXPECT_EQ(value.Rate(), 50u);
@@ -100,11 +101,21 @@ TEST(RefreshEstimator, EmptyQueueRecoversOnlyOncePerCompletedFrame) {
   value.Step(Direction::Down);
   value.Drained({ .available = true });
   EXPECT_EQ(value.Rate(), 50u);
+}
+auto ThenRestartForgetsQueuedFrame(Refresh& value) -> void {
   value.Written({ .available = true, .outq = 36 }, 10000);
   value.Restart();
   value.Step(Direction::Down);
   value.Drained({ .available = true });
   EXPECT_EQ(value.Rate(), 50u);
+}
+}
+TEST(RefreshEstimator, EmptyQueueRecoversOnlyOncePerCompletedFrame) {
+  Refresh value{ RefreshMode::Sender };
+  value.Restart();
+  ThenOnlyEmptyQueueRecovers(value);
+  ThenRecoversOncePerCompletedFrame(value);
+  ThenRestartForgetsQueuedFrame(value);
 }
 class RefreshReset : public testing::TestWithParam<RefreshMode> { };
 TEST_P(RefreshReset, RestartDropsHistory) {
