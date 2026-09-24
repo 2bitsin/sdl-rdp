@@ -37,11 +37,11 @@ auto AudioGate::ConnectAudioFormats(Client& client, SoundClient& audio) -> void 
   ThenAudioFormats(audio);
 }
 auto AudioGate::ThenInitialVolume(Client& client, SoundClient& audio) -> void {
-  EXPECT_EQ(sdlrdp_audio_rate(backend.get()), 44100u);
+  EXPECT_EQ(sdlrdp_audio_rate(backend.Handle()), 44100u);
   std::vector<INT16> pcm(882uz * 2);
   std::ranges::generate(pcm, [i = 0]() mutable { return ++i % 2 ? -12000 : 12000; });
-  ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 44), 44);
-  ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data() + 88, 838), 838);
+  ASSERT_EQ(sdlrdp_audio_write(backend.Handle(), pcm.data(), 44), 44);
+  ASSERT_EQ(sdlrdp_audio_write(backend.Handle(), pcm.data() + 88, 838), 838);
   ASSERT_TRUE(client.Until([&] { return audio.CaptureState().samples.size() == pcm.size(); }));
   ASSERT_NO_FATAL_FAILURE(ThenInitialVolumeSamples(audio));
   RecordProperty("volume_pcm", "44100 Hz; 44+838 frames; left=-12000 right=6000; volume=0x8000ffff");
@@ -54,19 +54,20 @@ auto AudioGate::ThenWriterFinishes(Client& client, SoundClient& audio, std::futu
 }
 auto AudioGate::ThenFirstAudioBlockConfirms() -> void {
   ASSERT_TRUE(AudioSession().Confirm());
-  EXPECT_EQ(sdlrdp_audio_wait(backend.get(), 10000), 1);
+  EXPECT_EQ(sdlrdp_audio_wait(backend.Handle(), 10000), 1);
   EXPECT_EQ(logs.Count(SDLRDP_LOG_WARN, "Audio confirmation gate waiting"), 1u);
 }
 auto AudioGate::WhenLastAudioBlockConfirms(std::vector<INT16> const& pcm) -> void {
   ASSERT_TRUE(AudioSession().Confirm(24));
-  EXPECT_EQ(sdlrdp_audio_wait(backend.get(), 10000), 1);
-  ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 960), 960);
+  EXPECT_EQ(sdlrdp_audio_wait(backend.Handle(), 10000), 1);
+  ASSERT_EQ(sdlrdp_audio_write(backend.Handle(), pcm.data(), 960), 960);
   ASSERT_TRUE(ClientSession().Until([&] { return AudioSession().CaptureState().samples.size() == 49920; }));
-  EXPECT_EQ(sdlrdp_audio_wait(backend.get(), 0), 0);
+  EXPECT_EQ(sdlrdp_audio_wait(backend.Handle(), 0), 0);
 }
 auto AudioGate::WhenIdleAudioBurst(std::vector<std::int16_t> const& pcm, std::size_t burst) -> void {
   auto started = Clock::now();
-  auto writing = std::async(std::launch::async, [&] { return sdlrdp_audio_write(backend.get(), pcm.data(), 48000); });
+  auto writing = std::async(std::launch::async,
+                            [&] { return sdlrdp_audio_write(backend.Handle(), pcm.data(), 48000); });
   EXPECT_TRUE(UntilCaptured(burst * pcm.size()));
   EXPECT_EQ(writing.get(), 48000);
   EXPECT_GE(Clock::now() - started, std::chrono::milliseconds(burst == 1 ? 950 : 450));
@@ -80,7 +81,7 @@ auto AudioGate::ThenDisconnectedWriter(Client& client, SoundClient& audio, std::
   ThenWriterFinishes(client, audio, writing, reconnect, frames);
 }
 auto AudioGate::ThenSlowAudioConfirms(std::future<int>& writing) -> void {
-  if (AudioSession().CaptureState().confirmed_frames < 480000) sdlrdp_audio_close(backend.get());
+  if (AudioSession().CaptureState().confirmed_frames < 480000) sdlrdp_audio_close(backend.Handle());
   EXPECT_EQ(AudioSession().CaptureState().confirmed_frames, 480000u);
   EXPECT_LE(AudioSession().CaptureState().maximum_pending_frames, 24960u);
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_WARN, "Audio confirmation gate waiting: client is 500.000 ms behind."));
@@ -96,14 +97,14 @@ auto AudioGate::GivenUnconfirmedSession() -> void {
 }
 auto AudioGate::NewSession(std::uint32_t width, std::uint32_t height) -> std::pair<Client&, SoundClient&> {
   connected_audio.reset();
-  connected_client = std::make_unique<Client>(sdlrdp_port(backend.get()), true, width, height);
+  connected_client = std::make_unique<Client>(sdlrdp_port(backend.Handle()), true, width, height);
   connected_audio  = std::make_unique<SoundClient>(*connected_client);
   return { *connected_client, *connected_audio };
 }
 // A capture that never completes closes the device, so a writer blocked on it returns.
 auto AudioGate::UntilCaptured(std::size_t samples) -> bool {
   auto const captured = ClientSession().Until([&] { return AudioSession().CaptureState().samples.size() == samples; });
-  if (!captured) sdlrdp_audio_close(backend.get());
+  if (!captured) sdlrdp_audio_close(backend.Handle());
   return captured;
 }
 auto AudioGate::ClientSession() -> Client& {

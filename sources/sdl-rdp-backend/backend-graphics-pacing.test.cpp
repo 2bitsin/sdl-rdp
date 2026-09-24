@@ -14,7 +14,7 @@ protected:
 };
 TEST_F(RoundFive, PipelinedLegacyPresent) {
   ASSERT_NO_FATAL_FAILURE(Open(320, 200));
-  Client client(sdlrdp_port(backend.get()), true);
+  Client client(sdlrdp_port(backend.Handle()), true);
   ASSERT_NO_FATAL_FAILURE(Connect(client));
   FrameObserver const       observer(client);
   std::vector<UINT32> const pixels(320uz * 200, 0x123456);
@@ -40,7 +40,7 @@ auto ThenFrameStatistics(Logs& logs) -> void {
 TEST_F(PipelinedGraphics, GraphicsFrameStatistics) {
   ASSERT_NO_FATAL_FAILURE(PresentGraphicsFrames(GraphicsClient(), GraphicsObserver(), pixels, 1, 2));
   for (unsigned count = 0; count < 3; ++count) Present(pixels, 320, 200);
-  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 1), 0);
+  EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 1), 0);
   ASSERT_TRUE(GraphicsObserver().AckFrame(0, 0));
   ASSERT_NO_FATAL_FAILURE(AwaitFrames(GraphicsClient(), GraphicsObserver().Observed().frames, 3));
   ASSERT_NO_FATAL_FAILURE(ThenGraphicsAcknowledgementsCounted());
@@ -51,7 +51,7 @@ TEST_F(PipelinedGraphics, GraphicsFrameStatistics) {
 TEST_F(PipelinedGraphics, GraphicsAcknowledgementsAgeOutAndResume) {
   ASSERT_NO_FATAL_FAILURE(PresentGraphicsFrames(GraphicsClient(), GraphicsObserver(), pixels, 1, 4));
   ASSERT_TRUE(GraphicsObserver().AckFrame(3, 0));
-  ASSERT_TRUE(GraphicsClient().Until([&] { return sdlrdp_wait_frame(backend.get(), 0) != 0; }));
+  ASSERT_TRUE(GraphicsClient().Until([&] { return sdlrdp_wait_frame(backend.Handle(), 0) != 0; }));
   ASSERT_NO_FATAL_FAILURE(PresentGraphicsFrames(GraphicsClient(), GraphicsObserver(), pixels, 5, 6));
   ThenAgedWindowResumes(pixels);
 }

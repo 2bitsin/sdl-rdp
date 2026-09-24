@@ -105,7 +105,7 @@ protected:
   auto GivenGraphics(sdlrdp_codec codec = SDLRDP_CODEC_AVC420, unsigned width = 320, unsigned height = 200,
                      bool avc = true) -> void {
     ASSERT_NO_FATAL_FAILURE(Open(codec, width, height));
-    graphics_client = std::make_unique<Headless::Client>(sdlrdp_port(backend.get()), true);
+    graphics_client = std::make_unique<Headless::Client>(sdlrdp_port(backend.Handle()), true);
     graphics_client->EnableGraphics(avc);
     if (!avc)
       ASSERT_TRUE(freerdp_settings_set_bool(graphics_client->Instance()->context->settings, FreeRDP_GfxH264, FALSE));
@@ -142,7 +142,7 @@ protected:
     auto error     = client.MaxError(pixels, &reference);
     RecordProperty("maximum_channel_error_" + std::to_string(observer.Observed().frames.size()), error);
     EXPECT_LE(error, 8u) << logs.Text(true);
-    ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0) == 1; }));
+    ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.Handle(), 0) == 1; }));
   }
   auto TearDown() -> void override {
     graphics_observer.reset();
@@ -171,7 +171,7 @@ protected:
   }
   auto WhenProgressiveSwitchesToAvc(std::vector<UINT32> const& pixels) -> void {
     auto commands = ObserverSession().Observed().commands;
-    ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_AVC420), 0);
+    ASSERT_EQ(sdlrdp_set_codec(backend.Handle(), SDLRDP_CODEC_AVC420), 0);
     ASSERT_NO_FATAL_FAILURE(Frame(pixels, { .width = 320, .height = 200 }, { 18, 20, 8, 6 }));
     EXPECT_EQ(ObserverSession().Observed().commands, commands + 1);
     ASSERT_EQ(ObserverSession().Observed().avc_nals.size(), 1u);
@@ -187,7 +187,7 @@ protected:
   auto WhenSmallAvcRequested(std::vector<UINT32> const& pixels) -> void {
     while (!backend.Poll().empty()) {
     }
-    ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_AVC420), 0);
+    ASSERT_EQ(sdlrdp_set_codec(backend.Handle(), SDLRDP_CODEC_AVC420), 0);
     ASSERT_NO_FATAL_FAILURE(PresentFrame(pixels, 32, 32));
     ASSERT_NO_FATAL_FAILURE(ThenProgressiveOnly());
     EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "surface below NVENC minimum"), 1u);
@@ -209,8 +209,8 @@ protected:
   auto ThenScaledAvc(Headless::Client& client, Headless::GraphicsObserver& observer, std::vector<UINT32> const& pixels,
                      std::vector<UINT32> const& scaled, sdlrdp_rect full) -> void {
     auto reference = Yuv420Reference(scaled, { .width = 321, .height = 214 });
-    ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0) == 1; }));
-    ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_AVC420), 0);
+    ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.Handle(), 0) == 1; }));
+    ASSERT_EQ(sdlrdp_set_codec(backend.Handle(), SDLRDP_CODEC_AVC420), 0);
     auto avc_before = observer.Observed().avc_nals.size();
     ASSERT_EQ(backend.Present(pixels, 320, 200, full), 0);
     ASSERT_TRUE(client.Until([&] { return observer.Observed().avc_nals.size() > avc_before; }));
@@ -230,8 +230,8 @@ protected:
   }
   auto ScaledPattern(Headless::Client& client, Headless::GraphicsObserver& observer, std::vector<UINT32> const& pixels)
       -> void {
-    ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_RAW), 0);
-    ASSERT_EQ(sdlrdp_set_aspect(backend.get(), { 3, 2 }), 0);
+    ASSERT_EQ(sdlrdp_set_codec(backend.Handle(), SDLRDP_CODEC_RAW), 0);
+    ASSERT_EQ(sdlrdp_set_aspect(backend.Handle(), { 3, 2 }), 0);
     auto              before{ observer.Observed().frames.size() };
     sdlrdp_rect const full  { 0, 0, 320, 200                    };
     ASSERT_EQ(backend.Present(pixels, 320, 200, full), 0);
@@ -320,10 +320,10 @@ TEST_F(AvcAvailable, CodecSwitchRestoresFullSurfaceAndIdr) {
   ASSERT_NO_FATAL_FAILURE(GivenGraphics(SDLRDP_CODEC_AVC420));
   std::vector<UINT32> pixels(320uz * 200, 0xff0000);
   ASSERT_NO_FATAL_FAILURE(PresentFrame(pixels));
-  ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_RAW), 0);
+  ASSERT_EQ(sdlrdp_set_codec(backend.Handle(), SDLRDP_CODEC_RAW), 0);
   pixels.assign(pixels.size(), 0x335577);
   ASSERT_NO_FATAL_FAILURE(PresentFrame(pixels));
-  ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_AVC420), 0);
+  ASSERT_EQ(sdlrdp_set_codec(backend.Handle(), SDLRDP_CODEC_AVC420), 0);
   ASSERT_NO_FATAL_FAILURE(Frame(pixels, { .width = 320, .height = 200 }, { 18, 20, 8, 6 }));
   ThenFullSurfaceIdr();
 }

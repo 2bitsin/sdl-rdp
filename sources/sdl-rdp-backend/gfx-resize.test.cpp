@@ -89,9 +89,9 @@ auto ThenProgressiveGeneration(Headless::GraphicsObserver const& observer, unsig
 }
 constexpr std::array ResizeSequence{ std::pair{ 640u, 480u }, std::pair{ 320u, 200u }, std::pair{ 640u, 480u } };
 TEST_F(GraphicsResize, RawAspectMatchesBilinear) {
-  ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_RAW), 0);
-  ASSERT_EQ(sdlrdp_set_aspect(backend.get(), { 4, 3 }), 0);
-  Headless::Client client(sdlrdp_port(backend.get()), true, 320, 240);
+  ASSERT_EQ(sdlrdp_set_codec(backend.Handle(), SDLRDP_CODEC_RAW), 0);
+  ASSERT_EQ(sdlrdp_set_aspect(backend.Handle(), { 4, 3 }), 0);
+  Headless::Client client(sdlrdp_port(backend.Handle()), true, 320, 240);
   client.EnableGraphics();
   Headless::GraphicsObserver observer(client);
   ASSERT_TRUE(client.Connect());
@@ -108,7 +108,7 @@ TEST_F(GraphicsResize, RawAspectMatchesBilinear) {
   ThenBilinearPixels(*gdi, pixels);
 }
 TEST_F(GraphicsResize, ProgressiveContextAndFullDamage) {
-  Headless::Client client(sdlrdp_port(backend.get()), true, 640, 480);
+  Headless::Client client(sdlrdp_port(backend.Handle()), true, 640, 480);
   client.EnableGraphics();
   client.Tolerance(24);
   Headless::GraphicsObserver observer(client);
@@ -141,7 +141,7 @@ auto ApplyPlanarDamage(std::vector<UINT32>& pixels, std::vector<UINT32>& expecte
 }
 TEST_F(GraphicsCost, PlanarPartialMatchesFull) {
   ASSERT_NO_FATAL_FAILURE(Open(354, 226, SDLRDP_CODEC_PLANAR));
-  Headless::Client client(sdlrdp_port(backend.get()), true, 354, 226);
+  Headless::Client client(sdlrdp_port(backend.Handle()), true, 354, 226);
   client.EnableGraphics();
   Headless::GraphicsObserver observer(client);
   ASSERT_NO_FATAL_FAILURE(ConnectGraphics(client));

@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <format>
 #include <memory>
 #include <optional>
@@ -48,7 +49,7 @@ auto ListEntry(void* user, char const* directory, char const* name) -> SDL_Enume
   auto*        storage = static_cast<SDL_Storage*>(user);
   SDL_PathInfo info    { };
   if (!SDL_GetStoragePathInfo(storage, (std::string(directory) + name).c_str(), &info)) return SDL_ENUM_FAILURE;
-  SDL_Log("entry name=%s size=%llu dir=%d", name, (unsigned long long)info.size, info.type == SDL_PATHTYPE_DIRECTORY);
+  SDL_Log("entry name=%s size=%" SDL_PRIu64 " dir=%d", name, info.size, info.type == SDL_PATHTYPE_DIRECTORY);
   return SDL_ENUM_CONTINUE;
 }
 auto ListDrive(char const* value) -> void {
@@ -61,9 +62,9 @@ auto ListDrive(char const* value) -> void {
     return;
   SDL_Log("ls done");
 }
-auto ReadDigest(SDL_IOStream& file, EVP_MD_CTX& hash) -> std::optional<uint64_t> {
-  std::vector<unsigned char> buffer(65536);
-  uint64_t                   total  = 0;
+auto ReadDigest(SDL_IOStream& file, EVP_MD_CTX& hash) -> std::optional<std::uint64_t> {
+  std::vector<std::byte> buffer(65536);
+  std::uint64_t          total  = 0;
   while (auto const count = SDL_ReadIO(&file, buffer.data(), buffer.size())) {
     Check(EVP_DigestUpdate(&hash, buffer.data(), count) == 1);
     total += count;
@@ -71,12 +72,12 @@ auto ReadDigest(SDL_IOStream& file, EVP_MD_CTX& hash) -> std::optional<uint64_t>
   if (!DriveResult(SDL_GetIOStatus(&file) == SDL_IO_STATUS_EOF, "cat")) return std::nullopt;
   return total;
 }
-auto LogDigest(EVP_MD_CTX& hash, uint64_t total) -> void {
-  std::array<unsigned char, EVP_MAX_MD_SIZE> digest { };
-  unsigned                                   size   = 0;
+auto LogDigest(EVP_MD_CTX& hash, std::uint64_t total) -> void {
+  std::array<std::uint8_t, EVP_MAX_MD_SIZE> digest { };
+  std::uint32_t                             size   = 0;
   Check(EVP_DigestFinal_ex(&hash, digest.data(), &size) == 1);
   auto const hex = oxbox::utilities::ToHex(std::as_bytes(std::span(digest).first(size)));
-  SDL_Log("cat bytes=%llu sha256=%s", (unsigned long long)total, hex.c_str());
+  SDL_Log("cat bytes=%" SDL_PRIu64 " sha256=%s", total, hex.c_str());
 }
 auto CatDrive(char const* value) -> void {
   auto file = OpenDriveFile(value, "rb", "cat");

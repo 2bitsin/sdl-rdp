@@ -11,7 +11,7 @@ namespace {
 using Headless::GraphicsCost;
 TEST_F(GraphicsCost, FullRandomFrame) {
   ASSERT_NO_FATAL_FAILURE(Open());
-  Headless::Client client(sdlrdp_port(backend.get()), true, 1280, 800);
+  Headless::Client client(sdlrdp_port(backend.Handle()), true, 1280, 800);
   client.EnableGraphics();
   Headless::GraphicsObserver observer(client);
   ASSERT_TRUE(client.Connect());
@@ -28,7 +28,7 @@ TEST_F(GraphicsCost, FullRandomFrame) {
 TEST_F(GraphicsCost, AvcFullFrame) {
   if (!Backend::Avc::Encoder::Available()) GTEST_SKIP() << Backend::Avc::Encoder::UnavailableReason();
   ASSERT_NO_FATAL_FAILURE(Open(1920, 1080, SDLRDP_CODEC_AVC420));
-  Headless::Client client(sdlrdp_port(backend.get()), true, 1920, 1080);
+  Headless::Client client(sdlrdp_port(backend.Handle()), true, 1920, 1080);
   client.EnableGraphics(true);
   Headless::GraphicsObserver observer(client);
   ASSERT_NO_FATAL_FAILURE(ConnectGraphics(client));

@@ -43,7 +43,7 @@ auto Session::ReapEvent() const noexcept -> HANDLE {
 auto Session::Takeover(PeerLink const& self) -> FrameLock {
   std::scoped_lock const session(_guard);
   auto                   peers   = LockPeersAndFrame();
-  peers.ForEach([&](Peer& peer) {
+  peers.ForEach([&](Peer& peer, FrameLock const& /*held*/) {
     if (peer.Owns(self))
       _current = &peer;
     else if (peer.Evict())
@@ -55,7 +55,7 @@ auto Session::Takeover(PeerLink const& self) -> FrameLock {
 auto Session::Depart(PeerLink const& self, Activation& activation) -> void {
   {
     std::scoped_lock const session(_guard);
-    LockPeersAndFrame().ForEach([&](Peer& peer) {
+    LockPeersAndFrame().ForEach([&](Peer& peer, FrameLock const& /*held*/) {
       if (!peer.Owns(self)) return;
       if (_current == &peer) _current = nullptr;
       if (activation.Deactivate()) AnnounceDeparture(*this, _events, peer);

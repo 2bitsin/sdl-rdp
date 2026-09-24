@@ -9,9 +9,9 @@ namespace Backend {
 class PeerFrame {
 public:
        PeerFrame(PeerSet& peers, FrameStore& frames);
-  auto Frame() const noexcept                          -> FrameLock const&;
-  auto ForEach(std::invocable<Peer&> auto visit) const -> void {
-    _peers.ForEach(_held, visit);
+  auto Frame() const noexcept                                            -> FrameLock const&;
+  auto ForEach(std::invocable<Peer&, FrameLock const&> auto visit) const -> void {
+    _peers.ForEach(_held, [&](Peer& peer) { visit(peer, _frame); });
   }
   auto ReleaseFrame() && noexcept -> FrameLock;
 

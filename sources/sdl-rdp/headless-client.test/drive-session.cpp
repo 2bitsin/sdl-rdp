@@ -15,7 +15,7 @@ namespace DriveGate {
 auto DriveSession::ThenPartialReads(sdlrdp_file* file, std::string const& source, std::string& result) -> void {
   for (size_t const offset : { 13u, 1048577u, 3145697u }) {
     result.resize(65536);
-    auto count = sdlrdp_drive_read(handle.get(), file, offset, result.data(), result.size());
+    auto count = sdlrdp_drive_read(handle.Handle(), file, offset, result.data(), result.size());
     ASSERT_GE(count, 0) << sdlrdp_last_error();
     EXPECT_EQ(result.substr(0, count), source.substr(offset, result.size()));
   }
@@ -29,14 +29,14 @@ auto DriveSession::SetUp() -> void {
   Connect();
 }
 auto DriveSession::Connect(char const* name, bool second) -> void {
-  client = std::make_unique<Headless::Client>(sdlrdp_port(handle.get()), false);
+  client = std::make_unique<Headless::Client>(sdlrdp_port(handle.Handle()), false);
   auto path = scratch.Path().string();
   Headless::ShareDrive(*client, path.c_str(), name);
   if (second) Headless::ShareDrive(*client, path.c_str(), "second");
   ASSERT_TRUE(client->Connect()) << logs.Text(true);
   ASSERT_TRUE(client->Until([&] {
     sdlrdp_drive value{ };
-    if (sdlrdp_drive_list(handle.get(), &value, 1) != 1) return false;
+    if (sdlrdp_drive_list(handle.Handle(), &value, 1) != 1) return false;
     EXPECT_STREQ(value.name, name);
     drive = value.id;
     return true;
@@ -85,7 +85,7 @@ auto DriveSession::Write(std::string const& name, std::string const& bytes) -> v
 }
 auto DriveSession::Open(char const* name, unsigned flags) -> sdlrdp_file* {
   sdlrdp_file* file = nullptr;
-  EXPECT_EQ(sdlrdp_drive_open(handle.get(), drive, name, flags, &file), 0) << sdlrdp_last_error();
+  EXPECT_EQ(sdlrdp_drive_open(handle.Handle(), drive, name, flags, &file), 0) << sdlrdp_last_error();
   return file;
 }
 auto DriveSession::ThenRemovedDrive() -> void {
@@ -100,8 +100,8 @@ auto DriveSession::PolledDriveName(bool added, std::uint32_t id) -> std::optiona
 }
 auto DriveSession::ThenDriveFailure(sdlrdp_file* file, std::size_t warnings) -> void {
   sdlrdp_drive value{ };
-  EXPECT_EQ(sdlrdp_drive_list(handle.get(), &value, 1), 0);
-  EXPECT_EQ(sdlrdp_drive_close(handle.get(), file), -1);
+  EXPECT_EQ(sdlrdp_drive_list(handle.Handle(), &value, 1), 0);
+  EXPECT_EQ(sdlrdp_drive_close(handle.Handle(), file), -1);
   EXPECT_EQ(Logged(SDLRDP_LOG_WARN, "") - warnings, 1u);
   EXPECT_EQ(Logged(SDLRDP_LOG_WARN, "Drive channel ended: Truncated drive response."), 1u);
 }

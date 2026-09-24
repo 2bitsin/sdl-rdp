@@ -30,7 +30,7 @@ auto ProduceProgressiveFrames(Headless::BackendInstance const& backend) -> std::
   auto                       deadline  = Clock::now() + std::chrono::seconds(2);
   std::size_t                presented = 0;
   while (Clock::now() < deadline) {
-    if (!sdlrdp_wait_frame(backend.get(), 10)) continue;
+    if (!sdlrdp_wait_frame(backend.Handle(), 10)) continue;
     Headless::MovingTilePattern(pixels, 1280, 800, presented);
     if (backend.Present(pixels, 1280, 800, full)) break;
     ++presented;
@@ -40,7 +40,7 @@ auto ProduceProgressiveFrames(Headless::BackendInstance const& backend) -> std::
 }
 TEST_F(AudioGate, AudioContinuousUnderProgressiveLoad) {
   ASSERT_NO_FATAL_FAILURE(Open(1280, 800, { }, SDLRDP_CODEC_PROGRESSIVE));
-  ASSERT_EQ(sdlrdp_audio_open(backend.get()), 0);
+  ASSERT_EQ(sdlrdp_audio_open(backend.Handle()), 0);
   auto [client, audio] = NewSession(1280, 800);
   client.EnableGraphics();
   Headless::GraphicsObserver const observer(client);
@@ -60,7 +60,8 @@ TEST_F(AudioGate, AudioNeverConfirmsUsesServerClock) {
   ASSERT_NO_FATAL_FAILURE(GivenUnconfirmedSession());
   std::vector<INT16> const pcm(48000uz * 2, 1234);
   auto                     started = Clock::now();
-  auto writing = std::async(std::launch::async, [&] { return sdlrdp_audio_write(backend.get(), pcm.data(), 48000); });
+  auto writing = std::async(std::launch::async,
+                            [&] { return sdlrdp_audio_write(backend.Handle(), pcm.data(), 48000); });
   EXPECT_TRUE(UntilCaptured(pcm.size()));
   EXPECT_EQ(writing.get(), 48000);
   auto elapsed = std::chrono::duration<double>(Clock::now() - started).count();

@@ -18,7 +18,7 @@ auto ConnectConfirmed(Client& client, Logs& logs, std::invocable<Client&> auto c
 }
 }
 auto GraphicsSession::ThenWriteDisconnect(Client& client) -> void {
-  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 1);
+  EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 0), 1);
   ASSERT_TRUE(client.Disconnect());
   EXPECT_TRUE(std::ranges::contains(UntilEvent(SDLRDP_DISCONNECTED), SDLRDP_DISCONNECTED, &sdlrdp_event::type));
   backend.Close();
@@ -51,12 +51,12 @@ auto GraphicsSession::ConnectPipeline(Client& client) -> void {
 }
 auto GraphicsSession::GivenGraphicsClient(sdlrdp_codec codec) -> void {
   ASSERT_NO_FATAL_FAILURE(Open(640, 480, { }, codec));
-  graphics_client = std::make_unique<Client>(sdlrdp_port(backend.get()), true, 640, 480);
+  graphics_client = std::make_unique<Client>(sdlrdp_port(backend.Handle()), true, 640, 480);
   graphics_client->EnableGraphics();
 }
 auto GraphicsSession::GivenPipelinedGraphics() -> void {
   ASSERT_NO_FATAL_FAILURE(Open(320, 200, { }, SDLRDP_CODEC_PROGRESSIVE));
-  graphics_client = std::make_unique<Client>(sdlrdp_port(backend.get()), true);
+  graphics_client = std::make_unique<Client>(sdlrdp_port(backend.Handle()), true);
   graphics_client->EnableGraphics();
   graphics_observer = std::make_unique<Headless::GraphicsObserver>(*graphics_client);
   ConnectGraphics(*graphics_client, *graphics_observer);

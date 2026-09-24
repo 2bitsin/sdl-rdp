@@ -53,7 +53,7 @@ protected:
   }
   auto Measure(sdlrdp_codec codec, bool noise) -> void {
     ASSERT_NO_FATAL_FAILURE(Open(640, 480, { }, codec));
-    Client client(sdlrdp_port(backend.get()), true, 640, 480);
+    Client client(sdlrdp_port(backend.Handle()), true, 640, 480);
     ASSERT_NO_FATAL_FAILURE(PrepareMeasurement(client, codec, noise));
     auto     initial_encode = EncodeDuration();
     auto     initial_bytes  = client.Received();

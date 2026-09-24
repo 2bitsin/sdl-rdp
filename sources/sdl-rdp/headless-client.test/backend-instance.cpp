@@ -17,7 +17,7 @@ auto BackendInstance::TryOpen(sdlrdp_config const& config) -> int {
 auto BackendInstance::Close() noexcept -> void {
   _handle.reset();
 }
-auto BackendInstance::get() const noexcept -> sdlrdp_handle* {
+auto BackendInstance::Handle() const noexcept -> sdlrdp_handle* {
   return _handle.get();
 }
 auto BackendInstance::operator*() const -> sdlrdp_handle& {
@@ -26,9 +26,6 @@ auto BackendInstance::operator*() const -> sdlrdp_handle& {
 }
 BackendInstance::operator bool() const noexcept {
   return _handle != nullptr;
-}
-auto BackendInstance::operator==(std::nullptr_t) const noexcept -> bool {
-  return _handle == nullptr;
 }
 auto BackendInstance::Poll() const -> std::vector<sdlrdp_event> {
   std::array<sdlrdp_event, 256> batch { };

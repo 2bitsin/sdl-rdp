@@ -42,7 +42,7 @@ auto DriveChannel::List(sdlrdp_drive* out, unsigned max) -> int {
   }
   return int(count);
 }
-auto DriveChannel::WaitAny(std::span<Slot const> slots) -> size_t {
+auto DriveChannel::WaitAny(std::span<Slot const> slots) -> std::size_t {
   Expects(std::ranges::any_of(slots, [](auto const& slot) { return bool(slot.request); }),
           "transfer has outstanding requests");
   std::unique_lock lock(mutex);

@@ -65,7 +65,7 @@ auto AudioSession::ThenRealtimeCounts(SoundClient const& audio) -> void {
 }
 auto AudioSession::GivenAudioServer() -> void {
   ASSERT_NO_FATAL_FAILURE(Open(320, 200));
-  ASSERT_EQ(sdlrdp_audio_open(backend.get()), 0);
+  ASSERT_EQ(sdlrdp_audio_open(backend.Handle()), 0);
 }
 auto AudioSession::ThenAudioFormats(SoundClient const& audio) -> void {
   ASSERT_EQ(audio.CaptureState().server_formats.size(), 2u);
@@ -87,12 +87,12 @@ auto AudioSession::ConnectAudio(Client& client, SoundClient& audio) -> void {
   ASSERT_TRUE(audio_connected(EventsUntil(audio_connected, true, [&client] { return client.Pump(); }))) << logs.Text();
 }
 auto AudioSession::RunRealtimeAudio(Client& client, SoundClient& audio) -> void {
-  Expects(backend != nullptr, "backend exists");
+  Expects(backend.Handle() != nullptr, "backend exists");
   Expects(audio.CaptureState().opened, "client audio channel is open");
-  auto writing = std::async(std::launch::async, [&] { return WriteRealtimeAudio(backend.get()); });
+  auto writing = std::async(std::launch::async, [&] { return WriteRealtimeAudio(backend.Handle()); });
   ConfirmDelayedAudio(client, audio,
                       { .frames = 96000, .delay = std::chrono::milliseconds(150), .timeout = std::chrono::seconds(4) });
-  sdlrdp_audio_close(backend.get());
+  sdlrdp_audio_close(backend.Handle());
   EXPECT_EQ(writing.get(), 96000);
   EXPECT_EQ(audio.CaptureState().samples.size() / 2, 96000u);
   ASSERT_NO_FATAL_FAILURE(ThenAudioCadence(audio));
@@ -120,9 +120,9 @@ auto AudioSession::EstablishConfirmations(Client& client, SoundClient& audio) ->
   std::vector<INT16> pcm(24000uz * 2);
   auto               automatic = audio.CaptureState().auto_confirm;
   audio.CaptureState().auto_confirm = true;
-  ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), 24000), 24000);
+  ASSERT_EQ(sdlrdp_audio_write(backend.Handle(), pcm.data(), 24000), 24000);
   ASSERT_TRUE(client.Until([&] { return audio.CaptureState().confirmed_frames == 24000; }));
-  ASSERT_EQ(sdlrdp_audio_wait(backend.get(), 10000), 1);
+  ASSERT_EQ(sdlrdp_audio_wait(backend.Handle(), 10000), 1);
   audio.CaptureState().auto_confirm = automatic;
   audio.CaptureState().samples.clear();
   audio.CaptureState().confirmed_frames = audio.CaptureState().maximum_pending_frames = 0;
@@ -132,7 +132,7 @@ auto AudioSession::ThenUnavailableAudio(Client& client, bool unmatched) -> void 
   auto event  = std::ranges::find(events, SDLRDP_AUDIO, &sdlrdp_event::type);
   ASSERT_NE(event, events.end()) << logs.Text();
   EXPECT_EQ(event->audio.connected, 0u);
-  EXPECT_EQ(sdlrdp_audio_rate(backend.get()), 0u);
+  EXPECT_EQ(sdlrdp_audio_rate(backend.Handle()), 0u);
   EXPECT_EQ(logs.Count(SDLRDP_LOG_WARN, unmatched ? "rate=22050" : "client formats: none"), 1u);
   EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, "client doesn't support any format"));
 }
@@ -141,7 +141,7 @@ auto AudioSession::ThenLiveVideoAndInput(Client& client) -> void {
   ASSERT_NO_FATAL_FAILURE(Present(std::vector<std::uint32_t>(320uz * 200, 0x123456), 320, 200));
   ASSERT_TRUE(client.Until([&] { return !observer.Frames().empty(); }));
   ASSERT_TRUE(observer.Ack());
-  ASSERT_EQ(sdlrdp_wait_frame(backend.get(), 10000), 1);
+  ASSERT_EQ(sdlrdp_wait_frame(backend.Handle(), 10000), 1);
   ThenLiveInput(client);
 }
 }

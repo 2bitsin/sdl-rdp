@@ -16,7 +16,7 @@ auto Contains(sdlrdp_event_type type) {
 }
 }
 auto BackendEvents::Acknowledged() const -> bool {
-  Expects(backend != nullptr, "backend exists");
+  Expects(backend.Handle() != nullptr, "backend exists");
   auto const status = CurrentStatus(*backend);
   return status && status->acknowledged >= Presented(*backend);
 }
@@ -42,7 +42,7 @@ auto BackendEvents::Accumulate(std::vector<sdlrdp_event>& result, bool include_r
                        [=](auto const& event) { return include_refresh || event.type != SDLRDP_REFRESH; });
 }
 auto BackendEvents::AwaitBackend() const -> bool {
-  sdlrdp_wait(backend.get(), 50);
+  sdlrdp_wait(backend.Handle(), 50);
   return true;
 }
 }

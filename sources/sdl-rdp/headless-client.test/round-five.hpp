@@ -14,16 +14,16 @@ class RoundFive : public GraphicsSession {
 protected:
   auto ThenPipelinedWindow(Client& client, auto const& frames, std::vector<UINT32> const& pixels) -> void {
     ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
-    EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 1);
+    EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 0), 1);
     ASSERT_NO_FATAL_FAILURE(AwaitFrames(client, frames, 1));
     ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
     ASSERT_NO_FATAL_FAILURE(AwaitFrames(client, frames, 2));
-    EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 1), 0);
+    EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 1), 0);
   }
   auto ThenNeverAcknowledges(auto timed) -> void {
     ASSERT_NO_FATAL_FAILURE(Open(320, 200));
-    EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 1);
-    Client client(sdlrdp_port(backend.get()), true);
+    EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 0), 1);
+    Client client(sdlrdp_port(backend.Handle()), true);
     ASSERT_NO_FATAL_FAILURE(Connect(client));
     FrameObserver const       observer(client);
     std::vector<UINT32> const pixels(320uz * 200, 0x778899);

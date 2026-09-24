@@ -23,7 +23,7 @@ protected:
     EXPECT_LE(std::abs(now - time), 60000) << line;
   }
   auto Exercise() -> void {
-    ASSERT_EQ(sdlrdp_audio_open(backend.get()), 0);
+    ASSERT_EQ(sdlrdp_audio_open(backend.Handle()), 0);
     NewSession();
     auto& client = ClientSession();
     auto& audio  = AudioSession();
@@ -31,7 +31,7 @@ protected:
     ASSERT_TRUE(freerdp_input_send_keyboard_event(client.Instance()->context->input, KBD_FLAGS_DOWN, 0x1e));
     auto               frames = 3 * (audio.CaptureState().rate / 50);
     std::vector<INT16> pcm(static_cast<std::size_t>(frames) * 2, -1234);
-    ASSERT_EQ(sdlrdp_audio_write(backend.get(), pcm.data(), frames), frames);
+    ASSERT_EQ(sdlrdp_audio_write(backend.Handle(), pcm.data(), frames), frames);
     ASSERT_NO_FATAL_FAILURE(Present(std::vector<std::uint32_t>(320uz * 200, 0xff123456), 320, 200));
     ASSERT_TRUE(client.Until([&] { return audio.CaptureState().samples.size() == pcm.size() && Acknowledged(); }));
     ThenKeyTraced(client);
@@ -48,7 +48,7 @@ TEST_F(TraceGate, WallClockEvents) {
   ASSERT_EQ(setenv("SDL_RDP_TRACE", "1", 1), 0);
   ASSERT_NO_FATAL_FAILURE(Open(320, 200));
   ASSERT_EQ(unsetenv("SDL_RDP_TRACE"), 0);
-  ASSERT_NE(backend, nullptr);
+  ASSERT_TRUE(backend);
   ASSERT_NO_FATAL_FAILURE(Exercise());
   backend.Close();
   ASSERT_NO_FATAL_FAILURE(ThenTraceEvents());

@@ -41,7 +41,7 @@ auto ThenDisplaced(Client const& first) -> void {
 }
 }
 TEST_P(Gate, FramesAndInput) {
-  Client client(sdlrdp_port(backend.get()), GetParam().surface);
+  Client client(sdlrdp_port(backend.Handle()), GetParam().surface);
   ASSERT_NO_FATAL_FAILURE(ConnectCodec(client));
   ASSERT_NO_FATAL_FAILURE(ThenConnected());
   ASSERT_NO_FATAL_FAILURE(PresentMeasuredFrame(client));
@@ -51,7 +51,7 @@ TEST_P(Gate, FramesAndInput) {
 }
 TEST_P(Gate, ResizeAndWakeup) {
   ASSERT_NO_FATAL_FAILURE(Reopen(640, 480));
-  auto*  handle = backend.get();
+  auto*  handle = backend.Handle();
   Client client(sdlrdp_port(handle), GetParam().surface);
   ASSERT_NO_FATAL_FAILURE(ConnectCodec(client));
   ASSERT_NO_FATAL_FAILURE(ThenResizedConnection());
@@ -67,7 +67,7 @@ TEST_P(Gate, ResizeAndWakeup) {
 TEST_P(Gate, LateClientAndBurst) {
   sdlrdp_rect const area{ 0, 0, 320, 200 };
   ASSERT_EQ(backend.Present(pixels, 320, 200, area), 0);
-  Client client(sdlrdp_port(backend.get()), GetParam().surface);
+  Client client(sdlrdp_port(backend.Handle()), GetParam().surface);
   ASSERT_NO_FATAL_FAILURE(ConnectCodec(client));
   ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text();
   WhenBurstPictures(client, area);
@@ -81,7 +81,7 @@ TEST_P(Gate, DesktopIsPicture) {
   Headless::HashPattern(frame);
   sdlrdp_rect const area{ 0, 0, 640, 480 };
   ASSERT_EQ(backend.Present(frame, 640, 480, area), 0);
-  Client client(sdlrdp_port(backend.get()), GetParam().surface);
+  Client client(sdlrdp_port(backend.Handle()), GetParam().surface);
   ASSERT_NO_FATAL_FAILURE(ConnectCodec(client));
   ASSERT_TRUE(client.Until([&] { return client.Matches(frame); })) << logs.Text();
   ThenPictureDesktop(client);
@@ -100,7 +100,7 @@ TEST_P(Gate, WaitForClient) {
 }
 TEST_P(Gate, BlockedSinglePresent) {
   ASSERT_NO_FATAL_FAILURE(Reopen(2048, 1536));
-  auto*  handle = backend.get();
+  auto*  handle = backend.Handle();
   Client client(sdlrdp_port(handle), GetParam().surface, 2048, 1536);
   ASSERT_NO_FATAL_FAILURE(ConnectCodec(client));
   auto events = Events(2);
@@ -118,10 +118,10 @@ TEST_P(Gate, BlockedSinglePresent) {
   RecordProperty("max_channel_error", std::to_string(client.MaxError(pixels)));
 }
 TEST_P(Gate, NewestClientTakesOver) {
-  Client const first(sdlrdp_port(backend.get()), GetParam().surface);
+  Client const first(sdlrdp_port(backend.Handle()), GetParam().surface);
   ASSERT_TRUE(first.Connect()) << logs.Text(true);
   ASSERT_EQ(Events(2).size(), 2u);
-  Client second(sdlrdp_port(backend.get()), GetParam().surface, 400, 240);
+  Client second(sdlrdp_port(backend.Handle()), GetParam().surface, 400, 240);
   ASSERT_TRUE(second.Connect()) << logs.Text(true);
   auto events = Events(3);
   ASSERT_NO_FATAL_FAILURE(ThenTakeoverEvents(events));
@@ -129,16 +129,16 @@ TEST_P(Gate, NewestClientTakesOver) {
   ASSERT_NO_FATAL_FAILURE(Input(second));
   ASSERT_TRUE(second.Disconnect());
   ASSERT_NO_FATAL_FAILURE(ThenDisconnected());
-  EXPECT_EQ(sdlrdp_wait(backend.get(), 0), 0);
+  EXPECT_EQ(sdlrdp_wait(backend.Handle(), 0), 0);
 }
 TEST_P(Gate, LiveCodecChange) {
-  Client client(sdlrdp_port(backend.get()), GetParam().surface);
+  Client client(sdlrdp_port(backend.Handle()), GetParam().surface);
   ASSERT_TRUE(client.Connect()) << logs.Text(true);
   ASSERT_EQ(Events(2).size(), 2u);
   auto previous = GetParam().codec;
   for (auto codec :
        { SDLRDP_CODEC_RAW, SDLRDP_CODEC_PLANAR, SDLRDP_CODEC_REMOTEFX, SDLRDP_CODEC_NSCODEC, SDLRDP_CODEC_AUTO }) {
-    ASSERT_EQ(sdlrdp_set_codec(backend.get(), codec), 0);
+    ASSERT_EQ(sdlrdp_set_codec(backend.Handle(), codec), 0);
     client.Tolerance(CodecTolerance(codec, GetParam().surface));
     std::ranges::fill(pixels, 0x00404040u + (unsigned(codec) * 0x00040404u));
     ASSERT_NO_FATAL_FAILURE(Frame(client, { 0, 0, 320, 200 }));
@@ -147,10 +147,10 @@ TEST_P(Gate, LiveCodecChange) {
     previous = expected;
   }
   // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange): Invalid codec ABI test.
-  EXPECT_EQ(sdlrdp_set_codec(backend.get(), sdlrdp_codec(99)), -1);
+  EXPECT_EQ(sdlrdp_set_codec(backend.Handle(), sdlrdp_codec(99)), -1);
 }
 TEST_P(Gate, ExactFlatColour) {
-  Client client(sdlrdp_port(backend.get()), GetParam().surface);
+  Client client(sdlrdp_port(backend.Handle()), GetParam().surface);
   client.Tolerance(std::min(CodecTolerance(GetParam().codec, GetParam().surface), FlatColourError));
   ASSERT_TRUE(client.Connect()) << logs.Text(true);
   ASSERT_EQ(Events(2).size(), 2u);
@@ -159,7 +159,7 @@ TEST_P(Gate, ExactFlatColour) {
   RecordProperty("maximum_channel_error", client.MaxError(pixels));
 }
 TEST_P(Gate, TinyDamage) {
-  Client client(sdlrdp_port(backend.get()), GetParam().surface);
+  Client client(sdlrdp_port(backend.Handle()), GetParam().surface);
   ASSERT_NO_FATAL_FAILURE(ConnectCodec(client));
   ASSERT_NO_FATAL_FAILURE(Frame(client, { 0, 0, 320, 200 }));
   pixels[(51 * 320) + 73] = 0x000000ff;
@@ -172,7 +172,7 @@ TEST_P(Gate, ProbeClosesBeforeActivation) {
     Backend::Descriptor const socket { Backend::SystemCall(::socket(AF_INET, SOCK_STREAM, 0), "probe socket") };
     sockaddr_in               address{ };
     address.sin_family      = AF_INET;
-    address.sin_port        = htons(sdlrdp_port(backend.get()));
+    address.sin_port        = htons(sdlrdp_port(backend.Handle()));
     address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     ASSERT_EQ(connect(socket.Get(), reinterpret_cast<sockaddr*>(&address), sizeof(address)), 0);
   }
@@ -186,7 +186,7 @@ TEST_P(Gate, ProbeClosesBeforeActivation) {
     }));
   }
   EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, "Peer transport failed")) << logs.Text();
-  EXPECT_EQ(sdlrdp_wait(backend.get(), 0), 0);
+  EXPECT_EQ(sdlrdp_wait(backend.Handle(), 0), 0);
 }
 
 INSTANTIATE_TEST_SUITE_P(Codec, Gate,

@@ -17,7 +17,7 @@
 
 namespace Backend {
 namespace {
-auto Header(unsigned type) -> DrivePacket {
+auto Header(std::uint32_t type) -> DrivePacket {
   DrivePacket packet;
   packet.Write(std::uint16_t{ RDPDR_CTYP_CORE });
   packet.Write(Narrowed<std::uint16_t>(type));
@@ -32,21 +32,21 @@ auto ChannelEvent(HANDLE channel) -> HANDLE {
   WTSFreeMemory(data);
   return event;
 }
-auto Announcement(unsigned type, unsigned client_id) -> DrivePacket {
+auto Announcement(std::uint32_t type, std::uint32_t client_id) -> DrivePacket {
   auto packet = Header(type);
   packet.Write(std::uint16_t{ RDPDR_VERSION_MAJOR });
   packet.Write(std::uint16_t{ RDPDR_VERSION_MINOR_RDP6X });
   packet.Write(std::uint32_t{ client_id });
   return packet;
 }
-auto IoRequest(std::span<unsigned const> header, DrivePacket const& body) -> DrivePacket {
+auto IoRequest(std::span<std::uint32_t const> header, DrivePacket const& body) -> DrivePacket {
   auto packet = Header(PAKID_CORE_DEVICE_IOREQUEST);
   std::ranges::for_each(header, [&packet](std::uint32_t field) { packet.Write(field); });
   packet.Append(body.Bytes());
   return packet;
 }
-auto Capability(DrivePacket& packet, unsigned type, unsigned version, DrivePacket const& body) -> void {
-  constexpr unsigned header_size = (sizeof(uint16_t) * 2) + sizeof(uint32_t);
+auto Capability(DrivePacket& packet, std::uint32_t type, std::uint32_t version, DrivePacket const& body) -> void {
+  constexpr std::uint32_t header_size = (sizeof(uint16_t) * 2) + sizeof(uint32_t);
   Expects(body.Bytes().size() <= UINT16_MAX - header_size, "capability length fits its header");
   packet.Write(Narrowed<std::uint16_t>(type));
   packet.Write(Narrowed<std::uint16_t>(header_size + body.Bytes().size()));
@@ -121,8 +121,8 @@ auto DriveChannel::Write(DrivePacket& packet) -> void {
   _link.Signal();
 }
 auto DriveChannel::Capabilities() -> void {
-  auto               packet           = Header(PAKID_CORE_SERVER_CAPABILITY);
-  constexpr unsigned capability_count = 2;
+  auto                    packet           = Header(PAKID_CORE_SERVER_CAPABILITY);
+  constexpr std::uint32_t capability_count = 2;
   packet.Write(std::uint16_t{ capability_count });
   packet.Write(std::uint16_t{ 0 });
   GeneralCapability(packet);
@@ -149,12 +149,12 @@ auto DriveChannel::Announce(DrivePacket& packet) -> void {
     Write(response);
     if (type != RDPDR_DTYP_FILESYSTEM) continue;
     auto label = Name(std::span(packet.Bytes()).subspan(begin, length), name.data());
-    AnnounceDevice(unsigned(wire), label);
+    AnnounceDevice(wire, label);
   }
 }
 auto DriveChannel::ClientCapabilities(DrivePacket& packet) -> void {
-  constexpr unsigned capability_header_size = 8;
-  auto               count                  = packet.Read<uint16_t>();
+  constexpr std::uint32_t capability_header_size = 8;
+  auto                    count                  = packet.Read<uint16_t>();
   packet.Skip(2);
   while (count--) {
     auto start   = packet.Position();
@@ -166,7 +166,7 @@ auto DriveChannel::ClientCapabilities(DrivePacket& packet) -> void {
     auto end = packet.Position();
     if (type == CAP_DRIVE_TYPE) drive_version = version;
     if (type == CAP_GENERAL_TYPE) {
-      GeneralClientCapability(packet, start, length, unsigned(version));
+      GeneralClientCapability(packet, start, length, version);
     }
     packet.Seek(end);
   }
@@ -179,7 +179,7 @@ auto DriveChannel::Fail(std::string const& cause) -> void {
   Warn("Drive channel ended: " + cause);
   Shutdown();
 }
-auto DriveChannel::Remove(unsigned wire) -> void {
+auto DriveChannel::Remove(std::uint32_t wire) -> void {
   for (auto it = devices.begin(); it != devices.end();) {
     if (it->second.wire != wire) {
       ++it;
@@ -243,8 +243,8 @@ auto DriveChannel::Pump(std::span<HANDLE const> signaled) -> bool {
     return true;
   }
 }
-auto DriveChannel::Send(unsigned drive, unsigned file, unsigned major, DrivePacket const& body, unsigned minor)
-    -> std::shared_ptr<DriveRequest> {
+auto DriveChannel::Send(std::uint32_t drive, std::uint32_t file, std::uint32_t major, DrivePacket const& body,
+                        std::uint32_t minor) -> std::shared_ptr<DriveRequest> {
   std::scoped_lock const lock(mutex);
   if (!connected) throw std::runtime_error("Drive channel ended.");
   auto wire = Device(drive);
@@ -262,7 +262,7 @@ auto DriveChannel::Send(unsigned drive, unsigned file, unsigned major, DrivePack
   }
   return request;
 }
-auto DriveChannel::AnnounceDevice(unsigned wire, std::string const& label) -> void {
+auto DriveChannel::AnnounceDevice(std::uint32_t wire, std::string const& label) -> void {
   auto        id    = _session.NextDrive();
   DeviceEntry entry { .wire = wire, .drive = { id, { } } };
   CopyTerminated(entry.drive.name, label);
@@ -270,10 +270,10 @@ auto DriveChannel::AnnounceDevice(unsigned wire, std::string const& label) -> vo
   _events.Push(DriveEvent(true, entry.drive));
 }
 auto DriveChannel::GeneralClientCapability(DrivePacket& packet, std::size_t start, std::size_t length,
-                                           unsigned version) const -> void {
-  constexpr unsigned general_caps_v1_size          = 40;
-  constexpr unsigned protocol_major_version_offset = 16;
-  constexpr unsigned io_code_fields_size           = 8;
+                                           std::uint32_t version) const -> void {
+  constexpr std::uint32_t general_caps_v1_size          = 40;
+  constexpr std::uint32_t protocol_major_version_offset = 16;
+  constexpr std::uint32_t io_code_fields_size           = 8;
   if (length < general_caps_v1_size) throw std::runtime_error("Truncated general drive capability.");
   packet.Seek(start + protocol_major_version_offset);
   auto major = packet.Read<uint16_t>();

@@ -115,7 +115,7 @@ protected:
     std::array const burst{ Backend::Extent{ .width = 1600, .height = 900 },
                             Backend::Extent{ .width = 1920, .height = 1080 }, last };
     for (auto size : burst) {
-      ASSERT_EQ(sdlrdp_resize(backend.get(), size.width, size.height), 0);
+      ASSERT_EQ(sdlrdp_resize(backend.Handle(), size.width, size.height), 0);
       EXPECT_EQ(probe.Calls(), 1u);
       EXPECT_TRUE(probe.Finalizing());
     }
@@ -141,7 +141,7 @@ protected:
   }
   auto Run(Backend::Extent last, std::size_t expected) -> void {
     ASSERT_NO_FATAL_FAILURE(Open(640, 480, { }, SDLRDP_CODEC_PLANAR));
-    Client                  client(sdlrdp_port(backend.get()), true, 640, 480);
+    Client                  client(sdlrdp_port(backend.Handle()), true, 640, 480);
     Headless::DisplayClient display(client);
     display.Observed().echo_resize = expected == 1;
     ASSERT_NO_FATAL_FAILURE(ConnectDisplay(client));
@@ -149,7 +149,7 @@ protected:
     display.Observed().finalizing = [&] {
       if (display.Observed().desktops == 1) DuringFinalization(probe, last);
     };
-    ASSERT_EQ(sdlrdp_resize(backend.get(), 1280, 800), 0);
+    ASSERT_EQ(sdlrdp_resize(backend.Handle(), 1280, 800), 0);
     ThenFinalLayout(client, display, probe, last, expected);
   }
 };
@@ -173,7 +173,7 @@ TEST_F(ResizeStorm, AlternatingAppSizesWithLayoutEcho) {
 }
 TEST_F(ResizeStorm, EqualLayoutDoesNotChangePicture) {
   ASSERT_NO_FATAL_FAILURE(Open());
-  Client                        client(sdlrdp_port(backend.get()), true, 640, 480);
+  Client                        client(sdlrdp_port(backend.Handle()), true, 640, 480);
   Headless::DisplayClient const display(client);
   ASSERT_NO_FATAL_FAILURE(ConnectDisplay(client));
   auto presented = Presented(*backend);
@@ -187,14 +187,14 @@ TEST_F(ResizeStorm, EqualLayoutDoesNotChangePicture) {
 }
 TEST_F(RoundFive, ResizeDesktop) {
   ASSERT_NO_FATAL_FAILURE(Open());
-  Client client(sdlrdp_port(backend.get()), true, 1024, 768);
+  Client client(sdlrdp_port(backend.Handle()), true, 1024, 768);
   client.Instance()->context->update->DesktopResize = [](rdpContext* context) -> BOOL {
     return gdi_resize(context->gdi, freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopWidth),
                       freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopHeight));
   };
   ASSERT_NO_FATAL_FAILURE(Connect(client, false));
   EXPECT_EQ(client.Instance()->context->gdi->width, 640);
-  ASSERT_EQ(sdlrdp_resize(backend.get(), 800, 600), 0);
+  ASSERT_EQ(sdlrdp_resize(backend.Handle(), 800, 600), 0);
   std::vector<UINT32> pixels(800uz * 600, 0x123456);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 800, 600));
   ASSERT_TRUE(client.Until([&] { return client.Instance()->context->gdi->width == 800 && client.Matches(pixels); }))
@@ -209,7 +209,7 @@ TEST_F(RoundFive, PictureSizeReactivatesDesktop) {
 
 TEST_F(RoundFive, ClientScreenNeverResizesPicture) {
   ASSERT_NO_FATAL_FAILURE(Open());
-  Client              client(sdlrdp_port(backend.get()), true, 1024, 768);
+  Client              client(sdlrdp_port(backend.Handle()), true, 1024, 768);
   DisplayClient const display(client);
   ASSERT_NO_FATAL_FAILURE(Connect(client, false));
   auto events = Events(2);
@@ -218,7 +218,7 @@ TEST_F(RoundFive, ClientScreenNeverResizesPicture) {
   EXPECT_EQ(events[1].screen.height, 768u);
   ASSERT_TRUE(client.Until([&] { return Headless::DisplayClient::Ready(); })) << logs.Text();
   ASSERT_TRUE(Headless::DisplayClient::Layout(1920, 1080, 500));
-  ASSERT_TRUE(client.Until([&] { return sdlrdp_wait(backend.get(), 0) == 1; })) << logs.Text();
+  ASSERT_TRUE(client.Until([&] { return sdlrdp_wait(backend.Handle(), 0) == 1; })) << logs.Text();
   events = backend.Poll();
   ASSERT_EQ(events.size(), 1u);
   EXPECT_EQ(events[0].type, SDLRDP_SCREEN);

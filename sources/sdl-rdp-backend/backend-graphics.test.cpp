@@ -11,18 +11,18 @@ class GraphicsGate : public Gate {
 protected:
   auto ThenFullGraphicsWindow(Headless::GraphicsObserver& observer, sdlrdp_rect full) -> void {
     ASSERT_EQ(backend.Present(pixels, 320, 200, full), 0);
-    EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 1), 0);
+    EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 1), 0);
     EXPECT_EQ(observer.Observed().frames.size(), 2u);
   }
   auto ThenCumulativeAcknowledgement(Client& client, Headless::GraphicsObserver& observer) -> void {
-    EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 0);
+    EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 0), 0);
     ASSERT_TRUE(observer.Ack());
-    ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.get(), 0) == 1; }));
+    ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.Handle(), 0) == 1; }));
     RecordProperty("trace", "two unacknowledged frames exhaust the window; suspend releases third; resume waits; "
                             "cumulative ack releases wait");
   }
   auto ThenGraphicsTakeover(Client& graphics) -> void {
-    Client next(sdlrdp_port(backend.get()), true);
+    Client next(sdlrdp_port(backend.Handle()), true);
     next.EnableGraphics();
     next.Tolerance(graphics.Tolerance());
     ASSERT_TRUE(next.Connect());
@@ -30,7 +30,7 @@ protected:
     RecordProperty("trace", "pipeline frame -> legacy takeover frame -> fresh pipeline takeover frame");
   }
   auto ThenLegacyAndGraphicsTakeover(Client& graphics) -> void {
-    Client legacy(sdlrdp_port(backend.get()), true);
+    Client legacy(sdlrdp_port(backend.Handle()), true);
     legacy.Tolerance(CodecTolerance(GetParam().codec, GetParam().surface));
     ASSERT_TRUE(legacy.Connect());
     ASSERT_TRUE(legacy.Until([&] { return legacy.Matches(pixels); }));
@@ -54,7 +54,7 @@ protected:
     RecordProperty("trace", logs.Text(true));
   }
   auto ThenSuspensionAcknowledged(Client& client, Headless::GraphicsObserver& observer) -> void {
-    EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 1);
+    EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 0), 1);
     ASSERT_TRUE(observer.Ack());
     ASSERT_TRUE(client.Pump(20));
   }
@@ -66,7 +66,7 @@ protected:
     EXPECT_EQ(observer.Observed().progressive_headers, GetParam().codec == SDLRDP_CODEC_PROGRESSIVE ? 2u : 0u);
   }
   auto GivenUnacknowledged() -> void {
-    graphics_client = std::make_unique<Client>(sdlrdp_port(backend.get()), true);
+    graphics_client = std::make_unique<Client>(sdlrdp_port(backend.Handle()), true);
     graphics_client->EnableGraphics();
     graphics_observer = std::make_unique<Headless::GraphicsObserver>(*graphics_client);
     ConnectUnacknowledged(*graphics_client, *graphics_observer);
@@ -99,7 +99,7 @@ protected:
     }
   }
   auto ThenSuspendedWindow(Client& client, Headless::GraphicsObserver& observer) -> void {
-    EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 0);
+    EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 0), 0);
     ASSERT_TRUE(observer.Ack(SUSPEND_FRAME_ACKNOWLEDGEMENT));
     ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() == 3; }));
     ThenSuspensionAcknowledged(client, observer);
@@ -116,7 +116,7 @@ auto RecordDamageCost(Client& client, std::vector<UINT32> const& pixels, uint64_
 }
 }
 TEST_P(GraphicsGate, DecodesAndResizes) {
-  Client client(sdlrdp_port(backend.get()), true);
+  Client client(sdlrdp_port(backend.Handle()), true);
   client.EnableGraphics();
   Headless::GraphicsObserver observer(client);
   client.Tolerance(CodecTolerance(GetParam().codec, GetParam().surface));
@@ -150,7 +150,7 @@ TEST_P(GraphicsGate, QueueDepthThrottlesBytes) {
       "ack frame 1 with 10000000 queued bytes holds frame 3 despite one free frame slot; queueDepth=0 releases it");
 }
 TEST_P(GraphicsGate, RejectedChannelUsesLegacy) {
-  Client client(sdlrdp_port(backend.get()), true);
+  Client client(sdlrdp_port(backend.Handle()), true);
   client.EnableGraphics();
   Headless::DisplayClient const display(client);
   client.Tolerance(CodecTolerance(GetParam().codec, GetParam().surface));
@@ -162,7 +162,7 @@ TEST_P(GraphicsGate, RejectedChannelUsesLegacy) {
                  "GCC negotiates GFX; client registers only disp; graphics DVC is rejected; legacy frame decodes");
 }
 TEST_P(GraphicsGate, TakeoverWithLegacy) {
-  Client graphics(sdlrdp_port(backend.get()), true);
+  Client graphics(sdlrdp_port(backend.Handle()), true);
   graphics.EnableGraphics();
   graphics.Tolerance(CodecTolerance(GetParam().codec, GetParam().surface));
   ASSERT_TRUE(graphics.Connect());
@@ -177,7 +177,7 @@ INSTANTIATE_TEST_SUITE_P(Pipeline, GraphicsGate,
 
 TEST_F(RoundFive, GraphicsAutoUsesProgressive) {
   ASSERT_NO_FATAL_FAILURE(Open(640, 480, { }, SDLRDP_CODEC_AUTO));
-  Client client(sdlrdp_port(backend.get()), true, 640, 480);
+  Client client(sdlrdp_port(backend.Handle()), true, 640, 480);
   ASSERT_NO_FATAL_FAILURE(ConnectPipeline(client));
   ASSERT_NO_FATAL_FAILURE(ThenConnectedCodec(client, SDLRDP_CODEC_PROGRESSIVE));
   auto pixels = GraphicsScene(3, false);
@@ -220,7 +220,7 @@ TEST_F(RoundFive, GraphicsVersion101) {
 
 TEST_F(RoundFive, GraphicsWithoutDynamicChannelsUsesLegacy) {
   ASSERT_NO_FATAL_FAILURE(Open(640, 480, { }, SDLRDP_CODEC_RAW));
-  Client client(sdlrdp_port(backend.get()), true, 640, 480);
+  Client client(sdlrdp_port(backend.Handle()), true, 640, 480);
   ASSERT_TRUE(freerdp_settings_set_bool(client.Instance()->context->settings, FreeRDP_SupportGraphicsPipeline, TRUE));
   client.Instance()->LoadChannels = [](freerdp*) -> BOOL { return TRUE; };
   ASSERT_NO_FATAL_FAILURE(ThenLegacyFallback(client));
@@ -255,7 +255,7 @@ TEST_F(RoundFive, GraphicsCodecSwitchPreservesUndamagedTiles) {
   ASSERT_NO_FATAL_FAILURE(Connect(client));
   auto pixels = GraphicsScene(4, false);
   ASSERT_NO_FATAL_FAILURE(PresentMatching(client, pixels));
-  ASSERT_EQ(sdlrdp_set_codec(backend.get(), SDLRDP_CODEC_PROGRESSIVE), 0);
+  ASSERT_EQ(sdlrdp_set_codec(backend.Handle(), SDLRDP_CODEC_PROGRESSIVE), 0);
   sdlrdp_rect const damage{ 18, 45, 1, 1 };
   pixels[(45 * 640) + 18] = 0x0000ee00;
   ASSERT_NO_FATAL_FAILURE(PresentProgressiveDamage(client, pixels, damage));

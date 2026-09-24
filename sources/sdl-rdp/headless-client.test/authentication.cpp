@@ -91,7 +91,7 @@ auto Authentication::Lookup(void* raw, char const* domain, char const* user, uns
 }
 auto Authentication::Attempt(char const* user, char const* password, char const* domain, bool nla, bool accepted)
     -> void {
-  Headless::Client client(sdlrdp_port(handle.get()), false);
+  Headless::Client client(sdlrdp_port(handle.Handle()), false);
   client.Credentials(user, password, domain, nla);
   ASSERT_EQ(client.Connect(), accepted);
   if (!accepted)

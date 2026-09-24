@@ -103,7 +103,7 @@ auto WhenFullFrameMeasured(CertificateDirectory const& certificates, Logs& logs,
   config.codec = codec;
   Headless::BackendInstance backend;
   ASSERT_NO_FATAL_FAILURE(backend.Open(config));
-  Client client(sdlrdp_port(backend.get()), true, 1024, 768);
+  Client client(sdlrdp_port(backend.Handle()), true, 1024, 768);
   client.Tolerance(CodecTolerance(codec, true));
   ASSERT_TRUE(client.Connect()) << logs.Text(true);
   ASSERT_TRUE(client.Until([&] { return HasCookie(client); }));

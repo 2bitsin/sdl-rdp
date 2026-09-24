@@ -160,7 +160,7 @@ TEST_F(Authentication, RefusedSecurityLogs) {
   for (bool const nla : { true, false }) {
     ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_TLS));
     {
-      Headless::Client const client(sdlrdp_port(handle.get()), false);
+      Headless::Client const client(sdlrdp_port(handle.Handle()), false);
       client.Credentials("alice", "correct-secret", "LAB", nla);
       auto* settings = client.Instance()->context->settings;
       ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_TlsSecurity, FALSE));
@@ -175,7 +175,7 @@ TEST_F(Authentication, RefusedSecurityLogs) {
 TEST_F(Authentication, RejectedCertificateLogs) {
   ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_TLS));
   bool verified = false;
-  ASSERT_NO_FATAL_FAILURE(RejectCertificate(sdlrdp_port(handle.get()), verified));
+  ASSERT_NO_FATAL_FAILURE(RejectCertificate(sdlrdp_port(handle.Handle()), verified));
   constexpr auto closed = "Connection closed before activation: ERRCONNECT_CONNECT_TRANSPORT_FAILED.";
   EXPECT_TRUE(
       Until([&] { return std::ranges::any_of(logs, [&](auto const& entry) { return entry.second == closed; }); }));
@@ -194,7 +194,7 @@ TEST_F(Authentication, PendingDisconnectLogLevels) {
   for (auto code :
        { FREERDP_ERROR_CONNECT_TRANSPORT_FAILED, FREERDP_ERROR_LOGOFF_BY_USER, FREERDP_ERROR_CONNECT_FAILED }) {
     ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_TLS));
-    Headless::Client client(sdlrdp_port(handle.get()), false);
+    Headless::Client client(sdlrdp_port(handle.Handle()), false);
     client.Credentials("alice", "correct-secret", "LAB");
     ASSERT_TRUE(client.Connect());
     ASSERT_TRUE(client.Until([&] { return CurrentStatus(*handle).has_value(); }));
