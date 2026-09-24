@@ -36,13 +36,17 @@ bool ExpectedDisconnect(unsigned code) {
          code == FREERDP_ERROR_AUTHENTICATION_FAILED || code == FREERDP_ERROR_SERVER_DENIED_CONNECTION;
 }
 namespace {
-constexpr std::array<std::pair<std::string_view, std::string_view>, 5> KnownLibraryMessages{ {
+constexpr std::array<std::pair<std::string_view, std::string_view>, 9> KnownLibraryMessages{ {
     { "com.freerdp.core.transport", "BIO_read retries exceeded" },
     { "com.freerdp.core.transport",
       "BIO_should_retry returned an error: error:80000068:system library::Connection reset by peer" },
     { "com.freerdp.core.transport"        , "BIO_write returned a system error 32: Broken pipe" },
     { "com.freerdp.core.transport", "BIO_should_retry returned an error: error:80000020:system library::Broken pipe" },
     { "com.freerdp.channels.rdpsnd.server", "client doesn't support any format!"                },
+    { "com.freerdp.core"                  , "setsockopt() IPPROTO_TCP, TCP_KEEPIDLE"            },
+    { "com.freerdp.core"                  , "setsockopt() SOL_TCP, TCP_KEEPCNT"                 },
+    { "com.freerdp.core"                  , "setsockopt() SOL_TCP, TCP_KEEPINTVL"               },
+    { "com.freerdp.core"                  , "setsockopt() SOL_TCP, TCP_USER_TIMEOUT"            },
 } };
 bool ExpectedLibraryMessage(std::string_view prefix, std::string_view text) {
   if (std::ranges::any_of(KnownLibraryMessages,

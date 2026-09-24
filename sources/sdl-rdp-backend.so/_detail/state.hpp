@@ -2,6 +2,7 @@
 #include "refresh.hpp"
 #include "audio.hpp"
 #include "auth.hpp"
+#include "certificate.hpp"
 #include "clipboard.hpp"
 #include "contract.hpp"
 #include "drive.hpp"
@@ -36,12 +37,6 @@
 namespace Backend {
 using utilities::Ensures;
 using utilities::Expects;
-struct Credentials {
-  std::filesystem::path certificate;
-  std::filesystem::path key;
-};
-std::filesystem::path DefaultCertificateDirectory();
-Credentials           EnsureCertificate(std::filesystem::path const& directory);
 struct Pointer {
   unsigned          width  = 0;
   unsigned          height = 0;

@@ -1,6 +1,5 @@
 #pragma once
 #include "headless-gfx.hpp"
-#include "headless-tls.hpp"
 #include "state.hpp"
 #include "test-logs.hpp"
 
@@ -18,7 +17,6 @@ protected:
     sdlrdp_handle* handle = nullptr;
     ASSERT_EQ(sdlrdp_open(&config, &handle), 0) << sdlrdp_last_error();
     backend.reset(handle);
-    InitializeTls(sdlrdp_port(handle));
   }
   void TearDown() override {
     backend.reset();

@@ -2,7 +2,7 @@ Init_submodule()
 Link_dependencies(SDL3 TEST freerdp-client freerdp winpr oxbox::platform)
 target_link_libraries(sdl-rdp-sample PRIVATE OpenSSL::Crypto)
 if(TARGET sdl-rdp-sample-tests)
-  target_sources(sdl-rdp-sample-tests PRIVATE ../sdl-rdp-backend.so/avc.cpp)
+  target_sources(sdl-rdp-sample-tests PRIVATE ../sdl-rdp-backend.so/avc.cpp ../sdl-rdp-backend.so/descriptor.cpp)
   target_link_libraries(sdl-rdp-sample-tests PRIVATE OpenSSL::Crypto
     nv-codec-headers::nv-codec-headers ${CMAKE_DL_LIBS})
   find_path(FREERDP_HEADERS freerdp/freerdp.h PATH_SUFFIXES freerdp3 REQUIRED)

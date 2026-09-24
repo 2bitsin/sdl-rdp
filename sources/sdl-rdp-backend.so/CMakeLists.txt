@@ -16,6 +16,25 @@ target_include_directories(sdl-rdp-backend PUBLIC ${FREERDP_HEADERS})
 target_link_options(sdl-rdp-backend PRIVATE "LINKER:--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
 set_property(TARGET sdl-rdp-backend APPEND PROPERTY LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/exports.map)
 if(TARGET sdl-rdp-backend-tests)
-  target_sources(sdl-rdp-backend-tests PRIVATE ../SDL3.so/rdp/SDL_rdpini.c avc.cpp wake-event.cpp refresh.cpp)
+  target_sources(sdl-rdp-backend-tests PRIVATE ../SDL3.so/rdp/SDL_rdpini.c avc.cpp wake-event.cpp refresh.cpp
+    descriptor.cpp system-call.cpp)
   target_link_libraries(sdl-rdp-backend-tests PRIVATE SDL3)
+  # tls-race.test/ interposes libcrypto and libc symbols, so it must not share a process with the other tests.
+  file(GLOB TLS_RACE_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tls-race.test/*.cpp)
+  get_target_property(BACKEND_TEST_SOURCES sdl-rdp-backend-tests SOURCES)
+  list(REMOVE_ITEM BACKEND_TEST_SOURCES ${TLS_RACE_SOURCES})
+  set_property(TARGET sdl-rdp-backend-tests PROPERTY SOURCES ${BACKEND_TEST_SOURCES})
+  add_executable(sdl-rdp-backend-tls-race-tests ${TLS_RACE_SOURCES} certificate.cpp descriptor.cpp socket-pair.cpp
+    system-call.cpp tls-rehearsal.cpp unsignalled-socket-bio.cpp support.test/child-process.cpp)
+  target_include_directories(sdl-rdp-backend-tls-race-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+  target_link_libraries(sdl-rdp-backend-tls-race-tests PRIVATE sdl-rdp-backend GTest::gtest_main freerdp-client
+    ${SDLRDP_TEST_SSL} ${SDLRDP_HOST_CRYPTO} ${CMAKE_DL_LIBS})
+  target_link_options(sdl-rdp-backend-tls-race-tests PRIVATE
+    "LINKER:--export-dynamic-symbol=BIO_meth_new,--export-dynamic-symbol=BIO_meth_set_write"
+    "LINKER:--export-dynamic-symbol=BIO_meth_set_create,--export-dynamic-symbol=SSL_use_PrivateKey"
+    "LINKER:--export-dynamic-symbol=SSL_connect")
+  gtest_discover_tests(sdl-rdp-backend-tls-race-tests
+    DISCOVERY_MODE PRE_TEST
+    DISCOVERY_TIMEOUT 30
+    PROPERTIES LABELS sdl-rdp-backend FIXTURES_REQUIRED buildutil-driver)
 endif()

@@ -1,7 +1,9 @@
 #include "_detail/test-backend.hpp"
+#include "support.test/child-process.hpp"
 
 #include <algorithm>
 #include <cstddef>
+#include <fcntl.h>
 #include <system_error>
 
 namespace BackendGate {
@@ -12,10 +14,8 @@ void ThenCertificateLifetime(X509* cert) {
   ASSERT_TRUE(ASN1_TIME_diff(&days, &seconds, X509_get0_notBefore(cert), X509_get0_notAfter(cert)));
   EXPECT_EQ(days, 3650);
 }
-void ThenLoggingChild(pid_t child, std::string const& output) {
-  int status = 0;
-  ASSERT_EQ(waitpid(child, &status, 0), child);
-  EXPECT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0) << output;
+void ThenLoggingChild(Headless::ChildProcess& child, std::string const& output) {
+  EXPECT_TRUE(child.ExitedCleanly()) << output;
   EXPECT_FALSE(output.contains("com.freerdp")) << output;
 }
 void ThenSignedDelta(std::vector<UINT32> const& decoded, std::vector<UINT32> const& pixels) {
@@ -35,14 +35,15 @@ void ThenNewestRoute(Logs& first, Logs& second) {
   EXPECT_FALSE(first.Contains("latest handle marker"));
   EXPECT_TRUE(second.Contains(SDLRDP_LOG_WARN, "latest handle marker"));
 }
-void RunLogChild(std::array<int, 2> pipefd) {
-  close(pipefd[0]);
-  if (dup2(pipefd[1], STDOUT_FILENO) < 0) _exit(125);
-  close(pipefd[1]);
+auto RunLogChild(int output) -> int {
+  if (dup2(output, STDOUT_FILENO) < 0) return 125;
   setenv("WLOG_LEVEL", "INFO", 1);
   execl("/proc/self/exe", "sdl-rdp-backend-tests", "--gtest_filter=Logging.ListenerCallback", "--gtest_repeat=1",
         "--gtest_output=", nullptr);
-  _exit(126);
+  return 126;
+}
+auto LoggingChild(Backend::Descriptor output) -> Headless::ChildProcess {
+  return Headless::ChildProcess{ [&output] { return RunLogChild(output.Get()); } };
 }
 }
 TEST(CopyRows, PaddedRows) {
@@ -180,15 +181,10 @@ TEST(Logging, NewestHandleRoutesAndClears) {
 }
 TEST(Logging, NoFreerdpStdout) {
   std::array<int, 2> pipefd{ };
-  ASSERT_EQ(pipe(pipefd.data()), 0);
-  auto child = fork();
-  ASSERT_GE(child, 0);
-  if (!child) {
-    RunLogChild(pipefd);
-  }
-  close(pipefd[1]);
-  Headless::Descriptor const input  { pipefd[0] };
-  auto                       output = Headless::ReadText(input.Get());
+  ASSERT_EQ(pipe2(pipefd.data(), O_CLOEXEC), 0);
+  Backend::Descriptor const input  { pipefd[0] };
+  auto                      child  = LoggingChild(Backend::Descriptor{ pipefd[1] });
+  auto                      output = Headless::ReadText(input.Get());
   ThenLoggingChild(child, output);
 }
 

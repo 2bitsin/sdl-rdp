@@ -5,8 +5,6 @@
 #include <array>
 #include <cstring>
 #include <freerdp/channels/wtsvc.h>
-#include <freerdp/crypto/certificate.h>
-#include <freerdp/crypto/privatekey.h>
 #include <freerdp/input.h>
 #include <freerdp/session.h>
 #include <freerdp/settings.h>
@@ -79,17 +77,13 @@ bool SendCookie(rdpContext* context) {
 }
 }
 namespace {
-bool InstallCredentials(rdpSettings* settings, std::string const& key_path, std::string const& certificate_path) {
-  std::unique_ptr<rdpPrivateKey, Releases<freerdp_key_free>>          key(freerdp_key_new_from_file(key_path.c_str()));
-  std::unique_ptr<rdpCertificate, Releases<freerdp_certificate_free>> cert(
-      freerdp_certificate_new_from_file(certificate_path.c_str()));
-  if (!key || !cert) return false;
-  // These two pointer setters transfer ownership despite the generic API's copy documentation.
-  if (!freerdp_settings_set_pointer_len(settings, FreeRDP_RdpServerRsaKey, key.get(), 1)) return false;
-  std::ignore = key.release();
-  if (!freerdp_settings_set_pointer_len(settings, FreeRDP_RdpServerCertificate, cert.get(), 1)) return false;
-  std::ignore = cert.release();
-  return true;
+auto CredentialsInstalled(rdpSettings& settings, Credentials const& credentials) -> bool {
+  try {
+    InstallServerCredentials(settings, credentials);
+    return true;
+  } catch (std::runtime_error const&) {
+    return false;
+  }
 }
 void ReportDisconnect(Peer& peer, UINT32 code, char const* error, bool pending) {
   if (ExpectedDisconnect(code))
@@ -188,7 +182,7 @@ bool Peer::Configure() {
     picture = owner.Picture();
   }
   auto* settings = client->context->settings;
-  if (!InstallCredentials(settings, owner.credentials.key, owner.credentials.certificate)) return false;
+  if (!CredentialsInstalled(*settings, owner.credentials)) return false;
   return freerdp_settings_set_string(settings, FreeRDP_AuthenticationPackageList, "!kerberos") &&
          freerdp_settings_set_bool(settings, FreeRDP_NlaSecurity,
                                    owner.authentication.Config().auth == SDLRDP_AUTH_NLA) &&

@@ -1,7 +1,6 @@
 #include "_detail/avc.hpp"
 #include "_detail/gfx-protocol.hpp"
 #include "_detail/headless-gfx.hpp"
-#include "_detail/headless-tls.hpp"
 #include "_detail/state.hpp"
 #include "_detail/test-graphics.hpp"
 #include "_detail/test-pattern.hpp"
@@ -27,7 +26,6 @@ protected:
     sdlrdp_handle* handle = nullptr;
     ASSERT_EQ(sdlrdp_open(&config, &handle), 0);
     backend.reset(handle);
-    Headless::InitializeTls(sdlrdp_port(handle));
   }
   void TearDown() override {
     backend.reset();

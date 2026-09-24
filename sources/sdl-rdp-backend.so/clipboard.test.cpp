@@ -1,4 +1,5 @@
 #include "_detail/headless-clipboard.hpp"
+#include "_detail/test-config.hpp"
 #include "_detail/test-logs.hpp"
 #include "_detail/transcode.hpp"
 #include "sdl-rdp-backend.h"
@@ -36,14 +37,10 @@ protected:
     ASSERT_TRUE(client.Until([&] { return clipboard.Observed().accepted.load() == 1; }));
   }
   void SetUp() override {
-    auto          directory = certificates.Path().string();
-    sdlrdp_config config    { };
+    auto directory = certificates.Path().string();
+    auto config    = Headless::LoopbackConfig(directory);
     config.log      = Headless::Logs::Collect;
     config.log_user = &logs;
-    config.bind     = "127.0.0.1";
-    config.cert_dir = directory.c_str();
-    config.width    = 320;
-    config.height   = 200;
     sdlrdp_handle* opened = nullptr;
     ASSERT_EQ(sdlrdp_open(&config, &opened), 0) << sdlrdp_last_error();
     handle.reset(opened);

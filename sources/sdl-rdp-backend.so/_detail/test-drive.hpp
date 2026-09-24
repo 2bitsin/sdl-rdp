@@ -2,6 +2,7 @@
 #include "drive-wire.hpp"
 #include "headless-drive.hpp"
 #include "sdl-rdp-backend.h"
+#include "test-config.hpp"
 #include "test-io.hpp"
 #include "test-logs.hpp"
 
@@ -29,12 +30,8 @@ protected:
     }
   }
   void SetUp() override {
-    auto          path   = scratch.Path().string();
-    sdlrdp_config config { };
-    config.bind     = "127.0.0.1";
-    config.cert_dir = path.c_str();
-    config.width    = 320;
-    config.height   = 200;
+    auto path   = scratch.Path().string();
+    auto config = Headless::LoopbackConfig(path);
     config.log_user = &logs;
     config.log      = Headless::Logs::Collect;
     sdlrdp_handle* opened = nullptr;

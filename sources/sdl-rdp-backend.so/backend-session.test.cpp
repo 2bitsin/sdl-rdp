@@ -1,3 +1,4 @@
+#include "_detail/system-call.hpp"
 #include "_detail/test-backend.hpp"
 
 #include <algorithm>
@@ -204,8 +205,8 @@ TEST_P(Gate, TinyDamage) {
 }
 TEST_P(Gate, ProbeClosesBeforeActivation) {
   {
-    Socket const socket;
-    sockaddr_in  address{ };
+    Backend::Descriptor const socket { Backend::SystemCall(::socket(AF_INET, SOCK_STREAM, 0), "probe socket") };
+    sockaddr_in               address{                                                                        };
     address.sin_family      = AF_INET;
     address.sin_port        = htons(sdlrdp_port(backend.get()));
     address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);

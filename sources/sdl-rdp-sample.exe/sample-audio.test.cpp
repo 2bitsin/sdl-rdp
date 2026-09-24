@@ -2,7 +2,6 @@
 
 #include <cstddef>
 #include <sdl-rdp-backend.so/_detail/headless-audio.hpp>
-#include <sdl-rdp-backend.so/_detail/headless-tls.hpp>
 
 namespace SampleGate {
 namespace {
@@ -200,7 +199,6 @@ protected:
     ASSERT_TRUE(stream) << SDL_GetError();
     auto port = ListeningPort(pid_t(Number(fs::read_symlink("/proc/self").string())));
     ASSERT_GT(port, 0u);
-    Headless::InitializeTls(port);
   }
   void TearDown() override {
     sound.reset();

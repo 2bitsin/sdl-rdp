@@ -4,7 +4,6 @@
 #include "encoder.hpp"
 #include "headless-client.hpp"
 #include "headless-gfx.hpp"
-#include "headless-tls.hpp"
 #include "rect.hpp"
 #include "sdl-rdp-backend.h"
 #include "state.hpp"
@@ -94,30 +93,6 @@ inline bool Listening(unsigned port) {
 }
 using Headless::Logs;
 
-struct Socket {
-public:
-  Socket(Socket const&) = delete;
-  Socket(Socket&&)      = delete;
-  Socket()              = default;
-  ~Socket() {
-    if (descriptor >= 0) close(descriptor);
-  }
-  Socket& operator = (Socket const&) = delete;
-  Socket& operator = (Socket&&)      = delete;
-  int     Get() const { return descriptor; }
-  void    Release() { descriptor = -1; }
-
-private:
-  int descriptor = socket(AF_INET, SOCK_STREAM, 0);
-};
-inline void InitializeTls(sdlrdp_config config) {
-  // Issue 1: prime FreeRDP's lazy BIO method before the in-process client races it.
-  config.log = nullptr;
-  sdlrdp_handle* raw = nullptr;
-  Expects(sdlrdp_open(&config, &raw) == 0, "TLS initialization listener opens");
-  std::unique_ptr<sdlrdp_handle, decltype(&sdlrdp_close)> const backend(raw, sdlrdp_close);
-  Headless::InitializeTls(sdlrdp_port(raw));
-}
 struct Mode {
 public:
   bool         surface;

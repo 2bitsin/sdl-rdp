@@ -1,6 +1,9 @@
 #include "_detail/state.hpp"
 
 #include "_detail/copy-rows.hpp"
+#include "_detail/descriptor.hpp"
+#include "_detail/system-call.hpp"
+#include "_detail/tls-rehearsal.hpp"
 
 #include <algorithm>
 #include <arpa/inet.h>
@@ -13,6 +16,7 @@
 #include <ranges>
 #include <stdexcept>
 #include <system_error>
+#include <tuple>
 #include <unistd.h>
 #include <utility>
 #include <winpr/ssl.h>
@@ -21,25 +25,7 @@
 
 namespace Backend {
 namespace {
-struct Socket {
-public:
-  Socket(Socket const&) = delete;
-  Socket(Socket&&)      = delete;
-  Socket()              = default;
-  ~Socket() {
-    if (descriptor >= 0) ::close(descriptor);
-  }
-  Socket& operator = (Socket const&) = delete;
-  Socket& operator = (Socket&&)      = delete;
-  int     Get() const { return descriptor; }
-  void    Release() { descriptor = -1; }
-
-private:
-  int descriptor = ::socket(AF_INET, SOCK_STREAM, 0);
-};
 void PrepareListenerSocket(int descriptor) {
-  if (descriptor < 0)
-    throw std::runtime_error(std::format("Socket creation failed: {}.", std::system_category().message(errno)));
   int reuse = 1;
   if (setsockopt(descriptor, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) != 0)
     throw std::runtime_error(std::format("Socket options failed: {}.", std::system_category().message(errno)));
@@ -53,10 +39,20 @@ void LogDeparture(Peer& peer) {
     peer.owner.trace.Line("disconnect");
   }
 }
+void AdoptListenerSocket(freerdp_listener& listener, Descriptor socket) {
+  if (!listener.OpenFromSocket(&listener, socket.Get()))
+    throw std::runtime_error("FreeRDP listener socket adoption failed.");
+  std::ignore = socket.Release();
+}
+auto RehearseTlsOnce(Credentials const& credentials) -> void {
+  // FreeRDP's lazily filled BIO tables are process-wide, so one rehearsal per process fills them for every State.
+  static std::once_flag rehearsed;
+  std::call_once(rehearsed, [&credentials] { TlsRehearsal{ credentials }.Perform(); });
+}
 unsigned Bind(freerdp_listener* listener, sdlrdp_config const& config) {
   Expects(listener != nullptr, "listener exists");
-  Socket      socket;
-  sockaddr_in address{ };
+  Descriptor  socket { SystemCall(::socket(AF_INET, SOCK_STREAM, 0), "Socket creation") };
+  sockaddr_in address{                                                                  };
   address.sin_family = AF_INET;
   address.sin_port   = htons(config.port);
   PrepareListenerSocket(socket.Get());
@@ -68,9 +64,7 @@ unsigned Bind(freerdp_listener* listener, sdlrdp_config const& config) {
   socklen_t size = sizeof(address);
   if (getsockname(socket.Get(), reinterpret_cast<sockaddr*>(&address), &size) != 0)
     throw std::runtime_error(std::format("Listener socket name failed: {}.", std::system_category().message(errno)));
-  if (!listener->OpenFromSocket(listener, socket.Get()))
-    throw std::runtime_error("FreeRDP listener socket adoption failed.");
-  socket.Release();
+  AdoptListenerSocket(*listener, std::move(socket));
   return ntohs(address.sin_port);
 }
 void ComposeRow(std::span<BYTE const> source, std::span<BYTE const> former, std::span<BYTE> target, auto damage) {
@@ -137,7 +131,8 @@ State::State(sdlrdp_config const& config, bool tracing)
   std::call_once(wts, [] { WTSRegisterWtsApiFunctionTable(FreeRDP_InitWtsApi()); });
   audio_latency = config.audio_latency_ms ? config.audio_latency_ms : 500;
   Picture();
-  winpr_InitializeSSL(WINPR_SSL_INIT_DEFAULT);
+  if (!winpr_InitializeSSL(WINPR_SSL_INIT_DEFAULT)) throw std::runtime_error("OpenSSL initialisation failed.");
+  RehearseTlsOnce(credentials);
   listener->info         = this;
   listener->PeerAccepted = Accepted;
   port                   = Bind(listener.get(), config);

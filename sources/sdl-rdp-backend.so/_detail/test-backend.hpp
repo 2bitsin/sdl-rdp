@@ -7,8 +7,6 @@ protected:
   void SetUp() override {
     sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), 320, 200, 0, Logs::Collect, &logs };
     config.codec = GetParam().codec;
-    static std::once_flag tls_initialized;
-    std::call_once(tls_initialized, [&] { InitializeTls(config); });
     std::filesystem::remove_all(certificates.Path());
     sdlrdp_handle* handle = nullptr;
     ASSERT_EQ(sdlrdp_open(&config, &handle), 0);

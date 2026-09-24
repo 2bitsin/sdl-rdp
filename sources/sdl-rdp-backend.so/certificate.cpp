@@ -1,42 +1,56 @@
-#include "_detail/state.hpp"
+#include "_detail/certificate.hpp"
+
+#include "_detail/contract.hpp"
+#include "_detail/descriptor.hpp"
+#include "_detail/rdp-handles.hpp"
+#include "_detail/system-call.hpp"
 
 #include <array>
 #include <cerrno>
 #include <cstdlib>
+#include <freerdp/crypto/certificate.h>
+#include <freerdp/crypto/privatekey.h>
+#include <memory>
+#include <mutex>
 #include <fcntl.h>
 #include <openssl/pem.h>
 #include <openssl/rsa.h>
 #include <openssl/x509v3.h>
 #include <pwd.h>
 #include <stdexcept>
+#include <string>
+#include <tuple>
+#include <utility>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 namespace Backend {
+using utilities::Ensures;
+using utilities::Expects;
 namespace {
 using Key         = std::unique_ptr<EVP_PKEY, Releases<EVP_PKEY_free>>;
 using Certificate = std::unique_ptr<X509, Releases<X509_free>>;
-using Bio         = std::unique_ptr<BIO, Releases<BIO_free>>;
-struct DirectoryLock {
+using ServerKey   = std::unique_ptr<rdpPrivateKey, Releases<freerdp_key_free>>;
+using ServerCert  = std::unique_ptr<rdpCertificate, Releases<freerdp_certificate_free>>;
+class DirectoryLock {
 public:
-           DirectoryLock(DirectoryLock const&) = delete;
-           DirectoryLock(DirectoryLock&&)      = delete;
   explicit DirectoryLock(std::filesystem::path const& directory)
-      : fd(open(directory.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC)) {
-    if (fd < 0) throw std::runtime_error("Certificate directory open failed.");
-    if (flock(fd, LOCK_EX)) {
-      close(fd);
-      throw std::runtime_error("Certificate directory lock failed.");
-    }
+      : descriptor(SystemCall(open(directory.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC), "certificate directory")) {
+    SystemCall(flock(descriptor.Get(), LOCK_EX), "certificate directory lock");
   }
-                 ~DirectoryLock() { close(fd); }
-  DirectoryLock& operator = (DirectoryLock const&) = delete;
-  DirectoryLock& operator = (DirectoryLock&&)      = delete;
 
 private:
-  int fd;
+  Descriptor descriptor;
 };
+template <FreeRDP_Settings_Keys_Pointer KEY, typename VTy, auto RELEASE>
+auto Adopt(rdpSettings& settings, std::unique_ptr<VTy, Releases<RELEASE>> owned) -> void {
+  Expects(owned != nullptr, "the server credential loaded");
+  // These pointer setters transfer ownership despite the generic API's copy documentation.
+  if (!freerdp_settings_set_pointer_len(&settings, KEY, owned.get(), 1))
+    throw std::runtime_error("FreeRDP refused a server credential.");
+  std::ignore = owned.release();
+}
 std::string Hostname() {
   std::array<char, 256> name{ };
   if (gethostname(name.data(), name.size() - 1)) throw std::runtime_error("Hostname unavailable.");
@@ -103,5 +117,15 @@ Credentials EnsureCertificate(std::filesystem::path const& directory) {
   Ensures(exists(result.certificate), "credentials exist");
   Ensures(exists(result.key), "credentials exist");
   return result;
+}
+auto InstallServerCredentials(rdpSettings& settings, Credentials const& credentials) -> void {
+  Expects(!credentials.key.empty(), "a private key path is supplied");
+  Expects(!credentials.certificate.empty(), "a certificate path is supplied");
+  ServerKey  key        { freerdp_key_new_from_file(credentials.key.c_str())                 };
+  ServerCert certificate{ freerdp_certificate_new_from_file(credentials.certificate.c_str()) };
+  if (!key) throw std::runtime_error("Server private key failed to load.");
+  if (!certificate) throw std::runtime_error("Server certificate failed to load.");
+  Adopt<FreeRDP_RdpServerRsaKey>(settings, std::move(key));
+  Adopt<FreeRDP_RdpServerCertificate>(settings, std::move(certificate));
 }
 }

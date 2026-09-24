@@ -22,7 +22,6 @@ protected:
     config.aspect           = aspect;
     config.codec            = codec;
     config.audio_latency_ms = audio_latency;
-    InitializeTls(config);
     sdlrdp_handle* handle = nullptr;
     ASSERT_EQ(sdlrdp_open(&config, &handle), 0) << sdlrdp_last_error();
     backend.reset(handle);

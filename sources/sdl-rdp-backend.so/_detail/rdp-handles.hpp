@@ -3,6 +3,7 @@
 #include <freerdp/listener.h>
 #include <freerdp/peer.h>
 #include <memory>
+#include <openssl/bio.h>
 #include <winpr/handle.h>
 #include <winpr/stream.h>
 
@@ -35,4 +36,5 @@ public:
 using ListenerHandle = std::unique_ptr<freerdp_listener, ReleasesListener>;
 using PeerHandle     = std::unique_ptr<freerdp_peer, ReleasesPeer>;
 using EventHandle    = std::unique_ptr<void, Releases<CloseHandle>>;
+using Bio            = std::unique_ptr<BIO, Releases<BIO_free>>;
 }

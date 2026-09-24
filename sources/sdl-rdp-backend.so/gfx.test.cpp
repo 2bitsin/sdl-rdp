@@ -1,6 +1,5 @@
 #include "_detail/gfx-protocol.hpp"
 #include "_detail/headless-gfx.hpp"
-#include "_detail/headless-tls.hpp"
 #include "_detail/state.hpp"
 #include "_detail/test-graphics.hpp"
 #include "_detail/test-pattern.hpp"
