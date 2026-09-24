@@ -7,13 +7,15 @@
 #include <oxbox/platform/file-writer.hpp>
 #include <algorithm>
 #include <array>
+#include <cstddef>
+#include <cstdint>
 #include <ranges>
 #include <span>
 #include <vector>
 
 namespace DriveGate {
 auto DriveSession::ThenPartialReads(sdlrdp_file* file, std::string const& source, std::string& result) -> void {
-  for (size_t const offset : { 13u, 1048577u, 3145697u }) {
+  for (std::size_t const offset : { 13u, 1048577u, 3145697u }) {
     result.resize(65536);
     auto count = sdlrdp_drive_read(handle.Handle(), file, offset, result.data(), result.size());
     ASSERT_GE(count, 0) << sdlrdp_last_error();
@@ -56,8 +58,8 @@ auto DriveSession::HoldRequests() -> void {
   observer->Observed().hold = true;
 }
 auto DriveSession::ThenVideoMatches() -> void {
-  std::vector<UINT32> pixels(320uz * 200uz, 0x00446688);
-  sdlrdp_rect const   damage{ 0, 0, 320, 200 };
+  std::vector<std::uint32_t> pixels(320uz * 200uz, 0x00446688);
+  sdlrdp_rect const          damage{ 0, 0, 320, 200 };
   ASSERT_EQ(handle.Present(pixels, 320, 200, damage), 0);
   ASSERT_TRUE(client->Until([&] { return client->Matches(pixels); }));
 }
@@ -83,7 +85,7 @@ auto Pattern(std::size_t size, std::uint32_t seed) -> std::string {
 auto DriveSession::Write(std::string const& name, std::string const& bytes) -> void {
   oxbox::platform::WriteBinaryFile(scratch.Path() / name, std::as_bytes(std::span(bytes)));
 }
-auto DriveSession::Open(char const* name, unsigned flags) -> sdlrdp_file* {
+auto DriveSession::Open(char const* name, std::uint32_t flags) -> sdlrdp_file* {
   sdlrdp_file* file = nullptr;
   EXPECT_EQ(sdlrdp_drive_open(handle.Handle(), drive, name, flags, &file), 0) << sdlrdp_last_error();
   return file;
@@ -107,7 +109,7 @@ auto DriveSession::ThenDriveFailure(sdlrdp_file* file, std::size_t warnings) -> 
 }
 auto DriveSession::GivenDirectoryEntries() -> std::set<std::string> {
   std::set<std::string> expected;
-  for (unsigned i = 0; i < 200; ++i) {
+  for (std::size_t i = 0; i < 200; ++i) {
     auto name = std::to_string(i);
     expected.insert(name);
     Write("many/" + name, "data");

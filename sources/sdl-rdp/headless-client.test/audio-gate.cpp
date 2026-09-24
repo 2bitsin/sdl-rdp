@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstddef>
+#include <cstdint>
 #include <ranges>
 #include <string>
 #include <thread>
@@ -38,7 +40,7 @@ auto AudioGate::ConnectAudioFormats(Client& client, SoundClient& audio) -> void 
 }
 auto AudioGate::ThenInitialVolume(Client& client, SoundClient& audio) -> void {
   EXPECT_EQ(sdlrdp_audio_rate(backend.Handle()), 44100u);
-  std::vector<INT16> pcm(882uz * 2);
+  std::vector<std::int16_t> pcm(882uz * 2);
   std::ranges::generate(pcm, [i = 0]() mutable { return ++i % 2 ? -12000 : 12000; });
   ASSERT_EQ(sdlrdp_audio_write(backend.Handle(), pcm.data(), 44), 44);
   ASSERT_EQ(sdlrdp_audio_write(backend.Handle(), pcm.data() + 88, 838), 838);
@@ -47,7 +49,7 @@ auto AudioGate::ThenInitialVolume(Client& client, SoundClient& audio) -> void {
   RecordProperty("volume_pcm", "44100 Hz; 44+838 frames; left=-12000 right=6000; volume=0x8000ffff");
 }
 auto AudioGate::ThenWriterFinishes(Client& client, SoundClient& audio, std::future<int>& writing, bool reconnect,
-                                   unsigned frames) -> void {
+                                   std::uint32_t frames) -> void {
   EXPECT_TRUE(client.Disconnect());
   EXPECT_EQ(writing.get(), frames);
   if (reconnect) EXPECT_EQ(audio.CaptureState().samples.size(), 1920u);
@@ -57,7 +59,7 @@ auto AudioGate::ThenFirstAudioBlockConfirms() -> void {
   EXPECT_EQ(sdlrdp_audio_wait(backend.Handle(), 10000), 1);
   EXPECT_EQ(logs.Count(SDLRDP_LOG_WARN, "Audio confirmation gate waiting"), 1u);
 }
-auto AudioGate::WhenLastAudioBlockConfirms(std::vector<INT16> const& pcm) -> void {
+auto AudioGate::WhenLastAudioBlockConfirms(std::vector<std::int16_t> const& pcm) -> void {
   ASSERT_TRUE(AudioSession().Confirm(24));
   EXPECT_EQ(sdlrdp_audio_wait(backend.Handle(), 10000), 1);
   ASSERT_EQ(sdlrdp_audio_write(backend.Handle(), pcm.data(), 960), 960);
@@ -74,7 +76,7 @@ auto AudioGate::WhenIdleAudioBurst(std::vector<std::int16_t> const& pcm, std::si
   if (burst == 1) std::this_thread::sleep_for(std::chrono::milliseconds(500));
 }
 auto AudioGate::ThenDisconnectedWriter(Client& client, SoundClient& audio, std::future<int>& writing, bool reconnect,
-                                       unsigned frames) -> void {
+                                       std::uint32_t frames) -> void {
   auto received = client.Until([&] { return audio.CaptureState().samples.size() >= (reconnect ? 1920u : 48000u); });
   EXPECT_TRUE(received);
   if (!reconnect) EXPECT_EQ(writing.wait_for(std::chrono::milliseconds(0)), std::future_status::timeout);

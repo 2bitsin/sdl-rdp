@@ -1,5 +1,6 @@
 #include <sdl-rdp/core/logging.hpp>
 
+#include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 
 #include <freerdp/error.h>
@@ -9,6 +10,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cstdint>
 #include <cstdlib>
 #include <mutex>
 #include <stdexcept>
@@ -30,7 +32,7 @@ auto TlsHandshakeFailed() -> bool {
 auto AuthenticationRejectedLogging() -> void {
   LogRoute::WithFilter([](auto& filter) { filter.authentication_failed = true; });
 }
-auto ExpectedDisconnect(unsigned code) -> bool {
+auto ExpectedDisconnect(std::uint32_t code) -> bool {
   switch (code) {
   case FREERDP_ERROR_CONNECT_TRANSPORT_FAILED:
   case FREERDP_ERROR_LOGOFF_BY_USER:
@@ -64,7 +66,7 @@ auto ExpectedLibraryMessage(std::string_view prefix, std::string_view text) -> b
     text.remove_prefix(system_error.size());
     auto const colon = text.find(": ");
     if (colon == std::string_view::npos) return false;
-    return oxbox::utilities::ParseNumber<unsigned>(text.substr(0, colon)).has_value();
+    return oxbox::utilities::ParseNumber<std::uint32_t>(text.substr(0, colon)).has_value();
   }
   return false;
 }
@@ -155,24 +157,21 @@ auto ExpectedPeerMessage(LogRoute::Filter& filter, wLogMessage const& message) -
 auto NtlmMessage(wLogMessage const& message) -> bool {
   return message.PrefixString && std::string_view(message.PrefixString) == "com.winpr.sspi.NTLM";
 }
-auto LibraryLevel(uint32_t level) -> sdlrdp_log_level {
+auto LibraryLevel(std::uint32_t level) -> sdlrdp_log_level {
   if (level == WLOG_ERROR) return SDLRDP_LOG_ERROR;
   return level == WLOG_WARN ? SDLRDP_LOG_WARN : SDLRDP_LOG_INFO;
 }
 }
-// WLog's wLogCallbacks table dictates the BOOL result.
-auto LogRoute::Forward(wLogMessage const* message) -> BOOL {
-  utilities::Expects(message != nullptr, "WLog message exists");
+auto LogRoute::Forward(wLogMessage const& message) -> void {
   auto&                  routing = Shared();
   std::scoped_lock const lock(routing.guard);
   auto&                  filter  = routing.filters[std::this_thread::get_id()];
-  if (message->Level < WLOG_INFO || message->Type != WLOG_MESSAGE_TEXT) return TRUE;
-  auto const expected = ExpectedPeerMessage(filter, *message);
+  if (message.Level < WLOG_INFO || message.Type != WLOG_MESSAGE_TEXT) return;
+  auto const expected = ExpectedPeerMessage(filter, message);
   // SSPI debug output can contain credentials and hashes, including binary dump callbacks.
-  if (NtlmMessage(*message) && !expected) return TRUE;
-  auto const level = expected ? SDLRDP_LOG_INFO : LibraryLevel(message->Level);
-  if (routing.active) routing.active->Deliver(level, message->TextString);
-  return TRUE;
+  if (NtlmMessage(message) && !expected) return;
+  auto const level = expected ? SDLRDP_LOG_INFO : LibraryLevel(message.Level);
+  if (routing.active) routing.active->Deliver(level, message.TextString);
 }
 auto LogRoute::Deliver(sdlrdp_log_level level, char const* text) const -> void {
   if (callback && text) callback(user, level, text);
@@ -180,7 +179,17 @@ auto LogRoute::Deliver(sdlrdp_log_level level, char const* text) const -> void {
 auto LogRoute::Install() -> void {
   auto* root = WLog_GetRoot();
   utilities::Expects(root != nullptr, "WLog root exists");
-  wLogCallbacks callbacks{ Forward, Forward, Forward, Forward };
+  // abi: wLogCallbackMessage_t and its siblings, BOOL is int
+  constexpr auto forward   = [](wLogMessage const* message) noexcept -> int {
+    utilities::Expects(message != nullptr, "WLog message exists");
+    auto const forwarded = [&] {
+      Forward(*message);
+      return true;
+    };
+    // The log route is the only reporting channel, so its own failure has nowhere further to go.
+    return Contained(false, forwarded, [](std::string_view) noexcept { });
+  };
+  wLogCallbacks  callbacks { forward, forward, forward, forward };
   if (!WLog_SetLogAppenderType(root, WLOG_APPENDER_CALLBACK)
       || !WLog_ConfigureAppender(WLog_GetLogAppender(root), "callbacks", &callbacks))
     throw std::runtime_error("WLog callback installation failed.");

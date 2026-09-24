@@ -2,6 +2,7 @@
 #include <oxbox/utilities/span.hpp>
 #include <oxbox/utilities/transcode.hpp>
 #include <bit>
+#include <cstddef>
 #include <functional>
 #include <stdexcept>
 #include <vector>

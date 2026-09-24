@@ -23,13 +23,13 @@ struct DriveRequest {
   bool          done    { };
   bool          removed { };
   std::uint32_t drive   { };
-  uint32_t      status  { };
+  std::uint32_t status  { };
   DrivePacket   response;
 };
 struct Slot {
   std::shared_ptr<DriveRequest> request;
-  size_t                        offset { };
-  size_t                        count  { };
+  std::size_t                   offset { };
+  std::size_t                   count  { };
 };
 // FreeRDP 3.32 server/rdpdr.h:103 Drive* uses 32-bit offsets and a private reader; this peer owns both directions.
 class DriveChannel : public std::enable_shared_from_this<DriveChannel> {
@@ -41,11 +41,11 @@ public:
   auto operator=(DriveChannel const&)             -> DriveChannel& = delete;
   auto operator=(DriveChannel&&)                  -> DriveChannel& = delete;
   auto Open()                                     -> bool;
-  auto Pump(std::span<HANDLE const> signaled)     -> bool;
-  auto Event() const                              -> HANDLE;
+  auto Pump(std::span<WaitHandle const> signaled) -> bool;
+  auto Event() const                              -> WaitHandle;
   auto Disconnect()                               -> void;
   auto Abort(std::string const& cause)            -> void;
-  auto List(sdlrdp_drive* out, std::uint32_t max) -> int;
+  auto List(sdlrdp_drive* out, std::size_t max)   -> int;
   auto Device(std::uint32_t id)                   -> std::uint32_t;
   auto Send(std::uint32_t drive, std::uint32_t file, std::uint32_t major, DrivePacket const& body,
             std::uint32_t minor = 0) -> std::shared_ptr<DriveRequest>;
@@ -79,7 +79,7 @@ private:
   Diagnostics const&                                     _diagnostics;
   SessionAccess&                                         _session;
   VirtualChannel                                         channel;
-  HANDLE                                                 event        { };
+  WaitHandle                                             event        { };
   std::atomic<bool>                                      connected    { true };
   std::uint32_t                                          next         { 1    };
   std::uint32_t                                          client_id    { 1    };

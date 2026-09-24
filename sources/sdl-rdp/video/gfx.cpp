@@ -3,8 +3,13 @@
 #include <sdl-rdp/core/activation.hpp>
 #include <sdl-rdp/core/configuration.hpp>
 #include <sdl-rdp/core/diagnostics.hpp>
+#include <sdl-rdp/core/dispatched.hpp>
+#include <sdl-rdp/core/failure-log.hpp>
 #include <sdl-rdp/core/peer-link.hpp>
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
+#include <sdl-rdp/utilities/contained.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
+#include <sdl-rdp/utilities/operation-name.hpp>
 #include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/video/acknowledgement-window.hpp>
 #include <sdl-rdp/video/encoder.hpp>
@@ -16,6 +21,7 @@
 #include <oxbox/utilities/text.hpp>
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <format>
 #include <numeric>
 #include <utility>
@@ -27,12 +33,44 @@ auto Held(RdpgfxServerContext* context) -> GfxChannel& {
   Expects(context != nullptr, "callback context exists");
   return CallbackOwner<GfxChannel>(context->custom);
 }
-auto Mode(UINT32 queue_depth) -> AcknowledgementMode {
+auto Mode(std::uint32_t queue_depth) -> AcknowledgementMode {
   return queue_depth == SUSPEND_FRAME_ACKNOWLEDGEMENT ? AcknowledgementMode::Suspended : AcknowledgementMode::Tracking;
 }
 auto FitsProtocol(sdlrdp_rect desktop) -> bool {
   return desktop.w <= MaximumSurfaceDimension && desktop.h <= MaximumSurfaceDimension;
 }
+}
+class GfxChannel::Callbacks {
+public:
+  static auto Install(RdpgfxServerContext& server) -> void;
+
+private:
+  template <auto HANDLER, class PduTy>
+  static auto Handled(RdpgfxServerContext* context, PduTy const* pdu, OperationName operation) noexcept
+      -> std::uint32_t;
+};
+template <auto HANDLER, class PduTy>
+auto GfxChannel::Callbacks::Handled(RdpgfxServerContext* context, PduTy const* pdu, OperationName operation) noexcept
+    -> std::uint32_t {
+  auto& owner = Held(context);
+  return Dispatched<HANDLER>(ERROR_INTERNAL_ERROR, owner, pdu, FailureLog{ owner._diagnostics, operation });
+}
+auto GfxChannel::Callbacks::Install(RdpgfxServerContext& server) -> void {
+  // abi: psRdpgfxServerCapsAdvertise, UINT is uint32_t
+  server.CapsAdvertise = [](RdpgfxServerContext* context,
+                            RDPGFX_CAPS_ADVERTISE_PDU const* caps) noexcept -> std::uint32_t {
+    return Handled<&GfxChannel::Caps>(context, caps, "Graphics capabilities");
+  };
+  // abi: psRdpgfxServerFrameAcknowledge, UINT is uint32_t
+  server.FrameAcknowledge = [](RdpgfxServerContext* context,
+                               RDPGFX_FRAME_ACKNOWLEDGE_PDU const* ack) noexcept -> std::uint32_t {
+    return Handled<&GfxChannel::Ack>(context, ack, "Graphics frame acknowledgement");
+  };
+  // abi: psRdpgfxServerQoeFrameAcknowledge, UINT is uint32_t
+  server.QoeFrameAcknowledge = [](RdpgfxServerContext* context,
+                                  RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU const* ack) noexcept -> std::uint32_t {
+    return Handled<&GfxChannel::Qoe>(context, ack, "Graphics QoE acknowledgement");
+  };
 }
 GfxChannel::GfxChannel(PeerLink& link, Diagnostics const& diagnostics, Configuration const& configuration,
                        Activation& activation, FrameSources sources, DynamicChannel& owner)
@@ -41,17 +79,15 @@ GfxChannel::GfxChannel(PeerLink& link, Diagnostics const& diagnostics, Configura
 GfxChannel::~GfxChannel() = default;
 auto GfxChannel::Open() -> bool {
   if (!BindContext(_context.get(), this, _link.Context())) return false;
-  // abi: psRdpgfxServerChannelIdAssigned
-  _context->ChannelIdAssigned   = [](RdpgfxServerContext* assigned, UINT32 id) noexcept -> BOOL {
-    Held(assigned)._slot.Assign(id);
-    return true;
+  // abi: psRdpgfxServerChannelIdAssigned, BOOL is int
+  _context->ChannelIdAssigned = [](RdpgfxServerContext* assigned, std::uint32_t id) noexcept -> int {
+    auto& owner = Held(assigned);
+    return owner._slot.Assigned(id, FailureLog{ owner._diagnostics, "Graphics channel assignment" });
   };
-  _context->CapsAdvertise       = Caps;
-  _context->FrameAcknowledge    = Ack;
-  _context->QoeFrameAcknowledge = Qoe;
-  return _context->Initialize(_context.get(), TRUE) && _context->Open(_context.get());
+  Callbacks::Install(*_context);
+  return _context->Initialize(_context.get(), true) && _context->Open(_context.get());
 }
-auto GfxChannel::Event() const -> HANDLE {
+auto GfxChannel::Event() const -> WaitHandle {
   return rdpgfx_server_get_event_handle(_context.get());
 }
 auto GfxChannel::Pump() -> bool {
@@ -64,7 +100,7 @@ auto GfxChannel::Confirmed() const noexcept -> bool {
 auto GfxChannel::Timing() const noexcept -> GraphicsTiming const& {
   return _timing;
 }
-auto GfxChannel::Check(UINT result, char const* operation) const -> bool {
+auto GfxChannel::Check(std::uint32_t result, char const* operation) const -> bool {
   if (result == CHANNEL_RC_OK) return true;
   _diagnostics.Log(SDLRDP_LOG_ERROR, std::format("GFX {} failed: {}.", operation, result));
   return false;
@@ -76,7 +112,7 @@ auto GfxChannel::LogCapabilities(std::span<RDPGFX_CAPSET const> advertised) cons
   });
   _diagnostics.Log(SDLRDP_LOG_INFO, "GFX advertised sets: " + sets);
 }
-auto GfxChannel::ActivateCapabilities(RDPGFX_CAPSET const& selected, bool wanted) -> UINT {
+auto GfxChannel::ActivateCapabilities(RDPGFX_CAPSET const& selected, bool wanted) -> std::uint32_t {
   auto const codec      = _sources.encoder.get().Codec();
   bool const announcing = _activation.Holding();
   _activation.Announce(codec, _sources.pacing.get().Effective());
@@ -95,31 +131,30 @@ auto GfxChannel::ResetSurface() -> bool {
     return false;
   RDPGFX_DELETE_SURFACE_PDU const remove{ GraphicsSurfaceId };
   if (_surface.width && !Check(_context->DeleteSurface(_context.get(), &remove), "delete surface")) return false;
-  constexpr UINT32                       PrimaryMonitor = 1;
-  constexpr UINT32                       MonitorCount   = 1;
+  constexpr std::uint32_t                PrimaryMonitor = 1;
+  constexpr std::uint32_t                MonitorCount   = 1;
   auto const                             desktop        = _sources.scaler.get().Target();
   MONITOR_DEF                            monitor        { 0, 0, desktop.w - 1, desktop.h - 1, PrimaryMonitor };
-  RDPGFX_RESET_GRAPHICS_PDU const reset{ unsigned(desktop.w), unsigned(desktop.h), MonitorCount, &monitor };
-  RDPGFX_CREATE_SURFACE_PDU const        create         { GraphicsSurfaceId, UINT16(desktop.w), UINT16(desktop.h),
-                                                          GFX_PIXEL_FORMAT_XRGB_8888 };
+  RDPGFX_RESET_GRAPHICS_PDU const reset{ Narrowed<std::uint32_t>(desktop.w), Narrowed<std::uint32_t>(desktop.h),
+                                         MonitorCount, &monitor };
+  RDPGFX_CREATE_SURFACE_PDU const create{ GraphicsSurfaceId, Narrowed<std::uint16_t>(desktop.w),
+                                          Narrowed<std::uint16_t>(desktop.h), GFX_PIXEL_FORMAT_XRGB_8888 };
   RDPGFX_MAP_SURFACE_TO_OUTPUT_PDU const map            { GraphicsSurfaceId, 0, 0, 0                         };
   return Check(_context->ResetGraphics(_context.get(), &reset), "reset graphics")
          && Check(_context->CreateSurface(_context.get(), &create), "create surface")
          && Check(_context->MapSurfaceToOutput(_context.get(), &map), "map surface");
 }
-auto GfxChannel::Caps(RdpgfxServerContext* context, RDPGFX_CAPS_ADVERTISE_PDU const* caps) -> UINT {
-  Expects(caps, "graphics capabilities are supplied");
-  auto& self       = Held(context);
-  auto  advertised = std::span(caps->capsSets, caps->capsSetCount);
-  self.LogCapabilities(advertised);
-  bool const wanted   = self._configuration.Codec() == SDLRDP_CODEC_AVC420;
+auto GfxChannel::Caps(RDPGFX_CAPS_ADVERTISE_PDU const& caps) -> std::uint32_t {
+  auto advertised = std::span(caps.capsSets, caps.capsSetCount);
+  LogCapabilities(advertised);
+  bool const wanted   = _configuration.Codec() == SDLRDP_CODEC_AVC420;
   auto       selected = SelectCapability(advertised, Avc::Encoder::Available());
   if (!selected.version) return ERROR_NOT_SUPPORTED;
   RDPGFX_CAPS_CONFIRM_PDU const confirm{ &selected };
-  if (!self.Check(context->CapsConfirm(context, &confirm), "confirm")) return ERROR_INTERNAL_ERROR;
-  self.ConfirmedCapability(selected);
-  if (!self.Select()) return ERROR_INTERNAL_ERROR;
-  return self.ActivateCapabilities(selected, wanted);
+  if (!Check(_context->CapsConfirm(_context.get(), &confirm), "confirm")) return ERROR_INTERNAL_ERROR;
+  ConfirmedCapability(selected);
+  if (!Select()) return ERROR_INTERNAL_ERROR;
+  return ActivateCapabilities(selected, wanted);
 }
 auto GfxChannel::ResetAvc() -> void {
   _avc.Close();
@@ -136,20 +171,17 @@ auto GfxChannel::ConfirmedCapability(RDPGFX_CAPSET const& cap) -> void {
   _headers = false;
   _prepared.clear();
 }
-auto GfxChannel::Ack(RdpgfxServerContext* context, RDPGFX_FRAME_ACKNOWLEDGE_PDU const* ack) -> UINT {
-  Expects(ack, "acknowledgement is supplied");
-  auto& self = Held(context);
-  self._sources.pacing.get().Accept(ack->frameId);
-  self._queue_depth = ack->queueDepth;
-  self._sources.pacing.get().Acknowledgements(Mode(ack->queueDepth));
+auto GfxChannel::Ack(RDPGFX_FRAME_ACKNOWLEDGE_PDU const& ack) -> std::uint32_t {
+  _sources.pacing.get().Accept(ack.frameId);
+  _queue_depth = ack.queueDepth;
+  _sources.pacing.get().Acknowledgements(Mode(ack.queueDepth));
   return CHANNEL_RC_OK;
 }
-auto GfxChannel::Qoe(RdpgfxServerContext* context, RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU const* ack) -> UINT {
-  Expects(ack, "acknowledgement is supplied");
-  Held(context)._timing.Record(*ack);
+auto GfxChannel::Qoe(RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU const& ack) -> std::uint32_t {
+  _timing.Record(ack);
   return CHANNEL_RC_OK;
 }
-auto GfxChannel::FrameWindow() const -> unsigned {
+auto GfxChannel::FrameWindow() const -> std::size_t {
   Expects(_queue_depth != SUSPEND_FRAME_ACKNOWLEDGEMENT, "acknowledgements are enabled");
   // MS-RDPEGFX 2.2.2.13 reports bytes, not frames; reserve at most one slot for that backlog.
   return _queue_depth && _queue_depth >= _last_bytes ? AcknowledgedFrameWindow - 1 : AcknowledgedFrameWindow;
@@ -163,7 +195,7 @@ auto GfxChannel::Surface() -> bool {
     return false;
   }
   if (!ResetSurface()) return false;
-  _surface = { .width = unsigned(desktop.w), .height = unsigned(desktop.h) };
+  _surface = { .width = Narrowed<std::uint32_t>(desktop.w), .height = Narrowed<std::uint32_t>(desktop.h) };
   _pixels.resize(FrameBytes(_surface));
   _headers = false;
   _progressive.reset();

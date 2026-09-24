@@ -1,6 +1,7 @@
 #pragma once
 #include <oxbox/utilities/text.hpp>
 #include <array>
+#include <cstddef>
 #include <functional>
 #include <optional>
 #include <ranges>
@@ -17,30 +18,30 @@ using SettingValues = std::array<std::optional<std::string>, SettingNames.size()
 enum class IniStatus{ SETTING, UNKNOWN, MALFORMED };
 class IniEntry {
 public:
-           IniEntry(std::string_view key, std::string_view value, unsigned line);
-  explicit IniEntry(unsigned line);
+           IniEntry(std::string_view key, std::string_view value, std::size_t line);
+  explicit IniEntry(std::size_t line);
   auto     Index() const  -> std::optional<std::size_t>;
   auto     Key() const    -> std::string_view;
   auto     Value() const  -> std::string_view;
-  auto     Line() const   -> unsigned;
+  auto     Line() const   -> std::size_t;
   auto     Status() const -> IniStatus;
 private:
   std::optional<std::size_t> _index;
   std::string_view           _key;
   std::string_view           _value;
-  unsigned                   _line;
+  std::size_t                _line;
   IniStatus                  _status;
 };
 auto SettingIndex(std::string_view name)                          -> std::optional<std::size_t>;
 auto IniValue(SettingValues const& values, std::string_view name) -> std::optional<std::string>;
-auto ParseEntry(std::string_view line, unsigned number)           -> IniEntry;
+auto ParseEntry(std::string_view line, std::size_t number)        -> IniEntry;
 auto IsIniEntry(std::string_view line)                            -> bool;
-template <typename _Accept>
-  requires std::invocable<_Accept const&, IniEntry>
-auto ParseIni(std::string_view text, _Accept const& accept) -> void {
+template <typename AcceptTy>
+  requires std::invocable<AcceptTy const&, IniEntry>
+auto ParseIni(std::string_view text, AcceptTy const& accept) -> void {
   for (auto const [index, part] : text | std::views::split('\n') | std::views::enumerate) {
     auto const line = oxbox::utilities::Trimmed(std::string_view{ part });
-    if (IsIniEntry(line)) std::invoke(accept, ParseEntry(line, static_cast<unsigned>(index) + 1));
+    if (IsIniEntry(line)) std::invoke(accept, ParseEntry(line, static_cast<std::size_t>(index) + 1));
   }
 }
 }

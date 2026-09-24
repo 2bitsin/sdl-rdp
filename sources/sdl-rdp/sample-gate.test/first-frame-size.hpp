@@ -15,8 +15,8 @@ public:
   auto     Height() const                   -> int;
 
 private:
-  static auto Connect(freerdp* instance) -> BOOL;
-  static auto Paint(rdpContext* context) -> BOOL;
+  auto Connect(freerdp& instance) -> bool;
+  auto Paint(rdpContext& context) -> bool;
   bool received = false;
   int  width    = 0;
   int  height   = 0;

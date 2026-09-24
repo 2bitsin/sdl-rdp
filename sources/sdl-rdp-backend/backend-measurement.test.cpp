@@ -1,6 +1,8 @@
 #include <sdl-rdp/headless-client.test/backend-instance.hpp>
 #include <sdl-rdp/headless-client.test/peer-status.hpp>
 #include <sdl-rdp/headless-client.test/round-five.hpp>
+#include <cstddef>
+#include <cstdint>
 
 namespace BackendGate {
 class GraphicsMeasurement : public RoundFive {
@@ -26,14 +28,14 @@ protected:
   }
   auto PrepareMeasurement(Client& client, sdlrdp_codec codec, bool noise) -> void {
     if (codec == SDLRDP_CODEC_PROGRESSIVE) client.EnableGraphics();
-    ASSERT_TRUE(freerdp_settings_set_bool(client.Instance()->context->settings, FreeRDP_GfxSendQoeAck, TRUE));
+    ASSERT_TRUE(freerdp_settings_set_bool(client.Instance()->context->settings, FreeRDP_GfxSendQoeAck, true));
     ASSERT_NO_FATAL_FAILURE(Connect(client));
     if (codec == SDLRDP_CODEC_PROGRESSIVE) ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
     ASSERT_NO_FATAL_FAILURE(Present(GraphicsScene(0, noise), 640, 480));
     ASSERT_TRUE(client.Until([&] { return Acknowledged(); }));
   }
-  auto MeasureFrames(Client& client, bool noise, unsigned& maximum_error, double& latency) -> void {
-    for (unsigned frame = 1; frame <= 20; ++frame) {
+  auto MeasureFrames(Client& client, bool noise, std::uint32_t& maximum_error, double& latency) -> void {
+    for (std::uint32_t frame = 1; frame <= 20; ++frame) {
       auto              pixels    = GraphicsScene(frame, noise);
       auto              presented = Clock::now();
       sdlrdp_rect const damage    = noise ? sdlrdp_rect{ 0, 0, 640, 480 } : sdlrdp_rect{ int(frame - 1), 40, 33, 32 };
@@ -44,7 +46,7 @@ protected:
     }
   }
   static auto RecordMeasurement(std::size_t bytes, double elapsed, double milliseconds, double latency,
-                                unsigned maximum_error) -> void {
+                                std::uint32_t maximum_error) -> void {
     RecordProperty("wire_MB_per_second", std::to_string(double(bytes) / elapsed / 1000000));
     RecordProperty("wire_MB_per_second_at_60fps", std::to_string(double(bytes) * 3.0 / 1000000));
     RecordProperty("encode_ms_per_frame", std::to_string(milliseconds / 20));
@@ -58,11 +60,11 @@ protected:
     ASSERT_NO_FATAL_FAILURE(MeasureAndRecord(client, codec, noise));
   }
   auto MeasureAndRecord(Client& client, sdlrdp_codec codec, bool noise) -> void {
-    auto     initial_encode = EncodeDuration();
-    auto     initial_bytes  = client.Received();
-    auto     start          = Clock::now();
-    unsigned maximum_error  = 0;
-    double   latency        = 0;
+    auto          initial_encode = EncodeDuration();
+    auto          initial_bytes  = client.Received();
+    auto          start          = Clock::now();
+    std::uint32_t maximum_error  = 0;
+    double        latency        = 0;
     ASSERT_NO_FATAL_FAILURE(MeasureFrames(client, noise, maximum_error, latency));
     auto elapsed      = std::chrono::duration<double>(Clock::now() - start).count();
     auto bytes        = client.Received() - initial_bytes;

@@ -13,7 +13,7 @@ public:
   using Channel = InputChannel<InputProtocol>;
   static auto Open(PeerLink& link, Channel& channel) -> Context;
   static auto Service(Context const& context)        -> bool;
-  static auto Handle(Context const& context)         -> HANDLE;
+  static auto Handle(Context const& context)         -> WaitHandle;
   static auto Activate(Context const& context)       -> bool;
 
 private:

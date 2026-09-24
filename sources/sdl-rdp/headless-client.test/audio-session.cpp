@@ -8,6 +8,7 @@
 #include <array>
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <future>
 #include <regex>
 #include <string>
@@ -17,10 +18,10 @@
 namespace BackendGate {
 namespace {
 auto WriteRealtimeAudio(sdlrdp_handle* backend) -> int {
-  std::array<INT16, 480uz * 2> pcm     { };
-  auto                         start   = Clock::now();
-  int                          written = 0;
-  for (unsigned tick = 1; tick <= 200; ++tick) {
+  std::array<std::int16_t, 480uz * 2> pcm     { };
+  auto                                start   = Clock::now();
+  int                                 written = 0;
+  for (std::size_t tick = 1; tick <= 200; ++tick) {
     std::this_thread::sleep_until(start + std::chrono::milliseconds(tick * 10));
     auto count = sdlrdp_audio_write(backend, pcm.data(), 480);
     if (count != 480) return written;
@@ -117,8 +118,8 @@ auto AudioSession::CheckAudioStatistics(SoundClient const& audio) -> void {
 auto AudioSession::EstablishConfirmations(Client& client, SoundClient& audio) -> void {
   // Fill one latency window, then return its credit. This distinguishes a
   // slow confirming client from the deliberate no-confirmation fallback.
-  std::vector<INT16> pcm(24000uz * 2);
-  auto               automatic = audio.CaptureState().auto_confirm;
+  std::vector<std::int16_t> pcm(24000uz * 2);
+  auto                      automatic = audio.CaptureState().auto_confirm;
   audio.CaptureState().auto_confirm = true;
   ASSERT_EQ(sdlrdp_audio_write(backend.Handle(), pcm.data(), 24000), 24000);
   ASSERT_TRUE(client.Until([&] { return audio.CaptureState().confirmed_frames == 24000; }));

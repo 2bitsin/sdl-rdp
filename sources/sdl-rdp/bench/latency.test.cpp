@@ -8,7 +8,10 @@
 #include <sdl-rdp/headless-client.test/frame-observer.hpp>
 #include <sdl-rdp/headless-client.test/sound-client.hpp>
 #include <sdl-rdp/headless-client.test/wall-milliseconds.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <format>
 #include <ranges>
@@ -20,32 +23,31 @@
 
 namespace SampleGate {
 namespace {
-auto RecordSample(std::string_view line, std::string_view prefix, std::span<int64_t const> sent,
-                  std::vector<int64_t>& latency) -> void {
+auto RecordSample(std::string_view line, std::string_view prefix, std::span<std::int64_t const> sent,
+                  std::vector<std::int64_t>& latency) -> void {
   ASSERT_LT(latency.size(), sent.size());
   auto elapsed = TraceNumber(line, prefix) - sent[latency.size()];
   EXPECT_GE(elapsed, 0);
   latency.push_back(elapsed);
 }
-auto SendTime(Client const& client) -> int64_t {
+auto SendTime(Client const& client) -> std::int64_t {
   Expects(client.Instance() != nullptr, "latency client exists");
   return Headless::WallMilliseconds();
 }
 
-auto ReportLatency(std::vector<int64_t>& latency, std::string_view event) -> void {
+auto ReportLatency(std::vector<std::int64_t>& latency, std::string_view event) -> void {
   std::ranges::sort(latency);
   auto p95 = latency[((latency.size() * 95 + 99) / 100) - 1];
   testing::Test::RecordProperty(std::string(event) + "_p95_ms", p95);
-  SDL_Log("latency %.*s count=%zu p95=%lld ms", int(event.size()), event.data(), latency.size(),
-          static_cast<long long>(p95));
+  SDL_Log("latency %.*s count=%zu p95=%" SDL_PRIs64 " ms", int(event.size()), event.data(), latency.size(), p95);
   EXPECT_LT(p95, 40) << event;
 }
-auto CheckLatency(std::string const& trace, std::string_view event, std::span<int64_t const> sent) -> void {
+auto CheckLatency(std::string const& trace, std::string_view event, std::span<std::int64_t const> sent) -> void {
   Expects(!event.empty(), "trace event is named");
   Expects(!sent.empty(), "client sent measured events");
-  auto                 prefix  = std::format("trace {} t=", event);
-  std::vector<int64_t> latency;
-  std::istringstream   lines(trace);
+  auto                      prefix  = std::format("trace {} t=", event);
+  std::vector<std::int64_t> latency;
+  std::istringstream        lines(trace);
   for (std::string line; std::getline(lines, line);) {
     if (!line.contains(prefix)) continue;
     if (event == "key" && !line.contains(" code=30 ")) continue;
@@ -64,14 +66,14 @@ auto PumpUntil(Client& client, Headless::FrameObserver& frames, Clock::time_poin
   }
 }
 auto SampleLatency(Client& client, Headless::FrameObserver& frames, Headless::ClipboardClient& clipboard,
-                   std::vector<int64_t>& keys, std::vector<int64_t>& clips, Clock::time_point start) -> void {
-  for (unsigned i = 0; i < 60; ++i) {
+                   std::vector<std::int64_t>& keys, std::vector<std::int64_t>& clips, Clock::time_point start) -> void {
+  for (std::size_t i = 0; i < 60; ++i) {
     ASSERT_NO_FATAL_FAILURE(PumpUntil(client, frames, start + i * 50ms));
     keys.push_back(SendTime(client));
     ASSERT_TRUE(freerdp_input_send_keyboard_event(client.Instance()->context->input,
                                                   i % 2 ? KBD_FLAGS_RELEASE : KBD_FLAGS_DOWN, 0x1e));
     clips.push_back(SendTime(client));
-    ASSERT_EQ(clipboard.Offer({ BYTE('A' + i), 0, 0, 0 }), CHANNEL_RC_OK);
+    ASSERT_EQ(clipboard.Offer({ Backend::Narrowed<std::uint8_t>('A' + i), 0, 0, 0 }), CHANNEL_RC_OK);
   }
   PumpUntil(client, frames, start + 3s);
 }
@@ -92,8 +94,8 @@ auto ThenMediaReady(Client& client, Headless::FrameObserver& frames, Headless::S
 }
 }
 namespace {
-auto FinishLatency(std::jthread& drain, Process const& process, std::span<int64_t const> keys,
-                   std::span<int64_t const> clips) -> void {
+auto FinishLatency(std::jthread& drain, Process const& process, std::span<std::int64_t const> keys,
+                   std::span<std::int64_t const> clips) -> void {
   drain.request_stop();
   drain.join();
   ASSERT_NO_FATAL_FAILURE(CheckLatency(process.Transcript(), "key", keys));
@@ -111,10 +113,10 @@ TEST_F(Sample, InputAndClipboardUnderTightVideo) {
   ASSERT_NO_FATAL_FAILURE(Connect(client));
   Headless::FrameObserver frames(client);
   ASSERT_NO_FATAL_FAILURE(ThenMediaReady(client, frames, audio, clipboard));
-  std::vector<int64_t> keys;
-  std::vector<int64_t> clips;
-  auto                 start  = Clock::now();
-  auto                 before = frames.Frames().size();
+  std::vector<std::int64_t> keys;
+  std::vector<std::int64_t> clips;
+  auto                      start  = Clock::now();
+  auto                      before = frames.Frames().size();
   ASSERT_NO_FATAL_FAILURE(SampleLatency(client, frames, clipboard, keys, clips, start));
   EXPECT_GE(frames.Frames().size() - before, 60u);
   ASSERT_NO_FATAL_FAILURE(Escape(client));

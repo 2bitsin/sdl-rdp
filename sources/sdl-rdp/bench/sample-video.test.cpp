@@ -4,6 +4,7 @@
 
 #include <SDL3/SDL.h>
 #include <chrono>
+#include <cstddef>
 
 namespace SampleGate {
 TEST_F(VideoDriver, DefaultPresentDoesNotWaitForAcknowledgements) {
@@ -13,7 +14,7 @@ TEST_F(VideoDriver, DefaultPresentDoesNotWaitForAcknowledgements) {
   SDL_PumpEvents();
   ASSERT_NE(SDL_GetWindowSurface(window), nullptr);
   auto start = Clock::now();
-  for (unsigned i = 0; i < 10; ++i) ASSERT_TRUE(SDL_UpdateWindowSurface(window));
+  for (std::size_t i = 0; i < 10; ++i) ASSERT_TRUE(SDL_UpdateWindowSurface(window));
   // Ten old 100 ms waits exceed this half-second regression budget.
   EXPECT_LT(Clock::now() - start, 500ms);
 }

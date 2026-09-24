@@ -13,11 +13,13 @@
 #include <sdl-rdp/video/peer-frames.hpp>
 #include <sdl-rdp/video/scaler.hpp>
 
+#include <oxbox/utilities/span.hpp>
 #include <winpr/sysinfo.h>
 #include <algorithm>
 #include <array>
 #include <concepts>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <ranges>
 #include <utility>
@@ -25,27 +27,27 @@
 namespace Backend {
 namespace {
 using InitializedRegion = std::unique_ptr<REGION16, Releases<region16_uninit>>;
-constexpr std::size_t ProgressiveSyncBytes        = 12;
-constexpr std::size_t ProgressiveContextBytes     = 10;
-constexpr std::size_t ProgressiveBlockHeaderBytes = sizeof(UINT16) + sizeof(UINT32);
-constexpr auto        ProgressiveHeaderBytes      = ProgressiveSyncBytes + ProgressiveContextBytes;
-constexpr UINT16      ProgressiveSyncBlock        = 0xCCC0;
-constexpr UINT16      ProgressiveContextBlock     = 0xCCC3;
-constexpr std::size_t WireToSurfaceHeaderBytes    = 25;
-auto SurfaceCommand(sdlrdp_rect area, std::span<BYTE> data, UINT32 codec) -> RDPGFX_SURFACE_COMMAND {
+constexpr std::size_t   ProgressiveSyncBytes        = 12;
+constexpr std::size_t   ProgressiveContextBytes     = 10;
+constexpr std::size_t   ProgressiveBlockHeaderBytes = sizeof(std::uint16_t) + sizeof(std::uint32_t);
+constexpr auto          ProgressiveHeaderBytes      = ProgressiveSyncBytes + ProgressiveContextBytes;
+constexpr std::uint16_t ProgressiveSyncBlock        = 0xCCC0;
+constexpr std::uint16_t ProgressiveContextBlock     = 0xCCC3;
+constexpr std::size_t   WireToSurfaceHeaderBytes    = 25;
+auto SurfaceCommand(sdlrdp_rect area, std::span<std::byte> data, std::uint32_t codec) -> RDPGFX_SURFACE_COMMAND {
   RDPGFX_SURFACE_COMMAND command{ };
   command.surfaceId = GraphicsSurfaceId;
   command.codecId   = codec;
   command.contextId = GraphicsContextId;
   command.format    = PIXEL_FORMAT_BGRX32;
-  command.left      = area.x;
-  command.top       = area.y;
-  command.right     = area.x + area.w;
-  command.bottom    = area.y + area.h;
-  command.width     = area.w;
-  command.height    = area.h;
-  command.length    = data.size();
-  command.data      = data.data();
+  command.left      = Narrowed<std::uint32_t>(area.x);
+  command.top       = Narrowed<std::uint32_t>(area.y);
+  command.right     = Narrowed<std::uint32_t>(area.x + area.w);
+  command.bottom    = Narrowed<std::uint32_t>(area.y + area.h);
+  command.width     = Narrowed<std::uint32_t>(area.w);
+  command.height    = Narrowed<std::uint32_t>(area.h);
+  command.length    = Narrowed<std::uint32_t>(data.size());
+  command.data      = oxbox::utilities::SpanCast<std::uint8_t>(data).data();
   return command;
 }
 auto Persistent(sdlrdp_codec codec) -> bool {
@@ -72,8 +74,8 @@ auto EachArea(bool confirmed, Extent surface, Scaler const& scaler, std::predica
   ExpectSurface(confirmed, surface);
   return std::ranges::all_of(scaler.Areas(), send);
 }
-auto SurfaceStride(Extent surface) -> unsigned {
-  return Avc::Aligned(surface.width) * unsigned{ PixelBytes };
+auto SurfaceStride(Extent surface) -> std::uint32_t {
+  return Avc::Aligned(surface.width) * std::uint32_t{ PixelBytes };
 }
 auto ExpectInside(sdlrdp_rect area, Extent surface) -> void {
   Expects(area.x >= 0, "command left edge is nonnegative");
@@ -83,14 +85,21 @@ auto ExpectInside(sdlrdp_rect area, Extent surface) -> void {
   Expects(std::cmp_less_equal(area.x + area.w, surface.width), "command right edge fits surface");
   Expects(std::cmp_less_equal(area.y + area.h, surface.height), "command bottom edge fits surface");
 }
-constexpr auto BlockHeader(UINT16 block, std::size_t bytes) -> std::array<BYTE, ProgressiveBlockHeaderBytes> {
-  return { BYTE(block), BYTE(block >> 8), BYTE(bytes), 0, 0, 0 };
+constexpr auto BlockHeader(std::uint16_t block, std::uint8_t bytes)
+    -> std::array<std::byte, ProgressiveBlockHeaderBytes> {
+  // MS-RDPEGFX block headers are little-endian: the type's low byte, then its high byte.
+  return { std::byte{ static_cast<std::uint8_t>(block) },
+           std::byte{ static_cast<std::uint8_t>(block >> 8) },
+           std::byte{ bytes },
+           std::byte{ },
+           std::byte{ },
+           std::byte{ } };
 }
 // FreeRDP 3.32 rfx.c:2499 repeats SYNC/CONTEXT; GRD sends them once per surface context.
-auto ProgressiveHeaders(std::span<BYTE const> data) -> bool {
+auto ProgressiveHeaders(std::span<std::byte const> data) -> bool {
   if (data.size() < ProgressiveHeaderBytes) return false;
-  constexpr auto sync    = BlockHeader(ProgressiveSyncBlock, ProgressiveSyncBytes);
-  constexpr auto context = BlockHeader(ProgressiveContextBlock, ProgressiveContextBytes);
+  constexpr auto sync    = BlockHeader(ProgressiveSyncBlock, std::uint8_t{ ProgressiveSyncBytes });
+  constexpr auto context = BlockHeader(ProgressiveContextBlock, std::uint8_t{ ProgressiveContextBytes });
   return std::ranges::equal(sync, data.first(sync.size()))
          && std::ranges::equal(context, data.subspan(ProgressiveSyncBytes, context.size()));
 }
@@ -108,23 +117,24 @@ auto GfxChannel::AvcFailure() -> std::string {
   if (!_avc_allowed) return "confirmed capabilities do not allow AVC420";
   if (_avc.IsOpen()) return { };
   auto const   desktop = _sources.scaler.get().Target();
-  Extent const size    { .width = unsigned(desktop.w), .height = unsigned(desktop.h) };
+  Extent const size    { .width = Narrowed<std::uint32_t>(desktop.w), .height = Narrowed<std::uint32_t>(desktop.h) };
   auto const   opened  = _avc.Open(size, Avc::Bitrate(size, _configuration.AvcBitrate()), _avc_rate);
   return opened ? std::string{ } : _avc.Error();
 }
 auto GfxChannel::CompressProgressive(REGION16& damage, Stopwatch const& watch) -> bool {
-  BYTE*  data    = nullptr;
-  UINT32 size    = 0;
-  auto   picture { Picture()               };
-  auto   stride  { SurfaceStride(_surface) };
-  auto   result  = progressive_compress(_progressive.get(), picture.data(), picture.size(), PIXEL_FORMAT_BGRX32,
-                                        _surface.width, _surface.height, stride, &damage, &data, &size);
+  std::uint8_t* data    = nullptr;
+  std::uint32_t size    = 0;
+  auto          picture { Picture()               };
+  auto          stride  { SurfaceStride(_surface) };
+  auto          result  = progressive_compress(_progressive.get(), picture.data(), picture.size(), PIXEL_FORMAT_BGRX32,
+                                               _surface.width, _surface.height, stride, &damage, &data, &size);
   _sources.encoder.get().Charge(watch.Elapsed());
-  return result >= 0 && data && ProgressivePayload({ data, size });
+  return result >= 0 && data && ProgressivePayload(oxbox::utilities::AsBytes(std::span{ data, size }));
 }
 auto GfxChannel::ProgressiveDamage(REGION16& damage) const -> bool {
   return std::ranges::all_of(_sources.scaler.get().Areas(), [&](sdlrdp_rect area) {
-    RECTANGLE_16 const wire{ UINT16(area.x), UINT16(area.y), UINT16(area.x + area.w), UINT16(area.y + area.h) };
+    RECTANGLE_16 const wire{ Narrowed<std::uint16_t>(area.x), Narrowed<std::uint16_t>(area.y),
+                             Narrowed<std::uint16_t>(area.x + area.w), Narrowed<std::uint16_t>(area.y + area.h) };
     return region16_union_rect(&damage, &damage, &wire);
   });
 }
@@ -173,13 +183,13 @@ auto GfxChannel::SelectAvc() -> bool {
   _avc_rejected =  true;
   return false;
 }
-auto GfxChannel::Picture() -> std::span<BYTE const> {
+auto GfxChannel::Picture() -> std::span<std::uint8_t const> {
   auto const& snapshot = _sources.frames.get().Snapshot();
   ExpectCaptured(_sources.frames.get());
   if (SameSize(snapshot.Bounds(), Whole(_surface))) return snapshot.Pixels();
-  auto const pitch = std::size_t(Avc::Aligned(_surface.width)) * PixelBytes;
+  auto const pitch = std::size_t{ Avc::Aligned(_surface.width) } * PixelBytes;
   std::ranges::for_each(_sources.scaler.get().Areas(), [&](sdlrdp_rect area) {
-    auto const offset = (std::size_t(area.y) * pitch) + (std::size_t(area.x) * PixelBytes);
+    auto const offset = (Narrowed<std::size_t>(area.y) * pitch) + (Narrowed<std::size_t>(area.x) * PixelBytes);
     _sources.scaler.get().Place(area, std::span(_pixels).subspan(offset), pitch);
   });
   Avc::ReplicateEdges(_pixels, _surface);
@@ -201,7 +211,7 @@ auto GfxChannel::Avc420() -> bool {
   _prepared.push_back({ _regions.Bounds(), 0, data.size(), RDPGFX_CODECID_AVC420 });
   return true;
 }
-auto GfxChannel::Command(sdlrdp_rect area, std::span<BYTE const> data, UINT32 codec) -> bool {
+auto GfxChannel::Command(sdlrdp_rect area, std::span<std::byte const> data, std::uint32_t codec) -> bool {
   Expects(!data.empty(), "encoded graphics payload exists");
   _frame_bytes += data.size() + WireToSurfaceHeaderBytes;
   auto offset = _payload.size();
@@ -217,22 +227,22 @@ auto GfxChannel::WriteCommand(Packet const& packet) -> bool {
   auto                        command = SurfaceCommand(packet.area, data, packet.codec);
   RDPGFX_AVC420_BITMAP_STREAM stream  { { Narrowed<std::uint32_t>(_regions.Areas().size()), _regions.Areas().data(),
                                           _regions.Quality().data() },
-                                        UINT32(data.size()),
-                                        data.data() };
+                                        Narrowed<std::uint32_t>(data.size()),
+                                        oxbox::utilities::SpanCast<std::uint8_t>(data).data() };
   if (packet.codec == RDPGFX_CODECID_AVC420) command.extra = &stream;
   return Check(_context->SurfaceCommand(_context.get(), &command), "surface command");
 }
 auto GfxChannel::Progressive() -> bool {
   ExpectSurface(_confirmed, _surface);
   Stopwatch const watch;
-  if (!_progressive) _progressive.reset(progressive_context_new_ex(TRUE, THREADING_FLAGS_DISABLE_THREADS));
+  if (!_progressive) _progressive.reset(progressive_context_new_ex(true, THREADING_FLAGS_DISABLE_THREADS));
   if (!_progressive) return false;
   REGION16 damage;
   region16_init(&damage);
   InitializedRegion const owned{ &damage };
   return ProgressiveDamage(damage) && CompressProgressive(damage, watch);
 }
-auto GfxChannel::ProgressivePayload(std::span<BYTE> data) -> bool {
+auto GfxChannel::ProgressivePayload(std::span<std::byte const> data) -> bool {
   if (!ProgressiveHeaders(data)) return false;
   auto payload = data.subspan(_headers ? ProgressiveHeaderBytes : 0);
   if (!Command(Whole(_surface), payload, RDPGFX_CODECID_CAPROGRESSIVE)) return false;
@@ -241,14 +251,14 @@ auto GfxChannel::ProgressivePayload(std::span<BYTE> data) -> bool {
 }
 auto GfxChannel::Raw() -> bool {
   return EachArea(_confirmed, _surface, _sources.scaler.get(), [&](sdlrdp_rect area) {
-    _band.resize(std::size_t(area.w) * area.h * PixelBytes);
+    _band.resize(AreaBytes(area));
     auto const band = _sources.scaler.get().Copy(area, _band, RowOrder::TopDown);
-    return Command(area, band.Pixels(), RDPGFX_CODECID_UNCOMPRESSED);
+    return Command(area, oxbox::utilities::AsBytes(band.Pixels()), RDPGFX_CODECID_UNCOMPRESSED);
   });
 }
 auto GfxChannel::Planar() -> bool {
   return EachArea(_confirmed, _surface, _sources.scaler.get(), [&](sdlrdp_rect area) {
-    auto const command = [this](sdlrdp_rect row, std::span<BYTE const> payload) {
+    auto const command = [this](sdlrdp_rect row, std::span<std::byte const> payload) {
       return Command(row, payload, RDPGFX_CODECID_PLANAR);
     };
     return EncodePlanarRows(_sources.encoder.get(), _sources.scaler.get(), area, command);

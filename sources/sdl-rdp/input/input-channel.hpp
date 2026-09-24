@@ -1,6 +1,7 @@
 #pragma once
 #include <sdl-rdp/core/channel-slot.hpp>
 #include <sdl-rdp/core/peer-link.hpp>
+#include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/input/activated-channel.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
@@ -15,9 +16,9 @@ public:
   InputChannel(PeerLink& link, InputEvents& events) noexcept
       : _link{ link }, _events{ events }, _dynamic{ [this] { return Activate(); } }, _slot{ link.Dynamic(), _dynamic } {
   }
-  auto Open()                              -> bool;
-  auto Pump(std::span<HANDLE const> ready) -> bool;
-  auto Event() const                       -> HANDLE;
+  auto Open()                                  -> bool;
+  auto Pump(std::span<WaitHandle const> ready) -> bool;
+  auto Event() const                           -> WaitHandle;
 
 private:
   auto Activate() -> bool;
@@ -33,10 +34,10 @@ template <class Protocol> auto InputChannel<Protocol>::Open() -> bool {
   _context = Protocol::Open(_link, *this);
   return _context != nullptr;
 }
-template <class Protocol> auto InputChannel<Protocol>::Pump(std::span<HANDLE const> ready) -> bool {
+template <class Protocol> auto InputChannel<Protocol>::Pump(std::span<WaitHandle const> ready) -> bool {
   return !_ready || !std::ranges::contains(ready, Event()) || Protocol::Service(_context);
 }
-template <class Protocol> auto InputChannel<Protocol>::Event() const -> HANDLE {
+template <class Protocol> auto InputChannel<Protocol>::Event() const -> WaitHandle {
   return _ready ? Protocol::Handle(_context) : nullptr;
 }
 template <class Protocol> auto InputChannel<Protocol>::Activate() -> bool {

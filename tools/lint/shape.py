@@ -678,8 +678,11 @@ def key_name(source, first, parameters):
 def name_start(source, first, parameters):
     operators = [index for index in range(first, parameters) if source.word(index) == 'operator']
     start = operators[-1] if operators else source.angle_openers.get(parameters - 1, parameters) - 1
-    while start - first > 1 and source.word(start - 1) == '::' and source.word(start - 2)[:1].isidentifier():
-        start -= 2
+    while start - first > 1 and source.word(start - 1) == '::':
+        qualifier = source.angle_openers.get(start - 2, start - 1) - 1
+        if qualifier < first or not source.word(qualifier)[:1].isidentifier():
+            break
+        start = qualifier
     return start
 
 

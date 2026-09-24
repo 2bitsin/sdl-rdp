@@ -4,6 +4,7 @@
 
 #include <concepts>
 #include <condition_variable>
+#include <cstdint>
 #include <deque>
 #include <mutex>
 #include <span>
@@ -12,7 +13,7 @@ namespace Backend {
 class EventQueue {
 public:
   auto Push(sdlrdp_event event)          -> void;
-  auto Poll(std::span<sdlrdp_event> out) -> unsigned;
+  auto Poll(std::span<sdlrdp_event> out) -> std::uint32_t;
   auto Wait(Deadline deadline)           -> int;
   auto Wakeup()                          -> void;
 
@@ -27,6 +28,6 @@ private:
   std::mutex               _guard;
   std::condition_variable  _changed;
   std::deque<sdlrdp_event> _events;
-  unsigned long            _generation{ };
+  std::uint64_t            _generation{ };
 };
 }

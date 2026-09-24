@@ -1,6 +1,8 @@
 #include <sdl-rdp/core/refresh.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 
+#include <cstdint>
 #include <linux/sockios.h>
 #include <linux/tcp.h>
 #include <netinet/in.h>
@@ -17,7 +19,7 @@ auto SampleWire(int descriptor) -> WireSample {
     return { };
   if (length < offsetof(tcp_info, tcpi_delivery_rate) + sizeof(info.tcpi_delivery_rate)) return { };
   return { .available     = true,
-           .outq          = unsigned(outq),
+           .outq          = Narrowed<std::uint32_t>(outq),
            .notsent       = info.tcpi_notsent_bytes,
            .unacked       = info.tcpi_unacked,
            .rtt           = info.tcpi_rtt,

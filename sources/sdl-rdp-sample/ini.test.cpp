@@ -6,6 +6,7 @@
 #include <sdl-rdp/utilities/scoped.hpp>
 
 #include <SDL3/SDL.h>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -23,7 +24,7 @@ auto ThenAspectReset(SDL_PropertiesID properties) -> void {
   ASSERT_TRUE(SDL_ResetHint(SDL_HINT_RDP_ASPECT));
   EXPECT_STREQ(SDL_GetStringProperty(properties, SDL_PROP_WINDOW_RDP_ASPECT_STRING, ""), "4:3");
 }
-auto AvailablePort() -> unsigned {
+auto AvailablePort() -> std::uint32_t {
   int const socket_fd = socket(AF_INET, SOCK_STREAM, 0);
   Expects(socket_fd >= 0, "port reservation socket created");
   sockaddr_in address{ };
@@ -48,7 +49,7 @@ auto WriteInvalidIni(fs::path const& directory) -> void {
   std::ofstream out(directory / "libSDL3.ini");
   out << "SDL_RDP_PORT=1\nSDL_RDP_AUTH=invalid\n";
 }
-auto WriteIni(fs::path const& file, unsigned port) -> void {
+auto WriteIni(fs::path const& file, std::uint32_t port) -> void {
   std::ofstream out(file);
   out << "[server]\nSDL_RDP_PORT = " << port << "\nSDL_RDP_BACKEND = \"" << BackendLibrary().string()
       << "\"\nSDL_RDP_ASPECT = 4:3\n";

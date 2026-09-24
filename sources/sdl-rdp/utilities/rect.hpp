@@ -1,8 +1,11 @@
 #pragma once
 #include <sdl-rdp/utilities/contract.hpp>
+#include <sdl-rdp/utilities/extent.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp-abi/sdl-rdp-backend.h>
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <ranges>
@@ -20,6 +23,12 @@ constexpr auto SameSize(sdlrdp_rect left, sdlrdp_rect right) noexcept -> bool {
 inline auto ExpectsArea(sdlrdp_rect area, std::source_location where = std::source_location::current()) -> void {
   Expects(area.w >= 0, "rectangle width is nonnegative", where);
   Expects(area.h >= 0, "rectangle height is nonnegative", where);
+}
+inline auto RowBytes(int width) -> std::size_t {
+  return Narrowed<std::size_t>(width) * PixelBytes;
+}
+inline auto AreaBytes(sdlrdp_rect area) -> std::size_t {
+  return RowBytes(area.w) * Narrowed<std::size_t>(area.h);
 }
 inline auto Union(sdlrdp_rect left, sdlrdp_rect right) -> sdlrdp_rect {
   ExpectsArea(left);
@@ -45,8 +54,8 @@ inline auto Intersect(sdlrdp_rect left, sdlrdp_rect right) -> std::optional<sdlr
   ExpectsArea(right);
   auto x     = std::max(left.x, right.x);
   auto y     = std::max(left.y, right.y);
-  auto end_x = std::min(std::int64_t(left.x) + left.w, std::int64_t(right.x) + right.w);
-  auto end_y = std::min(std::int64_t(left.y) + left.h, std::int64_t(right.y) + right.h);
+  auto end_x = std::min(std::int64_t{ left.x } + left.w, std::int64_t{ right.x } + right.w);
+  auto end_y = std::min(std::int64_t{ left.y } + left.h, std::int64_t{ right.y } + right.h);
   if (end_x <= x || end_y <= y) return std::nullopt;
   return sdlrdp_rect{ x, y, int(end_x - x), int(end_y - y) };
 }

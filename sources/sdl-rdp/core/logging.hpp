@@ -3,17 +3,18 @@
 
 #include <freerdp/settings.h>
 #include <winpr/wlog.h>
+#include <cstdint>
 #include <map>
 #include <mutex>
 #include <thread>
 namespace Backend {
 // MS-RDPBCGR 2.2.1.1.1 requestedProtocols (FreeRDP keeps these constants private).
-inline constexpr unsigned SecurityTls = 0x01, SecurityNla = 0x02, SecurityRdstls = 0x04, SecurityNlaExt = 0x08,
-                          SecurityRdsaad = 0x10;
+inline constexpr std::uint32_t SecurityTls = 0x01, SecurityNla = 0x02, SecurityRdstls = 0x04, SecurityNlaExt = 0x08,
+                               SecurityRdsaad = 0x10;
 auto PeerNegotiationLogging(rdpSettings const* settings) -> void;
 auto NegotiationRefused()                                -> bool;
 auto TlsHandshakeFailed()                                -> bool;
-auto ExpectedDisconnect(unsigned code)                   -> bool;
+auto ExpectedDisconnect(std::uint32_t code)              -> bool;
 auto AuthenticationRejectedLogging()                     -> void;
 auto ResetAuthenticationLogging()                        -> void;
 class LogRoute {
@@ -44,7 +45,7 @@ private:
     std::map<std::thread::id, Filter> filters;
   };
   static auto Shared()                                                -> Routing&;
-  static auto Forward(wLogMessage const* message)                     -> BOOL;
+  static auto Forward(wLogMessage const& message)                     -> void;
   static auto Install()                                               -> void;
   auto        Deliver(sdlrdp_log_level level, char const* text) const -> void;
   decltype(sdlrdp_config::log) callback;

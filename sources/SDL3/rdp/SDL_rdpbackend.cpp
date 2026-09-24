@@ -1,13 +1,14 @@
 #include "SDL_rdpbackend.hpp"
+#include <cstddef>
 #include <stdexcept>
 #include <string>
 
 namespace rdp {
 namespace {
-template <std::size_t... _Indices>
-auto LoadSymbols(Library const& library, [[maybe_unused]] std::index_sequence<_Indices...> indices) -> BackendSymbols {
-  return BackendSymbols{ reinterpret_cast<std::tuple_element_t<_Indices, BackendSymbols>>(
-      SDL_LoadFunction(library.Get(), BackendCatalog::Names.at(_Indices)))... };
+template <std::size_t... INDICES>
+auto LoadSymbols(Library const& library, [[maybe_unused]] std::index_sequence<INDICES...> indices) -> BackendSymbols {
+  return BackendSymbols{ reinterpret_cast<std::tuple_element_t<INDICES, BackendSymbols>>(
+      SDL_LoadFunction(library.Get(), BackendCatalog::Names.at(INDICES)))... };
 }
 }
 Backend::Backend(std::filesystem::path const& path) : _library{ path }, _symbols{ _Load(_library) } {

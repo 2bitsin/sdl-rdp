@@ -1,36 +1,43 @@
 #include <sdl-rdp/core/picture-geometry.hpp>
 #include <sdl-rdp/session/handle.hpp>
 #include <sdl-rdp/session/peer.hpp>
+#include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/deadline.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 
 #include <algorithm>
-#include <climits>
+#include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <format>
+#include <limits>
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <type_traits>
 #include <utility>
 
 namespace {
 using Backend::Extent;
 using Backend::PixelBytes;
-constexpr unsigned MaximumRefreshMode  = 3;
-constexpr unsigned MinimumPacedRefresh = 10;
-constexpr unsigned MaximumPort         = 65535;
-constexpr unsigned StereoChannels      = 2;
-auto Dimensions(unsigned width, unsigned height) -> Extent {
+constexpr std::uint32_t MaximumRefreshMode  = 3;
+constexpr std::uint32_t MinimumPacedRefresh = 10;
+constexpr std::uint32_t MaximumPort         = 65535;
+constexpr std::uint32_t StereoChannels      = 2;
+constexpr std::uint32_t LargestMillihertz   = std::numeric_limits<std::int32_t>::max();
+// NVENC takes the rate in bits per second as a uint32_t.
+constexpr std::uint32_t LargestAvcKbps = std::numeric_limits<std::uint32_t>::max() / 1000;
+auto Dimensions(std::uint32_t width, std::uint32_t height) -> Extent {
   if (!width || width > Backend::MaximumPictureWidth) throw std::runtime_error("Desktop width must be 1..16383.");
   if (!height || height > Backend::MaximumPictureHeight) throw std::runtime_error("Desktop height must be 1..65535.");
   return { .width = width, .height = height };
 }
-template <class Result> auto Guarded(sdlrdp_handle* handle, Result failure, std::invocable auto operation) -> Result {
-  try {
-    return operation();
-  } catch (std::exception const& error) {
-    Backend::SetError(handle, error.what());
-    return failure;
-  }
+template <std::invocable BodyTy>
+auto Guarded(sdlrdp_handle* handle, std::invoke_result_t<BodyTy> failure, BodyTy const& body) noexcept
+    -> std::invoke_result_t<BodyTy> {
+  return Backend::Contained(failure, body,
+                            [handle](std::string_view text) { Backend::SetError(handle, std::string{ text }); });
 }
 auto Opened(sdlrdp_handle* handle, char const* failure) -> sdlrdp_handle& {
   if (!handle) throw std::runtime_error(failure);
@@ -40,15 +47,15 @@ auto ValidateConfiguration(sdlrdp_config const& config) -> void {
   if (config.auth < SDLRDP_AUTH_NONE || config.auth > SDLRDP_AUTH_NLA)
     throw std::runtime_error("Invalid authentication mode.");
   Dimensions(config.width, config.height);
-  if (config.avc_bitrate_kbps > UINT32_MAX / 1000) throw std::runtime_error("AVC bitrate exceeds NVENC range");
+  if (config.avc_bitrate_kbps > LargestAvcKbps) throw std::runtime_error("AVC bitrate exceeds NVENC range");
   if (config.codec < SDLRDP_CODEC_AUTO || config.codec > SDLRDP_CODEC_AVC420)
     throw std::runtime_error("Invalid codec preference.");
   if (config.port > MaximumPort) throw std::runtime_error("Open failed: port exceeds 65535.");
 }
 auto Inside(sdlrdp_rect area, Extent size) -> bool {
-  return area.x >= 0 && area.y >= 0 && area.w > 0 && area.h > 0 && std::cmp_less_equal(area.x, size.width)
-         && unsigned(area.w) <= size.width - unsigned(area.x) && std::cmp_less_equal(area.y, size.height)
-         && unsigned(area.h) <= size.height - unsigned(area.y);
+  return area.x >= 0 && area.y >= 0 && area.w > 0 && area.h > 0
+         && std::cmp_less_equal(std::int64_t{ area.x } + area.w, size.width)
+         && std::cmp_less_equal(std::int64_t{ area.y } + area.h, size.height);
 }
 auto ValidateDamage(std::span<sdlrdp_rect const> damage, Extent size) -> void {
   if (!std::ranges::all_of(damage, [=](sdlrdp_rect area) { return Inside(area, size); }))
@@ -58,23 +65,25 @@ auto Tracing() -> bool {
   auto const* trace = std::getenv("SDL_RDP_TRACE");
   return trace && std::string_view(trace) == "1";
 }
-auto ValidPointer(unsigned w, unsigned h, unsigned x, unsigned y, void const* argb) -> bool {
+auto ValidPointer(std::uint32_t w, std::uint32_t h, std::uint32_t x, std::uint32_t y, void const* argb) -> bool {
   if (w > Backend::LargePointerLimit || h > Backend::LargePointerLimit) return false;
   return !(w || h) || (w && h && argb && x < w && y < h);
 }
-auto ValidRefresh(unsigned mode, unsigned ceiling) -> bool {
-  return mode <= MaximumRefreshMode && ceiling && ceiling <= unsigned(INT32_MAX) / Backend::MillihertzPerHz
+auto ValidRefresh(std::uint32_t mode, std::uint32_t ceiling) -> bool {
+  return mode <= MaximumRefreshMode && ceiling && ceiling <= LargestMillihertz / Backend::MillihertzPerHz
          && (!mode || ceiling >= MinimumPacedRefresh);
 }
 }
 auto sdlrdp_last_error() -> char const* {
   return Backend::ErrorStore::Last();
 }
-auto sdlrdp_version() -> unsigned {
+static_assert(std::is_same_v<decltype(sdlrdp_version()), std::uint32_t>,
+              "the ABI's unsigned is the std::uint32_t these definitions spell");
+auto sdlrdp_version() -> std::uint32_t {
   return SDLRDP_ABI_VERSION;
 }
 auto sdlrdp_open(sdlrdp_config const* config, sdlrdp_handle** out) -> int {
-  try {
+  auto const opened = [&] {
     if (!out) throw std::runtime_error("Open failed: output handle is null.");
     *out = nullptr;
     if (!config) throw std::runtime_error("Open failed: configuration is null.");
@@ -83,32 +92,34 @@ auto sdlrdp_open(sdlrdp_config const* config, sdlrdp_handle** out) -> int {
     if (config->wait_for_client) handle->Events().Wait(Backend::Deadline::max());
     *out = handle.release();
     return 0;
-  } catch (std::exception const& error) {
-    Backend::SetError(nullptr, std::format("sdlrdp_open failed: {}", error.what()));
-    return -1;
-  }
+  };
+  auto const failed = [](std::string_view text) {
+    Backend::SetError(nullptr, std::format("sdlrdp_open failed: {}", text));
+  };
+  return Backend::Contained(-1, opened, failed);
 }
 auto sdlrdp_close(sdlrdp_handle* handle) -> void {
   std::unique_ptr<sdlrdp_handle> const closed{ handle };
 }
-auto sdlrdp_port(sdlrdp_handle const* handle) -> unsigned {
+auto sdlrdp_port(sdlrdp_handle const* handle) -> std::uint32_t {
   Backend::Expects(handle != nullptr, "backend is open");
   return handle->Port();
 }
-auto sdlrdp_present(sdlrdp_handle* handle, void const* pixels, int pitch, unsigned width, unsigned height,
-                    sdlrdp_rect const* rects, unsigned count) -> int {
+auto sdlrdp_present(sdlrdp_handle* handle, void const* pixels, int pitch, std::uint32_t width, std::uint32_t height,
+                    sdlrdp_rect const* rects, std::uint32_t count) -> int {
   return Guarded(handle, -1, [&] {
     auto const size = Dimensions(width, height);
     if (!handle || !pixels || (!rects && count) || std::cmp_less(pitch, width * PixelBytes))
       throw std::runtime_error("Present failed: invalid handle, pixels, rectangles or pitch.");
     std::span const damage{ rects, count };
     ValidateDamage(damage, size);
-    auto const bytes = (std::size_t(pitch) * (height - 1)) + (std::size_t(width) * PixelBytes);
-    handle->Presentation().Present({ static_cast<BYTE const*>(pixels), bytes }, unsigned(pitch), size, damage);
+    auto const bytes = (Backend::Narrowed<std::size_t>(pitch) * (height - 1)) + (std::size_t{ width } * PixelBytes);
+    handle->Presentation().Present({ static_cast<std::uint8_t const*>(pixels), bytes },
+                                   Backend::Narrowed<std::uint32_t>(pitch), size, damage);
     return 0;
   });
 }
-auto sdlrdp_poll(sdlrdp_handle* handle, sdlrdp_event* out, unsigned max) -> unsigned {
+auto sdlrdp_poll(sdlrdp_handle* handle, sdlrdp_event* out, std::uint32_t max) -> std::uint32_t {
   Backend::Expects(handle != nullptr, "backend is open");
   return handle->Events().Poll({ out, max });
 }
@@ -128,7 +139,7 @@ auto sdlrdp_set_codec(sdlrdp_handle* handle, sdlrdp_codec codec) -> int {
   handle->Presentation().SetCodec(codec);
   return 0;
 }
-auto sdlrdp_resize(sdlrdp_handle* handle, unsigned width, unsigned height) -> int {
+auto sdlrdp_resize(sdlrdp_handle* handle, std::uint32_t width, std::uint32_t height) -> int {
   return Guarded(handle, -1, [&] {
     auto& opened = Opened(handle, "Invalid handle.");
     opened.Presentation().Resize(Dimensions(width, height));
@@ -146,12 +157,12 @@ auto sdlrdp_wait_frame(sdlrdp_handle* handle, int timeout) -> int {
     return Opened(handle, "Invalid handle.").Presentation().WaitFrame(Backend::AbiDeadline(timeout));
   });
 }
-auto sdlrdp_set_pointer(sdlrdp_handle* handle, unsigned w, unsigned h, unsigned x, unsigned y, void const* argb)
-    -> int {
+auto sdlrdp_set_pointer(sdlrdp_handle* handle, std::uint32_t w, std::uint32_t h, std::uint32_t x, std::uint32_t y,
+                        void const* argb) -> int {
   return Guarded(handle, -1, [&] {
     if (!handle || !ValidPointer(w, h, x, y, argb))
       throw std::runtime_error("Invalid pointer dimensions, hotspot, pixels or handle.");
-    std::span const pixels{ static_cast<BYTE const*>(argb), argb ? std::size_t(w) * h * PixelBytes : 0 };
+    std::span const pixels{ static_cast<std::uint8_t const*>(argb), argb ? std::size_t{ w } * h * PixelBytes : 0 };
     handle->Presentation().SetPointer(Backend::PointerShape{ { .width = w, .height = h }, x, y, pixels });
     return 0;
   });
@@ -186,14 +197,14 @@ auto sdlrdp_audio_open(sdlrdp_handle* handle) -> int {
     return 0;
   });
 }
-auto sdlrdp_audio_rate(sdlrdp_handle* handle) -> unsigned {
+auto sdlrdp_audio_rate(sdlrdp_handle* handle) -> std::uint32_t {
   return Guarded(handle, 0U, [&] { return Opened(handle, "Invalid audio handle.").Audio().Rate(); });
 }
-auto sdlrdp_audio_write(sdlrdp_handle* handle, void const* frames, unsigned count) -> int {
+auto sdlrdp_audio_write(sdlrdp_handle* handle, void const* frames, std::uint32_t count) -> int {
   return Guarded(handle, -1, [&] {
-    if (!handle || (!frames && count) || count > unsigned(INT_MAX))
+    if (!handle || (!frames && count) || std::cmp_greater(count, std::numeric_limits<int>::max()))
       throw std::runtime_error("Invalid audio handle, frames or count.");
-    return handle->Audio().Write({ static_cast<int16_t const*>(frames), std::size_t(count) * StereoChannels });
+    return handle->Audio().Write({ static_cast<std::int16_t const*>(frames), std::size_t{ count } * StereoChannels });
   });
 }
 auto sdlrdp_audio_wait(sdlrdp_handle* handle, int timeout) -> int {
@@ -207,7 +218,7 @@ auto sdlrdp_audio_close(sdlrdp_handle* handle) -> void {
     return 0;
   });
 }
-auto sdlrdp_set_refresh(sdlrdp_handle* handle, unsigned mode, unsigned ceiling) -> int {
+auto sdlrdp_set_refresh(sdlrdp_handle* handle, std::uint32_t mode, std::uint32_t ceiling) -> int {
   Backend::Expects(handle != nullptr, "backend is open");
   if (!ValidRefresh(mode, ceiling)) {
     Backend::SetError(handle, "Invalid refresh mode or ceiling.");

@@ -6,6 +6,7 @@
 #include <oxbox/utilities/number-text.hpp>
 #include <sdl-rdp/headless-client.test/input-steps.hpp>
 #include <array>
+#include <cstdint>
 #include <string>
 #include <utility>
 

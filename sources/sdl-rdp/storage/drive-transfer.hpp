@@ -8,28 +8,30 @@
 #include <freerdp/channels/rdpdr.h>
 #include <winpr/nt.h>
 #include <array>
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
 
 namespace Backend {
 using utilities::Expects;
-template <class Byte> auto Submit(sdlrdp_file& file, uint64_t offset, std::span<Byte> bytes)
+template <class Byte> auto Submit(sdlrdp_file& file, std::uint64_t offset, std::span<Byte> bytes)
     -> std::shared_ptr<DriveRequest> {
   Expects(!bytes.empty(), "transfer chunk is nonempty");
   Expects(bytes.size() <= UINT32_MAX, "transfer length fits the wire field");
-  constexpr bool     write                = std::is_const_v<Byte>;
-  DrivePacket        packet;
-  constexpr unsigned padding_after_offset = 20;
+  constexpr bool        write                = std::is_const_v<Byte>;
+  DrivePacket           packet;
+  constexpr std::size_t padding_after_offset = 20;
   packet.Write(Narrowed<std::uint32_t>(bytes.size()));
-  packet.Write(std::uint64_t{ offset });
+  packet.Write(offset);
   packet.Zero(padding_after_offset);
   if constexpr (write) packet.Append(bytes);
   return file.Channel()->Send(file.Drive(), file.Id(), write ? IRP_MJ_WRITE : IRP_MJ_READ, packet);
 }
 template <class Byte>
-auto Finish(sdlrdp_file& file, std::shared_ptr<DriveRequest> const& request, std::span<Byte> bytes) -> size_t {
+auto Finish(sdlrdp_file& file, std::shared_ptr<DriveRequest> const& request, std::span<Byte> bytes) -> std::size_t {
   constexpr bool write    = std::is_const_v<Byte>;
   auto           response = file.Channel()->Wait(request, file.Path(), !write);
-  auto           received = response.Read<uint32_t>();
+  auto           received = response.Read<std::uint32_t>();
   if (received > bytes.size()) response.Invalid("Drive returned oversized transfer.");
   if constexpr (!write) {
     if (received > response.Bytes().size() - response.Position()) response.Invalid("Truncated drive read.");
@@ -44,7 +46,7 @@ struct TransferProgress {
   std::exception_ptr failure;
 };
 template <class Byte>
-auto SubmitSlot(sdlrdp_file& file, uint64_t offset, std::span<Byte> bytes, TransferProgress& progress, Slot& slot)
+auto SubmitSlot(sdlrdp_file& file, std::uint64_t offset, std::span<Byte> bytes, TransferProgress& progress, Slot& slot)
     -> void {
   if (progress.failure || progress.submitted >= progress.limit) return;
   Expects(!slot.request, "submission slot is empty");
@@ -67,7 +69,7 @@ auto FinishSlot(sdlrdp_file& file, std::span<Byte> bytes, TransferProgress& prog
   slot.request.reset();
   --progress.active;
 }
-template <class Byte> auto Transfer(sdlrdp_file* file, uint64_t offset, Byte* buffer, size_t size) -> int {
+template <class Byte> auto Transfer(sdlrdp_file* file, std::uint64_t offset, Byte* buffer, std::size_t size) -> int {
   std::array<Slot, 8> slots    { };
   TransferProgress    progress { .limit = size };
   auto                bytes    = std::span(buffer, size);

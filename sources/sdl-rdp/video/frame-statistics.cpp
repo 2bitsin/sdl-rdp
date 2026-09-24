@@ -3,24 +3,25 @@
 #include <sdl-rdp/utilities/contract.hpp>
 
 #include <concepts>
+#include <cstddef>
 #include <format>
 
 namespace Backend {
 namespace {
 using Milliseconds = std::chrono::duration<double, std::milli>;
 constexpr auto SlowAcknowledgement = std::chrono::milliseconds(100);
-auto Mean(std::convertible_to<double> auto total, uint64_t count) -> double {
+auto Mean(std::convertible_to<double> auto total, std::uint64_t count) -> double {
   return count ? double(total) / double(count) : 0;
 }
-auto MeanMilliseconds(std::chrono::nanoseconds total, uint64_t count) -> double {
+auto MeanMilliseconds(std::chrono::nanoseconds total, std::uint64_t count) -> double {
   return Mean(Milliseconds(total).count(), count);
 }
 }
-auto FrameStatistics::Begin(std::chrono::nanoseconds encoded, uint64_t presents) noexcept -> void {
+auto FrameStatistics::Begin(std::chrono::nanoseconds encoded, std::uint64_t presents) noexcept -> void {
   _coalesced += presents ? presents - 1 : 0;
   _started   =  encoded;
 }
-auto FrameStatistics::Sent(FrameCost const& cost, unsigned queued) -> void {
+auto FrameStatistics::Sent(FrameCost const& cost, std::size_t queued) -> void {
   _outq.Add(queued);
   _encode.Add(cost.encoded - _started);
   if (!cost.avc) return;
@@ -32,7 +33,7 @@ auto FrameStatistics::Acknowledged(std::chrono::nanoseconds latency) -> void {
   _acknowledgement.Add(latency);
   if (latency > SlowAcknowledgement) ++_slow;
 }
-auto FrameStatistics::TimedOut(unsigned count) noexcept -> void {
+auto FrameStatistics::TimedOut(std::size_t count) noexcept -> void {
   _timed_out += count;
 }
 auto FrameStatistics::AvcPhases() const -> std::string {
@@ -49,7 +50,7 @@ auto FrameStatistics::Summary() const -> std::string {
                      Milliseconds(_acknowledgement.Maximum()).count(), _slow, _timed_out,
                      Mean(_outq.Total(), _encode.Count()), _outq.Maximum());
 }
-auto FrameStatistics::Acknowledgements() const noexcept -> uint64_t {
+auto FrameStatistics::Acknowledgements() const noexcept -> std::uint64_t {
   return _acknowledgement.Count();
 }
 }

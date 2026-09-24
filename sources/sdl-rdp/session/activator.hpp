@@ -1,8 +1,6 @@
 #pragma once
 #include <sdl-rdp/utilities/pinned.hpp>
 
-#include <winpr/wtypes.h>
-
 namespace Backend {
 class Activation;
 class Arrival;
@@ -14,7 +12,7 @@ class Activator : private Pinned {
 public:
        Activator(PeerLink& link, Authenticator& authenticator, Activation const& activation, Encoder& encoder,
                  Configuration const& configuration, Arrival& arrival) noexcept;
-  auto Activate() -> BOOL;
+  auto Activate() -> bool;
 
 private:
   PeerLink&            _link;

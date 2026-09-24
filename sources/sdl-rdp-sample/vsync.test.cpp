@@ -4,6 +4,7 @@
 #include <sdl-rdp/sample-gate.test/rate-exercise.hpp>
 
 #include <SDL3/SDL.h>
+#include <cstdint>
 #include <future>
 #include <ostream>
 #include <string>
@@ -21,7 +22,7 @@ auto PrintTo(RefreshCase const& value, std::ostream* output) -> void {
 }
 class VsyncRecovery : public Sample, public testing::WithParamInterface<RefreshCase> {
 protected:
-  auto WhenFrameRendered(unsigned& frame) -> void {
+  auto WhenFrameRendered(std::uint32_t& frame) -> void {
     SDL_PumpEvents();
     ASSERT_TRUE(SDL_SetRenderDrawColor(renderer, ++frame % 256, 0, 0, 255));
     ASSERT_TRUE(SDL_RenderClear(renderer));
@@ -59,7 +60,7 @@ protected:
   }
   auto RenderWhile(std::future<void>& client) -> void {
     Expects(renderer != nullptr, "vsync renderer exists");
-    unsigned frame = 0;
+    std::uint32_t frame = 0;
     while (client.wait_for(0ms) != std::future_status::ready) {
       ASSERT_NO_FATAL_FAILURE(WhenFrameRendered(frame));
     }

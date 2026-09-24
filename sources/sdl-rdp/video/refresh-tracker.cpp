@@ -1,9 +1,10 @@
 #include <sdl-rdp/video/refresh-tracker.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace Backend {
-auto RefreshTracker::Effective() const noexcept -> unsigned {
+auto RefreshTracker::Effective() const noexcept -> std::uint32_t {
   return _effective.load();
 }
 auto RefreshTracker::Mode() const noexcept -> RefreshMode {

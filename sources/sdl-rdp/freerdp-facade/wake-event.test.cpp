@@ -6,11 +6,12 @@
 #include <winpr/synch.h>
 #include <algorithm>
 #include <chrono>
+#include <cstddef>
 #include <ranges>
 #include <thread>
 
 namespace {
-auto ConsumePublished(Backend::WakeEvent& wake, std::atomic<unsigned>& published, std::atomic<unsigned>& consumed)
+auto ConsumePublished(Backend::WakeEvent& wake, std::atomic<std::size_t>& published, std::atomic<std::size_t>& consumed)
     -> void {
   for (int iteration = 0; iteration < 4096; ++iteration) {
     wake.Transition(Backend::WakeEvent::Phase::Idle);
@@ -19,8 +20,8 @@ auto ConsumePublished(Backend::WakeEvent& wake, std::atomic<unsigned>& published
   }
 }
 namespace {
-auto ProducePending(Backend::WakeEvent& wake, std::atomic<unsigned>& published, std::atomic<unsigned> const& consumed,
-                    std::stop_token const& stop) -> void {
+auto ProducePending(Backend::WakeEvent& wake, std::atomic<std::size_t>& published,
+                    std::atomic<std::size_t> const& consumed, std::stop_token const& stop) -> void {
   while (!stop.stop_requested()) {
     published.store(consumed.load() + 1);
     wake.Transition(Backend::WakeEvent::Phase::Pending);
@@ -29,7 +30,7 @@ auto ProducePending(Backend::WakeEvent& wake, std::atomic<unsigned>& published, 
 }
 }
 TEST(WakeEvent, SignalledManualResetEvent) {
-  Backend::EventHandle const event{ CreateEvent(nullptr, TRUE, FALSE, nullptr) };
+  Backend::EventHandle const event{ CreateEvent(nullptr, true, false, nullptr) };
   utilities::Expects(bool(event), "manual reset event exists");
   EXPECT_FALSE(Backend::Signalled(event.get()));
   ASSERT_TRUE(SetEvent(event.get()));
@@ -41,9 +42,9 @@ TEST(WakeEvent, SignalledManualResetEvent) {
 
 TEST(WakeEvent, ConcurrentPendingAndIdle) {
   using Phase = Backend::WakeEvent::Phase;
-  Backend::WakeEvent    wake     { CreateEvent(nullptr, TRUE, FALSE, nullptr) };
-  std::atomic<unsigned> published{ 0                                          };
-  std::atomic<unsigned> consumed { 0                                          };
+  Backend::WakeEvent       wake     { CreateEvent(nullptr, true, false, nullptr) };
+  std::atomic<std::size_t> published{ 0                                          };
+  std::atomic<std::size_t> consumed { 0                                          };
   ASSERT_TRUE(wake);
   std::jthread producer([&](std::stop_token const& stop) { ProducePending(wake, published, consumed, stop); });
   ASSERT_NO_FATAL_FAILURE(ConsumePublished(wake, published, consumed));

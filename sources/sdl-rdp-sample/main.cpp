@@ -12,6 +12,7 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <format>
 #include <memory>
@@ -21,11 +22,13 @@
 
 namespace {
 
-auto Draw(SDL_Window* window, unsigned frame, bool full) -> void {
+auto Draw(SDL_Window* window, std::uint32_t frame, bool full) -> void {
   auto* surface = SDL_GetWindowSurface(window);
   Check(surface != nullptr);
   Check(SDL_FillSurfaceRect(surface, nullptr, 0x00010101));
-  SDL_Rect const block{ int(frame % unsigned(surface->w)), 40, 32, 32 };
+  Check(surface->w > 0);
+  // The column is below the positive surface width, so both conversions keep the value.
+  SDL_Rect const block{ static_cast<int>(frame % static_cast<std::uint32_t>(surface->w)), 40, 32, 32 };
   Check(SDL_FillSurfaceRect(surface, &block, 0x0000ff00));
   SDL_Rect const damage{ 0, 40, surface->w, std::min(32, std::max(0, surface->h - 40)) };
   Check(full ? SDL_UpdateWindowSurface(window) : SDL_UpdateWindowSurfaceRects(window, &damage, 1));
@@ -53,7 +56,7 @@ auto WindowShortcut(SDL_Event const& event, SDL_Window* window) -> void {
     Check(SDL_SetWindowFullscreen(window, !(SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN)));
   if (event.key.scancode == SDL_SCANCODE_F1) CycleCodec();
 }
-auto ProcessEvent(SDL_Event const& event, SDL_Window* window, unsigned frame, bool& full, bool partial) -> bool {
+auto ProcessEvent(SDL_Event const& event, SDL_Window* window, std::uint32_t frame, bool& full, bool partial) -> bool {
   PrintEvent(event, window, frame);
   InputMode(event, window);
   if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED || event.type == SDL_EVENT_WINDOW_EXPOSED) full = true;
@@ -66,17 +69,18 @@ auto ProcessEvent(SDL_Event const& event, SDL_Window* window, unsigned frame, bo
   }
   return true;
 }
-auto DrawScheduled(SDL_Window* window, unsigned& frame, bool& full, Uint64& next, bool tight, bool partial) -> void {
+auto DrawScheduled(SDL_Window* window, std::uint32_t& frame, bool& full, std::uint64_t& next, bool tight, bool partial)
+    -> void {
   if (SDL_GetTicks() < next) return;
   Draw(window, frame++, full || !partial);
   full = false;
   next = SDL_GetTicks() + (tight ? 0 : 100);
 }
 auto Run(SDL_Window* window, bool tight, bool partial, DriveOptions drives) -> void {
-  std::string codec;
-  bool        full  = true;
-  unsigned    frame = 0;
-  Uint64      next  = 0;
+  std::string   codec;
+  bool          full  = true;
+  std::uint32_t frame = 0;
+  std::uint64_t next  = 0;
   for (;;) {
     SDL_Event event;
     if (SDL_WaitEventTimeout(&event, tight ? 0 : 10) && !ProcessEvent(event, window, frame, full, partial)) return;
@@ -87,22 +91,23 @@ auto Run(SDL_Window* window, bool tight, bool partial, DriveOptions drives) -> v
 }
 
 auto SDLCALL FeedTone(void* userdata, SDL_AudioStream* stream, int additional, int /*unused*/) -> void {
-  auto&                   frame   = *static_cast<Uint64*>(userdata);
-  std::array<Sint16, 960> samples { };
+  auto&                         frame   = *static_cast<std::uint64_t*>(userdata);
+  std::array<std::int16_t, 960> samples { };
   while (additional > 0) {
-    auto count = std::min(additional / int(2 * sizeof(Sint16)), 480);
+    auto count = std::min(additional / int(2 * sizeof(std::int16_t)), 480);
     if (!count) return;
     for (int i = 0; i < count; ++i, ++frame) {
-      auto value = Sint16(std::lround(32767 * std::pow(10.0, -12.0 / 20.0)
-                                      * std::sin(2 * std::numbers::pi * 440 * double(frame) / 48000)));
+      // A -12 dBFS sine stays inside std::int16_t.
+      auto value = static_cast<std::int16_t>(std::lround(
+          32767 * std::pow(10.0, -12.0 / 20.0) * std::sin(2 * std::numbers::pi * 440 * double(frame) / 48000)));
       samples[2uz * i] = samples[(2uz * i) + 1] = value;
     }
-    Check(SDL_PutAudioStreamData(stream, samples.data(), count * 2 * int(sizeof(Sint16))));
-    additional -= count * 2 * int(sizeof(Sint16));
+    Check(SDL_PutAudioStreamData(stream, samples.data(), count * 2 * int(sizeof(std::int16_t))));
+    additional -= count * 2 * int(sizeof(std::int16_t));
   }
 }
 
-auto OpenTone(Uint64& frame) -> SDL_AudioStream* {
+auto OpenTone(std::uint64_t& frame) -> SDL_AudioStream* {
   SDL_AudioSpec const spec   { SDL_AUDIO_S16, 2, 48000 };
   auto*               stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, FeedTone, &frame);
   Check(stream != nullptr);
@@ -220,7 +225,7 @@ auto RunWindow(Options const& options) -> void {
   Fullscreen(window.get(), options);
   std::unique_ptr<SDL_Cursor, decltype(&SDL_DestroyCursor)> const cursor(CreateCursor(), SDL_DestroyCursor);
   Check(SDL_StartTextInput(window.get()));
-  Uint64 tone_frame = 0;
+  std::uint64_t tone_frame = 0;
   std::unique_ptr<SDL_AudioStream, decltype(&SDL_DestroyAudioStream)> const tone(
       options.tone ? OpenTone(tone_frame) : nullptr, SDL_DestroyAudioStream);
   Run(window.get(), options.tight, options.partial, options.drives);
@@ -237,8 +242,8 @@ auto main(int argc,
   authentication.Install();
   if (options.clip) Check(SDL_SetClipboardText(options.clip));
   auto display = SDL_GetPrimaryDisplay();
-  SDL_Log("port %lld",
-          (long long)SDL_GetNumberProperty(SDL_GetDisplayProperties(display), SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0));
+  SDL_Log("port %" SDL_PRIs64,
+          SDL_GetNumberProperty(SDL_GetDisplayProperties(display), SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0));
   RunWindow(options);
   SDL_Quit();
 }

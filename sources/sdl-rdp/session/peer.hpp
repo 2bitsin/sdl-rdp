@@ -58,7 +58,7 @@ public:
   auto Repaint(FrameLock const& held, sdlrdp_rect area)                    -> void;
   auto RestartPacing(FrameLock const& held)                                -> void;
   auto Signal()                                                            -> void;
-  auto Settled(FrameLock const& held, uint64_t target) const               -> bool;
+  auto Settled(FrameLock const& held, std::uint64_t target) const          -> bool;
   auto Redirected() const noexcept                                         -> Redirection const&;
   auto Point(MouseMode mode)                                               -> void;
   auto Status(FrameLock const& held) const                                 -> PeerStatus;

@@ -10,18 +10,18 @@ namespace BackendGate {
 TEST_F(AudioGate, AudioAbsentDiscards) {
   ASSERT_NO_FATAL_FAILURE(ThenMissingAudioHandle());
   ASSERT_NO_FATAL_FAILURE(GivenAudioServer());
-  std::vector<INT16> frames(static_cast<std::ptrdiff_t>(48000 * 10) * 2, 1234);
+  std::vector<std::int16_t> frames(static_cast<std::ptrdiff_t>(48000 * 10) * 2, 1234);
   EXPECT_EQ(sdlrdp_audio_write(backend.Handle(), frames.data(), 480000), 480000);
   EXPECT_EQ(sdlrdp_audio_wait(backend.Handle(), 0), 1);
   sdlrdp_audio_close(backend.Handle());
 }
 TEST_F(AudioGate, AudioPcmAndReconnect) {
   ASSERT_NO_FATAL_FAILURE(GivenAudioServer());
-  for (unsigned connection = 0; connection < 2; ++connection) {
+  for (std::size_t connection = 0; connection < 2; ++connection) {
     auto [client, audio] = NewSession();
     ASSERT_NO_FATAL_FAILURE(ConnectAudioFormats(client, audio));
-    auto               frames = audio.CaptureState().rate / 50;
-    std::vector<INT16> pcm(static_cast<std::size_t>(frames) * 2);
+    auto                      frames = audio.CaptureState().rate / 50;
+    std::vector<std::int16_t> pcm(std::size_t{ frames } * 2);
     std::ranges::iota(pcm, -480);
     ASSERT_EQ(sdlrdp_audio_write(backend.Handle(), pcm.data(), frames), frames);
     ASSERT_TRUE(client.Until([&] { return audio.CaptureState().samples.size() >= pcm.size(); }));
@@ -49,8 +49,8 @@ TEST_F(AudioGate, AudioBothRatesPrefer44100) {
   audio.CaptureState().advertise_both_rates = true;
   ASSERT_NO_FATAL_FAILURE(ConnectAudioFormats(client, audio));
   EXPECT_EQ(sdlrdp_audio_rate(backend.Handle()), 44100u);
-  auto               frames = audio.CaptureState().rate / 50;
-  std::vector<INT16> pcm(static_cast<std::size_t>(frames) * 2, 1234);
+  auto                      frames = audio.CaptureState().rate / 50;
+  std::vector<std::int16_t> pcm(std::size_t{ frames } * 2, 1234);
   ASSERT_EQ(sdlrdp_audio_write(backend.Handle(), pcm.data(), frames), frames);
   ASSERT_TRUE(client.Until([&] { return audio.CaptureState().samples.size() == pcm.size(); }));
   EXPECT_EQ(audio.CaptureState().samples, pcm);
@@ -83,10 +83,10 @@ TEST_F(AudioGate, AudioDisconnectDuringBlockedWrite) {
     audio.CaptureState().auto_confirm = reconnect;
     ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
     ASSERT_NO_FATAL_FAILURE(EstablishConfirmations(client, audio));
-    unsigned           frames  = reconnect ? 960 : 480000;
-    std::vector<INT16> pcm(static_cast<std::size_t>(frames) * 2, 1234);
-    auto               writing = std::async(std::launch::async,
-                                            [&] { return sdlrdp_audio_write(backend.Handle(), pcm.data(), frames); });
+    std::uint32_t             frames = reconnect ? 960 : 480000;
+    std::vector<std::int16_t> pcm(std::size_t{ frames } * 2, 1234);
+    auto writing = std::async(std::launch::async,
+                              [&] { return sdlrdp_audio_write(backend.Handle(), pcm.data(), frames); });
     ASSERT_NO_FATAL_FAILURE(ThenDisconnectedWriter(client, audio, writing, reconnect, frames));
   }
 }
@@ -96,7 +96,7 @@ TEST_F(AudioGate, AudioOneMillisecondPartialBlock) {
   auto [client, audio] = NewSession();
   audio.CaptureState().rate = 48000;
   ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
-  std::array<INT16, 1920> pcm{ };
+  std::array<std::int16_t, 1920> pcm{ };
   ASSERT_EQ(sdlrdp_audio_write(backend.Handle(), pcm.data(), 48), 48);
   auto writing = std::async(std::launch::async,
                             [&] { return sdlrdp_audio_write(backend.Handle(), pcm.data() + 96, 912); });
@@ -105,7 +105,7 @@ TEST_F(AudioGate, AudioOneMillisecondPartialBlock) {
 }
 TEST_F(AudioGate, AudioFallbackIdleDoesNotAccumulateCredit) {
   ASSERT_NO_FATAL_FAILURE(GivenUnconfirmedSession());
-  std::vector<INT16> const pcm(48000uz * 2, 1234);
+  std::vector<std::int16_t> const pcm(48000uz * 2, 1234);
   for (std::size_t burst = 1; burst <= 2; ++burst) {
     ASSERT_NO_FATAL_FAILURE(WhenIdleAudioBurst(pcm, burst));
   }
@@ -113,7 +113,7 @@ TEST_F(AudioGate, AudioFallbackIdleDoesNotAccumulateCredit) {
 
 TEST_F(AudioGate, AudioReorderedConfirmsCreditOnlyTheirBlock) {
   ASSERT_NO_FATAL_FAILURE(GivenConfirmingSession());
-  std::vector<INT16> const pcm(24000uz * 2, 1234);
+  std::vector<std::int16_t> const pcm(24000uz * 2, 1234);
   ASSERT_EQ(sdlrdp_audio_write(backend.Handle(), pcm.data(), 24000), 24000);
   ASSERT_TRUE(ClientSession().Until([&] { return AudioSession().CaptureState().pending.size() == 25; }));
   EXPECT_EQ(sdlrdp_audio_wait(backend.Handle(), 0), 0);

@@ -2,28 +2,30 @@
 
 #include <sdl-rdp/core/activation.hpp>
 #include <sdl-rdp/core/peer-link.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/video/acknowledgement-window.hpp>
 #include <sdl-rdp/video/frame-pacing.hpp>
 #include <sdl-rdp/video/graphics-link.hpp>
 
 #include <freerdp/channels/wtsvc.h>
 #include <algorithm>
+#include <cstdint>
 
 namespace Backend {
 namespace {
 // WinPR BIO signals readability only; retry blocked output every 5 ms for static frames.
-constexpr DWORD BlockedRetry = 5;
+constexpr std::uint32_t BlockedRetry = 5;
 }
 PeerWait::PeerWait(PeerLink& link, ChannelSet const& channels, Activation const& activation, FramePacing& pacing,
                    GraphicsLink& graphics) noexcept
     : _link{ link }, _channels{ channels }, _activation{ activation }, _pacing{ pacing }, _graphics{ graphics } { }
-auto PeerWait::Plan(std::span<HANDLE> handles) -> WaitPlan {
+auto PeerWait::Plan(std::span<WaitHandle> handles) -> WaitPlan {
   _graphics.ExpireConfirmation();
   if (!_activation.Activated()) _link.Invalidate();
   auto const count = _link.Handles([&] { return Collect(handles); });
   return { .count = count, .timeout = Timeout() };
 }
-auto PeerWait::Collect(std::span<HANDLE> handles) -> DWORD {
+auto PeerWait::Collect(std::span<WaitHandle> handles) -> std::uint32_t {
   Expects(handles.size() > AppendedHandleCount, "event array has room for transport and peer handles");
   auto&      client    = _link.Client();
   auto const budget    = handles.size() - AppendedHandleCount;
@@ -34,9 +36,9 @@ auto PeerWait::Collect(std::span<HANDLE> handles) -> DWORD {
   Expects(rest.size() >= LoopHandleCount, "the loop's own handles fit");
   rest[0] = _link.Wake();
   rest[1] = WTSVirtualChannelManagerGetEventHandle(_link.Channels());
-  return DWORD(handles.size() - rest.size() + LoopHandleCount);
+  return Narrowed<std::uint32_t>(handles.size() - rest.size() + LoopHandleCount);
 }
-auto PeerWait::Timeout() const -> DWORD {
+auto PeerWait::Timeout() const -> std::uint32_t {
   auto const blocked = _link.WriteBlocked();
   if (_activation.Holding()) {
     auto const remaining = _activation.ActivatedAt() + GraphicsConnectionWait - Activation::Clock::now();

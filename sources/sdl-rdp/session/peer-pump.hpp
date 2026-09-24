@@ -1,4 +1,5 @@
 #pragma once
+#include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
 #include <winpr/wtypes.h>
@@ -17,12 +18,12 @@ class PeerPump : private Pinned {
 public:
   PeerPump(PeerLink& link, SessionAccess& session, ChannelSet& channels, Redirection& redirection, FrameSender& sender,
            TransportEnd& end, TraceQueue& traces) noexcept;
-  auto Service(std::stop_token const& quit, std::span<HANDLE const> ready) -> bool;
+  auto Service(std::stop_token const& quit, std::span<WaitHandle const> ready) -> bool;
 
 private:
-  auto Exchange(std::stop_token const& quit, std::span<HANDLE const> ready) -> bool;
-  auto Deliver(std::stop_token const& quit)                                 -> bool;
-  auto Ended()                                                              -> bool;
+  auto Exchange(std::stop_token const& quit, std::span<WaitHandle const> ready) -> bool;
+  auto Deliver(std::stop_token const& quit)                                     -> bool;
+  auto Ended()                                                                  -> bool;
   PeerLink&      _link;
   SessionAccess& _session;
   ChannelSet&    _channels;

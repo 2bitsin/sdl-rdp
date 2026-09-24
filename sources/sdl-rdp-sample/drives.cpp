@@ -35,7 +35,7 @@ auto OpenDriveFile(char const* value, char const* mode, char const* operation) -
   auto [drive, path] = SplitDrive(value);
   auto props         = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
   // The display property carries the driver's file factory as an untyped pointer.
-  auto open          = reinterpret_cast<DriveOpen>(
+  auto open = reinterpret_cast<DriveOpen>(
       SDL_GetPointerProperty(props, SDL_PROP_DISPLAY_RDP_OPEN_FILE_POINTER, nullptr));
   Check(open != nullptr);
   IoStream file{ open(drive.c_str(), path.c_str(), mode), SDL_CloseIO };

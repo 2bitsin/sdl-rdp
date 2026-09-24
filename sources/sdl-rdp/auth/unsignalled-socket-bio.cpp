@@ -1,12 +1,13 @@
 #include "_detail/unsignalled-socket-bio.hpp"
 
+#include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 
 #include <cerrno>
 #include <cstddef>
 #include <memory>
-#include <new>
 #include <stdexcept>
+#include <string_view>
 #include <sys/socket.h>
 #include <tuple>
 
@@ -15,6 +16,8 @@ namespace {
 using utilities::Expects;
 using Method = std::unique_ptr<BIO_METHOD, Releases<BIO_meth_free>>;
 constexpr int Unset = -1;
+// OpenSSL's BIO control table dictates its C `long` argument and result.
+using ControlValue = decltype(BIO_ctrl(nullptr, 0, 0, nullptr));
 
 auto Slot(BIO* bio) -> int& {
   Expects(bio != nullptr, "the BIO exists");
@@ -27,7 +30,11 @@ auto SocketOf(BIO* bio) -> int {
   Expects(socket >= 0, "the BIO has its socket");
   return socket;
 }
-auto Write(BIO* bio, char const* data, int size) noexcept -> int {
+// OpenSSL reports a BIO's -1 or 0 to its own caller as the I/O failure; there is no diagnostics route here.
+constexpr auto Unreported = [](std::string_view) noexcept { };
+constexpr int  IoFailed   = -1;
+
+auto Sent(BIO* bio, char const* data, int size) -> int {
   Expects(data != nullptr, "the data exists");
   Expects(size >= 0, "the size is not negative");
   BIO_clear_retry_flags(bio);
@@ -35,7 +42,7 @@ auto Write(BIO* bio, char const* data, int size) noexcept -> int {
   if (sent < 0 && errno == EINTR) BIO_set_retry_write(bio);
   return static_cast<int>(sent);
 }
-auto Read(BIO* bio, char* data, int size) noexcept -> int {
+auto Received(BIO* bio, char* data, int size) -> int {
   Expects(data != nullptr, "the buffer exists");
   Expects(size >= 0, "the size is not negative");
   BIO_clear_retry_flags(bio);
@@ -43,18 +50,24 @@ auto Read(BIO* bio, char* data, int size) noexcept -> int {
   if (received < 0 && errno == EINTR) BIO_set_retry_read(bio);
   return static_cast<int>(received);
 }
-auto Adopt(BIO* bio, int socket, long closing) -> long {
+auto Write(BIO* bio, char const* data, int size) noexcept -> int {
+  return Contained(IoFailed, [&] { return Sent(bio, data, size); }, Unreported);
+}
+auto Read(BIO* bio, char* data, int size) noexcept -> int {
+  return Contained(IoFailed, [&] { return Received(bio, data, size); }, Unreported);
+}
+auto Adopt(BIO* bio, int socket, ControlValue closing) -> ControlValue {
   Expects(socket >= 0, "the socket is open");
   Expects(closing == BIO_NOCLOSE, "the caller closes the socket");
   Slot(bio) = socket;
   BIO_set_init(bio, 1);
   return 1;
 }
-auto Reported(BIO* bio, void const* out) -> long {
+auto Reported(BIO* bio, void const* out) -> ControlValue {
   Expects(out == nullptr, "the socket is read from the result");
   return Slot(bio);
 }
-auto Control(BIO* bio, int command, long argument, void* pointer) noexcept -> long {
+auto Control(BIO* bio, int command, ControlValue argument, void* pointer) noexcept -> ControlValue {
   // OpenSSL sends an open set of commands; 0 answers every one a plain socket does not support.
   switch (command) {
   case BIO_C_SET_FD:   return Adopt(bio, *static_cast<int const*>(pointer), argument);
@@ -64,17 +77,19 @@ auto Control(BIO* bio, int command, long argument, void* pointer) noexcept -> lo
   }
 }
 auto Create(BIO* bio) noexcept -> int {
-  try {
+  auto const created = [&] {
     BIO_set_data(bio, std::make_unique<int>(Unset).release());
     return 1;
-  } catch (std::bad_alloc const&) {
-    return 0;
-  }
+  };
+  return Contained(0, created, Unreported);
 }
 auto Destroy(BIO* bio) noexcept -> int {
-  std::unique_ptr<int> const slot{ static_cast<int*>(BIO_get_data(bio)) };
-  BIO_set_data(bio, nullptr);
-  return 1;
+  auto const released = [bio] {
+    std::unique_ptr<int> const slot{ static_cast<int*>(BIO_get_data(bio)) };
+    BIO_set_data(bio, nullptr);
+    return 1;
+  };
+  return Contained(0, released, Unreported);
 }
 auto NewMethod() -> Method {
   Method method{ BIO_meth_new(BIO_get_new_index() | BIO_TYPE_SOURCE_SINK, "sdl-rdp unsignalled socket") };

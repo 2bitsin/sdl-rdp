@@ -9,6 +9,7 @@ import columns
 import format as formatter
 import includes
 import shape
+import spellings
 
 LINT = pathlib.Path(__file__).resolve().parent
 
@@ -44,3 +45,7 @@ def test_cmake():
 
 def test_includes():
     assert includes.main() == 0
+
+
+def test_spellings():
+    assert spellings.main() == 0

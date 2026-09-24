@@ -5,8 +5,8 @@
 #include <utility>
 
 namespace Backend {
-template <std::integral _To, std::integral _From> constexpr auto Narrowed(_From value) -> _To {
-  utilities::Expects(std::in_range<_To>(value), "the value fits the narrower type");
-  return static_cast<_To>(value);
+template <std::integral ToTy, std::integral FromTy> constexpr auto Narrowed(FromTy value) -> ToTy {
+  utilities::Expects(std::in_range<ToTy>(value), "the value fits the narrower type");
+  return static_cast<ToTy>(value);
 }
 }

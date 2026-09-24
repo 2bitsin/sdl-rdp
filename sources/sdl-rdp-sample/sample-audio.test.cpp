@@ -7,9 +7,11 @@
 #include <sdl-rdp/headless-client.test/frame-observer.hpp>
 #include <sdl-rdp/headless-client.test/sound-client.hpp>
 #include <sdl-rdp/headless-client.test/tone-measurements.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 #include <algorithm>
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <ranges>
 #include <string>
@@ -30,7 +32,7 @@ auto ThenTone(Headless::SoundClient const& audio, Headless::FrameObserver const&
   if (tight) EXPECT_GE(frames.Frames().size(), 2u);
 }
 auto ToneCaptured(Headless::SoundClient const& audio, Headless::FrameObserver const& frames) -> bool {
-  return audio.CaptureState().samples.size() >= std::size_t(audio.CaptureState().rate) * 2
+  return audio.CaptureState().samples.size() >= std::size_t{ audio.CaptureState().rate } * 2
          && frames.Frames().size() >= 2;
 }
 }
@@ -83,8 +85,8 @@ TEST_F(AudioDriver, AudioOnlyPlaysBlackDesktop) {
   Client                client(port, true);
   Headless::SoundClient audio(client);
   ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
-  auto*               gdi   = client.Instance()->context->gdi;
-  std::vector<UINT32> black(std::size_t(gdi->width) * gdi->height);
+  auto*                      gdi   = client.Instance()->context->gdi;
+  std::vector<std::uint32_t> black(Backend::Narrowed<std::size_t>(gdi->width) * gdi->height);
   ASSERT_TRUE(client.Until([&] { return client.Matches(black); }));
   ASSERT_NO_FATAL_FAILURE(ThenPcm(client, audio));
   EXPECT_EQ(SDL_WasInit(SDL_INIT_VIDEO), 0u);

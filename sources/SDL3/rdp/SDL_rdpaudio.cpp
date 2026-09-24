@@ -2,6 +2,10 @@
 #include "SDL_rdpdrive.hpp"
 #include "SDL_rdpowneddriver.hpp"
 #include "boundary.hpp"
+#include <sdl-rdp/utilities/narrowed.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <utility>
 namespace rdp {
 namespace {
 constexpr SDL_AudioSpec PlaybackSpec     { SDL_AUDIO_S16, 2, 44100 };
@@ -11,11 +15,11 @@ constexpr int           DefaultLeadMs    = 150;
 auto PeriodFrames(int frequency) -> int {
   return frequency / PeriodsPerSecond;
 }
-auto AudioLead(Driver const& driver) -> Uint64 {
+auto AudioLead(Driver const& driver) -> std::uint64_t {
   auto const lead = driver.Options().Integer(SDL_HINT_RDP_AUDIO_LEAD, DefaultLeadMs, 0, SDL_MAX_SINT32);
   if (std::cmp_greater_equal(lead, driver.Config().audio_latency_ms))
     InvalidSetting("RDP audio lead must be below the audio latency window");
-  return static_cast<Uint64>(lead) * SDL_NS_PER_MS;
+  return static_cast<std::uint64_t>(lead) * SDL_NS_PER_MS;
 }
 auto OpenAudio(Driver const& driver) -> std::reference_wrapper<Driver const> {
   if (driver.Call<Operation::AUDIO_OPEN>() < 0) driver.Throw();
@@ -34,29 +38,30 @@ public:
   explicit SDL_PrivateAudioData(std::shared_ptr<rdp::Driver const> driver)
       : rdp::OwnedDriver<rdp::Driver const>{ std::move(driver) }, _lead{ rdp::AudioLead(Backend()) },
         _rate{ Backend().Call<rdp::Operation::AUDIO_RATE>() }, _session{ Backend() } { }
-  auto     Buffer() -> std::vector<Uint8>& {
+  auto     Buffer() -> std::vector<std::uint8_t>& {
     return _buffer;
   }
-  auto Rate() const -> unsigned {
+  auto Rate() const -> std::uint32_t {
     return _rate;
   }
-  auto Rate(unsigned rate) -> void {
+  auto Rate(std::uint32_t rate) -> void {
     if (rate && !_rate) _next = SDL_GetTicksNS();
     _rate = rate;
   }
-  auto Delay(SDL_AudioDevice const& device) -> Uint64 {
+  auto Delay(SDL_AudioDevice const& device) -> std::uint64_t {
     auto const now = SDL_GetTicksNS();
-    _next += static_cast<Uint64>(device.sample_frames) * SDL_NS_PER_SECOND / static_cast<Uint64>(device.spec.freq);
+    _next += static_cast<std::uint64_t>(device.sample_frames) * SDL_NS_PER_SECOND
+             / static_cast<std::uint64_t>(device.spec.freq);
     auto const delay = _next > now + _lead ? _next - now - _lead : 0;
     _next = std::max(_next, now);
     return delay;
   }
 private:
-  std::vector<Uint8>      _buffer;
-  Uint64                  _next   { SDL_GetTicksNS() };
-  Uint64                  _lead;
-  std::uint32_t           _rate;
-  rdp::AudioSession const _session;
+  std::vector<std::uint8_t> _buffer;
+  std::uint64_t             _next   { SDL_GetTicksNS() };
+  std::uint64_t             _lead;
+  std::uint32_t             _rate;
+  rdp::AudioSession const   _session;
 };
 namespace rdp {
 namespace {
@@ -79,7 +84,7 @@ auto OpenDevice(SDL_AudioDevice* device) -> bool {
     return true;
   });
 }
-auto ChangeRate(SDL_AudioDevice& device, unsigned rate) -> bool {
+auto ChangeRate(SDL_AudioDevice& device, std::uint32_t rate) -> bool {
   auto& data = *device.hidden;
   data.Rate(rate);
   if (!rate || std::cmp_equal(rate, device.spec.freq)) return true;
@@ -102,7 +107,7 @@ auto PlaybackDevice() -> std::optional<std::reference_wrapper<SDL_AudioDevice>> 
   return std::ref(*device);
 }
 }
-auto AudioRate(unsigned rate) -> void {
+auto AudioRate(std::uint32_t rate) -> void {
   auto const found = PlaybackDevice();
   if (!found) return;
   auto&                 device = found->get();
@@ -125,7 +130,7 @@ auto PollRateChanges(Driver const& driver) -> void {
     if (event.type == SDLRDP_AUDIO) AudioRate(event.audio.freq);
   });
 }
-auto PlaybackDelay(SDL_AudioDevice& device) -> Uint64 {
+auto PlaybackDelay(SDL_AudioDevice& device) -> std::uint64_t {
   ScopedMutexLock const lock{ *device.lock };
   return device.hidden->Delay(device);
 }
@@ -140,16 +145,16 @@ auto WaitDevice(SDL_AudioDevice* device) -> bool {
   });
 }
 // SDL audio playback provides a borrowed device and counted sample buffer.
-auto PlayDevice(SDL_AudioDevice* device, Uint8 const* buffer, int length) -> bool {
+auto PlayDevice(SDL_AudioDevice* device, std::uint8_t const* buffer, int length) -> bool {
   utilities::Expects(device != nullptr, "audio playback has a device");
   utilities::Expects(buffer != nullptr, "audio playback has a buffer");
   utilities::Expects(length >= 0, "audio buffer length is nonnegative");
-  auto const  frames = static_cast<unsigned>(length) / SDL_AUDIO_FRAMESIZE(device->spec);
+  auto const  frames = ::Backend::Narrowed<std::uint32_t>(length) / SDL_AUDIO_FRAMESIZE(device->spec);
   auto const& driver = device->hidden->Backend();
-  return driver.Call<Operation::AUDIO_WRITE>(buffer, frames) == static_cast<int>(frames) || driver.Fail();
+  return std::cmp_equal(driver.Call<Operation::AUDIO_WRITE>(buffer, frames), frames) || driver.Fail();
 }
 // SDL borrows the returned mixing buffer until its next device callback.
-auto GetDeviceBuffer(SDL_AudioDevice* device, [[maybe_unused]] int* unused_size) -> Uint8* {
+auto GetDeviceBuffer(SDL_AudioDevice* device, [[maybe_unused]] int* unused_size) -> std::uint8_t* {
   utilities::Expects(device != nullptr, "audio buffer has a device");
   auto& buffer = device->hidden->Buffer();
   return std::cmp_greater_equal(buffer.size(), device->buffer_size) ? buffer.data() : nullptr;

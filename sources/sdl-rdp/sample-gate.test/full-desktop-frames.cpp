@@ -1,16 +1,17 @@
 #include <sdl-rdp/sample-gate.test/full-desktop-frames.hpp>
 
 #include <algorithm>
+#include <cstddef>
 #include <functional>
 #include <utility>
 
 namespace SampleGate {
 FullDesktopFrames::FullDesktopFrames(Headless::Client& client)
     : hook(client, std::bind_front(&FullDesktopFrames::Observe, this)) { }
-auto FullDesktopFrames::Full() const -> unsigned {
+auto FullDesktopFrames::Full() const -> std::size_t {
   return full;
 }
-auto FullDesktopFrames::Deliveries() const -> unsigned {
+auto FullDesktopFrames::Deliveries() const -> std::size_t {
   return deliveries;
 }
 auto FullDesktopFrames::Observe(Headless::PictureUpdate const& update) -> void {

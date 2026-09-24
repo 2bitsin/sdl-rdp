@@ -7,8 +7,13 @@ FirstFrameSize::FirstFrameSize(Headless::Client& value)
     : client(value), original_connect(value.Instance()->PostConnect) {
   Expects(!active, "no observer is already installed");
   Expects(original_connect, "original connection callback is installed");
-  active                         = this;
-  client.Instance()->PostConnect = Connect;
+  active = this;
+  // abi: pConnectCallback, BOOL is int
+  client.Instance()->PostConnect = [](freerdp* instance) -> int {
+    Expects(active, "observer is installed");
+    Expects(instance, "FreeRDP instance exists");
+    return active->Connect(*instance);
+  };
 }
 FirstFrameSize::~FirstFrameSize() {
   client.Instance()->PostConnect = original_connect;
@@ -24,24 +29,25 @@ auto FirstFrameSize::Width() const -> int {
 auto FirstFrameSize::Height() const -> int {
   return height;
 }
-auto FirstFrameSize::Connect(freerdp* instance) -> BOOL {
-  Expects(active, "observer is installed");
-  Expects(instance, "FreeRDP instance exists");
-  if (!active->original_connect(instance)) return FALSE;
-  active->original_paint              = instance->context->update->EndPaint;
-  instance->context->update->EndPaint = Paint;
-  active->paint_installed             = true;
-  return TRUE;
+auto FirstFrameSize::Connect(freerdp& instance) -> bool {
+  if (!original_connect(&instance)) return false;
+  original_paint = instance.context->update->EndPaint;
+  // abi: pEndPaint, BOOL is int
+  instance.context->update->EndPaint = [](rdpContext* context) -> int {
+    Expects(active, "observer is installed");
+    Expects(context, "callback context exists");
+    return active->Paint(*context);
+  };
+  paint_installed                    = true;
+  return true;
 }
-auto FirstFrameSize::Paint(rdpContext* context) -> BOOL {
-  Expects(active, "observer is installed");
-  Expects(context, "callback context exists");
-  Expects(context->gdi, "decoded framebuffer exists");
-  if (!active->received) {
-    active->width    = context->gdi->width;
-    active->height   = context->gdi->height;
-    active->received = true;
+auto FirstFrameSize::Paint(rdpContext& context) -> bool {
+  Expects(context.gdi, "decoded framebuffer exists");
+  if (!received) {
+    width    = context.gdi->width;
+    height   = context.gdi->height;
+    received = true;
   }
-  return active->original_paint ? active->original_paint(context) : TRUE;
+  return original_paint ? original_paint(&context) : true;
 }
 }

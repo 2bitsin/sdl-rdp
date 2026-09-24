@@ -1,12 +1,14 @@
 #pragma once
 #include "SDL_rdpboundary.hpp"
 #include "SDL_rdpsettings.hpp"
+#include <cstddef>
+#include <cstdint>
 namespace rdp {
-template <typename _Credential>
-concept AuthenticationCredential = std::same_as<_Credential, char const*> || std::same_as<_Credential, unsigned char*>;
+template <typename CredentialTy>
+concept AuthenticationCredential = std::same_as<CredentialTy, char const*> || std::same_as<CredentialTy, std::uint8_t*>;
 // SDL's display properties publish the application's C authentication callbacks with this signature.
-template <AuthenticationCredential _Credential>
-using AuthenticationCallback = bool(SDLCALL*)(void* user, char const* domain, char const* name, _Credential secret);
+template <AuthenticationCredential CredentialTy>
+using AuthenticationCallback = bool(SDLCALL*)(void* user, char const* domain, char const* name, CredentialTy secret);
 class Configuration {
 public:
   // The backend calls these C callbacks with the opaque context.

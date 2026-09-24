@@ -2,6 +2,7 @@
 #include "SDL_rdpresources.hpp"
 #include <oxbox/utilities/number-text.hpp>
 #include <oxbox/utilities/text.hpp>
+#include <cstdint>
 #include <stdexcept>
 #if defined(SDL_PLATFORM_WINDOWS)
 #include "src/core/windows/SDL_windows.h"
@@ -18,10 +19,10 @@ namespace {
 constexpr auto IniFileName = "libSDL3.ini";
 auto LibraryPath() -> std::filesystem::path {
 #if defined(SDL_PLATFORM_WINDOWS)
-  constexpr DWORD long_path_limit = 32768;
-  HMODULE         module          { };
+  constexpr std::uint32_t long_path_limit = 32768;
+  HMODULE                 module          { };
   if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                          reinterpret_cast<LPCWSTR>(LibraryPath), &module))
+                          reinterpret_cast<std::wstring::const_pointer>(LibraryPath), &module))
     return { };
   std::wstring filename(long_path_limit, L'\0');
   auto const   length   = GetModuleFileNameW(module, filename.data(), long_path_limit);
@@ -43,9 +44,9 @@ auto LibraryIni() -> std::optional<std::filesystem::path> {
 auto WarnIniEntry(std::filesystem::path const& path, IniEntry const& entry) -> void {
   auto const file = path.string();
   if (entry.Status() == IniStatus::MALFORMED)
-    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "%s:%u: malformed ini line (missing '=')", file.c_str(), entry.Line());
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "%s:%zu: malformed ini line (missing '=')", file.c_str(), entry.Line());
   else
-    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "%s:%u: unknown RDP setting '%.*s'", file.c_str(), entry.Line(),
+    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "%s:%zu: unknown RDP setting '%.*s'", file.c_str(), entry.Line(),
                 static_cast<int>(entry.Key().size()), entry.Key().data());
 }
 }

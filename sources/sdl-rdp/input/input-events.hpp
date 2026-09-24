@@ -1,4 +1,6 @@
 #pragma once
+#include <sdl-rdp/core/failure-log.hpp>
+#include <sdl-rdp/utilities/operation-name.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 #include <sdl-rdp-abi/sdl-rdp-backend.h>
 
@@ -6,6 +8,7 @@
 #include <freerdp/server/rdpei.h>
 #include <oxbox/utilities/utf-decode.hpp>
 #include <array>
+#include <cstdint>
 
 namespace Backend {
 class Activation;
@@ -27,14 +30,15 @@ class InputEvents : private Pinned {
 public:
        InputEvents(PeerLink& link, Activation const& activation, DesktopLayout const& desktop, EventQueue& events,
                    FrameStore& store, Diagnostics const& diagnostics, SessionAccess& session) noexcept;
-  auto Install(rdpInput& input)                 -> void;
-  auto Key(UINT16 flags, UINT8 code)            -> BOOL;
-  auto Text(UINT16 flags, UINT16 code)          -> BOOL;
-  auto Mouse(UINT16 flags, UINT16 x, UINT16 y)  -> BOOL;
-  auto ExtendedMouse(UINT16 flags)              -> BOOL;
-  auto Pointer(UINT64 flags, INT32 x, INT32 y)  -> UINT;
-  auto Touch(RDPINPUT_TOUCH_EVENT const& event) -> UINT;
-  auto Point(MouseMode mode) noexcept           -> void;
+  auto Install(rdpInput& input)                                     -> void;
+  auto Key(std::uint16_t flags, std::uint8_t code)                  -> bool;
+  auto Text(std::uint16_t flags, std::uint16_t code)                -> bool;
+  auto Mouse(std::uint16_t flags, std::uint16_t x, std::uint16_t y) -> bool;
+  auto ExtendedMouse(std::uint16_t flags)                           -> bool;
+  auto Pointer(std::uint64_t flags, std::int32_t x, std::int32_t y) -> std::uint32_t;
+  auto Touch(RDPINPUT_TOUCH_EVENT const& event)                     -> std::uint32_t;
+  auto Point(MouseMode mode) noexcept                               -> void;
+  auto Failures(OperationName operation) const noexcept             -> FailureLog;
 
 private:
   template <class Result> auto WhenActive(Result idle, std::invocable auto action)                    -> Result;

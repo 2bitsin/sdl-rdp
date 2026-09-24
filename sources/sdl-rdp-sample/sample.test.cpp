@@ -10,6 +10,7 @@
 #include <SDL3/SDL.h>
 #include <sdl-rdp/headless-client.test/display-client.hpp>
 #include <sdl-rdp/video/avc-encoder.hpp>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -98,8 +99,8 @@ TEST_F(DesktopSample, LiveCodec) {
 
 TEST_F(DesktopSample, WaitForClient) {
   process = std::make_unique<Process>(Arguments(certificates.Path(), { "SDL_RDP_WAIT_FOR_CLIENT=1" }));
-  auto     deadline = Clock::now() + 10s;
-  unsigned port     = 0;
+  auto          deadline = Clock::now() + 10s;
+  std::uint32_t port     = 0;
   while (!(port = ListeningPort()) && Clock::now() < deadline) std::this_thread::sleep_for(1ms);
   ASSERT_GT(port, 0u) << "sample's ephemeral listener: " << process->Transcript();
   ASSERT_FALSE(Read("port ", 300ms)) << "no port line before client: " << process->Transcript();
@@ -132,8 +133,9 @@ TEST_F(DesktopSample, FullscreenFollowsScreen) {
 
 TEST_F(DesktopSample, FirstFrameObserverWithoutSuccessfulConnect) {
   Client client(0, true);
-  auto   paint   = +[](rdpContext*) -> BOOL { return TRUE; };
-  auto   connect = +[](freerdp*) -> BOOL { return FALSE; };
+  // abi: pEndPaint and pConnectCallback, BOOL is int
+  auto paint   = +[](rdpContext*) -> int { return true; };
+  auto connect = +[](freerdp*) -> int { return false; };
   client.Instance()->context->update->EndPaint = paint;
   client.Instance()->PostConnect               = connect;
   for (bool const attempt : { false, true }) {
@@ -205,8 +207,8 @@ TEST_F(DesktopSample, ClipboardAscii) {
 
 TEST_F(DesktopSample, ClipboardUnicode) {
   ASSERT_NO_FATAL_FAILURE(GivenClipboard("żółw"));
-  auto&             client = SessionClient();
-  std::vector<BYTE> bytes  { 0x7c, 1, 0xf3, 0, 0x42, 1, 0x77, 0, 0, 0 };
+  auto&                     client = SessionClient();
+  std::vector<std::uint8_t> bytes  { 0x7c, 1, 0xf3, 0, 0x42, 1, 0x77, 0, 0, 0 };
   ASSERT_TRUE(client.Until([&] { return ClipboardSession().Received(bytes); }));
   SDL_Log("trace CLIPBOARD server formats=13,1 request=13 utf16le=7c01f300420177000000 text=żółw");
   ASSERT_NO_FATAL_FAILURE(ThenLegacyClipboard(client));

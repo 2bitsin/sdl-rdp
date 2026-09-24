@@ -6,28 +6,29 @@
 #include <freerdp/channels/rdpdr.h>
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <future>
 #include <string>
 #include <utility>
 namespace DriveGate {
 namespace {
 auto SendMalformedDrivePacket(Headless::Client& client) -> void {
-  std::array<BYTE, 4> const malformed{ 0x72, 0x44, 0x41, 0x44 };
+  std::array<std::uint8_t, 4> const malformed{ 0x72, 0x44, 0x41, 0x44 };
   ASSERT_TRUE(Headless::SendStaticChannel(client.Instance().get(), RDPDR_CHANNEL_NAME, malformed));
 }
 auto EmptyBasicInformation(Headless::DriveObserver& observer) -> Backend::DrivePacket {
   auto request = observer.Observed().io.front();
-  auto device  = request.Read<uint32_t>();
+  auto device  = request.Read<std::uint32_t>();
   request.Skip(4);
-  auto id = request.Read<uint32_t>();
-  EXPECT_EQ(request.Read<uint32_t>(), IRP_MJ_QUERY_INFORMATION);
+  auto id = request.Read<std::uint32_t>();
+  EXPECT_EQ(request.Read<std::uint32_t>(), IRP_MJ_QUERY_INFORMATION);
   request.Skip(4);
-  EXPECT_EQ(request.Read<uint32_t>(), FileBasicInformation);
+  EXPECT_EQ(request.Read<std::uint32_t>(), FileBasicInformation);
   auto response = Completion(device, id, STATUS_SUCCESS);
   response.Write(std::uint32_t{ 0 });
   return response;
 }
-auto CompleteRead(Headless::DriveObserver& observer, size_t index) -> void {
+auto CompleteRead(Headless::DriveObserver& observer, std::size_t index) -> void {
   auto response = ReplyTo(observer.Observed().io[index], STATUS_SUCCESS);
   response.Write(std::uint32_t{ 65536 });
   response.Bytes().resize(response.Bytes().size() + 65536, std::byte{ 'x' });
@@ -35,15 +36,16 @@ auto CompleteRead(Headless::DriveObserver& observer, size_t index) -> void {
 }
 auto AnnounceDriveNames(Headless::DriveObserver& observer) -> void {
   std::string_view const label = "żółw";
-  auto                   wide  = Backend::TranscodeRange<std::vector<uint8_t>>(
+  auto                   wide  = Backend::TranscodeRange<std::vector<std::byte>>(
       std::as_bytes(std::span(label)), { },
       { .encoding = oxbox::utilities::Encoding::UTF16, .order = std::endian::little });
   wide.resize(wide.size() + 2);
   ASSERT_TRUE(observer.Send(DeviceAnnouncement(RDPDR_DTYP_FILESYSTEM, 100, wide)));
-  std::vector<uint8_t> long_name(600, 'x');
-  long_name.push_back(0);
+  std::vector<std::byte> long_name(600, std::byte{ 'x' });
+  long_name.push_back(std::byte{ 0 });
   ASSERT_TRUE(observer.Send(DeviceAnnouncement(RDPDR_DTYP_FILESYSTEM, 101, long_name)));
-  ASSERT_TRUE(observer.Send(DeviceAnnouncement(RDPDR_DTYP_FILESYSTEM, 102, std::array<uint8_t, 2>{ 0xff, 0 })));
+  ASSERT_TRUE(
+      observer.Send(DeviceAnnouncement(RDPDR_DTYP_FILESYSTEM, 102, std::array{ std::byte{ 0xff }, std::byte{ 0 } })));
   ASSERT_TRUE(observer.Send(DeviceAnnouncement(RDPDR_DTYP_PRINT, 103, { })));
 }
 }
@@ -63,7 +65,8 @@ namespace {
 class DriveWire : public DriveChecks {
 protected:
   auto ThenRecoverableAnnouncements(Headless::DriveObserver& observer) -> void {
-    auto rejected = std::ranges::find(observer.Observed().replies, 103u, &std::pair<unsigned, unsigned>::first);
+    auto rejected = std::ranges::find(observer.Observed().replies, 103u,
+                                      &std::pair<std::uint32_t, std::uint32_t>::first);
     ASSERT_NE(rejected, observer.Observed().replies.end());
     EXPECT_EQ(rejected->second, STATUS_NOT_SUPPORTED);
     EXPECT_EQ(Logged(SDLRDP_LOG_WARN, "truncating"), 1u);
@@ -89,8 +92,9 @@ protected:
     ASSERT_TRUE(client->Until([&] { return observer.Observed().requests == 9; }));
     CompleteRead(observer, 0);
     ASSERT_TRUE(client->Until([&] { return observer.Observed().requests == 10; }));
-    std::ranges::for_each(std::views::iota(1uz, 10uz) | std::views::filter([](size_t index) { return index != 7; }),
-                          [&](size_t index) { CompleteRead(observer, index); });
+    std::ranges::for_each(std::views::iota(1uz, 10uz)
+                              | std::views::filter([](std::size_t index) { return index != 7; }),
+                          [&](std::size_t index) { CompleteRead(observer, index); });
   }
   auto ThenTruncatedInformation(auto& stat) -> void {
     auto [result, error] = stat.get();

@@ -7,6 +7,7 @@
 
 #include <gtest/gtest.h>
 #include <oxbox/platform/scratch-area.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -20,7 +21,7 @@ auto HasClipboardEvent(std::span<sdlrdp_event const> events) -> bool {
 class Clipboard : public testing::Test {
 protected:
   auto Poll(std::span<sdlrdp_event> events) -> std::span<sdlrdp_event const> {
-    return events.first(sdlrdp_poll(handle.Handle(), events.data(), static_cast<uint32_t>(events.size())));
+    return events.first(sdlrdp_poll(handle.Handle(), events.data(), Backend::Narrowed<std::uint32_t>(events.size())));
   }
   auto Drain() -> void {
     std::array<sdlrdp_event, 32> events{ };
@@ -68,7 +69,7 @@ protected:
   std::unique_ptr<Headless::ClipboardClient> clipboard;
 };
 auto OfferMalformedText(Headless::Client& client, Headless::ClipboardClient& clipboard) -> void {
-  for (auto const& bytes : { std::vector<BYTE>{ 0x7c }, { 0, 0xdc, 0, 0 }, { 'x', 0 } }) {
+  for (auto const& bytes : { std::vector<std::uint8_t>{ 0x7c }, { 0, 0xdc, 0, 0 }, { 'x', 0 } }) {
     auto count = clipboard.Observed().requests.load();
     ASSERT_EQ(clipboard.Offer(bytes), CHANNEL_RC_OK);
     ASSERT_TRUE(client.Until([&] { return clipboard.Observed().requests.load() > count; }));
@@ -128,11 +129,11 @@ TEST_F(Clipboard, NonTextOfferClearsText) {
 TEST(ClipboardTranscode, ByteRanges) {
   using namespace oxbox::utilities;
   using Backend::TranscodeRange;
-  std::string_view const text  = "Aż😀";
-  auto                   input = std::as_bytes(std::span(text));
-  auto encoded = TranscodeRange<std::vector<BYTE>>(input, { },
-                                                   { .encoding = Encoding::UTF16, .order = std::endian::little });
-  EXPECT_EQ(encoded, (std::vector<BYTE>{ 0x41, 0, 0x7c, 1, 0x3d, 0xd8, 0, 0xde }));
+  std::string_view const text    = "Aż😀";
+  auto                   input   = std::as_bytes(std::span(text));
+  auto                   encoded = TranscodeRange<std::vector<std::uint8_t>>(
+      input, { }, { .encoding = Encoding::UTF16, .order = std::endian::little });
+  EXPECT_EQ(encoded, (std::vector<std::uint8_t>{ 0x41, 0, 0x7c, 1, 0x3d, 0xd8, 0, 0xde }));
   EXPECT_EQ(
       TranscodeRange<std::string>(std::as_bytes(std::span(encoded)), { Encoding::UTF16, std::endian::little }, { }),
       text);

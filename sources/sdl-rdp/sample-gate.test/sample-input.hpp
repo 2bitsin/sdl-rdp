@@ -2,6 +2,7 @@
 #include <sdl-rdp/sample-gate.test/sample-process.hpp>
 
 #include <chrono>
+#include <cstdint>
 #include <string_view>
 
 namespace SampleGate {

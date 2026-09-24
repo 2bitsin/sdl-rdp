@@ -2,5 +2,5 @@
 #include <cstdint>
 
 namespace Headless {
-auto WallMilliseconds() -> int64_t;
+auto WallMilliseconds() -> std::int64_t;
 }

@@ -1,18 +1,18 @@
 #pragma once
 #include <sdl-rdp/utilities/extent.hpp>
 
-#include <winpr/wtypes.h>
 #include <chrono>
+#include <cstdint>
 #include <span>
 
 namespace Backend::Avc {
 struct IntraRefresh {
-  unsigned period;
-  unsigned count;
+  std::uint32_t period;
+  std::uint32_t count;
 };
-auto IntraRefreshFor(unsigned fps)                       -> IntraRefresh;
-auto Bitrate(Extent size, unsigned kbps = 0)             -> unsigned;
-auto ReplicateEdges(std::span<BYTE> pixels, Extent size) -> void;
+auto IntraRefreshFor(std::uint32_t fps)                          -> IntraRefresh;
+auto Bitrate(Extent size, std::uint32_t kbps = 0)                -> std::uint32_t;
+auto ReplicateEdges(std::span<std::uint8_t> pixels, Extent size) -> void;
 struct EncodingTimes {
   std::chrono::nanoseconds convert{ };
   std::chrono::nanoseconds upload { };

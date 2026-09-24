@@ -2,16 +2,19 @@
 #include "SDL_rdpowneddriver.hpp"
 #include "boundary.hpp"
 #include <oxbox/utilities/text.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <span>
 namespace rdp {
 namespace {
 constexpr std::size_t InitialDriveCapacity = 16;
-template <typename _Element, typename _Fill>
-  requires std::invocable<_Fill const&, std::span<_Element>>
-auto GrowUntilFits(std::size_t capacity, _Fill const& fill) -> std::vector<_Element> {
-  std::vector<_Element> buffer(capacity);
-  auto                  count  = std::invoke(fill, std::span(buffer));
+template <typename ElementTy, typename FillTy>
+  requires std::invocable<FillTy const&, std::span<ElementTy>>
+auto GrowUntilFits(std::size_t capacity, FillTy const& fill) -> std::vector<ElementTy> {
+  std::vector<ElementTy> buffer(capacity);
+  auto                   count  = std::invoke(fill, std::span(buffer));
   while (count == buffer.size()) {
     buffer.resize(buffer.size() * 2);
     count = std::invoke(fill, std::span(buffer));
@@ -20,8 +23,9 @@ auto GrowUntilFits(std::size_t capacity, _Fill const& fill) -> std::vector<_Elem
   return buffer;
 }
 auto ListDrives(Driver const& driver, std::span<sdlrdp_drive> drives) -> std::size_t {
-  if (!std::in_range<unsigned>(drives.size())) throw std::length_error("Too many RDP drives");
-  auto const count = driver.Call<Operation::DRIVE_LIST>(drives.data(), static_cast<unsigned>(drives.size()));
+  if (!std::in_range<std::uint32_t>(drives.size())) throw std::length_error("Too many RDP drives");
+  auto const count = driver.Call<Operation::DRIVE_LIST>(drives.data(),
+                                                        ::Backend::Narrowed<std::uint32_t>(drives.size()));
   if (count < 0) driver.Throw();
   return std::min(static_cast<std::size_t>(count), drives.size());
 }
@@ -29,16 +33,16 @@ auto Drives(Driver const& driver) -> std::vector<sdlrdp_drive> {
   return GrowUntilFits<sdlrdp_drive>(InitialDriveCapacity,
                                      [&](std::span<sdlrdp_drive> drives) { return ListDrives(driver, drives); });
 }
-auto FirstDrive(std::span<sdlrdp_drive const> drives) -> unsigned {
+auto FirstDrive(std::span<sdlrdp_drive const> drives) -> std::uint32_t {
   if (drives.empty()) throw std::runtime_error("No RDP drive is available");
   return drives.front().id;
 }
-auto NamedDrive(std::span<sdlrdp_drive const> drives, std::string const& name) -> unsigned {
+auto NamedDrive(std::span<sdlrdp_drive const> drives, std::string const& name) -> std::uint32_t {
   auto const found = std::ranges::find_if(drives, [&](sdlrdp_drive const& drive) { return name == drive.name; });
   if (found == drives.end()) throw std::runtime_error("RDP drive unavailable: " + name);
   return found->id;
 }
-auto OpenHandle(Driver const& driver, unsigned drive, std::string const& path, unsigned flags)
+auto OpenHandle(Driver const& driver, std::uint32_t drive, std::string const& path, std::uint32_t flags)
     -> std::pair<std::reference_wrapper<Driver const>, sdlrdp_file*> {
   sdlrdp_file* opened{ };
   if (driver.Call<Operation::DRIVE_OPEN>(drive, path.c_str(), flags, &opened) < 0) driver.Throw();
@@ -63,28 +67,29 @@ public:
   auto Mode() const -> FileMode {
     return _mode;
   }
-  auto Position() const -> Sint64 {
+  auto Position() const -> std::int64_t {
     return _position;
   }
-  auto Seek(Sint64 position) -> void {
+  auto Seek(std::int64_t position) -> void {
     _position = position;
   }
   auto Close() -> bool {
     return _file.Close();
   }
 private:
-  DriveFile _file;
-  FileMode  _mode;
-  Sint64    _position{ };
+  DriveFile    _file;
+  FileMode     _mode;
+  std::int64_t _position{ };
 };
-auto Size(File const& file) -> Sint64 {
+auto Size(File const& file) -> std::int64_t {
   sdlrdp_stat info{ };
-  if (file.Backend().Call<Operation::DRIVE_FSTAT>(file.Handle(), &info) < 0) return file.Backend().Fail<Sint64>(-1);
-  if (std::in_range<Sint64>(info.size)) return static_cast<Sint64>(info.size);
+  if (file.Backend().Call<Operation::DRIVE_FSTAT>(file.Handle(), &info) < 0)
+    return file.Backend().Fail<std::int64_t>(-1);
+  if (std::in_range<std::int64_t>(info.size)) return static_cast<std::int64_t>(info.size);
   SDL_SetError("RDP file exceeds signed stream size");
   return -1;
 }
-auto SeekBase(File const& file, SDL_IOWhence origin) -> Sint64 {
+auto SeekBase(File const& file, SDL_IOWhence origin) -> std::int64_t {
   switch (origin) {
   case SDL_IO_SEEK_SET: return 0;
   case SDL_IO_SEEK_CUR: return file.Position();
@@ -93,12 +98,12 @@ auto SeekBase(File const& file, SDL_IOWhence origin) -> Sint64 {
   }
 }
 // SDL stream callbacks carry their owned File through an opaque context pointer.
-auto SDLCALL FileSize(void* context) -> Sint64 {
+auto SDLCALL FileSize(void* context) -> std::int64_t {
   utilities::Expects(context != nullptr, "stream size has state");
   return Size(*static_cast<File*>(context));
 }
 // SDL stream seek borrows its opaque state and supplies a signed offset and origin.
-auto SDLCALL FileSeek(void* context, Sint64 offset, SDL_IOWhence origin) -> Sint64 {
+auto SDLCALL FileSeek(void* context, std::int64_t offset, SDL_IOWhence origin) -> std::int64_t {
   utilities::Expects(context != nullptr, "stream seek has state");
   auto&      file = *static_cast<File*>(context);
   auto const base = SeekBase(file, origin);
@@ -120,19 +125,19 @@ auto Advance(File& file, int count, std::size_t size, SDL_IOStatus short_status)
   return { static_cast<std::size_t>(count), std::cmp_less(count, size) ? short_status : SDL_IO_STATUS_READY };
 }
 // SDL's stream transfer callbacks require raw counted buffers and a status output.
-template <Operation _Operation, typename _Byte>
-  requires IoBuffer<_Byte>
-auto SDLCALL Transfer(void* context, _Byte* buffer, std::size_t size, SDL_IOStatus* status) -> std::size_t {
+template <Operation OPERATION, typename ByteTy>
+  requires IoBuffer<ByteTy>
+auto SDLCALL Transfer(void* context, ByteTy* buffer, std::size_t size, SDL_IOStatus* status) -> std::size_t {
   utilities::Expects(context != nullptr, "stream transfer has state");
   utilities::Expects(status != nullptr, "stream transfer has a status output");
   auto&          file         = *static_cast<File*>(context);
-  constexpr auto short_status = _Operation == Operation::DRIVE_READ ? SDL_IO_STATUS_EOF : SDL_IO_STATUS_ERROR;
-  if (_Operation == Operation::DRIVE_WRITE && file.Mode().Appends() && FileSeek(context, 0, SDL_IO_SEEK_END) < 0) {
+  constexpr auto short_status = OPERATION == Operation::DRIVE_READ ? SDL_IO_STATUS_EOF : SDL_IO_STATUS_ERROR;
+  if (OPERATION == Operation::DRIVE_WRITE && file.Mode().Appends() && FileSeek(context, 0, SDL_IO_SEEK_END) < 0) {
     *status = SDL_IO_STATUS_ERROR;
     return 0;
   }
-  auto const count = file.Backend().Call<_Operation>(file.Handle(), static_cast<Uint64>(file.Position()), buffer,
-                                                     std::min(size, static_cast<std::size_t>(SDL_MAX_SINT32)));
+  auto const count = file.Backend().Call<OPERATION>(file.Handle(), static_cast<std::uint64_t>(file.Position()), buffer,
+                                                    std::min(size, static_cast<std::size_t>(SDL_MAX_SINT32)));
   auto const [bytes, outcome] = Advance(file, count, size, short_status);
   if (outcome != SDL_IO_STATUS_READY) *status = outcome;
   return bytes;
@@ -168,7 +173,7 @@ auto DriveName(char const* name) -> std::optional<std::string> {
   if (text && text->empty()) return std::nullopt;
   return text;
 }
-auto DriveId(Driver const& driver, std::optional<std::string> const& name) -> unsigned {
+auto DriveId(Driver const& driver, std::optional<std::string> const& name) -> std::uint32_t {
   auto const drives = Drives(driver);
   return name ? NamedDrive(drives, *name) : FirstDrive(drives);
 }

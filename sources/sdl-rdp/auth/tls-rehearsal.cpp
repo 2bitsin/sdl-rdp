@@ -2,6 +2,7 @@
 
 #include "_detail/unsignalled-socket-bio.hpp"
 #include <sdl-rdp/auth/tls-accept-refused.hpp>
+#include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/system-call.hpp>
 
@@ -14,6 +15,7 @@
 #include <future>
 #include <initializer_list>
 #include <stdexcept>
+#include <string_view>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <tuple>
@@ -45,7 +47,7 @@ auto AcceptTls(freerdp_peer& peer) -> bool {
   auto const* const io = freerdp_get_io_callbacks(peer.context);
   Expects(io != nullptr, "the peer has transport callbacks");
   Expects(io->TLSAccept != nullptr, "the peer can accept TLS");
-  return io->TLSAccept(freerdp_get_transport(peer.context)) == TRUE;
+  return io->TLSAccept(freerdp_get_transport(peer.context)) != 0;
 }
 auto Timeval(std::chrono::microseconds span) -> timeval {
   auto const seconds = std::chrono::floor<std::chrono::seconds>(span);
@@ -80,14 +82,12 @@ auto StopDirection(int socket, int direction) noexcept -> void {
 }
 auto ConnectTls(int socket, std::chrono::milliseconds limit) noexcept -> bool {
   Expects(socket >= 0, "the client socket is open");
-  auto const connected = [socket, limit] {
-    try {
-      LimitBlockedCalls(socket, limit);
-      return Handshake(socket);
-    } catch (std::exception const&) {
-      return false;
-    }
-  }();
+  auto const handshake = [socket, limit] {
+    LimitBlockedCalls(socket, limit);
+    return Handshake(socket);
+  };
+  // The false result reaches Perform, which throws the client's failure on the calling thread.
+  auto const connected = Contained(false, handshake, [](std::string_view) noexcept { });
   StopDirection(socket, SHUT_WR);
   return connected;
 }

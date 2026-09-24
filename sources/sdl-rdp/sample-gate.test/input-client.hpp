@@ -13,7 +13,6 @@ public:
   static auto Touch()    -> std::atomic<RdpeiClientContext*> const&;
 
 private:
-  static auto Connected(void* /*unused*/, ChannelConnectedEventArgs const* event) -> void;
   inline static std::atomic<AInputClientContext*> advanced = nullptr;
   inline static std::atomic<RdpeiClientContext*>  touch    = nullptr;
 };

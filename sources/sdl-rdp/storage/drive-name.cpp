@@ -2,6 +2,9 @@
 #include <sdl-rdp/utilities/transcode.hpp>
 
 #include <freerdp/channels/rdpdr.h>
+#include <bit>
+#include <cstddef>
+#include <cstdint>
 #include <format>
 
 namespace Backend {
@@ -30,11 +33,11 @@ auto DriveChannel::Name(std::span<std::byte const> bytes, char const* dos) const
     label = dos;
     Warn(std::format("{} Using DOS name '{}'.", error.what(), dos));
   }
-  constexpr size_t capacity = sizeof(sdlrdp_drive::name) - 1;
+  constexpr std::size_t capacity = sizeof(sdlrdp_drive::name) - 1;
   if (label.size() > capacity) {
     Warn(std::format("Drive name exceeds {} bytes; truncating.", capacity));
     auto end = capacity;
-    while ((uint8_t(label[end]) & 0xc0) == 0x80) --end;
+    while ((std::bit_cast<std::uint8_t>(label[end]) & 0xc0) == 0x80) --end;
     label.resize(end);
   }
   return label;

@@ -1,18 +1,20 @@
 #include <sdl-rdp/headless-client.test/authentication.hpp>
 #include <sdl-rdp/headless-client.test/client.hpp>
+#include <cstddef>
+#include <cstdint>
 
 namespace AuthenticationGate {
 namespace {
-auto RejectCertificate(unsigned port, bool& rejected) -> void {
+auto RejectCertificate(std::uint32_t port, bool& rejected) -> void {
   static thread_local bool verified;
   verified = false;
   Headless::Client const client(port, false);
   client.Credentials("alice", "correct-secret", "LAB", true);
   auto* settings = client.Instance()->context->settings;
-  ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_TlsSecurity, TRUE));
-  ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_IgnoreCertificate, FALSE));
-  client.Instance()->VerifyCertificateEx = [](freerdp*, char const*, UINT16, char const*, char const*, char const*,
-                                              char const*, DWORD) -> DWORD {
+  ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_TlsSecurity, true));
+  ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_IgnoreCertificate, false));
+  client.Instance()->VerifyCertificateEx = [](freerdp*, char const*, std::uint16_t, char const*, char const*,
+                                              char const*, char const*, std::uint32_t) -> std::uint32_t {
     verified = true;
     return 0;
   };
@@ -144,7 +146,7 @@ TEST_F(Authentication, NlaMissingLookup) {
   RejectionLogs("missing-secret");
 }
 namespace {
-auto DisconnectWithPending(sdlrdp_handle& handle, UINT32 code) -> void {
+auto DisconnectWithPending(sdlrdp_handle& handle, std::uint32_t code) -> void {
   auto const session = handle.Session().Lock();
   auto const frame   = handle.Frames().Lock();
   auto*      current = handle.Session().Current(frame);
@@ -152,7 +154,8 @@ auto DisconnectWithPending(sdlrdp_handle& handle, UINT32 code) -> void {
   current->Repaint(frame, { 0, 0, 1, 1 });
   auto* const client = current->Status(frame).client;
   freerdp_set_last_error(client->context, code);
-  client->CheckFileDescriptor = [](freerdp_peer*) -> BOOL { return FALSE; };
+  // abi: psPeerCheckFileDescriptor, BOOL is int
+  client->CheckFileDescriptor = [](freerdp_peer*) -> int { return false; };
   current->Signal();
 }
 }
@@ -163,7 +166,7 @@ TEST_F(Authentication, RefusedSecurityLogs) {
       Headless::Client const client(sdlrdp_port(handle.Handle()), false);
       client.Credentials("alice", "correct-secret", "LAB", nla);
       auto* settings = client.Instance()->context->settings;
-      ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_TlsSecurity, FALSE));
+      ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_TlsSecurity, false));
       ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_RdpSecurity, !nla));
       EXPECT_FALSE(client.Connect());
     }
@@ -206,7 +209,7 @@ TEST_F(Authentication, PendingDisconnectLogLevels) {
 }
 TEST_F(Authentication, TenRejectionsThenSuccess) {
   ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_TLS));
-  for (unsigned i = 0; i < 10; ++i) Attempt("alice", "wrong-secret", "LAB", false, false);
+  for (std::size_t i = 0; i < 10; ++i) Attempt("alice", "wrong-secret", "LAB", false, false);
   ASSERT_NO_FATAL_FAILURE(Attempt("alice", "correct-secret", "LAB", false, true));
   RejectionLogs("wrong-secret", 10);
 }

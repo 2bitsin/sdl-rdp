@@ -16,6 +16,6 @@ private:
   PointerStore&      _pointer;
   PeerLink&          _link;
   Diagnostics const& _diagnostics;
-  uint64_t           _generation { };
+  std::uint64_t      _generation { };
 };
 }

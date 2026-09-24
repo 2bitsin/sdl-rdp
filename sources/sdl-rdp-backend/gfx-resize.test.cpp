@@ -79,8 +79,8 @@ auto ThenBilinearPixels(rdpGdi const& gdi, std::vector<std::uint32_t> const& pix
     ASSERT_NO_FATAL_FAILURE(ThenBilinearRow(gdi, pixels, y));
   }
 }
-auto ThenProgressiveGeneration(Headless::GraphicsObserver const& observer, unsigned generations, unsigned w, unsigned h)
-    -> void {
+auto ThenProgressiveGeneration(Headless::GraphicsObserver const& observer, std::size_t generations, std::uint32_t w,
+                               std::uint32_t h) -> void {
   EXPECT_EQ(observer.Observed().progressive_headers, generations);
   EXPECT_EQ(observer.Observed().deleted, generations - 1);
   ASSERT_EQ(observer.Observed().surfaces.size(), generations);
@@ -95,8 +95,8 @@ TEST_F(GraphicsResize, RawAspectMatchesBilinear) {
   client.EnableGraphics();
   Headless::GraphicsObserver observer(client);
   ASSERT_TRUE(client.Connect());
-  std::vector<UINT32> pixels(320uz * 200);
-  std::mt19937        random(17);           // NOLINT(cert-msc32-c, cert-msc51-cpp): Reproducible codec input.
+  std::vector<std::uint32_t> pixels(320uz * 200);
+  std::mt19937               random(17);           // NOLINT(cert-msc32-c, cert-msc51-cpp): Reproducible codec input.
   std::ranges::generate(pixels, [&] { return random() & 0x00ffffff; });
   sdlrdp_rect const full{ 0, 0, 320, 200 };
   ASSERT_EQ(backend.Present(pixels, 320, 200, full), 0);
@@ -113,9 +113,9 @@ TEST_F(GraphicsResize, ProgressiveContextAndFullDamage) {
   client.Tolerance(24);
   Headless::GraphicsObserver observer(client);
   ASSERT_TRUE(client.Connect());
-  unsigned generations = 0;
+  std::size_t generations = 0;
   for (auto [w, h] : ResizeSequence) {
-    std::vector<UINT32> pixels(static_cast<std::size_t>(w) * h, 0x335577 + (generations * 0x221100));
+    std::vector<std::uint32_t> pixels(static_cast<std::size_t>(w) * h, 0x335577 + (generations * 0x221100));
     SCOPED_TRACE(std::to_string(w) + "x" + std::to_string(h));
     sdlrdp_rect const damage{ 0, 0, int(w), int(h) };
     ASSERT_EQ(backend.Present(pixels, w, h, damage), 0);
@@ -131,7 +131,8 @@ TEST_F(GraphicsResize, ProgressiveContextAndFullDamage) {
 namespace {
 using Headless::GraphicsCost;
 
-auto ApplyPlanarDamage(std::vector<UINT32>& pixels, std::vector<UINT32>& expected, sdlrdp_rect part) -> void {
+auto ApplyPlanarDamage(std::vector<std::uint32_t>& pixels, std::vector<std::uint32_t>& expected, sdlrdp_rect part)
+    -> void {
   std::ranges::for_each(std::views::iota(part.y, part.y + part.h), [&](int row) {
     std::ranges::fill(std::span(pixels).subspan((row * 354) + part.x, part.w), 0x55aaffu);
   });
@@ -145,7 +146,7 @@ TEST_F(GraphicsCost, PlanarPartialMatchesFull) {
   client.EnableGraphics();
   Headless::GraphicsObserver observer(client);
   ASSERT_NO_FATAL_FAILURE(ConnectGraphics(client));
-  std::vector<UINT32> pixels(354uz * 226);
+  std::vector<std::uint32_t> pixels(354uz * 226);
   Headless::MovingTilePattern(pixels, 354, 226, 0);
   sdlrdp_rect const full     { 0, 0, 354, 226   };
   sdlrdp_rect const part     { 17, 19, 177, 113 };
@@ -154,8 +155,9 @@ TEST_F(GraphicsCost, PlanarPartialMatchesFull) {
   ApplyPlanarDamage(pixels, expected, part);
   ASSERT_NO_FATAL_FAILURE(PresentPlanar(client, observer, pixels, expected, part));
   pixels = expected;
-  auto*             gdi     = client.Instance()->context->gdi;
-  std::vector<BYTE> partial(gdi->primary_buffer, gdi->primary_buffer + (std::size_t(gdi->stride) * gdi->height));
+  auto*                     gdi     = client.Instance()->context->gdi;
+  std::vector<std::uint8_t> partial(gdi->primary_buffer,
+                                    gdi->primary_buffer + (std::size_t{ gdi->stride } * gdi->height));
   ASSERT_NO_FATAL_FAILURE(PresentPlanar(client, observer, pixels, expected, full));
   EXPECT_TRUE(std::ranges::equal(partial, std::span(gdi->primary_buffer, partial.size())));
 }

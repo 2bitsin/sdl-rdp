@@ -17,10 +17,10 @@
 namespace Backend {
 namespace {
 constexpr std::uint32_t ColorPointerLimit = 96;
-constexpr uint16_t      ColorBits         = 32;
+constexpr std::uint16_t ColorBits         = 32;
 constexpr std::uint8_t  TransparentAlpha  = 0;
 auto MaskStride(std::uint32_t width) -> std::size_t {
-  return std::size_t((width + 15) / 16) * 2;
+  return std::size_t{ (width + 15) / 16 } * 2;
 }
 auto MarkTransparent(std::span<std::uint8_t const> source, std::span<std::uint8_t> mask_row) -> void {
   constexpr std::size_t AlphaByte = 3;
@@ -32,17 +32,17 @@ auto Delivered(bool sent) -> PointerDelivery {
 }
 }
 PointerShape::PointerShape(Extent size, std::uint32_t x, std::uint32_t y, std::span<std::uint8_t const> argb)
-    : _size{ size }, _hot_x{ x }, _hot_y{ y }, _pixels(std::size_t(size.width) * size.height * PixelBytes),
+    : _size{ size }, _hot_x{ x }, _hot_y{ y }, _pixels(std::size_t{ size.width } * size.height * PixelBytes),
       _mask(MaskStride(size.width) * size.height) {
   Expects(size.width <= LargePointerLimit, "pointer width fits a large pointer");
   Expects(size.height <= LargePointerLimit, "pointer height fits a large pointer");
   Expects(argb.size() >= _pixels.size(), "source covers every pointer pixel");
   auto const stride = MaskStride(size.width);
-  auto const row    = std::size_t(size.width) * PixelBytes;
+  auto const row    = std::size_t{ size.width } * PixelBytes;
   for (auto line : std::views::iota(0u, size.height)) {
-    auto const source = argb.subspan(std::size_t(line) * row, row);
-    auto const target = std::size_t(size.height - line - 1);
-    std::ranges::copy(source, _pixels.begin() + std::ptrdiff_t(target * row));
+    auto const source = argb.subspan(std::size_t{ line } * row, row);
+    auto const target = std::size_t{ size.height - line - 1 };
+    std::ranges::copy(source, _pixels.begin() + Narrowed<std::ptrdiff_t>(target * row));
     MarkTransparent(source, std::span(_mask).subspan(target * stride, stride));
   }
 }

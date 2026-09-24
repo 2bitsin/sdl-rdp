@@ -6,6 +6,7 @@
 #include <sdl-rdp/utilities/contract.hpp>
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <cstdlib>
 #include <ranges>
 
@@ -60,7 +61,7 @@ auto Arguments(fs::path const& certificates, Words const& environment, Words con
 }
 
 auto AnnouncedPort(std::string_view line) -> std::uint32_t {
-  return utilities::Required(oxbox::utilities::ParseNumberAfter<unsigned>(line, "port "),
+  return utilities::Required(oxbox::utilities::ParseNumberAfter<std::uint32_t>(line, "port "),
                              "the sample announces its port as a whole number");
 }
 auto PrimaryDisplayPort() -> std::uint32_t {

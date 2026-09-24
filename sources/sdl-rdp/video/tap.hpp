@@ -1,16 +1,17 @@
 #pragma once
+#include <cstdint>
 
 namespace Backend {
 class Tap {
 public:
-       Tap(int index, double ratio, unsigned extent);
-  auto First() const noexcept  -> unsigned;
-  auto Second() const noexcept -> unsigned;
+       Tap(int index, double ratio, std::uint32_t extent);
+  auto First() const noexcept  -> std::uint32_t;
+  auto Second() const noexcept -> std::uint32_t;
   auto Weight() const noexcept -> float;
 
 private:
-  unsigned _first;
-  unsigned _second;
-  float    _weight;
+  std::uint32_t _first;
+  std::uint32_t _second;
+  float         _weight;
 };
 }

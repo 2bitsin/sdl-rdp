@@ -82,3 +82,11 @@ TEST(RectDeathTest, UnionAndTouchesRejectANegativeExtent) {
   EXPECT_DEATH(std::ignore = Backend::Union({ 0, 0, -1, 1 }, { 0, 0, 1, 1 }), "rectangle width is nonnegative");
   EXPECT_DEATH(std::ignore = Backend::Touches({ 0, 0, 1, 1 }, { 0, 0, 1, -1 }), "rectangle height is nonnegative");
 }
+TEST(Rect, BytesCountFourOctetsPerPixel) {
+  EXPECT_EQ(Backend::RowBytes(320), 1280u);
+  EXPECT_EQ(Backend::AreaBytes({ 7, 9, 320, 200 }), 256000u);
+}
+TEST(RectDeathTest, BytesRejectANegativeExtent) {
+  EXPECT_DEATH(std::ignore = Backend::RowBytes(-1), "fits the narrower type");
+  EXPECT_DEATH(std::ignore = Backend::AreaBytes({ 0, 0, 1, -1 }), "fits the narrower type");
+}

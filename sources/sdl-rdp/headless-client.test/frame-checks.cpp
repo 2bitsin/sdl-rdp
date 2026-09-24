@@ -1,4 +1,5 @@
 #include <sdl-rdp/headless-client.test/frame-checks.hpp>
+#include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/headless-client.test/backend-instance.hpp>
 
 #include <sdl-rdp/headless-client.test/peer-status.hpp>
@@ -10,6 +11,7 @@
 #include <winpr/synch.h>
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <ranges>
@@ -128,10 +130,10 @@ auto FrameChecks::ThenProducerFrame(Client& client, FrameObserver& observer, std
   testing::Test::RecordProperty("acknowledged_frames", std::to_string(observer.Frames().size()));
 }
 auto FrameChecks::ThenReadable(Client const& client) -> void {
-  std::array<HANDLE, 64> handles{ };
+  std::array<Backend::WaitHandle, 64> handles{ };
   auto count = freerdp_get_event_handles(client.Instance()->context, handles.data(), handles.size());
   ASSERT_GT(count, 0u);
-  ASSERT_LT(WaitForMultipleObjects(count, handles.data(), FALSE, 10000), WAIT_OBJECT_0 + count);
+  ASSERT_LT(WaitForMultipleObjects(count, handles.data(), false, 10000), WAIT_OBJECT_0 + count);
 }
 auto FrameChecks::ThenQoe(Client& client, Headless::GraphicsObserver& observer) -> void {
   RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU qoe{ observer.Observed().frames.back().frameId, 1234, 7, 9 };

@@ -3,9 +3,11 @@
 #include <sdl-rdp/auth/tls-rehearsal.hpp>
 #include <sdl-rdp/core/configuration.hpp>
 #include <sdl-rdp/core/diagnostics.hpp>
+#include <sdl-rdp/core/failure-log.hpp>
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
 #include <sdl-rdp/session/peer.hpp>
 #include <sdl-rdp/session/session.hpp>
+#include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/descriptor.hpp>
 #include <sdl-rdp/utilities/system-call.hpp>
@@ -16,6 +18,8 @@
 #include <winpr/wtsapi.h>
 #include <arpa/inet.h>
 #include <array>
+#include <cstddef>
+#include <cstdint>
 #include <format>
 #include <mutex>
 #include <stdexcept>
@@ -24,9 +28,9 @@
 
 namespace Backend {
 namespace {
-constexpr int         ListenBacklog      = 8;
-constexpr std::size_t WaitHandleCapacity = 32;
-constexpr DWORD       ListenerOwnHandles = 2;
+constexpr int           ListenBacklog      = 8;
+constexpr std::size_t   WaitHandleCapacity = 32;
+constexpr std::uint32_t ListenerOwnHandles = 2;
 // Process-wide and idempotent; OpenSSL 3 releases its state at exit, so neither has a release call.
 auto InitializeProcess(Credentials const& credentials) -> void {
   static std::once_flag once;
@@ -62,7 +66,7 @@ auto AdoptListenerSocket(freerdp_listener& listener, Descriptor socket) -> void 
     throw std::runtime_error("FreeRDP listener socket adoption failed.");
   std::ignore = socket.Release();
 }
-auto Bind(freerdp_listener& listener, sdlrdp_config const& config) -> unsigned {
+auto Bind(freerdp_listener& listener, sdlrdp_config const& config) -> std::uint32_t {
   Descriptor socket  { SystemCall(::socket(AF_INET, SOCK_STREAM, 0), "Socket creation") };
   auto       address = Address(config);
   StartListening(socket, address);
@@ -76,7 +80,7 @@ auto NewListener(Credentials const& credentials) -> ListenerHandle {
   return listener;
 }
 auto NewStopEvent() -> EventHandle {
-  EventHandle stop{ CreateEvent(nullptr, TRUE, FALSE, nullptr) };
+  EventHandle stop{ CreateEvent(nullptr, true, false, nullptr) };
   if (!stop) throw std::runtime_error("listener stop event allocation failed");
   return stop;
 }
@@ -87,36 +91,37 @@ Listener::Listener(Configuration const& configuration, Diagnostics const& diagno
       _listener{ NewListener(configuration.ServerCredentials()) }, _stop{ NewStopEvent() },
       _port{ Bind(*_listener, configuration.Config()) } {
   _listener->info = this;
-  _listener->PeerAccepted = [](freerdp_listener* accepting, freerdp_peer* client) -> BOOL {
-    CallbackOwner<Listener>(accepting->info).Accept(client);
-    // TRUE transfers ownership even when construction failed and RAII already released the peer.
-    return TRUE;
+  // abi: psPeerAccepted, BOOL is int
+  _listener->PeerAccepted = [](freerdp_listener* accepting, freerdp_peer* client) noexcept -> int {
+    auto&      owner    = CallbackOwner<Listener>(accepting->info);
+    auto const accepted = [&] {
+      owner.Accept(client);
+      return true;
+    };
+    // True transfers ownership even when construction failed and RAII already released the peer.
+    return Contained(true, accepted, FailureLog{ owner._diagnostics, "Peer construction" });
   };
   _diagnostics.Log(SDLRDP_LOG_INFO, std::format("Listening on port {}", _port));
   _thread = std::jthread([this](std::stop_token const& quit) { Listen(quit); });
   Ensures(_port != 0, "bound port is available");
 }
-auto Listener::Port() const noexcept -> unsigned {
+auto Listener::Port() const noexcept -> std::uint32_t {
   return _port;
 }
 auto Listener::Accept(freerdp_peer* client) -> void {
   PeerHandle accepted{ client };
-  try {
-    _diagnostics.Log(SDLRDP_LOG_INFO, std::format("Peer accepted: {}.", client->hostname));
-    _session.Add(_make(std::move(accepted)));
-  } catch (std::exception const& error) {
-    _diagnostics.Log(SDLRDP_LOG_ERROR, std::format("Peer construction failed: {}.", error.what()));
-  }
+  _diagnostics.Log(SDLRDP_LOG_INFO, std::format("Peer accepted: {}.", client->hostname));
+  _session.Add(_make(std::move(accepted)));
 }
 auto Listener::Listen(std::stop_token const& quit) -> void {
-  std::stop_callback const               wake(quit, [this] { SetEvent(_stop.get()); });
-  std::array<HANDLE, WaitHandleCapacity> handles{ };
+  std::stop_callback const                   wake(quit, [this] { SetEvent(_stop.get()); });
+  std::array<WaitHandle, WaitHandleCapacity> handles{ };
   while (!quit.stop_requested()) {
     auto count = _listener->GetEventHandles(_listener.get(), handles.data(), handles.size() - ListenerOwnHandles);
     if (!count) break;
     handles[count++] = _stop.get();
     handles[count++] = _session.ReapEvent();
-    if (WaitForMultipleObjects(count, handles.data(), FALSE, INFINITE) == WAIT_FAILED || quit.stop_requested()
+    if (WaitForMultipleObjects(count, handles.data(), false, INFINITE) == WAIT_FAILED || quit.stop_requested()
         || !_listener->CheckFileDescriptor(_listener.get()))
       break;
     _session.Reap();

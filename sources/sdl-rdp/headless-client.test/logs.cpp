@@ -1,4 +1,5 @@
 #include <sdl-rdp/headless-client.test/logs.hpp>
+#include <cstddef>
 
 namespace Headless {
 auto Logs::Collect(void* user, sdlrdp_log_level level, char const* text) -> void {
@@ -18,7 +19,7 @@ auto Logs::Text(bool include_info) -> std::string {
            })
          | std::views::join_with('\n') | std::ranges::to<std::string>();
 }
-auto Logs::Count(sdlrdp_log_level level, std::string_view text) -> unsigned {
+auto Logs::Count(sdlrdp_log_level level, std::string_view text) -> std::size_t {
   return Matching([=](auto const& line) { return line.first == level && line.second.contains(text); });
 }
 auto Logs::Contains(sdlrdp_log_level level, std::string_view text) -> bool {

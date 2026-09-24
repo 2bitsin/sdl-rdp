@@ -14,6 +14,7 @@
 #include <array>
 #include <cerrno>
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <fcntl.h>
 #include <memory>
@@ -60,7 +61,7 @@ auto Hostname() -> std::string {
   return name.data();
 }
 auto Stamp(X509& cert) -> bool {
-  constexpr long X509Version3 = 2;
+  constexpr int  X509Version3 = 2;
   constexpr auto Validity     = std::chrono::seconds(std::chrono::days(3650));
   return X509_set_version(&cert, X509Version3) && ASN1_INTEGER_set(X509_get_serialNumber(&cert), 1)
          && X509_gmtime_adj(X509_getm_notBefore(&cert), 0)
@@ -72,7 +73,7 @@ auto Identify(X509& cert, EVP_PKEY* key, std::string const& host) -> bool {
   Extension const extension(X509V3_EXT_conf_nid(nullptr, nullptr, NID_subject_alt_name, san.c_str()));
   return X509_set_pubkey(&cert, key)
          && X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC,
-                                       oxbox::utilities::SpanCast<unsigned char const>(std::span(host)).data(), -1, -1,
+                                       oxbox::utilities::SpanCast<std::uint8_t const>(std::span(host)).data(), -1, -1,
                                        0)
          && X509_set_issuer_name(&cert, name) && extension && X509_add_ext(&cert, extension.get(), -1);
 }

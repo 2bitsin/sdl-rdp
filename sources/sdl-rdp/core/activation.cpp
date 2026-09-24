@@ -5,6 +5,7 @@
 #include <sdl-rdp/core/refresh.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace Backend {
@@ -41,7 +42,7 @@ auto Activation::Hold(sdlrdp_event connection, sdlrdp_event screen) -> void {
 auto Activation::Holding() const noexcept -> bool {
   return _connection.has_value();
 }
-auto Activation::Announce(sdlrdp_codec codec, unsigned refresh_hz) -> void {
+auto Activation::Announce(sdlrdp_codec codec, std::uint32_t refresh_hz) -> void {
   auto connection = std::exchange(_connection, std::nullopt);
   if (!connection) return;
   connection->connected.codec              = codec;

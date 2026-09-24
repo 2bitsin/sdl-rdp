@@ -22,13 +22,13 @@ public:
   auto Maximum() const noexcept -> Value {
     return _maximum;
   }
-  auto Count() const noexcept -> uint64_t {
+  auto Count() const noexcept -> std::uint64_t {
     return _count;
   }
 
 private:
-  Value    _total  { };
-  Value    _maximum{ };
-  uint64_t _count  { };
+  Value         _total  { };
+  Value         _maximum{ };
+  std::uint64_t _count  { };
 };
 }

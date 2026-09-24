@@ -4,6 +4,8 @@
 #include <sdl-rdp/utilities/rect.hpp>
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 
 namespace Backend::Avc {
 using utilities::Expects;

@@ -45,8 +45,9 @@ public:
   auto operator=(Installation&&)      -> Installation& = delete;
 
 private:
+  // abi: pSurfaceBits and pBitmapUpdate, BOOL is int
   template <auto original, PictureCommand command, class Wire>
-  static auto Receive(rdpContext* context, Wire const* wire) -> BOOL;
+  static auto Receive(rdpContext* context, Wire const* wire) -> int;
   inline static thread_local Installation* active   = nullptr;
   rdpUpdate*                               update;
   pSurfaceBits                             surface;
@@ -70,13 +71,13 @@ PictureUpdateHook::Installation::~Installation() {
   active               = nullptr;
 }
 template <auto original, PictureCommand command, class Wire>
-auto PictureUpdateHook::Installation::Receive(rdpContext* context, Wire const* wire) -> BOOL {
+auto PictureUpdateHook::Installation::Receive(rdpContext* context, Wire const* wire) -> int {
   Expects(active, "observer is installed");
   Expects(wire, "wire command is supplied");
   auto       result  = (active->*original)(context, wire);
   auto const regions = Regions(*wire);
   auto const desktop = Desktop(context);
-  active->observer({ .command = command, .regions = regions, .desktop = desktop, .delivered = result != FALSE });
+  active->observer({ .command = command, .regions = regions, .desktop = desktop, .delivered = result != 0 });
   return result;
 }
 

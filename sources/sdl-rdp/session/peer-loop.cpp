@@ -10,12 +10,14 @@
 #include <sdl-rdp/session/departure.hpp>
 #include <sdl-rdp/session/peer-pump.hpp>
 #include <sdl-rdp/session/peer-wait.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/video/acknowledgement-window.hpp>
 
 #include <freerdp/settings.h>
 #include <winpr/synch.h>
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <format>
 #include <memory>
 #include <ranges>
@@ -30,7 +32,7 @@ auto Apply(rdpSettings& settings, std::ranges::input_range auto const& entries, 
 }
 auto Flags(sdlrdp_auth auth) -> SecurityFlags {
   return { {
-      { FreeRDP_NlaSecurity              , auth == SDLRDP_AUTH_NLA  },
+      { FreeRDP_NlaSecurity, auth == SDLRDP_AUTH_NLA },
       // sdl-rdp#41: FreeRDP 3.32 nla.c:943 sends Early User Authorization success before Logon decides.
       { FreeRDP_ExtSecurity              , false                    },
       { FreeRDP_TlsSecurity              , true                     },
@@ -46,11 +48,11 @@ auto Flags(sdlrdp_auth auth) -> SecurityFlags {
   } };
 }
 auto ApplySettings(rdpSettings& settings, sdlrdp_auth auth, sdlrdp_rect picture) -> bool {
-  std::array const numbers{
-    std::pair{ FreeRDP_EncryptionLevel, UINT32(ENCRYPTION_LEVEL_CLIENT_COMPATIBLE) },
-    std::pair{ FreeRDP_FrameAcknowledge, UINT32(AcknowledgedFrameWindow) },
-    std::pair{ FreeRDP_LargePointerFlag, UINT32(LARGE_POINTER_FLAG_96x96 | LARGE_POINTER_FLAG_384x384) },
-  };
+  std::array<std::pair<FreeRDP_Settings_Keys_UInt32, std::uint32_t>, 3> const numbers{ {
+      { FreeRDP_EncryptionLevel , ENCRYPTION_LEVEL_CLIENT_COMPATIBLE                    },
+      { FreeRDP_FrameAcknowledge, AcknowledgedFrameWindow                               },
+      { FreeRDP_LargePointerFlag, LARGE_POINTER_FLAG_96x96 | LARGE_POINTER_FLAG_384x384 },
+  } };
   return freerdp_settings_set_string(&settings, FreeRDP_AuthenticationPackageList, "!kerberos")
          && Apply(settings, Flags(auth), freerdp_settings_set_bool)
          && Apply(settings, numbers, freerdp_settings_set_uint32) && ApplyDesktopSize(settings, picture);
@@ -94,7 +96,7 @@ auto PeerLoop::Serve(std::stop_token const& quit) -> void {
 auto PeerLoop::Run(std::stop_token const& quit) -> bool {
   auto const connection = Connection(_link, _session);
   if (!connection) return false;
-  std::array<HANDLE, MAXIMUM_WAIT_OBJECTS> handles{ };
+  std::array<WaitHandle, MAXIMUM_WAIT_OBJECTS> handles{ };
   while (!quit.stop_requested() && Step(quit, handles)) {
   }
   return true;
@@ -104,18 +106,18 @@ auto PeerLoop::Configure() -> bool {
   auto&      settings = _link.Settings();
   return _configuration.InstallCredentials(settings) && ApplySettings(settings, _configuration.Auth(), picture);
 }
-auto PeerLoop::Step(std::stop_token const& quit, std::span<HANDLE> handles) -> bool {
+auto PeerLoop::Step(std::stop_token const& quit, std::span<WaitHandle> handles) -> bool {
   auto const plan = [&] {
     auto const session = _session.Lock();
     return _wait.Plan(handles);
   }();
   return plan.count && Dispatch(quit, handles.first(plan.count), plan.timeout);
 }
-auto PeerLoop::Dispatch(std::stop_token const& quit, std::span<HANDLE> handles, DWORD timeout) -> bool {
-  auto const result = WaitForMultipleObjects(DWORD(handles.size()), handles.data(), FALSE, timeout);
+auto PeerLoop::Dispatch(std::stop_token const& quit, std::span<WaitHandle> handles, std::uint32_t timeout) -> bool {
+  auto const result = WaitForMultipleObjects(Narrowed<std::uint32_t>(handles.size()), handles.data(), false, timeout);
   if (result == WAIT_FAILED || quit.stop_requested()) return false;
-  std::array<HANDLE, MAXIMUM_WAIT_OBJECTS> signalled{ };
-  HANDLE*                                  end      { };
+  std::array<WaitHandle, MAXIMUM_WAIT_OBJECTS> signalled{ };
+  WaitHandle*                                  end      { };
   try {
     end = std::ranges::copy_if(handles, signalled.begin(), Signalled).out;
   } catch (std::runtime_error const&) {

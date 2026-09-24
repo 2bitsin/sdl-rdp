@@ -1,7 +1,7 @@
 #pragma once
 #include <sdl-rdp/utilities/pinned.hpp>
 
-#include <winpr/wtypes.h>
+#include <cstdint>
 
 namespace Backend {
 class Activation;
@@ -13,8 +13,8 @@ class OutputControl : private Pinned {
 public:
        OutputControl(PeerLink& link, GraphicsLink const& graphics, FramePacing& pacing, Activation& activation,
                      PeerFrames& frames) noexcept;
-  auto Acknowledge(UINT32 id) -> void;
-  auto Suppress(bool allow)   -> void;
+  auto Acknowledge(std::uint32_t id) -> void;
+  auto Suppress(bool allow)          -> void;
 
 private:
   PeerLink&           _link;

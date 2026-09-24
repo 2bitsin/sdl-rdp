@@ -7,6 +7,8 @@
 #include <sdl-rdp/utilities/deadline.hpp>
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <stdexcept>
 
 namespace Backend {
@@ -26,7 +28,7 @@ auto AudioOutput::Open() -> void {
   _presenter.EnsurePicture();
   _open = true;
 }
-auto AudioOutput::Rate() -> unsigned {
+auto AudioOutput::Rate() -> std::uint32_t {
   auto const  held    = _session.Lock();
   auto const* channel = Channel(held);
   return channel ? channel->Rate() : 0;
@@ -43,7 +45,7 @@ auto AudioOutput::Wait(Deadline deadline) -> int {
     _session.WaitAudio(held, std::min(deadline, now + AudioPollPeriod));
   }
 }
-auto AudioOutput::Write(std::span<int16_t const> samples) -> int {
+auto AudioOutput::Write(std::span<std::int16_t const> samples) -> int {
   auto const count = int(samples.size() / 2);
   while (!samples.empty()) {
     Wait(Deadline::max());
@@ -52,7 +54,7 @@ auto AudioOutput::Write(std::span<int16_t const> samples) -> int {
     if (!Rate()) return count;
     auto& audio = *Channel(held);
     if (!audio.Ready(_configuration.AudioLatency())) continue;
-    auto size = std::min(samples.size(), std::size_t(audio.Remaining()) * 2);
+    auto size = std::min(samples.size(), std::size_t{ audio.Remaining() } * 2);
     if (!audio.Send(samples.first(size))) return count;
     samples = samples.subspan(size);
   }

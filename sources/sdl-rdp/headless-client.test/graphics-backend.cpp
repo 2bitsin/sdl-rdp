@@ -1,10 +1,12 @@
 #include <sdl-rdp/headless-client.test/graphics-backend.hpp>
 
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
 
 namespace Headless {
-auto GraphicsBackend::OpenGraphics(char* pattern, unsigned width, unsigned height, sdlrdp_codec codec) -> void {
+auto GraphicsBackend::OpenGraphics(char* pattern, std::uint32_t width, std::uint32_t height, sdlrdp_codec codec)
+    -> void {
   auto* path = mkdtemp(pattern);
   ASSERT_NE(path, nullptr);
   directory = path;

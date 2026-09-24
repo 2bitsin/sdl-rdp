@@ -1,8 +1,6 @@
 #pragma once
 #include <sdl-rdp/utilities/pinned.hpp>
 
-#include <winpr/wtypes.h>
-
 namespace Backend {
 class Activation;
 class Authenticator;
@@ -15,7 +13,7 @@ class CapabilityCheck : private Pinned {
 public:
        CapabilityCheck(PeerLink& link, Authenticator& authenticator, Activation const& activation, FramePacing& pacing,
                        DesktopLayout& desktop, FrameStore& store, Diagnostics const& diagnostics) noexcept;
-  auto Accept() -> BOOL;
+  auto Accept() -> bool;
 
 private:
   PeerLink&          _link;

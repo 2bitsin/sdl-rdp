@@ -18,8 +18,8 @@ struct RowBlock {
 template <class Byte> auto CoversRows(Pitched<Byte> image, RowBlock block) -> bool {
   return block.rows == 0 || image.bytes.size() >= ((block.rows - 1) * image.pitch) + block.row_bytes;
 }
-inline auto CopyRows(Pitched<uint8_t const> source, Pitched<uint8_t> destination, RowBlock block, bool flip = false)
-    -> void {
+inline auto CopyRows(Pitched<std::uint8_t const> source, Pitched<std::uint8_t> destination, RowBlock block,
+                     bool flip = false) -> void {
   utilities::Expects(source.pitch >= block.row_bytes, "pitches cover copied bytes");
   utilities::Expects(destination.pitch >= block.row_bytes, "pitches cover copied bytes");
   utilities::Expects(CoversRows(source, block), "source covers rows");

@@ -6,6 +6,8 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
+#include <cstdint>
 #include <format>
 #include <ranges>
 #include <span>
@@ -83,7 +85,7 @@ auto Authentication::Verify(void* raw, char const* domain, char const* user, cha
   self.seen.thread   =  std::this_thread::get_id();
   return self.permit;
 }
-auto Authentication::Lookup(void* raw, char const* domain, char const* user, unsigned char* hash) -> int {
+auto Authentication::Lookup(void* raw, char const* domain, char const* user, std::uint8_t* hash) -> int {
   auto& self = *static_cast<Authentication*>(raw);
   self.seen.order += 'L';
   EXPECT_TRUE(self.seen.password.empty());
@@ -115,15 +117,15 @@ auto Authentication::PasswordCleared() -> void {
   auto const* password = freerdp_settings_get_string(status.client->context->settings, FreeRDP_Password);
   EXPECT_TRUE(!password || !*password);
 }
-auto Authentication::ThenRejection(sdlrdp_log_level level, std::string const& text, unsigned rejected) -> void {
+auto Authentication::ThenRejection(sdlrdp_log_level level, std::string const& text, std::size_t rejected) -> void {
   EXPECT_EQ(level, SDLRDP_LOG_WARN);
   if (rejected < rejections.size()) EXPECT_EQ(text, rejections[rejected]);
 }
-auto Authentication::RejectionLogs(char const* password, unsigned expected) -> void {
+auto Authentication::RejectionLogs(char const* password, std::size_t expected) -> void {
   handle.Close();
   std::scoped_lock const lock(guard);
-  unsigned               rejected = 0;
-  unsigned               warnings = 0;
+  std::size_t            rejected = 0;
+  std::size_t            warnings = 0;
   std::string            trace;
   for (auto const& [level, text] : logs) {
     warnings += level == SDLRDP_LOG_WARN;
@@ -152,7 +154,7 @@ auto Authentication::ThenSecurityWarning(bool nla) -> void {
   EXPECT_EQ(warnings, expected);
 }
 auto Authentication::ThenCertificateDisconnect(std::string_view closed) -> void {
-  unsigned    disconnects = 0;
+  std::size_t disconnects = 0;
   std::string trace;
   for (auto const& [level, text] : logs) {
     ThenInformational(level, text);
@@ -164,7 +166,7 @@ auto Authentication::ThenCertificateDisconnect(std::string_view closed) -> void 
   EXPECT_EQ(disconnects, 1) << trace;
   RecordProperty("trace", trace);
 }
-auto Authentication::ThenPendingDisconnect(UINT32 code) -> void {
+auto Authentication::ThenPendingDisconnect(std::uint32_t code) -> void {
   auto const* message = code == FREERDP_ERROR_CONNECT_FAILED ? "Peer transport failed with pending data:"
                                                              : "Peer disconnected:";
   EXPECT_TRUE(Until([&] {

@@ -2,13 +2,18 @@
 
 #include <freerdp/gdi/gdi.h>
 #include <cstddef>
+#include <cstdint>
 
 namespace Headless {
 FrameObserver::FrameObserver(Client& client)
     : update(client.Instance()->context->update), original(update->SurfaceFrameMarker) {
   Expects(!active, "one frame observer per thread");
-  active                     = this;
-  update->SurfaceFrameMarker = Receive;
+  active = this;
+  // abi: pSurfaceFrameMarker, BOOL is int
+  update->SurfaceFrameMarker = [](rdpContext* context, SURFACE_FRAME_MARKER const* marker) -> int {
+    active->Receive(*context, *marker);
+    return true;
+  };
 }
 FrameObserver::~FrameObserver() {
   update->SurfaceFrameMarker = original;
@@ -21,13 +26,13 @@ auto FrameObserver::Ack() -> bool {
   ack_times.push_back(sent);
   return true;
 }
-auto FrameObserver::Frames() const -> std::vector<UINT32> const& {
+auto FrameObserver::Frames() const -> std::vector<std::uint32_t> const& {
   return ids;
 }
 auto FrameObserver::ReceivedAt() const -> std::vector<Clock::time_point> const& {
   return received;
 }
-auto FrameObserver::AckFrame(UINT32 id) -> bool {
+auto FrameObserver::AckFrame(std::uint32_t id) -> bool {
   return update->SurfaceFrameAcknowledge(update->context, id);
 }
 auto FrameObserver::Acknowledgements() const -> std::vector<Clock::time_point> const& {
@@ -42,14 +47,13 @@ auto FrameObserver::Installed() const -> bool {
 auto FrameObserver::Clear() -> void {
   ids.clear();
 }
-auto FrameObserver::Receive(rdpContext* context, SURFACE_FRAME_MARKER const* marker) -> BOOL {
-  if (marker->frameAction != SURFACECMD_FRAMEACTION_END) return TRUE;
-  active->ids.push_back(marker->frameId);
-  active->received.push_back(Clock::now());
-  auto*       gdi    = context->gdi;
-  auto const* pixels = reinterpret_cast<UINT32 const*>(gdi->primary_buffer);
-  active->coherent &= (pixels[0] & 0xffffff)
-                      == (pixels[(static_cast<std::ptrdiff_t>(gdi->height - 1)) * gdi->width] & 0xffffff);
-  return TRUE;
+auto FrameObserver::Receive(rdpContext const& context, SURFACE_FRAME_MARKER const& marker) -> void {
+  if (marker.frameAction != SURFACECMD_FRAMEACTION_END) return;
+  ids.push_back(marker.frameId);
+  received.push_back(Clock::now());
+  auto*       gdi    = context.gdi;
+  auto const* pixels = reinterpret_cast<std::uint32_t const*>(gdi->primary_buffer);
+  coherent &= (pixels[0] & 0xffffff)
+              == (pixels[(static_cast<std::ptrdiff_t>(gdi->height - 1)) * gdi->width] & 0xffffff);
 }
 }

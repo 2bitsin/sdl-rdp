@@ -6,39 +6,61 @@
 #include <freerdp/channels/channels.h>
 #include <freerdp/client/channels.h>
 #include <freerdp/gdi/gdi.h>
+#include <cstdint>
 #include <string_view>
 
 namespace Headless {
 namespace {
-auto LoadDisplayChannel(freerdp* instance) -> BOOL {
+// abi: pLoadChannels, BOOL is int
+auto LoadDisplayChannel(freerdp* instance) -> int {
   return LoadDynamicChannel(instance, "disp");
 }
+auto Held(DispClientContext* channel) -> DisplayClient& {
+  Expects(channel != nullptr, "callback channel exists");
+  Expects(channel->custom != nullptr, "the display channel carries its observer");
+  return *static_cast<DisplayClient*>(channel->custom);
 }
-
+}
+class DisplayClient::Callbacks {
+public:
+  static auto Install(rdpUpdate& update) -> void;
+  // abi: pChannelConnectedEventHandler
+  static auto ChannelConnected(void* context, ChannelConnectedEventArgs const* event) -> void;
+};
+auto DisplayClient::Callbacks::Install(rdpUpdate& update) -> void {
+  // abi: pDesktopResize, BOOL is int
+  update.DesktopResize = [](rdpContext* context) -> int {
+    Expects(context != nullptr, "resize names its client context");
+    return ObserverSet::Of(*context).Held<DisplayClient>()->Resize(*context);
+  };
+}
+auto DisplayClient::Callbacks::ChannelConnected(void* context, ChannelConnectedEventArgs const* event) -> void {
+  Expects(event != nullptr, "channel event is supplied");
+  if (std::string_view(event->name) != DISP_DVC_CHANNEL_NAME) return;
+  auto* channel = static_cast<DispClientContext*>(event->pInterface);
+  Expects(channel != nullptr, "the display channel interface exists");
+  ObserverSet::Of(context).Held<DisplayClient>()->Connected(*channel);
+}
 DisplayClient::DisplayClient(Client& client)
     : client(client), desktop_resize(client.Instance()->context->update->DesktopResize) {
-  Expects(!active, "one display observer per thread");
-  active                                            = this;
-  client.Instance()->context->update->DesktopResize = Resize;
-  channel                                           = nullptr;
-  ready                                             = false;
+  ObserverSet::Of(*client.Instance()->context).Add(*this);
+  Callbacks::Install(*client.Instance()->context->update);
   freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
   auto* context = client.Instance()->context;
-  Expects(freerdp_settings_set_bool(context->settings, FreeRDP_SupportDisplayControl, TRUE), "display control enabled");
-  Expects(freerdp_settings_set_bool(context->settings, FreeRDP_SynchronousDynamicChannels, TRUE),
+  Expects(freerdp_settings_set_bool(context->settings, FreeRDP_SupportDisplayControl, true), "display control enabled");
+  Expects(freerdp_settings_set_bool(context->settings, FreeRDP_SynchronousDynamicChannels, true),
           "display control enabled");
-  PubSub_SubscribeChannelConnected(context->pubSub, Connected);
+  PubSub_SubscribeChannelConnected(context->pubSub, Callbacks::ChannelConnected);
   client.Instance()->LoadChannels = LoadDisplayChannel;
 }
 DisplayClient::~DisplayClient() {
   client.Disconnect();
   client.Instance()->context->update->DesktopResize = desktop_resize;
-  PubSub_UnsubscribeChannelConnected(client.Instance()->context->pubSub, Connected);
-  active  = nullptr;
-  channel = nullptr;
-  ready   = false;
+  PubSub_UnsubscribeChannelConnected(client.Instance()->context->pubSub, Callbacks::ChannelConnected);
+  ObserverSet::Of(*client.Instance()->context).Remove<DisplayClient>();
 }
-auto DisplayClient::Monitor(unsigned width, unsigned height, unsigned millimetres) -> DISPLAY_CONTROL_MONITOR_LAYOUT {
+auto DisplayClient::Monitor(std::uint32_t width, std::uint32_t height, std::uint32_t millimetres)
+    -> DISPLAY_CONTROL_MONITOR_LAYOUT {
   DISPLAY_CONTROL_MONITOR_LAYOUT monitor{ };
   monitor.Flags              = DISPLAY_CONTROL_MONITOR_PRIMARY;
   monitor.Width              = width;
@@ -48,39 +70,37 @@ auto DisplayClient::Monitor(unsigned width, unsigned height, unsigned millimetre
   monitor.DesktopScaleFactor = monitor.DeviceScaleFactor = 100;
   return monitor;
 }
-auto DisplayClient::Layout(std::uint32_t width, std::uint32_t height, std::uint32_t millimetres) -> bool {
-  Expects(active, "observer is installed");
+auto DisplayClient::Layout(std::uint32_t width, std::uint32_t height, std::uint32_t millimetres) const -> bool {
   Expects(ready, "channel handshake is complete");
-  Expects(channel, "channel is installed");
+  auto* connected = channel.load();
+  Expects(connected != nullptr, "channel is installed");
   auto monitor = Monitor(width, height, millimetres);
-  return channel.load()->SendMonitorLayout(channel.load(), 1, &monitor) == CHANNEL_RC_OK;
+  return connected->SendMonitorLayout(connected, 1, &monitor) == CHANNEL_RC_OK;
 }
 auto DisplayClient::Observed() -> DisplayCapture& {
   return observed;
 }
-auto DisplayClient::Ready() -> bool {
+auto DisplayClient::Ready() const -> bool {
   return ready.load();
 }
-auto DisplayClient::Channel() -> DispClientContext* {
-  return channel.load();
-}
-auto DisplayClient::Resize(rdpContext* context) -> BOOL {
-  Expects(active != nullptr, "display observer exists");
-  ++active->observed.desktops;
-  if (!active->desktop_resize(context)) return FALSE;
-  if (active->observed.echo_resize && ready) {
-    ++active->observed.echoes;
-    if (!Layout(context->gdi->width, context->gdi->height)) return FALSE;
-  }
-  if (active->observed.finalizing) active->observed.finalizing();
-  return TRUE;
-}
-auto DisplayClient::Connected(void* /*unused*/, ChannelConnectedEventArgs const* event) -> void {
-  if (std::string_view(event->name) != DISP_DVC_CHANNEL_NAME) return;
-  channel                            = static_cast<DispClientContext*>(event->pInterface);
-  channel.load()->DisplayControlCaps = [](DispClientContext*, UINT32, UINT32, UINT32) -> UINT {
-    ready = true;
+auto DisplayClient::Connected(DispClientContext& connected) -> void {
+  connected.custom = this;
+  // abi: pcDispCaps, UINT32 and UINT are uint32_t
+  connected.DisplayControlCaps = [](DispClientContext* context, std::uint32_t, std::uint32_t,
+                                    std::uint32_t) -> std::uint32_t {
+    Held(context).ready = true;
     return CHANNEL_RC_OK;
   };
+  channel                      = &connected;
+}
+auto DisplayClient::Resize(rdpContext& context) -> bool {
+  ++observed.desktops;
+  if (!desktop_resize(&context)) return false;
+  if (observed.echo_resize && ready) {
+    ++observed.echoes;
+    if (!Layout(context.gdi->width, context.gdi->height)) return false;
+  }
+  if (observed.finalizing) observed.finalizing();
+  return true;
 }
 }

@@ -5,6 +5,7 @@
 
 #include <sdl-rdp/headless-client.test/display-client.hpp>
 #include <sdl-rdp/headless-client.test/frame-observer.hpp>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <utility>
@@ -12,30 +13,30 @@
 namespace SampleGate {
 namespace {
 struct Pace {
-  int64_t  milliseconds = 0;
-  unsigned presents     = 0;
+  std::int64_t milliseconds = 0;
+  std::size_t  presents     = 0;
 };
 struct RateTrace {
-  std::size_t cursor               = 0;
-  unsigned    blocked              = 0;
-  unsigned    floor_blocked        = 0;
-  unsigned    timeouts             = 0;
-  unsigned    floor_timeouts       = 0;
-  unsigned    presents             = 0;
-  unsigned    frames               = 0;
-  unsigned    acknowledgements     = 0;
-  unsigned    floors               = 0;
-  unsigned    ceilings             = 0;
-  unsigned    pressure_frames      = 0;
-  unsigned    presents_at_send     = 0;
-  int64_t     sent_id              = -1;
-  int64_t     time                 = 0;
-  int64_t     rate                 = 60;
-  bool        pressure             = false;
-  bool        floor_after_pressure = false;
-  bool        recovered            = false;
-  Pace        floor_pace;
-  Pace        recovered_pace;
+  std::size_t  cursor               = 0;
+  std::size_t  blocked              = 0;
+  std::size_t  floor_blocked        = 0;
+  std::size_t  timeouts             = 0;
+  std::size_t  floor_timeouts       = 0;
+  std::size_t  presents             = 0;
+  std::size_t  frames               = 0;
+  std::size_t  acknowledgements     = 0;
+  std::size_t  floors               = 0;
+  std::size_t  ceilings             = 0;
+  std::size_t  pressure_frames      = 0;
+  std::size_t  presents_at_send     = 0;
+  std::int64_t sent_id              = -1;
+  std::int64_t time                 = 0;
+  std::int64_t rate                 = 60;
+  bool         pressure             = false;
+  bool         floor_after_pressure = false;
+  bool         recovered            = false;
+  Pace         floor_pace;
+  Pace         recovered_pace;
 };
 auto ObserveRefresh(RateTrace& trace, std::string const& line) -> void {
   if (!line.contains("trace refresh ")) return;
@@ -131,8 +132,8 @@ auto HeldLongEnough(RateTrace const& trace, Headless::FrameObserver const& frame
          && trace.presents >= trace.presents_at_send + 6;
 }
 auto DelayUntilFloor(Client& client, Headless::FrameObserver& frames, Headless::Logs& logs, RateTrace& trace) -> void {
-  int64_t    acknowledged = -1;
-  auto const acknowledge  = [&] {
+  std::int64_t acknowledged = -1;
+  auto const   acknowledge  = [&] {
     if (!HeldLongEnough(trace, frames) || acknowledged == trace.sent_id) return;
     EXPECT_TRUE(frames.Ack());
     acknowledged = trace.sent_id;
@@ -152,7 +153,7 @@ auto ReachFloor(Client& client, Headless::FrameObserver& frames, Headless::Logs&
 }
 auto PresentsPerSecond(Pace const& pace) -> double {
   Expects(pace.milliseconds > 0, "the published rate held for a measurable interval");
-  return pace.presents * 1000.0 / double(pace.milliseconds);
+  return double(pace.presents) * 1000.0 / double(pace.milliseconds);
 }
 auto ThenPresentRecovery(RateTrace const& trace) -> void {
   ASSERT_GT(trace.floors, 0u);
@@ -168,14 +169,16 @@ auto ThenPresentRecovery(RateTrace const& trace) -> void {
   testing::Test::RecordProperty("ceiling_publications", trace.ceilings);
 }
 auto Resized(Client& client, std::uint32_t width) -> bool {
-  return Headless::DisplayClient::Layout(width, 480)
+  return Headless::DisplayClient::Of(client, [width](auto const& display) { return display.Layout(width, 480); })
          && client.Until([&] { return std::cmp_equal(client.Instance()->context->gdi->width, width); });
 }
 auto AwaitRateClient(Client& client, Headless::FrameObserver& frames) -> void {
-  ASSERT_TRUE(client.Until([&] { return Headless::DisplayClient::Ready() && !frames.Frames().empty(); }));
+  ASSERT_TRUE(client.Until([&] {
+    return Headless::DisplayClient::Of(client, &Headless::DisplayClient::Ready) && !frames.Frames().empty();
+  }));
   ASSERT_TRUE(frames.Ack());
 }
-auto ThenFixedRate(RateTrace const& trace, unsigned held) -> void {
+auto ThenFixedRate(RateTrace const& trace, std::uint32_t held) -> void {
   auto resumed = trace.presents - held;
   EXPECT_GT(held * 8, resumed);
   EXPECT_LT(held, resumed * 8);
@@ -197,7 +200,7 @@ auto RecoverToCeiling(Client& client, Headless::FrameObserver& frames, Headless:
   ThenPresentRecovery(trace);
 }
 }
-auto ExerciseRate(unsigned port, Headless::Logs& logs, Backend::RefreshMode mode, RateRecovery recovery) -> void {
+auto ExerciseRate(std::uint32_t port, Headless::Logs& logs, Backend::RefreshMode mode, RateRecovery recovery) -> void {
   Expects(port > 0, "sample listener is open");
   Client                        client(port, true, 640, 480);
   Headless::DisplayClient const display(client);

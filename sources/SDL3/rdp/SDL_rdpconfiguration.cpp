@@ -1,6 +1,8 @@
 #include "SDL_rdpconfiguration.hpp"
 #include "SDL_rdpconstants.hpp"
 #include <oxbox/utilities/hash.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <ranges>
@@ -13,17 +15,19 @@ constexpr int MaximumPort           = std::numeric_limits<std::uint16_t>::max();
 constexpr int MaximumBitrateKbps    = std::numeric_limits<std::uint32_t>::max() / std::kilo::num;
 class IntegerSetting {
 public:
-       IntegerSetting(unsigned sdlrdp_config::* field, std::string_view hint, int fallback, int minimum, int maximum)
+  using Field = std::uint32_t sdlrdp_config::*;
+       IntegerSetting(Field field, std::string_view hint, int fallback, int minimum, int maximum)
       : _field{ field }, _hint{ hint }, _fallback{ fallback }, _minimum{ minimum }, _maximum{ maximum } { }
   auto Apply(Settings const& settings, sdlrdp_config& config) const -> void {
-    config.*_field = static_cast<unsigned>(settings.Integer(std::string{ _hint }, _fallback, _minimum, _maximum));
+    config.*_field = Backend::Narrowed<std::uint32_t>(
+        settings.Integer(std::string{ _hint }, _fallback, _minimum, _maximum));
   }
 private:
-  unsigned sdlrdp_config::* _field;
-  std::string_view          _hint;
-  int                       _fallback;
-  int                       _minimum;
-  int                       _maximum;
+  Field            _field;
+  std::string_view _hint;
+  int              _fallback;
+  int              _minimum;
+  int              _maximum;
 };
 auto Integers(Settings const& settings) -> sdlrdp_config {
   auto const    fields = std::to_array<IntegerSetting>(

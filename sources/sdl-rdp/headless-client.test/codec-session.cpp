@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <filesystem>
 #include <string>
 
@@ -15,7 +16,8 @@ auto CodecSession::SetUp() -> void {
   std::filesystem::remove_all(certificates.Path());
   ASSERT_NO_FATAL_FAILURE(backend.Open(config));
   ASSERT_NE(sdlrdp_port(backend.Handle()), 0u);
-  std::array<UINT32, 8> bars{ 0x00ffffff, 0x00ffff00, 0x0000ffff, 0x0000ff00, 0x00ff00ff, 0x00ff0000, 0x000000ff, 0 };
+  std::array<std::uint32_t, 8> bars{ 0x00ffffff, 0x00ffff00, 0x0000ffff, 0x0000ff00,
+                                     0x00ff00ff, 0x00ff0000, 0x000000ff, 0 };
   std::ranges::generate(pixels, [&, index = 0u]() mutable {
     auto x = index % 320;
     auto y = index++ / 320;
@@ -26,7 +28,7 @@ auto CodecSession::ConnectCodec(Client& client) -> void {
   client.Tolerance(CodecTolerance(GetParam().codec, GetParam().surface));
   ASSERT_TRUE(client.Connect()) << logs.Text(true);
 }
-auto CodecSession::Reopen(unsigned width, unsigned height) -> void {
+auto CodecSession::Reopen(std::uint32_t width, std::uint32_t height) -> void {
   backend.Close();
   sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), width, height, 0 };
   config.codec = GetParam().codec;
@@ -86,7 +88,7 @@ auto CodecSession::ThenDisconnected() -> void {
   ASSERT_EQ(events.size(), 1u);
   EXPECT_EQ(events[0].type, SDLRDP_DISCONNECTED);
 }
-auto CodecSession::RecordFrameCost(Client& client, uint64_t bytes) -> void {
+auto CodecSession::RecordFrameCost(Client& client, std::uint64_t bytes) -> void {
   RecordProperty("max_channel_error", std::to_string(client.MaxError(pixels)));
   RecordProperty("wire_bytes", std::to_string(client.Received() - bytes));
   RecordProperty("codec", std::to_string(GetParam().codec));

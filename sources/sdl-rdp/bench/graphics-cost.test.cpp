@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 #include <algorithm>
+#include <cstdint>
 #include <random>
 #include <vector>
 
@@ -17,8 +18,8 @@ TEST_F(GraphicsCost, FullRandomFrame) {
   ASSERT_TRUE(client.Connect());
   EXPECT_EQ(client.Instance()->context->codecs->ThreadingFlags, THREADING_FLAGS_DISABLE_THREADS);
   ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
-  std::vector<UINT32> pixels(1280uz * 800);
-  std::mt19937        random(17);            // NOLINT(cert-msc32-c, cert-msc51-cpp): Reproducible codec input.
+  std::vector<std::uint32_t> pixels(1280uz * 800);
+  std::mt19937               random(17);            // NOLINT(cert-msc32-c, cert-msc51-cpp): Reproducible codec input.
   std::ranges::generate(pixels, [&] { return random() & 0x00ffffff; });
   sdlrdp_rect const full{ 0, 0, 1280, 800 };
   ASSERT_EQ(backend.Present(pixels, 1280, 800, full), 0);

@@ -39,7 +39,7 @@ auto InitClipboard(SDL_VideoDevice& device) -> void {
   device.HasClipboardText = HasText;
 }
 auto ClipboardUpdate(SDL_VideoData const& data) -> void {
-  auto const  count = data.Backend().Call<Operation::HAS_CLIPBOARD_TEXT>() > 0 ? TextMimeTypes.size() : 0;
+  auto const count = data.Backend().Call<Operation::HAS_CLIPBOARD_TEXT>() > 0 ? TextMimeTypes.size() : 0;
   // Temporary memory: SDL frees the table itself once the update event is consumed.
   auto* const types = SDL_CopyClipboardMimeTypes(TextMimeTypes.data(), count, true);
   if (types == nullptr) throw std::bad_alloc();

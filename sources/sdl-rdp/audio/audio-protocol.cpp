@@ -3,20 +3,18 @@
 #include <sdl-rdp/core/event-queue.hpp>
 #include <sdl-rdp/core/session-access.hpp>
 #include <sdl-rdp/core/trace-queue.hpp>
-#include <sdl-rdp/freerdp-facade/callback-owner.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 
 #include <oxbox/utilities/text.hpp>
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <format>
 
 namespace Backend {
 namespace {
-auto Owner(RdpsndServerContext* context) -> AudioChannel& {
-  Expects(context != nullptr, "callback context exists");
-  return CallbackOwner<AudioChannel>(context->data);
-}
 auto Supported(RdpsndServerContext const& context) -> bool {
-  static constexpr unsigned wave2_version = 8;
+  static constexpr std::uint32_t wave2_version = 8;
   if (context.clientVersion < wave2_version || !context.num_client_formats) return false;
   auto const& selected = context.client_formats[0];
   return selected.wFormatTag == WAVE_FORMAT_PCM && selected.nChannels == 2 && selected.wBitsPerSample == 16
@@ -30,44 +28,45 @@ auto Formats(RdpsndServerContext const& context) -> std::string {
       });
   return formats.empty() ? "none" : formats;
 }
-auto Behind(uint64_t sent, uint64_t credit, unsigned rate) -> double {
+auto Behind(std::uint64_t sent, std::uint64_t credit, std::uint32_t rate) -> double {
   return double(sent > credit ? sent - credit : 0) * 1000.0 / rate;
 }
 }
-auto AudioChannel::Select(unsigned index) -> void {
+auto AudioChannel::Select(std::size_t index) -> void {
   Expects(index < _sound->num_client_formats, "client format exists");
   _selected                      = _sound->client_formats[index];
-  _sound->selected_client_format = UINT16(index);
+  _sound->selected_client_format = Narrowed<std::uint16_t>(index);
   Reset();
   _ready = true;
   _session.AudioChanged();
 }
-auto AudioChannel::Activated(RdpsndServerContext* context) -> void {
-  auto& self = Owner(context);
-  if (!Supported(*context)) {
-    self.RejectFormats();
+auto AudioChannel::Activate() -> void {
+  if (!Supported(*_sound)) {
+    RejectFormats();
     return;
   }
-  auto const rate = context->client_formats[0].nSamplesPerSec;
-  self.Select(0);
-  self._diagnostics.Log(SDLRDP_LOG_INFO, std::format("Audio selected: stereo S16 at {} Hz.", rate));
-  self._events.Push({ .type = SDLRDP_AUDIO, .audio = { .freq = rate, .connected = 1 } });
+  auto const rate = _sound->client_formats[0].nSamplesPerSec;
+  Select(0);
+  _diagnostics.Log(SDLRDP_LOG_INFO, std::format("Audio selected: stereo S16 at {} Hz.", rate));
+  _events.Push({ .type = SDLRDP_AUDIO, .audio = { .freq = rate, .connected = 1 } });
 }
 auto AudioChannel::RejectFormats() -> void {
   _rejected = true;
   _diagnostics.Log(SDLRDP_LOG_WARN, std::format("Audio unavailable: client version={}; client formats: {}.",
                                                 _sound->clientVersion, Formats(*_sound)));
 }
-auto AudioChannel::Credit() -> uint64_t {
+auto AudioChannel::Credit() -> std::uint64_t {
   if (!_server_clock) return _confirmed;
   auto const now    = Clock::now();
-  auto const credit = _clock_frames + uint64_t(std::chrono::duration<double>(now - _clock_start).count() * Rate());
+  auto const played = std::chrono::duration<double>(now - _clock_start).count() * Rate();
+  // Elapsed frames are nonnegative; truncation drops the partial frame.
+  auto const credit = _clock_frames + static_cast<std::uint64_t>(played);
   if (credit < _sent) return credit;
   _clock_frames = _sent;
   _clock_start  = now;
   return _sent;
 }
-auto AudioChannel::ReportGate(bool available, uint64_t credit) -> void {
+auto AudioChannel::ReportGate(bool available, std::uint64_t credit) -> void {
   if (!available && !_gate_warned) {
     _gate_warned = true;
     _diagnostics.Line("audio-gate", [&] { return std::format("behind={:.1f}", Behind(_sent, credit, Rate())); });
@@ -79,21 +78,17 @@ auto AudioChannel::ReportGate(bool available, uint64_t credit) -> void {
     _diagnostics.Line("audio-open");
   }
 }
-auto AudioChannel::Ready(unsigned latency_ms) -> bool {
+auto AudioChannel::Ready(std::uint32_t latency_ms) -> bool {
   Expects(_ready, "audio has a selected format");
   auto const credit = Credit();
   if (!_buffer.empty()) return true;
   auto const unused    = std::ranges::find(_pending, _sound->block_no, &Block::id) == _pending.end();
-  auto const allowance = uint64_t(latency_ms) * Rate() / 1000;
+  auto const allowance = std::uint64_t{ latency_ms } * Rate() / 1000;
   auto const available = unused && (_sent <= credit || _sent - credit < allowance);
   ReportGate(available, credit);
   return available;
 }
-auto AudioChannel::Confirmed(RdpsndServerContext* context, BYTE id, UINT16 timestamp) -> UINT {
-  Owner(context).Confirm(id, timestamp);
-  return CHANNEL_RC_OK;
-}
-auto AudioChannel::Confirm(BYTE id, UINT16 timestamp) -> void {
+auto AudioChannel::Confirm(std::uint8_t id, std::uint16_t timestamp) -> void {
   auto found = std::ranges::find(_pending, id, &Block::id);
   if (found == _pending.end()) return;
   auto rtt = std::chrono::duration<double, std::milli>(Clock::now() - found->sent).count();
@@ -107,7 +102,7 @@ auto AudioChannel::Confirm(BYTE id, UINT16 timestamp) -> void {
   _pending.erase(found);
   _session.AudioChanged();
 }
-auto AudioChannel::RecordBlock(Clock::time_point now, BYTE block) -> void {
+auto AudioChannel::RecordBlock(Clock::time_point now, std::uint8_t block) -> void {
   if (_blocks_sent++) {
     auto gap = now - _last_send;
     _gap_total += gap;

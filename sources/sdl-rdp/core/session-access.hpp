@@ -1,6 +1,7 @@
 #pragma once
 #include <sdl-rdp/core/frame-store.hpp>
 
+#include <cstdint>
 #include <mutex>
 
 namespace Backend {

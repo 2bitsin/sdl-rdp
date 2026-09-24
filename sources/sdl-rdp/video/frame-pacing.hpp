@@ -7,6 +7,7 @@
 #include <sdl-rdp/video/refresh-tracker.hpp>
 
 #include <concepts>
+#include <cstdint>
 #include <format>
 
 namespace Backend {
@@ -25,7 +26,7 @@ public:
   auto Blocked()                                       -> void;
   auto Drained()                                       -> void;
   auto Sent(PeerFrames& frames, FrameCost const& cost) -> void;
-  auto Accept(UINT32 id)                               -> void;
+  auto Accept(std::uint32_t id)                        -> void;
   auto Acknowledgements(AcknowledgementMode mode)      -> void;
   auto Admit(std::invocable auto capacity)             -> bool {
     auto const held = _store.Lock();
@@ -36,12 +37,12 @@ public:
     }
     return !_window.Enabled() || _window.Open(capacity());
   }
-  auto Timeout()                                             -> DWORD;
-  auto Effective() const noexcept                            -> unsigned;
-  auto Frame() const noexcept                                -> UINT32;
-  auto Begin() noexcept                                      -> void;
-  auto Settled(FrameLock const& held, uint64_t target) const -> bool;
-  auto Acknowledged(FrameLock const& held) const             -> uint64_t;
+  auto Timeout()                                                  -> std::uint32_t;
+  auto Effective() const noexcept                                 -> std::uint32_t;
+  auto Frame() const noexcept                                     -> std::uint32_t;
+  auto Begin() noexcept                                           -> void;
+  auto Settled(FrameLock const& held, std::uint64_t target) const -> bool;
+  auto Acknowledged(FrameLock const& held) const                  -> std::uint64_t;
 
 private:
   auto Adjust(std::invocable<Refresh&> auto step) -> void;

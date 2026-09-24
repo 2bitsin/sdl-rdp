@@ -3,6 +3,7 @@
 #include <sdl-rdp/utilities/contract.hpp>
 
 #include <array>
+#include <cstdint>
 
 namespace BackendGate {
 auto ModeName(testing::TestParamInfo<Mode> const& info) -> std::string {

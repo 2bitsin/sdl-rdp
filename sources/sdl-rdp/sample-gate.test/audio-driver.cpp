@@ -4,6 +4,8 @@
 #include <sdl-rdp/sample-gate.test/sample-launch.hpp>
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <vector>
 
 namespace SampleGate {
@@ -38,11 +40,11 @@ auto AudioDriver::GivenSoundClient() -> void {
   ASSERT_NO_FATAL_FAILURE(Connect(*sound_client));
 }
 auto AudioDriver::PlayPcm(std::size_t count) -> void {
-  std::vector<Sint16> pcm(count, 1234);
-  ASSERT_TRUE(SDL_PutAudioStreamData(stream.get(), pcm.data(), pcm.size() * sizeof(Sint16)));
+  std::vector<std::int16_t> pcm(count, 1234);
+  ASSERT_TRUE(SDL_PutAudioStreamData(stream.get(), pcm.data(), pcm.size() * sizeof(std::int16_t)));
   ASSERT_TRUE(SDL_ResumeAudioStreamDevice(stream.get()));
 }
-auto AudioDriver::PlayFlushed(std::span<Sint16 const> pcm) -> Clock::time_point {
+auto AudioDriver::PlayFlushed(std::span<std::int16_t const> pcm) -> Clock::time_point {
   EXPECT_TRUE(SDL_PutAudioStreamData(stream.get(), pcm.data(), static_cast<int>(pcm.size_bytes())));
   EXPECT_TRUE(SDL_FlushAudioStream(stream.get()));
   auto const started = Clock::now();

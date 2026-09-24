@@ -8,6 +8,7 @@
 #include <sdl-rdp/headless-client.test/mode.hpp>
 #include <sdl-rdp/headless-client.test/pattern.hpp>
 #include <sdl-rdp/utilities/copy-rows.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 
 #include <gtest/gtest.h>
 #include <openssl/pem.h>
@@ -57,14 +58,14 @@ auto LoggingChild(Backend::Descriptor output) -> Headless::ChildProcess {
 }
 }
 TEST(CopyRows, PaddedRows) {
-  std::array<BYTE, 8> source     { 1, 2, 9, 9, 3, 4, 9, 9 };
-  std::array<BYTE, 6> destination{ 8, 8, 8, 8, 8, 8       };
+  std::array<std::uint8_t, 8> source     { 1, 2, 9, 9, 3, 4, 9, 9 };
+  std::array<std::uint8_t, 6> destination{ 8, 8, 8, 8, 8, 8       };
   Backend::CopyRows({ .bytes = source, .pitch = 4 }, { .bytes = destination, .pitch = 3 },
                     { .rows = 2, .row_bytes = 2 });
-  EXPECT_EQ(destination, (std::array<BYTE, 6>{ 1, 2, 8, 3, 4, 8 }));
+  EXPECT_EQ(destination, (std::array<std::uint8_t, 6>{ 1, 2, 8, 3, 4, 8 }));
   Backend::CopyRows({ .bytes = source, .pitch = 4 }, { .bytes = destination, .pitch = 3 },
                     { .rows = 2, .row_bytes = 2 }, true);
-  EXPECT_EQ(destination, (std::array<BYTE, 6>{ 3, 4, 8, 1, 2, 8 }));
+  EXPECT_EQ(destination, (std::array<std::uint8_t, 6>{ 3, 4, 8, 1, 2, 8 }));
   Backend::CopyRows({ }, { }, { });
 }
 TEST(Errors, WidthAndBind) {
@@ -97,8 +98,8 @@ auto MeasureFullFrame(Headless::BackendInstance const& handle, Client& client, s
   testing::Test::RecordProperty("codec_" + name + "_ms", std::to_string(elapsed));
   testing::Test::RecordProperty("codec_" + name + "_frames", std::to_string(counter.Frames()));
 }
-auto WhenFullFrameMeasured(CertificateDirectory const& certificates, Logs& logs, std::vector<UINT32> const& pixels,
-                           sdlrdp_codec codec) -> void {
+auto WhenFullFrameMeasured(CertificateDirectory const& certificates, Logs& logs,
+                           std::vector<std::uint32_t> const& pixels, sdlrdp_codec codec) -> void {
   sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), 1024, 768, 0, Logs::Collect, &logs };
   config.codec = codec;
   Headless::BackendInstance backend;
@@ -109,8 +110,8 @@ auto WhenFullFrameMeasured(CertificateDirectory const& certificates, Logs& logs,
   ASSERT_TRUE(client.Until([&] { return HasCookie(client); }));
   MeasureFullFrame(backend, client, pixels, codec);
 }
-auto CompressSignedDelta(BITMAP_PLANAR_CONTEXT* encoder, std::vector<UINT32>& pixels, std::vector<BYTE>& compressed,
-                         UINT32& size) -> void {
+auto CompressSignedDelta(BITMAP_PLANAR_CONTEXT* encoder, std::vector<std::uint32_t>& pixels,
+                         std::vector<std::uint8_t>& compressed, std::uint32_t& size) -> void {
   auto const source = oxbox::utilities::SpanCast<std::uint8_t const>(std::span(pixels));
   ASSERT_NE(freerdp_bitmap_compress_planar(encoder, source.data(), PIXEL_FORMAT_BGRA32, 64, 64, 64 * 4,
                                            compressed.data(), &size),
@@ -132,25 +133,25 @@ auto ThenCertificate(std::string const& first, std::filesystem::path const& data
 TEST(Measurement, FullFrames1024x768) {
   CertificateDirectory const certificates;
   Logs                       logs;
-  std::vector<UINT32>        pixels(1024uz * 768);
+  std::vector<std::uint32_t> pixels(1024uz * 768);
   Headless::HashPattern(pixels);
   for (auto codec : { SDLRDP_CODEC_RAW, SDLRDP_CODEC_PLANAR, SDLRDP_CODEC_REMOTEFX, SDLRDP_CODEC_NSCODEC }) {
     ASSERT_NO_FATAL_FAILURE(WhenFullFrameMeasured(certificates, logs, pixels, codec));
   }
 }
 TEST(Planar, SignedDelta64Rows) {
-  constexpr unsigned  width   = 64;
-  constexpr unsigned  height  = 64;
-  std::vector<UINT32> pixels(static_cast<std::size_t>(width) * height);
-  std::vector<UINT32> decoded(pixels.size());
+  constexpr std::uint32_t    width   = 64;
+  constexpr std::uint32_t    height  = 64;
+  std::vector<std::uint32_t> pixels(static_cast<std::size_t>(width) * height);
+  std::vector<std::uint32_t> decoded(pixels.size());
   std::ranges::generate(pixels,
                         [index = 0u]() mutable { return 0xff000000u | ((200u - index++ / width) * 0x00010101u); });
   PlanarContext const encoder(freerdp_bitmap_planar_context_new(PLANAR_FORMAT_HEADER_RLE, width, height));
   PlanarContext const decoder(freerdp_bitmap_planar_context_new(0, width, height));
   ASSERT_TRUE(encoder && decoder);
-  freerdp_planar_topdown_image(encoder.get(), TRUE);
-  std::vector<BYTE> compressed((pixels.size() * 4) + 1024);
-  UINT32            size       = compressed.size();
+  freerdp_planar_topdown_image(encoder.get(), true);
+  std::vector<std::uint8_t> compressed((pixels.size() * 4) + 1024);
+  auto                      size       = Backend::Narrowed<std::uint32_t>(compressed.size());
   ASSERT_NO_FATAL_FAILURE(CompressSignedDelta(encoder.get(), pixels, compressed, size));
   auto const target = oxbox::utilities::SpanCast<std::uint8_t>(std::span(decoded));
   ASSERT_TRUE(freerdp_bitmap_decompress_planar(decoder.get(), compressed.data(), size, width, height, target.data(),
@@ -243,15 +244,15 @@ TEST(Planar, Noisy640Rows) {
   PlanarContext const encoder(
       freerdp_bitmap_planar_context_new(PLANAR_FORMAT_HEADER_RLE | PLANAR_FORMAT_HEADER_NA, 1, 1));
   ASSERT_TRUE(freerdp_bitmap_planar_context_reset(encoder.get(), 640, 1));
-  std::vector<BYTE>   payload((640 * 4) + 1024);
-  PlanarContext const decoder(freerdp_bitmap_planar_context_new(0, 640, 1));
-  std::vector<UINT32> pixels(640);
-  std::vector<UINT32> decoded(640);
-  auto const          source  = oxbox::utilities::SpanCast<std::uint8_t const>(std::span(pixels));
-  auto const          target  = oxbox::utilities::SpanCast<std::uint8_t>(std::span(decoded));
-  for (unsigned y = 0; y < 480; ++y) {
+  std::vector<std::uint8_t>  payload((640 * 4) + 1024);
+  PlanarContext const        decoder(freerdp_bitmap_planar_context_new(0, 640, 1));
+  std::vector<std::uint32_t> pixels(640);
+  std::vector<std::uint32_t> decoded(640);
+  auto const                 source  = oxbox::utilities::SpanCast<std::uint8_t const>(std::span(pixels));
+  auto const                 target  = oxbox::utilities::SpanCast<std::uint8_t>(std::span(decoded));
+  for (std::uint32_t y = 0; y < 480; ++y) {
     Headless::HashPattern(pixels, y * 640);
-    UINT32 size = payload.size();
+    auto size = Backend::Narrowed<std::uint32_t>(payload.size());
     ASSERT_TRUE(freerdp_bitmap_compress_planar(encoder.get(), source.data(), PIXEL_FORMAT_BGRA32, 640, 1, 2560,
                                                payload.data(), &size));
     ASSERT_TRUE(freerdp_bitmap_decompress_planar(decoder.get(), payload.data(), size, 640, 1, target.data(),

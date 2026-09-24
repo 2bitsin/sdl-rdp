@@ -6,9 +6,10 @@
 
 #include <gtest/gtest.h>
 #include <oxbox/platform/scratch-area.hpp>
-#include <winpr/wtypes.h>
 #include <chrono>
 #include <condition_variable>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -38,14 +39,14 @@ protected:
     return logged.wait_for(lock, std::chrono::seconds(10), ready);
   }
   static auto Verify(void* raw, char const* domain, char const* user, char const* password)                -> int;
-  static auto Lookup(void* raw, char const* domain, char const* user, unsigned char* hash)                 -> int;
+  static auto Lookup(void* raw, char const* domain, char const* user, std::uint8_t* hash)                  -> int;
   auto        Attempt(char const* user, char const* password, char const* domain, bool nla, bool accepted) -> void;
   auto        PasswordCleared()                                                                            -> void;
-  auto        ThenRejection(sdlrdp_log_level level, std::string const& text, unsigned rejected)            -> void;
-  auto        RejectionLogs(char const* password, unsigned expected = 1)                                   -> void;
+  auto        ThenRejection(sdlrdp_log_level level, std::string const& text, std::size_t rejected)         -> void;
+  auto        RejectionLogs(char const* password, std::size_t expected = 1)                                -> void;
   auto        ThenSecurityWarning(bool nla)                                                                -> void;
   auto        ThenCertificateDisconnect(std::string_view closed)                                           -> void;
-  auto        ThenPendingDisconnect(UINT32 code)                                                           -> void;
+  auto        ThenPendingDisconnect(std::uint32_t code)                                                    -> void;
   oxbox::platform::ScratchArea                          certificates  { "auth", "sdl-rdp" };
   Headless::BackendInstance                             handle;
   sdlrdp_config                                         config        { };

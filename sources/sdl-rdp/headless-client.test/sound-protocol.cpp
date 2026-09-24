@@ -1,11 +1,14 @@
 #include <sdl-rdp/headless-client.test/sound-protocol.hpp>
 
 #include <sdl-rdp/headless-client.test/sound-client.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 
 #include <freerdp/svc.h>
 #include <oxbox/utilities/serdes.hpp>
 #include <algorithm>
 #include <array>
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <iterator>
 #include <span>
@@ -15,7 +18,7 @@ namespace {
 auto ReadSoundFormats(wStream* stream, SoundCapture& capture) -> void {
   Expects(Stream_GetRemainingLength(stream) >= 20, "server format header complete");
   Stream_Seek(stream, 14);
-  UINT16 count = 0;
+  std::uint16_t count = 0;
   Stream_Read_UINT16(stream, count);
   Stream_Seek(stream, 4);
   capture.server_formats.resize(count);
@@ -38,25 +41,25 @@ auto WriteSoundFormatHeader(wStream* out, SoundCapture const& capture, std::size
   Expects(Stream_GetRemainingCapacity(out) >= 24, "format reply header fits");
   oxbox::utilities::BoundedWriter writer(
       std::as_writable_bytes(std::span(static_cast<std::byte*>(Stream_Pointer(out)), 24)));
-  writer.Store<UINT8>(7);
-  writer.Store<UINT8>(0);
-  writer.Store<UINT16, std::endian::little>(UINT16(size - 4));
-  writer.Store<UINT32, std::endian::little>(3);
-  writer.Store<UINT32, std::endian::little>(capture.volume);
-  writer.Store<UINT32, std::endian::little>(0);
-  writer.Store<UINT16, std::endian::little>(0);
-  writer.Store<UINT16, std::endian::little>(UINT16(count));
-  writer.Store<UINT8>(0);
-  writer.Store<UINT16, std::endian::little>(capture.version);
-  writer.Store<UINT8>(0);
+  writer.Store<std::uint8_t>(7);
+  writer.Store<std::uint8_t>(0);
+  writer.Store<std::uint16_t, std::endian::little>(Backend::Narrowed<std::uint16_t>(size - 4));
+  writer.Store<std::uint32_t, std::endian::little>(3);
+  writer.Store<std::uint32_t, std::endian::little>(capture.volume);
+  writer.Store<std::uint32_t, std::endian::little>(0);
+  writer.Store<std::uint16_t, std::endian::little>(0);
+  writer.Store<std::uint16_t, std::endian::little>(Backend::Narrowed<std::uint16_t>(count));
+  writer.Store<std::uint8_t>(0);
+  writer.Store<std::uint16_t, std::endian::little>(capture.version);
+  writer.Store<std::uint8_t>(0);
   Expects(writer.Whole(), "sound format header fills its wire layout");
   Stream_Seek(out, 24);
 }
-auto SoundFormatReply(SoundCapture const& capture) -> std::vector<BYTE> {
-  auto              supported = SupportedSoundFormats(capture);
-  std::vector<BYTE> bytes(24 + (supported.size() * 18));
-  wStream           output    { };
-  auto*             out       = Stream_StaticInit(&output, bytes.data(), bytes.size());
+auto SoundFormatReply(SoundCapture const& capture) -> std::vector<std::uint8_t> {
+  auto                      supported = SupportedSoundFormats(capture);
+  std::vector<std::uint8_t> bytes(24 + (supported.size() * 18));
+  wStream                   output    { };
+  auto*                     out       = Stream_StaticInit(&output, bytes.data(), bytes.size());
   WriteSoundFormatHeader(out, capture, supported.size(), bytes.size());
   std::ranges::for_each(supported, [&](auto const& format) {
     Expects(audio_format_write(out, &format), "supported PCM format serialized");
@@ -65,36 +68,49 @@ auto SoundFormatReply(SoundCapture const& capture) -> std::vector<BYTE> {
 }
 }
 
-auto SoundProtocol::Register(CHANNEL_ENTRY_POINTS_EX* points, void* handle) -> BOOL {
-  auto* extended = reinterpret_cast<CHANNEL_ENTRY_POINTS_FREERDP_EX*>(points);
-  auto* self     = static_cast<SoundClient*>(extended->pExtendedData);
-  Expects(self != nullptr, "capture context supplied");
-  self->entry = *points;
-  self->init  = handle;
+auto SoundProtocol::EntryPoint() -> PVIRTUALCHANNELENTRYEX {
+  // abi: VIRTUALCHANNELENTRYEX, BOOL is int
+  return [](CHANNEL_ENTRY_POINTS_EX* points, void* handle) -> int {
+    Expects(points != nullptr, "channel entry points supplied");
+    auto* extended = reinterpret_cast<CHANNEL_ENTRY_POINTS_FREERDP_EX*>(points);
+    auto* self     = static_cast<SoundClient*>(extended->pExtendedData);
+    Expects(self != nullptr, "capture context supplied");
+    return Register(*self, *points, handle);
+  };
+}
+auto SoundProtocol::Register(SoundClient& self, CHANNEL_ENTRY_POINTS_EX const& points, void* handle) -> bool {
+  self.entry = points;
+  self.init  = handle;
   CHANNEL_DEF definition{ };
   std::memcpy(definition.name, "rdpsnd", 7);
   definition.options = CHANNEL_OPTION_INITIALIZED | CHANNEL_OPTION_ENCRYPT_RDP;
-  return points->pVirtualChannelInitEx(self, nullptr, handle, &definition, 1, VIRTUAL_CHANNEL_VERSION_WIN2000,
-                                       Initialized)
+  // abi: CHANNEL_INIT_EVENT_EX_FN, UINT is uint32_t
+  auto const initialized = [](void* user, void*, std::uint32_t event, void*, std::uint32_t) {
+    Initialized(*static_cast<SoundClient*>(user), event);
+  };
+  return points.pVirtualChannelInitEx(&self, nullptr, handle, &definition, 1, VIRTUAL_CHANNEL_VERSION_WIN2000,
+                                      initialized)
          == CHANNEL_RC_OK;
 }
-auto SoundProtocol::Initialized(void* user, void* /*unused*/, UINT event, void* /*unused*/, UINT /*unused*/) -> void {
-  auto& self = *static_cast<SoundClient*>(user);
+auto SoundProtocol::Initialized(SoundClient& self, std::uint32_t event) -> void {
   if (event != CHANNEL_EVENT_CONNECTED) return;
   auto name = std::to_array("rdpsnd");
-  Expects(self.entry.pVirtualChannelOpenEx(self.init, &self.channel, name.data(), Received) == CHANNEL_RC_OK,
-          "sound static channel opens");
+  // abi: CHANNEL_OPEN_EVENT_EX_FN, DWORD, UINT and UINT32 are uint32_t
+  auto const received = [](void* user, std::uint32_t, std::uint32_t event, void* data, std::uint32_t size,
+                           std::uint32_t total, std::uint32_t flags) {
+    if (event != CHANNEL_EVENT_DATA_RECEIVED) return;
+    Received(*static_cast<SoundClient*>(user), std::span(static_cast<std::uint8_t const*>(data), size), total, flags);
+  };
+  auto const opened   = self.entry.pVirtualChannelOpenEx(self.init, &self.channel, name.data(), received);
+  Expects(opened == CHANNEL_RC_OK, "sound static channel opens");
   self.capture.opened = true;
 }
-auto SoundProtocol::Received(void* user, DWORD /*unused*/, UINT event, void* data, UINT32 size, UINT32 total,
-                             UINT32 flags) -> void {
-  auto& self = *static_cast<SoundClient*>(user);
-  if (event != CHANNEL_EVENT_DATA_RECEIVED) return;
+auto SoundProtocol::Received(SoundClient& self, std::span<std::uint8_t const> bytes, std::size_t total,
+                             std::uint32_t flags) -> void {
   if (flags & CHANNEL_FLAG_FIRST) {
     self.incoming.clear();
     self.incoming.reserve(total);
   }
-  auto bytes = std::span(static_cast<BYTE*>(data), size);
   self.incoming.insert(self.incoming.end(), bytes.begin(), bytes.end());
   if (!(flags & CHANNEL_FLAG_LAST)) return;
   Expects(self.incoming.size() == total, "static channel fragments complete");
@@ -104,12 +120,12 @@ auto SoundProtocol::Formats(SoundClient& self, wStream* stream) -> void {
   ReadSoundFormats(stream, self.capture);
   Expects(self.Send(SoundFormatReply(self.capture)), "client format intersection sent");
   if (self.capture.version >= 6)
-    Expects(self.Send(std::array<BYTE, 8>{ 12, 0, 4, 0, 2, 0, 0, 0 }), "quality mode sent");
+    Expects(self.Send(std::array<std::uint8_t, 8>{ 12, 0, 4, 0, 2, 0, 0, 0 }), "quality mode sent");
   self.capture.ready = true;
 }
-auto SoundProtocol::Wave(SoundClient& self, wStream* stream, unsigned size, bool second) -> void {
+auto SoundProtocol::Wave(SoundClient& self, wStream* stream, std::uint32_t size, bool second) -> void {
   Expects(Stream_GetRemainingLength(stream) >= 12, "wave header complete");
-  UINT16 format = 0;
+  std::uint16_t format = 0;
   Stream_Read_UINT16(stream, self.timestamp);
   Stream_Read_UINT16(stream, format);
   Stream_Read_UINT8(stream, self.block);
@@ -119,7 +135,7 @@ auto SoundProtocol::Wave(SoundClient& self, wStream* stream, unsigned size, bool
     Stream_Seek(stream, 4);
     Expects(size >= 12, "wave PDU includes its fixed header");
     Expects(Stream_GetRemainingLength(stream) >= size - 12, "wave payload fits the remaining stream");
-    self.Capture({ static_cast<uint8_t const*>(Stream_Pointer(stream)), size - 12 });
+    self.Capture({ static_cast<std::uint8_t const*>(Stream_Pointer(stream)), size - 12 });
   } else {
     Stream_Read(stream, self.first.data(), self.first.size());
     self.wave_bytes     = size - 8;
@@ -132,10 +148,10 @@ auto SoundProtocol::Receive(SoundClient& self) -> void {
     return;
   }
   Expects(self.incoming.size() >= 4, "sound PDU header complete");
-  wStream storage { };
-  auto*   stream  = Stream_StaticInit(&storage, self.incoming.data(), self.incoming.size());
-  BYTE    type    = 0;
-  UINT16  size    = 0;
+  wStream       storage { };
+  auto*         stream  = Stream_StaticInit(&storage, self.incoming.data(), self.incoming.size());
+  std::uint8_t  type    = 0;
+  std::uint16_t size    = 0;
   Stream_Read_UINT8(stream, type);
   Stream_Seek(stream, 1);
   Stream_Read_UINT16(stream, size);
@@ -148,7 +164,7 @@ auto SoundProtocol::CaptureWave(SoundClient& self) -> void {
   self.expecting_wave = false;
   self.Capture(std::span(self.incoming).first(self.wave_bytes));
 }
-auto SoundProtocol::Dispatch(SoundClient& self, wStream* stream, BYTE type, UINT16 size) -> void {
+auto SoundProtocol::Dispatch(SoundClient& self, wStream* stream, std::uint8_t type, std::uint16_t size) -> void {
   switch (type) {
   case 7: Formats(self, stream); break;
   case 2:

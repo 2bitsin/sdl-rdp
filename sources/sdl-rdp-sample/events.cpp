@@ -7,10 +7,11 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <format>
 #include <string>
 namespace {
-constexpr std::array<std::pair<Uint32, char const*>, 24> EventLabels{ {
+constexpr std::array<std::pair<std::uint32_t, char const*>, 24> EventLabels{ {
     { SDL_EVENT_KEYBOARD_ADDED              , "KEYBOARD_ADDED"               },
     { SDL_EVENT_MOUSE_ADDED                 , "MOUSE_ADDED"                  },
     { SDL_EVENT_WINDOW_MOVED                , "MOVED"                        },
@@ -36,8 +37,8 @@ constexpr std::array<std::pair<Uint32, char const*>, 24> EventLabels{ {
     { SDL_EVENT_MOUSE_BUTTON_UP             , "MOUSE_BUTTON_UP"              },
     { SDL_EVENT_MOUSE_WHEEL                 , "MOUSE_WHEEL"                  },
 } };
-auto EventName(Uint32 type) -> char const* {
-  auto const* label = std::ranges::find(EventLabels, type, &std::pair<Uint32, char const*>::first);
+auto EventName(std::uint32_t type) -> char const* {
+  auto const* label = std::ranges::find(EventLabels, type, &std::pair<std::uint32_t, char const*>::first);
   return label == EventLabels.end() ? "OTHER" : label->second;
 }
 
@@ -75,7 +76,7 @@ auto ClientProperties(SDL_Window* window) -> std::string {
                      SDL_GetStringProperty(properties, SDL_PROP_WINDOW_RDP_CODEC_STRING, ""));
 }
 
-auto PointerDetails(SDL_Event const& event, unsigned frame) -> std::string {
+auto PointerDetails(SDL_Event const& event, std::uint32_t frame) -> std::string {
   switch (event.type) {
   case SDL_EVENT_MOUSE_MOTION:
     return std::format(" xrel={:g} yrel={:g} x={:.0f} y={:.0f} frame={}", event.motion.xrel, event.motion.yrel,
@@ -98,14 +99,14 @@ auto WindowDetails(SDL_Event const& event, SDL_Window* window) -> std::string {
     return std::format(" data1={} data2={}", event.window.data1, event.window.data2);
   return { };
 }
-auto EventDetails(SDL_Event const& event, SDL_Window* window, unsigned frame) -> std::string {
+auto EventDetails(SDL_Event const& event, SDL_Window* window, std::uint32_t frame) -> std::string {
   if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP)
     return std::format(" scancode={} key={} down={}", int(event.key.scancode), event.key.key, int(event.key.down));
   if (event.type == SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED) PrintAudioFormat(event.adevice.which);
   return PointerDetails(event, frame) + WindowDetails(event, window);
 }
 }
-auto PrintEvent(SDL_Event const& event, SDL_Window* window, unsigned frame) -> void {
+auto PrintEvent(SDL_Event const& event, SDL_Window* window, std::uint32_t frame) -> void {
   if (PrintClipboardEvent(event)) return;
   if (PrintInput(event, window)) return;
   auto line = std::format("event {} type={}", EventName(event.type), event.type);

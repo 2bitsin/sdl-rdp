@@ -5,6 +5,7 @@
 #include <SDL3/SDL.h>
 #include <freerdp/input.h>
 #include <freerdp/settings.h>
+#include <cstdint>
 
 namespace SampleGate {
 auto SampleProcess::GivenProcess(Words const& environment, Words const& options) -> void {
@@ -29,7 +30,12 @@ auto SampleProcess::SetUp() -> void {
   client_logs = &logs;
   auto* root = WLog_GetRoot();
   ASSERT_NE(root, nullptr);
-  wLogCallbacks callbacks{ CollectClientLog, CollectClientLog, CollectClientLog, CollectClientLog };
+  // abi: wLogCallbackMessage_t and its siblings, BOOL is int
+  constexpr auto collect   = [](wLogMessage const* message) -> int {
+    CollectClientLog(*message);
+    return true;
+  };
+  wLogCallbacks  callbacks { collect, collect, collect, collect };
   ASSERT_TRUE(WLog_SetLogAppenderType(root, WLOG_APPENDER_CALLBACK));
   ASSERT_TRUE(WLog_ConfigureAppender(WLog_GetLogAppender(root), "callbacks", &callbacks));
 }
@@ -69,14 +75,13 @@ auto SampleProcess::Escape(Client const& client) -> void {
   ASSERT_TRUE(freerdp_input_send_keyboard_event(client.Instance()->context->input, KBD_FLAGS_DOWN, 1)) << "send Escape";
   ASSERT_TRUE(process->Exit()) << "sample exit 0 within ten seconds: " << process->Transcript();
 }
-auto SampleProcess::CollectClientLog(wLogMessage const* message) -> BOOL {
+auto SampleProcess::CollectClientLog(wLogMessage const& message) -> void {
   std::scoped_lock const lock(log_guard);
-  if (client_logs && message->TextString) {
-    auto level = message->Level == WLOG_ERROR ? SDLRDP_LOG_ERROR
-                 : message->Level == WLOG_WARN ? SDLRDP_LOG_WARN
-                                               : SDLRDP_LOG_INFO;
-    Headless::Logs::Collect(client_logs, level, message->TextString);
+  if (client_logs && message.TextString) {
+    auto level = message.Level == WLOG_ERROR ? SDLRDP_LOG_ERROR
+                 : message.Level == WLOG_WARN ? SDLRDP_LOG_WARN
+                                              : SDLRDP_LOG_INFO;
+    Headless::Logs::Collect(client_logs, level, message.TextString);
   }
-  return TRUE;
 }
 }

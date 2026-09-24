@@ -12,7 +12,7 @@ class CodecSession : public testing::TestWithParam<Mode>, protected BackendEvent
 protected:
   auto        SetUp()                                                       -> void override;
   auto        ConnectCodec(Client& client)                                  -> void;
-  auto        Reopen(unsigned width, unsigned height)                       -> void;
+  auto        Reopen(std::uint32_t width, std::uint32_t height)             -> void;
   auto        Frame(Client& client, sdlrdp_rect area)                       -> void;
   static auto ThenMotion(sdlrdp_event const& event)                         -> void;
   static auto ThenPointerEvents(std::span<sdlrdp_event const> events)       -> void;
@@ -22,7 +22,7 @@ protected:
   auto        ThenConnected()                                               -> void;
   static auto ThenConnectionDetails(sdlrdp_event const& event)              -> void;
   auto        ThenDisconnected()                                            -> void;
-  auto        RecordFrameCost(Client& client, uint64_t bytes)               -> void;
-  std::vector<UINT32> pixels = std::vector<UINT32>(320uz * 200);
+  auto        RecordFrameCost(Client& client, std::uint64_t bytes)          -> void;
+  std::vector<std::uint32_t> pixels = std::vector<std::uint32_t>(320uz * 200);
 };
 }

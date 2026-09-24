@@ -8,7 +8,7 @@ public:
   auto     Red() const -> bool;
 
 private:
-  static auto Receive(rdpContext* /*unused*/, POINTER_NEW_UPDATE const* update) -> BOOL;
+  auto Receive(POINTER_NEW_UPDATE const& update) -> void;
   inline static thread_local PointerObserver* active = nullptr;
   bool                                        red    = false;
 };

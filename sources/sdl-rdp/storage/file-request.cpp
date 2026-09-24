@@ -5,30 +5,32 @@
 #include <sdl-rdp-abi/sdl-rdp-backend.h>
 
 #include <winpr/nt.h>
+#include <cstddef>
+#include <cstdint>
 #include <stdexcept>
 
 namespace Backend {
 namespace {
-constexpr unsigned AllowedFlags = SDLRDP_FILE_READ | SDLRDP_FILE_WRITE | SDLRDP_FILE_CREATE | SDLRDP_FILE_TRUNCATE
-                                  | SDLRDP_FILE_DIRECTORY;
-auto Validated(unsigned flags) -> unsigned {
+constexpr std::uint32_t AllowedFlags = SDLRDP_FILE_READ | SDLRDP_FILE_WRITE | SDLRDP_FILE_CREATE | SDLRDP_FILE_TRUNCATE
+                                       | SDLRDP_FILE_DIRECTORY;
+auto Validated(std::uint32_t flags) -> std::uint32_t {
   if ((flags & SDLRDP_FILE_TRUNCATE) && !(flags & SDLRDP_FILE_WRITE))
     throw std::runtime_error("Truncate requires write access.");
   if (flags & ~AllowedFlags) throw std::runtime_error("Invalid drive open flags.");
   return flags;
 }
-auto Access(unsigned flags, unsigned extra) -> unsigned {
+auto Access(std::uint32_t flags, std::uint32_t extra) -> std::uint32_t {
   auto access = extra | FILE_READ_ATTRIBUTES | SYNCHRONIZE;
   if (flags & SDLRDP_FILE_READ) access |= FILE_READ_DATA;
   if (flags & SDLRDP_FILE_WRITE) access |= FILE_WRITE_DATA;
   return access;
 }
-auto Disposition(unsigned flags) -> unsigned {
+auto Disposition(std::uint32_t flags) -> std::uint32_t {
   bool const create = flags & SDLRDP_FILE_CREATE;
   if (flags & SDLRDP_FILE_TRUNCATE) return create ? FILE_OVERWRITE_IF : FILE_OVERWRITE;
   return create ? FILE_OPEN_IF : FILE_OPEN;
 }
-auto CreateOptions(FileKind kind) -> unsigned {
+auto CreateOptions(FileKind kind) -> std::uint32_t {
   switch (kind) {
   case FileKind::Directory: return FILE_DIRECTORY_FILE;
   case FileKind::File:      return FILE_NON_DIRECTORY_FILE;
@@ -37,16 +39,16 @@ auto CreateOptions(FileKind kind) -> unsigned {
   }
 }
 }
-FileRequest::FileRequest(unsigned flags, FileKind file_kind, unsigned extra_access)
+FileRequest::FileRequest(std::uint32_t flags, FileKind file_kind, std::uint32_t extra_access)
     : _access{ Access(Validated(flags), extra_access) }, _disposition{ Disposition(flags) }, _kind{ file_kind } { }
 auto FileRequest::Create(std::span<std::byte const> name) const -> DrivePacket {
   DrivePacket packet;
-  packet.Write(std::uint32_t{ _access });
+  packet.Write(_access);
   packet.Write(std::uint64_t{ 0 });
   packet.Write(std::uint32_t{ 0 });
   packet.Write(std::uint32_t{ FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE });
-  packet.Write(std::uint32_t{ _disposition });
-  packet.Write(std::uint32_t{ CreateOptions(_kind) });
+  packet.Write(_disposition);
+  packet.Write(CreateOptions(_kind));
   packet.Write(Narrowed<std::uint32_t>(name.size()));
   packet.Append(name);
   return packet;

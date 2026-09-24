@@ -5,22 +5,23 @@
 #include <winpr/sysinfo.h>
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <ranges>
 #include <span>
 
 namespace Backend {
-inline constexpr std::array versions             { RDPGFX_CAPVERSION_8, RDPGFX_CAPVERSION_81, RDPGFX_CAPVERSION_10,
-                                                   RDPGFX_CAPVERSION_101, RDPGFX_CAPVERSION_102, RDPGFX_CAPVERSION_103,
-                                                   RDPGFX_CAPVERSION_104, RDPGFX_CAPVERSION_105, RDPGFX_CAPVERSION_106,
-                                                   RDPGFX_CAPVERSION_106_ERR, RDPGFX_CAPVERSION_107 };
-inline constexpr UINT32     Version101DataLength = 16;
-inline constexpr UINT32     FlagsDataLength      = 4;
+inline constexpr std::array versions{ RDPGFX_CAPVERSION_8, RDPGFX_CAPVERSION_81, RDPGFX_CAPVERSION_10,
+                                      RDPGFX_CAPVERSION_101, RDPGFX_CAPVERSION_102, RDPGFX_CAPVERSION_103,
+                                      RDPGFX_CAPVERSION_104, RDPGFX_CAPVERSION_105, RDPGFX_CAPVERSION_106,
+                                      RDPGFX_CAPVERSION_106_ERR, RDPGFX_CAPVERSION_107 };
+inline constexpr std::uint32_t Version101DataLength = 16;
+inline constexpr std::uint32_t FlagsDataLength      = 4;
 inline auto AllowsAvc(RDPGFX_CAPSET const& cap) -> bool {
   return cap.version == RDPGFX_CAPVERSION_81
              ? (cap.flags & RDPGFX_CAPS_FLAG_AVC420_ENABLED) != 0
              : cap.version >= RDPGFX_CAPVERSION_10 && !(cap.flags & RDPGFX_CAPS_FLAG_AVC_DISABLED);
 }
-inline auto CapabilityDataLength(uint32_t version) -> uint32_t {
+inline auto CapabilityDataLength(std::uint32_t version) -> std::uint32_t {
   return version == RDPGFX_CAPVERSION_101 ? Version101DataLength : FlagsDataLength;
 }
 inline auto Acceptable(RDPGFX_CAPSET const& cap) -> bool {
@@ -31,7 +32,7 @@ inline auto Newest(std::span<RDPGFX_CAPSET const> caps) -> RDPGFX_CAPSET {
   auto const newest     = std::ranges::max_element(acceptable, { }, &RDPGFX_CAPSET::version);
   return newest == acceptable.end() ? RDPGFX_CAPSET{ } : *newest;
 }
-inline auto AnsweredFlags(RDPGFX_CAPSET const& cap, bool avc) -> uint32_t {
+inline auto AnsweredFlags(RDPGFX_CAPSET const& cap, bool avc) -> std::uint32_t {
   if (cap.version == RDPGFX_CAPVERSION_101) return 0;
   auto const kept = cap.flags
                     & (RDPGFX_CAPS_FLAG_THINCLIENT | RDPGFX_CAPS_FLAG_SMALL_CACHE | RDPGFX_CAPS_FLAG_SCALEDMAP_DISABLE);
@@ -45,19 +46,19 @@ inline auto SelectCapability(std::span<RDPGFX_CAPSET const> caps, bool avc_avail
   selected.flags  = AnsweredFlags(selected, avc_available && AllowsAvc(selected));
   return selected;
 }
-inline auto FrameTimestamp(SYSTEMTIME const& time) -> UINT32 {
-  constexpr unsigned HourShift       = 22;
-  constexpr unsigned MinuteShift     = 16;
-  constexpr unsigned SecondShift     = 10;
-  constexpr unsigned HourBits        = 5;
-  constexpr unsigned MinuteBits      = 6;
-  constexpr unsigned SecondBits      = 6;
-  constexpr unsigned MillisecondBits = 10;
+inline auto FrameTimestamp(SYSTEMTIME const& time) -> std::uint32_t {
+  constexpr std::uint32_t HourShift       = 22;
+  constexpr std::uint32_t MinuteShift     = 16;
+  constexpr std::uint32_t SecondShift     = 10;
+  constexpr std::uint32_t HourBits        = 5;
+  constexpr std::uint32_t MinuteBits      = 6;
+  constexpr std::uint32_t SecondBits      = 6;
+  constexpr std::uint32_t MillisecondBits = 10;
   utilities::Expects(time.wHour < (1u << HourBits), "MS-RDPEGFX 2.2.2.11 timestamp fields fit");
   utilities::Expects(time.wMinute < (1u << MinuteBits), "MS-RDPEGFX 2.2.2.11 timestamp fields fit");
   utilities::Expects(time.wSecond < (1u << SecondBits), "MS-RDPEGFX 2.2.2.11 timestamp fields fit");
   utilities::Expects(time.wMilliseconds < (1u << MillisecondBits), "MS-RDPEGFX 2.2.2.11 timestamp fields fit");
-  return (UINT32(time.wHour) << HourShift) | (UINT32(time.wMinute) << MinuteShift)
-         | (UINT32(time.wSecond) << SecondShift) | time.wMilliseconds;
+  return (std::uint32_t{ time.wHour } << HourShift) | (std::uint32_t{ time.wMinute } << MinuteShift)
+         | (std::uint32_t{ time.wSecond } << SecondShift) | time.wMilliseconds;
 }
 }

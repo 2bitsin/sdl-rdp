@@ -1,4 +1,6 @@
 #pragma once
+#include <sdl-rdp/core/failure-log.hpp>
+#include <sdl-rdp/utilities/operation-name.hpp>
 
 namespace Backend {
 class Activator;
@@ -18,12 +20,15 @@ public:
   auto operator=(PeerCallbacks&&)      -> PeerCallbacks& = delete;
 
 private:
-  auto InstallClient()  -> void;
-  auto InstallUpdates() -> void;
-  PeerLink&        _link;
-  Authenticator&   _authenticator;
-  Activator&       _activator;
-  CapabilityCheck& _capabilities;
-  OutputControl&   _output;
+  auto InstallClient()                                  -> void;
+  auto InstallAuthentication()                          -> void;
+  auto InstallUpdates()                                 -> void;
+  auto Failures(OperationName operation) const noexcept -> FailureLog;
+  PeerLink&          _link;
+  Authenticator&     _authenticator;
+  Activator&         _activator;
+  CapabilityCheck&   _capabilities;
+  OutputControl&     _output;
+  InputEvents const& _input;
 };
 }

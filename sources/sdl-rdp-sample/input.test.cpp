@@ -6,6 +6,7 @@
 #include <SDL3/SDL.h>
 #include <sdl-rdp/headless-client.test/input-steps.hpp>
 #include <array>
+#include <cstdint>
 #include <string>
 #include <utility>
 
@@ -15,11 +16,11 @@ namespace {
 auto InputOf(Client const& client) -> rdpInput* {
   return client.Instance()->context->input;
 }
-auto WhenPressureContact(auto* touch, INT32& id) -> void {
+auto WhenPressureContact(auto* touch, std::int32_t& id) -> void {
   ASSERT_EQ(
       touch->TouchRawEvent(touch, 3, 160, 120, &id,
                            RDPINPUT_CONTACT_FLAG_DOWN | RDPINPUT_CONTACT_FLAG_INRANGE | RDPINPUT_CONTACT_FLAG_INCONTACT,
-                           CONTACT_DATA_PRESSURE_PRESENT, UINT32(512)),
+                           CONTACT_DATA_PRESSURE_PRESENT, 512u),
       CHANNEL_RC_OK);
 }
 auto TouchChannel(Client& client) -> auto* {
@@ -47,7 +48,7 @@ TEST_F(Sample, UnicodeTextAndStopped) {
 TEST_F(Sample, WheelBothAxesPrecise) {
   ASSERT_NO_FATAL_FAILURE(GivenInputSession());
   auto* input = InputOf(SessionClient());
-  for (auto [flags, expected] : std::array<std::pair<UINT16, char const*>, 4>{
+  for (auto [flags, expected] : std::array<std::pair<std::uint16_t, char const*>, 4>{
            { { PTR_FLAGS_WHEEL | 30                                      , " x=0 y=0.25"  },
              { PTR_FLAGS_WHEEL | PTR_FLAGS_WHEEL_NEGATIVE | (0x200 - 60) , " x=0 y=-0.5"  },
              { PTR_FLAGS_HWHEEL | 120                                    , " x=1 y=0"     },
@@ -80,7 +81,7 @@ TEST_F(Sample, TouchContacts) {
   auto& client = SessionClient();
   auto* touch  = TouchChannel(client);
   ASSERT_NE(touch, nullptr);
-  INT32 id = 0;
+  std::int32_t id = 0;
   ASSERT_EQ(touch->TouchBegin(touch, 7, 160, 120, &id), CHANNEL_RC_OK);
   ASSERT_NO_FATAL_FAILURE(ThenTouchEvent(client, "event FINGER_DOWN ", " x=0.250 y=0.250 "));
   ASSERT_EQ(touch->TouchUpdate(touch, 7, 320, 240, &id), CHANNEL_RC_OK);
@@ -97,7 +98,7 @@ TEST_F(Sample, TouchPressureCancel) {
   ASSERT_TRUE(client.Connect());
   auto* touch = TouchChannel(client);
   ASSERT_NE(touch, nullptr);
-  INT32 id = 0;
+  std::int32_t id = 0;
   ASSERT_NO_FATAL_FAILURE(WhenPressureContact(touch, id));
   ASSERT_NO_FATAL_FAILURE(ThenTouchEvent(client, "event FINGER_DOWN ", "pressure=0.500"));
   ASSERT_EQ(touch->TouchCancel(touch, 3, 160, 120, &id), CHANNEL_RC_OK);
@@ -154,11 +155,11 @@ TEST_F(Sample, RelativeIgnoredWarp) {
   auto& client = SessionClient();
   auto* input  = InputOf(client);
   ASSERT_NO_FATAL_FAILURE(GivenRelativeOrigin(client));
-  for (auto [x, y, delta] :
-       std::array<std::tuple<UINT16, UINT16, char const*>, 4>{ { { 250, 200, " xrel=50 yrel=50 "   },
-                                                                 { 300, 260, " xrel=50 yrel=60 "   },
-                                                                 { 630, 260, " xrel=330 yrel=0 "   },
-                                                                 { 580, 200, " xrel=-50 yrel=-60 " } } }) {
+  for (auto [x, y, delta] : std::array<std::tuple<std::uint16_t, std::uint16_t, char const*>, 4>{
+           { { 250, 200, " xrel=50 yrel=50 "   },
+             { 300, 260, " xrel=50 yrel=60 "   },
+             { 630, 260, " xrel=330 yrel=0 "   },
+             { 580, 200, " xrel=-50 yrel=-60 " } } }) {
     ASSERT_NO_FATAL_FAILURE(ThenIgnoredWarpMotion(client, input, x, y, delta));
   }
   SDL_Log("gate IGNORED_WARP deltas=50,50;50,60;330,0;-50,-60");

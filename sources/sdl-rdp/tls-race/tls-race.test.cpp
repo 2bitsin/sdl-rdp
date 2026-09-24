@@ -8,6 +8,7 @@
 #include <sdl-rdp/headless-client.test/client.hpp>
 #include <sdl-rdp/headless-client.test/config.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp-abi/sdl-rdp-backend.h>
 
 #include <gtest/gtest.h>
@@ -18,6 +19,8 @@
 #include <array>
 #include <chrono>
 #include <csignal>
+#include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <future>
 #include <memory>
@@ -37,16 +40,16 @@ using Race::InjectedFaults;
 using Race::MethodFill;
 using Race::Setter;
 using Outcome = auto (*)(int status) -> bool;
-constexpr unsigned Children          = 200;
-constexpr unsigned FaultChildren     = 10;
-constexpr unsigned ChildrenPerWave   = 10;
-constexpr unsigned ChildLimitSeconds = 5;
-constexpr auto     ShortCallLimit    = 250ms;
-constexpr auto     SchedulingSlack   = 1s;
-constexpr int      AcceptRefused     = 1;
-constexpr int      MethodFilledLate  = 2;
-constexpr int      FailedOtherwise   = 4;
-constexpr int      Unbounded         = 8;
+constexpr std::size_t   Children          = 200;
+constexpr std::size_t   FaultChildren     = 10;
+constexpr std::size_t   ChildrenPerWave   = 10;
+constexpr std::uint32_t ChildLimitSeconds = 5;
+constexpr auto          ShortCallLimit    = 250ms;
+constexpr auto          SchedulingSlack   = 1s;
+constexpr int           AcceptRefused     = 1;
+constexpr int           MethodFilledLate  = 2;
+constexpr int           FailedOtherwise   = 4;
+constexpr int           Unbounded         = 8;
 
 auto Child(std::function<int()> const& body) -> Headless::ChildProcess {
   return Headless::ChildProcess{ [&] {
@@ -55,15 +58,15 @@ auto Child(std::function<int()> const& body) -> Headless::ChildProcess {
     return body();
   } };
 }
-auto WaveStatuses(unsigned size, std::function<int()> const& body) -> std::vector<int> {
-  auto children = std::views::iota(0U, size) | std::views::transform([&](unsigned) { return Child(body); })
+auto WaveStatuses(std::size_t size, std::function<int()> const& body) -> std::vector<int> {
+  auto children = std::views::iota(0uz, size) | std::views::transform([&](std::size_t) { return Child(body); })
                   | std::ranges::to<std::vector>();
   return children | std::views::transform([](auto& child) { return child.Wait(); }) | std::ranges::to<std::vector>();
 }
-auto Statuses(unsigned count, std::function<int()> const& body) -> std::vector<int> {
+auto Statuses(std::size_t count, std::function<int()> const& body) -> std::vector<int> {
   utilities::Expects(count % ChildrenPerWave == 0, "the children fill whole waves");
-  return std::views::iota(0U, count / ChildrenPerWave)
-         | std::views::transform([&](unsigned) { return WaveStatuses(ChildrenPerWave, body); }) | std::views::join
+  return std::views::iota(0uz, count / ChildrenPerWave)
+         | std::views::transform([&](std::size_t) { return WaveStatuses(ChildrenPerWave, body); }) | std::views::join
          | std::ranges::to<std::vector>();
 }
 auto ExitedWith(int status, int code) -> bool {
@@ -91,8 +94,8 @@ constexpr std::array<std::pair<std::string_view, Outcome>, 4> Explained{ {
 auto Unexplained(int status) -> bool {
   return std::ranges::none_of(Explained, [status](auto const& outcome) { return outcome.second(status); });
 }
-auto Count(std::vector<int> const& statuses, Outcome outcome) -> unsigned {
-  return unsigned(std::ranges::count_if(statuses, outcome));
+auto Count(std::vector<int> const& statuses, Outcome outcome) -> std::size_t {
+  return Backend::Narrowed<std::size_t>(std::ranges::count_if(statuses, outcome));
 }
 auto RecordOutcomes(std::vector<int> const& statuses) -> void {
   for (auto const& [name, outcome] : Explained)
@@ -154,7 +157,7 @@ auto GivesUpWithin(std::chrono::milliseconds limit, Backend::Credentials const& 
     return std::chrono::steady_clock::now() - start < limit + SchedulingSlack ? 0 : Unbounded;
   }
 }
-auto ExpectCleanChildren(unsigned count, std::function<int()> const& body) -> void {
+auto ExpectCleanChildren(std::size_t count, std::function<int()> const& body) -> void {
   auto const statuses = Statuses(count, body);
   RecordOutcomes(statuses);
   EXPECT_EQ(Count(statuses, Clean), count) << Count(statuses, Unexplained) << " unexplained";

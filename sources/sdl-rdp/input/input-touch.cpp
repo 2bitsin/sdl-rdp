@@ -2,13 +2,14 @@
 #include <sdl-rdp/core/desktop-layout.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <ranges>
 #include <span>
 
 namespace Backend {
 namespace {
-constexpr UINT32 PressureScale = 1024;
-auto Phase(UINT32 flags) -> sdlrdp_touch_phase {
+constexpr std::uint32_t PressureScale = 1024;
+auto Phase(std::uint32_t flags) -> sdlrdp_touch_phase {
   if (flags & RDPINPUT_CONTACT_FLAG_CANCELED) return SDLRDP_TOUCH_CANCEL;
   if (flags & RDPINPUT_CONTACT_FLAG_UP) return SDLRDP_TOUCH_UP;
   if (flags & RDPINPUT_CONTACT_FLAG_DOWN) return SDLRDP_TOUCH_DOWN;
@@ -18,7 +19,7 @@ auto Pressure(RDPINPUT_CONTACT_DATA const& contact) -> float {
   if (!(contact.fieldsPresent & CONTACT_DATA_PRESSURE_PRESENT)) return 1.0F;
   return float(std::min(contact.pressure, PressureScale)) / float(PressureScale);
 }
-auto Unit(INT32 value, int extent) -> float {
+auto Unit(std::int32_t value, int extent) -> float {
   return std::clamp(float(value) / float(extent), 0.0F, 1.0F);
 }
 auto Contact(sdlrdp_rect desktop, RDPINPUT_CONTACT_DATA const& contact) -> sdlrdp_event {
@@ -38,10 +39,10 @@ auto Contacts(RDPINPUT_TOUCH_EVENT const& event) {
          | std::views::join;
 }
 }
-auto InputEvents::Touch(RDPINPUT_TOUCH_EVENT const& event) -> UINT {
-  return WhenActive(UINT{ CHANNEL_RC_OK }, [&] {
+auto InputEvents::Touch(RDPINPUT_TOUCH_EVENT const& event) -> std::uint32_t {
+  return WhenActive(std::uint32_t{ CHANNEL_RC_OK }, [&] {
     for (auto const& contact : Contacts(event)) _events.Push(Contact(_desktop.Rect(), contact));
-    return UINT{ CHANNEL_RC_OK };
+    return std::uint32_t{ CHANNEL_RC_OK };
   });
 }
 }

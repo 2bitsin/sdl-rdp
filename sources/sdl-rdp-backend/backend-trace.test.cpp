@@ -3,6 +3,7 @@
 
 #include <oxbox/utilities/number-text.hpp>
 #include <cstddef>
+#include <cstdint>
 
 namespace BackendGate {
 class TraceGate : public AudioGate {
@@ -16,9 +17,9 @@ protected:
   auto ThenKeyTraced(Client& client) -> void {
     ASSERT_TRUE(std::ranges::contains(UntilEvent(client, SDLRDP_KEY), SDLRDP_KEY, &sdlrdp_event::type));
   }
-  static auto ThenTraceTime(sdlrdp_log_level level, std::string const& line, int64_t now) -> void {
+  static auto ThenTraceTime(sdlrdp_log_level level, std::string const& line, std::int64_t now) -> void {
     EXPECT_EQ(level, SDLRDP_LOG_INFO);
-    auto const time = Backend::Required(oxbox::utilities::ParseNumberAfter<int64_t>(line, " t="),
+    auto const time = Backend::Required(oxbox::utilities::ParseNumberAfter<std::int64_t>(line, " t="),
                                         "trace lines carry a whole-millisecond time");
     EXPECT_LE(std::abs(now - time), 60000) << line;
   }
@@ -34,7 +35,7 @@ protected:
   }
   auto WhenSoundAndPicture(Client& client, SoundClient& audio) -> void {
     auto                      frames = 3 * (audio.CaptureState().rate / 50);
-    std::vector<std::int16_t> pcm(static_cast<std::size_t>(frames) * 2, -1234);
+    std::vector<std::int16_t> pcm(std::size_t{ frames } * 2, -1234);
     ASSERT_EQ(sdlrdp_audio_write(backend.Handle(), pcm.data(), frames), frames);
     ASSERT_NO_FATAL_FAILURE(Present(std::vector<std::uint32_t>(320uz * 200, 0xff123456), 320, 200));
     ASSERT_TRUE(client.Until([&] { return audio.CaptureState().samples.size() == pcm.size() && Acknowledged(); }));

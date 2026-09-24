@@ -2,6 +2,7 @@
 #include "client.hpp"
 
 #include <freerdp/update.h>
+#include <cstdint>
 #include <vector>
 
 namespace Headless {
@@ -14,21 +15,21 @@ public:
   auto     operator=(FrameObserver const&) -> FrameObserver& = delete;
   auto     operator=(FrameObserver&&)      -> FrameObserver& = delete;
 
-  auto Ack()                    -> bool;
-  auto Frames() const           -> std::vector<UINT32> const&;
-  auto ReceivedAt() const       -> std::vector<Clock::time_point> const&;
-  auto AckFrame(UINT32 id)      -> bool;
-  auto Acknowledgements() const -> std::vector<Clock::time_point> const&;
-  auto Coherent() const         -> bool;
-  auto Installed() const        -> bool;
-  auto Clear()                  -> void;
+  auto Ack()                      -> bool;
+  auto Frames() const             -> std::vector<std::uint32_t> const&;
+  auto ReceivedAt() const         -> std::vector<Clock::time_point> const&;
+  auto AckFrame(std::uint32_t id) -> bool;
+  auto Acknowledgements() const   -> std::vector<Clock::time_point> const&;
+  auto Coherent() const           -> bool;
+  auto Installed() const          -> bool;
+  auto Clear()                    -> void;
 
 private:
-  static auto Receive(rdpContext* context, SURFACE_FRAME_MARKER const* marker) -> BOOL;
+  auto Receive(rdpContext const& context, SURFACE_FRAME_MARKER const& marker) -> void;
   inline static thread_local FrameObserver* active    = nullptr;
   rdpUpdate*                                update;
   pSurfaceFrameMarker                       original;
-  std::vector<UINT32>                       ids;
+  std::vector<std::uint32_t>                ids;
   std::vector<Clock::time_point>            received;
   bool                                      coherent  = true;
   std::vector<Clock::time_point>            ack_times;

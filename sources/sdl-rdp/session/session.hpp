@@ -9,6 +9,7 @@
 #include <chrono>
 #include <concepts>
 #include <condition_variable>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <type_traits>
@@ -23,7 +24,7 @@ public:
   [[nodiscard]] auto LockPeersAndFrame()                                  -> PeerFrame;
   auto               Add(std::unique_ptr<Peer> peer)                      -> void;
   auto               Reap()                                               -> void;
-  auto               ReapEvent() const noexcept                           -> HANDLE;
+  auto               ReapEvent() const noexcept                           -> WaitHandle;
   [[nodiscard]] auto Takeover(PeerLink const& self)                       -> FrameLock     override;
   auto               Depart(PeerLink const& self, Activation& activation) -> void          override;
   auto               Current(SessionLock const& held) const               -> Peer*;
@@ -38,7 +39,7 @@ private:
   std::condition_variable_any _audio_changed;
   EventHandle                 _reap;
   Peer*                       _current      { };
-  std::atomic_uint            _next_drive   { 1 };
+  std::atomic<std::uint32_t>  _next_drive   { 1 };
   FrameStore&                 _frames;
   EventQueue&                 _events;
   PeerSet                     _peers;

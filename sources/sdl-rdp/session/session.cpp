@@ -6,13 +6,14 @@
 #include <sdl-rdp/session/peer.hpp>
 
 #include <winpr/synch.h>
+#include <cstdint>
 #include <stdexcept>
 #include <utility>
 
 namespace Backend {
 namespace {
 auto ReapSignal() -> EventHandle {
-  EventHandle signal{ CreateEvent(nullptr, TRUE, FALSE, nullptr) };
+  EventHandle signal{ CreateEvent(nullptr, true, false, nullptr) };
   if (!signal) throw std::runtime_error("peer reaping event allocation failed");
   return signal;
 }
@@ -37,7 +38,7 @@ auto Session::Reap() -> void {
   ResetEvent(_reap.get());
   _peers.Reap();
 }
-auto Session::ReapEvent() const noexcept -> HANDLE {
+auto Session::ReapEvent() const noexcept -> WaitHandle {
   return _reap.get();
 }
 auto Session::Takeover(PeerLink const& self) -> FrameLock {

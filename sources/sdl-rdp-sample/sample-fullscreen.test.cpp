@@ -10,6 +10,7 @@
 #include <sdl-rdp/headless-client.test/frame-observer.hpp>
 #include <sdl-rdp/headless-client.test/input-steps.hpp>
 #include <algorithm>
+#include <cstddef>
 #include <fstream>
 #include <memory>
 #include <ranges>
@@ -137,7 +138,7 @@ protected:
     return ini;
   }
   static auto AcknowledgeCadence(Client& client, Headless::FrameObserver& frames) -> void {
-    for (unsigned i = 0; i < 6; ++i) {
+    for (std::size_t i = 0; i < 6; ++i) {
       auto before = frames.Frames().size();
       std::this_thread::sleep_for(i % 2 ? 20ms : 120ms);
       ASSERT_TRUE(frames.Ack());
@@ -183,8 +184,8 @@ protected:
     ASSERT_TRUE(frames.Ack());
     ASSERT_TRUE(client.Until([&] { return frames.Frames().size() >= initial + 2; }));
   }
-  static auto ThenIncrementalPicture(Client& client, FullDesktopFrames const& desktop, unsigned baseline,
-                                     unsigned deliveries) -> void {
+  static auto ThenIncrementalPicture(Client& client, FullDesktopFrames const& desktop, std::size_t baseline,
+                                     std::size_t deliveries) -> void {
     EXPECT_EQ(desktop.Full(), baseline);
     EXPECT_GT(desktop.Deliveries(), deliveries);
     EXPECT_EQ(client.Instance()->context->gdi->width, 320);
@@ -208,7 +209,7 @@ protected:
     ASSERT_TRUE(frames.Ack());
     ASSERT_TRUE(client.Until([&] { return frames.Frames().size() >= before + 2; }));
     ASSERT_NO_FATAL_FAILURE(ThenIncrementalPicture(client, desktop, baseline, deliveries));
-    SDL_Log("trace exclusive %.*s gdi=%dx%d new_full_desktop=%u frames=%zu", int(change.size()), change.data(),
+    SDL_Log("trace exclusive %.*s gdi=%dx%d new_full_desktop=%zu frames=%zu", int(change.size()), change.data(),
             client.Instance()->context->gdi->width, client.Instance()->context->gdi->height, desktop.Full() - baseline,
             frames.Frames().size() - before);
   }
@@ -216,14 +217,13 @@ protected:
     Expects(process == nullptr, "sample has not started");
     GivenProcess({ "SDL_RDP_CODEC=" + std::string(GetParam()) }, { "--fullscreen", "--mode", "320x200", "--partial" });
   }
-  auto InitialFrames(Client& client, Headless::DisplayClient& /*display*/, Headless::FrameObserver& frames) -> void {
+  auto InitialFrames(Client& client, Headless::DisplayClient& display, Headless::FrameObserver& frames) -> void {
     Expects(process != nullptr, "sample is running");
     ASSERT_TRUE(client.Until([&] { return !frames.Frames().empty(); }));
     auto initial = frames.Frames().size();
     ASSERT_TRUE(frames.Ack());
     ASSERT_TRUE(ReadInput(client, "event FOCUS_GAINED "));
-    ASSERT_TRUE(
-        client.Until([&] { return Headless::DisplayClient::Ready() && frames.Frames().size() >= initial + 2; }));
+    ASSERT_TRUE(client.Until([&] { return display.Ready() && frames.Frames().size() >= initial + 2; }));
     ThenNextWindow(client, frames);
   }
 };
@@ -262,8 +262,8 @@ TEST_F(FullscreenSample, AspectMapsMouse) {
 }
 
 namespace {
-auto ThenRefilledWindow(Client& client, Headless::FrameObserver& observer, std::size_t& acknowledged, unsigned window)
-    -> void {
+auto ThenRefilledWindow(Client& client, Headless::FrameObserver& observer, std::size_t& acknowledged,
+                        std::size_t window) -> void {
   ASSERT_EQ(observer.Frames().size() - acknowledged, window);
   ASSERT_TRUE(observer.Ack());
   acknowledged = observer.Frames().size();
@@ -275,7 +275,7 @@ auto FillSendWindow(Client& client, Headless::FrameObserver& observer) -> void {
   ASSERT_EQ(window, 2u);
   std::size_t acknowledged = 0;
   ASSERT_TRUE(client.Until([&] { return observer.Frames().size() >= window; }));
-  for (unsigned i = 0; i < 30; ++i) {
+  for (std::size_t i = 0; i < 30; ++i) {
     ASSERT_NO_FATAL_FAILURE(ThenRefilledWindow(client, observer, acknowledged, window));
   }
 }

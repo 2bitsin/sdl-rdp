@@ -15,23 +15,23 @@ struct FrameCost {
 };
 class FrameStatistics {
 public:
-  auto Begin(std::chrono::nanoseconds encoded, uint64_t presents) noexcept -> void;
-  auto Sent(FrameCost const& cost, unsigned queued)                        -> void;
-  auto Acknowledged(std::chrono::nanoseconds latency)                      -> void;
-  auto TimedOut(unsigned count) noexcept                                   -> void;
-  auto Summary() const                                                     -> std::string;
-  auto Acknowledgements() const noexcept                                   -> uint64_t;
+  auto Begin(std::chrono::nanoseconds encoded, std::uint64_t presents) noexcept -> void;
+  auto Sent(FrameCost const& cost, std::size_t queued)                          -> void;
+  auto Acknowledged(std::chrono::nanoseconds latency)                           -> void;
+  auto TimedOut(std::size_t count) noexcept                                     -> void;
+  auto Summary() const                                                          -> std::string;
+  auto Acknowledgements() const noexcept                                        -> std::uint64_t;
 
 private:
   auto AvcPhases() const -> std::string;
   RunningStatistics<std::chrono::nanoseconds> _encode;
   RunningStatistics<std::chrono::nanoseconds> _acknowledgement;
-  RunningStatistics<uint64_t>                 _outq;
+  RunningStatistics<std::uint64_t>            _outq;
   Avc::EncodingTimes                          _avc;
-  uint64_t                                    _avc_frames     { };
-  uint64_t                                    _coalesced      { };
-  uint64_t                                    _slow           { };
-  uint64_t                                    _timed_out      { };
+  std::uint64_t                               _avc_frames     { };
+  std::uint64_t                               _coalesced      { };
+  std::uint64_t                               _slow           { };
+  std::uint64_t                               _timed_out      { };
   std::chrono::nanoseconds                    _started        { };
 };
 }

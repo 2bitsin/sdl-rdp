@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <ranges>
 #include <string>
 #include <vector>
@@ -18,13 +19,13 @@ auto ThenBlockCadence(Headless::SoundClient const& audio, bool tight) -> void {
     auto blocks = std::ranges::count_if(audio.CaptureState().received,
                                         [&](auto time) { return time >= start && time < start + 1s; });
     EXPECT_GE(blocks, 45) << "tight=" << tight << " second=" << second;
-    SDL_Log("tone tight=%d second=%d blocks=%zu", tight, second, std::size_t(blocks));
+    SDL_Log("tone tight=%d second=%d blocks=%td", tight, second, blocks);
   });
 }
 auto ThreeSecondsCaptured(Headless::SoundClient const& audio, Headless::FrameObserver const& /*frames*/) -> bool {
   return !audio.CaptureState().received.empty() && Clock::now() >= audio.CaptureState().received.front() + 3s;
 }
-auto ThenLeadCadence(Headless::SoundClient const& audio, size_t first, size_t frames) -> void {
+auto ThenLeadCadence(Headless::SoundClient const& audio, std::size_t first, std::size_t frames) -> void {
   ASSERT_GT(audio.CaptureState().received.size(), first);
   auto const maximum_gap = Headless::MaximumGapMs(std::span(audio.CaptureState().received).subspan(first - 1));
   auto       sent_frames = (audio.CaptureState().samples.size() / 2) - frames;
@@ -44,9 +45,9 @@ TEST_F(AudioSample, BlockCadence) {
 TEST_F(AudioDriver, NoClientTenSecondClock) {
   EXPECT_EQ(SDL_WasInit(SDL_INIT_VIDEO), 0u);
   EXPECT_STREQ(SDL_GetCurrentAudioDriver(), "rdp");
-  std::vector<Sint16> frames(480000uz * 2, 1000);
-  auto                started  = PlayFlushed(frames);
-  auto                deadline = started + 30s;
+  std::vector<std::int16_t> frames(480000uz * 2, 1000);
+  auto                      started  = PlayFlushed(frames);
+  auto                      deadline = started + 30s;
   while (SDL_GetAudioStreamQueued(stream.get()) > 0 && Clock::now() < deadline) SDL_Delay(5);
   auto elapsed = std::chrono::duration<double>(Clock::now() - started).count();
   EXPECT_EQ(SDL_GetAudioStreamQueued(stream.get()), 0);
@@ -79,8 +80,8 @@ TEST_F(AudioDriver, ZeroLeadKeepsRealtimeClock) {
   stream.reset();
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_AUDIO_LEAD, "0"));
   ASSERT_NO_FATAL_FAILURE(OpenStream());
-  std::vector<Sint16> const pcm(48000uz * 2, 1234);
-  auto const                started = PlayFlushed(pcm);
+  std::vector<std::int16_t> const pcm(48000uz * 2, 1234);
+  auto const                      started = PlayFlushed(pcm);
   while (SDL_GetAudioStreamQueued(stream.get()) > 0 && Clock::now() < started + 3s) SDL_Delay(1);
   EXPECT_EQ(SDL_GetAudioStreamQueued(stream.get()), 0);
   EXPECT_GE(Clock::now() - started, 990ms);

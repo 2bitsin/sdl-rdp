@@ -5,6 +5,7 @@
 #include <sdl-rdp/sample-gate.test/sample-launch.hpp>
 
 #include <SDL3/SDL.h>
+#include <cstdint>
 #include <format>
 #include <utility>
 
@@ -18,7 +19,7 @@ auto SampleDesktopSteps::PressFullscreenKey(Client& client) -> void {
   ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x3e));
   ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x3e));
 }
-auto SampleDesktopSteps::WhenUnicodeClipboardOffered(Client& client, std::vector<BYTE> const& bytes) -> void {
+auto SampleDesktopSteps::WhenUnicodeClipboardOffered(Client& client, std::vector<std::uint8_t> const& bytes) -> void {
   ASSERT_EQ(ClipboardSession().Offer(bytes), CHANNEL_RC_OK);
   ASSERT_TRUE(client.Until([&] { return ClipboardSession().Observed().requests.load() == 2; }));
   ASSERT_TRUE(Read("event CLIPBOARD text=żółw"));
@@ -41,14 +42,14 @@ auto SampleDesktopSteps::ThenSizeEvents(std::string const& dimensions) -> void {
   ASSERT_TRUE(Read("event PIXEL_SIZE_CHANGED "));
   EXPECT_TRUE(line.ends_with(dimensions)) << line;
 }
-auto SampleDesktopSteps::ThenDesktopMode(Client& client, unsigned w, unsigned h) -> void {
+auto SampleDesktopSteps::ThenDesktopMode(Client& client, std::uint32_t w, std::uint32_t h) -> void {
   ASSERT_TRUE(ReadInput(client, "event DISPLAY_DESKTOP_MODE_CHANGED type="
                                     + std::to_string(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED)
                                     + std::format(" width={} height={}", w, h)));
   ASSERT_TRUE(Read(std::format("event GEOMETRY window={}x{} desktop={}x{}", w, h, w, h)));
   ASSERT_TRUE(client.UntilDesktop(w, h));
 }
-auto SampleDesktopSteps::ThenWaitingPort(unsigned port) -> void {
+auto SampleDesktopSteps::ThenWaitingPort(std::uint32_t port) -> void {
   ASSERT_TRUE(Read("port ")) << "port after connection: " << process->Transcript();
   ASSERT_EQ(AnnouncedPort(line), port) << line;
 }
@@ -61,8 +62,8 @@ auto SampleDesktopSteps::WhenCodecKeyChanges(Client const& client) -> void {
 }
 auto SampleDesktopSteps::GivenSwitchableCodec(Client const& client) -> void {
   auto* settings = client.Instance()->context->settings;
-  ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_RemoteFxCodec, TRUE));
-  ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_NSCodec, TRUE));
+  ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_RemoteFxCodec, true));
+  ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_NSCodec, true));
   ASSERT_NO_FATAL_FAILURE(Connect(client));
 }
 auto SampleDesktopSteps::ThenTakeoverEvent(char const* expected) -> void {
@@ -78,7 +79,7 @@ auto SampleDesktopSteps::WhenSmallerDesktop(Client& first) -> void {
   ASSERT_TRUE(first.Disconnect());
   ASSERT_TRUE(Read("event FOCUS_LOST "));
 }
-auto SampleDesktopSteps::WhenWholeSampleReconnects(Client const& client, unsigned port) -> void {
+auto SampleDesktopSteps::WhenWholeSampleReconnects(Client const& client, std::uint32_t port) -> void {
   ASSERT_TRUE(client.Disconnect()) << "disconnect";
   ASSERT_TRUE(Read("event OCCLUDED ")) << "OCCLUDED: " << process->Transcript();
   ASSERT_TRUE(Read("event FOCUS_LOST ")) << "FOCUS_LOST: " << process->Transcript();

@@ -1,12 +1,13 @@
 #include <sdl-rdp/sample-gate.test/frame-pattern.hpp>
 
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <ranges>
 
 namespace SampleGate {
-auto PatternPixel(rdpGdi const* gdi, int index) -> UINT32 {
-  UINT32 value = 0;
+auto PatternPixel(rdpGdi const* gdi, int index) -> std::uint32_t {
+  std::uint32_t value = 0;
   std::memcpy(&value,
               gdi->primary_buffer + (static_cast<std::size_t>((index / 640)) * gdi->stride)
                   + ((static_cast<std::ptrdiff_t>(index % 640)) * 4),

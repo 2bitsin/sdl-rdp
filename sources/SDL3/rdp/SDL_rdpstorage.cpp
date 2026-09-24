@@ -1,6 +1,9 @@
 #include "SDL_rdpdrive.hpp"
 #include "SDL_rdpowneddriver.hpp"
 #include "boundary.hpp"
+#include <sdl-rdp/utilities/narrowed.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <span>
 namespace rdp {
 namespace {
@@ -12,7 +15,7 @@ public:
   using OwnedDriver<Driver const>::Owner;
        Storage(std::shared_ptr<Driver const> driver, std::optional<std::string> name)
       : OwnedDriver<Driver const>{ std::move(driver) }, _name{ std::move(name) } { }
-  auto Drive() const -> unsigned {
+  auto Drive() const -> std::uint32_t {
     return _drive;
   }
   auto Resolve() -> void {
@@ -57,10 +60,10 @@ auto DirectoryPrefix(std::string_view path) -> std::string {
   if (!prefix.empty() && !prefix.ends_with('/')) prefix += '/';
   return prefix;
 }
-auto ReadDirectory(Storage const& data, std::string const& path, unsigned offset, std::span<sdlrdp_dirent> entries)
+auto ReadDirectory(Storage const& data, std::string const& path, std::uint32_t offset, std::span<sdlrdp_dirent> entries)
     -> std::span<sdlrdp_dirent const> {
-  auto const count = data.Backend().Call<Operation::DRIVE_ENUMERATE>(data.Drive(), path.c_str(), offset, entries.data(),
-                                                                     static_cast<unsigned>(entries.size()));
+  auto const count = data.Backend().Call<Operation::DRIVE_ENUMERATE>(
+      data.Drive(), path.c_str(), offset, entries.data(), ::Backend::Narrowed<std::uint32_t>(entries.size()));
   if (count < 0) data.Backend().Throw();
   utilities::Ensures(std::cmp_less_equal(count, entries.size()), "backend fills at most the directory buffer");
   return entries.first(static_cast<std::size_t>(count));
@@ -76,7 +79,7 @@ auto Enumerate(Storage const& data, std::string const& path, SDL_EnumerateDirect
     -> bool {
   auto const                                directory = DirectoryPrefix(path);
   std::array<sdlrdp_dirent, DirectoryBatch> entries   { };
-  for (unsigned offset{ };; offset += static_cast<unsigned>(entries.size())) {
+  for (std::uint32_t offset{ };; offset += ::Backend::Narrowed<std::uint32_t>(entries.size())) {
     auto const batch  = ReadDirectory(data, path, offset, entries);
     auto const result = Deliver(batch, directory, callback, user);
     if (result != SDL_ENUM_CONTINUE) return result == SDL_ENUM_SUCCESS;
@@ -89,23 +92,23 @@ auto StorageEnumerate(void* context, char const* path, SDL_EnumerateDirectoryCal
   auto const& data = Opened(context);
   return Boundary([&] { return Enumerate(data, std::string{ path }, callback, user); });
 }
-template <typename _Byte>
-  requires IoBuffer<_Byte>
-auto TransferAll(SDL_IOStream& stream, _Byte* buffer, std::size_t length) -> std::size_t {
-  if constexpr (std::is_const_v<_Byte>)
+template <typename ByteTy>
+  requires IoBuffer<ByteTy>
+auto TransferAll(SDL_IOStream& stream, ByteTy* buffer, std::size_t length) -> std::size_t {
+  if constexpr (std::is_const_v<ByteTy>)
     return SDL_WriteIO(&stream, buffer, length);
   else
     return SDL_ReadIO(&stream, buffer, length);
 }
 // SDL storage transfer callbacks provide counted raw buffers and borrowed paths.
-template <typename _Byte>
-  requires IoBuffer<_Byte>
-auto StorageTransfer(void* context, char const* path, _Byte* buffer, Uint64 length) -> bool {
+template <typename ByteTy>
+  requires IoBuffer<ByteTy>
+auto StorageTransfer(void* context, char const* path, ByteTy* buffer, std::uint64_t length) -> bool {
   utilities::Expects(path != nullptr, "storage transfer has a path");
   auto const& data = Opened(context);
   return Boundary([&] {
     if (!std::in_range<std::size_t>(length)) return SDL_SetError("RDP storage transfer too large");
-    FileMode const mode   { std::is_const_v<_Byte> ? "wb" : "rb" };
+    FileMode const mode   { std::is_const_v<ByteTy> ? "wb" : "rb" };
     auto           file   = OpenDriveFile(data.Owner(), data.Drive(), path, mode);
     auto const     count  = TransferAll(*file.Get(), buffer, static_cast<std::size_t>(length));
     auto const     closed = file.Close();
@@ -113,15 +116,15 @@ auto StorageTransfer(void* context, char const* path, _Byte* buffer, Uint64 leng
   });
 }
 // SDL storage mutation callbacks supply an opaque context and one or more borrowed paths.
-template <Operation _Operation, typename... _Path>
-  requires(std::same_as<_Path, char const*> && ...)
-auto StorageMutate(void* context, _Path... path) -> bool {
+template <Operation OPERATION, typename... PathTy>
+  requires(std::same_as<PathTy, char const*> && ...)
+auto StorageMutate(void* context, PathTy... path) -> bool {
   (utilities::Expects(path != nullptr, "storage mutation has its paths"), ...);
   auto const& data = Opened(context);
-  return data.Backend().Call<_Operation>(data.Drive(), path...) >= 0 || data.Backend().Fail();
+  return data.Backend().Call<OPERATION>(data.Drive(), path...) >= 0 || data.Backend().Fail();
 }
 auto CopyStream(SDL_IOStream& source, SDL_IOStream& target) -> bool {
-  std::array<Uint8, CopyChunkBytes> buffer{ };
+  std::array<std::uint8_t, CopyChunkBytes> buffer{ };
   for (auto count = SDL_ReadIO(&source, buffer.data(), buffer.size()); count;
        count = SDL_ReadIO(&source, buffer.data(), buffer.size()))
     if (SDL_WriteIO(&target, buffer.data(), count) != count) return false;
@@ -143,9 +146,9 @@ auto StorageCopy(void* context, char const* from, char const* to) -> bool {
   });
 }
 // SDL storage space callbacks supply their opaque state.
-auto StorageSpace([[maybe_unused]] void* unused_context) -> Uint64 {
+auto StorageSpace([[maybe_unused]] void* unused_context) -> std::uint64_t {
   utilities::NotImplemented("RDP backend ABI has no free-space query");
-  constexpr Uint64 unknown_space = 0;
+  constexpr std::uint64_t unknown_space = 0;
   return unknown_space;
 }
 // SDL's storage bootstrap lends the name and takes ownership of the returned storage.
@@ -180,4 +183,4 @@ auto UserStorageOpen([[maybe_unused]] char const* organization, char const* app,
 // SDL's C title storage table requires this named object with static storage.
 extern "C" TitleStorageBootStrap const RDP_titlebootstrap = { "rdp", "RDP client drive storage", rdp::StorageOpen };
 // SDL's C user storage table requires this named object with static storage.
-extern "C" UserStorageBootStrap const RDP_userbootstrap   = { "rdp", "RDP client drive storage", rdp::UserStorageOpen };
+extern "C" UserStorageBootStrap const RDP_userbootstrap = { "rdp", "RDP client drive storage", rdp::UserStorageOpen };

@@ -10,18 +10,19 @@
 #include <freerdp/settings.h>
 #include <algorithm>
 #include <array>
+#include <cstdint>
 
 namespace Backend {
 namespace {
-constexpr std::array<UINT32, 3> ColourDepths{ 16, 24, 32 };
+constexpr std::array<std::uint32_t, 3> ColourDepths{ 16, 24, 32 };
 }
 CapabilityCheck::CapabilityCheck(PeerLink& link, Authenticator& authenticator, Activation const& activation,
                                  FramePacing& pacing, DesktopLayout& desktop, FrameStore& store,
                                  Diagnostics const& diagnostics) noexcept
     : _link{ link }, _authenticator{ authenticator }, _activation{ activation }, _pacing{ pacing }, _desktop{ desktop },
       _store{ store }, _diagnostics{ diagnostics } { }
-auto CapabilityCheck::Accept() -> BOOL {
-  if (!_authenticator.VerifySettings()) return FALSE;
+auto CapabilityCheck::Accept() -> bool {
+  if (!_authenticator.VerifySettings()) return false;
   auto&      settings = _link.Settings();
   auto const frame    = _store.Lock();
   if (!_activation.Activated()) {
@@ -30,7 +31,7 @@ auto CapabilityCheck::Accept() -> BOOL {
   }
   if (!std::ranges::contains(ColourDepths, freerdp_settings_get_uint32(&settings, FreeRDP_ColorDepth))) {
     _diagnostics.Log(SDLRDP_LOG_WARN, "Connection refused: colour depth must be 16, 24 or 32 bpp.");
-    return FALSE;
+    return false;
   }
   return ApplyDesktopSize(settings, _desktop.Offer(_store.Picture(frame)));
 }

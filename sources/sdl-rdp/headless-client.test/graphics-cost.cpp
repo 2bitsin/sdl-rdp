@@ -5,6 +5,7 @@
 #include <sdl-rdp/headless-client.test/peer-status.hpp>
 
 #include <array>
+#include <cstdint>
 #include <regex>
 #include <string>
 #include <utility>
@@ -36,20 +37,20 @@ auto GraphicsCost::ThenProgressiveCost(Client& client, GraphicsObserver& observe
   backend.Close();
   RecordProgressiveCost(logs);
 }
-auto GraphicsCost::AwaitAcknowledgement(Client& client, uint64_t sequence) -> void {
+auto GraphicsCost::AwaitAcknowledgement(Client& client, std::uint64_t sequence) -> void {
   ASSERT_TRUE(client.Until([&] {
     auto const status = BackendGate::CurrentStatus(*backend);
     return status && status->acknowledged == sequence;
   })) << logs.Text(true);
 }
-auto GraphicsCost::Open(unsigned width, unsigned height, sdlrdp_codec codec) -> void {
+auto GraphicsCost::Open(std::uint32_t width, std::uint32_t height, sdlrdp_codec codec) -> void {
   auto pattern = std::to_array("/tmp/sdlrdp-cost-XXXXXX");
   OpenGraphics(pattern.data(), width, height, codec);
 }
-auto GraphicsCost::PresentMovingTiles(Client& client, std::uint32_t frames) -> void {
+auto GraphicsCost::PresentMovingTiles(Client& client, std::size_t frames) -> void {
   std::vector<std::uint32_t> pixels(1920uz * 1080);
   sdlrdp_rect const          full  { 0, 0, 1920, 1080 };
-  for (std::uint32_t frame = 0; frame < frames; ++frame) {
+  for (std::size_t frame = 0; frame < frames; ++frame) {
     MovingTilePattern(pixels, 1920, 1080, frame);
     ASSERT_EQ(backend.Present(pixels, 1920, 1080, full), 0);
     ASSERT_NO_FATAL_FAILURE(AwaitAcknowledgement(client, frame + 1));

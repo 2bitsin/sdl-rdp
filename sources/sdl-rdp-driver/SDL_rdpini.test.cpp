@@ -1,5 +1,6 @@
 #include <sdl-rdp-driver/SDL_rdpini.hpp>
 #include <gtest/gtest.h>
+#include <cstddef>
 #include <map>
 #include <string>
 #include <vector>
@@ -10,7 +11,7 @@ public:
   struct Warning {
     rdp::IniStatus status;
     std::string    key;
-    unsigned       line;
+    std::size_t    line;
   };
   explicit Ini(std::string const& text) {
     rdp::ParseIni(text, [this](rdp::IniEntry entry) {

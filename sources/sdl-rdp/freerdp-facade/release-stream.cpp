@@ -2,6 +2,6 @@
 
 namespace Backend {
 auto ReleaseStream::operator()(wStream* stream) const -> void {
-  Stream_Free(stream, TRUE);
+  Stream_Free(stream, true);
 }
 }

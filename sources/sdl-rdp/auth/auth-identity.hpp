@@ -19,7 +19,7 @@ struct IdentityNames {
 inline auto QualifiedName(std::string_view domain, std::string_view user) -> std::string {
   return domain.empty() ? std::string(user) : std::string(domain) + "\\" + std::string(user);
 }
-inline auto IdentityText(std::span<uint16_t const> utf16) -> std::string {
+inline auto IdentityText(std::span<std::uint16_t const> utf16) -> std::string {
   using oxbox::utilities::Encoding;
   return TranscodeRange<std::string>(oxbox::utilities::SpanCast<std::byte const>(utf16),
                                      { .encoding = Encoding::UTF16, .order = std::endian::native }, { });
@@ -29,7 +29,7 @@ inline auto IdentityText(std::span<char const> utf8) -> std::string {
   return TranscodeRange<std::string>(oxbox::utilities::AsBytes(utf8),
                                      { .encoding = Encoding::UTF8, .order = std::endian::native }, { });
 }
-inline auto IdentityText(std::span<uint8_t const> utf8) -> std::string {
+inline auto IdentityText(std::span<std::uint8_t const> utf8) -> std::string {
   return IdentityText(oxbox::utilities::SpanCast<char const>(utf8));
 }
 template <class Unit> auto IdentityField(Unit const* text, std::size_t length) -> std::span<Unit const> {

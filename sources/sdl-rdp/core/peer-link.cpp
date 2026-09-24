@@ -4,6 +4,7 @@
 
 #include <freerdp/channels/wtsvc.h>
 #include <winpr/synch.h>
+#include <cstdint>
 #include <stdexcept>
 #include <utility>
 
@@ -22,7 +23,7 @@ auto OpenChannelManager(rdpContext* context) -> ChannelManager {
 }
 PeerLink::PeerLink(PeerHandle accepted)
     : _client{ Accepted(std::move(accepted)) }, _socket{ _client->sockfd },
-      _wake{ CreateEvent(nullptr, TRUE, FALSE, nullptr) } {
+      _wake{ CreateEvent(nullptr, true, false, nullptr) } {
   if (!_wake) throw std::runtime_error("peer event allocation failed");
   if (!freerdp_peer_context_new(_client.get())) throw std::runtime_error("peer context failed");
   _channels = OpenChannelManager(_client->context);
@@ -36,7 +37,7 @@ auto PeerLink::Context() const noexcept -> rdpContext& {
 auto PeerLink::Settings() const noexcept -> rdpSettings& {
   return *_client->context->settings;
 }
-auto PeerLink::Channels() const noexcept -> HANDLE {
+auto PeerLink::Channels() const noexcept -> WaitHandle {
   return _channels.get();
 }
 auto PeerLink::Dynamic() noexcept -> DynamicChannels& {
@@ -54,13 +55,13 @@ auto PeerLink::Signal() -> void {
 auto PeerLink::Settle() -> void {
   _wake.Transition(WakeEvent::Phase::Idle);
 }
-auto PeerLink::Wake() const noexcept -> HANDLE {
+auto PeerLink::Wake() const noexcept -> WaitHandle {
   return _wake.get();
 }
 auto PeerLink::Invalidate() noexcept -> void {
   _handle_count = 0;
 }
-auto PeerLink::Refuse(UINT32 reason) -> void {
+auto PeerLink::Refuse(std::uint32_t reason) -> void {
   freerdp_set_error_info(_client->context->rdp, reason);
   freerdp_send_error_info(_client->context->rdp);
 }

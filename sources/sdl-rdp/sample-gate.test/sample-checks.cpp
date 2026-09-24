@@ -10,16 +10,18 @@
 #include <sdl-rdp/headless-client.test/share-drive.hpp>
 #include <algorithm>
 #include <array>
+#include <cstddef>
+#include <cstdint>
 #include <span>
 
 namespace SampleGate {
 namespace {
 auto ThenWrittenBytes(std::string const& output) -> void {
-  for (size_t i = 0; i < output.size(); ++i) {
+  for (std::size_t i = 0; i < output.size(); ++i) {
     auto expected = i >= 1024uz * 1024 && i < static_cast<std::ptrdiff_t>(2 * 1024) * 1024
                         ? 0
                         : (i % (1024uz * 1024)) % 251;
-    ASSERT_EQ(static_cast<unsigned char>(output[i]), expected) << i;
+    ASSERT_EQ(static_cast<std::uint8_t>(output[i]), expected) << i;
   }
 }
 }
@@ -74,8 +76,8 @@ auto SampleChecks::WhenUnicodeKeys(rdpInput* input) -> void {
   WhenNonAsciiKey(input);
 }
 auto SampleChecks::ThenDriveOutput(fs::path const& share, std::string const& original) -> void {
-  std::array<unsigned char, EVP_MAX_MD_SIZE> digest { };
-  unsigned                                   length = 0;
+  std::array<std::uint8_t, EVP_MAX_MD_SIZE> digest { };
+  std::uint32_t                             length = 0;
   ASSERT_EQ(EVP_Digest(original.data(), original.size(), digest.data(), &length, EVP_sha256(), nullptr), 1);
   auto hex = oxbox::utilities::ToHex(std::as_bytes(std::span(digest).first(length)));
   ASSERT_TRUE(Read("cat bytes=21 sha256=" + hex)) << process->Transcript();
@@ -111,7 +113,7 @@ auto SampleChecks::ThenReloadedIni(fs::path const& file) -> void {
   ASSERT_TRUE(SDL_Init(SDL_INIT_VIDEO)) << SDL_GetError();
   ThenReloadedAspect();
 }
-auto SampleChecks::DisconnectReading(unsigned port, fs::path const& share) -> void {
+auto SampleChecks::DisconnectReading(std::uint32_t port, fs::path const& share) -> void {
   {
     Client client(port, true, 640, 480);
     Headless::ShareDrive(client, share.c_str());
@@ -120,7 +122,7 @@ auto SampleChecks::DisconnectReading(unsigned port, fs::path const& share) -> vo
     ASSERT_TRUE(client.Until([&] {
       return std::ranges::any_of(observer.Observed().io, [](Backend::DrivePacket packet) {
         packet.Skip(12);
-        return packet.Read<uint32_t>() == IRP_MJ_READ;
+        return packet.Read<std::uint32_t>() == IRP_MJ_READ;
       });
     }));
     ASSERT_TRUE(client.Disconnect());

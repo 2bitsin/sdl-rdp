@@ -4,6 +4,7 @@
 #include <sdl-rdp-abi/sdl-rdp-backend.h>
 
 #include <freerdp/peer.h>
+#include <cstdint>
 
 namespace Backend {
 class Configuration;
@@ -12,16 +13,16 @@ class PeerLink;
 class Authenticator : private Pinned {
 public:
        Authenticator(PeerLink& link, Configuration const& configuration, Diagnostics const& diagnostics) noexcept;
-  auto Logon(BOOL automatic)                                         -> BOOL;
-  auto VerifySettings()                                              -> bool;
-  auto Hash(SEC_WINNT_AUTH_IDENTITY const& identity, BYTE* response) -> bool;
-  auto End()                                                         -> void;
+  auto Logon(bool automatic)                                                 -> bool;
+  auto VerifySettings()                                                      -> bool;
+  auto Hash(SEC_WINNT_AUTH_IDENTITY const& identity, std::uint8_t* response) -> bool;
+  auto End()                                                                 -> void;
 
 private:
-  auto Reject()                                                             -> void;
-  auto Verify(char const* domain, char const* user, char const* password)   -> bool;
-  auto Denied()                                                             -> bool;
-  auto ResponseKey(SEC_WINNT_AUTH_IDENTITY const& identity, BYTE* response) -> bool;
+  auto Reject()                                                                     -> void;
+  auto Verify(char const* domain, char const* user, char const* password)           -> bool;
+  auto Denied()                                                                     -> bool;
+  auto ResponseKey(SEC_WINNT_AUTH_IDENTITY const& identity, std::uint8_t* response) -> bool;
   PeerLink&            _link;
   Configuration const& _configuration;
   Diagnostics const&   _diagnostics;

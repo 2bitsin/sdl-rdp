@@ -5,6 +5,7 @@
 #include <sdl-rdp/utilities/pinned.hpp>
 #include <sdl-rdp-abi/sdl-rdp-backend.h>
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <stop_token>
@@ -19,7 +20,7 @@ using PeerFactory = std::move_only_function<std::unique_ptr<Peer>(PeerHandle)>;
 class Listener : private Pinned {
 public:
        Listener(Configuration const& configuration, Diagnostics const& diagnostics, Session& session, PeerFactory make);
-  auto Port() const noexcept -> unsigned;
+  auto Port() const noexcept -> std::uint32_t;
 
 private:
   auto Accept(freerdp_peer* client)        -> void;
@@ -29,7 +30,7 @@ private:
   PeerFactory        _make;
   ListenerHandle     _listener;
   EventHandle        _stop;
-  unsigned           _port       { };
+  std::uint32_t      _port       { };
   std::jthread       _thread;
 };
 }

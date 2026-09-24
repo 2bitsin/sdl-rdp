@@ -75,9 +75,12 @@ def align(text):
         id='function_pointer_declarations',
     ),
     pytest.param(
-        '  auto Name(int x) -> Ret;\n  // continuation\n  [[nodiscard]] auto Longer() -> bool;\n',
-        '  auto               Name(int x) -> Ret;\n  // continuation\n'
-        '  [[nodiscard]] auto Longer()    -> bool;\n',
+        '  auto Name(int x) -> Ret;\n  [[nodiscard]] auto Longer() -> bool;\n'
+        '  // continuation\n  auto Last() -> int;\n',
+        '  auto               Name(int x) -> Ret;\n'
+        '  [[nodiscard]] auto Longer()    -> bool;\n'
+        '  // continuation\n'
+        '  auto Last() -> int;\n',
         id='trailing_return_member_run',
     ),
     pytest.param(
@@ -214,10 +217,10 @@ def align(text):
         'int a{1};\n'
         '// stays\n'
         'int longer{22};\n',
-        'int a     { 1  };\n'
+        'int a{ 1 };\n'
         '// stays\n'
         'int longer{ 22 };\n',
-        id='comment_only_continues_group',
+        id='comment_only_ends_group',
     ),
     pytest.param(
         'int a{1};\n'
@@ -534,10 +537,10 @@ def test_overflow_collapses_padding_and_check_reports_it(tmp_path, capsys):
 
 @pytest.mark.parametrize(('source', 'expected'), [
     (
-        'struct Peer {\n  Peer();\n  // member declarations\n'
-        '  unsigned Count(int first,\n                 int second);\n};\n',
-        'struct Peer {\n           Peer();\n  // member declarations\n'
-        '  unsigned Count(int first,\n                 int second);\n};\n',
+        'struct Peer {\n  Peer();\n'
+        '  unsigned Count(int first,\n                 int second);\n  // member declarations\n  bool Ready();\n};\n',
+        'struct Peer {\n           Peer();\n'
+        '  unsigned Count(int first,\n                 int second);\n  // member declarations\n  bool Ready();\n};\n',
     ),
     (
         'int    long_name =   f("keep   spaces",   ' + 'x' * 110 + '); // keep   comment\n',
@@ -699,11 +702,11 @@ def test_uppercase_calls_keep_control_flow_indentation():
         '/* keep   this\n'
         ' * block   intact */\n'
         'long longer{22};\n',
-        'int  a     { 1  };\n'
+        'int a{ 1 };\n'
         '/* keep   this\n'
         ' * block   intact */\n'
         'long longer{ 22 };\n',
-        id='comment_block_continues_run',
+        id='comment_block_ends_run',
     ),
     pytest.param(
         'if  (ready)   Invoke("keep   this",  \' \');\n'
@@ -891,7 +894,7 @@ AUDIO = '''\
 '''
 
 AUDIO_EXPECTED = '''\
-  sound->num_server_formats          = 2;
+  sound->num_server_formats = 2;
   // mstsc plays 48 kHz at its 44.1 kHz device rate (measured 2026-09-23).
   sound->server_formats[0]           = { .wFormatTag      = WAVE_FORMAT_PCM,
                                          .nChannels       = 2,

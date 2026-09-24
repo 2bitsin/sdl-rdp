@@ -2,6 +2,7 @@
 #include "SDL_rdpconstants.hpp"
 #include "boundary.hpp"
 #include <oxbox/utilities/hash.hpp>
+#include <cstdint>
 namespace rdp {
 using namespace oxbox::utilities::literals;
 auto SetAspect(Driver const& driver, std::optional<std::string> const& value) -> void {
@@ -15,7 +16,7 @@ namespace {
 constexpr int DefaultRefreshHz = 60;
 constexpr int MaximumRefreshHz = SDL_MAX_SINT32 / MillihertzPerHertz;
 // Values are the frozen backend set_refresh mode argument.
-enum class    RefreshMode      : unsigned { FIXED = 0, CLIENT = 1, CLIENT_AVERAGE = 2, SENDER = 3 };
+enum class RefreshMode : std::uint32_t { FIXED = 0, CLIENT = 1, CLIENT_AVERAGE = 2, SENDER = 3 };
 auto ApplyCodec(SDL_VideoData& data, std::optional<std::string> const& value) -> void {
   if (data.Backend().Call<Operation::SET_CODEC>(Codec(value)) != 0) data.Backend().Throw();
 }
@@ -24,12 +25,12 @@ auto ApplyAspect(SDL_VideoData& data, std::optional<std::string> const& value) -
   if (auto const window = data.Window()) PublishAspect(*window, value);
 }
 // SDL hint observers receive an opaque context and nullable C strings.
-template <auto _Apply>
+template <auto APPLY>
 auto SDLCALL HintChanged(void* context, char const* name, char const* old_value, char const* new_value) -> void {
   utilities::Expects(context != nullptr, "hint observer has video state");
   utilities::Expects(name != nullptr, "hint observer has a name");
   auto& data = *static_cast<SDL_VideoData*>(context);
-  Boundary([&] { _Apply(data, data.Backend().Options().Changed(name, Text(old_value), Text(new_value))); });
+  Boundary([&] { APPLY(data, data.Backend().Options().Changed(name, Text(old_value), Text(new_value))); });
 }
 auto ConfiguredRefresh(Settings const& settings) -> RefreshMode {
   switch (oxbox::utilities::HashString(settings.Get(SDL_HINT_RDP_REFRESH).value_or(""))) {

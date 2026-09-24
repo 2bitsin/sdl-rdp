@@ -9,6 +9,7 @@
 #include <sdl-rdp/headless-client.test/io.hpp>
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <format>
 #include <memory>
@@ -45,11 +46,11 @@ TEST_F(Sample, DriveCommands) {
 }
 namespace {
 auto ThenStorageEntries(SDL_Storage* storage) -> void {
-  unsigned entries = 0;
+  std::size_t entries = 0;
   EXPECT_TRUE(SDL_EnumerateStorageDirectory(
       storage, "",
       [](void* data, char const*, char const* name) {
-        if (std::string_view(name) == "whole") ++*static_cast<unsigned*>(data);
+        if (std::string_view(name) == "whole") ++*static_cast<std::uint32_t*>(data);
         return SDL_ENUM_CONTINUE;
       },
       &entries));

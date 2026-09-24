@@ -3,11 +3,14 @@
 #include <sdl-rdp/headless-client.test/mode.hpp>
 #include <sdl-rdp/headless-client.test/pattern.hpp>
 #include <sdl-rdp/headless-client.test/waiting-open.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/utilities/system-call.hpp>
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <future>
+#include <utility>
 
 namespace BackendGate {
 namespace {
@@ -77,7 +80,7 @@ TEST_P(Gate, DesktopIsPicture) {
   sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), 640, 480, 0, Logs::Collect, &logs };
   config.codec = GetParam().codec;
   ASSERT_NO_FATAL_FAILURE(backend.Open(config));
-  std::vector<UINT32> frame(640uz * 480);
+  std::vector<std::uint32_t> frame(640uz * 480);
   Headless::HashPattern(frame);
   sdlrdp_rect const area{ 0, 0, 640, 480 };
   ASSERT_EQ(backend.Present(frame, 640, 480, area), 0);
@@ -94,7 +97,7 @@ TEST_P(Gate, WaitForClient) {
   auto              port    = opening.Receive(std::chrono::seconds(15)).value_or(0);
   ASSERT_GT(port, 0);
   EXPECT_FALSE(opening.Receive(std::chrono::milliseconds(0)).has_value());
-  Client client(unsigned(port), GetParam().surface);
+  Client client(Backend::Narrowed<std::uint32_t>(port), GetParam().surface);
   ASSERT_NO_FATAL_FAILURE(ConnectCodec(client));
   EXPECT_EQ(opening.Receive(std::chrono::seconds(15)), std::optional(0));
 }
@@ -108,10 +111,10 @@ TEST_P(Gate, BlockedSinglePresent) {
   ASSERT_EQ(events.front().type, SDLRDP_CONNECTED);
   pixels.resize(2048uz * 1536);
   Headless::HashPattern(pixels);
-  sdlrdp_rect area       { 0, 0, 2048, 1536 };
+  sdlrdp_rect area{ 0, 0, 2048, 1536 };
   // Keep the client unpumped until the presenter completes. Completion therefore
   // cannot depend on the client draining output; ten seconds is a progress bound.
-  auto        presenting = std::async(std::launch::async, [&] { return backend.Present(pixels, 2048, 1536, area); });
+  auto presenting = std::async(std::launch::async, [&] { return backend.Present(pixels, 2048, 1536, area); });
   ASSERT_NO_FATAL_FAILURE(ThenUnblockedPresent(presenting, client));
   EXPECT_TRUE(client.Until([&] { return client.Matches(pixels); }))
       << "maximum channel error " << client.MaxError(pixels);
@@ -140,7 +143,8 @@ TEST_P(Gate, LiveCodecChange) {
        { SDLRDP_CODEC_RAW, SDLRDP_CODEC_PLANAR, SDLRDP_CODEC_REMOTEFX, SDLRDP_CODEC_NSCODEC, SDLRDP_CODEC_AUTO }) {
     ASSERT_EQ(sdlrdp_set_codec(backend.Handle(), codec), 0);
     client.Tolerance(CodecTolerance(codec, GetParam().surface));
-    std::ranges::fill(pixels, 0x00404040u + (unsigned(codec) * 0x00040404u));
+    std::ranges::fill(pixels,
+                      0x00404040u + (Backend::Narrowed<std::uint32_t>(std::to_underlying(codec)) * 0x00040404u));
     ASSERT_NO_FATAL_FAILURE(Frame(client, { 0, 0, 320, 200 }));
     auto expected = NegotiatedCodec(codec, GetParam().surface);
     ASSERT_NO_FATAL_FAILURE(ThenCodecChange(expected, previous));

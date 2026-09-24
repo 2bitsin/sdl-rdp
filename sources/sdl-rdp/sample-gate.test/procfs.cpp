@@ -4,6 +4,7 @@
 #include <sdl-rdp/utilities/contract.hpp>
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -15,9 +16,10 @@ namespace SampleGate {
 namespace fs = std::filesystem;
 
 namespace {
-auto ProcfsPort(std::string_view address) -> unsigned {
-  return utilities::Required(oxbox::utilities::ParseNumberAfter<unsigned>(address, ":", oxbox::utilities::Radix::HEX),
-                             "a procfs socket address ends in a hex port");
+auto ProcfsPort(std::string_view address) -> std::uint32_t {
+  return utilities::Required(
+      oxbox::utilities::ParseNumberAfter<std::uint32_t>(address, ":", oxbox::utilities::Radix::HEX),
+      "a procfs socket address ends in a hex port");
 }
 
 auto ProcId() -> pid_t {
@@ -34,7 +36,7 @@ auto ProcfsSelf() -> pid_t {
                              "/proc/self links to a process id");
 }
 
-auto ListeningPort(pid_t pid) -> unsigned {
+auto ListeningPort(pid_t pid) -> std::uint32_t {
   if (!pid) pid = ProcId();
   std::vector<std::string> sockets;
   for (auto const& entry : fs::directory_iterator("/proc/" + std::to_string(pid) + "/fd")) {

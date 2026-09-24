@@ -3,11 +3,12 @@
 #include <sdl-rdp/core/certificate.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 
+#include <cstdint>
 #include <stdexcept>
 
 namespace Backend {
 namespace {
-constexpr unsigned DefaultAudioLatency = 500;
+constexpr std::uint32_t DefaultAudioLatency = 500;
 auto CertificateDirectory(sdlrdp_config const& config) -> std::filesystem::path {
   return config.cert_dir ? std::filesystem::path(config.cert_dir) : DefaultCertificateDirectory();
 }
@@ -39,16 +40,16 @@ auto Configuration::Codec() const noexcept -> sdlrdp_codec {
 auto Configuration::SetCodec(sdlrdp_codec value) noexcept -> void {
   _codec.store(value);
 }
-auto Configuration::AvcBitrate() const noexcept -> unsigned {
+auto Configuration::AvcBitrate() const noexcept -> std::uint32_t {
   return _avc_bitrate_kbps;
 }
-auto Configuration::AudioLatency() const noexcept -> unsigned {
+auto Configuration::AudioLatency() const noexcept -> std::uint32_t {
   return _audio_latency;
 }
 auto Configuration::RefreshPolicy() const noexcept -> Refresh const& {
   return _refresh;
 }
-auto Configuration::SetRefresh(RefreshMode mode, unsigned ceiling) -> void {
+auto Configuration::SetRefresh(RefreshMode mode, std::uint32_t ceiling) -> void {
   Expects(ceiling > 0, "declared refresh is positive");
   _refresh = Refresh(mode, ceiling);
   _refresh.Restart();

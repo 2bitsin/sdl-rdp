@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <ranges>
 
 namespace {
@@ -72,9 +73,9 @@ TEST(Avc, Bitrate) {
   EXPECT_EQ(Backend::Avc::Bitrate({ 32766, 32766 }), UINT32_MAX);
 }
 TEST(Avc, ReplicatesPadding) {
-  std::array<BYTE, 32> source{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 99, 99, 99, 99,
-                               13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 99, 99, 99, 99 };
-  std::vector<BYTE>    padded(16uz * 16 * 4);
+  std::array<std::uint8_t, 32> source{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 99, 99, 99, 99,
+                                       13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 99, 99, 99, 99 };
+  std::vector<std::uint8_t>    padded(16uz * 16 * 4);
   std::copy_n(source.data(), 12, padded.data());
   std::copy_n(source.data() + 16, 12, padded.data() + 64);
   Backend::Avc::ReplicateEdges(padded, { .width = 3, .height = 2 });
@@ -108,10 +109,10 @@ TEST(Avc, RegionMetablock) {
     ThenRegionQuality(q);
   }
 }
-auto ThenAvailableCapability(RDPGFX_CAPSET const& cap, UINT32 version) -> void {
+auto ThenAvailableCapability(RDPGFX_CAPSET const& cap, std::uint32_t version) -> void {
   for (bool const available : { false, true }) {
-    auto   selected = Backend::SelectCapability({ &cap, 1 }, available);
-    UINT32 expected = 0;
+    auto          selected = Backend::SelectCapability({ &cap, 1 }, available);
+    std::uint32_t expected = 0;
     if (version == RDPGFX_CAPVERSION_81 && available) expected = RDPGFX_CAPS_FLAG_AVC420_ENABLED;
     if (version >= RDPGFX_CAPVERSION_10 && version != RDPGFX_CAPVERSION_101 && !available)
       expected = RDPGFX_CAPS_FLAG_AVC_DISABLED;

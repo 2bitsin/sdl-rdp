@@ -72,8 +72,8 @@ auto Yuv420Reference(std::vector<std::uint32_t> const& pixels, Backend::Extent s
   auto const            yuv     = EncodeYuv420(PadReference(pixels, size, aligned), aligned);
   return Cropped(DecodeYuv420(yuv, aligned), aligned.width, size);
 }
-auto ThenScaledError(Headless::Client& client, std::vector<UINT32> const& scaled, std::vector<UINT32> const& reference)
-    -> void {
+auto ThenScaledError(Headless::Client& client, std::vector<std::uint32_t> const& scaled,
+                     std::vector<std::uint32_t> const& reference) -> void {
   auto error = client.MaxError(scaled, &reference);
   testing::Test::RecordProperty("scaled_maximum_channel_error", error);
   EXPECT_LE(error, 8u);
@@ -82,13 +82,14 @@ class AvcSession : public Headless::GraphicsBackend {
 protected:
   auto GivenAutoFrame(bool avc = true) -> void {
     ASSERT_NO_FATAL_FAILURE(GivenGraphics(SDLRDP_CODEC_AUTO, 320, 200, avc));
-    PresentFrame(std::vector<UINT32>(320uz * 200, 0x55aaff));
+    PresentFrame(std::vector<std::uint32_t>(320uz * 200, 0x55aaff));
   }
-  auto PresentFrame(std::vector<UINT32> const& pixels, unsigned width = 320, unsigned height = 200) -> void {
+  auto PresentFrame(std::vector<std::uint32_t> const& pixels, std::uint32_t width = 320, std::uint32_t height = 200)
+      -> void {
     Backend::Extent const size{ .width = width, .height = height };
     Frame(pixels, size, Backend::Whole(size));
   }
-  auto Open(sdlrdp_codec codec = SDLRDP_CODEC_AVC420, unsigned width = 320, unsigned height = 200) -> void {
+  auto Open(sdlrdp_codec codec = SDLRDP_CODEC_AVC420, std::uint32_t width = 320, std::uint32_t height = 200) -> void {
     auto pattern = std::to_array("/tmp/sdlrdp-avc-XXXXXX");
     OpenGraphics(pattern.data(), width, height, codec);
   }
@@ -102,13 +103,13 @@ protected:
     EXPECT_TRUE(ObserverSession().Observed().avc_nals.empty());
     EXPECT_EQ(ObserverSession().Observed().progressive_headers, 1u);
   }
-  auto GivenGraphics(sdlrdp_codec codec = SDLRDP_CODEC_AVC420, unsigned width = 320, unsigned height = 200,
+  auto GivenGraphics(sdlrdp_codec codec = SDLRDP_CODEC_AVC420, std::uint32_t width = 320, std::uint32_t height = 200,
                      bool avc = true) -> void {
     ASSERT_NO_FATAL_FAILURE(Open(codec, width, height));
     graphics_client = std::make_unique<Headless::Client>(sdlrdp_port(backend.Handle()), true);
     graphics_client->EnableGraphics(avc);
     if (!avc)
-      ASSERT_TRUE(freerdp_settings_set_bool(graphics_client->Instance()->context->settings, FreeRDP_GfxH264, FALSE));
+      ASSERT_TRUE(freerdp_settings_set_bool(graphics_client->Instance()->context->settings, FreeRDP_GfxH264, false));
     graphics_observer = std::make_unique<Headless::GraphicsObserver>(*graphics_client);
     ConnectGraphics(*graphics_client);
   }
@@ -164,12 +165,12 @@ protected:
 };
 class AvcGraphics : public AvcSession {
 protected:
-  auto GivenSmallSurface(sdlrdp_codec codec, std::vector<UINT32> const& pixels) -> void {
+  auto GivenSmallSurface(sdlrdp_codec codec, std::vector<std::uint32_t> const& pixels) -> void {
     ASSERT_NO_FATAL_FAILURE(GivenGraphics(codec, 32, 32));
     ASSERT_NO_FATAL_FAILURE(PresentFrame(pixels, 32, 32));
     ThenProgressiveOnly();
   }
-  auto WhenProgressiveSwitchesToAvc(std::vector<UINT32> const& pixels) -> void {
+  auto WhenProgressiveSwitchesToAvc(std::vector<std::uint32_t> const& pixels) -> void {
     auto commands = ObserverSession().Observed().commands;
     ASSERT_EQ(sdlrdp_set_codec(backend.Handle(), SDLRDP_CODEC_AVC420), 0);
     ASSERT_NO_FATAL_FAILURE(Frame(pixels, { .width = 320, .height = 200 }, { 18, 20, 8, 6 }));
@@ -184,7 +185,7 @@ protected:
     EXPECT_EQ(ObserverSession().Observed().avc_rects.back().right, 320);
     EXPECT_EQ(ObserverSession().Observed().avc_rects.back().bottom, 200);
   }
-  auto WhenSmallAvcRequested(std::vector<UINT32> const& pixels) -> void {
+  auto WhenSmallAvcRequested(std::vector<std::uint32_t> const& pixels) -> void {
     while (!backend.Poll().empty()) {
     }
     ASSERT_EQ(sdlrdp_set_codec(backend.Handle(), SDLRDP_CODEC_AVC420), 0);
@@ -194,7 +195,7 @@ protected:
     EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "falls back"), 1u);
     ThenCodecChanged();
   }
-  auto ThenAvcResizes(std::vector<UINT32>& pixels) -> void {
+  auto ThenAvcResizes(std::vector<std::uint32_t>& pixels) -> void {
     pixels.assign(354uz * 226, 0x335577);
     ASSERT_NO_FATAL_FAILURE(PresentFrame(pixels, 354, 226));
     ThenResizedIdr();
@@ -206,8 +207,9 @@ protected:
     EXPECT_EQ(ObserverSession().Observed().avc_rects[0].right, 26);
     ThenPFrameQuality();
   }
-  auto ThenScaledAvc(Headless::Client& client, Headless::GraphicsObserver& observer, std::vector<UINT32> const& pixels,
-                     std::vector<UINT32> const& scaled, sdlrdp_rect full) -> void {
+  auto ThenScaledAvc(Headless::Client& client, Headless::GraphicsObserver& observer,
+                     std::vector<std::uint32_t> const& pixels, std::vector<std::uint32_t> const& scaled,
+                     sdlrdp_rect full) -> void {
     auto reference = Yuv420Reference(scaled, { .width = 321, .height = 214 });
     ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.Handle(), 0) == 1; }));
     ASSERT_EQ(sdlrdp_set_codec(backend.Handle(), SDLRDP_CODEC_AVC420), 0);
@@ -228,15 +230,15 @@ protected:
     EXPECT_EQ(ObserverSession().Observed().avc_quality[0].qpVal, 0x9a);
     EXPECT_EQ(ObserverSession().Observed().avc_quality[0].qualityVal, 100);
   }
-  auto ScaledPattern(Headless::Client& client, Headless::GraphicsObserver& observer, std::vector<UINT32> const& pixels)
-      -> void {
+  auto ScaledPattern(Headless::Client& client, Headless::GraphicsObserver& observer,
+                     std::vector<std::uint32_t> const& pixels) -> void {
     ASSERT_EQ(sdlrdp_set_codec(backend.Handle(), SDLRDP_CODEC_RAW), 0);
     ASSERT_EQ(sdlrdp_set_aspect(backend.Handle(), { 3, 2 }), 0);
     auto              before{ observer.Observed().frames.size() };
     sdlrdp_rect const full  { 0, 0, 320, 200                    };
     ASSERT_EQ(backend.Present(pixels, 320, 200, full), 0);
     ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() > before; }));
-    std::vector<UINT32> scaled(321uz * 214);
+    std::vector<std::uint32_t> scaled(321uz * 214);
     ASSERT_NO_FATAL_FAILURE(ReadScaledPixels(client, scaled));
     ThenScaledAvc(client, observer, pixels, scaled, full);
   }
@@ -273,10 +275,10 @@ TEST_F(AvcGraphics, AutoWithoutAvcUsesProgressiveSilently) {
 }
 TEST_F(AvcAvailable, DecodesPFrameAndResize) {
   ASSERT_NO_FATAL_FAILURE(GivenGraphics(SDLRDP_CODEC_AVC420));
-  std::vector<UINT32>             pixels(320uz * 200);
-  constexpr std::array<UINT32, 4> colors{ 0xff0000, 0x00ff00, 0x0000ff, 0x55aaff };
+  std::vector<std::uint32_t>             pixels(320uz * 200);
+  constexpr std::array<std::uint32_t, 4> colors{ 0xff0000, 0x00ff00, 0x0000ff, 0x55aaff };
   std::ranges::transform(std::views::iota(0uz, pixels.size()), pixels.begin(),
-                         [&](size_t i) { return colors[(i % 320) / 80]; });
+                         [&](std::size_t i) { return colors[(i % 320) / 80]; });
   ASSERT_NO_FATAL_FAILURE(PresentFrame(pixels));
   sdlrdp_rect const damage{ 18, 20, 8, 6 };
   std::ranges::for_each(std::views::iota(20, 26),
@@ -287,7 +289,7 @@ TEST_F(AvcAvailable, DecodesPFrameAndResize) {
 }
 TEST_F(AvcGraphics, ClientWithoutAvcFallsBackAndReportsChange) {
   ASSERT_NO_FATAL_FAILURE(GivenGraphics(SDLRDP_CODEC_AVC420, 320, 200, false));
-  std::vector<UINT32> const pixels(320uz * 200, 0x55aaff);
+  std::vector<std::uint32_t> const pixels(320uz * 200, 0x55aaff);
   ASSERT_NO_FATAL_FAILURE(PresentFrame(pixels));
   ASSERT_NO_FATAL_FAILURE(ThenCodecChanged());
   EXPECT_EQ(ObserverSession().Observed().progressive_headers, 1u);
@@ -297,12 +299,12 @@ TEST_F(AvcGraphics, ClientWithoutAvcFallsBackAndReportsChange) {
 
 namespace {
 TEST_F(AvcAvailable, SmallSurfaceFallsBack) {
-  std::vector<UINT32> const pixels(32uz * 32, 0x55aaff);
+  std::vector<std::uint32_t> const pixels(32uz * 32, 0x55aaff);
   ASSERT_NO_FATAL_FAILURE(GivenSmallSurface(SDLRDP_CODEC_AVC420, pixels));
   EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "surface below NVENC minimum"), 1u);
 }
 TEST_F(AvcAvailable, AutoSmallSurfaceLogsFallbackWhenAvcRequested) {
-  std::vector<UINT32> const pixels(32uz * 32, 0x55aaff);
+  std::vector<std::uint32_t> const pixels(32uz * 32, 0x55aaff);
   ASSERT_NO_FATAL_FAILURE(GivenSmallSurface(SDLRDP_CODEC_AUTO, pixels));
   EXPECT_FALSE(logs.Contains("falls back"));
   EXPECT_FALSE(logs.Contains("surface below NVENC minimum"));
@@ -310,7 +312,7 @@ TEST_F(AvcAvailable, AutoSmallSurfaceLogsFallbackWhenAvcRequested) {
 }
 TEST_F(AvcAvailable, ProgressiveConnectionSwitchesToAvcWithIdr) {
   ASSERT_NO_FATAL_FAILURE(GivenGraphics(SDLRDP_CODEC_PROGRESSIVE));
-  std::vector<UINT32> const pixels(320uz * 200, 0x335577);
+  std::vector<std::uint32_t> const pixels(320uz * 200, 0x335577);
   ASSERT_NO_FATAL_FAILURE(PresentFrame(pixels));
   EXPECT_EQ(ObserverSession().Observed().progressive_headers, 1u);
   EXPECT_TRUE(ObserverSession().Observed().avc_nals.empty());
@@ -318,7 +320,7 @@ TEST_F(AvcAvailable, ProgressiveConnectionSwitchesToAvcWithIdr) {
 }
 TEST_F(AvcAvailable, CodecSwitchRestoresFullSurfaceAndIdr) {
   ASSERT_NO_FATAL_FAILURE(GivenGraphics(SDLRDP_CODEC_AVC420));
-  std::vector<UINT32> pixels(320uz * 200, 0xff0000);
+  std::vector<std::uint32_t> pixels(320uz * 200, 0xff0000);
   ASSERT_NO_FATAL_FAILURE(PresentFrame(pixels));
   ASSERT_EQ(sdlrdp_set_codec(backend.Handle(), SDLRDP_CODEC_RAW), 0);
   pixels.assign(pixels.size(), 0x335577);
@@ -329,7 +331,7 @@ TEST_F(AvcAvailable, CodecSwitchRestoresFullSurfaceAndIdr) {
 }
 TEST_F(AvcAvailable, KnownPatternColours) {
   ASSERT_NO_FATAL_FAILURE(GivenGraphics(SDLRDP_CODEC_AVC420));
-  std::vector<UINT32> pixels(320uz * 200);
+  std::vector<std::uint32_t> pixels(320uz * 200);
   Headless::MovingTilePattern(pixels, 320, 200, 0);
   ASSERT_NO_FATAL_FAILURE(PresentFrame(pixels));
   EXPECT_EQ(ObserverSession().Observed().avc_nals.size(), 1u);
@@ -337,9 +339,9 @@ TEST_F(AvcAvailable, KnownPatternColours) {
 }
 TEST(AvcConfiguration, IntraRefreshUsesConfiguredFrameRate) {
   struct Case {
-    unsigned fps;
-    unsigned period;
-    unsigned count;
+    std::uint32_t fps;
+    std::uint32_t period;
+    std::uint32_t count;
   };
   constexpr std::array cases{
     Case{ .fps = 1, .period = 2, .count = 1 }, Case{ .fps = 24, .period = 48, .count = 12 },

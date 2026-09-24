@@ -1,5 +1,6 @@
 #pragma once
+#include <cstdint>
 namespace rdp {
-auto SameRefresh(unsigned left_numerator, unsigned left_denominator, unsigned right_numerator,
-                 unsigned right_denominator) -> bool;
+auto SameRefresh(std::uint32_t left_numerator, std::uint32_t left_denominator, std::uint32_t right_numerator,
+                 std::uint32_t right_denominator) -> bool;
 }

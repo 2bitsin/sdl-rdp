@@ -4,12 +4,13 @@
 
 #include <atomic>
 #include <concepts>
+#include <cstdint>
 
 namespace Backend {
-inline constexpr unsigned DefaultRefreshRate = 60;
+inline constexpr std::uint32_t DefaultRefreshRate = 60;
 class RefreshTracker {
 public:
-  auto Effective() const noexcept                 -> unsigned;
+  auto Effective() const noexcept                 -> std::uint32_t;
   auto Mode() const noexcept                      -> RefreshMode;
   auto AwaitingEmpty() const noexcept             -> bool;
   auto TestAndSetUnavailableLogged() noexcept     -> bool;
@@ -22,8 +23,8 @@ public:
   }
 
 private:
-  Refresh          _refresh;
-  std::atomic_uint _effective         { DefaultRefreshRate };
-  bool             _unavailable_logged{ };
+  Refresh                    _refresh;
+  std::atomic<std::uint32_t> _effective         { DefaultRefreshRate };
+  bool                       _unavailable_logged{ };
 };
 }

@@ -11,12 +11,13 @@
 #include <sdl-rdp/utilities/pinned.hpp>
 #include <sdl-rdp/video/pointer-store.hpp>
 
+#include <cstdint>
 #include <string>
 
 struct sdlrdp_handle : private Backend::Pinned {
 public:
        sdlrdp_handle(sdlrdp_config const& config, bool tracing);
-  auto Port() const noexcept   -> unsigned;
+  auto Port() const noexcept   -> std::uint32_t;
   auto Diagnostics() noexcept  -> Backend::Diagnostics&;
   auto Events() noexcept       -> Backend::EventQueue&;
   auto Presentation() noexcept -> Backend::Presenter&;

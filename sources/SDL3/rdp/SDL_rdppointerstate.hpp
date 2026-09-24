@@ -2,14 +2,14 @@
 #include <functional>
 namespace rdp {
 // SDL handles are C pointers; this policy and CheckedAcquisition are the only place their null value is spelled.
-template <typename _Handle, auto _Projection = std::identity{ }>
+template <typename HandleTy, auto PROJECTION = std::identity{ }>
 class PointerState {
 public:
-  static auto IsNull(_Handle const& value) noexcept -> bool {
-    return std::invoke(_Projection, value) == nullptr;
+  static auto IsNull(HandleTy const& value) noexcept -> bool {
+    return std::invoke(PROJECTION, value) == nullptr;
   }
-  static auto MakeNull(_Handle& value) noexcept -> void {
-    std::invoke(_Projection, value) = nullptr;
+  static auto MakeNull(HandleTy& value) noexcept -> void {
+    std::invoke(PROJECTION, value) = nullptr;
   }
 };
 }

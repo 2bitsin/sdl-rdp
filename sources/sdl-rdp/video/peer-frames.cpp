@@ -28,7 +28,7 @@ auto PeerFrames::Dirty(FrameLock const& held) const -> bool {
 auto PeerFrames::Pending(FrameLock const& held) const -> bool {
   return Dirty(held) || _snapshot;
 }
-auto PeerFrames::Capture(FrameLock const& held) -> uint64_t {
+auto PeerFrames::Capture(FrameLock const& held) -> std::uint64_t {
   _snapshot = _store.Snapshot(held);
   ExpectCaptured(*this);
   _sequence = _store.Presented(held);
@@ -61,7 +61,7 @@ auto PeerFrames::Snapshot() const noexcept -> FrameSnapshot const& {
 auto PeerFrames::Sending() const noexcept -> std::vector<sdlrdp_rect> const& {
   return _sending.Rects();
 }
-auto PeerFrames::Sequence() const noexcept -> uint64_t {
+auto PeerFrames::Sequence() const noexcept -> std::uint64_t {
   return _sequence;
 }
 auto ExpectCaptured(PeerFrames const& frames) -> void {

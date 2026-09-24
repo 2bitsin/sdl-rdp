@@ -4,24 +4,24 @@
 #include <cstdint>
 
 namespace Backend {
-inline constexpr unsigned MillihertzPerHz = 1000;
+inline constexpr std::uint32_t MillihertzPerHz = 1000;
 enum class Direction  { Down, Hold, Up                 };
 enum class RefreshMode{ Fixed, Client, Average, Sender };
 struct WireSample {
-  bool     available    { };
-  unsigned outq         { };
-  unsigned notsent      { };
-  unsigned unacked      { };
-  unsigned rtt          { };
-  unsigned mss          { };
-  uint64_t delivery_rate{ };
+  bool          available    { };
+  std::uint32_t outq         { };
+  std::uint32_t notsent      { };
+  std::uint32_t unacked      { };
+  std::uint32_t rtt          { };
+  std::uint32_t mss          { };
+  std::uint64_t delivery_rate{ };
 };
 auto SampleWire(int descriptor) -> WireSample;
 class Refresh {
 public:
   using Clock = std::chrono::steady_clock;
-  explicit    Refresh(RefreshMode selected = RefreshMode::Fixed, unsigned limit = 60);
-  auto        Rate() const                                                -> unsigned;
+  explicit    Refresh(RefreshMode selected = RefreshMode::Fixed, std::uint32_t limit = 60);
+  auto        Rate() const                                                -> std::uint32_t;
   auto        Mode() const                                                -> RefreshMode;
   auto        AwaitingEmpty() const                                       -> bool;
   auto        Restart()                                                   -> void;
@@ -37,8 +37,8 @@ private:
   auto Average(Clock::time_point now)     -> void;
   auto Estimate(Clock::duration interval) -> void;
   RefreshMode       mode          { RefreshMode::Fixed };
-  unsigned          ceiling       { 60                 };
-  unsigned          rate          { 60                 };
+  std::uint32_t     ceiling       { 60                 };
+  std::uint32_t     rate          { 60                 };
   double            average       { };
   std::size_t       awaiting_empty{ };
   Clock::time_point last_ack;

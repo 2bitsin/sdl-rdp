@@ -1,6 +1,7 @@
 #include <sdl-rdp/video/avc-encoder.hpp>
 #include <sdl-rdp/core/picture-geometry.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/utilities/stopwatch.hpp>
 #include <sdl-rdp/video/avc.hpp>
 
@@ -15,6 +16,7 @@
 // WinPR already supplies the ABI-compatible GUID type.
 #define GUID_DEFINED
 #include <freerdp/primitives.h>
+#include <cstdint>
 #include <ffnvcodec/dynlink_loader.h>
 #include <format>
 #include <ranges>
@@ -25,17 +27,17 @@ using utilities::Ensures;
 using utilities::Expects;
 struct Encoder::Impl {
 public:
-  auto Check(int status, char const* operation)                           -> bool;
-  auto Load()                                                             -> bool;
-  auto Session()                                                          -> bool;
-  auto Initialize(unsigned bitrate, unsigned fps)                         -> bool;
-  auto Parameters(unsigned fps, NV_ENC_CONFIG* config) const              -> NV_ENC_INITIALIZE_PARAMS;
-  auto Buffers()                                                          -> bool;
-  auto Capability(NV_ENC_CAPS query, int& value, char const* operation)   -> bool;
-  auto MinimumSize()                                                      -> bool;
-  auto Picture(bool force_idr) const                                      -> NV_ENC_PIC_PARAMS;
-  auto Fill(std::span<BYTE const> bgrx, unsigned stride, Encoder& timing) -> bool;
-  auto Close()                                                            -> void;
+  auto Check(int status, char const* operation)                                        -> bool;
+  auto Load()                                                                          -> bool;
+  auto Session()                                                                       -> bool;
+  auto Initialize(std::uint32_t bitrate, std::uint32_t fps)                            -> bool;
+  auto Parameters(std::uint32_t fps, NV_ENC_CONFIG* config) const                      -> NV_ENC_INITIALIZE_PARAMS;
+  auto Buffers()                                                                       -> bool;
+  auto Capability(NV_ENC_CAPS query, int& value, char const* operation)                -> bool;
+  auto MinimumSize()                                                                   -> bool;
+  auto Picture(bool force_idr) const                                                   -> NV_ENC_PIC_PARAMS;
+  auto Fill(std::span<std::uint8_t const> bgrx, std::uint32_t stride, Encoder& timing) -> bool;
+  auto Close()                                                                         -> void;
 
 private:
   friend class Encoder;
@@ -89,12 +91,13 @@ auto Encoder::Impl::Session() -> bool {
   return Check(driver.api.nvEncOpenEncodeSessionEx(&open, &handles.session), "open session");
 }
 namespace {
-auto ConfigureRate(NV_ENC_RC_PARAMS& rc, unsigned bitrate, unsigned fps) -> void {
+auto ConfigureRate(NV_ENC_RC_PARAMS& rc, std::uint32_t bitrate, std::uint32_t fps) -> void {
   rc.enableLookahead  = 0;
   rc.lookaheadDepth   = 0;
   rc.rateControlMode  = NV_ENC_PARAMS_RC_CBR;
   rc.averageBitRate   = bitrate;
-  rc.vbvBufferSize    = unsigned(std::clamp<uint64_t>(uint64_t(bitrate) * 2 / fps, 1, UINT32_MAX));
+  rc.vbvBufferSize    = Narrowed<std::uint32_t>(
+      std::clamp<std::uint64_t>(std::uint64_t{ bitrate } * 2 / fps, 1, UINT32_MAX));
   rc.vbvInitialDelay  = rc.vbvBufferSize;
   rc.zeroReorderDelay = 1;
 }
@@ -106,7 +109,7 @@ auto ConfigureColour(NV_ENC_CONFIG_H264_VUI_PARAMETERS& vui) -> void {
   vui.transferCharacteristics      = NV_ENC_VUI_TRANSFER_CHARACTERISTIC_BT709;
   vui.colourMatrix                 = NV_ENC_VUI_MATRIX_COEFFS_BT709;
 }
-auto ConfigureH264(NV_ENC_CONFIG_H264& h264, unsigned fps) -> void {
+auto ConfigureH264(NV_ENC_CONFIG_H264& h264, std::uint32_t fps) -> void {
   h264.chromaFormatIDC = 1;
   h264.level           = NV_ENC_LEVEL_AUTOSELECT;
   h264.idrPeriod       = NVENC_INFINITE_GOPLENGTH;
@@ -117,7 +120,7 @@ auto ConfigureH264(NV_ENC_CONFIG_H264& h264, unsigned fps) -> void {
   h264.intraRefreshCnt    = refresh.count;
   ConfigureColour(h264.h264VUIParameters);
 }
-auto ConfigurePreset(NV_ENC_CONFIG& config, unsigned bitrate, unsigned fps) -> void {
+auto ConfigurePreset(NV_ENC_CONFIG& config, std::uint32_t bitrate, std::uint32_t fps) -> void {
   config.profileGUID    = NV_ENC_H264_PROFILE_HIGH_GUID;
   config.gopLength      = NVENC_INFINITE_GOPLENGTH;
   config.frameIntervalP = 1;
@@ -125,7 +128,7 @@ auto ConfigurePreset(NV_ENC_CONFIG& config, unsigned bitrate, unsigned fps) -> v
   ConfigureH264(config.encodeCodecConfig.h264Config, fps);
 }
 }
-auto Encoder::Impl::Parameters(unsigned fps, NV_ENC_CONFIG* config) const -> NV_ENC_INITIALIZE_PARAMS {
+auto Encoder::Impl::Parameters(std::uint32_t fps, NV_ENC_CONFIG* config) const -> NV_ENC_INITIALIZE_PARAMS {
   NV_ENC_INITIALIZE_PARAMS init{ };
   init.version           = NV_ENC_INITIALIZE_PARAMS_VER;
   init.encodeGUID        = NV_ENC_CODEC_H264_GUID;
@@ -142,7 +145,7 @@ auto Encoder::Impl::Parameters(unsigned fps, NV_ENC_CONFIG* config) const -> NV_
   init.encodeConfig      = config;
   return init;
 }
-auto Encoder::Impl::Initialize(unsigned bitrate, unsigned fps) -> bool {
+auto Encoder::Impl::Initialize(std::uint32_t bitrate, std::uint32_t fps) -> bool {
   Expects(handles.session != nullptr, "encoder session exists");
   Expects(bitrate > 0, "encoder bitrate is positive");
   Expects(fps > 0, "encoder frame rate is positive");
@@ -176,19 +179,19 @@ auto Encoder::Impl::Buffers() -> bool {
   return true;
 }
 namespace {
-auto ConvertInput(NV_ENC_LOCK_INPUT_BUFFER const& lock, prim_size_t const& size, std::span<BYTE const> bgrx,
-                  unsigned stride) -> int {
+auto ConvertInput(NV_ENC_LOCK_INPUT_BUFFER const& lock, prim_size_t const& size, std::span<std::uint8_t const> bgrx,
+                  std::uint32_t stride) -> int {
   Expects(lock.pitch >= size.width, "I420 pitch covers aligned width");
   Expects(lock.pitch % 2 == 0, "I420 pitch is even");
-  auto*                 y      { static_cast<BYTE*>(lock.bufferDataPtr)     };
-  std::array<BYTE*, 3>  planes { y, y + (std::size_t(lock.pitch) * size.height),
-                                 y + (std::size_t(lock.pitch) * size.height * 5 / 4) };
-  std::array<UINT32, 3> pitches{ lock.pitch, lock.pitch / 2, lock.pitch / 2 };
+  auto*                        y      { static_cast<std::uint8_t*>(lock.bufferDataPtr) };
+  std::array<std::uint8_t*, 3> planes { y, y + (std::size_t{ lock.pitch } * size.height),
+                                        y + (std::size_t{ lock.pitch } * size.height * 5 / 4) };
+  std::array<std::uint32_t, 3> pitches{ lock.pitch, lock.pitch / 2, lock.pitch / 2     };
   return primitives_get()->RGBToYUV420_8u_P3AC4R(bgrx.data(), PIXEL_FORMAT_BGRX32, stride, planes.data(),
                                                  pitches.data(), &size);
 }
 }
-auto Encoder::Impl::Fill(std::span<BYTE const> bgrx, unsigned stride, Encoder& timing) -> bool {
+auto Encoder::Impl::Fill(std::span<std::uint8_t const> bgrx, std::uint32_t stride, Encoder& timing) -> bool {
   Expects(handles.session != nullptr, "encoder session exists");
   Expects(handles.input != nullptr, "encoder input buffer exists");
   Stopwatch                watch;
@@ -262,7 +265,7 @@ auto Encoder::Impl::MinimumSize() -> bool {
   if (small) error = "surface below NVENC minimum picture size";
   return ok;
 }
-auto Encoder::Open(Extent size, unsigned bitrate, unsigned fps) -> bool {
+auto Encoder::Open(Extent size, std::uint32_t bitrate, std::uint32_t fps) -> bool {
   auto const [width, height] = size;
   Expects(width > 0, "picture width is positive");
   Expects(height > 0, "picture height is positive");
@@ -292,11 +295,11 @@ auto Encoder::Impl::Picture(bool force_idr) const -> NV_ENC_PIC_PARAMS {
   if (force_idr || first) pic.encodePicFlags = NV_ENC_PIC_FLAG_FORCEIDR | NV_ENC_PIC_FLAG_OUTPUT_SPSPPS;
   return pic;
 }
-auto Encoder::Encode(std::span<BYTE const> bgrx, unsigned stride, bool force_idr, std::vector<BYTE>& encoded)
-    -> std::span<BYTE const> {
+auto Encoder::Encode(std::span<std::uint8_t const> bgrx, std::uint32_t stride, bool force_idr,
+                     std::vector<std::byte>& encoded) -> std::span<std::byte const> {
   Expects(IsOpen(), "encoder is open");
   Expects(stride >= impl->aligned.width * 4, "source stride covers aligned width");
-  Expects(bgrx.size() >= (std::size_t(impl->aligned.height - 1) * stride) + (std::size_t(impl->aligned.width) * 4),
+  Expects(bgrx.size() >= (std::size_t{ impl->aligned.height - 1 } * stride) + (std::size_t{ impl->aligned.width } * 4),
           "source covers aligned height");
   times.convert = times.upload = times.encode = { };
   if (!impl->Fill(bgrx, stride, *this)) return { };
@@ -306,7 +309,7 @@ auto Encoder::Encode(std::span<BYTE const> bgrx, unsigned stride, bool force_idr
   NV_ENC_LOCK_BITSTREAM lock{ .version = NV_ENC_LOCK_BITSTREAM_VER, .outputBitstream = impl->handles.output };
   if (!impl->Check(impl->driver.api.nvEncLockBitstream(impl->handles.session, &lock), "lock bitstream")) return { };
   times.encode = watch.Elapsed();
-  auto const* data = static_cast<BYTE const*>(lock.bitstreamBufferPtr);
+  auto const* data = static_cast<std::byte const*>(lock.bitstreamBufferPtr);
   encoded.assign(data, data + lock.bitstreamSizeInBytes);
   if (!impl->Check(impl->driver.api.nvEncUnlockBitstream(impl->handles.session, impl->handles.output),
                    "unlock bitstream"))

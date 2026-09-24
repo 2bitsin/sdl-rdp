@@ -3,12 +3,13 @@
 #include <sdl-rdp/sample-gate.test/frame-pattern.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <functional>
 
 namespace SampleGate {
 using utilities::Expects;
 
-NextFrame::NextFrame(Headless::Client& value, unsigned frame)
+NextFrame::NextFrame(Headless::Client& value, std::uint32_t frame)
     : client(value), column(frame % 640), hook(value, std::bind_front(&NextFrame::Observe, this)) { }
 auto NextFrame::Received() const -> bool {
   return received;

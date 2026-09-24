@@ -8,6 +8,7 @@
 #include <sdl-rdp/core/trace-queue.hpp>
 #include <sdl-rdp/video/peer-frames.hpp>
 
+#include <cstdint>
 #include <format>
 
 namespace Backend {
@@ -60,7 +61,7 @@ auto FramePacing::Sent(PeerFrames& frames, FrameCost const& cost) -> void {
   _statistics.Sent(cost, wire.outq);
   frames.Complete(held);
 }
-auto FramePacing::Accept(UINT32 id) -> void {
+auto FramePacing::Accept(std::uint32_t id) -> void {
   auto const held    = _store.Lock();
   auto const settled = _window.Accept(id);
   if (settled.empty()) return;
@@ -88,24 +89,24 @@ auto FramePacing::Acknowledgements(AcknowledgementMode mode) -> void {
   _store.Notify();
   _link.Signal();
 }
-auto FramePacing::Timeout() -> DWORD {
+auto FramePacing::Timeout() -> std::uint32_t {
   auto const held = _store.Lock();
   return _window.Remaining(Clock::now());
 }
-auto FramePacing::Effective() const noexcept -> unsigned {
+auto FramePacing::Effective() const noexcept -> std::uint32_t {
   return _refresh.Effective();
 }
-auto FramePacing::Frame() const noexcept -> UINT32 {
+auto FramePacing::Frame() const noexcept -> std::uint32_t {
   return _window.Frame();
 }
 auto FramePacing::Begin() noexcept -> void {
   std::ignore = _window.Next();
 }
-auto FramePacing::Settled(FrameLock const& held, uint64_t target) const -> bool {
+auto FramePacing::Settled(FrameLock const& held, std::uint64_t target) const -> bool {
   Expects(_store.Holds(held), "reading acknowledgements holds the frame lock");
   return _window.Settled(target);
 }
-auto FramePacing::Acknowledged(FrameLock const& held) const -> uint64_t {
+auto FramePacing::Acknowledged(FrameLock const& held) const -> std::uint64_t {
   Expects(_store.Holds(held), "reading acknowledgements holds the frame lock");
   return _window.Acknowledged();
 }

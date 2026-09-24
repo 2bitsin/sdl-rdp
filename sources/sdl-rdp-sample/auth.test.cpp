@@ -4,13 +4,15 @@
 #include <SDL3/SDL.h>
 #include <winpr/ntlm.h>
 #include <atomic>
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
 
 namespace SampleGate {
 namespace {
 class AuthenticationSample : public SampleGate::Sample {
 protected:
-  auto ThenWrongPassword(unsigned port) -> void {
+  auto ThenWrongPassword(std::uint32_t port) -> void {
     Client const wrong(port, true);
     wrong.Credentials("alice", "wrong-secret", "LAB", true);
     ASSERT_FALSE(wrong.Connect());
@@ -48,17 +50,17 @@ public:
     ++self.verified;
     return true;
   }
-  static auto SDLCALL Lookup(void* raw, char const* domain, char const* user, Uint8* hash) -> bool {
+  static auto SDLCALL Lookup(void* raw, char const* domain, char const* user, std::uint8_t* hash) -> bool {
     auto& self = *static_cast<PropertyCredentials*>(raw);
     self.arguments = self.arguments && std::string_view(domain) == "LAB" && std::string_view(user) == "alice";
     ++self.looked_up;
     auto secret = std::to_array("property-secret");
     return NTOWFv1A(secret.data(), secret.size() - 1, hash);
   }
-  auto Verified() const -> unsigned {
+  auto Verified() const -> std::size_t {
     return verified.load();
   }
-  auto LookedUp() const -> unsigned {
+  auto LookedUp() const -> std::size_t {
     return looked_up.load();
   }
   auto Arguments() const -> bool {
@@ -66,9 +68,9 @@ public:
   }
 
 private:
-  std::atomic<unsigned> verified  = 0;
-  std::atomic<unsigned> looked_up = 0;
-  std::atomic<bool>     arguments = true;
+  std::atomic<std::size_t> verified  = 0;
+  std::atomic<std::size_t> looked_up = 0;
+  std::atomic<bool>        arguments = true;
 };
 }
 namespace {
@@ -98,7 +100,7 @@ auto GivenPropertyCredentials(SDL_PropertiesID properties, PropertyCredentials& 
   ASSERT_TRUE(SDL_SetPointerProperty(properties, SDL_PROP_DISPLAY_RDP_LOOKUP_POINTER,
                                      reinterpret_cast<void*>(PropertyCredentials::Lookup)));
 }
-auto ConnectPropertyCredentials(unsigned port) -> void {
+auto ConnectPropertyCredentials(std::uint32_t port) -> void {
   {
     Client const client(port, true);
     client.Credentials("alice", "property-secret", "LAB", false);

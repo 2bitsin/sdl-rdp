@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 namespace rdp {
-auto AudioRate(unsigned rate) -> void;
+auto AudioRate(std::uint32_t rate) -> void;
 }

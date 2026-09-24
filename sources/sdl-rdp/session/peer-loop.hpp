@@ -1,7 +1,9 @@
 #pragma once
+#include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
 #include <winpr/wtypes.h>
+#include <cstdint>
 #include <span>
 #include <stop_token>
 #include <thread>
@@ -23,11 +25,11 @@ public:
   auto Stop()  -> void;
 
 private:
-  auto Serve(std::stop_token const& quit)                                              -> void;
-  auto Run(std::stop_token const& quit)                                                -> bool;
-  auto Configure()                                                                     -> bool;
-  auto Step(std::stop_token const& quit, std::span<HANDLE> handles)                    -> bool;
-  auto Dispatch(std::stop_token const& quit, std::span<HANDLE> handles, DWORD timeout) -> bool;
+  auto Serve(std::stop_token const& quit)                                                          -> void;
+  auto Run(std::stop_token const& quit)                                                            -> bool;
+  auto Configure()                                                                                 -> bool;
+  auto Step(std::stop_token const& quit, std::span<WaitHandle> handles)                            -> bool;
+  auto Dispatch(std::stop_token const& quit, std::span<WaitHandle> handles, std::uint32_t timeout) -> bool;
   PeerLink&            _link;
   SessionAccess&       _session;
   Diagnostics const&   _diagnostics;

@@ -42,7 +42,7 @@ protected:
 
 private:
   auto        ConnectLogs()                                -> std::string;
-  static auto CollectClientLog(wLogMessage const* message) -> BOOL;
+  static auto CollectClientLog(wLogMessage const& message) -> void;
   inline static std::mutex      log_guard;
   inline static Headless::Logs* client_logs = nullptr;
 };

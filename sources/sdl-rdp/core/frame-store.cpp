@@ -1,7 +1,9 @@
 #include <sdl-rdp/core/frame-store.hpp>
 
+#include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/utilities/rect.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace Backend {
@@ -10,8 +12,8 @@ auto Consistent(FrameSnapshot const& shadow, PictureGeometry const& geometry) ->
   return !shadow || SameSize(shadow.Bounds(), geometry.Bounds());
 }
 auto Blank(sdlrdp_rect bounds) -> FrameSnapshot {
-  Extent const size{ .width = unsigned(bounds.w), .height = unsigned(bounds.h) };
-  return { std::make_shared<std::vector<BYTE> const>(FrameBytes(size)), size };
+  Extent const size{ .width = Narrowed<std::uint32_t>(bounds.w), .height = Narrowed<std::uint32_t>(bounds.h) };
+  return { std::make_shared<std::vector<std::uint8_t> const>(FrameBytes(size)), size };
 }
 }
 FrameStore::FrameStore(Extent size, sdlrdp_aspect aspect) : _geometry{ size, aspect } { }
@@ -40,11 +42,12 @@ auto FrameStore::Previous(FrameLock const& held, Extent size) const -> FrameSnap
   Expects(Holds(held), "reading the shadow holds the frame lock");
   return _shadow.Matching(size);
 }
-auto FrameStore::Presented(FrameLock const& held) const -> uint64_t {
+auto FrameStore::Presented(FrameLock const& held) const -> std::uint64_t {
   Expects(Holds(held), "reading the present count holds the frame lock");
   return _presented;
 }
-auto FrameStore::Publish(FrameLock const& held, std::shared_ptr<std::vector<BYTE> const> next, Extent size) -> bool {
+auto FrameStore::Publish(FrameLock const& held, std::shared_ptr<std::vector<std::uint8_t> const> next, Extent size)
+    -> bool {
   Expects(Holds(held), "publishing holds the frame lock");
   auto const resized = !SameSize(_shadow.Bounds(), Whole(size));
   std::ignore = _geometry.Resize(size);

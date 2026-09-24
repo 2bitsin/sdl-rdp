@@ -4,6 +4,8 @@
 
 #include <SDL3/SDL.h>
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <ranges>
 #include <string>
 
@@ -12,7 +14,8 @@ auto Sample::ThenTouchEvent(Client& client, std::string_view event, std::string_
   ASSERT_TRUE(ReadInput(client, event));
   EXPECT_TRUE(line.contains(detail)) << line;
 }
-auto Sample::ThenIgnoredWarpMotion(Client& client, rdpInput* input, UINT16 x, UINT16 y, char const* delta) -> void {
+auto Sample::ThenIgnoredWarpMotion(Client& client, rdpInput* input, std::uint16_t x, std::uint16_t y, char const* delta)
+    -> void {
   ASSERT_TRUE(freerdp_input_send_mouse_event(input, PTR_FLAGS_MOVE, x, y));
   ASSERT_TRUE(Read("event MOUSE_MOTION "));
   EXPECT_TRUE(line.contains(delta)) << line;
@@ -42,7 +45,7 @@ auto Sample::WhenAspectRelative(Client& client) -> void {
 auto Sample::WhenAdvancedMotion(Client& client) -> void {
   WhenRelativeAdvanced(client, 17, -9, " xrel=17 yrel=-9 ");
 }
-auto Sample::WhenRelativeAdvanced(Client& client, int32_t x, int32_t y, std::string_view expected) -> void {
+auto Sample::WhenRelativeAdvanced(Client& client, std::int32_t x, std::int32_t y, std::string_view expected) -> void {
   ASSERT_NO_FATAL_FAILURE(WhenRelative(client));
   auto* advanced = SampleGate::InputClient::Advanced().load();
   ASSERT_EQ(advanced->AInputSendInputEvent(advanced, AINPUT_FLAGS_MOVE | AINPUT_FLAGS_REL, x, y), CHANNEL_RC_OK);
@@ -65,7 +68,7 @@ auto Sample::WhenRelativeWarp(Client& client, rdpInput* input) -> void {
   EXPECT_EQ(Position().Y(), 240u);
   SDL_Log("gate POINTER_POSITION x=%u y=%u", Position().X(), Position().Y());
 }
-auto Sample::WhenPreciseWheel(rdpInput* input, UINT16 flags, char const* expected) -> void {
+auto Sample::WhenPreciseWheel(rdpInput* input, std::uint16_t flags, char const* expected) -> void {
   ASSERT_TRUE(freerdp_input_send_mouse_event(input, flags, 0, 0));
   ASSERT_TRUE(Read("event MOUSE_WHEEL "));
   EXPECT_TRUE(line.ends_with(expected)) << line;

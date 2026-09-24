@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <iterator>
 
 namespace BackendGate {
@@ -20,7 +21,7 @@ auto BackendEvents::Acknowledged() const -> bool {
   auto const status = CurrentStatus(*backend);
   return status && status->acknowledged >= Presented(*backend);
 }
-auto BackendEvents::Events(unsigned wanted) -> std::vector<sdlrdp_event> {
+auto BackendEvents::Events(std::size_t wanted) -> std::vector<sdlrdp_event> {
   return EventsUntil([=](auto const& events) { return events.size() >= wanted; }, false,
                      [this] { return AwaitBackend(); });
 }

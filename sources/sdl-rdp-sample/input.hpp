@@ -1,7 +1,9 @@
 #pragma once
 #include "check.hpp"
 
-inline auto TouchName(Uint32 type) -> char const* {
+#include <cstdint>
+
+inline auto TouchName(std::uint32_t type) -> char const* {
   switch (type) {
   case SDL_EVENT_FINGER_DOWN:     return "FINGER_DOWN";
   case SDL_EVENT_FINGER_MOTION:   return "FINGER_MOTION";
@@ -20,8 +22,8 @@ inline auto PrintInput(SDL_Event const& event, SDL_Window* window) -> bool {
   int width  = 0;
   int height = 0;
   Check(SDL_GetWindowSize(window, &width, &height));
-  SDL_Log("event %s id=%llu x=%.3f y=%.3f pressure=%.3f window_x=%.0f window_y=%.0f", name,
-          (unsigned long long)event.tfinger.fingerID, event.tfinger.x, event.tfinger.y, event.tfinger.pressure,
+  SDL_Log("event %s id=%" SDL_PRIu64 " x=%.3f y=%.3f pressure=%.3f window_x=%.0f window_y=%.0f", name,
+          event.tfinger.fingerID, event.tfinger.x, event.tfinger.y, event.tfinger.pressure,
           event.tfinger.x * float(width), event.tfinger.y * float(height));
   return true;
 }

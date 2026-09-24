@@ -3,6 +3,7 @@
 #include <sdl-rdp/utilities/contract.hpp>
 
 #include <chrono>
+#include <cstddef>
 #include <tuple>
 
 namespace Race {
@@ -40,7 +41,7 @@ auto MethodFill::RacerDone() -> void {
   }
   racer_done.notify_all();
 }
-auto MethodFill::Fills() -> unsigned {
+auto MethodFill::Fills() -> std::size_t {
   std::scoped_lock const lock(guard);
   return fills;
 }

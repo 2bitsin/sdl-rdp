@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <chrono>
 #include <concepts>
+#include <cstddef>
+#include <cstdint>
 #include <ranges>
 
 namespace BackendGate {
@@ -25,8 +27,8 @@ auto GraphicsSession::ThenWriteDisconnect(Client& client) -> void {
   EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, "")) << logs.Text(true);
   RecordProperty("trace", logs.Text(true));
 }
-auto GraphicsSession::Open(unsigned w, unsigned h, sdlrdp_aspect aspect, sdlrdp_codec codec, unsigned audio_latency)
-    -> void {
+auto GraphicsSession::Open(std::uint32_t w, std::uint32_t h, sdlrdp_aspect aspect, sdlrdp_codec codec,
+                           std::uint32_t audio_latency) -> void {
   sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), w, h, 0, Logs::Collect, &logs };
   config.aspect           = aspect;
   config.codec            = codec;
@@ -39,8 +41,8 @@ auto GraphicsSession::GraphicsClient() -> Client& {
 auto GraphicsSession::GraphicsObserver() -> Headless::GraphicsObserver& {
   return *graphics_observer;
 }
-auto GraphicsSession::PresentProgressiveDamage(Client& client, std::vector<UINT32> const& pixels, sdlrdp_rect damage)
-    -> void {
+auto GraphicsSession::PresentProgressiveDamage(Client& client, std::vector<std::uint32_t> const& pixels,
+                                               sdlrdp_rect damage) -> void {
   ASSERT_EQ(backend.Present(pixels, 640, 480, damage), 0);
   ASSERT_TRUE(client.Until([&] { return Acknowledged(); }));
   EXPECT_LE(client.MaxError(pixels), 24u);
@@ -71,8 +73,9 @@ auto GraphicsSession::PresentMatching(Client& client, std::vector<std::uint32_t>
   ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text(true);
 }
 auto GraphicsSession::PresentGraphicsFrames(Client& client, Headless::GraphicsObserver& observer,
-                                            std::vector<UINT32> const& pixels, unsigned first, unsigned last) -> void {
-  std::ranges::for_each(std::views::iota(first, last + 1), [&](unsigned count) {
+                                            std::vector<std::uint32_t> const& pixels, std::uint32_t first,
+                                            std::uint32_t last) -> void {
+  std::ranges::for_each(std::views::iota(first, last + 1), [&](std::size_t count) {
     ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
     ASSERT_NO_FATAL_FAILURE(AwaitFrames(client, observer.Observed().frames, count));
   });

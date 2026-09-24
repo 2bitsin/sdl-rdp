@@ -9,6 +9,8 @@
 #include <sdl-rdp/video/pointer-store.hpp>
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <format>
 #include <ranges>
 #include <utility>
@@ -18,8 +20,8 @@ namespace {
 auto Spans(int start, int length, int value) -> bool {
   return start <= value && value < start + length;
 }
-auto ComposeRow(std::span<BYTE const> source, std::span<BYTE const> former, std::span<BYTE> target, auto damage)
-    -> void {
+auto ComposeRow(std::span<std::uint8_t const> source, std::span<std::uint8_t const> former,
+                std::span<std::uint8_t> target, auto damage) -> void {
   auto const width = int(target.size() / PixelBytes);
   for (int x = 0; x < width;) {
     auto covered{ std::ranges::find_if(damage, [x](auto rect) { return Spans(rect.x, rect.w, x); })               };
@@ -35,20 +37,20 @@ auto ComposeRow(std::span<BYTE const> source, std::span<BYTE const> former, std:
     x = end;
   }
 }
-auto ComposePicture(std::span<BYTE const> source, unsigned pitch, FrameSnapshot const& former, std::span<BYTE> target,
-                    std::span<sdlrdp_rect const> damage) -> void {
+auto ComposePicture(std::span<std::uint8_t const> source, std::uint32_t pitch, FrameSnapshot const& former,
+                    std::span<std::uint8_t> target, std::span<sdlrdp_rect const> damage) -> void {
   auto const width  = former.Width();
   auto const stride = former.Stride();
-  auto const row    = std::size_t(width) * PixelBytes;
-  auto const prior  = former ? former.Pixels() : std::span<BYTE const>{ };
+  auto const row    = std::size_t{ width } * PixelBytes;
+  auto const prior  = former ? former.Pixels() : std::span<std::uint8_t const>{ };
   if (!prior.empty())
     Expects(prior.size() >= stride * (former.Height() - 1) + row, "previous frame covers every composed row");
   auto const prior_stride = prior.empty() ? std::size_t{ 0 } : stride;
   auto const prior_row    = prior.empty() ? std::size_t{ 0 } : row;
-  std::ranges::for_each(std::views::iota(0u, former.Height()), [&](unsigned y) {
+  std::ranges::for_each(std::views::iota(0u, former.Height()), [&](std::uint32_t y) {
     auto active = damage | std::views::filter([y](auto rect) { return Spans(rect.y, rect.h, int(y)); });
-    ComposeRow(source.subspan(std::size_t(y) * pitch, row), prior.subspan(std::size_t(y) * prior_stride, prior_row),
-               target.subspan(std::size_t(y) * stride, row), active);
+    ComposeRow(source.subspan(std::size_t{ y } * pitch, row), prior.subspan(std::size_t{ y } * prior_stride, prior_row),
+               target.subspan(std::size_t{ y } * stride, row), active);
   });
 }
 }
@@ -56,10 +58,10 @@ Presenter::Presenter(Diagnostics const& diagnostics, FrameStore& frames, Session
                      Configuration& configuration)
     : _diagnostics{ diagnostics }, _frames{ frames }, _session{ session }, _pointer{ pointer },
       _configuration{ configuration } { }
-auto Presenter::Present(std::span<BYTE const> pixels, unsigned pitch, Extent size, std::span<sdlrdp_rect const> damage)
-    -> void {
+auto Presenter::Present(std::span<std::uint8_t const> pixels, std::uint32_t pitch, Extent size,
+                        std::span<sdlrdp_rect const> damage) -> void {
   Expects(pitch >= size.width * PixelBytes, "source pitch covers framebuffer rows");
-  Expects(pixels.size() >= std::size_t(pitch) * size.height, "source framebuffer covers every row");
+  Expects(pixels.size() >= std::size_t{ pitch } * size.height, "source framebuffer covers every row");
   _diagnostics.Line("present", [&] { return std::format("dirty={}", damage.size()); });
   if (damage.empty()) return;
   std::scoped_lock const lock(_producer);
@@ -70,8 +72,8 @@ auto Presenter::Present(std::span<BYTE const> pixels, unsigned pitch, Extent siz
   Avc::ReplicateEdges(*next, size);
   Publish(std::move(next), size, damage);
 }
-auto Presenter::Publish(std::shared_ptr<std::vector<BYTE> const> next, Extent size, std::span<sdlrdp_rect const> damage)
-    -> void {
+auto Presenter::Publish(std::shared_ptr<std::vector<std::uint8_t> const> next, Extent size,
+                        std::span<sdlrdp_rect const> damage) -> void {
   auto const locked  = _session.LockPeersAndFrame();
   auto const resized = _frames.Publish(locked.Frame(), std::move(next), size);
   locked.ForEach([&](Peer& peer, FrameLock const& frame) {
@@ -82,9 +84,9 @@ auto Presenter::Publish(std::shared_ptr<std::vector<BYTE> const> next, Extent si
       peer.Present(frame, damage);
   });
 }
-auto Presenter::Acquire(Extent size) -> std::shared_ptr<std::vector<BYTE>> {
+auto Presenter::Acquire(Extent size) -> std::shared_ptr<std::vector<std::uint8_t>> {
   auto unused = std::ranges::find_if(_pool, [](auto const& buffer) { return buffer.use_count() == 1; });
-  if (unused == _pool.end()) unused = _pool.insert(_pool.end(), std::make_shared<std::vector<BYTE>>());
+  if (unused == _pool.end()) unused = _pool.insert(_pool.end(), std::make_shared<std::vector<std::uint8_t>>());
   (*unused)->resize(FrameBytes(size));
   return *unused;
 }
@@ -109,7 +111,7 @@ auto Presenter::SetAspect(sdlrdp_aspect value) -> void {
   _frames.SetAspect(locked.Frame(), value);
   locked.ForEach([&](Peer& peer, FrameLock const& frame) { peer.Repaint(frame, _frames.Bounds(frame)); });
 }
-auto Presenter::SetRefresh(RefreshMode mode, unsigned ceiling) -> void {
+auto Presenter::SetRefresh(RefreshMode mode, std::uint32_t ceiling) -> void {
   auto const locked = _session.LockPeersAndFrame();
   _configuration.SetRefresh(mode, ceiling);
   locked.ForEach([](Peer& peer, FrameLock const& frame) { peer.RestartPacing(frame); });

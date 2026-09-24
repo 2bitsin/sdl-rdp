@@ -5,6 +5,8 @@
 #include <sdl-rdp/headless-client.test/peer-status.hpp>
 #include <sdl-rdp/headless-client.test/round-five.hpp>
 #include <sdl-rdp/video/graphics-link.hpp>
+#include <cstddef>
+#include <cstdint>
 
 namespace BackendGate {
 class GraphicsGate : public Gate {
@@ -76,23 +78,24 @@ protected:
     ASSERT_TRUE(client.Connect());
     ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
   }
-  auto PresentFrames(Client& client, Headless::GraphicsObserver& observer, unsigned first, unsigned last) -> void {
+  auto PresentFrames(Client& client, Headless::GraphicsObserver& observer, std::uint32_t first, std::uint32_t last)
+      -> void {
     sdlrdp_rect const full{ 0, 0, 320, 200 };
-    std::ranges::for_each(std::views::iota(first, last + 1), [&](unsigned count) {
+    std::ranges::for_each(std::views::iota(first, last + 1), [&](std::size_t count) {
       ASSERT_EQ(backend.Present(pixels, 320, 200, full), 0);
       ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() == count; }));
     });
   }
   auto ThenResized(Client& client, Headless::GraphicsObserver& observer) -> void {
-    std::vector<UINT32> resized(352uz * 224, 0x0055aaff);
-    sdlrdp_rect const   full   { 0, 0, 352, 224 };
+    std::vector<std::uint32_t> resized(352uz * 224, 0x0055aaff);
+    sdlrdp_rect const          full   { 0, 0, 352, 224 };
     ASSERT_EQ(backend.Present(resized, 352, 224, full), 0);
     ASSERT_TRUE(client.Until([&] { return client.Matches(resized); })) << logs.Text(true);
     EXPECT_EQ(client.Instance()->context->gdi->width, 352);
     ThenResizedSurface(observer);
   }
   auto FillGraphicsWindow(Client& client, Headless::GraphicsObserver& observer, sdlrdp_rect full) -> void {
-    for (unsigned count = 1; count <= 2; ++count) {
+    for (std::size_t count = 1; count <= 2; ++count) {
       std::ranges::fill(pixels, count * 0x00202020u);
       ASSERT_EQ(backend.Present(pixels, 320, 200, full), 0);
       ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() == count; })) << logs.Text(true);
@@ -108,7 +111,7 @@ protected:
   std::unique_ptr<Headless::GraphicsObserver> graphics_observer;
 };
 namespace {
-auto RecordDamageCost(Client& client, std::vector<UINT32> const& pixels, uint64_t before) -> void {
+auto RecordDamageCost(Client& client, std::vector<std::uint32_t> const& pixels, std::uint64_t before) -> void {
   testing::Test::RecordProperty("damage_wire_bytes", std::to_string(client.Received() - before));
   testing::Test::RecordProperty("maximum_channel_error", client.MaxError(pixels));
   testing::Test::RecordProperty("trace", "7x5 damage at 17,19; one progressive header over two frames; "
@@ -221,8 +224,9 @@ TEST_F(RoundFive, GraphicsVersion101) {
 TEST_F(RoundFive, GraphicsWithoutDynamicChannelsUsesLegacy) {
   ASSERT_NO_FATAL_FAILURE(Open(640, 480, { }, SDLRDP_CODEC_RAW));
   Client client(sdlrdp_port(backend.Handle()), true, 640, 480);
-  ASSERT_TRUE(freerdp_settings_set_bool(client.Instance()->context->settings, FreeRDP_SupportGraphicsPipeline, TRUE));
-  client.Instance()->LoadChannels = [](freerdp*) -> BOOL { return TRUE; };
+  ASSERT_TRUE(freerdp_settings_set_bool(client.Instance()->context->settings, FreeRDP_SupportGraphicsPipeline, true));
+  // abi: pLoadChannels, BOOL is int
+  client.Instance()->LoadChannels = [](freerdp*) -> int { return true; };
   ASSERT_NO_FATAL_FAILURE(ThenLegacyFallback(client));
   {
     auto const status  = RequiredStatus(*backend);

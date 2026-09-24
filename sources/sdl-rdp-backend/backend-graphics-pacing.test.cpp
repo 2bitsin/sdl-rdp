@@ -1,6 +1,8 @@
 #include <sdl-rdp/headless-client.test/graphics-observer.hpp>
 #include <sdl-rdp/headless-client.test/round-five.hpp>
 
+#include <cstddef>
+#include <cstdint>
 #include <regex>
 
 namespace BackendGate {
@@ -16,8 +18,8 @@ TEST_F(RoundFive, PipelinedLegacyPresent) {
   ASSERT_NO_FATAL_FAILURE(Open(320, 200));
   Client client(sdlrdp_port(backend.Handle()), true);
   ASSERT_NO_FATAL_FAILURE(Connect(client));
-  FrameObserver const       observer(client);
-  std::vector<UINT32> const pixels(320uz * 200, 0x123456);
+  FrameObserver const              observer(client);
+  std::vector<std::uint32_t> const pixels(320uz * 200, 0x123456);
   ASSERT_NO_FATAL_FAILURE(ThenPipelinedWindow(client, observer.Frames(), pixels));
   ThenLegacyWindowReleases(client, observer, pixels);
 }
@@ -39,7 +41,7 @@ auto ThenFrameStatistics(Logs& logs) -> void {
 }
 TEST_F(PipelinedGraphics, GraphicsFrameStatistics) {
   ASSERT_NO_FATAL_FAILURE(PresentGraphicsFrames(GraphicsClient(), GraphicsObserver(), pixels, 1, 2));
-  for (unsigned count = 0; count < 3; ++count) Present(pixels, 320, 200);
+  for (std::size_t count = 0; count < 3; ++count) Present(pixels, 320, 200);
   EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 1), 0);
   ASSERT_TRUE(GraphicsObserver().AckFrame(0, 0));
   ASSERT_NO_FATAL_FAILURE(AwaitFrames(GraphicsClient(), GraphicsObserver().Observed().frames, 3));

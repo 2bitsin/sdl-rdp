@@ -13,11 +13,11 @@ class Presenter;
 class AudioOutput : private Pinned {
 public:
        AudioOutput(Session& session, Presenter& presenter, Configuration const& configuration) noexcept;
-  auto Open()                                  -> void;
-  auto Rate()                                  -> unsigned;
-  auto Wait(Deadline deadline)                 -> int;
-  auto Write(std::span<int16_t const> samples) -> int;
-  auto Close()                                 -> void;
+  auto Open()                                       -> void;
+  auto Rate()                                       -> std::uint32_t;
+  auto Wait(Deadline deadline)                      -> int;
+  auto Write(std::span<std::int16_t const> samples) -> int;
+  auto Close()                                      -> void;
 
 private:
   auto Channel(SessionLock const& held) const -> AudioChannel*;

@@ -2,11 +2,12 @@
 #include <gtest/gtest.h>
 #include <sdl-rdp/headless-client.test/client.hpp>
 #include <sdl-rdp/headless-client.test/picture-update-hook.hpp>
+#include <cstdint>
 
 namespace SampleGate {
 class NextFrame {
 public:
-  explicit NextFrame(Headless::Client& value, unsigned frame);
+  explicit NextFrame(Headless::Client& value, std::uint32_t frame);
   auto     Received() const -> bool;
   auto     Matches() const  -> testing::AssertionResult const&;
 
@@ -16,7 +17,7 @@ private:
   bool                        received = false;
   testing::AssertionResult    matches  = testing::AssertionFailure() << "no complete frame";
   Headless::Client&           client;
-  unsigned                    column;
+  std::uint32_t               column;
   Headless::PictureUpdateHook hook;
 };
 }

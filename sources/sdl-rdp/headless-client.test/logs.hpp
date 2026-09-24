@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <chrono>
 #include <condition_variable>
+#include <cstddef>
 #include <mutex>
 #include <optional>
 #include <ranges>
@@ -18,7 +19,7 @@ class Logs {
 public:
   static auto Collect(void* user, sdlrdp_log_level level, char const* text) -> void;
   auto Text(bool include_info = false)                         -> std::string;
-  auto Count(sdlrdp_log_level level, std::string_view text)    -> unsigned;
+  auto Count(sdlrdp_log_level level, std::string_view text)    -> std::size_t;
   auto Contains(sdlrdp_log_level level, std::string_view text) -> bool;
   auto Contains(std::string_view text)                         -> bool;
   auto Entries()                                               -> std::vector<std::pair<sdlrdp_log_level, std::string>>;
@@ -45,7 +46,7 @@ private:
     return lines.size();
   }
   template <typename Projection>
-  auto Matching(Projection project) -> unsigned {
+  auto Matching(Projection project) -> std::size_t {
     std::scoped_lock const lock(guard);
     return std::ranges::count_if(lines, project);
   }

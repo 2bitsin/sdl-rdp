@@ -7,13 +7,14 @@
 #include <freerdp/settings.h>
 #include <oxbox/utilities/number-text.hpp>
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <regex>
 #include <string>
 
 namespace BackendGate {
-auto RoundFive::ThenAcknowledgementTimeout(std::vector<UINT32> const& pixels) -> void {
+auto RoundFive::ThenAcknowledgementTimeout(std::vector<std::uint32_t> const& pixels) -> void {
   EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 10000), 1);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
   EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 10000), 1);
@@ -21,14 +22,14 @@ auto RoundFive::ThenAcknowledgementTimeout(std::vector<UINT32> const& pixels) ->
   EXPECT_EQ(RequiredStatus(*backend).acknowledgements, 0u);
   ThenTimedOutFrames("[0-9]+", 1);
 }
-auto RoundFive::ThenTimedOutFrames(std::string_view sent, unsigned minimum) -> void {
+auto RoundFive::ThenTimedOutFrames(std::string_view sent, std::size_t minimum) -> void {
   backend.Close();
   auto        text  = logs.Text(true);
   std::smatch match;
   ASSERT_TRUE(
       std::regex_search(text, match, std::regex(std::format(R"(Frames: {} sent,[^\n]*, ([0-9]+) timed out\.)", sent))))
       << text;
-  EXPECT_GE(oxbox::utilities::ParseNumber<unsigned>(match.str(1)), minimum);
+  EXPECT_GE(oxbox::utilities::ParseNumber<std::uint32_t>(match.str(1)), minimum);
 }
 auto RoundFive::ThenAspectMouse(Client& client) -> void {
   ASSERT_TRUE(freerdp_input_send_mouse_event(client.Instance()->context->input, PTR_FLAGS_MOVE, 639, 479));
@@ -37,32 +38,32 @@ auto RoundFive::ThenAspectMouse(Client& client) -> void {
   EXPECT_EQ(events[0].mouse_move.x, 639);
   EXPECT_EQ(events[0].mouse_move.y, 349);
 }
-auto RoundFive::ThenAgedWindowResumes(std::vector<UINT32> const& pixels) -> void {
+auto RoundFive::ThenAgedWindowResumes(std::vector<std::uint32_t> const& pixels) -> void {
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
   EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 0), 0);
   ASSERT_TRUE(GraphicsObserver().AckFrame(4, 0));
   ASSERT_NO_FATAL_FAILURE(AwaitFrames(GraphicsClient(), GraphicsObserver().Observed().frames, 7));
   ThenGraphicsTimeoutStatistics();
 }
-auto RoundFive::ThenColourDepth(unsigned depth) -> void {
+auto RoundFive::ThenColourDepth(std::uint32_t depth) -> void {
   Client client(sdlrdp_port(backend.Handle()), false);
   ASSERT_TRUE(freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_ColorDepth, depth));
   ASSERT_NO_FATAL_FAILURE(Connect(client, false));
   client.Tolerance(depth == 16 ? 7 : 0);
   EXPECT_EQ(freerdp_settings_get_uint32(client.Instance()->context->settings, FreeRDP_ColorDepth), depth);
-  std::vector<UINT32> pixels(320uz * 200);
+  std::vector<std::uint32_t> pixels(320uz * 200);
   Headless::HashPattern(pixels);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
   ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text();
 }
-auto RoundFive::ThenProgressiveDamageCost(Client& client, Headless::GraphicsObserver& observer, uint64_t before)
+auto RoundFive::ThenProgressiveDamageCost(Client& client, Headless::GraphicsObserver& observer, std::uint64_t before)
     -> void {
   EXPECT_EQ(observer.Observed().progressive_headers, 1u);
   EXPECT_EQ(observer.Observed().surfaces.size(), 1u);
   EXPECT_LT(client.Received() - before, 4096u);
   ThenQoe(client, observer);
 }
-auto RoundFive::ThenAutoChangesToRaw(Client& client, std::vector<UINT32>& pixels) -> void {
+auto RoundFive::ThenAutoChangesToRaw(Client& client, std::vector<std::uint32_t>& pixels) -> void {
   ASSERT_EQ(sdlrdp_set_codec(backend.Handle(), SDLRDP_CODEC_RAW), 0);
   pixels = GraphicsScene(4, false);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
@@ -82,14 +83,14 @@ auto RoundFive::ThenGraphicsAcknowledgementsCounted() -> void {
   ASSERT_TRUE(GraphicsClient().Until([&] { return Acknowledged(); }));
   EXPECT_EQ(RequiredStatus(*backend).acknowledgements, 3u);
 }
-auto RoundFive::ThenGraphicsWindowReleases(std::vector<UINT32> const& pixels) -> void {
+auto RoundFive::ThenGraphicsWindowReleases(std::vector<std::uint32_t> const& pixels) -> void {
   ASSERT_TRUE(GraphicsObserver().AckFrame(0, 0));
   ASSERT_TRUE(GraphicsClient().Until([&] { return sdlrdp_wait_frame(backend.Handle(), 0) == 1; }));
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
   EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 1), 0);
 }
 auto RoundFive::ThenLegacyWindowReleases(Client& client, FrameObserver const& observer,
-                                         std::vector<UINT32> const& pixels) -> void {
+                                         std::vector<std::uint32_t> const& pixels) -> void {
   auto* update = client.Instance()->context->update;
   ASSERT_TRUE(update->SurfaceFrameAcknowledge(update->context, observer.Frames().front()));
   EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 10000), 1);

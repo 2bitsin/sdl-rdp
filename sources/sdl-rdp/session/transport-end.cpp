@@ -10,6 +10,7 @@
 #include <freerdp/settings.h>
 #include <oxbox/utilities/text.hpp>
 #include <array>
+#include <cstdint>
 #include <format>
 #include <ranges>
 #include <string>
@@ -19,12 +20,12 @@
 
 namespace Backend {
 namespace {
-constexpr std::array<std::pair<UINT32, char const*>, 5> ProtocolFlags{ { { SecurityTls   , "TLS"     },
-                                                                         { SecurityNla   , "NLA"     },
-                                                                         { SecurityNlaExt, "NLA_EXT" },
-                                                                         { SecurityRdstls, "RDSTLS"  },
-                                                                         { SecurityRdsaad, "RDSAAD"  } } };
-auto ProtocolNames(UINT32 mask, bool rdp) -> std::string {
+constexpr std::array<std::pair<std::uint32_t, char const*>, 5> ProtocolFlags{ { { SecurityTls   , "TLS"     },
+                                                                                { SecurityNla   , "NLA"     },
+                                                                                { SecurityNlaExt, "NLA_EXT" },
+                                                                                { SecurityRdstls, "RDSTLS"  },
+                                                                                { SecurityRdsaad, "RDSAAD"  } } };
+auto ProtocolNames(std::uint32_t mask, bool rdp) -> std::string {
   std::vector<std::string_view> names;
   if (rdp) names.emplace_back("RDP");
   names.append_range(ProtocolFlags | std::views::filter([mask](auto entry) { return mask & entry.first; })
@@ -42,7 +43,7 @@ auto HandshakeFailure(rdpSettings const& settings, std::string const& protocols)
   return std::format("TLS handshake failed: client requested {}, server selected {}", protocols,
                      ProtocolNames(selected, !selected));
 }
-auto ReportDisconnect(Diagnostics const& diagnostics, Activation const& activation, UINT32 code, bool pending,
+auto ReportDisconnect(Diagnostics const& diagnostics, Activation const& activation, std::uint32_t code, bool pending,
                       char const* error) -> void {
   auto const activated = activation.Activated();
   if (ExpectedDisconnect(code))
@@ -61,10 +62,10 @@ TransportEnd::TransportEnd(PeerLink& link, Activation const& activation, Authent
       _diagnostics{ diagnostics } { }
 auto TransportEnd::SecurityEnded() const -> bool {
   if (!NegotiationRefused() && !TlsHandshakeFailed()) return false;
-  auto const& settings  = _link.Settings();
+  auto const& settings = _link.Settings();
   // FreeRDP 3.32 nego.c:1663 publishes requestedProtocols even after a failure response.
-  auto const  requested = freerdp_settings_get_uint32(&settings, FreeRDP_RequestedProtocols);
-  auto const  protocols = ProtocolNames(requested, !requested);
+  auto const requested = freerdp_settings_get_uint32(&settings, FreeRDP_RequestedProtocols);
+  auto const protocols = ProtocolNames(requested, !requested);
   _diagnostics.Log(SDLRDP_LOG_WARN,
                    NegotiationRefused() ? Refusal(settings, protocols) : HandshakeFailure(settings, protocols));
   return true;

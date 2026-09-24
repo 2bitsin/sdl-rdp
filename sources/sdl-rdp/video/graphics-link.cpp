@@ -2,6 +2,7 @@
 
 #include <sdl-rdp/core/activation.hpp>
 #include <sdl-rdp/core/diagnostics.hpp>
+#include <sdl-rdp/core/failure-log.hpp>
 #include <sdl-rdp/core/peer-link.hpp>
 #include <sdl-rdp/video/acknowledgement-window.hpp>
 #include <sdl-rdp/video/encoder.hpp>
@@ -9,6 +10,7 @@
 
 #include <freerdp/settings.h>
 #include <algorithm>
+#include <cstddef>
 #include <utility>
 
 namespace Backend {
@@ -17,7 +19,7 @@ GraphicsLink::GraphicsLink(PeerLink& link, Diagnostics const& diagnostics, Activ
                            Factory<std::unique_ptr<GfxChannel>, DynamicChannel&> make) noexcept
     : _link{ link }, _diagnostics{ diagnostics }, _activation{ activation }, _pacing{ pacing }, _encoder{ encoder },
       _make{ std::move(make) } { }
-auto GraphicsLink::Pump(std::span<HANDLE const> ready) -> bool {
+auto GraphicsLink::Pump(std::span<WaitHandle const> ready) -> bool {
   if (_channel) return !std::ranges::contains(ready, _channel->Event()) || _channel->Pump();
   if (_attempted || !freerdp_settings_get_bool(&_link.Settings(), FreeRDP_SupportGraphicsPipeline)
       || !DynamicChannelsReady(_link))
@@ -38,14 +40,14 @@ auto GraphicsLink::ExpireConfirmation() -> void {
 auto GraphicsLink::Confirmed() const -> bool {
   return _channel && _channel->Confirmed();
 }
-auto GraphicsLink::Capacity() const -> unsigned {
+auto GraphicsLink::Capacity() const -> std::size_t {
   return Confirmed() ? _channel->FrameWindow() : AcknowledgedFrameWindow;
 }
 auto GraphicsLink::Channel() const -> GfxChannel& {
   Expects(_channel != nullptr, "graphics channel exists");
   return *_channel;
 }
-auto GraphicsLink::Handles(std::span<HANDLE> out) const -> std::span<HANDLE> {
+auto GraphicsLink::Handles(std::span<WaitHandle> out) const -> std::span<WaitHandle> {
   Expects(out.size() >= GraphicsHandleLimit, "handle span has room for the graphics channel");
   if (!_channel) return out;
   out.front() = _channel->Event();
@@ -60,6 +62,9 @@ auto GraphicsLink::Reject() -> void {
 }
 auto GraphicsLink::Timing() const noexcept -> GraphicsTiming const* {
   return _channel ? &_channel->Timing() : nullptr;
+}
+auto GraphicsLink::Failures(OperationName operation) const noexcept -> FailureLog {
+  return { _diagnostics, operation };
 }
 auto GraphicsLink::Abandon(char const* reason) -> void {
   _channel.reset();

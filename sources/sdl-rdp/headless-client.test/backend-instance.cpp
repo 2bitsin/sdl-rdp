@@ -3,6 +3,7 @@
 
 #include <gtest/gtest.h>
 #include <array>
+#include <cstdint>
 
 namespace Headless {
 auto BackendInstance::Open(sdlrdp_config const& config) -> void {

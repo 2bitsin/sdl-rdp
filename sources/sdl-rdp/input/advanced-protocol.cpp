@@ -2,8 +2,10 @@
 
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
 #include <sdl-rdp/input/input-events.hpp>
+#include <sdl-rdp/utilities/contained.hpp>
 
 #include <freerdp/channels/wtsvc.h>
+#include <cstdint>
 #include <utility>
 
 namespace Backend {
@@ -24,8 +26,8 @@ template <> auto AdvancedProtocol::Open(PeerLink& link, Channel& channel) -> Con
 template <> auto AdvancedProtocol::Service(Context const& context) -> bool {
   return context->Poll(context.get()) == CHANNEL_RC_OK;
 }
-template <> auto AdvancedProtocol::Handle(Context const& context) -> HANDLE {
-  HANDLE event = nullptr;
+template <> auto AdvancedProtocol::Handle(Context const& context) -> WaitHandle {
+  WaitHandle event = nullptr;
   return context->ChannelHandle(context.get(), &event) ? event : nullptr;
 }
 template <> auto AdvancedProtocol::Activate(Context const& context) -> bool {
@@ -33,18 +35,20 @@ template <> auto AdvancedProtocol::Activate(Context const& context) -> bool {
 }
 template <> auto AdvancedProtocol::Install(Context const& context, Channel& channel) -> void {
   Expects(context != nullptr, "an installed input channel has its context");
-  context->data              = &channel;
+  context->data = &channel;
   // abi: psAInputServerMouseEvent
-  context->MouseEvent        = [](ainput_server_context* owner, UINT64 /*timestamp*/, UINT64 flags, INT32 x,
-                                  INT32 y) noexcept -> UINT {
+  context->MouseEvent = [](ainput_server_context* owner, std::uint64_t /*timestamp*/, std::uint64_t flags,
+                           std::int32_t x, std::int32_t y) noexcept -> std::uint32_t {
     Expects(owner != nullptr, "callback context exists");
-    return CallbackOwner<AdvancedChannel>(owner->data)._events.Pointer(flags, x, y);
+    auto&      events  = CallbackOwner<AdvancedChannel>(owner->data)._events;
+    auto const pointed = [&] { return events.Pointer(flags, x, y); };
+    return Contained(ERROR_INTERNAL_ERROR, pointed, events.Failures("Advanced input mouse event"));
   };
-  // abi: psAInputChannelIdAssigned
-  context->ChannelIdAssigned = [](ainput_server_context* owner, UINT32 id) noexcept -> BOOL {
+  // abi: psAInputChannelIdAssigned, BOOL is int
+  context->ChannelIdAssigned = [](ainput_server_context* owner, std::uint32_t id) noexcept -> int {
     Expects(owner != nullptr, "callback context exists");
-    CallbackOwner<AdvancedChannel>(owner->data)._slot.Assign(id);
-    return true;
+    auto& channel = CallbackOwner<AdvancedChannel>(owner->data);
+    return channel._slot.Assigned(id, channel._events.Failures("Advanced input channel assignment"));
   };
 }
 }

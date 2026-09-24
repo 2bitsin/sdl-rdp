@@ -17,9 +17,9 @@ struct PeerStatus {
   bool                                  holding         { };
   std::chrono::steady_clock::time_point activated_at;
   std::optional<GraphicsTiming>         graphics;
-  UINT32                                frame           { };
-  uint64_t                              acknowledged    { };
-  uint64_t                              acknowledgements{ };
+  std::uint32_t                         frame           { };
+  std::uint64_t                         acknowledged    { };
+  std::uint64_t                         acknowledgements{ };
   std::chrono::nanoseconds              encode_time     { };
 };
 }

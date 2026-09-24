@@ -11,6 +11,7 @@
 #include <openssl/crypto.h>
 #include <oxbox/utilities/span.hpp>
 #include <winpr/ntlm.h>
+#include <cstdint>
 #include <cstring>
 
 namespace Backend {
@@ -25,12 +26,12 @@ public:
   }
   auto operator=(NtHash const&) -> NtHash& = delete;
   auto operator=(NtHash&&)      -> NtHash& = delete;
-  auto Data()                   -> BYTE* {
+  auto Data()                   -> std::uint8_t* {
     return bytes.data();
   }
 
 private:
-  std::array<BYTE, 16> bytes{ };
+  std::array<std::uint8_t, 16> bytes{ };
 };
 struct SettingsPassword {
 public:
@@ -70,20 +71,20 @@ auto Setting(freerdp_peer const& client, FreeRDP_Settings_Keys_String key) -> ch
   auto const* value = freerdp_settings_get_string(client.context->settings, key);
   return value ? value : "";
 }
-auto Utf16(std::string const& text) -> std::vector<BYTE> {
-  return TranscodeRange<std::vector<BYTE>>(std::as_bytes(std::span(text)), { }, Utf16Little);
+auto Utf16(std::string const& text) -> std::vector<std::uint8_t> {
+  return TranscodeRange<std::vector<std::uint8_t>>(std::as_bytes(std::span(text)), { }, Utf16Little);
 }
-auto NtlmResponseKey(AuthenticationState const& identity, BYTE* nt_hash_v1, BYTE* response) -> bool {
+auto NtlmResponseKey(AuthenticationState const& identity, std::uint8_t* nt_hash_v1, std::uint8_t* response) -> bool {
   // FreeRDP 3.32 ntlm_compute.c:513 takes the NTLMv2 response key, not the NT hash, and needs SEC_E_OK.
   auto user          = Utf16(identity.User());
   auto domain        = Utf16(identity.Domain());
   auto user_length   = user.size();
   auto domain_length = domain.size();
-  user.resize(user_length + sizeof(WCHAR));
-  domain.resize(domain_length + sizeof(WCHAR));
+  user.resize(user_length + sizeof(char16_t));
+  domain.resize(domain_length + sizeof(char16_t));
   using oxbox::utilities::SpanCast;
-  return NTOWFv2FromHashW(nt_hash_v1, SpanCast<uint16_t>(std::span(user)).data(), user_length,
-                          SpanCast<uint16_t>(std::span(domain)).data(), domain_length, response);
+  return NTOWFv2FromHashW(nt_hash_v1, SpanCast<std::uint16_t>(std::span(user)).data(), user_length,
+                          SpanCast<std::uint16_t>(std::span(domain)).data(), domain_length, response);
 }
 }
 Authenticator::Authenticator(PeerLink& link, Configuration const& configuration,
@@ -91,7 +92,7 @@ Authenticator::Authenticator(PeerLink& link, Configuration const& configuration,
     : _link{ link }, _configuration{ configuration }, _diagnostics{ diagnostics } { }
 auto Authenticator::Reject() -> void {
   if (_state.TestAndSetRejected()) return;
-  _link.Client().authenticated = FALSE;
+  _link.Client().authenticated = false;
   AuthenticationRejectedLogging();
   auto const user = QualifiedName(_state.Domain(), _state.User());
   _diagnostics.Log(SDLRDP_LOG_WARN,
@@ -119,7 +120,7 @@ auto Authenticator::Denied() -> bool {
   _link.Refuse(ERRINFO_SERVER_DENIED_CONNECTION);
   return false;
 }
-auto Authenticator::Logon(BOOL automatic) -> BOOL {
+auto Authenticator::Logon(bool automatic) -> bool {
   // FreeRDP 3.32 peer.c:846 drops a failed Logon unannounced; the refusal waits for activation, where ERRINFO reaches.
   if (!automatic || _configuration.Config().auth == SDLRDP_AUTH_NONE) return true;
   // FreeRDP 3.32 nla.c:1494 stores delegated credentials in settings, not nla_get_identity().
@@ -155,7 +156,7 @@ auto Authenticator::VerifySettings() -> bool {
     return Denied();
   }
 }
-auto Authenticator::ResponseKey(SEC_WINNT_AUTH_IDENTITY const& identity, BYTE* response) -> bool {
+auto Authenticator::ResponseKey(SEC_WINNT_AUTH_IDENTITY const& identity, std::uint8_t* response) -> bool {
   auto const names = ClientNames(identity);
   _state.Identify(names.user, names.domain);
   auto const& config = _configuration.Config();
@@ -166,7 +167,7 @@ auto Authenticator::ResponseKey(SEC_WINNT_AUTH_IDENTITY const& identity, BYTE* r
                                      : sdlrdp_lookup_pair(&config, domain, user, hash.Data()) != 0;
   return known && NtlmResponseKey(_state, hash.Data(), response);
 }
-auto Authenticator::Hash(SEC_WINNT_AUTH_IDENTITY const& identity, BYTE* response) -> bool {
+auto Authenticator::Hash(SEC_WINNT_AUTH_IDENTITY const& identity, std::uint8_t* response) -> bool {
   _state.AttemptHash();
   try {
     bool const result = ResponseKey(identity, response);
@@ -186,6 +187,6 @@ auto AuthenticationIdentity(freerdp_peer const& client, sdlrdp_event& event) -> 
   auto const  names    = ClientNames(identity);
   CopyTerminated(event.connected.user, names.user);
   CopyTerminated(event.connected.domain, names.domain);
-  event.connected.authenticated = client.authenticated != FALSE;
+  event.connected.authenticated = client.authenticated != 0;
 }
 }

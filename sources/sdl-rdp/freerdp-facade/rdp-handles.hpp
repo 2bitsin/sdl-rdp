@@ -13,6 +13,8 @@ public:
   }
 };
 
+// A waitable the peer loop hands to WaitForMultipleObjects; its owner closes it.
+using WaitHandle     = HANDLE;
 using EventHandle    = std::unique_ptr<void, Releases<CloseHandle>>;
 using Bio            = std::unique_ptr<BIO, Releases<BIO_free>>;
 using VirtualChannel = std::unique_ptr<void, Releases<WTSVirtualChannelClose>>;

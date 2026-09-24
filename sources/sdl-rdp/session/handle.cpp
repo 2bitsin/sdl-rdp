@@ -2,6 +2,7 @@
 
 #include <sdl-rdp/session/peer.hpp>
 
+#include <cstdint>
 #include <memory>
 #include <utility>
 
@@ -14,7 +15,7 @@ sdlrdp_handle::sdlrdp_handle(sdlrdp_config const& config, bool tracing)
                   return std::make_unique<Backend::Peer>(std::move(accepted), _diagnostics, _events, _configuration,
                                                          _frames, _pointer, _clipboard, _session);
                 } } { }
-auto sdlrdp_handle::Port() const noexcept -> unsigned {
+auto sdlrdp_handle::Port() const noexcept -> std::uint32_t {
   return _listener.Port();
 }
 auto sdlrdp_handle::Diagnostics() noexcept -> Backend::Diagnostics& {

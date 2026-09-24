@@ -7,6 +7,8 @@
 #include <sdl-rdp/sample-gate.test/video-driver.hpp>
 
 #include <SDL3/SDL.h>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -22,7 +24,7 @@ auto ThenUnchangedPicture(Headless::DisplayClient& display, FullDesktopFrames co
   testing::Test::RecordProperty("equal_layout_picture_resizes", 0);
 }
 auto PumpDesktop(Client& client) -> void {
-  for (unsigned i = 0; i < 20; ++i) {
+  for (std::size_t i = 0; i < 20; ++i) {
     ASSERT_TRUE(client.Pump(5));
     SDL_PumpEvents();
   }
@@ -51,7 +53,7 @@ auto ThenAudioDeviceChanges(Client& client, SDL_AudioStream* stream) -> void {
 namespace {
 auto AwaitResizedPicture(Client& client, Headless::DisplayClient& display) -> void {
   Expects(client.Instance() != nullptr, "resized client exists");
-  std::vector<UINT32> pixels(1280uz * 800, 0);
+  std::vector<std::uint32_t> pixels(1280uz * 800, 0);
   ASSERT_TRUE(client.Until([&] {
     SDL_PumpEvents();
     return display.Observed().desktops && client.Matches(pixels);
@@ -62,7 +64,7 @@ auto PresentDesktop(Client& client, SDL_Window* window) -> void {
   ASSERT_NE(surface, nullptr);
   ASSERT_TRUE(SDL_FillSurfaceRect(surface, nullptr, SDL_MapSurfaceRGB(surface, 0x12, 0x34, 0x56)));
   ASSERT_TRUE(SDL_UpdateWindowSurface(window));
-  std::vector<UINT32> pixels(1280uz * 800, 0x00123456);
+  std::vector<std::uint32_t> pixels(1280uz * 800, 0x00123456);
   ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); }));
 }
 auto ConnectDesktop(Client& client, Headless::Logs& logs) -> void {
@@ -71,7 +73,7 @@ auto ConnectDesktop(Client& client, Headless::Logs& logs) -> void {
   ASSERT_TRUE(client.Connect()) << logs.Text(true);
   ASSERT_TRUE(client.Until([&] {
     SDL_PumpEvents();
-    return Headless::DisplayClient::Ready();
+    return Headless::DisplayClient::Of(client, &Headless::DisplayClient::Ready);
   }));
 }
 }

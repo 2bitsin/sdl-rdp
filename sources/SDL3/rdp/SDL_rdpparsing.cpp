@@ -3,6 +3,8 @@
 #include <oxbox/utilities/number-text.hpp>
 #include <oxbox/utilities/text.hpp>
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <stdexcept>
 namespace rdp {
 namespace {
@@ -26,7 +28,7 @@ auto CodecName(sdlrdp_codec codec) -> std::string {
 }
 auto Aspect(std::optional<std::string> const& text) -> sdlrdp_aspect {
   if (!text || text->empty()) return { };
-  auto const parts = oxbox::utilities::ParseNumbers<unsigned, 2>(oxbox::utilities::Trimmed(*text), ':');
+  auto const parts = oxbox::utilities::ParseNumbers<std::uint32_t, 2>(oxbox::utilities::Trimmed(*text), ':');
   if (!parts || std::ranges::contains(*parts, 0U))
     InvalidSetting("Invalid RDP aspect '" + *text + "': expected two positive whole numbers as N:D");
   return { (*parts)[0], (*parts)[1] };

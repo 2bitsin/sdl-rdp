@@ -16,8 +16,8 @@ using HeapCount::CountingHeap;
 using HeapCount::Tally;
 using SampleGate::InitializedSdl;
 using SampleGate::Window;
-constexpr int         Width            = 640;
-constexpr int         Height           = 480;
+constexpr int Width  = 640;
+constexpr int Height = 480;
 // With no peer the backend's frame pool settles at 2 buffers on the second present (measured under gdb).
 constexpr std::size_t WarmPresents     = 10;
 constexpr std::size_t MeasuredPresents = 100;

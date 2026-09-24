@@ -7,8 +7,8 @@
 
 namespace Backend {
 // A 32-bit row must fit BitmapUpdate bitmapLength (UINT16); height is UINT16.
-inline constexpr unsigned MaximumPictureWidth  = std::numeric_limits<uint16_t>::max() / PixelBytes;
-inline constexpr unsigned MaximumPictureHeight = std::numeric_limits<uint16_t>::max();
+inline constexpr std::uint32_t MaximumPictureWidth  = std::numeric_limits<std::uint16_t>::max() / PixelBytes;
+inline constexpr std::uint32_t MaximumPictureHeight = std::numeric_limits<std::uint16_t>::max();
 class PictureGeometry {
 public:
        PictureGeometry(Extent size, sdlrdp_aspect aspect);
@@ -25,5 +25,5 @@ private:
 }
 
 namespace Backend::Avc {
-auto Aligned(unsigned dimension) -> unsigned;
+auto Aligned(std::uint32_t dimension) -> std::uint32_t;
 }

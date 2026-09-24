@@ -1,6 +1,7 @@
 #include <sdl-rdp/core/desktop-layout.hpp>
 
 #include <sdl-rdp/utilities/contract.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/utilities/rect.hpp>
 
 #include <cstdint>
@@ -40,8 +41,8 @@ auto DesktopLayout::Matches(sdlrdp_rect picture) const noexcept -> bool {
 auto DesktopLayout::Offer(sdlrdp_rect picture) const noexcept -> sdlrdp_rect {
   return _resizing ? _desktop : picture;
 }
-auto DesktopLayout::Scale(int value, unsigned target, int sdlrdp_rect::* extent) const -> int {
+auto DesktopLayout::Scale(int value, std::uint32_t target, int sdlrdp_rect::* extent) const -> int {
   Expects(_desktop.*extent > 0, "desktop extent is positive");
-  return int(int64_t(value) * target / (_desktop.*extent));
+  return Narrowed<int>(std::int64_t{ value } * target / (_desktop.*extent));
 }
 }

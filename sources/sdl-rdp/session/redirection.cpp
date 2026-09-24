@@ -33,7 +33,7 @@ auto Redirection::OpenDrive() -> void {
   _drive = _make_drive();
   _drive->Open();
 }
-auto Redirection::OpenStatic(std::span<HANDLE const> ready) -> bool {
+auto Redirection::OpenStatic(std::span<WaitHandle const> ready) -> bool {
   if (!OpenClipboard()) return false;
   OpenDrive();
   if (_drive) _drive->Pump(ready);
@@ -45,7 +45,7 @@ auto Redirection::OpenSound() -> bool {
   _sound = _make_sound();
   return _sound->Initialize();
 }
-auto Redirection::Sound(std::span<HANDLE const> ready) -> void {
+auto Redirection::Sound(std::span<WaitHandle const> ready) -> void {
   if (!_activation.Active()) return;
   auto healthy = OpenSound();
   if (!_sound) return;
@@ -69,7 +69,7 @@ auto Redirection::LogAudio() const -> void {
 auto Redirection::Disconnect() -> void {
   if (_drive) _drive->Disconnect();
 }
-auto Redirection::Handles(std::span<HANDLE> out) const -> std::span<HANDLE> {
+auto Redirection::Handles(std::span<WaitHandle> out) const -> std::span<WaitHandle> {
   Expects(out.size() >= RedirectionHandleLimit, "handle span has room for the redirection channels");
   auto next = out.begin();
   if (_drive && _drive->Event()) *next++ = _drive->Event();

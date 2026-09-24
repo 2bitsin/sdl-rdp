@@ -5,7 +5,7 @@
 #include <span>
 
 namespace DriveGate {
-auto Completion(unsigned device, unsigned id, unsigned status)                     -> Backend::DrivePacket;
-auto ReplyTo(Backend::DrivePacket request, unsigned status)                        -> Backend::DrivePacket;
-auto DeviceAnnouncement(unsigned type, unsigned id, std::span<uint8_t const> name) -> Backend::DrivePacket;
+auto Completion(std::uint32_t device, std::uint32_t id, std::uint32_t status)                  -> Backend::DrivePacket;
+auto ReplyTo(Backend::DrivePacket request, std::uint32_t status)                               -> Backend::DrivePacket;
+auto DeviceAnnouncement(std::uint32_t type, std::uint32_t id, std::span<std::byte const> name) -> Backend::DrivePacket;
 }

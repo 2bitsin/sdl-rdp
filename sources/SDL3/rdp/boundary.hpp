@@ -6,13 +6,13 @@
 #include <new>
 #include <type_traits>
 namespace rdp {
-template <typename _Action>
-concept BoundaryOperation = std::invocable<_Action>
-                            && (std::same_as<std::invoke_result_t<_Action>, void>
-                                || std::default_initializable<std::invoke_result_t<_Action>>);
+template <typename ActionTy>
+concept BoundaryOperation = std::invocable<ActionTy>
+                            && (std::same_as<std::invoke_result_t<ActionTy>, void>
+                                || std::default_initializable<std::invoke_result_t<ActionTy>>);
 // SDL callbacks report failure through SDL_SetError and a default return value, never an exception.
-template <BoundaryOperation _Action>
-auto Boundary(_Action const& action) noexcept -> std::invoke_result_t<_Action> {
+template <BoundaryOperation ActionTy>
+auto Boundary(ActionTy const& action) noexcept -> std::invoke_result_t<ActionTy> {
   try {
     return std::invoke(action);
   } catch (std::bad_alloc const&) {
@@ -22,6 +22,6 @@ auto Boundary(_Action const& action) noexcept -> std::invoke_result_t<_Action> {
   } catch (...) {
     SDL_SetError("Unknown exception in RDP driver");
   }
-  if constexpr (!std::same_as<std::invoke_result_t<_Action>, void>) return { };
+  if constexpr (!std::same_as<std::invoke_result_t<ActionTy>, void>) return { };
 }
 }

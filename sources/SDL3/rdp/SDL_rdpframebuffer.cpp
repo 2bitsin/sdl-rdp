@@ -1,7 +1,10 @@
 #include "SDL_rdpframebuffer.hpp"
 #include "SDL_rdpvideo.hpp"
 #include "boundary.hpp"
+#include <sdl-rdp/utilities/narrowed.hpp>
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <iterator>
 namespace rdp {
 namespace {
@@ -54,7 +57,7 @@ auto Framebuffer::Present(Driver const& driver, std::span<SDL_Rect const> rects)
   auto const& surface = *_surface.Get();
   auto const  damage  = _Damage(rects);
   if (driver.Call<Operation::PRESENT>(surface.pixels, surface.pitch, surface.w, surface.h, damage.data(),
-                                      static_cast<unsigned>(damage.size()))
+                                      ::Backend::Narrowed<std::uint32_t>(damage.size()))
       != 0)
     return driver.Fail();
   if (!driver.Options().Boolean(SDL_HINT_RDP_VSYNC, false)) return true;

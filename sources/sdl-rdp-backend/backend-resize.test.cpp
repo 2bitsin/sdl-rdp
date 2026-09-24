@@ -20,14 +20,15 @@ public:
         _capabilities{ _client.ClientCapabilities } {
     auto const held = _handle.Session().Lock();
     Expects(active == nullptr, "one resize probe exists");
-    active                                 = this;
-    _client.context->update->DesktopResize = [](rdpContext* context) -> BOOL {
+    active = this;
+    // abi: pDesktopResize and psPeerClientCapabilities, BOOL is int
+    _client.context->update->DesktopResize = [](rdpContext* context) -> int {
       EXPECT_TRUE(freerdp_is_active_state(context));
       ++active->_calls;
       return active->_original(context);
     };
     // FreeRDP enters finalization right after ClientCapabilities, before the peer releases the session lock.
-    _client.ClientCapabilities             = [](freerdp_peer* client) -> BOOL {
+    _client.ClientCapabilities = [](freerdp_peer* client) -> int {
       auto const accepted = active->_capabilities == nullptr || active->_capabilities(client);
       active->_changed.notify_all();
       return accepted;
@@ -67,7 +68,7 @@ public:
     ASSERT_TRUE(_client.Activate(&_client));
     EXPECT_TRUE(RequiredStatus(_handle).resizing);
   }
-  auto Calls() -> unsigned {
+  auto Calls() -> std::size_t {
     auto const held = _handle.Session().Lock();
     return _calls;
   }
@@ -86,13 +87,13 @@ private:
   pDesktopResize              _original;
   psPeerClientCapabilities    _capabilities;
   std::condition_variable_any _changed;
-  unsigned                    _calls        = 0;
+  std::size_t                 _calls        = 0;
 };
 class ResizeStorm : public RoundFive {
 protected:
   auto ConnectDisplay(Client& client) -> void {
     ASSERT_NO_FATAL_FAILURE(Connect(client, false));
-    ASSERT_TRUE(client.Until([&] { return Headless::DisplayClient::Ready(); }));
+    ASSERT_TRUE(client.Until([&] { return Headless::DisplayClient::Of(client, &Headless::DisplayClient::Ready); }));
     std::ignore = backend.Poll();
   }
   auto ThenQuietResize(ResizeProbe& probe) -> void {
@@ -134,7 +135,7 @@ protected:
         << "server calls=" << probe.Calls() << " client calls=" << display.Observed().desktops
         << " GDI=" << client.Instance()->context->gdi->width << "x" << client.Instance()->context->gdi->height << "\n"
         << logs.Text(true);
-    for (unsigned i = 0; i < 20; ++i) ASSERT_TRUE(client.Pump(5));
+    for (std::size_t i = 0; i < 20; ++i) ASSERT_TRUE(client.Pump(5));
     ASSERT_NO_FATAL_FAILURE(ThenFinalDesktop(client, last));
     ASSERT_NO_FATAL_FAILURE(ThenResizeCounts(display, probe, expected));
     ThenQuietResize(probe);
@@ -154,7 +155,7 @@ protected:
   }
 };
 namespace {
-auto ThenSingleScreen(std::vector<sdlrdp_event> const& events, unsigned width, unsigned height) -> void {
+auto ThenSingleScreen(std::vector<sdlrdp_event> const& events, std::uint32_t width, std::uint32_t height) -> void {
   auto screens = events | std::views::filter([](auto event) { return event.type == SDLRDP_SCREEN; });
   ASSERT_EQ(std::ranges::distance(screens), 1);
   EXPECT_EQ(screens.front().screen.width, width);
@@ -188,14 +189,15 @@ TEST_F(ResizeStorm, EqualLayoutDoesNotChangePicture) {
 TEST_F(RoundFive, ResizeDesktop) {
   ASSERT_NO_FATAL_FAILURE(Open());
   Client client(sdlrdp_port(backend.Handle()), true, 1024, 768);
-  client.Instance()->context->update->DesktopResize = [](rdpContext* context) -> BOOL {
+  // abi: pDesktopResize, BOOL is int
+  client.Instance()->context->update->DesktopResize = [](rdpContext* context) -> int {
     return gdi_resize(context->gdi, freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopWidth),
                       freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopHeight));
   };
   ASSERT_NO_FATAL_FAILURE(Connect(client, false));
   EXPECT_EQ(client.Instance()->context->gdi->width, 640);
   ASSERT_EQ(sdlrdp_resize(backend.Handle(), 800, 600), 0);
-  std::vector<UINT32> pixels(800uz * 600, 0x123456);
+  std::vector<std::uint32_t> pixels(800uz * 600, 0x123456);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 800, 600));
   ASSERT_TRUE(client.Until([&] { return client.Instance()->context->gdi->width == 800 && client.Matches(pixels); }))
       << logs.Text();
@@ -216,8 +218,9 @@ TEST_F(RoundFive, ClientScreenNeverResizesPicture) {
   ASSERT_EQ(events.size(), 2u);
   EXPECT_EQ(events[1].screen.width, 1024u);
   EXPECT_EQ(events[1].screen.height, 768u);
-  ASSERT_TRUE(client.Until([&] { return Headless::DisplayClient::Ready(); })) << logs.Text();
-  ASSERT_TRUE(Headless::DisplayClient::Layout(1920, 1080, 500));
+  ASSERT_TRUE(client.Until([&] { return Headless::DisplayClient::Of(client, &Headless::DisplayClient::Ready); }))
+      << logs.Text();
+  ASSERT_TRUE(Headless::DisplayClient::Of(client, [](auto const& display) { return display.Layout(1920, 1080, 500); }));
   ASSERT_TRUE(client.Until([&] { return sdlrdp_wait(backend.Handle(), 0) == 1; })) << logs.Text();
   events = backend.Poll();
   ASSERT_EQ(events.size(), 1u);

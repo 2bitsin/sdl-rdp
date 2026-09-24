@@ -1,30 +1,32 @@
 #pragma once
+#include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/session/channel-set.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
 #include <winpr/wtypes.h>
+#include <cstdint>
 #include <span>
 
 namespace Backend {
-inline constexpr DWORD LoopHandleCount     = 2;
-inline constexpr DWORD AppendedHandleCount = ChannelHandleLimit + LoopHandleCount;
+inline constexpr std::uint32_t LoopHandleCount     = 2;
+inline constexpr std::uint32_t AppendedHandleCount = ChannelHandleLimit + LoopHandleCount;
 class Activation;
 class FramePacing;
 class GraphicsLink;
 class PeerLink;
 struct WaitPlan {
-  DWORD count  { };
-  DWORD timeout{ };
+  std::uint32_t count  { };
+  std::uint32_t timeout{ };
 };
 class PeerWait : private Pinned {
 public:
        PeerWait(PeerLink& link, ChannelSet const& channels, Activation const& activation, FramePacing& pacing,
                 GraphicsLink& graphics) noexcept;
-  auto Plan(std::span<HANDLE> handles) -> WaitPlan;
+  auto Plan(std::span<WaitHandle> handles) -> WaitPlan;
 
 private:
-  auto Collect(std::span<HANDLE> handles) -> DWORD;
-  auto Timeout() const                    -> DWORD;
+  auto Collect(std::span<WaitHandle> handles) -> std::uint32_t;
+  auto Timeout() const                        -> std::uint32_t;
   PeerLink&         _link;
   ChannelSet const& _channels;
   Activation const& _activation;

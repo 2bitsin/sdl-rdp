@@ -4,6 +4,7 @@
 #include <SDL3/SDL.h>
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <span>
 
@@ -34,7 +35,7 @@ protected:
   auto GivenAudioHints()                                          -> void;
   auto GivenSoundClient()                                         -> void;
   auto PlayPcm(std::size_t count)                                 -> void;
-  auto PlayFlushed(std::span<Sint16 const> pcm)                   -> Clock::time_point;
+  auto PlayFlushed(std::span<std::int16_t const> pcm)             -> Clock::time_point;
   auto OpenStream()                                               -> void;
   auto ConnectAudio(Client& client, Headless::SoundClient& audio) -> void;
   auto ThenPcm(Client& client, Headless::SoundClient& audio)      -> void;

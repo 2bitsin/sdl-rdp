@@ -956,7 +956,7 @@ def inner_item(logical, constructors, depth=-1):
     if item and item.kind in ANCHORED_KINDS:
         return item, False
     if is_comment_only(logical.text, logical.code):
-        return None, True
+        return None, False
     return None, len(indentation(logical.text)) <= depth
 
 
@@ -967,7 +967,7 @@ def top_level_items(physical, logicals, constructors):
             yield inner_item(logical, constructors, skipped[logical.key[0]])
             continue
         if is_comment_only(logical.text, logical.code):
-            yield None, True
+            yield None, False
             continue
         item, extent = top_level_item(physical, logical, constructors)
         skipped |= extent

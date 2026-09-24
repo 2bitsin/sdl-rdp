@@ -12,6 +12,7 @@
 
 #include <chrono>
 #include <concepts>
+#include <cstddef>
 #include <memory>
 #include <vector>
 
@@ -38,7 +39,7 @@ protected:
     } while (Clock::now() < deadline);
     return result;
   }
-  auto Events(unsigned wanted)                                                   -> std::vector<sdlrdp_event>;
+  auto Events(std::size_t wanted)                                                -> std::vector<sdlrdp_event>;
   auto UntilEvent(sdlrdp_event_type type, bool include_refresh = true)           -> std::vector<sdlrdp_event>;
   auto UntilEvent(Client const& client, sdlrdp_event_type type, bool include_refresh = true)
       -> std::vector<sdlrdp_event>;

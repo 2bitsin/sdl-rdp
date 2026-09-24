@@ -3,6 +3,7 @@
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/transcode.hpp>
 
+#include <cstddef>
 #include <stdexcept>
 #include <utility>
 

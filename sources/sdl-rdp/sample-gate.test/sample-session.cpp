@@ -4,6 +4,7 @@
 #include <sdl-rdp/sample-gate.test/frame-pattern.hpp>
 #include <sdl-rdp/sample-gate.test/sample-launch.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace SampleGate {
@@ -39,7 +40,7 @@ auto SampleSession::Position() -> PositionObserver& {
 auto SampleSession::GivenFullscreen() -> void {
   GivenProcess({ }, { "--fullscreen", "--mode", "320x200" });
 }
-auto SampleSession::ThenExplicitGeometry(Client& client, unsigned height) -> void {
+auto SampleSession::ThenExplicitGeometry(Client& client, std::uint32_t height) -> void {
   ASSERT_TRUE(Read("event GEOMETRY window=320x200 desktop=320x200"));
   ASSERT_TRUE(client.UntilDesktop(320, height));
 }
@@ -48,7 +49,7 @@ auto SampleSession::GivenAudioProcess(Words const& environment, Words const& opt
   audio_port = AnnouncedPort(line);
   ASSERT_TRUE(Read("audio device=RDP client freq=44100"));
 }
-auto SampleSession::ThenIniConnects(std::vector<std::string> const& args, unsigned port) -> void {
+auto SampleSession::ThenIniConnects(std::vector<std::string> const& args, std::uint32_t port) -> void {
   ASSERT_NO_FATAL_FAILURE(GivenIniProcess(args, port));
   Client client(port, true, 640, 480);
   ASSERT_NO_FATAL_FAILURE(Connect(client));
@@ -68,7 +69,7 @@ auto SampleSession::GivenSession(Words const& environment, Words const& options,
   ASSERT_NO_FATAL_FAILURE(GivenProcess(environment, options));
   session = std::make_unique<Client>(AnnouncedPort(line), true, width, height);
 }
-auto SampleSession::GivenIniProcess(std::vector<std::string> const& args, unsigned port) -> void {
+auto SampleSession::GivenIniProcess(std::vector<std::string> const& args, std::uint32_t port) -> void {
   ASSERT_NO_FATAL_FAILURE(Launch(args));
   EXPECT_EQ(AnnouncedPort(line), port);
 }

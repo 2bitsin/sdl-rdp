@@ -1,6 +1,7 @@
 #pragma once
 #include <openssl/bio.h>
 #include <condition_variable>
+#include <cstddef>
 #include <functional>
 #include <map>
 #include <mutex>
@@ -22,7 +23,7 @@ public:
   auto               Filling(BIO_METHOD const* method, Setter setter)       -> void;
   auto               Arm(std::string_view method, Setter setter)            -> void;
   auto               RacerDone()                                            -> void;
-  [[nodiscard]] auto Fills()                                                -> unsigned;
+  [[nodiscard]] auto Fills()                                                -> std::size_t;
   [[nodiscard]] auto Seen(std::string_view method)                          -> bool;
   [[nodiscard]] auto Named(BIO_METHOD const* method, std::string_view name) -> bool;
 
@@ -34,7 +35,7 @@ private:
   std::map<std::string, BIO_METHOD const*, std::less<>> created;
   std::string                                           held_method;
   Setter                                                held_setter = Setter::Write;
-  unsigned                                              fills       = 0;
-  unsigned                                              racers_done = 0;
+  std::size_t                                           fills       = 0;
+  std::size_t                                           racers_done = 0;
 };
 }

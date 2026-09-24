@@ -2,6 +2,7 @@
 #include <sdl-rdp/sample-gate.test/sample-input.hpp>
 
 #include <sdl-rdp/headless-client.test/clipboard-client.hpp>
+#include <cstdint>
 
 namespace SampleGate {
 class SampleChecks : public SampleInput {
@@ -19,7 +20,7 @@ protected:
   auto        GivenIniHints(fs::path const& file)                                        -> void;
   static auto ThenReloadedAspect()                                                       -> void;
   auto        ThenReloadedIni(fs::path const& file)                                      -> void;
-  auto        DisconnectReading(unsigned port, fs::path const& share)                    -> void;
+  auto        DisconnectReading(std::uint32_t port, fs::path const& share)               -> void;
   auto        ThenClipboardCleared(Client& client, Headless::ClipboardClient& clipboard) -> void;
 };
 }

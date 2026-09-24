@@ -26,7 +26,7 @@ Peer::Peer(PeerHandle accepted, Diagnostics const& diagnostics, EventQueue& even
                    };
                    return std::make_unique<GfxChannel>(_link, diagnostics, configuration, _activation, sources, owner);
                  } },
-      _display     { _link, _activation, _desktop, events                              },
+      _display     { _link, _activation, _desktop, events, diagnostics                 },
       _input_events{ _link, _activation, _desktop, events, store, diagnostics, session },
       _input       { _link, _input_events                                              },
       _redirection{ _link,
@@ -90,7 +90,7 @@ auto Peer::RestartPacing(FrameLock const& held) -> void {
 auto Peer::Signal() -> void {
   if (_activation.Active()) _link.Signal();
 }
-auto Peer::Settled(FrameLock const& held, uint64_t target) const -> bool {
+auto Peer::Settled(FrameLock const& held, std::uint64_t target) const -> bool {
   return _pacing.Settled(held, target);
 }
 auto Peer::Redirected() const noexcept -> Redirection const& {

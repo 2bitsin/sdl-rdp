@@ -1,12 +1,14 @@
 #pragma once
+#include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/utilities/factory.hpp>
 
 #include <winpr/wtypes.h>
+#include <cstddef>
 #include <memory>
 #include <span>
 
 namespace Backend {
-inline constexpr unsigned RedirectionHandleLimit = 3;
+inline constexpr std::size_t RedirectionHandleLimit = 3;
 class Activation;
 class AudioChannel;
 class ClipboardChannel;
@@ -15,21 +17,21 @@ class PeerLink;
 class SessionAccess;
 class Redirection {
 public:
-       Redirection(Redirection const&)                           = delete;
-       Redirection(Redirection&&)                                = delete;
+       Redirection(Redirection const&)                               = delete;
+       Redirection(Redirection&&)                                    = delete;
        Redirection(PeerLink& link, Activation const& activation, SessionAccess& session,
                    Factory<std::unique_ptr<AudioChannel>> sound, Factory<std::unique_ptr<ClipboardChannel>> clipboard,
                    Factory<std::shared_ptr<DriveChannel>> drive) noexcept;
        ~Redirection();
-  auto operator=(Redirection const&)             -> Redirection& = delete;
-  auto operator=(Redirection&&)                  -> Redirection& = delete;
-  auto OpenStatic(std::span<HANDLE const> ready) -> bool;
-  auto Sound(std::span<HANDLE const> ready)      -> void;
-  auto Audio() const noexcept                    -> AudioChannel*;
-  auto Drive() const                             -> std::shared_ptr<DriveChannel>;
-  auto LogAudio() const                          -> void;
-  auto Disconnect()                              -> void;
-  auto Handles(std::span<HANDLE> out) const      -> std::span<HANDLE>;
+  auto operator=(Redirection const&)                 -> Redirection& = delete;
+  auto operator=(Redirection&&)                      -> Redirection& = delete;
+  auto OpenStatic(std::span<WaitHandle const> ready) -> bool;
+  auto Sound(std::span<WaitHandle const> ready)      -> void;
+  auto Audio() const noexcept                        -> AudioChannel*;
+  auto Drive() const                                 -> std::shared_ptr<DriveChannel>;
+  auto LogAudio() const                              -> void;
+  auto Disconnect()                                  -> void;
+  auto Handles(std::span<WaitHandle> out) const      -> std::span<WaitHandle>;
 
 private:
   auto OpenClipboard() -> bool;

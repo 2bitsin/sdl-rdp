@@ -12,6 +12,8 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <cstddef>
+#include <cstdint>
 #include <ranges>
 #include <span>
 
@@ -23,12 +25,12 @@ auto Header(std::uint32_t type) -> DrivePacket {
   packet.Write(Narrowed<std::uint16_t>(type));
   return packet;
 }
-auto ChannelEvent(HANDLE channel) -> HANDLE {
-  void* data = nullptr;
-  DWORD size = 0;
+auto ChannelEvent(WaitHandle channel) -> WaitHandle {
+  void*         data = nullptr;
+  std::uint32_t size = 0;
   if (!WTSVirtualChannelQuery(channel, WTSVirtualEventHandle, &data, &size))
     throw std::runtime_error("Drive channel event query failed.");
-  auto* event = *static_cast<HANDLE*>(data);
+  auto* event = *static_cast<WaitHandle*>(data);
   WTSFreeMemory(data);
   return event;
 }
@@ -46,7 +48,7 @@ auto IoRequest(std::span<std::uint32_t const> header, DrivePacket const& body) -
   return packet;
 }
 auto Capability(DrivePacket& packet, std::uint32_t type, std::uint32_t version, DrivePacket const& body) -> void {
-  constexpr std::uint32_t header_size = (sizeof(uint16_t) * 2) + sizeof(uint32_t);
+  constexpr std::size_t header_size = (sizeof(std::uint16_t) * 2) + sizeof(std::uint32_t);
   Expects(body.Bytes().size() <= UINT16_MAX - header_size, "capability length fits its header");
   packet.Write(Narrowed<std::uint16_t>(type));
   packet.Write(Narrowed<std::uint16_t>(header_size + body.Bytes().size()));
@@ -93,7 +95,7 @@ DriveChannel::DriveChannel(PeerLink& link, EventQueue& events, Diagnostics const
 DriveChannel::~DriveChannel() {
   Disconnect();
 }
-auto DriveChannel::Event() const -> HANDLE {
+auto DriveChannel::Event() const -> WaitHandle {
   return event;
 }
 auto DriveChannel::Open() -> bool {
@@ -113,7 +115,7 @@ auto DriveChannel::Open() -> bool {
 }
 auto DriveChannel::Write(DrivePacket& packet) -> void {
   Expects(channel != nullptr, "drive transport exists");
-  ULONG written = 0;
+  std::uint32_t written = 0;
   if (!WTSVirtualChannelWrite(channel.get(), oxbox::utilities::SpanCast<char>(std::span(packet.Bytes())).data(),
                               packet.Bytes().size(), &written)
       || written != packet.Bytes().size())
@@ -134,13 +136,13 @@ auto DriveChannel::Capabilities() -> void {
   Write(logged_on);
 }
 auto DriveChannel::Announce(DrivePacket& packet) -> void {
-  auto count = packet.Read<uint32_t>();
+  auto count = packet.Read<std::uint32_t>();
   while (count--) {
-    auto                type = packet.Read<uint32_t>();
-    auto                wire = packet.Read<uint32_t>();
+    auto                type = packet.Read<std::uint32_t>();
+    auto                wire = packet.Read<std::uint32_t>();
     std::array<char, 9> name { };
-    for (std::size_t i = 0; i < 8; ++i) name[i] = char(packet.Read<uint8_t>());
-    auto length = packet.Read<uint32_t>();
+    for (std::size_t i = 0; i < 8; ++i) name[i] = char(packet.Read<std::uint8_t>());
+    auto length = packet.Read<std::uint32_t>();
     auto begin  = packet.Position();
     packet.Skip(length);
     auto response = Header(PAKID_CORE_DEVICE_REPLY);
@@ -153,14 +155,14 @@ auto DriveChannel::Announce(DrivePacket& packet) -> void {
   }
 }
 auto DriveChannel::ClientCapabilities(DrivePacket& packet) -> void {
-  constexpr std::uint32_t capability_header_size = 8;
-  auto                    count                  = packet.Read<uint16_t>();
+  constexpr std::size_t capability_header_size = 8;
+  auto                  count                  = packet.Read<std::uint16_t>();
   packet.Skip(2);
   while (count--) {
     auto start   = packet.Position();
-    auto type    = packet.Read<uint16_t>();
-    auto length  = packet.Read<uint16_t>();
-    auto version = packet.Read<uint32_t>();
+    auto type    = packet.Read<std::uint16_t>();
+    auto length  = packet.Read<std::uint16_t>();
+    auto version = packet.Read<std::uint32_t>();
     if (length < capability_header_size) throw std::runtime_error("Invalid drive capability length.");
     packet.Skip(length - capability_header_size);
     auto end = packet.Position();
@@ -195,9 +197,9 @@ auto DriveChannel::Remove(std::uint32_t wire) -> void {
   }
 }
 auto DriveChannel::Complete(DrivePacket& packet) -> void {
-  packet.Read<uint32_t>();
-  auto id     = packet.Read<uint32_t>();
-  auto status = packet.Read<uint32_t>();
+  packet.Read<std::uint32_t>();
+  auto id     = packet.Read<std::uint32_t>();
+  auto status = packet.Read<std::uint32_t>();
   auto found  = pending.find(id);
   if (found == pending.end()) {
     Warn(std::format("Unknown drive completion id {}; ignored.", id));
@@ -205,17 +207,18 @@ auto DriveChannel::Complete(DrivePacket& packet) -> void {
   }
   auto& request = *found->second;
   request.status = status;
-  request.response.Bytes().assign(packet.Bytes().begin() + std::ptrdiff_t(packet.Position()), packet.Bytes().end());
+  request.response.Bytes().assign(packet.Bytes().begin() + Narrowed<std::ptrdiff_t>(packet.Position()),
+                                  packet.Bytes().end());
   request.done = true;
   pending.erase(found);
   changed.notify_all();
 }
 auto DriveChannel::Receive(DrivePacket& packet) -> void {
-  if (packet.Read<uint16_t>() != RDPDR_CTYP_CORE) return;
-  auto type = packet.Read<uint16_t>();
+  if (packet.Read<std::uint16_t>() != RDPDR_CTYP_CORE) return;
+  auto type = packet.Read<std::uint16_t>();
   if (type == PAKID_CORE_CLIENTID_CONFIRM) {
     packet.Skip(4);
-    client_id = packet.Read<uint32_t>();
+    client_id = packet.Read<std::uint32_t>();
   } else if (type == PAKID_CORE_CLIENT_CAPABILITY)
     ClientCapabilities(packet);
   else if (type == PAKID_CORE_CLIENT_NAME)
@@ -225,11 +228,11 @@ auto DriveChannel::Receive(DrivePacket& packet) -> void {
   else if (type == PAKID_CORE_DEVICE_IOCOMPLETION)
     Complete(packet);
   else if (type == PAKID_CORE_DEVICELIST_REMOVE) {
-    auto count = packet.Read<uint32_t>();
-    while (count--) Remove(packet.Read<uint32_t>());
+    auto count = packet.Read<std::uint32_t>();
+    while (count--) Remove(packet.Read<std::uint32_t>());
   }
 }
-auto DriveChannel::Pump(std::span<HANDLE const> signaled) -> bool {
+auto DriveChannel::Pump(std::span<WaitHandle const> signaled) -> bool {
   std::scoped_lock const lock(mutex);
   if (!connected) {
     CloseTransport();
@@ -271,15 +274,15 @@ auto DriveChannel::AnnounceDevice(std::uint32_t wire, std::string const& label) 
 }
 auto DriveChannel::GeneralClientCapability(DrivePacket& packet, std::size_t start, std::size_t length,
                                            std::uint32_t version) const -> void {
-  constexpr std::uint32_t general_caps_v1_size          = 40;
-  constexpr std::uint32_t protocol_major_version_offset = 16;
-  constexpr std::uint32_t io_code_fields_size           = 8;
+  constexpr std::size_t general_caps_v1_size          = 40;
+  constexpr std::size_t protocol_major_version_offset = 16;
+  constexpr std::size_t io_code_fields_size           = 8;
   if (length < general_caps_v1_size) throw std::runtime_error("Truncated general drive capability.");
   packet.Seek(start + protocol_major_version_offset);
-  auto major = packet.Read<uint16_t>();
-  auto minor = packet.Read<uint16_t>();
+  auto major = packet.Read<std::uint16_t>();
+  auto minor = packet.Read<std::uint16_t>();
   packet.Skip(io_code_fields_size);
-  auto flags = packet.Read<uint32_t>();
+  auto flags = packet.Read<std::uint32_t>();
   _diagnostics.Log(
       SDLRDP_LOG_INFO,
       std::format("Drive client version {}.{}, general capability {}, extended PDU 0x{:08x}, device removal {}.", major,
@@ -288,7 +291,7 @@ auto DriveChannel::GeneralClientCapability(DrivePacket& packet, std::size_t star
 auto DriveChannel::PumpAvailable() -> bool {
   for (;;) {
     if (!Signalled(event)) return true;
-    ULONG length = 0;
+    std::uint32_t length = 0;
     if (!WTSVirtualChannelRead(channel.get(), 0, nullptr, 0, &length))
       throw std::runtime_error("Drive channel read failed.");
     if (!length) return true;

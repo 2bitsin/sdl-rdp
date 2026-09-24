@@ -4,10 +4,11 @@
 #include <freerdp/channels/channels.h>
 #include <freerdp/client/cmdline.h>
 #include <array>
+#include <cstdint>
 
 namespace Headless {
 namespace {
-auto LoadAddin(freerdp* instance, char const* name, std::span<char const* const> dynamic) -> BOOL {
+auto LoadAddin(freerdp* instance, char const* name, std::span<char const* const> dynamic) -> bool {
   auto* settings = instance->context->settings;
   auto  entry    = reinterpret_cast<PVIRTUALCHANNELENTRYEX>(freerdp_load_channel_addin_entry(
       name, nullptr, nullptr, FREERDP_ADDIN_CHANNEL_STATIC | FREERDP_ADDIN_CHANNEL_ENTRYEX));
@@ -16,14 +17,14 @@ auto LoadAddin(freerdp* instance, char const* name, std::span<char const* const>
 }
 }
 
-auto LoadStaticChannel(freerdp* instance, char const* name) -> BOOL {
+auto LoadStaticChannel(freerdp* instance, char const* name) -> bool {
   return LoadAddin(instance, name, { });
 }
-auto LoadDynamicChannel(freerdp* instance, char const* name) -> BOOL {
+auto LoadDynamicChannel(freerdp* instance, char const* name) -> bool {
   std::array const channel{ name };
   return LoadAddin(instance, "drdynvc", channel);
 }
-auto SendStaticChannel(freerdp* instance, char const* name, std::span<BYTE const> bytes) -> bool {
+auto SendStaticChannel(freerdp* instance, char const* name, std::span<std::uint8_t const> bytes) -> bool {
   auto id = freerdp_channels_get_id_by_name(instance, name);
   return id && instance->SendChannelData(instance, id, bytes.data(), bytes.size());
 }

@@ -3,22 +3,24 @@
 #include <sdl-rdp/utilities/contract.hpp>
 
 #include <algorithm>
+#include <cstdint>
 
 namespace Backend {
 namespace {
 constexpr double PixelCenter = 0.5;
-auto Position(int index, double ratio, unsigned extent) -> double {
+auto Position(int index, double ratio, std::uint32_t extent) -> double {
   Expects(extent > 0, "sampled extent is positive");
   return std::clamp(((index + PixelCenter) * ratio) - PixelCenter, 0.0, double(extent - 1));
 }
 }
-Tap::Tap(int index, double ratio, unsigned extent)
-    : _first{ unsigned(Position(index, ratio, extent)) }, _second{ std::min(_first + 1, extent - 1) },
+// The position is clamped to 0..extent - 1, so truncation takes its floor inside the extent.
+Tap::Tap(int index, double ratio, std::uint32_t extent)
+    : _first{ static_cast<std::uint32_t>(Position(index, ratio, extent)) }, _second{ std::min(_first + 1, extent - 1) },
       _weight{ float(Position(index, ratio, extent) - _first) } { }
-auto Tap::First() const noexcept -> unsigned {
+auto Tap::First() const noexcept -> std::uint32_t {
   return _first;
 }
-auto Tap::Second() const noexcept -> unsigned {
+auto Tap::Second() const noexcept -> std::uint32_t {
   return _second;
 }
 auto Tap::Weight() const noexcept -> float {

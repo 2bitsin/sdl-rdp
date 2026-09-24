@@ -1,6 +1,7 @@
 #include <sdl-rdp-driver/SDL_rdpini.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <algorithm>
+#include <cstddef>
 
 namespace rdp {
 namespace {
@@ -23,17 +24,17 @@ auto IsIniEntry(std::string_view line) -> bool {
   auto const section = line.starts_with('[') && line.ends_with(']');
   return !line.empty() && !comment && !section;
 }
-auto ParseEntry(std::string_view line, unsigned number) -> IniEntry {
+auto ParseEntry(std::string_view line, std::size_t number) -> IniEntry {
   utilities::Expects(number > 0, "ini lines are one based");
   auto const equals = line.find('=');
   if (equals == std::string_view::npos) return IniEntry{ number };
   return { oxbox::utilities::Trimmed(line.substr(0, equals)),
            Unquoted(oxbox::utilities::Trimmed(line.substr(equals + 1))), number };
 }
-IniEntry::IniEntry(std::string_view key, std::string_view value, unsigned line)
+IniEntry::IniEntry(std::string_view key, std::string_view value, std::size_t line)
     : _index{ SettingIndex(key) }, _key{ key }, _value{ value }, _line{ line },
       _status{ _index ? IniStatus::SETTING : IniStatus::UNKNOWN } { }
-IniEntry::IniEntry(unsigned line) : _line{ line }, _status{ IniStatus::MALFORMED } { }
+IniEntry::IniEntry(std::size_t line) : _line{ line }, _status{ IniStatus::MALFORMED } { }
 auto IniEntry::Index() const -> std::optional<std::size_t> {
   return _index;
 }
@@ -43,7 +44,7 @@ auto IniEntry::Key() const -> std::string_view {
 auto IniEntry::Value() const -> std::string_view {
   return _value;
 }
-auto IniEntry::Line() const -> unsigned {
+auto IniEntry::Line() const -> std::size_t {
   return _line;
 }
 auto IniEntry::Status() const -> IniStatus {

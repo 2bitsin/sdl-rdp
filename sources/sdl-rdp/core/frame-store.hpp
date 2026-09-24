@@ -36,8 +36,8 @@ public:
   auto Bounds(FrameLock const& held) const                   -> sdlrdp_rect;
   auto Snapshot(FrameLock const& held) const                 -> FrameSnapshot const&;
   auto Previous(FrameLock const& held, Extent size) const    -> FrameSnapshot;
-  auto Presented(FrameLock const& held) const                -> uint64_t;
-  auto Publish(FrameLock const& held, std::shared_ptr<std::vector<BYTE> const> next, Extent size) -> bool;
+  auto Presented(FrameLock const& held) const                -> std::uint64_t;
+  auto Publish(FrameLock const& held, std::shared_ptr<std::vector<std::uint8_t> const> next, Extent size) -> bool;
   auto Ensure(FrameLock const& held)                         -> bool;
   auto Resize(FrameLock const& held, Extent size)            -> bool;
   auto SetAspect(FrameLock const& held, sdlrdp_aspect value) -> void;
@@ -47,6 +47,6 @@ private:
   std::condition_variable _changed;
   PictureGeometry         _geometry;
   FrameSnapshot           _shadow;
-  uint64_t                _presented{ };
+  std::uint64_t           _presented{ };
 };
 }

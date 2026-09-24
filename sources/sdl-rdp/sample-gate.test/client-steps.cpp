@@ -8,8 +8,8 @@
 
 namespace SampleGate {
 auto ChangeMonitor(Headless::Client& client) -> void {
-  ASSERT_TRUE(client.Until([] { return Headless::DisplayClient::Ready(); }));
-  ASSERT_TRUE(Headless::DisplayClient::Layout(1920, 1080, 500));
+  ASSERT_TRUE(client.Until([&] { return Headless::DisplayClient::Of(client, &Headless::DisplayClient::Ready); }));
+  ASSERT_TRUE(Headless::DisplayClient::Of(client, [](auto const& display) { return display.Layout(1920, 1080, 500); }));
 }
 
 auto ThenAdvanced(Headless::Client& client) -> void {

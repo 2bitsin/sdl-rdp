@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <future>
@@ -25,21 +26,21 @@ protected:
     EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 0), 1);
     Client client(sdlrdp_port(backend.Handle()), true);
     ASSERT_NO_FATAL_FAILURE(Connect(client));
-    FrameObserver const       observer(client);
-    std::vector<UINT32> const pixels(320uz * 200, 0x778899);
+    FrameObserver const              observer(client);
+    std::vector<std::uint32_t> const pixels(320uz * 200, 0x778899);
     timed([&] {
       ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
       ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == 1; }));
       ThenAcknowledgementTimeout(pixels);
     });
   }
-  auto ThenAcknowledgementTimeout(std::vector<UINT32> const& pixels) -> void;
-  auto ThenTimedOutFrames(std::string_view sent, unsigned minimum)   -> void;
-  auto ThenAspectMouse(Client& client)                               -> void;
-  auto ThenAgedWindowResumes(std::vector<UINT32> const& pixels)      -> void;
-  auto ThenColourDepth(unsigned depth)                               -> void;
-  auto WhenAcknowledgedFrame(Client& client, FrameObserver& observer, std::vector<UINT32> const& pixels, unsigned i,
-                             auto wait) -> void {
+  auto ThenAcknowledgementTimeout(std::vector<std::uint32_t> const& pixels) -> void;
+  auto ThenTimedOutFrames(std::string_view sent, std::size_t minimum)       -> void;
+  auto ThenAspectMouse(Client& client)                                      -> void;
+  auto ThenAgedWindowResumes(std::vector<std::uint32_t> const& pixels)      -> void;
+  auto ThenColourDepth(std::uint32_t depth)                                 -> void;
+  auto WhenAcknowledgedFrame(Client& client, FrameObserver& observer, std::vector<std::uint32_t> const& pixels,
+                             std::size_t i, auto wait) -> void {
     ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
     auto waiting = std::async(std::launch::async, wait, std::ref(*backend));
     ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == i; }));
@@ -48,13 +49,13 @@ protected:
     ASSERT_EQ(waiting.get(), 1);
     EXPECT_TRUE(std::ranges::none_of(backend.Poll(), [](auto const& event) { return event.type == SDLRDP_REFRESH; }));
   }
-  auto ThenProgressiveDamageCost(Client& client, Headless::GraphicsObserver& observer, uint64_t before) -> void;
-  auto ThenAutoChangesToRaw(Client& client, std::vector<UINT32>& pixels)                                -> void;
-  auto ThenGraphicsTimeoutStatistics()                                                                  -> void;
-  auto ThenGraphicsAcknowledgementsCounted()                                                            -> void;
-  auto ThenGraphicsWindowReleases(std::vector<UINT32> const& pixels)                                    -> void;
-  auto ThenLegacyWindowReleases(Client& client, FrameObserver const& observer, std::vector<UINT32> const& pixels)
+  auto ThenProgressiveDamageCost(Client& client, Headless::GraphicsObserver& observer, std::uint64_t before) -> void;
+  auto ThenAutoChangesToRaw(Client& client, std::vector<std::uint32_t>& pixels)                              -> void;
+  auto ThenGraphicsTimeoutStatistics()                                                                       -> void;
+  auto ThenGraphicsAcknowledgementsCounted()                                                                 -> void;
+  auto ThenGraphicsWindowReleases(std::vector<std::uint32_t> const& pixels)                                  -> void;
+  auto ThenLegacyWindowReleases(Client& client, FrameObserver const& observer, std::vector<std::uint32_t> const& pixels)
       -> void;
-  auto RunPictureSizes(bool graphics)                                                                   -> void;
+  auto RunPictureSizes(bool graphics)                                                                        -> void;
 };
 }

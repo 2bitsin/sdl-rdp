@@ -2,15 +2,18 @@
 #include "client.hpp"
 #include <sdl-rdp/storage/drive-packet.hpp>
 
+#include <cstddef>
+#include <cstdint>
+#include <span>
 #include <utility>
 #include <vector>
 
 namespace Headless {
 struct DriveCapture {
-  unsigned                                   requests = 0;
-  std::vector<Backend::DrivePacket>          io;
-  std::vector<std::pair<unsigned, unsigned>> replies;
-  bool                                       hold     = false;
+  std::size_t                                          requests = 0;
+  std::vector<Backend::DrivePacket>                    io;
+  std::vector<std::pair<std::uint32_t, std::uint32_t>> replies;
+  bool                                                 hold     = false;
 };
 struct DriveObserver {
 public:
@@ -25,7 +28,7 @@ public:
   auto     Observed() const                               -> DriveCapture const&;
 
 private:
-  static auto Receive(freerdp* instance, UINT16 id, BYTE const* data, size_t size, UINT32 flags, size_t total) -> BOOL;
+  auto Receive(std::uint16_t id, std::span<std::byte const> data, std::uint32_t flags, std::size_t total) -> bool;
   DriveCapture                              observed;
   inline static thread_local DriveObserver* active   = nullptr;
   freerdp*                                  instance;

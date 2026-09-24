@@ -2,6 +2,7 @@
 
 #include <sdl-rdp/utilities/contract.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace Backend {

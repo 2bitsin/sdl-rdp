@@ -2,6 +2,7 @@
 
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
 #include <sdl-rdp/input/input-events.hpp>
+#include <sdl-rdp/utilities/contained.hpp>
 
 #include <freerdp/channels/wtsvc.h>
 #include <cstdint>
@@ -28,7 +29,7 @@ template <> auto TouchProtocol::Open(PeerLink& link, Channel& channel) -> Contex
 template <> auto TouchProtocol::Service(Context const& context) -> bool {
   return TouchHandled(rdpei_server_handle_messages(context.get()));
 }
-template <> auto TouchProtocol::Handle(Context const& context) -> HANDLE {
+template <> auto TouchProtocol::Handle(Context const& context) -> WaitHandle {
   return rdpei_server_get_event_handle(context.get());
 }
 template <> auto TouchProtocol::Activate(Context const& context) -> bool {
@@ -36,18 +37,19 @@ template <> auto TouchProtocol::Activate(Context const& context) -> bool {
 }
 template <> auto TouchProtocol::Install(Context const& context, Channel& channel) -> void {
   Expects(context != nullptr, "an installed input channel has its context");
-  context->user_data           = &channel;
+  context->user_data = &channel;
   // abi: rdpei onTouchEvent
-  context->onTouchEvent        = [](RdpeiServerContext* owner, RDPINPUT_TOUCH_EVENT const* event) noexcept -> UINT {
+  context->onTouchEvent = [](RdpeiServerContext* owner, RDPINPUT_TOUCH_EVENT const* event) noexcept -> std::uint32_t {
     Expects(owner != nullptr, "callback context exists");
     Expects(event != nullptr, "event is supplied");
-    return CallbackOwner<TouchChannel>(owner->user_data)._events.Touch(*event);
+    auto& events = CallbackOwner<TouchChannel>(owner->user_data)._events;
+    return Contained(ERROR_INTERNAL_ERROR, [&] { return events.Touch(*event); }, events.Failures("Touch event"));
   };
-  // abi: rdpei onChannelIdAssigned
-  context->onChannelIdAssigned = [](RdpeiServerContext* owner, UINT32 id) noexcept -> BOOL {
+  // abi: rdpei onChannelIdAssigned, BOOL is int
+  context->onChannelIdAssigned = [](RdpeiServerContext* owner, std::uint32_t id) noexcept -> int {
     Expects(owner != nullptr, "callback context exists");
-    CallbackOwner<TouchChannel>(owner->user_data)._slot.Assign(id);
-    return true;
+    auto& channel = CallbackOwner<TouchChannel>(owner->user_data);
+    return channel._slot.Assigned(id, channel._events.Failures("Touch channel assignment"));
   };
 }
 }
