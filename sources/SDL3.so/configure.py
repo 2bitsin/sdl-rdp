@@ -82,6 +82,7 @@ def configure(source, fingerprint):
     disabled = "X11 WAYLAND OPENGL OPENGLES VULKAN GPU ALSA PULSEAUDIO SNDIO DBUS LIBUDEV HIDAPI CAMERA TRAY DIALOG TESTS EXAMPLES"
     command = ["cmake", "-S", source, "-B", config, "-G", "Ninja",
                "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+               "-DCMAKE_CXX_STANDARD=23",
                f"-DCMAKE_BUILD_TYPE={os.environ['SDL_RDP_BUILD_TYPE']}"]
     command += [f"-DSDL_{option}=OFF" for option in disabled.split()]
     command += ["-DSDL_UNIX_CONSOLE_BUILD=ON", "-DSDL_RDP=ON", "-DSDL_RDPAUDIO=ON", "-DSDL_RDPSTORAGE=ON",
@@ -134,13 +135,28 @@ def declare_sources(config):
     lines += [f'set_source_files_properties({quoted(path)} PROPERTIES '
               f'COMPILE_DEFINITIONS {quoted(";".join(driver_defines))} '
               f'COMPILE_OPTIONS {quoted(";".join(driver_options))})'
-              for path in sorted((ROOT / "rdp").glob("*.c"))]
+              for path in sorted((ROOT / "rdp").glob("*.cpp"))]
     print(f"Declared {len(entries)} SDL C sources", flush=True)
     return lines
 
 
+def operation_header():
+    names = (ROOT / 'rdp/SDL_rdpoperations.txt').read_text().splitlines()
+    enum = ',\n  '.join(name.upper() for name in names)
+    types = ',\n      '.join(f'decltype(&sdlrdp_{name})' for name in names)
+    symbols = ',\n      '.join(f'"sdlrdp_{name}"' for name in names)
+    header = ('#pragma once\n#include <array>\n#include <tuple>\nnamespace rdp {\n'
+              f'enum class Operation {{ {enum}, COUNT }};\n'
+              'struct BackendCatalog {\n'
+              f'  using Symbols = std::tuple<{types}>;\n'
+              f'  static constexpr auto Names = std::to_array<char const*>({{{symbols}}});\n'
+              '};\n}\n')
+    (SHARED / 'SDL_rdpoperations.generated.hpp').write_text(header)
+
+
 def settings(source, config):
     lines = declare_sources(config)
+    lines += [f'target_include_directories(SDL3 PRIVATE {quoted(SHARED)})']
     lines += [f'target_include_directories(SDL3 PRIVATE {quoted(source)} PUBLIC '
               f'"$<BUILD_INTERFACE:{source}/include>" "$<INSTALL_INTERFACE:include>")',
               f'target_link_options(SDL3 PRIVATE "LINKER:--version-script={source}/src/dynapi/SDL_dynapi.sym")',
@@ -170,10 +186,16 @@ def main():
     print(f'SDL version: {SDL_VERSION}', flush=True)
     bc.depends(__file__, VERSIONS, ROOT / 'rdp-driver.patch',
                ROOT.parent / 'sdl-rdp-backend.so/sdl-rdp-backend.h')
-    bc.inputs('*.c', '*.h', root=ROOT / 'rdp')
+    bc.inputs('*.cpp', '*.hpp', '*.txt', root=ROOT / 'rdp')
+    operation_header()
     source_hash = SDL_SHA256 + digest(ROOT / 'rdp-driver.patch')
     source = extract(download(), source_hash)
     patch_driver(source)
+    for path in (ROOT / 'rdp').glob('*.cpp'):
+        subsystem = 'audio' if path.stem == 'SDL_rdpaudio' else 'storage' if path.stem == 'SDL_rdpstorage' else 'video'
+        target = source / 'src' / subsystem / 'rdp' / path.name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(path, target)
     config_hash = source_hash + digest(Path(__file__)) + os.environ['SDL_RDP_BUILD_TYPE']
     settings(source, configure(source, config_hash))
 

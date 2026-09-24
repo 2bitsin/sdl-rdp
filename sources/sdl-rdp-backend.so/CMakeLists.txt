@@ -16,8 +16,8 @@ target_include_directories(sdl-rdp-backend PUBLIC ${FREERDP_HEADERS})
 target_link_options(sdl-rdp-backend PRIVATE "LINKER:--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
 set_property(TARGET sdl-rdp-backend APPEND PROPERTY LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/exports.map)
 if(TARGET sdl-rdp-backend-tests)
-  target_sources(sdl-rdp-backend-tests PRIVATE ../SDL3.so/rdp/SDL_rdpini.c avc.cpp wake-event.cpp refresh.cpp
-    descriptor.cpp system-call.cpp)
+  target_sources(sdl-rdp-backend-tests PRIVATE ../SDL3.so/rdp/SDL_rdpini.cpp ../SDL3.so/rdp/SDL_rdprefresh.cpp avc.cpp
+    wake-event.cpp refresh.cpp descriptor.cpp system-call.cpp)
   target_link_libraries(sdl-rdp-backend-tests PRIVATE SDL3)
   # tls-race.test/ interposes libcrypto and libc symbols, so it must not share a process with the other tests.
   file(GLOB TLS_RACE_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tls-race.test/*.cpp)

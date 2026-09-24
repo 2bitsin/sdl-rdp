@@ -2,29 +2,23 @@
 #include <map>
 #include <string>
 #include <vector>
-extern "C" {
-#include "../SDL3.so/rdp/SDL_rdpini.h"
-}
+#include "../SDL3.so/rdp/SDL_rdpini.hpp"
 
 namespace {
 struct Ini {
 public:
   struct Warning {
-    int         index;
-    std::string key;
-    unsigned    line;
+    rdp::IniStatus status;
+    std::string    key;
+    unsigned       line;
   };
-  explicit Ini(std::string text) {
-    SDL_RDP_IniParse(
-        text.data(),
-        [](void* raw, int index, char const* key, char const* value, unsigned line) {
-          auto& self = *static_cast<Ini*>(raw);
-          if (index < 0)
-            self.warnings.push_back({ index, key, line });
-          else
-            self.values[key] = value;
-        },
-        this);
+  explicit Ini(std::string const& text) {
+    rdp::ParseIni(text, [this](rdp::IniEntry entry) {
+      if (!entry.Index())
+        warnings.push_back({entry.Status(), std::string(entry.Key()), entry.Line()});
+      else
+        values[std::string(entry.Key())] = entry.Value();
+    });
   }
   std::map<std::string, std::string> values;
   std::vector<Warning>               warnings;
@@ -45,10 +39,10 @@ TEST(Ini, CommentsSectionsAndBlankLines) {
 TEST(Ini, UnknownAndMalformedLinesReportLineNumbersWithoutValues) {
   Ini ini("# first\nSDL_VIDEO_DRIVER = secret\nSDL_RDP_PASSWORD secret\nSDL_RDP_PORT=1234\n");
   ASSERT_EQ(ini.warnings.size(), 2u);
-  EXPECT_EQ(ini.warnings[0].index, -1);
+  EXPECT_EQ(ini.warnings[0].status, rdp::IniStatus::UNKNOWN);
   EXPECT_EQ(ini.warnings[0].key, "SDL_VIDEO_DRIVER");
   EXPECT_EQ(ini.warnings[0].line, 2u);
-  EXPECT_EQ(ini.warnings[1].index, -2);
+  EXPECT_EQ(ini.warnings[1].status, rdp::IniStatus::MALFORMED);
   EXPECT_TRUE(ini.warnings[1].key.empty());
   EXPECT_EQ(ini.warnings[1].line, 3u);
   EXPECT_EQ(ini.values.size(), 1u);
@@ -60,11 +54,20 @@ TEST(Ini, LastDuplicateWinsWithCrlfAndNoFinalNewline) {
   EXPECT_TRUE(ini.warnings.empty());
 }
 TEST(Ini, EveryDriverNameAndIniPathAreRecognized) {
-  for (int i = 0; i < SDL_RDP_SETTING_COUNT; ++i) {
-    EXPECT_EQ(SDL_RDP_IniIndex(SDL_RDP_SettingNames[i]), i);
+  for (int i = 0; std::cmp_less(i, rdp::SettingNames.size()); ++i) {
+    EXPECT_EQ(rdp::SettingIndex(rdp::SettingNames[static_cast<std::size_t>(i)]), i);
   }
-  EXPECT_EQ(SDL_RDP_IniIndex("SDL_RDP_INI"), SDL_RDP_SETTING_INI);
-  EXPECT_EQ(SDL_RDP_IniIndex("SDL_RDP_PORT_SUFFIX"), -1);
+  EXPECT_EQ(rdp::SettingIndex("SDL_RDP_INI"), 0);
+  EXPECT_EQ(rdp::SettingIndex("SDL_RDP_PORT_SUFFIX"), std::nullopt);
   EXPECT_TRUE(Ini("").values.empty());
 }
+}
+
+TEST(Ini, FallbackIncludesSlotZeroAndPreservesEmptyValues) {
+  rdp::SettingValues values{ };
+  values.front() = "chosen.ini";
+  EXPECT_EQ(rdp::IniValue(values, "SDL_RDP_INI"), "chosen.ini");
+  values.front() = "";
+  EXPECT_EQ(rdp::IniValue(values, "SDL_RDP_INI"), "");
+  EXPECT_EQ(rdp::IniValue(values, "unknown"), std::nullopt);
 }

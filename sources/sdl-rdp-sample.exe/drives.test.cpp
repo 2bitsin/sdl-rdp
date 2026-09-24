@@ -82,6 +82,27 @@ void ThenStreamWrite(SDL_IOStream* stream) {
   EXPECT_EQ(SDL_GetIOSize(stream), 8);
   EXPECT_TRUE(SDL_FlushIO(stream)) << SDL_GetError();
 }
+using OpenFile = SDL_IOStream*(SDLCALL*)(char const*, char const*, char const*);
+using Stream   = std::unique_ptr<SDL_IOStream, decltype(&SDL_CloseIO)>;
+void ThenAppendExtends(OpenFile open) {
+  Stream const append{ open(nullptr, "whole", "a+b"), SDL_CloseIO };
+  ASSERT_TRUE(append) << SDL_GetError();
+  auto const before = SDL_GetIOSize(append.get());
+  EXPECT_EQ(SDL_SeekIO(append.get(), 0, SDL_IO_SEEK_SET), 0);
+  EXPECT_EQ(SDL_WriteIO(append.get(), "+", 1), 1u);
+  EXPECT_EQ(SDL_GetIOSize(append.get()), before + 1);
+}
+void ThenEmptyNameSelectsFirstDrive(OpenFile open) {
+  EXPECT_TRUE(Stream(open("", "whole", "rb"), SDL_CloseIO)) << SDL_GetError();
+  EXPECT_FALSE(Stream(open("missing-drive", "whole", "rb"), SDL_CloseIO));
+}
+void VerifyAppendAndDefaultDrive(SDL_PropertiesID properties) {
+  auto const open = reinterpret_cast<OpenFile>(SDL_GetPointerProperty(properties,
+                                                                      SDL_PROP_DISPLAY_RDP_OPEN_FILE_POINTER, nullptr));
+  ASSERT_NE(open, nullptr);
+  ThenAppendExtends(open);
+  ThenEmptyNameSelectsFirstDrive(open);
+}
 void VerifyStream(SDL_PropertiesID properties, fs::path const& path) {
   using Open = SDL_IOStream*(SDLCALL*)(char const*, char const*, char const*);
   auto open =
@@ -96,14 +117,18 @@ void VerifyStream(SDL_PropertiesID properties, fs::path const& path) {
   EXPECT_TRUE(SDL_CloseIO(stream));
   EXPECT_EQ(Headless::ReadText((path / "whole").c_str()), "content!");
 }
-}
-TEST_F(Sample, DriveStorageAndStream) {
+void InitializeRdpVideo(fs::path const& certificates) {
   auto backend = BuildRoot() / "sources/sdl-rdp-backend.so/libsdl-rdp-backend.so";
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_BACKEND, backend.c_str()));
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_CERT_DIR, certificates.Path().c_str()));
+  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_CERT_DIR, certificates.c_str()));
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_PORT, "0"));
   ASSERT_TRUE(SDL_Init(SDL_INIT_VIDEO));
+}
+}
+TEST_F(Sample, DriveStorageAndStream) {
+  InitializeRdpVideo(certificates.Path());
+  if (::testing::Test::HasFatalFailure()) return;
   auto quit = std::unique_ptr<void, void (*)(void*)>(reinterpret_cast<void*>(1), [](void*) { SDL_Quit(); });
   auto                               properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
   Client client(SDL_GetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0), false);
@@ -118,5 +143,6 @@ TEST_F(Sample, DriveStorageAndStream) {
   if (::testing::Test::HasFatalFailure()) return;
   VerifyStorage();
   VerifyStream(properties, share.Path());
+  VerifyAppendAndDefaultDrive(properties);
 }
 }

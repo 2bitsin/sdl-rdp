@@ -4,7 +4,7 @@ Require(FreeRDP          VERSION ">=3"          SYSTEM)
 Require(WinPR            VERSION ">=3"          SYSTEM)
 Require(FreeRDP-Client   VERSION ">=3"          SYSTEM TEST)
 Require(GTest            VERSION ">=1.17.0"     TEST CONAN gtest COMPONENTS gtest gtest_main)
-Require(oxbox            VERSION "0.30.0.344"   CONAN oxbox)
+Require(oxbox            VERSION "0.32.1.351"   CONAN oxbox)
 Require(nv-codec-headers VERSION "13.0.19.0"    CONAN nv-codec-headers)
 Scan_subdirectories()
 if(TARGET sdl-rdp-backend-tests)
@@ -26,5 +26,9 @@ if(TARGET sdl-rdp-backend-tests)
   add_test(NAME              clone-lint
            COMMAND           ${CMAKE_SOURCE_DIR}/bin/lint-clones.sh
            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+  add_test(NAME              tidy-driver
+           COMMAND           ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/bin/tidy-driver.py
+                             ${CMAKE_BINARY_DIR}/compile_commands.json)
+  set_tests_properties(tidy-driver PROPERTIES RUN_SERIAL TRUE TIMEOUT 600)
   set_tests_properties(clone-lint shape-lint-tests PROPERTIES SKIP_RETURN_CODE 77)
 endif()

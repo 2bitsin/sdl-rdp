@@ -20,30 +20,36 @@ diff -ruN a/CMakeLists.txt b/CMakeLists.txt
    set(SDL_OFFSCREEN        OFF)
    set(SDL_RENDER_GPU       OFF)
    set(SDL_TRAY             OFF)
-@@ -1330,7 +1335,16 @@
+@@ -1330,7 +1335,21 @@
  
  
  # General SDL subsystem options, valid for all platforms
++if(SDL_RDP OR SDL_RDPAUDIO OR SDL_RDPSTORAGE)
++  enable_language(CXX)
++  set(CMAKE_CXX_STANDARD 23)
++  set(CMAKE_CXX_STANDARD_REQUIRED ON)
++endif()
 +if(SDL_RDPSTORAGE)
 +  set(SDL_STORAGE_DRIVER_RDP 1)
-+  sdl_glob_sources("${SDL3_SOURCE_DIR}/src/storage/rdp/*.c")
++  sdl_glob_sources("${SDL3_SOURCE_DIR}/src/storage/rdp/*.cpp")
 +endif()
  if(SDL_AUDIO)
 +  if(SDL_RDPAUDIO)
 +    set(SDL_AUDIO_DRIVER_RDP 1)
 +    set(HAVE_SDL_AUDIO TRUE)
-+    sdl_glob_sources("${SDL3_SOURCE_DIR}/src/audio/rdp/*.c")
++    sdl_glob_sources("${SDL3_SOURCE_DIR}/src/audio/rdp/*.cpp")
 +  endif()
    # CheckDummyAudio/CheckDiskAudio - valid for all platforms
    if(SDL_DUMMYAUDIO)
      set(SDL_AUDIO_DRIVER_DUMMY 1)
-@@ -3501,6 +3515,12 @@
+@@ -3501,6 +3520,13 @@
  # Platform-independent options
  
  if(SDL_VIDEO)
 +  if(SDL_RDP)
 +    set(SDL_VIDEO_DRIVER_RDP 1)
 +    set(SDL_VIDEO_DRIVER_RDP_DYNAMIC "\"${SDL_RDP_DYNAMIC}\"")
++    sdl_glob_sources("${SDL3_SOURCE_DIR}/src/video/rdp/*.cpp")
 +    set(HAVE_RDP TRUE)
 +    set(HAVE_SDL_VIDEO TRUE)
 +  endif()
@@ -163,7 +169,7 @@ diff -ruN a/src/SDL_hints.c b/src/SDL_hints.c
 @@ -255,6 +255,20 @@
      return SDL_SetHintWithPriority(name, value, SDL_HINT_NORMAL);
  }
-
+ 
 +const char *SDL_GetHintFromCode(const char *name)
 +{
 +    const char *result = NULL;
@@ -186,7 +192,7 @@ diff -ruN a/src/SDL_hints_c.h b/src/SDL_hints_c.h
 +++ b/src/SDL_hints_c.h
 @@ -26,6 +26,7 @@
  #define SDL_hints_c_h_
-
+ 
  extern void SDL_InitHints(void);
 +extern const char *SDL_GetHintFromCode(const char *name);
  extern bool SDL_GetStringBoolean(const char *value, bool default_value);
@@ -212,171 +218,57 @@ diff -ruN a/src/audio/SDL_sysaudio.h b/src/audio/SDL_sysaudio.h
  extern AudioBootStrap HAIKUAUDIO_bootstrap;
  extern AudioBootStrap COREAUDIO_bootstrap;
  extern AudioBootStrap DISKAUDIO_bootstrap;
-+extern AudioBootStrap RDPAUDIO_bootstrap;
++extern AudioBootStrap const RDPAUDIO_bootstrap;
  extern AudioBootStrap DUMMYAUDIO_bootstrap;
  extern AudioBootStrap AAUDIO_bootstrap;
  extern AudioBootStrap OPENSLES_bootstrap;
-diff -ruN a/src/audio/rdp/SDL_rdpaudio.c b/src/audio/rdp/SDL_rdpaudio.c
---- a/src/audio/rdp/SDL_rdpaudio.c
-+++ b/src/audio/rdp/SDL_rdpaudio.c
-@@ -0,0 +1,133 @@
-+#include "SDL_internal.h"
-+#include "SDL_rdpaudio.h"
-+
-+static void RDPAUDIO_DetectDevices(SDL_AudioDevice **playback, SDL_AudioDevice **recording)
-+{
-+    const SDL_AudioSpec spec = {SDL_AUDIO_S16, 2, 44100};
-+    *playback = SDL_AddAudioDevice(false, "RDP client", &spec, &RDPAUDIO_bootstrap);
-+}
-+
-+static bool RDPAUDIO_OpenDevice(SDL_AudioDevice *device)
-+{
-+    device->hidden = SDL_calloc(1, sizeof(*device->hidden));
-+    if (!device->hidden) return false;
-+    sdlrdp_config config;
-+    if (!SDL_RDP_AcquireBackend(&device->hidden->backend, &device->hidden->handle, &config)) return false;
-+    const int lead = SDL_RDP_GetInteger(SDL_HINT_RDP_AUDIO_LEAD, 150);
-+    if (lead < 0) return SDL_SetError("Invalid RDP audio lead");
-+    if ((unsigned)lead >= config.audio_latency_ms)
-+        return SDL_SetError("RDP audio lead must be below the audio latency window");
-+    device->hidden->lead = SDL_MS_TO_NS((Uint64)lead);
-+    device->spec.format = SDL_AUDIO_S16;
-+    device->spec.channels = 2;
-+    device->hidden->rate = device->hidden->backend.audio_rate(device->hidden->handle);
-+    device->spec.freq = device->hidden->rate ? (int)device->hidden->rate : 44100;
-+    device->sample_frames = device->spec.freq / 100;
-+    SDL_UpdatedAudioDeviceFormat(device);
-+    if (device->hidden->backend.audio_open(device->hidden->handle) < 0) {
-+        return SDL_SetError("%s", device->hidden->backend.last_error());
-+    }
-+    device->hidden->mixbuf = SDL_malloc(device->buffer_size);
-+    device->hidden->next = SDL_GetTicksNS();
-+    return device->hidden->mixbuf != NULL;
-+}
-+
-+static bool RDPAUDIO_ChangeRate(SDL_AudioDevice *device, unsigned rate)
-+{
-+    SDL_assert(device && device->hidden);
-+    struct SDL_PrivateAudioData *data = device->hidden;
-+    if (rate && !data->rate) data->next = SDL_GetTicksNS();
-+    data->rate = rate;
-+    if (!rate || rate == (unsigned)device->spec.freq) return true;
-+    SDL_AudioSpec spec = device->spec;
-+    spec.freq = (int)rate;
-+    if (!SDL_AudioDeviceFormatChangedAlreadyLocked(device, &spec, spec.freq / 100)) return false;
-+    Uint8 *mixbuf = SDL_realloc(data->mixbuf, device->buffer_size);
-+    if (!mixbuf) return false;
-+    data->mixbuf = mixbuf;
-+    return true;
-+}
-+
-+void SDL_RDP_AudioRate(unsigned rate)
-+{
-+    if (!SDL_GetCurrentAudioDriver() || SDL_strcmp(SDL_GetCurrentAudioDriver(), "rdp")) return;
-+    SDL_AudioDevice *device = SDL_FindPhysicalAudioDeviceByHandle(&RDPAUDIO_bootstrap);
-+    if (!device) return;
-+    SDL_LockMutex(device->lock);
-+    if (device->hidden && !RDPAUDIO_ChangeRate(device, rate)) SDL_AudioDeviceDisconnected(device);
-+    SDL_UnlockMutex(device->lock);
-+}
-+
-+static void RDPAUDIO_PumpEvents(SDL_AudioDevice *device)
-+{
-+    if (SDL_WasInit(SDL_INIT_VIDEO)) return;
-+    sdlrdp_event events[64];
-+    struct SDL_PrivateAudioData *data = device->hidden;
-+    unsigned count;
-+    while ((count = data->backend.poll(data->handle, events, SDL_arraysize(events))) != 0) {
-+        for (unsigned i = 0; i < count; ++i)
-+            if (events[i].type == SDLRDP_AUDIO) SDL_RDP_AudioRate(events[i].audio.freq);
-+    }
-+}
-+
-+static bool RDPAUDIO_WaitDevice(SDL_AudioDevice *device)
-+{
-+    struct SDL_PrivateAudioData *data = device->hidden;
-+    int result;
-+    do {
-+        result = data->backend.audio_wait(data->handle, 100);
-+    } while (!result && !SDL_GetAtomicInt(&device->shutdown));
-+    if (result < 0) return SDL_SetError("%s", data->backend.last_error());
-+    RDPAUDIO_PumpEvents(device);
-+    SDL_LockMutex(device->lock);
-+    const Uint64 now = SDL_GetTicksNS();
-+    data->next += (Uint64)device->sample_frames * SDL_NS_PER_SECOND / device->spec.freq;
-+    const Uint64 delay = data->next > now + data->lead ? data->next - now - data->lead : 0;
-+    if (data->next < now) data->next = now;
-+    SDL_UnlockMutex(device->lock);
-+    if (delay) SDL_DelayNS(delay);
-+    return true;
-+}
-+
-+static bool RDPAUDIO_PlayDevice(SDL_AudioDevice *device, const Uint8 *buffer, int buflen)
-+{
-+    struct SDL_PrivateAudioData *data = device->hidden;
-+    const unsigned frames = buflen / (2 * sizeof(Sint16));
-+    if (data->backend.audio_write(data->handle, buffer, frames) != (int)frames) {
-+        return SDL_SetError("%s", data->backend.last_error());
-+    }
-+    return true;
-+}
-+
-+static Uint8 *RDPAUDIO_GetDeviceBuf(SDL_AudioDevice *device, int *size)
-+{
-+    return device->hidden->mixbuf;
-+}
-+
-+static void RDPAUDIO_CloseDevice(SDL_AudioDevice *device)
-+{
-+    if (device->hidden) {
-+        if (device->hidden->handle) {
-+            device->hidden->backend.audio_close(device->hidden->handle);
-+            SDL_RDP_ReleaseBackend();
+diff -ruN a/src/render/SDL_render.c b/src/render/SDL_render.c
+--- a/src/render/SDL_render.c
++++ b/src/render/SDL_render.c
+@@ -1028,7 +1028,8 @@
+     if (displayID == 0) {
+         displayID = SDL_GetPrimaryDisplay();
+     }
+-    mode = SDL_GetDesktopDisplayMode(displayID);
++    mode = window && SDL_strcmp(SDL_GetCurrentVideoDriver(), "rdp") == 0 ?
++        SDL_GetCurrentDisplayMode(displayID) : SDL_GetDesktopDisplayMode(displayID);
+     if (mode && mode->refresh_rate_numerator > 0 && mode->refresh_rate_denominator > 0) {
+         refresh_num = mode->refresh_rate_numerator;
+         refresh_den = mode->refresh_rate_denominator;
+@@ -5490,6 +5491,13 @@
+ static void SDL_SimulateRenderVSync(SDL_Renderer *renderer)
+ {
+     Uint64 now, elapsed;
++    if (renderer->window && SDL_strcmp(SDL_GetCurrentVideoDriver(), "rdp") == 0) {
++        const SDL_DisplayMode *mode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(renderer->window));
++        if (mode && mode->refresh_rate != renderer->rdp_refresh_rate) {
++            renderer->rdp_refresh_rate = mode->refresh_rate;
++            SDL_CalculateSimulatedVSyncInterval(renderer, renderer->window);
 +        }
-+        SDL_free(device->hidden->mixbuf);
-+        SDL_free(device->hidden);
-+        device->hidden = NULL;
 +    }
-+}
-+
-+static bool RDPAUDIO_Init(SDL_AudioDriverImpl *impl)
-+{
-+    impl->DetectDevices = RDPAUDIO_DetectDevices;
-+    impl->OpenDevice = RDPAUDIO_OpenDevice;
-+    impl->CloseDevice = RDPAUDIO_CloseDevice;
-+    impl->WaitDevice = RDPAUDIO_WaitDevice;
-+    impl->PlayDevice = RDPAUDIO_PlayDevice;
-+    impl->GetDeviceBuf = RDPAUDIO_GetDeviceBuf;
-+    return true;
-+}
-+
-+AudioBootStrap RDPAUDIO_bootstrap = {
-+    "rdp", "SDL RDP audio driver", RDPAUDIO_Init, true, false
-+};
-diff -ruN a/src/audio/rdp/SDL_rdpaudio.h b/src/audio/rdp/SDL_rdpaudio.h
---- a/src/audio/rdp/SDL_rdpaudio.h
-+++ b/src/audio/rdp/SDL_rdpaudio.h
-@@ -0,0 +1,14 @@
-+#ifndef SDL_rdpaudio_h_
-+#define SDL_rdpaudio_h_
-+#include "../SDL_sysaudio.h"
-+#include "SDL_rdpdyn.h"
-+struct SDL_PrivateAudioData
-+{
-+    SDL_RDP_Backend backend;
-+    sdlrdp_handle *handle;
-+    Uint8 *mixbuf;
-+    Uint64 next;
-+    Uint64 lead;
-+    unsigned rate;
-+};
-+#endif
+     const Uint64 interval = renderer->simulate_vsync_interval_ns;
+ 
+     if (!interval) {
+diff -ruN a/src/render/SDL_sysrender.h b/src/render/SDL_sysrender.h
+--- a/src/render/SDL_sysrender.h
++++ b/src/render/SDL_sysrender.h
+@@ -294,6 +294,7 @@
+     // Whether we should simulate vsync
+     bool wanted_vsync;
+     bool simulate_vsync;
++    float rdp_refresh_rate;
+     Uint64 simulate_vsync_interval_ns;
+     Uint64 last_present;
+ 
 diff -ruN a/src/storage/SDL_storage.c b/src/storage/SDL_storage.c
 --- a/src/storage/SDL_storage.c
 +++ b/src/storage/SDL_storage.c
-@@ -27,6 +27,9 @@
+@@ -25,13 +25,16 @@
+ #include "../filesystem/SDL_sysfilesystem.h"
+ 
  // Available title storage drivers
- static TitleStorageBootStrap *titlebootstrap[] = {
+-static TitleStorageBootStrap *titlebootstrap[] = {
++static TitleStorageBootStrap const *titlebootstrap[] = {
      &GENERIC_titlebootstrap,
 +#ifdef SDL_STORAGE_DRIVER_RDP
 +    &RDP_titlebootstrap,
@@ -384,6 +276,12 @@ diff -ruN a/src/storage/SDL_storage.c b/src/storage/SDL_storage.c
      NULL
  };
  
+ // Available user storage drivers
+-static UserStorageBootStrap *userbootstrap[] = {
++static UserStorageBootStrap const *userbootstrap[] = {
+ #ifdef SDL_STORAGE_STEAM
+     &STEAM_userbootstrap,
+ #endif
 @@ -39,6 +42,9 @@
      &PRIVATE_userbootstrap,
  #endif
@@ -401,165 +299,11 @@ diff -ruN a/src/storage/SDL_sysstorage.h b/src/storage/SDL_sysstorage.h
  
  // Not all of these are available in a given build. Use #ifdefs, etc.
  
-+extern TitleStorageBootStrap RDP_titlebootstrap;
-+extern UserStorageBootStrap RDP_userbootstrap;
++extern TitleStorageBootStrap const RDP_titlebootstrap;
++extern UserStorageBootStrap const RDP_userbootstrap;
  extern TitleStorageBootStrap GENERIC_titlebootstrap;
  // Steam does not have title storage APIs
  
-diff -ruN a/src/storage/rdp/SDL_rdpstorage.c b/src/storage/rdp/SDL_rdpstorage.c
---- a/src/storage/rdp/SDL_rdpstorage.c
-+++ b/src/storage/rdp/SDL_rdpstorage.c
-@@ -0,0 +1,150 @@
-+#include "SDL_internal.h"
-+#include "../SDL_sysstorage.h"
-+#include "SDL_rdpdrive.h"
-+
-+typedef struct RDP_Storage {
-+    SDL_RDP_Backend backend;
-+    sdlrdp_handle *handle;
-+    char *name;
-+    unsigned drive;
-+} RDP_Storage;
-+
-+static bool RDP_StorageClose(void *userdata)
-+{
-+    RDP_Storage *data = userdata;
-+    SDL_RDP_ReleaseBackend();
-+    SDL_free(data->name);
-+    SDL_free(data);
-+    return true;
-+}
-+
-+static bool RDP_StorageReady(void *userdata)
-+{
-+    RDP_Storage *data = userdata;
-+    return SDL_RDP_FindDrive(&data->backend, data->handle, data->name, &data->drive);
-+}
-+
-+static bool RDP_StorageInfo(void *userdata, const char *path, SDL_PathInfo *info)
-+{
-+    RDP_Storage *data = userdata;
-+    sdlrdp_stat value;
-+    if (data->backend.drive_stat(data->handle, data->drive, path, &value) < 0)
-+        return SDL_SetError("%s", data->backend.last_error());
-+    SDL_zero(*info);
-+    info->type = value.directory ? SDL_PATHTYPE_DIRECTORY : SDL_PATHTYPE_FILE;
-+    info->size = value.size;
-+    info->modify_time = SDL_SECONDS_TO_NS(value.modified);
-+    return true;
-+}
-+
-+static bool RDP_StorageEnumerate(void *userdata, const char *path, SDL_EnumerateDirectoryCallback callback, void *user)
-+{
-+    RDP_Storage *data = userdata;
-+    sdlrdp_dirent entries[32];
-+    unsigned offset = 0;
-+    char *directory;
-+    SDL_asprintf(&directory, "%s%s", path, *path && path[SDL_strlen(path)-1] != '/' ? "/" : "");
-+    if (!directory) return false;
-+    for (;;) {
-+        int count = data->backend.drive_enumerate(data->handle, data->drive, path, offset, entries, SDL_arraysize(entries));
-+        if (count < 0) {
-+            SDL_free(directory);
-+            return SDL_SetError("%s", data->backend.last_error());
-+        }
-+        for (int i = 0; i < count; ++i) {
-+            SDL_EnumerationResult result = callback(user, directory, entries[i].name);
-+            if (result != SDL_ENUM_CONTINUE) { SDL_free(directory); return result == SDL_ENUM_SUCCESS; }
-+        }
-+        offset += count;
-+        if ((size_t)count < SDL_arraysize(entries)) break;
-+    }
-+    SDL_free(directory);
-+    return true;
-+}
-+
-+static bool RDP_StorageRead(void *userdata, const char *path, void *buffer, Uint64 length)
-+{
-+    RDP_Storage *data = userdata;
-+    if (length > SDL_SIZE_MAX) return SDL_SetError("RDP storage read too large");
-+    SDL_IOStream *file = SDL_RDP_OpenFile(data->name, path, "rb");
-+    if (!file) return false;
-+    bool ok = SDL_ReadIO(file, buffer, (size_t)length) == length;
-+    bool closed = SDL_CloseIO(file);
-+    return ok && closed;
-+}
-+
-+static bool RDP_StorageWrite(void *userdata, const char *path, const void *buffer, Uint64 length)
-+{
-+    RDP_Storage *data = userdata;
-+    if (length > SDL_SIZE_MAX) return SDL_SetError("RDP storage write too large");
-+    SDL_IOStream *file = SDL_RDP_OpenFile(data->name, path, "wb");
-+    if (!file) return false;
-+    bool ok = SDL_WriteIO(file, buffer, (size_t)length) == length;
-+    bool closed = SDL_CloseIO(file);
-+    return ok && closed;
-+}
-+
-+static bool RDP_StorageMkdir(void *userdata, const char *path)
-+{
-+    RDP_Storage *data = userdata;
-+    return data->backend.drive_mkdir(data->handle, data->drive, path) >= 0 || SDL_SetError("%s", data->backend.last_error());
-+}
-+
-+static bool RDP_StorageRemove(void *userdata, const char *path)
-+{
-+    RDP_Storage *data = userdata;
-+    return data->backend.drive_remove(data->handle, data->drive, path) >= 0 || SDL_SetError("%s", data->backend.last_error());
-+}
-+
-+static bool RDP_StorageRename(void *userdata, const char *from, const char *to)
-+{
-+    RDP_Storage *data = userdata;
-+    return data->backend.drive_rename(data->handle, data->drive, from, to) >= 0 || SDL_SetError("%s", data->backend.last_error());
-+}
-+
-+static bool RDP_StorageCopy(void *userdata, const char *from, const char *to)
-+{
-+    RDP_Storage *data = userdata;
-+    if (!SDL_strcmp(from, to)) return SDL_SetError("RDP copy source equals destination");
-+    SDL_IOStream *source = SDL_RDP_OpenFile(data->name, from, "rb");
-+    if (!source) return false;
-+    SDL_IOStream *target = SDL_RDP_OpenFile(data->name, to, "wb");
-+    bool ok = target != NULL;
-+    Uint8 buffer[65536];
-+    while (ok) {
-+        size_t count = SDL_ReadIO(source, buffer, sizeof(buffer));
-+        if (!count) { ok = SDL_GetIOStatus(source) == SDL_IO_STATUS_EOF; break; }
-+        ok = SDL_WriteIO(target, buffer, count) == count;
-+    }
-+    if (target && !SDL_CloseIO(target)) ok = false;
-+    if (!SDL_CloseIO(source)) ok = false;
-+    return ok;
-+}
-+
-+static Uint64 RDP_StorageSpace(void *userdata) { return 0; }
-+
-+static const SDL_StorageInterface RDP_storage_interface = {
-+    sizeof(SDL_StorageInterface), RDP_StorageClose, RDP_StorageReady, RDP_StorageEnumerate,
-+    RDP_StorageInfo, RDP_StorageRead, RDP_StorageWrite, RDP_StorageMkdir, RDP_StorageRemove,
-+    RDP_StorageRename, RDP_StorageCopy, RDP_StorageSpace
-+};
-+
-+static SDL_Storage *RDP_StorageOpen(const char *name, SDL_PropertiesID props)
-+{
-+    RDP_Storage *data = SDL_calloc(1, sizeof(*data));
-+    if (!data) return NULL;
-+    if (!SDL_RDP_AcquireBackend(&data->backend, &data->handle, NULL)) { SDL_free(data); return NULL; }
-+    data->name = SDL_strdup(name ? name : "");
-+    if (!data->name) { RDP_StorageClose(data); return NULL; }
-+    SDL_Storage *storage = SDL_OpenStorage(&RDP_storage_interface, data);
-+    if (!storage) RDP_StorageClose(data);
-+    return storage;
-+}
-+
-+static SDL_Storage *RDP_UserStorageOpen(const char *org, const char *app, SDL_PropertiesID props)
-+{
-+    return RDP_StorageOpen(app, props);
-+}
-+
-+TitleStorageBootStrap RDP_titlebootstrap = { "rdp", "RDP client drive storage", RDP_StorageOpen };
-+UserStorageBootStrap RDP_userbootstrap = { "rdp", "RDP client drive storage", RDP_UserStorageOpen };
 diff -ruN a/src/video/SDL_sysvideo.h b/src/video/SDL_sysvideo.h
 --- a/src/video/SDL_sysvideo.h
 +++ b/src/video/SDL_sysvideo.h
@@ -567,13 +311,22 @@ diff -ruN a/src/video/SDL_sysvideo.h b/src/video/SDL_sysvideo.h
  extern VideoBootStrap Wayland_bootstrap;
  extern VideoBootStrap VIVANTE_bootstrap;
  extern VideoBootStrap Emscripten_bootstrap;
-+extern VideoBootStrap RDP_bootstrap;
++extern VideoBootStrap const RDP_bootstrap;
  extern VideoBootStrap OFFSCREEN_bootstrap;
  extern VideoBootStrap QNX_bootstrap;
  extern VideoBootStrap OPENVR_bootstrap;
 diff -ruN a/src/video/SDL_video.c b/src/video/SDL_video.c
 --- a/src/video/SDL_video.c
 +++ b/src/video/SDL_video.c
+@@ -85,7 +85,7 @@
+ #endif /* GL_RGBA_FLOAT_MODE_ARB */
+ 
+ // Available video drivers
+-static VideoBootStrap *bootstrap[] = {
++static VideoBootStrap const *bootstrap[] = {
+ #ifdef SDL_VIDEO_DRIVER_PRIVATE
+     &PRIVATE_bootstrap,
+ #endif
 @@ -146,6 +146,9 @@
  #ifdef SDL_VIDEO_DRIVER_QNX
      &QNX_bootstrap,
@@ -612,39 +365,3 @@ diff -ruN a/src/video/SDL_video.c b/src/video/SDL_video.c
  }
  
  void SDL_SetDesktopDisplayMode(SDL_VideoDisplay *display, const SDL_DisplayMode *mode)
-diff -ruN a/src/render/SDL_render.c b/src/render/SDL_render.c
---- a/src/render/SDL_render.c
-+++ b/src/render/SDL_render.c
-@@ -1028,7 +1028,8 @@
-     if (displayID == 0) {
-         displayID = SDL_GetPrimaryDisplay();
-     }
--    mode = SDL_GetDesktopDisplayMode(displayID);
-+    mode = window && SDL_strcmp(SDL_GetCurrentVideoDriver(), "rdp") == 0 ?
-+        SDL_GetCurrentDisplayMode(displayID) : SDL_GetDesktopDisplayMode(displayID);
-     if (mode && mode->refresh_rate_numerator > 0 && mode->refresh_rate_denominator > 0) {
-         refresh_num = mode->refresh_rate_numerator;
-         refresh_den = mode->refresh_rate_denominator;
-@@ -5490,6 +5491,13 @@
- static void SDL_SimulateRenderVSync(SDL_Renderer *renderer)
- {
-     Uint64 now, elapsed;
-+    if (renderer->window && SDL_strcmp(SDL_GetCurrentVideoDriver(), "rdp") == 0) {
-+        const SDL_DisplayMode *mode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(renderer->window));
-+        if (mode && mode->refresh_rate != renderer->rdp_refresh_rate) {
-+            renderer->rdp_refresh_rate = mode->refresh_rate;
-+            SDL_CalculateSimulatedVSyncInterval(renderer, renderer->window);
-+        }
-+    }
-     const Uint64 interval = renderer->simulate_vsync_interval_ns;
-
-     if (!interval) {
---- a/src/render/SDL_sysrender.h
-+++ b/src/render/SDL_sysrender.h
-@@ -294,5 +294,6 @@
-     // Whether we should simulate vsync
-     bool wanted_vsync;
-     bool simulate_vsync;
-+    float rdp_refresh_rate;
-     Uint64 simulate_vsync_interval_ns;
-     Uint64 last_present;

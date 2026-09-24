@@ -1,5 +1,6 @@
 # re-enabled when Step 3 makes State and Peer private
 # configuration is read before workers start
+# Private names deliberately use leading underscores; disable the reserved-identifier check and its CERT aliases.
 Checks: >
   bugprone-*, cert-*, clang-analyzer-*, concurrency-*, cppcoreguidelines-*,
   misc-*, modernize-*, performance-*, portability-*, readability-*,
@@ -11,7 +12,7 @@ Checks: >
   -cppcoreguidelines-pro-type-union-access, -cppcoreguidelines-owning-memory,
   -misc-non-private-member-variables-in-classes, -misc-include-cleaner,
   -readability-identifier-naming, -bugprone-easily-swappable-parameters,
-  -readability-uppercase-literal-suffix, -readability-implicit-bool-conversion,
+  -bugprone-reserved-identifier, -cert-dcl37-c, -cert-dcl51-cpp, -readability-uppercase-literal-suffix, -readability-implicit-bool-conversion,
   -modernize-use-nodiscard, -cert-err58-cpp, -cppcoreguidelines-avoid-do-while,
   -readability-avoid-nested-conditional-operator, -performance-enum-size
 WarningsAsErrors: '*'

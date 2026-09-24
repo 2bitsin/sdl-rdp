@@ -1,10 +1,4 @@
-.: NOLINT lines 14 > 10 # reaches 10 in #19
-.: c files 14 > 0 # rewritten in #22
-SDL3.so/rdp/SDL_rdpdrive.c:149: SDL_RDP_OpenFile body lines 31 > 20 # rewritten in #22
-SDL3.so/rdp/SDL_rdpevents.c:61: SDL_RDP_Resize complexity 12 > 10 # rewritten in #22
-SDL3.so/rdp/SDL_rdpevents.c:175: SDL_RDP_Input body lines 21 > 20 # rewritten in #22
-SDL3.so/rdp/SDL_rdpshared.c:30: SDL_RDP_ParseAspect complexity 11 > 10 # rewritten in #22
-SDL3.so/rdp/SDL_rdpshared.c:59: SDL_RDP_Config complexity 11 > 10 # rewritten in #22
+.: NOLINT lines 12 > 10 # reaches 10 in #19
 sdl-rdp-backend.so/_detail/audio.hpp: AudioChannel data members 22 > 10 # split in #6
 sdl-rdp-backend.so/_detail/clipboard.hpp: ClipboardChannel data members 11 > 10 # split in #6
 sdl-rdp-backend.so/_detail/clipboard.hpp: ClipboardChannel member functions 18 > 15 # split in #6

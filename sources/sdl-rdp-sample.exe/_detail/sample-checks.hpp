@@ -91,19 +91,20 @@ protected:
     ASSERT_TRUE(SDL_SetHintWithPriority(SDL_HINT_RDP_PORT, "0", SDL_HINT_OVERRIDE));
     WhenIniEnvironmentConflicts();
   }
-  static void ThenCachedAspect() {
-    auto* window = SDL_CreateWindow("cached ini", 640, 480, 0);
+  static void ThenReloadedAspect() {
+    auto* window = SDL_CreateWindow("reloaded ini", 640, 480, 0);
     ASSERT_NE(window, nullptr);
-    EXPECT_STREQ(SDL_GetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_ASPECT_STRING, ""), "4:3");
+    EXPECT_STREQ(SDL_GetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_ASPECT_STRING, ""), "2:1");
     SDL_DestroyWindow(window);
     SDL_Quit();
   }
-  void ThenCachedIni() {
+  void ThenReloadedIni(fs::path const& file) {
+    ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_INI, file.c_str()));
     ASSERT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));
     ASSERT_TRUE(SDL_SetHintWithPriority(SDL_HINT_RDP_PORT, "0", SDL_HINT_OVERRIDE));
     ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_CERT_DIR, certificates.Path().c_str()));
     ASSERT_TRUE(SDL_Init(SDL_INIT_VIDEO)) << SDL_GetError();
-    ThenCachedAspect();
+    ThenReloadedAspect();
   }
   void DisconnectReading(unsigned port, fs::path const& share) {
     {
