@@ -26,9 +26,13 @@ if(TARGET sdl-rdp-backend-tests)
   add_test(NAME              clone-lint
            COMMAND           ${CMAKE_SOURCE_DIR}/bin/lint-clones.sh
            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-  add_test(NAME              tidy-driver
-           COMMAND           ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/bin/tidy-driver.py
-                             ${CMAKE_BINARY_DIR}/compile_commands.json)
-  set_tests_properties(tidy-driver PROPERTIES RUN_SERIAL TRUE TIMEOUT 600)
+  file(GLOB DRIVER_UNITS CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/sources/SDL3.so/rdp/*.cpp)
+  foreach(unit IN LISTS DRIVER_UNITS)
+    get_filename_component(unit_name ${unit} NAME_WE)
+    add_test(NAME    tidy-driver/${unit_name}
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/bin/tidy-driver.py
+                     ${CMAKE_BINARY_DIR}/compile_commands.json --unit ${unit})
+    set_tests_properties(tidy-driver/${unit_name} PROPERTIES TIMEOUT 300)
+  endforeach()
   set_tests_properties(clone-lint shape-lint-tests PROPERTIES SKIP_RETURN_CODE 77)
 endif()

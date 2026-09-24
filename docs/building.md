@@ -7,8 +7,8 @@ system; `nv-codec-headers` and gtest from conan. AVC420 needs an NVIDIA driver
 with NVENC at runtime and is skipped without one. The build driver `buildutil`
 and the `oxbox` utility library the backend uses are not published yet; until
 they are, the tree builds only where a conan remote and a package index provide
-them. `./buildutil build` builds everything, `./buildutil test` runs the gate,
-and `./buildutil build --release` writes the release libraries under
+them. `./buildutil build` builds everything, `./buildutil test --parallel` runs
+the gate, and `./buildutil build --release` writes the release libraries under
 `_build/<profile>/`.
 
 The SDL patch touches CMake/build configuration, public hint/video headers, `src/SDL_hints*`, and audio/video/storage bootstrap files to register RDP drivers and hints.
@@ -23,7 +23,7 @@ only found next to it at runtime.
 
 # Quality gate
 
-Run `./buildutil test` and `./buildutil analyze` before committing.
+Run `./buildutil test --parallel` and `./buildutil analyze` before committing.
 `bin/lint-shape.py` checks non-blank file lines, class lines, member counts,
 access/function/data ordering, and wholly-comment line percentages in `sources/`;
 function and lambda body lines (over 20 needs an allow entry, over 40 fails),
@@ -53,3 +53,9 @@ with exit code 77 and the reason printed; neither passes silently.
 The driver C files in `rdp/` are compiled directly, not copied into the SDL patch.
 For bootstrap changes, extract two pristine copies of the pinned SDL archive,
 apply `rdp-driver.patch` to one, edit it, then regenerate with `diff -ruN a b`.
+
+The gate excludes the `bench` label, the tests that measure the box's real-time
+scheduling (input and clipboard p95 under tight video, PCM clock and cadence,
+present latency); their behaviour halves stay in the gate.
+`./buildutil test --parallel bench` runs the benchmarks. Buildutil has no project
+setting for parallel tests, so every gate command carries `--parallel`.

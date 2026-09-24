@@ -3,6 +3,7 @@
 #include "_detail/contract.hpp"
 #include "_detail/system-call.hpp"
 
+#include <csignal>
 #include <sys/wait.h>
 #include <tuple>
 #include <unistd.h>
@@ -41,5 +42,8 @@ auto ChildProcess::Wait() -> int {
 auto ChildProcess::ExitedCleanly() -> bool {
   auto const status = Wait();
   return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
+auto ChildProcess::Kill() const noexcept -> void {
+  if (pid != Reaped) ::kill(pid, SIGKILL);
 }
 }

@@ -13,6 +13,7 @@ public:
   auto               operator = (ChildProcess const&) -> ChildProcess& = delete;
   [[nodiscard]] auto Wait()                           -> int;
   [[nodiscard]] auto ExitedCleanly()                  -> bool;
+  auto               Kill() const noexcept            -> void;
 
 private:
   static constexpr pid_t Reaped = 0;

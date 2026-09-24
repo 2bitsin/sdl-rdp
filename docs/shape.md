@@ -1,6 +1,6 @@
 # Shape
 
-One buildutil project. `./buildutil build`, `./buildutil test`,
+One buildutil project. `./buildutil build`, `./buildutil test --parallel`,
 `./buildutil publish` at the root.
 
 SDL defaults to `[options] sdl_version = "3.4.8"` in `buildutil.toml`.

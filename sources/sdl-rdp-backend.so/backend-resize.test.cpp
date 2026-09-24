@@ -1,6 +1,8 @@
 #include "_detail/test-backend.hpp"
 
+#include <condition_variable>
 #include <cstddef>
+#include <vector>
 
 namespace BackendGate {
 struct ResizeProbe {
@@ -8,28 +10,38 @@ public:
            ResizeProbe(ResizeProbe const&) = delete;
            ResizeProbe(ResizeProbe&&)      = delete;
   explicit ResizeProbe(sdlrdp_handle& handle)
-      : _handle{ handle }, _client{ CurrentClient(handle) }, _original{ _client.context->update->DesktopResize } {
+      : _handle{ handle }, _client{ CurrentClient(handle) }, _original{ _client.context->update->DesktopResize },
+        _capabilities{ _client.ClientCapabilities } {
     auto const held = _handle.Session().Lock();
     Expects(active == nullptr, "one resize probe exists");
-    active = this;
-
+    active                                 = this;
     _client.context->update->DesktopResize = [](rdpContext* context) -> BOOL {
       EXPECT_TRUE(freerdp_is_active_state(context));
       ++active->_calls;
       return active->_original(context);
     };
+    // FreeRDP enters finalization right after ClientCapabilities, before the peer releases the session lock.
+    _client.ClientCapabilities             = [](freerdp_peer* client) -> BOOL {
+      auto const accepted = active->_capabilities == nullptr || active->_capabilities(client);
+      active->_changed.notify_all();
+      return accepted;
+    };
   }
   ~ResizeProbe() {
     auto const held = _handle.Session().Lock();
     _client.context->update->DesktopResize = _original;
+    _client.ClientCapabilities             = _capabilities;
     active                                 = nullptr;
   }
   ResizeProbe& operator = (ResizeProbe const&) = delete;
   ResizeProbe& operator = (ResizeProbe&&)      = delete;
-  bool         Finalizing() {
-    auto const held    = _handle.Session().Lock();
-    auto const current = freerdp_get_state(_client.context);
-    return current >= CONNECTION_STATE_FINALIZATION_SYNC && current <= CONNECTION_STATE_FINALIZATION_FONT_LIST;
+  bool         AwaitFinalizing() {
+    auto held = _handle.Session().Lock();
+    return _changed.wait_for(held, std::chrono::seconds(10), [&] { return InFinalization(); });
+  }
+  bool Finalizing() {
+    auto const held = _handle.Session().Lock();
+    return InFinalization();
   }
   void MatchingLayout() {
     auto const held   = _handle.Session().Lock();
@@ -58,22 +70,32 @@ private:
   static freerdp_peer& CurrentClient(sdlrdp_handle& handle) {
     return *RequiredStatus(handle).client;
   }
-  inline static ResizeProbe* active    = nullptr;
-  sdlrdp_handle&             _handle;
-  freerdp_peer&              _client;
-  pDesktopResize             _original;
-  unsigned                   _calls    = 0;
+  bool InFinalization() const {
+    auto const current = freerdp_get_state(_client.context);
+    return current >= CONNECTION_STATE_FINALIZATION_SYNC && current <= CONNECTION_STATE_FINALIZATION_FONT_LIST;
+  }
+  inline static ResizeProbe*  active        = nullptr;
+  sdlrdp_handle&              _handle;
+  freerdp_peer&               _client;
+  pDesktopResize              _original;
+  psPeerClientCapabilities    _capabilities;
+  std::condition_variable_any _changed;
+  unsigned                    _calls        = 0;
 };
 class ResizeStorm : public RoundFive {
 protected:
+  void ConnectDisplay(Client& client) {
+    Connect(client, false);
+    ASSERT_TRUE(client.Until([&] { return Headless::DisplayClient::Ready(); }));
+    Events();
+  }
   void ThenQuietResize(ResizeProbe& probe) {
     EXPECT_FALSE(logs.Contains("Unexpected client message")) << logs.Text(true);
     EXPECT_FALSE(std::ranges::any_of(Events(), [](auto event) { return event.type == SDLRDP_SCREEN; }));
     RecordProperty("DesktopResize_calls", probe.Calls());
     RecordProperty("SDLRDP_SCREEN_events", 0);
   }
-  void ThenResizeCounts(Headless::DisplayClient& display, ResizeProbe& probe, unsigned expected) const {
-    EXPECT_EQ(intervening, 3u);
+  static void ThenResizeCounts(Headless::DisplayClient& display, ResizeProbe& probe, unsigned expected) {
     EXPECT_EQ(probe.Calls(), expected);
     EXPECT_EQ(display.Observed().desktops, expected);
     EXPECT_EQ(display.Observed().echoes, display.Observed().echo_resize ? expected : 0u);
@@ -86,22 +108,17 @@ protected:
   void WhenResizeBurst(ResizeProbe& probe, unsigned last_width, unsigned last_height) {
     for (auto [w, h] : { std::pair{ 1600u, 900u }, { 1920u, 1080u }, { last_width, last_height } }) {
       ASSERT_EQ(sdlrdp_resize(backend.get(), w, h), 0);
-      ++intervening;
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
       EXPECT_EQ(probe.Calls(), 1u);
       EXPECT_TRUE(probe.Finalizing());
     }
   }
   void DuringFinalization(ResizeProbe& probe, unsigned last_width, unsigned last_height) {
-    auto deadline = Clock::now() + std::chrono::seconds(2);
-    while (!probe.Finalizing() && Clock::now() < deadline)
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    ASSERT_TRUE(probe.Finalizing());
+    ASSERT_TRUE(probe.AwaitFinalizing());
     probe.ConfirmActiveCallback();
     WhenResizeBurst(probe, last_width, last_height);
     if (::testing::Test::HasFatalFailure()) return;
     probe.MatchingLayout();
-    EXPECT_LT(Clock::now() - started, std::chrono::milliseconds(200));
+    EXPECT_TRUE(probe.Finalizing());
   }
   void ThenFinalLayout(Client& client, Headless::DisplayClient& display, ResizeProbe& probe, unsigned last_width,
                        unsigned last_height, unsigned expected) {
@@ -122,23 +139,24 @@ protected:
     Open(640, 480, { }, SDLRDP_CODEC_PLANAR);
     Client                  client(sdlrdp_port(backend.get()), true, 640, 480);
     Headless::DisplayClient display(client);
-    display.Observed().echo_resize        = expected == 1;
-    display.Observed().finalization_delay = std::chrono::milliseconds(20);
-    Connect(client, false);
-    ASSERT_TRUE(client.Until([&] { return Headless::DisplayClient::Ready(); }));
-    Events();
+    display.Observed().echo_resize = expected == 1;
+    ConnectDisplay(client);
+    if (::testing::Test::HasFatalFailure()) return;
     ResizeProbe probe(*backend);
     display.Observed().finalizing = [&] {
       if (display.Observed().desktops == 1) DuringFinalization(probe, last_width, last_height);
     };
-    started                       = Clock::now();
     ASSERT_EQ(sdlrdp_resize(backend.get(), 1280, 800), 0);
     ThenFinalLayout(client, display, probe, last_width, last_height, expected);
   }
-  Clock::time_point started;
-  unsigned          intervening = 0;
 };
 namespace {
+void ThenSingleScreen(std::vector<sdlrdp_event> const& events, unsigned width, unsigned height) {
+  auto screens = events | std::views::filter([](auto event) { return event.type == SDLRDP_SCREEN; });
+  ASSERT_EQ(std::ranges::distance(screens), 1);
+  EXPECT_EQ(screens.front().screen.width, width);
+  EXPECT_EQ(screens.front().screen.height, height);
+}
 void ThenOriginalPicture(Client& client) {
   EXPECT_EQ(client.Instance()->context->gdi->width, 640);
   EXPECT_EQ(client.Instance()->context->gdi->height, 480);
@@ -154,21 +172,17 @@ TEST_F(ResizeStorm, EqualLayoutDoesNotChangePicture) {
   Open();
   Client                        client(sdlrdp_port(backend.get()), true, 640, 480);
   Headless::DisplayClient const display(client);
-  Connect(client, false);
-  ASSERT_TRUE(client.Until([&] { return Headless::DisplayClient::Ready(); }));
-  Events();
+  ConnectDisplay(client);
+  if (::testing::Test::HasFatalFailure()) return;
   auto presented = Presented(*backend);
   ASSERT_TRUE(display.Layout(640, 480));
   ASSERT_TRUE(display.Layout(800, 600));
-  auto events  = EventsUntil(
+  auto events = EventsUntil(
       [](auto const& events) {
         return std::ranges::any_of(events, [](auto event) { return event.type == SDLRDP_SCREEN; });
       },
       false, &client);
-  auto screens = events | std::views::filter([](auto event) { return event.type == SDLRDP_SCREEN; });
-  ASSERT_EQ(std::ranges::distance(screens), 1);
-  EXPECT_EQ(screens.front().screen.width, 800u);
-  EXPECT_EQ(screens.front().screen.height, 600u);
+  ThenSingleScreen(events, 800, 600);
   EXPECT_EQ(Presented(*backend), presented);
   RecordProperty("equal_layout_screen_events", 0);
   RecordProperty("equal_layout_picture_resizes", 0);

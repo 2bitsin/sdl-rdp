@@ -54,31 +54,45 @@ inline BOOL ClientDesktopResize(rdpContext* context) {
   auto h = freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopHeight);
   return freerdp_client_codecs_reset(context->codecs, FREERDP_CODEC_ALL, w, h) && gdi_resize(context->gdi, w, h);
 }
-inline void ConfigureClient(rdpSettings* settings, unsigned port, bool surface, unsigned width, unsigned height) {
-  Expects(freerdp_settings_set_string(settings, FreeRDP_ServerHostname, "127.0.0.1"),
-          "client server hostname is configured");
-  Expects(freerdp_settings_set_string(settings, FreeRDP_Username, "test"), "client username is configured");
-  Expects(freerdp_settings_set_uint32(settings, FreeRDP_ServerPort, port), "client server port is configured");
-  Expects(freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth, width), "client desktop width is configured");
-  Expects(freerdp_settings_set_uint32(settings, FreeRDP_DesktopHeight, height), "client desktop height is configured");
-  Expects(freerdp_settings_set_uint32(settings, FreeRDP_ColorDepth, 32), "client color depth is configured");
-  Expects(freerdp_settings_set_uint32(settings, FreeRDP_ThreadingFlags, THREADING_FLAGS_DISABLE_THREADS),
-          "client configured");
-  Expects(freerdp_settings_set_bool(settings, FreeRDP_RemoteFxCodec, TRUE), "client RemoteFX support is configured");
-  Expects(freerdp_settings_set_bool(settings, FreeRDP_NSCodec, TRUE), "client NSCodec support is configured");
-  Expects(freerdp_settings_set_bool(settings, FreeRDP_IgnoreCertificate, TRUE),
-          "client certificate verification policy is configured");
-  Expects(freerdp_settings_set_bool(settings, FreeRDP_NlaSecurity, FALSE), "client NLA policy is configured");
-  Expects(freerdp_settings_set_bool(settings, FreeRDP_SupportGraphicsPipeline, FALSE),
-          "client graphics pipeline support is configured");
+inline void RequireClientResult(BOOL result, std::string_view message) {
+  Expects(result != FALSE, message);
+}
+inline void ConfigureClientCodecs(rdpSettings* settings, bool surface) {
+  RequireClientResult(freerdp_settings_set_bool(settings, FreeRDP_RemoteFxCodec, TRUE),
+                      "client RemoteFX support is configured");
+  RequireClientResult(freerdp_settings_set_bool(settings, FreeRDP_NSCodec, TRUE),
+                      "client NSCodec support is configured");
+  RequireClientResult(freerdp_settings_set_bool(settings, FreeRDP_IgnoreCertificate, TRUE),
+                      "client certificate verification policy is configured");
+  RequireClientResult(freerdp_settings_set_bool(settings, FreeRDP_NlaSecurity, FALSE),
+                      "client NLA policy is configured");
+  RequireClientResult(freerdp_settings_set_bool(settings, FreeRDP_SupportGraphicsPipeline, FALSE),
+                      "client graphics pipeline support is configured");
   if (!surface)
-    Expects(freerdp_settings_set_uint32(settings, FreeRDP_SurfaceCommandsSupported, 0), "surface commands disabled");
+    RequireClientResult(freerdp_settings_set_uint32(settings, FreeRDP_SurfaceCommandsSupported, 0),
+                        "surface commands disabled");
+}
+inline void ConfigureClient(rdpSettings* settings, unsigned port, bool surface, unsigned width, unsigned height) {
+  RequireClientResult(freerdp_settings_set_string(settings, FreeRDP_ServerHostname, "127.0.0.1"),
+                      "client server hostname is configured");
+  RequireClientResult(freerdp_settings_set_string(settings, FreeRDP_Username, "test"), "client username is configured");
+  RequireClientResult(freerdp_settings_set_uint32(settings, FreeRDP_ServerPort, port),
+                      "client server port is configured");
+  RequireClientResult(freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth, width),
+                      "client desktop width is configured");
+  RequireClientResult(freerdp_settings_set_uint32(settings, FreeRDP_DesktopHeight, height),
+                      "client desktop height is configured");
+  RequireClientResult(freerdp_settings_set_uint32(settings, FreeRDP_ColorDepth, 32),
+                      "client color depth is configured");
+  RequireClientResult(freerdp_settings_set_uint32(settings, FreeRDP_ThreadingFlags, THREADING_FLAGS_DISABLE_THREADS),
+                      "client configured");
+  ConfigureClientCodecs(settings, surface);
 }
 inline void ConnectGraphicsDecoder(void* raw, ChannelConnectedEventArgs const* event) {
   if (std::string_view(event->name) != RDPGFX_DVC_CHANNEL_NAME) return;
   auto* context = static_cast<rdpContext*>(raw);
-  Expects(gdi_graphics_pipeline_init(context->gdi, static_cast<RdpgfxClientContext*>(event->pInterface)),
-          "graphics decoder initialized");
+  RequireClientResult(gdi_graphics_pipeline_init(context->gdi, static_cast<RdpgfxClientContext*>(event->pInterface)),
+                      "graphics decoder initialized");
 }
 inline void DisconnectGraphicsDecoder(void* raw, ChannelDisconnectedEventArgs const* event) {
   if (std::string_view(event->name) != RDPGFX_DVC_CHANNEL_NAME) return;
@@ -98,20 +112,20 @@ public:
   explicit Client(unsigned port, bool surface, unsigned width = 320, unsigned height = 200) {
     Expects(instance != nullptr, "client allocated");
     instance->PostConnect = ClientPostConnect;
-    Expects(freerdp_context_new(instance.get()), "client context allocated");
+    RequireClientResult(freerdp_context_new(instance.get()), "client context allocated");
     instance->context->update->DesktopResize = ClientDesktopResize;
     ConfigureClient(instance->context->settings, port, surface, width, height);
   }
   void EnableGraphics(bool h264 = false) const {
     auto* context = instance->context;
-    Expects(freerdp_settings_set_bool(context->settings, FreeRDP_GfxH264, h264),
-            "graphics pipeline enabled on the client pump thread");
-    Expects(freerdp_settings_set_bool(context->settings, FreeRDP_GfxAVC444, FALSE),
-            "graphics pipeline enabled on the client pump thread");
-    Expects(freerdp_settings_set_bool(context->settings, FreeRDP_SupportGraphicsPipeline, TRUE),
-            "graphics pipeline enabled on the client pump thread");
-    Expects(freerdp_settings_set_bool(context->settings, FreeRDP_SynchronousDynamicChannels, TRUE),
-            "graphics pipeline enabled on the client pump thread");
+    RequireClientResult(freerdp_settings_set_bool(context->settings, FreeRDP_GfxH264, h264),
+                        "graphics pipeline enabled on the client pump thread");
+    RequireClientResult(freerdp_settings_set_bool(context->settings, FreeRDP_GfxAVC444, FALSE),
+                        "graphics pipeline enabled on the client pump thread");
+    RequireClientResult(freerdp_settings_set_bool(context->settings, FreeRDP_SupportGraphicsPipeline, TRUE),
+                        "graphics pipeline enabled on the client pump thread");
+    RequireClientResult(freerdp_settings_set_bool(context->settings, FreeRDP_SynchronousDynamicChannels, TRUE),
+                        "graphics pipeline enabled on the client pump thread");
     freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
     PubSub_SubscribeChannelConnected(context->pubSub, ConnectGraphicsDecoder);
     PubSub_SubscribeChannelDisconnected(context->pubSub, DisconnectGraphicsDecoder);
@@ -119,15 +133,18 @@ public:
   }
   void Credentials(char const* user, char const* password, char const* domain, bool nla = false) const {
     auto* settings = instance->context->settings;
-    Expects(freerdp_settings_set_string(settings, FreeRDP_Username, user), "client username is configured");
-    Expects(freerdp_settings_set_string(settings, FreeRDP_Password, password), "client password is configured");
-    Expects(freerdp_settings_set_string(settings, FreeRDP_Domain, domain), "client domain is configured");
-    Expects(freerdp_settings_set_bool(settings, FreeRDP_NlaSecurity, nla), "client NLA policy is configured");
-    Expects(freerdp_settings_set_bool(settings, FreeRDP_TlsSecurity, !nla), "client TLS policy is configured");
-    Expects(freerdp_settings_set_bool(settings, FreeRDP_RdpSecurity, FALSE),
-            "client RDP security policy is configured");
-    Expects(freerdp_settings_set_string(settings, FreeRDP_AuthenticationPackageList, "!kerberos"),
-            "client credentials configured");
+    RequireClientResult(freerdp_settings_set_string(settings, FreeRDP_Username, user), "client username is configured");
+    RequireClientResult(freerdp_settings_set_string(settings, FreeRDP_Password, password),
+                        "client password is configured");
+    RequireClientResult(freerdp_settings_set_string(settings, FreeRDP_Domain, domain), "client domain is configured");
+    RequireClientResult(freerdp_settings_set_bool(settings, FreeRDP_NlaSecurity, nla),
+                        "client NLA policy is configured");
+    RequireClientResult(freerdp_settings_set_bool(settings, FreeRDP_TlsSecurity, !nla),
+                        "client TLS policy is configured");
+    RequireClientResult(freerdp_settings_set_bool(settings, FreeRDP_RdpSecurity, FALSE),
+                        "client RDP security policy is configured");
+    RequireClientResult(freerdp_settings_set_string(settings, FreeRDP_AuthenticationPackageList, "!kerberos"),
+                        "client credentials configured");
   }
   bool Pump(unsigned timeout = 10) const {
     std::array<HANDLE, 64> handles { };
@@ -164,12 +181,13 @@ public:
   }
   UINT64 Received() const {
     UINT64 bytes = 0;
-    Expects(freerdp_get_stats(instance->context->rdp, &bytes, nullptr, nullptr, nullptr),
-            "transport statistics available");
+    RequireClientResult(freerdp_get_stats(instance->context->rdp, &bytes, nullptr, nullptr, nullptr),
+                        "transport statistics available");
     return bytes;
   }
-  bool Until(auto ready) {
-    auto deadline = Clock::now() + std::chrono::seconds(10);
+  bool Until(auto ready, std::chrono::milliseconds timeout = std::chrono::seconds(10)) {
+    Expects(timeout.count() > 0, "event deadline is positive");
+    auto deadline = Clock::now() + timeout;
     while (!ready() && Clock::now() < deadline) {
       for (unsigned batch = 0; batch < 16; ++batch)
         if (!Pump(batch ? 0 : 10)) return false;
@@ -236,11 +254,10 @@ private:
   std::vector<Clock::time_point>            ack_times;
 };
 struct DisplayCapture {
-  bool                      echo_resize        = false;
-  std::chrono::milliseconds finalization_delay { };
-  std::function<void()>     finalizing;
-  unsigned                  desktops           = 0;
-  unsigned                  echoes             = 0;
+  bool                  echo_resize = false;
+  std::function<void()> finalizing;
+  unsigned              desktops    = 0;
+  unsigned              echoes      = 0;
 };
 struct DisplayClient {
 public:
@@ -255,10 +272,10 @@ public:
     ready                                             = false;
     freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
     auto* context = client.Instance()->context;
-    Expects(freerdp_settings_set_bool(context->settings, FreeRDP_SupportDisplayControl, TRUE),
-            "display control enabled");
-    Expects(freerdp_settings_set_bool(context->settings, FreeRDP_SynchronousDynamicChannels, TRUE),
-            "display control enabled");
+    RequireClientResult(freerdp_settings_set_bool(context->settings, FreeRDP_SupportDisplayControl, TRUE),
+                        "display control enabled");
+    RequireClientResult(freerdp_settings_set_bool(context->settings, FreeRDP_SynchronousDynamicChannels, TRUE),
+                        "display control enabled");
     PubSub_SubscribeChannelConnected(context->pubSub, Connected);
     client.Instance()->LoadChannels = [](freerdp* instance) -> BOOL {
       std::array<char const*, 1> channel  { "disp" };
@@ -310,7 +327,6 @@ private:
       if (!Layout(context->gdi->width, context->gdi->height)) return FALSE;
     }
     if (active->observed.finalizing) active->observed.finalizing();
-    std::this_thread::sleep_for(active->observed.finalization_delay);
     return TRUE;
   }
   static void Connected(void* /*unused*/, ChannelConnectedEventArgs const* event) {

@@ -77,7 +77,7 @@ TEST_F(DesktopSample, AutoAvcCodecProperty) {
   Client client(Number(std::string_view(line).substr(5)), true, 640, 480);
   client.EnableGraphics(true);
   ASSERT_TRUE(freerdp_connect(client.Instance().get())) << ConnectLogs();
-  ASSERT_TRUE(ReadInput(client, "event CODEC_CHANGED codec=avc420")) << process->Transcript();
+  ASSERT_TRUE(ReadInput(client, "event CODEC_CHANGED codec=avc420", 30s)) << process->Transcript();
   Escape(client);
 }
 

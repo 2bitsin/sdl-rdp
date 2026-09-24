@@ -88,6 +88,7 @@ Listener::Listener(Configuration const& configuration, Diagnostics const& diagno
     // TRUE transfers ownership even when construction failed and RAII already released the peer.
     return TRUE;
   };
+  _diagnostics.Log(SDLRDP_LOG_INFO, std::format("Listening on port {}", _port));
   _thread = std::jthread([this](std::stop_token const& quit) { Listen(quit); });
   Ensures(_port != 0, "bound port is available");
 }

@@ -16,3 +16,6 @@ default = "sdl-rdp-sample"
 [package]
 kind = "library"
 name = "sdl-rdp"
+
+[test]
+exclude_labels = ["bench"]

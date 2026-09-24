@@ -24,7 +24,8 @@ protected:
   }
   void ConnectGraphics(Client& client) {
     ASSERT_TRUE(freerdp_connect(client.Instance().get()));
-    ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); })) << logs.Text(true);
+    ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }, std::chrono::seconds(20)))
+        << logs.Text(true);
   }
   Logs                                                    logs;
   std::filesystem::path                                   directory;

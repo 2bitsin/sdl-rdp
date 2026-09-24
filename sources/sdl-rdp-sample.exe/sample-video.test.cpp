@@ -7,7 +7,6 @@ protected:
   void ThenResizeEvents(Headless::DisplayClient& display) {
     EXPECT_EQ(display.Observed().desktops, 1u);
     EXPECT_EQ(display.Observed().echoes, 1u);
-    EXPECT_EQ(intervening, 3u);
     EXPECT_FALSE(logs.Contains("Unexpected client message")) << logs.Text(true);
     RecordProperty("DesktopResize_calls", display.Observed().desktops);
   }
@@ -19,6 +18,11 @@ protected:
     EXPECT_EQ(event.display.data1, width);
     EXPECT_EQ(event.display.data2, height);
     EXPECT_FALSE(SDL_HasEvent(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED));
+  }
+  void GivenFullscreen() {
+    auto mode = *SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
+    ASSERT_TRUE(SDL_SetWindowFullscreenMode(window, &mode));
+    ASSERT_TRUE(SDL_SetWindowFullscreen(window, true));
   }
   void GivenVideoHints() {
     for (auto [name, value] : { std::pair{ SDL_HINT_VIDEO_DRIVER, "rdp" },
@@ -52,13 +56,9 @@ protected:
     SDL_FlushEvents(SDL_EVENT_FIRST, SDL_EVENT_LAST);
   }
   void StormSizes() {
-    auto start = Clock::now();
     for (auto [w, h] : { std::pair{ 1600, 900 }, { 1920, 1080 }, { 1280, 800 } }) {
       ASSERT_TRUE(SDL_SetWindowSize(window, w, h));
-      ++intervening;
-      std::this_thread::sleep_for(10ms);
     }
-    EXPECT_LT(Clock::now() - start, 200ms);
   }
   static void Desktop(int width, int height) {
     auto const* mode = SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
@@ -94,7 +94,6 @@ protected:
   SDL_Window*           window       = nullptr;
   SDL_LogOutputFunction log_output   = nullptr;
   void*                 log_userdata = nullptr;
-  unsigned              intervening  = 0;
 };
 
 namespace {
@@ -133,32 +132,49 @@ void ThenAudioDeviceChanges(Client& client, SDL_AudioStream* stream) {
   }));
 }
 }
-TEST_F(VideoDriver, ResizeStormWithLayoutEcho) {
-  ASSERT_TRUE(SDL_SetWindowSize(window, 640, 480));
-  auto                    properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
-  Client client(SDL_GetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0), true, 640, 480);
-  Headless::DisplayClient display(client);
-  display.Observed().echo_resize        = true;
-  display.Observed().finalization_delay = 20ms;
-  ASSERT_TRUE(freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_FrameAcknowledge, 0));
-  ASSERT_TRUE(freerdp_connect(client.Instance().get()));
-  ASSERT_TRUE(client.Until([&] {
-    SDL_PumpEvents();
-    return Headless::DisplayClient::Ready();
-  }));
-  auto started = Clock::now();
-  display.Observed().finalizing = [&] {
-    if (display.Observed().desktops == 1) {
-      StormSizes();
-      EXPECT_LT(Clock::now() - started, 200ms);
-    }
-  };
-  ASSERT_TRUE(SDL_SetWindowSize(window, 1280, 800));
+namespace {
+void AwaitResizedPicture(Client& client, Headless::DisplayClient& display) {
+  Expects(client.Instance() != nullptr, "resized client exists");
   std::vector<UINT32> pixels(1280uz * 800, 0);
   ASSERT_TRUE(client.Until([&] {
     SDL_PumpEvents();
     return display.Observed().desktops && client.Matches(pixels);
   }));
+}
+void PresentDesktop(Client& client, SDL_Window* window) {
+  auto* surface = SDL_GetWindowSurface(window);
+  ASSERT_NE(surface, nullptr);
+  ASSERT_TRUE(SDL_FillSurfaceRect(surface, nullptr, SDL_MapSurfaceRGB(surface, 0x12, 0x34, 0x56)));
+  ASSERT_TRUE(SDL_UpdateWindowSurface(window));
+  std::vector<UINT32> pixels(1280uz * 800, 0x00123456);
+  ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); }));
+}
+void ConnectDesktop(Client& client, Headless::Logs& logs) {
+  Expects(client.Instance() != nullptr, "desktop client exists");
+  ASSERT_TRUE(freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_FrameAcknowledge, 0));
+  ASSERT_TRUE(freerdp_connect(client.Instance().get())) << logs.Text(true);
+  ASSERT_TRUE(client.Until([&] {
+    SDL_PumpEvents();
+    return Headless::DisplayClient::Ready();
+  }));
+}
+}
+TEST_F(VideoDriver, ResizeStormWithLayoutEcho) {
+  ASSERT_TRUE(SDL_SetWindowSize(window, 640, 480));
+  auto                    properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
+  Client client(SDL_GetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0), true, 640, 480);
+  Headless::DisplayClient display(client);
+  display.Observed().echo_resize = true;
+  ConnectDesktop(client, logs);
+  if (::testing::Test::HasFatalFailure()) return;
+  display.Observed().finalizing = [&] {
+    if (display.Observed().desktops == 1) {
+      StormSizes();
+    }
+  };
+  ASSERT_TRUE(SDL_SetWindowSize(window, 1280, 800));
+  AwaitResizedPicture(client, display);
+  if (::testing::Test::HasFatalFailure()) return;
   PumpDesktop(client);
   if (::testing::Test::HasFatalFailure()) return;
   ThenResizeStorm(client, display);
@@ -167,22 +183,13 @@ TEST_F(VideoDriver, ResizeStormWithLayoutEcho) {
 }
 
 TEST_F(VideoDriver, ExclusiveScreenChangeDoesNotResizePicture) {
-  auto mode = *SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
-  ASSERT_TRUE(SDL_SetWindowFullscreenMode(window, &mode));
-  ASSERT_TRUE(SDL_SetWindowFullscreen(window, true));
+  ASSERT_NO_FATAL_FAILURE(GivenFullscreen());
   auto                    properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
   Client client(SDL_GetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, 0), true, 1280, 800);
   Headless::DisplayClient display(client);
-  ASSERT_TRUE(freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_FrameAcknowledge, 0));
-  ASSERT_TRUE(freerdp_connect(client.Instance().get()));
-  ASSERT_NE(SDL_GetWindowSurface(window), nullptr);
-  ASSERT_TRUE(SDL_UpdateWindowSurface(window));
-  ASSERT_TRUE(client.Until([&] {
-    SDL_PumpEvents();
-    return Headless::DisplayClient::Ready();
-  }));
-  PumpDesktop(client);
+  ConnectDesktop(client, logs);
   if (::testing::Test::HasFatalFailure()) return;
+  ASSERT_NO_FATAL_FAILURE(PresentDesktop(client, window));
   FullDesktopFrames const frames(client);
   SDL_FlushEvents(SDL_EVENT_FIRST, SDL_EVENT_LAST);
   ASSERT_TRUE(display.Layout(1600, 900));

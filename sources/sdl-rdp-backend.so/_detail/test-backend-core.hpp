@@ -86,14 +86,6 @@ inline std::size_t ResidentBytes() {
   Expects(second.ec == std::errc(), "resident pages readable");
   return resident * std::size_t(sysconf(_SC_PAGESIZE));
 }
-inline bool Listening(unsigned port) {
-  auto tcp     = Headless::ReadText("/proc/net/tcp");
-  auto address = std::format("0100007F:{:04X}", port);
-  return std::ranges::any_of(tcp | std::views::split('\n'), [&](auto row) {
-    std::string_view const line(row.begin(), row.end());
-    return line.contains(address) && line.contains(" 0A ");
-  });
-}
 using Headless::Logs;
 
 struct Mode {

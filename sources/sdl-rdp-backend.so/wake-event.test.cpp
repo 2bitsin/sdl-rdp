@@ -11,13 +11,11 @@
 
 namespace {
 void ConsumePublished(Backend::WakeEvent& wake, std::atomic<unsigned>& published, std::atomic<unsigned>& consumed) {
-  std::ranges::for_each(std::views::iota(0, 4096), [&](int) {
+  for (int iteration = 0; iteration < 4096; ++iteration) {
     wake.Transition(Backend::WakeEvent::Phase::Idle);
-    auto start = std::chrono::steady_clock::now();
-    if (published.load() == consumed.load()) EXPECT_EQ(WaitForSingleObject(wake.get(), 10000), WAIT_OBJECT_0);
-    EXPECT_LT(std::chrono::steady_clock::now() - start, std::chrono::seconds(10));
+    if (published.load() == consumed.load()) ASSERT_EQ(WaitForSingleObject(wake.get(), 10000), WAIT_OBJECT_0);
     consumed.store(published.load());
-  });
+  }
 }
 namespace {
 void ProducePending(Backend::WakeEvent& wake, std::atomic<unsigned>& published, std::atomic<unsigned> const& consumed,

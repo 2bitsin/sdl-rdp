@@ -1,5 +1,6 @@
 #include "_detail/system-call.hpp"
 #include "_detail/test-backend.hpp"
+#include "_detail/waiting-open.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -96,20 +97,17 @@ TEST_P(Gate, DesktopIsPicture) {
   ThenPictureDesktop(client);
 }
 TEST_P(Gate, WaitForClient) {
-  auto port = sdlrdp_port(backend.get());
   backend.reset();
-  sdlrdp_config config{ "127.0.0.1", port, certificates.Path().c_str(), 320, 200, 1 };
+  sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), 320, 200, 1 };
   config.codec = GetParam().codec;
-  sdlrdp_handle* handle   = nullptr;
-  auto           opening  = std::async(std::launch::async, [&] { return sdlrdp_open(&config, &handle); });
-  auto           deadline = Clock::now() + std::chrono::seconds(10);
-  while (!Listening(port) && Clock::now() < deadline)
-    std::this_thread::yield();
-  EXPECT_EQ(opening.wait_for(std::chrono::milliseconds(0)), std::future_status::timeout);
-  Client client(port, GetParam().surface);
+  WaitingOpen const opening(config);
+  auto              port    = opening.Receive(std::chrono::seconds(15)).value_or(0);
+  ASSERT_GT(port, 0);
+  EXPECT_FALSE(opening.Receive(std::chrono::milliseconds(0)).has_value());
+  Client client(unsigned(port), GetParam().surface);
   ConnectCodec(client);
   if (::testing::Test::HasFatalFailure()) return;
-  ThenWaitingOpenCompletes(opening, handle);
+  EXPECT_EQ(opening.Receive(std::chrono::seconds(15)), std::optional(0));
 }
 TEST_P(Gate, BlockedSinglePresent) {
   Reopen(2048, 1536);

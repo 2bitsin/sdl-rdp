@@ -38,6 +38,7 @@ void FramePacing::Restart(FrameLock const& held) {
   });
 }
 void FramePacing::Blocked() {
+  _diagnostics.Line("wire-blocked");
   Adjust([](Refresh& rate) { rate.Blocked(Clock::now()); });
 }
 void FramePacing::Drained() {

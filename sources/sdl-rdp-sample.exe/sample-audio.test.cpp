@@ -23,15 +23,24 @@ void ReceiveAudio(Client& client, Headless::FrameObserver& observer, auto ready)
 }
 
 namespace {
-void ThenTone(Headless::SoundClient const& audio, Headless::FrameObserver const& frames, bool tight) {
-  ThenBlockCadence(audio, tight);
-  if (::testing::Test::HasFatalFailure()) return;
+void ThenDeviceTone(Headless::SoundClient const& audio, std::string const& line) {
   auto [frequency, db] = Headless::ToneMeasurements(audio.CaptureState().samples, audio.CaptureState().rate);
   EXPECT_NEAR(frequency, 440, 8.8);
   EXPECT_NEAR(db, -12, 0.3);
+  testing::Test::RecordProperty("device_format", line);
+  testing::Test::RecordProperty("tone_hz", std::to_string(frequency));
+  testing::Test::RecordProperty("tone_dbfs", std::to_string(db));
+}
+void ThenTone(Headless::SoundClient const& audio, Headless::FrameObserver const& frames, bool tight) {
+  ThenDeviceTone(audio, tight ? "tight vsync" : "default vsync");
   if (tight) EXPECT_GE(frames.Frames().size(), 2u);
-  testing::Test::RecordProperty(tight ? "tight_tone_hz" : "tone_hz", std::to_string(frequency));
-  testing::Test::RecordProperty(tight ? "tight_tone_dbfs" : "tone_dbfs", std::to_string(db));
+}
+bool ToneCaptured(Headless::SoundClient const& audio, Headless::FrameObserver const& frames) {
+  return audio.CaptureState().samples.size() >= std::size_t(audio.CaptureState().rate) * 2 &&
+         frames.Frames().size() >= 2;
+}
+bool ThreeSecondsCaptured(Headless::SoundClient const& audio, Headless::FrameObserver const& /*frames*/) {
+  return !audio.CaptureState().received.empty() && Clock::now() >= audio.CaptureState().received.front() + 3s;
 }
 }
 
@@ -55,68 +64,53 @@ void ThenLeadCadence(Headless::SoundClient const& audio, size_t first, size_t fr
 }
 }
 namespace {
-void ThenDeviceTone(Headless::SoundClient const& audio, std::string const& line) {
-  auto [frequency, db] = Headless::ToneMeasurements(audio.CaptureState().samples, audio.CaptureState().rate);
-  EXPECT_NEAR(frequency, 440, 8.8);
-  EXPECT_NEAR(db, -12, 0.3);
-  testing::Test::RecordProperty("device_format", line);
-  testing::Test::RecordProperty("tone_hz", std::to_string(frequency));
-  testing::Test::RecordProperty("tone_dbfs", std::to_string(db));
-}
-}
-namespace {
 class AudioSample : public SampleGate::Sample {
 protected:
-  void WhenTonePlayed(bool tight) {
+  void GivenToneProcess(bool tight) {
     auto arguments = Arguments(certificates.Path(), false);
     arguments.insert(arguments.begin() + 1, "SDL_AUDIO_DRIVER=rdp");
     arguments.emplace_back("--tone");
     if (tight) arguments.emplace_back("--tight");
     GivenAudioProcess(arguments);
+  }
+  void WhenTonePlayed(bool tight, unsigned rate, auto captured, auto verify) {
+    GivenToneProcess(tight);
     if (::testing::Test::HasFatalFailure()) return;
-    auto                  port   = audio_port;
-    Client                client(port, true, 640, 480);
+    Client                client(audio_port, true, 640, 480);
     Headless::SoundClient audio(client);
+    audio.CaptureState().rate = rate;
     ASSERT_TRUE(freerdp_connect(client.Instance().get())) << ConnectLogs();
     Headless::FrameObserver observer(client);
-    ReceiveAudio(client, observer, [&] {
-      return !audio.CaptureState().received.empty() && Clock::now() >= audio.CaptureState().received.front() + 3s;
-    });
+    ReceiveAudio(client, observer, [&] { return captured(audio, observer); });
     if (::testing::Test::HasFatalFailure()) return;
-    ASSERT_EQ(audio.CaptureState().rate, 44100u);
-    ThenTone(audio, observer, tight);
+    ASSERT_EQ(audio.CaptureState().rate, rate);
+    verify(audio, observer, tight);
     if (::testing::Test::HasFatalFailure()) return;
     Escape(client);
     if (::testing::Test::HasFatalFailure()) return;
     process.reset();
   }
+  void WhenTonePlayedTwice(auto captured, auto verify) {
+    for (bool const tight : { false, true }) {
+      WhenTonePlayed(tight, 44100, captured, verify);
+      if (::testing::Test::HasFatalFailure()) return;
+    }
+  }
 };
 TEST_F(AudioSample, ToneAndVsync) {
-  for (bool const tight : { false, true }) {
-    WhenTonePlayed(tight);
-    if (::testing::Test::HasFatalFailure()) return;
-  }
+  WhenTonePlayedTwice(ToneCaptured, ThenTone);
+}
+TEST_F(AudioSample, BlockCadence) {
+  WhenTonePlayedTwice(ThreeSecondsCaptured, [](auto const& audio, auto const& /*frames*/, bool tight) {
+    ThenBlockCadence(audio, tight);
+  });
 }
 
 TEST_F(AudioSample, ToneAtClientRate) {
-  auto arguments = Arguments(certificates.Path(), false);
-  arguments.insert(arguments.begin() + 1, "SDL_AUDIO_DRIVER=rdp");
-  arguments.emplace_back("--tone");
-  GivenProcess(arguments);
-  if (::testing::Test::HasFatalFailure()) return;
-  auto port = Number(std::string_view(line).substr(5));
-  ASSERT_TRUE(Read("audio device=RDP client freq=44100"));
-  Client                client(port, true, 640, 480);
-  Headless::SoundClient audio(client);
-  audio.CaptureState().rate = 48000;
-  ASSERT_TRUE(freerdp_connect(client.Instance().get())) << ConnectLogs();
-  Headless::FrameObserver observer(client);
-  ReceiveAudio(client, observer,
-               [&] { return audio.CaptureState().samples.size() >= std::size_t(audio.CaptureState().rate) * 2; });
-  if (::testing::Test::HasFatalFailure()) return;
-  ASSERT_TRUE(Read("audio device=RDP client freq=48000"));
-  ThenDeviceTone(audio, line);
-  Escape(client);
+  WhenTonePlayed(false, 48000, ToneCaptured, [this](auto const& audio, auto const& /*frames*/, bool /*tight*/) {
+    ASSERT_TRUE(Read("audio device=RDP client freq=48000"));
+    ThenDeviceTone(audio, line);
+  });
 }
 
 class AudioDriver : public AudioSample {
@@ -127,21 +121,40 @@ protected:
     ThenPcm(client, audio);
     if (::testing::Test::HasFatalFailure()) return;
   }
-  static void ThenRefilledLead(Client& client, Headless::SoundClient& audio, std::size_t frames,
-                               Clock::time_point resumed) {
-    while ((audio.CaptureState().samples.size() / 2) - frames < audio.CaptureState().rate * 150 / 1000 &&
-           Clock::now() < resumed + 100ms)
-      ASSERT_TRUE(client.Pump(1));
-    EXPECT_GE((audio.CaptureState().samples.size() / 2) - frames, audio.CaptureState().rate * 150 / 1000);
-    EXPECT_LE(audio.CaptureState().received.back(), resumed + 100ms);
+  static void ThenRefilledLead(Client& client, Headless::SoundClient& audio, std::size_t frames) {
+    ASSERT_TRUE(client.Until([&] {
+      return (audio.CaptureState().samples.size() / 2) - frames >= audio.CaptureState().rate * 150 / 1000;
+    }));
   }
   static void ThenInitialLead(Client& client, Headless::SoundClient& audio) {
-    ASSERT_TRUE(client.Until([&] { return !audio.CaptureState().received.empty(); }));
-    auto deadline = audio.CaptureState().received.front() + 100ms;
-    while (audio.CaptureState().samples.size() / 2 < audio.CaptureState().rate * 140 / 1000 && Clock::now() < deadline)
-      ASSERT_TRUE(client.Pump(1));
-    EXPECT_GE(audio.CaptureState().samples.size() / 2, audio.CaptureState().rate * 140 / 1000);
-    EXPECT_LE(audio.CaptureState().received.back(), deadline);
+    ASSERT_TRUE(client.Until([&] {
+      return audio.CaptureState().samples.size() / 2 >= audio.CaptureState().rate * 140 / 1000;
+    }));
+  }
+  void ReceiveLead() {
+    PlayPcm(48000uz * 5 * 2);
+    if (::testing::Test::HasFatalFailure()) return;
+    GivenSoundClient();
+    if (::testing::Test::HasFatalFailure()) return;
+    ThenInitialLead(*sound_client, *sound);
+  }
+  void RefillLead(auto then_refilled) {
+    ReceiveLead();
+    if (::testing::Test::HasFatalFailure()) return;
+    auto& client = *sound_client;
+    auto& audio  = *sound;
+    {
+      ASSERT_TRUE(SDL_LockAudioStream(stream.get()));
+      std::unique_ptr<SDL_AudioStream, decltype(&SDL_UnlockAudioStream)> const locked(stream.get(),
+                                                                                      SDL_UnlockAudioStream);
+      auto deadline = Clock::now() + 300ms;
+      while (Clock::now() < deadline) ASSERT_TRUE(client.Pump(1));
+    }
+    auto frames  = audio.CaptureState().samples.size() / 2;
+    auto resumed = Clock::now();
+    ThenRefilledLead(client, audio, frames);
+    if (::testing::Test::HasFatalFailure()) return;
+    then_refilled(audio, resumed);
   }
   void GivenAudioBackend() {
     ASSERT_TRUE(SDL_SetHint("SDL_RDP_CERT_DIR", certificates.Path().c_str()));
@@ -238,40 +251,29 @@ TEST_F(AudioDriver, NoClientTenSecondClock) {
   RecordProperty("no_client_ten_seconds_elapsed", std::to_string(elapsed));
 }
 TEST_F(AudioDriver, ClientReceivesOneLeadOnAttach) {
-  PlayPcm(static_cast<std::ptrdiff_t>(48000 * 5) * 2);
+  ReceiveLead();
+}
+TEST_F(AudioDriver, InitialLeadClock) {
+  ReceiveLead();
   if (::testing::Test::HasFatalFailure()) return;
-  SDL_Delay(200);
-  GivenSoundClient();
+  EXPECT_LE(sound->CaptureState().received.back(), sound->CaptureState().received.front() + 100ms);
+}
+TEST_F(AudioDriver, LeadCadence) {
+  ReceiveLead();
   if (::testing::Test::HasFatalFailure()) return;
-  auto& client = *sound_client;
-  auto& audio  = *sound;
-  ThenInitialLead(client, audio);
-  if (::testing::Test::HasFatalFailure()) return;
-  auto first    = audio.CaptureState().received.size();
-  auto frames   = audio.CaptureState().samples.size() / 2;
+  auto first    = sound->CaptureState().received.size();
+  auto frames   = sound->CaptureState().samples.size() / 2;
   auto deadline = Clock::now() + 1s;
-  while (Clock::now() < deadline)
-    ASSERT_TRUE(client.Pump(1));
-  ThenLeadCadence(audio, first, frames);
+  while (Clock::now() < deadline) ASSERT_TRUE(sound_client->Pump(1));
+  ThenLeadCadence(*sound, first, frames);
 }
 TEST_F(AudioDriver, StallRefillsTheLead) {
-  PlayPcm(static_cast<std::ptrdiff_t>(48000 * 5) * 2);
-  if (::testing::Test::HasFatalFailure()) return;
-  GivenSoundClient();
-  if (::testing::Test::HasFatalFailure()) return;
-  auto& client = *sound_client;
-  auto& audio  = *sound;
-  ASSERT_TRUE(client.Until([&] { return audio.CaptureState().samples.size() / 2 >= audio.CaptureState().rate / 2; }));
-  ASSERT_TRUE(SDL_LockAudioStream(stream.get()));
-  auto deadline = Clock::now() + 300ms;
-  bool pumped   = true;
-  while (Clock::now() < deadline && pumped)
-    pumped = client.Pump(1);
-  auto frames  = audio.CaptureState().samples.size() / 2;
-  auto resumed = Clock::now();
-  SDL_UnlockAudioStream(stream.get());
-  ASSERT_TRUE(pumped);
-  ThenRefilledLead(client, audio, frames, resumed);
+  RefillLead([](Headless::SoundClient const& /*audio*/, Clock::time_point /*resumed*/) { });
+}
+TEST_F(AudioDriver, StallRefillClock) {
+  RefillLead([](Headless::SoundClient const& audio, Clock::time_point resumed) {
+    EXPECT_LE(audio.CaptureState().received.back(), resumed + 100ms);
+  });
 }
 TEST_F(AudioDriver, LeadAtOrAboveLatencyFailsOpen) {
   stream.reset();

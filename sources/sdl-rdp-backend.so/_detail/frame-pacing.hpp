@@ -1,16 +1,17 @@
 #pragma once
 #include "acknowledgement-window.hpp"
+#include "diagnostics.hpp"
 #include "frame-statistics.hpp"
 #include "frame-store.hpp"
 #include "pinned.hpp"
 #include "refresh-tracker.hpp"
 
 #include <concepts>
+#include <format>
 
 namespace Backend {
 class Activation;
 class Configuration;
-class Diagnostics;
 class EventQueue;
 class PeerFrames;
 class PeerLink;
@@ -30,6 +31,7 @@ public:
   bool Admit(std::invocable auto capacity) {
     auto const held = _store.Lock();
     if (auto const expired = _window.Expire(AcknowledgementWindow::Clock::now())) {
+      _diagnostics.Line("ack-timeout", [&] { return std::format("frames={}", expired); });
       _statistics.TimedOut(expired);
       _store.Notify();
     }

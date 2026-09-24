@@ -239,10 +239,10 @@ protected:
       if (line.starts_with(expected)) return true;
     return false;
   }
-  bool ReadInput(Client& client, std::string_view expected) {
+  bool ReadInput(Client& client, std::string_view expected, std::chrono::milliseconds timeout = 10s) {
     Expects(!expected.empty(), "expected input event supplied");
     bool received = false;
-    return client.Until([&] { return received || (received = Read(expected, 1ms)); });
+    return client.Until([&] { return received || (received = Read(expected, 1ms)); }, timeout);
   }
 
   void Exposed() {

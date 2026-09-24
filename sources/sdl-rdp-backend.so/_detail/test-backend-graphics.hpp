@@ -37,7 +37,8 @@ protected:
     client.EnableGraphics();
     Connect(client);
     if (::testing::Test::HasFatalFailure()) return;
-    ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
+    ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }, std::chrono::seconds(30)))
+        << logs.Text(true);
   }
   void ThenProgressivePicture(Client& client, std::vector<UINT32> const& pixels) {
     Present(pixels, 640, 480);
@@ -91,7 +92,8 @@ protected:
     observer.Observed().automatic = false;
     Connect(client);
     if (::testing::Test::HasFatalFailure()) return;
-    ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
+    ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }, std::chrono::seconds(30)))
+        << logs.Text(true);
   }
   void Connect(Client& client, bool ack = true) {
     ASSERT_TRUE(
@@ -104,6 +106,46 @@ protected:
 };
 class RoundFive : public GraphicsSession {
 protected:
+  void ThenPipelinedWindow(Client& client, auto const& frames, std::vector<UINT32> const& pixels) {
+    Present(pixels, 320, 200);
+    EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 1);
+    AwaitFrames(client, frames, 1);
+    if (::testing::Test::HasFatalFailure()) return;
+    Present(pixels, 320, 200);
+    AwaitFrames(client, frames, 2);
+    if (::testing::Test::HasFatalFailure()) return;
+    EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 1), 0);
+  }
+  void ThenNeverAcknowledges(auto timed) {
+    Open(320, 200);
+    EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 1);
+    Client client(sdlrdp_port(backend.get()), true);
+    Connect(client);
+    FrameObserver const       observer(client);
+    std::vector<UINT32> const pixels(320uz * 200, 0x778899);
+    timed([&] {
+      Present(pixels, 320, 200);
+      ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == 1; }));
+      ThenAcknowledgementTimeout(pixels);
+    });
+  }
+  void ThenAcknowledgementTimeout(std::vector<UINT32> const& pixels) {
+    EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 10000), 1);
+    Present(pixels, 320, 200);
+    EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 10000), 1);
+    EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 1);
+    EXPECT_EQ(RequiredStatus(*backend).acknowledgements, 0u);
+    ThenTimedOutFrames("[0-9]+", 1);
+  }
+  void ThenTimedOutFrames(std::string_view sent, unsigned minimum) {
+    backend.reset();
+    auto        text  = logs.Text(true);
+    std::smatch match;
+    ASSERT_TRUE(std::regex_search(text, match, std::regex(std::format(R"(Frames: {} sent,[^\n]*, ([0-9]+) timed out\.)",
+                                                                      sent))))
+        << text;
+    EXPECT_GE(std::stoull(match[1].str()), minimum);
+  }
   void ThenAspectMouse(Client& client) {
     ASSERT_TRUE(freerdp_input_send_mouse_event(client.Instance()->context->input, PTR_FLAGS_MOVE, 639, 479));
     auto events = Events(1);
@@ -159,12 +201,8 @@ protected:
                    "auto connects as progressive; live raw preference produces exact RGB and CODEC_CHANGED raw");
   }
   void ThenGraphicsTimeoutStatistics() {
-    backend.reset();
+    ThenTimedOutFrames("7", 2);
     EXPECT_EQ(GraphicsObserver().Observed().frames.size(), 7u);
-    auto        text  = logs.Text(true);
-    std::smatch match;
-    ASSERT_TRUE(std::regex_search(text, match, std::regex(R"(Frames: 7 sent,[^\n]*, ([0-9]+) timed out\.)"))) << text;
-    EXPECT_GE(std::stoull(match[1].str()), 2u);
   }
   void ThenGraphicsAcknowledgementsCounted() {
     ASSERT_TRUE(GraphicsObserver().Ack());

@@ -117,20 +117,14 @@ TEST_F(RoundFive, WaitWithoutRefreshFeedback) {
   }
 }
 TEST_F(RoundFive, NeverAcknowledges) {
-  Open(320, 200);
-  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 1);
-  Client client(sdlrdp_port(backend.get()), true);
-  Connect(client);
-  FrameObserver             observer(client);
-  std::vector<UINT32> const pixels(320uz * 200, 0x778899);
-  auto                      start    = Clock::now();
-  Present(pixels, 320, 200);
-  ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == 1; }));
-  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 10000), 1);
-  Present(pixels, 320, 200);
-  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 10000), 1);
-  EXPECT_GE(Clock::now() - start, std::chrono::milliseconds(200));
-  EXPECT_EQ(sdlrdp_wait_frame(backend.get(), 0), 1);
+  ThenNeverAcknowledges([](auto run) { run(); });
+}
+TEST_F(RoundFive, NeverAcknowledgesClock) {
+  ThenNeverAcknowledges([](auto run) {
+    auto start = Clock::now();
+    run();
+    EXPECT_GE(Clock::now() - start, std::chrono::milliseconds(200));
+  });
 }
 TEST_F(RoundFive, ColourDepths) {
   Open(320, 200);
@@ -148,7 +142,8 @@ void ProduceFrames(sdlrdp_handle* backend, std::atomic<unsigned>& presents, std:
     auto sequence = presents.load() + 1;
     std::fill_n(pixels.begin(), 1024, sequence);
     std::fill_n(pixels.end() - 1024, 1024, sequence);
-    Expects(sdlrdp_present(backend, pixels.data(), 4096, 1024, 768, &area, 1) == 0, "concurrent present accepted");
+    auto result = sdlrdp_present(backend, pixels.data(), 4096, 1024, 768, &area, 1);
+    Expects(result == 0, "concurrent present accepted");
     presents = sequence;
     std::this_thread::yield();
   }

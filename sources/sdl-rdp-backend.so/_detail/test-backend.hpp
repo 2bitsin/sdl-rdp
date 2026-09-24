@@ -103,15 +103,6 @@ protected:
 };
 class Gate : public CodecSession {
 protected:
-  void ThenWaitingOpenCompletes(std::future<int>& opening, sdlrdp_handle* handle) {
-    ASSERT_EQ(opening.wait_for(std::chrono::seconds(10)), std::future_status::ready);
-    ASSERT_EQ(opening.get(), 0);
-    backend.reset(handle);
-    EXPECT_EQ(sdlrdp_wait(handle, 0), 1);
-    sdlrdp_event event{ };
-    ASSERT_EQ(sdlrdp_poll(handle, &event, 1), 1u);
-    EXPECT_EQ(event.type, SDLRDP_CONNECTED);
-  }
   void ThenPictureDesktop(Client const& client) {
     EXPECT_EQ(client.Instance()->context->gdi->width, 640);
     EXPECT_EQ(client.Instance()->context->gdi->height, 480);

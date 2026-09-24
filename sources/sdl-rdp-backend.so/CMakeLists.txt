@@ -32,6 +32,7 @@ target_link_libraries(sdl-rdp-backend-internal PUBLIC freerdp-server freerdp win
   nv-codec-headers::nv-codec-headers OpenSSL::SSL OpenSSL::Crypto ${CMAKE_DL_LIBS})
 target_link_libraries(sdl-rdp-backend PRIVATE sdl-rdp-backend-internal)
 if(TARGET sdl-rdp-backend-tests)
+  set_property(DIRECTORY APPEND PROPERTY TEST_INCLUDE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/bench-tests.cmake")
   target_sources(sdl-rdp-backend-tests PRIVATE ../SDL3.so/rdp/SDL_rdpini.cpp ../SDL3.so/rdp/SDL_rdprefresh.cpp)
   target_link_libraries(sdl-rdp-backend-tests PRIVATE sdl-rdp-backend-internal SDL3)
   # tls-race.test/ interposes libcrypto and libc symbols, so it must not share a process with the other tests.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run every local SDL driver TU with the project checks; compiler errors also fail."""
+"""Run the SDL driver TUs, or one with --unit, under the project checks; compiler errors also fail."""
 import argparse
 import concurrent.futures
 import json
@@ -40,9 +40,11 @@ def check(entry, root):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('database', type=pathlib.Path)
+    parser.add_argument('--unit', type=pathlib.Path, help='check one driver TU, so ctest runs one entry per TU')
     args = parser.parse_args()
     root = pathlib.Path(__file__).resolve().parent.parent
-    expected = {path.resolve() for path in (root / 'sources/SDL3.so/rdp').glob('*.cpp')}
+    units = [args.unit] if args.unit else (root / 'sources/SDL3.so/rdp').glob('*.cpp')
+    expected = {path.resolve() for path in units}
     entries = {pathlib.Path(entry['file']).resolve(): entry for entry in json.loads(args.database.read_text())
                if pathlib.Path(entry['file']).resolve() in expected}
     if entries.keys() != expected:
