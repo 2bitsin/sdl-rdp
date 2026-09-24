@@ -5,9 +5,6 @@ SDL_VideoData::SDL_VideoData(std::shared_ptr<rdp::Driver> driver, SDL_HintCallba
 auto SDL_VideoData::Backend() const -> rdp::Driver const& {
   return *_driver;
 }
-auto SDL_VideoData::Backend() -> rdp::Driver& {
-  return *_driver;
-}
 auto SDL_VideoData::Display() const -> SDL_DisplayID {
   return _display;
 }
@@ -43,12 +40,15 @@ auto SDL_VideoData::RefreshMode(SDL_DisplayMode const& current) -> SDL_DisplayMo
   mode = current;
   return mode;
 }
-auto SDL_VideoData::Framebuffer() const -> std::optional<std::reference_wrapper<SDL_Surface const>> {
+auto SDL_VideoData::Framebuffer() noexcept -> std::optional<std::reference_wrapper<rdp::Framebuffer>> {
   if (!_framebuffer) return std::nullopt;
-  return std::cref(*_framebuffer->Get());
+  return std::ref(*_framebuffer);
 }
-auto SDL_VideoData::Framebuffer(std::optional<rdp::Surface> surface) -> void {
-  _framebuffer = std::move(surface);
+auto SDL_VideoData::Attach(rdp::Surface surface) noexcept -> void {
+  _framebuffer.emplace(std::move(surface));
+}
+auto SDL_VideoData::Detach() noexcept -> void {
+  _framebuffer.reset();
 }
 namespace rdp {
 auto BoundWindow(SDL_VideoData const& data) -> SDL_Window& {

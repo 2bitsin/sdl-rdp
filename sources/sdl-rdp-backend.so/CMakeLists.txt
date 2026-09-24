@@ -59,5 +59,7 @@ if(TARGET sdl-rdp-backend-tests)
     graphics-observer.test.cpp test-graphics-backend.test.cpp test-logs.test.cpp test-pattern.test.cpp)
   target_link_options(sdl-rdp-backend-allocation-tests PRIVATE
     "LINKER:--export-dynamic-symbol=malloc,--export-dynamic-symbol=calloc,--export-dynamic-symbol=realloc")
+  # buildutil #132: the driver allocation test moves to a .test module linked under TEST.
+  target_link_libraries(sdl-rdp-backend-allocation-tests PRIVATE SDL3)
   set_property(TARGET sdl-rdp-backend-tests PROPERTY SOURCES ${BACKEND_TEST_SOURCES})
 endif()

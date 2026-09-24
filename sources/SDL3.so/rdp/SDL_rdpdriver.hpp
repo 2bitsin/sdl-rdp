@@ -18,7 +18,8 @@ public:
   template <typename _Accept>
     requires std::invocable<_Accept const&, sdlrdp_event const&>
   auto Poll(_Accept const& accept) const -> void {
-    std::array<sdlrdp_event, _EventBatch> events{ };
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init): ES.20 input buffer, the poll writes what it reports
+    std::array<sdlrdp_event, _EventBatch> events;
     for (auto count = _Poll(events); count; count = _Poll(events))
       std::ranges::for_each(std::span(events).first(count), std::cref(accept));
   }

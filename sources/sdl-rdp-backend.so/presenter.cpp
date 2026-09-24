@@ -40,10 +40,14 @@ auto ComposePicture(std::span<BYTE const> source, unsigned pitch, FrameSnapshot 
   auto const width  = former.Width();
   auto const stride = former.Stride();
   auto const row    = std::size_t(width) * PixelBytes;
+  auto const prior  = former ? former.Pixels() : std::span<BYTE const>{ };
+  if (!prior.empty())
+    Expects(prior.size() >= stride * (former.Height() - 1) + row, "previous frame covers every composed row");
+  auto const prior_stride = prior.empty() ? std::size_t{ 0 } : stride;
+  auto const prior_row    = prior.empty() ? std::size_t{ 0 } : row;
   std::ranges::for_each(std::views::iota(0u, former.Height()), [&](unsigned y) {
     auto active = damage | std::views::filter([y](auto rect) { return Spans(rect.y, rect.h, int(y)); });
-    ComposeRow(source.subspan(std::size_t(y) * pitch, row),
-               former ? former.Pixels().subspan(std::size_t(y) * stride, row) : std::span<BYTE const>{ },
+    ComposeRow(source.subspan(std::size_t(y) * pitch, row), prior.subspan(std::size_t(y) * prior_stride, prior_row),
                target.subspan(std::size_t(y) * stride, row), active);
   });
 }
