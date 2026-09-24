@@ -1,4 +1,5 @@
-#include "_detail/test-auth.hpp"
+#include "_detail/client.hpp"
+#include "_detail/test-authentication.hpp"
 
 namespace AuthenticationGate {
 namespace {

@@ -1,5 +1,9 @@
+#include "_detail/graphics-link.hpp"
 #include "_detail/graphics-observer.hpp"
-#include "_detail/test-backend.hpp"
+#include "_detail/test-gate.hpp"
+#include "_detail/test-mode.hpp"
+#include "_detail/test-peer-status.hpp"
+#include "_detail/test-round-five.hpp"
 
 namespace BackendGate {
 class GraphicsGate : public Gate {

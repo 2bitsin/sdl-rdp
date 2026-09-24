@@ -1,5 +1,7 @@
 #include "_detail/graphics-observer.hpp"
-#include "_detail/test-backend.hpp"
+#include "_detail/test-round-five.hpp"
+
+#include <regex>
 
 namespace BackendGate {
 TEST_F(RoundFive, PipelinedLegacyPresent) {

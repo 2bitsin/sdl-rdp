@@ -3,7 +3,7 @@
 #include "_detail/gfx-protocol.hpp"
 #include "_detail/graphics-observer.hpp"
 #include "_detail/handle.hpp"
-#include "_detail/test-graphics.hpp"
+#include "_detail/test-graphics-backend.hpp"
 #include "_detail/test-pattern.hpp"
 
 #include <algorithm>

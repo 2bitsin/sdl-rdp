@@ -1,9 +1,13 @@
 #include "_detail/system-call.hpp"
-#include "_detail/test-backend.hpp"
+#include "_detail/test-frame-counter.hpp"
+#include "_detail/test-gate.hpp"
+#include "_detail/test-has-cookie.hpp"
+#include "_detail/test-mode.hpp"
 #include "_detail/waiting-open.hpp"
 
 #include <algorithm>
 #include <cstddef>
+#include <future>
 
 namespace BackendGate {
 namespace {

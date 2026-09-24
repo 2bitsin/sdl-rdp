@@ -1,6 +1,9 @@
-#include "_detail/test-drive.hpp"
+#include "_detail/test-drive-checks.hpp"
+#include "_detail/test-io.hpp"
+#include "_detail/test-rdpdr-packets.hpp"
 
 #include <cstddef>
+#include <future>
 #include <utility>
 namespace DriveGate {
 namespace {

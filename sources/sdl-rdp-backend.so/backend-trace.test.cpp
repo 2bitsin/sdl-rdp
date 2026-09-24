@@ -1,4 +1,4 @@
-#include "_detail/test-audio.hpp"
+#include "_detail/test-audio-gate.hpp"
 
 #include <cstddef>
 #include <oxbox/utilities/number-text.hpp>

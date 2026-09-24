@@ -1,5 +1,5 @@
 #include "_detail/graphics-observer.hpp"
-#include "_detail/test-audio.hpp"
+#include "_detail/test-audio-gate.hpp"
 
 #include <algorithm>
 #include <cstddef>

@@ -5,6 +5,7 @@
 #include "_detail/frame-pacing.hpp"
 #include "_detail/peer-frames.hpp"
 #include "_detail/peer-link.hpp"
+#include "_detail/rect.hpp"
 
 #include <freerdp/freerdp.h>
 #include <freerdp/update.h>

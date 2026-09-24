@@ -1,4 +1,5 @@
 #include "_detail/rect.hpp"
+#include "_detail/region.hpp"
 
 #include <gtest/gtest.h>
 #include <limits>

@@ -1,9 +1,18 @@
-#include "_detail/test-backend.hpp"
+#include "_detail/copy-rows.hpp"
+#include "_detail/test-backend-events.hpp"
+#include "_detail/test-certificate-directory.hpp"
+#include "_detail/test-frame-counter.hpp"
+#include "_detail/test-has-cookie.hpp"
+#include "_detail/test-io.hpp"
 #include "support.test/child-process.hpp"
 
 #include <algorithm>
 #include <cstddef>
 #include <fcntl.h>
+#include <future>
+#include <gtest/gtest.h>
+#include <openssl/pem.h>
+#include <openssl/x509v3.h>
 #include <system_error>
 
 namespace BackendGate {

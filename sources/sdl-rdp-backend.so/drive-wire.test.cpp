@@ -1,10 +1,12 @@
 #include "_detail/client-channels.hpp"
-#include "_detail/test-drive.hpp"
+#include "_detail/test-drive-checks.hpp"
+#include "_detail/test-rdpdr-packets.hpp"
 #include "_detail/transcode.hpp"
 
 #include <array>
 #include <cstddef>
 #include <freerdp/channels/rdpdr.h>
+#include <future>
 namespace DriveGate {
 namespace {
 void SendMalformedDrivePacket(Headless::Client& client) {

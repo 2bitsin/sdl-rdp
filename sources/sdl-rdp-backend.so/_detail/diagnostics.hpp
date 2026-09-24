@@ -1,5 +1,5 @@
 #pragma once
-#include "errors.hpp"
+#include "error-store.hpp"
 #include "logger.hpp"
 #include "pinned.hpp"
 #include "sdl-rdp-backend.h"

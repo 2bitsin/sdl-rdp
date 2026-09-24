@@ -1,9 +1,9 @@
 #include "_detail/avc-encoder.hpp"
 #include "_detail/gfx-protocol.hpp"
 #include "_detail/graphics-observer.hpp"
-#include "_detail/test-graphics.hpp"
-#include "_detail/test-peer-status.hpp"
+#include "_detail/test-graphics-backend.hpp"
 #include "_detail/test-pattern.hpp"
+#include "_detail/test-peer-status.hpp"
 
 #include <array>
 #include <cstddef>

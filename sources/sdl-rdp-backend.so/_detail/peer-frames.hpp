@@ -2,7 +2,7 @@
 #include "frame-snapshot.hpp"
 #include "frame-store.hpp"
 #include "pinned.hpp"
-#include "rect.hpp"
+#include "region.hpp"
 
 #include <cstdint>
 #include <vector>
