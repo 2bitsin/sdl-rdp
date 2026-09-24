@@ -6,9 +6,6 @@ module_define_prefix = "BACKEND"
 [cmake]
 extensions = []
 
-[modules.SDL3]
-soversion = 0
-
 [options]
 contracts = "stop"
 

@@ -190,7 +190,8 @@ def main():
     option_files(uniform_options(entries))
     headers = public_headers(source, config)
     include_layer(source, headers)
-    bc.emit("SDL3.sym", (source / "src/dynapi/SDL_dynapi.sym").read_text())
+    bc.emit("exports.map", (source / "src/dynapi/SDL_dynapi.sym").read_text())
+    bc.soversion(0)
     installed_headers(source, headers)
 
 
