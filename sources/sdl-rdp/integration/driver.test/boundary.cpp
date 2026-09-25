@@ -1,4 +1,4 @@
-#include <sdl-rdp/SDL3/rdp/backend/error-routes.hpp>
+#include <sdl-rdp/SDL3/rdp/sdl/error-routes.hpp>
 
 #include <SDL3/SDL_error.h>
 #include <gtest/gtest.h>
@@ -10,8 +10,8 @@
 
 namespace sdl_rdp::integration::driver_test::detail::boundary {
 namespace {
-using sdl3::rdp::backend::Bounded;
-using sdl3::rdp::backend::ErrorRoutes;
+using sdl3::rdp::sdl::Bounded;
+using sdl3::rdp::sdl::ErrorRoutes;
 constexpr auto const& DriverRoutes{ ErrorRoutes<&SDL_SetError, &SDL_OutOfMemory> };
 auto ErrorAfter(auto const& action) -> std::string_view {
   std::ignore = SDL_ClearError();

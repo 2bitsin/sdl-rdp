@@ -8,7 +8,8 @@
 namespace sdl_rdp::utilities::detail::deadline {
 using Deadline = std::chrono::steady_clock::time_point;
 auto DeadlineAfter(std::chrono::milliseconds timeout) -> Deadline;
-auto AbiDeadline(int timeout_ms)                      -> Deadline;
+// A timeout as SDL states it: negative waits forever, and one the clock cannot represent does too.
+auto DeadlineWithin(std::chrono::nanoseconds timeout) -> Deadline;
 
 // Runs `wait` between checks of `ready` until it holds or the deadline passes; a failed wait ends it early.
 template <std::predicate WaitTy, std::predicate ReadyTy>
@@ -31,9 +32,9 @@ auto Sleeping(std::chrono::duration<RepTy, PeriodTy> interval) -> std::predicate
 }
 
 namespace sdl_rdp::utilities {
-using detail::deadline::AbiDeadline;
 using detail::deadline::Deadline;
 using detail::deadline::DeadlineAfter;
+using detail::deadline::DeadlineWithin;
 using detail::deadline::Sleeping;
 using detail::deadline::Throughout;
 using detail::deadline::Until;

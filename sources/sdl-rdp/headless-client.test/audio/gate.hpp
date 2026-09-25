@@ -13,21 +13,20 @@ using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::SoundClient;
 
 auto ThenCapturedPcm(SoundClient const& audio, std::vector<std::int16_t> const& pcm) -> void;
-auto ThenMissingAudioHandle()                                                        -> void;
 
 class AudioGate : public AudioSession {
 protected:
   auto        GivenConfirmingSession()                                                    -> void;
   auto        ConnectAudioFormats(Client& client, SoundClient& audio)                     -> void;
   auto        ThenInitialVolume(Client& client, SoundClient& audio)                       -> void;
-  static auto ThenWriterFinishes(Client& client, SoundClient& audio, std::future<int>& writing, bool reconnect,
+  static auto ThenWriterFinishes(Client& client, SoundClient& audio, std::future<std::size_t>& writing, bool reconnect,
                                  std::uint32_t frames) -> void;
   auto        ThenFirstAudioBlockConfirms()                                               -> void;
   auto        WhenLastAudioBlockConfirms(std::vector<std::int16_t> const& pcm)            -> void;
   auto        WhenIdleAudioBurst(std::vector<std::int16_t> const& pcm, std::size_t burst) -> void;
-  static auto ThenDisconnectedWriter(Client& client, SoundClient& audio, std::future<int>& writing, bool reconnect,
-                                     std::uint32_t frames) -> void;
-  auto        ThenSlowAudioConfirms(std::future<int>& writing)                            -> void;
+  static auto ThenDisconnectedWriter(Client& client, SoundClient& audio, std::future<std::size_t>& writing,
+                                     bool reconnect, std::uint32_t frames) -> void;
+  auto        ThenSlowAudioConfirms(std::future<std::size_t>& writing)                    -> void;
   auto        GivenUnconfirmedSession()                                                   -> void;
   auto NewSession(std::uint32_t width = 320, std::uint32_t height = 200) -> std::pair<Client&, SoundClient&>;
   auto        UntilCaptured(std::size_t samples)                                          -> bool;
@@ -43,5 +42,4 @@ private:
 namespace sdl_rdp::headless_client_test::audio {
 using detail::gate::AudioGate;
 using detail::gate::ThenCapturedPcm;
-using detail::gate::ThenMissingAudioHandle;
 }

@@ -1,6 +1,7 @@
 #pragma once
 #include <sdl-rdp/picture/forward.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
+#include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/video/forward.hpp>
 #include <sdl-rdp/video/pixel-band.hpp>
 #include <sdl-rdp/video/tap.hpp>
@@ -13,22 +14,23 @@
 namespace sdl_rdp::video::detail::scaler {
 using sdl_rdp::picture::DesktopLayout;
 using sdl_rdp::utilities::Pinned;
+using sdl_rdp::utilities::Rect;
 
 enum class RowOrder{ TopDown, BottomUp };
 class Scaler : private Pinned {
 public:
        Scaler(PeerFrames const& source, DesktopLayout const& layout) noexcept;
-  auto Areas() const                                                              -> std::vector<sdlrdp_rect>;
-  auto Target() const noexcept                                                    -> sdlrdp_rect;
-  auto Copy(sdlrdp_rect area, std::span<std::uint8_t> buffer, RowOrder order)     -> PixelBand;
-  auto Place(sdlrdp_rect area, std::span<std::uint8_t> buffer, std::size_t pitch) -> PixelBand;
+  auto Areas() const                                                       -> std::vector<Rect>;
+  auto Target() const noexcept                                             -> Rect;
+  auto Copy(Rect area, std::span<std::uint8_t> buffer, RowOrder order)     -> PixelBand;
+  auto Place(Rect area, std::span<std::uint8_t> buffer, std::size_t pitch) -> PixelBand;
 
 private:
-  auto Area(sdlrdp_rect damage) const                                                                -> sdlrdp_rect;
-  auto Scaled() const                                                                                -> bool;
-  auto Fill(sdlrdp_rect area, std::span<std::uint8_t> buffer, std::size_t pitch, RowOrder order)     -> PixelBand;
-  auto Resample(sdlrdp_rect area, std::span<std::uint8_t> buffer, std::size_t pitch, RowOrder order) -> void;
-  auto Columns(sdlrdp_rect area)                                                                     -> void;
+  auto Area(Rect damage) const                                                                -> Rect;
+  auto Scaled() const                                                                         -> bool;
+  auto Fill(Rect area, std::span<std::uint8_t> buffer, std::size_t pitch, RowOrder order)     -> PixelBand;
+  auto Resample(Rect area, std::span<std::uint8_t> buffer, std::size_t pitch, RowOrder order) -> void;
+  auto Columns(Rect area)                                                                     -> void;
   PeerFrames const&    _frames;
   DesktopLayout const& _desktop;
   std::vector<Tap>     _columns;

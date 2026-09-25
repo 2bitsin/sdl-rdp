@@ -15,16 +15,19 @@ namespace sdl_rdp::headless_client_test::frame::detail::update_hook {
 using sdl_rdp::headless_client_test::client::ClientUpdates;
 using sdl_rdp::headless_client_test::utilities::ObserverSet;
 using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Rect;
 
 namespace {
-auto Corners(std::uint32_t left, std::uint32_t top, std::uint32_t right, std::uint32_t bottom) -> sdlrdp_rect {
-  return { static_cast<int>(left), static_cast<int>(top), static_cast<int>(right) - static_cast<int>(left),
-           static_cast<int>(bottom) - static_cast<int>(top) };
+auto Corners(std::uint32_t left, std::uint32_t top, std::uint32_t right, std::uint32_t bottom) -> Rect {
+  return { .x = static_cast<int>(left),
+           .y = static_cast<int>(top),
+           .w = static_cast<int>(right) - static_cast<int>(left),
+           .h = static_cast<int>(bottom) - static_cast<int>(top) };
 }
-auto Regions(SURFACE_BITS_COMMAND const& command) -> std::vector<sdlrdp_rect> {
+auto Regions(SURFACE_BITS_COMMAND const& command) -> std::vector<Rect> {
   return { Corners(command.destLeft, command.destTop, command.destRight, command.destBottom) };
 }
-auto Regions(BITMAP_UPDATE const& command) -> std::vector<sdlrdp_rect> {
+auto Regions(BITMAP_UPDATE const& command) -> std::vector<Rect> {
   // Bitmap update corners are inclusive; surface command corners are exclusive.
   return std::span(command.rectangles, command.number) | std::views::transform([](auto const& rectangle) {
            return Corners(rectangle.destLeft, rectangle.destTop, rectangle.destRight + 1, rectangle.destBottom + 1);

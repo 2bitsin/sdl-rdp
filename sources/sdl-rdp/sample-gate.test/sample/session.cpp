@@ -5,6 +5,8 @@
 #include <sdl-rdp/sample-gate.test/sample/launch.hpp>
 
 #include <cstdint>
+#include <format>
+#include <string_view>
 #include <utility>
 
 namespace sdl_rdp::sample_gate_test::sample::detail::session {
@@ -52,10 +54,13 @@ auto SampleSession::GivenAudioProcess(Words const& environment, Words const& opt
   audio_port = AnnouncedPort(line);
   ASSERT_TRUE(Read("audio device=RDP client freq=44100"));
 }
-auto SampleSession::ThenSettingsConnect(std::vector<std::string> const& args, std::uint32_t port) -> void {
+auto SampleSession::ThenSettingsConnect(std::vector<std::string> const& args, std::uint32_t port,
+                                        std::string_view codec) -> void {
   ASSERT_NO_FATAL_FAILURE(GivenSettingsProcess(args, port));
   Client client(port, true, 640, 480);
   ASSERT_NO_FATAL_FAILURE(Connect(client));
+  ASSERT_TRUE(Read("event EXPOSED ")) << process->Transcript();
+  EXPECT_TRUE(line.ends_with(std::format(" codec={}", codec))) << line;
   ASSERT_TRUE(client.Until([&] { return Pattern(client, false); }));
   Escape(client);
 }

@@ -28,7 +28,6 @@ using sdl_rdp::headless_client_test::utilities::ReadText;
 using sdl_rdp::sample_gate_test::client::ConnectDrive;
 using sdl_rdp::sample_gate_test::process::InitializedSdl;
 using sdl_rdp::sample_gate_test::process::Storage;
-using sdl_rdp::sample_gate_test::sample::BackendLibrary;
 using sdl_rdp::sample_gate_test::sample::PrimaryDisplayPort;
 using sdl_rdp::sample_gate_test::sample::Sample;
 using sdl_rdp::utilities::Expects;
@@ -148,9 +147,7 @@ auto VerifyStream(OpenFile& open, std::filesystem::path const& path) -> void {
   EXPECT_EQ(ReadText(path / "whole"), "content!");
 }
 auto InitializeRdpVideo(std::filesystem::path const& certificates) -> void {
-  auto backend = BackendLibrary();
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_BACKEND, backend.c_str()));
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_CERT_DIR, certificates.c_str()));
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_PORT, "0"));
   ASSERT_TRUE(SDL_Init(SDL_INIT_VIDEO));

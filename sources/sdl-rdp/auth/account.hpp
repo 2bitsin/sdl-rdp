@@ -1,25 +1,31 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
-#include <sdl-rdp/freerdp-facade/ntlm.hpp>
-#include <sdl-rdp/utilities/pinned.hpp>
+#include <sdl-rdp/configuration/credential-check.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
+#include <sdl-rdp/utilities/nt-owf.hpp>
+#include <sdl-rdp/utilities/wiped-string.hpp>
 
 #include <optional>
+#include <string>
 #include <string_view>
 
 namespace sdl_rdp::auth::detail::account {
-using sdl_rdp::freerdp_facade::NtOwf;
-using sdl_rdp::utilities::Pinned;
+using sdl_rdp::configuration::CredentialCheck;
+using sdl_rdp::configuration::Setup;
+using sdl_rdp::utilities::NtOwf;
+using sdl_rdp::utilities::WipedString;
 
-// The fixed user, domain and password sdlrdp_config names: the check used when the app sets no callback.
-class Account : private Pinned {
+// The fixed user, domain and password Setup names: the check used when the app supplies none.
+class Account final : public CredentialCheck {
 public:
-  explicit Account(sdlrdp_config const& config) noexcept;
-  auto Verifies(std::string_view domain, std::string_view user, std::string_view password) const noexcept -> bool;
-  auto     NtHash(std::string_view domain, std::string_view user) const -> std::optional<NtOwf>;
+  explicit Account(Setup const& setup);
+  auto Verifies(std::string_view domain, std::string_view user, std::string_view password) const -> bool override;
+  auto     NtHash(std::string_view domain, std::string_view user) const -> std::optional<NtOwf> override;
 
 private:
-  auto PairName(std::string_view domain, std::string_view user) const noexcept -> bool;
-  sdlrdp_config const& _config;
+  auto Password(std::string_view domain, std::string_view user) const noexcept -> std::optional<std::string_view>;
+  std::optional<std::string> _user;
+  std::optional<WipedString> _password;
+  std::optional<std::string> _domain;
 };
 }
 

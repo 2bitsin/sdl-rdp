@@ -1,5 +1,3 @@
-# re-enabled when Step 3 makes State and Peer private
-# configuration is read before workers start
 # Private names deliberately use leading underscores; disable the reserved-identifier check and its CERT aliases.
 Checks: >
   bugprone-*, cert-*, clang-analyzer-*, concurrency-*, cppcoreguidelines-*,
@@ -17,7 +15,7 @@ Checks: >
   -readability-avoid-nested-conditional-operator, -performance-enum-size
 WarningsAsErrors: '*'
 HeaderFilterRegex: 'sources/(sdl-rdp/[^/]+|sample)/.*\.(hpp|cpp)$'
-ExcludeHeaderFilterRegex: 'abi/backend\.h$|/(third-party|_build|_bdudata)/'
+ExcludeHeaderFilterRegex: '/(third-party|_build|_bdudata)/'
 CheckOptions:
   readability-function-size.LineThreshold: 40
   readability-function-size.StatementThreshold: 60

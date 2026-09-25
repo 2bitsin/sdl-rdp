@@ -11,6 +11,7 @@
 namespace sdl_rdp::picture::detail::frame_snapshot {
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::PixelBytes;
+using sdl_rdp::utilities::Rect;
 using sdl_rdp::utilities::SameSize;
 using sdl_rdp::utilities::Whole;
 
@@ -39,7 +40,7 @@ auto FrameSnapshot::Width() const noexcept -> std::uint32_t {
 auto FrameSnapshot::Height() const noexcept -> std::uint32_t {
   return _size.height;
 }
-auto FrameSnapshot::Bounds() const noexcept -> sdlrdp_rect {
+auto FrameSnapshot::Bounds() const noexcept -> Rect {
   return Whole(_size);
 }
 auto FrameSnapshot::Matching(Extent size) const -> FrameSnapshot {

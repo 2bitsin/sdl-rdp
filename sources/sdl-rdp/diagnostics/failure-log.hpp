@@ -1,6 +1,6 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
 #include <sdl-rdp/diagnostics/forward.hpp>
+#include <sdl-rdp/diagnostics/log-level.hpp>
 #include <sdl-rdp/utilities/operation-name.hpp>
 
 #include <functional>
@@ -11,14 +11,13 @@ using sdl_rdp::utilities::OperationName;
 
 class FailureLog {
 public:
-       FailureLog(Diagnostics const& diagnostics, OperationName operation,
-                  sdlrdp_log_level level = SDLRDP_LOG_ERROR) noexcept;
+       FailureLog(Diagnostics const& diagnostics, OperationName operation, LogLevel level = LogLevel::Error) noexcept;
   auto operator()(std::string_view failure) const -> void;
 
 private:
   std::reference_wrapper<Diagnostics const> _diagnostics;
   OperationName                             _operation;
-  sdlrdp_log_level                          _level;
+  LogLevel                                  _level;
 };
 auto FailuresOf(Diagnostics const& diagnostics, OperationName operation) noexcept -> FailureLog;
 template <class SourceTy>

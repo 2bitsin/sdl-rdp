@@ -2,14 +2,15 @@
 
 #include <sdl-rdp/freerdp-facade/exceptions.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
+#include <sdl-rdp/utilities/wiped-string.hpp>
 
-#include <openssl/crypto.h>
 #include <oxbox/utilities/span.hpp>
 #include <winpr/ntlm.h>
 #include <string>
 
 namespace sdl_rdp::freerdp_facade::detail::ntlm {
 using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::Wipe;
 
 namespace {
 // WinPR 3.32 ntlm.h:41 takes every string as a writable, terminated LPWSTR measured in bytes.
@@ -19,7 +20,7 @@ public:
            WideArgument(WideArgument const&) = delete;
            WideArgument(WideArgument&&)      = delete;
            ~WideArgument() {
-    OPENSSL_cleanse(_text.data(), _text.size() * sizeof(char16_t));
+    Wipe(std::as_writable_bytes(std::span{ _text }));
   }
   auto operator=(WideArgument const&) -> WideArgument& = delete;
   auto operator=(WideArgument&&)      -> WideArgument& = delete;
@@ -33,15 +34,6 @@ public:
 private:
   std::u16string _text;
 };
-}
-NtOwf::~NtOwf() {
-  OPENSSL_cleanse(_bytes.data(), _bytes.size());
-}
-auto NtOwf::Bytes() noexcept -> std::span<std::uint8_t, 16> {
-  return _bytes;
-}
-auto NtOwf::Bytes() const noexcept -> std::span<std::uint8_t const, 16> {
-  return _bytes;
 }
 auto NtOwfV1(std::u16string_view password) -> NtOwf {
   WideArgument written{ password };

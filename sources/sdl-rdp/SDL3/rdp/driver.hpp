@@ -1,70 +1,30 @@
 #pragma once
-#include <sdl-rdp/SDL3/rdp/backend/backend.hpp>
+#include "credential-relay.hpp"
+#include "log-relay.hpp"
 #include <sdl-rdp/SDL3/rdp/settings/configuration.hpp>
-#include <algorithm>
-#include <array>
-#include <atomic>
-#include <cstddef>
-#include <functional>
-#include <span>
+#include <sdl-rdp/SDL3/rdp/settings/options.hpp>
+#include <sdl-rdp/session/backend.hpp>
+#include <sdl-rdp/utilities/pinned.hpp>
 namespace sdl3::rdp::detail::driver {
-using sdl3::rdp::backend::Backend;
-using sdl3::rdp::backend::BackendOperation;
-using sdl3::rdp::backend::Session;
-using sdl3::rdp::settings::AuthenticationCredential;
-using sdl3::rdp::settings::Configuration;
-using sdl_rdp::utilities::RAIIWrap;
+using sdl_rdp::utilities::Pinned;
 
-class Driver {
+// The process's one RDP session: the settings read once, the backend built over them, the relays it reports through.
+class Driver : private Pinned {
 public:
-  Driver();
-  template <backend::Operation OPERATION, typename... ArgsTy>
-    requires BackendOperation<OPERATION, sdlrdp_handle*, ArgsTy...>
-  auto Call(ArgsTy&&... args) const -> decltype(auto) {
-    return _backend.Call<OPERATION>(_session.Get().second, std::forward<ArgsTy>(args)...);
-  }
-  template <typename AcceptTy>
-    requires std::invocable<AcceptTy const&, sdlrdp_event const&>
-  auto Poll(AcceptTy const& accept) const -> void {
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init): ES.20 input buffer, the poll writes what it reports
-    std::array<sdlrdp_event, EventBatch> events;
-    for (auto count = PollBatch(events); count; count = PollBatch(events))
-      std::ranges::for_each(std::span(events).first(count), std::cref(accept));
-  }
-  auto Options() const                                   -> sdl3::rdp::settings::Options const&;
-  auto Config() const                                    -> Configuration const&;
-  auto AuthDisplay(SDL_PropertiesID properties) noexcept -> void;
-  template <typename FailureTy = bool>
-  auto Fail(FailureTy failure = { }) const -> FailureTy {
-    ReportError();
-    return failure;
-  }
-  [[noreturn]] auto Throw() const -> void;
+       Driver();
+  auto Options() const noexcept -> sdl3::rdp::settings::Options const&;
+  auto Config() const noexcept  -> sdl3::rdp::settings::Configuration const&;
+  auto Credentials() noexcept   -> CredentialRelay&;
+  auto Backend() noexcept       -> sdl_rdp::session::Backend&;
 private:
-  // Backend authentication callbacks carry an opaque context and borrowed C strings.
-  template <backend::Operation OPERATION, AuthenticationCredential CredentialTy>
-  static auto Authenticate(void* context, char const* domain, char const* user, CredentialTy credential) -> int;
-  auto Registered()                                    -> sdlrdp_config;
-  auto PollBatch(std::span<sdlrdp_event> events) const -> std::size_t;
-  auto ReportError() const                             -> void;
-  static constexpr std::size_t       EventBatch       = 64;
-  sdl3::rdp::settings::Options const _options;
-  Configuration const                _config;
-  Backend const                      _backend;
-  std::atomic<SDL_PropertiesID>      _auth_properties;
-  Session const                      _session;
+  sdl3::rdp::settings::Options const       _options;
+  sdl3::rdp::settings::Configuration const _config;
+  LogRelay                                 _log;
+  CredentialRelay                          _credentials;
+  sdl_rdp::session::Backend                _backend;
 };
-// The backend's authentication callback reports to this display's properties until it is withdrawn.
-using DisplayAuthentication = std::pair<std::reference_wrapper<Driver>, SDL_PropertiesID>;
-auto PublishAuthentication(Driver& driver, SDL_PropertiesID properties)           -> DisplayAuthentication;
-auto WithdrawAuthentication(DisplayAuthentication const& authentication) noexcept -> void;
-using AuthenticationDisplay = RAIIWrap<DisplayAuthentication, PublishAuthentication, WithdrawAuthentication>;
 }
 
 namespace sdl3::rdp {
-using detail::driver::AuthenticationDisplay;
-using detail::driver::DisplayAuthentication;
 using detail::driver::Driver;
-using detail::driver::PublishAuthentication;
-using detail::driver::WithdrawAuthentication;
 }

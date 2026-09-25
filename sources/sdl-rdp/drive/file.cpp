@@ -1,4 +1,5 @@
 #include <sdl-rdp/drive/file.hpp>
+
 #include <sdl-rdp/drive/channel.hpp>
 #include <sdl-rdp/drive/information.hpp>
 #include <sdl-rdp/drive/transfer.hpp>
@@ -19,77 +20,64 @@
 
 namespace sdl_rdp::drive::detail::file {
 using sdl_rdp::freerdp_facade::InformationClass;
+using sdl_rdp::utilities::Contained;
 using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::InvalidArguments;
 
-auto Exchange(sdlrdp_file& file, IrpMajor major, DrivePacket const& packet, IrpMinor minor, bool end) -> DrivePacket {
+auto Exchange(File& file, IrpMajor major, DrivePacket const& packet, IrpMinor minor, bool end) -> DrivePacket {
   Expects(file.Channel() != nullptr, "file retains its channel");
   auto request = file.Channel()->Send(file.Drive(), file.Id(), major, packet, minor);
   return file.Channel()->Wait(request, file.Path(), end);
 }
 namespace {
-auto QueryInformation(sdlrdp_file& file, InformationClass type) -> DrivePacket {
+auto QueryInformation(File& file, InformationClass type) -> DrivePacket {
   return Information(Exchange(file, IrpMajor::QueryInformation, InformationRequest(type, { })));
 }
 }
-}
-
-using sdl_rdp::drive::Basic;
-using sdl_rdp::drive::DriveChannel;
-using sdl_rdp::drive::DrivePacket;
-using sdl_rdp::drive::EndOfFile;
-using sdl_rdp::drive::Exchange;
-using sdl_rdp::drive::detail::file::QueryInformation;
-using sdl_rdp::freerdp_facade::InformationClass;
-using sdl_rdp::freerdp_facade::IrpMajor;
-using sdl_rdp::utilities::Contained;
-using sdl_rdp::utilities::Expects;
-using sdl_rdp::utilities::InvalidArguments;
-
-sdlrdp_file::sdlrdp_file(std::shared_ptr<DriveChannel> source, std::uint32_t device, std::uint32_t file,
-                         std::string name)
-    : channel{ std::move(source) }, drive{ device }, wire{ file }, path{ std::move(name) } { }
-sdlrdp_file::~sdlrdp_file() {
+File::File(std::shared_ptr<DriveChannel> source, std::uint32_t device, std::uint32_t file, std::string name)
+    : _channel{ std::move(source) }, _drive{ device }, _wire{ file }, _path{ std::move(name) } { }
+File::~File() {
   std::ignore = Contained(
       [this] { Close(); },
-      [this](std::string_view cause) { channel->Warn(std::format("Drive close '{}': {}", path, cause)); });
+      [this](std::string_view cause) { _channel->Warn(std::format("Drive close '{}': {}", _path, cause)); });
 }
-auto sdlrdp_file::Close() -> void {
-  if (std::exchange(closed, true)) return;
+auto File::Close() -> void {
+  if (std::exchange(_closed, true)) return;
   DrivePacket           packet;
   constexpr std::size_t padding_after_request_header = 32;
   packet.Zero(padding_after_request_header);
   Exchange(*this, IrpMajor::Close, packet);
 }
-auto sdlrdp_file::Channel() const -> std::shared_ptr<DriveChannel> const& {
-  return channel;
+auto File::Channel() const -> std::shared_ptr<DriveChannel> const& {
+  return _channel;
 }
-auto sdlrdp_file::Drive() const -> std::uint32_t {
-  return drive;
+auto File::Drive() const -> std::uint32_t {
+  return _drive;
 }
-auto sdlrdp_file::Id() const -> std::uint32_t {
-  return wire;
+auto File::Id() const -> std::uint32_t {
+  return _wire;
 }
-auto sdlrdp_file::Path() const -> std::string const& {
-  return path;
+auto File::Path() const -> std::string const& {
+  return _path;
 }
-template <class ByteTy> auto sdlrdp_file::Checked(std::uint64_t offset, std::span<ByteTy> bytes) -> int {
+template <class ByteTy> auto File::Checked(std::uint64_t offset, std::span<ByteTy> bytes) -> std::size_t {
   static_assert(std::same_as<std::remove_const_t<ByteTy>, std::byte>);
-  Expects(!closed, "the file is open");
+  Expects(!_closed, "the file is open");
   auto const room = std::numeric_limits<std::uint64_t>::max() - bytes.size();
-  if (std::cmp_greater(bytes.size(), std::numeric_limits<int>::max()) || offset > room)
-    throw InvalidArguments{ "drive transfer", "size or offset" };
+  if (offset > room) throw InvalidArguments{ "drive transfer", "size or offset" };
   return sdl_rdp::drive::Transfer(*this, offset, bytes);
 }
-auto sdlrdp_file::Transfer(std::uint64_t offset, std::span<std::byte> bytes) -> int {
+auto File::Transfer(std::uint64_t offset, std::span<std::byte> bytes) -> std::size_t {
   return Checked(offset, bytes);
 }
-auto sdlrdp_file::Transfer(std::uint64_t offset, std::span<std::byte const> bytes) -> int {
+auto File::Transfer(std::uint64_t offset, std::span<std::byte const> bytes) -> std::size_t {
   return Checked(offset, bytes);
 }
-auto sdlrdp_file::Stat() -> sdlrdp_stat {
-  Expects(!closed, "the file is open");
+auto File::Stat() -> FileStatus {
+  Expects(!_closed, "the file is open");
   auto const basic = Basic(QueryInformation(*this, InformationClass::Basic));
   return { .size      = EndOfFile(QueryInformation(*this, InformationClass::Standard)),
-           .directory = int{ basic.directory },
+           .directory = basic.directory,
            .modified  = basic.modified };
+}
 }

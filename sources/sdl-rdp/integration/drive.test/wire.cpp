@@ -1,9 +1,12 @@
-#include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/diagnostics/log-level.hpp>
+#include <sdl-rdp/drive/drive.hpp>
+#include <sdl-rdp/drive/exceptions.hpp>
+#include <sdl-rdp/drive/file.hpp>
 #include <sdl-rdp/headless-client.test/client/channels.hpp>
 #include <sdl-rdp/headless-client.test/drive/checks.hpp>
 #include <sdl-rdp/headless-client.test/drive/rdpdr-packets.hpp>
+#include <sdl-rdp/headless-client.test/utilities/thrown-text.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
-#include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/utilities/transcode.hpp>
 
 #include <freerdp/channels/rdpdr.h>
@@ -12,10 +15,15 @@
 #include <cstdint>
 #include <future>
 #include <string>
+#include <tuple>
 #include <utility>
 namespace sdl_rdp::integration::drive_test::detail::wire {
+using sdl_rdp::diagnostics::LogLevel;
+using sdl_rdp::drive::File;
 using namespace std::chrono_literals;
 using sdl_rdp::drive::DrivePacket;
+using sdl_rdp::drive::MalformedResponse;
+using sdl_rdp::drive::PeerDisconnected;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::SendStaticChannel;
 using sdl_rdp::headless_client_test::drive::Completion;
@@ -23,9 +31,9 @@ using sdl_rdp::headless_client_test::drive::DeviceAnnouncement;
 using sdl_rdp::headless_client_test::drive::DriveChecks;
 using sdl_rdp::headless_client_test::drive::DriveObserver;
 using sdl_rdp::headless_client_test::drive::Pattern;
+using sdl_rdp::headless_client_test::drive::ReadAt;
 using sdl_rdp::headless_client_test::drive::ReplyTo;
-using sdl_rdp::utilities::Narrowed;
-using sdl_rdp::utilities::Required;
+using sdl_rdp::headless_client_test::utilities::ThrownText;
 using sdl_rdp::utilities::TranscodeRange;
 
 namespace {
@@ -65,14 +73,12 @@ auto AnnounceDriveNames(DriveObserver& observer) -> void {
       observer.Send(DeviceAnnouncement(RDPDR_DTYP_FILESYSTEM, 102, std::array{ std::byte{ 0xff }, std::byte{ 0 } })));
   ASSERT_TRUE(observer.Send(DeviceAnnouncement(RDPDR_DTYP_PRINT, 103, { })));
 }
-auto ReadLargeFile(sdlrdp_handle& handle, sdlrdp_file& file) -> int {
+auto ReadLargeFile(File& file) -> std::size_t {
   std::string bytes(static_cast<std::ptrdiff_t>(3 * 1024) * 1024, '\0');
-  return sdlrdp_drive_read(&handle, &file, 0, bytes.data(), bytes.size());
+  return ReadAt(file, 0, bytes);
 }
-auto StatWithError(sdlrdp_handle& handle, sdlrdp_file& file) -> std::pair<int, std::string> {
-  sdlrdp_stat info   { };
-  auto        result = sdlrdp_drive_fstat(&handle, &file, &info);
-  return { result, sdlrdp_last_error() };
+auto StatWithError(File& file) -> std::string {
+  return ThrownText<MalformedResponse>([&] { return file.Stat(); });
 }
 class DriveWire : public DriveChecks {
 protected:
@@ -81,22 +87,21 @@ protected:
                                       &std::pair<std::uint32_t, std::uint32_t>::first);
     ASSERT_NE(rejected, observer.Observed().replies.end());
     EXPECT_EQ(rejected->second, STATUS_NOT_SUPPORTED);
-    EXPECT_EQ(Logged(SDLRDP_LOG_WARN, "truncating"), 1u);
-    EXPECT_EQ(Logged(SDLRDP_LOG_WARN, "Using DOS name"), 1u);
-    EXPECT_EQ(Logged(SDLRDP_LOG_INFO, "extended PDU"), 1u);
+    EXPECT_EQ(logs.Count(LogLevel::Warn, "Using DOS name"), 1u);
+    EXPECT_EQ(logs.Count(LogLevel::Info, "extended PDU"), 1u);
   }
   auto ThenDriveNames() -> void {
-    std::array<sdlrdp_drive, 8> drives{ };
-    ASSERT_EQ(sdlrdp_drive_list(&*handle, drives.data(), 8), 4);
-    EXPECT_STREQ(drives[1].name, "żółw");
-    EXPECT_EQ(std::string(drives[2].name), std::string(511, 'x'));
-    EXPECT_STREQ(drives[3].name, "dos");
+    auto const drives = Files().List();
+    ASSERT_EQ(drives.size(), 4u);
+    EXPECT_EQ(drives[1].name, "żółw");
+    EXPECT_EQ(drives[2].name, std::string(600, 'x'));
+    EXPECT_EQ(drives[3].name, "dos");
   }
-  auto ThenHeldFileClosed(DriveObserver& observer, sdlrdp_file& file) -> void {
+  auto ThenHeldFileClosed(DriveObserver& observer, File& file) -> void {
     observer.Observed().hold = false;
-    auto close = std::async(std::launch::async, [&] { return sdlrdp_drive_close(&*handle, &file); });
+    auto close = std::async(std::launch::async, [&] { file.Close(); });
     ASSERT_TRUE(client->Until([&] { return close.wait_for(0s) == std::future_status::ready; }));
-    EXPECT_EQ(close.get(), 0);
+    close.get();
   }
   auto WhenReadWindowRefilled(DriveObserver& observer) -> void {
     ASSERT_TRUE(client->Until([&] { return observer.Observed().requests == 8; }));
@@ -109,44 +114,42 @@ protected:
                           [&](std::size_t index) { CompleteRead(observer, index); });
   }
   auto ThenTruncatedInformation(auto& stat) -> void {
-    auto [result, error] = stat.get();
-    EXPECT_EQ(result, -1);
-    EXPECT_EQ(error, "Malformed drive response: truncated.");
+    EXPECT_EQ(stat.get(), "Malformed drive response: truncated.");
   }
-  auto ThenAbortedRead(std::future<int>& read, sdlrdp_file& file) -> void {
+  static auto ThenAbortedRead(std::future<std::size_t>& read) -> void {
     ASSERT_EQ(read.wait_for(2s), std::future_status::ready);
-    EXPECT_EQ(read.get(), -1);
-    EXPECT_EQ(Logged(SDLRDP_LOG_WARN, "Drive channel ended: Malformed drive response: truncated."), 1u);
-    EXPECT_EQ(sdlrdp_drive_close(&*handle, &file), -1);
+    EXPECT_THROW(std::ignore = read.get(), PeerDisconnected);
+  }
+  auto ThenEndedChannel(File& file) -> void {
+    EXPECT_EQ(logs.Count(LogLevel::Warn, "Drive channel ended: Malformed drive response: truncated."), 1u);
+    EXPECT_THROW(file.Close(), PeerDisconnected);
   }
 };
 TEST_F(DriveWire, MalformedChannelKeepsVideoSession) {
   Write("file", Pattern(static_cast<std::ptrdiff_t>(3 * 1024) * 1024));
   auto const opened = Open("file");
-  if (!opened) FAIL() << "the file opens";
-  auto& file = opened->get();
+  auto&      file   = *opened;
   ASSERT_NO_FATAL_FAILURE(HoldRequests());
   auto& observer = *this->observer;
-  auto  read     = std::async(std::launch::async, [&] { return ReadLargeFile(*handle, file); });
+  auto  read     = std::async(std::launch::async, [&] { return ReadLargeFile(file); });
   ASSERT_TRUE(client->Until([&] { return observer.Observed().requests == 8; }));
   ASSERT_NO_FATAL_FAILURE(SendMalformedDrivePacket(*client));
-  ASSERT_TRUE(client->Until([&] {
-    sdlrdp_drive value{ };
-    return sdlrdp_drive_list(&*handle, &value, 1) == 0;
-  }));
-  ASSERT_NO_FATAL_FAILURE(ThenAbortedRead(read, file));
+  ASSERT_TRUE(client->Until([&] { return Files().List().empty(); }));
+  ASSERT_NO_FATAL_FAILURE(ThenAbortedRead(read));
+  ASSERT_NO_FATAL_FAILURE(ThenEndedChannel(file));
   ThenRemovedDrive();
   ThenVideoMatches();
 }
 
 TEST_F(DriveWire, MalformedInformationKeepsVideoSession) {
   ASSERT_NO_FATAL_FAILURE(GivenHeldFile());
-  auto& file     = Required(held_file, "the held file is open").get();
+  ASSERT_TRUE(held_file) << "the held file is open";
+  auto& file     = *held_file;
   auto& observer = *this->observer;
-  auto  stat     = std::async(std::launch::async, StatWithError, std::ref(*handle), std::ref(file));
+  auto  stat     = std::async(std::launch::async, StatWithError, std::ref(file));
   ASSERT_TRUE(client->Until([&] { return observer.Observed().requests == 1; }));
   auto response = EmptyBasicInformation(observer);
-  auto warnings = Logged(SDLRDP_LOG_WARN, "");
+  auto warnings = logs.Count(LogLevel::Warn, "");
   ASSERT_TRUE(observer.Send(response));
   ASSERT_TRUE(client->Until([&] { return stat.wait_for(0s) == std::future_status::ready; }));
   ASSERT_NO_FATAL_FAILURE(ThenTruncatedInformation(stat));
@@ -158,14 +161,14 @@ TEST_F(DriveWire, MalformedInformationKeepsVideoSession) {
 
 TEST_F(DriveWire, SlidingWindowRefillsOnOutOfOrderCompletion) {
   ASSERT_NO_FATAL_FAILURE(GivenHeldFile());
-  auto&       file     = Required(held_file, "the held file is open").get();
+  ASSERT_TRUE(held_file) << "the held file is open";
+  auto&       file     = *held_file;
   auto&       observer = *this->observer;
   std::string bytes(10uz * 65536, '\0');
-  auto        read     = std::async(std::launch::async,
-                                    [&] { return sdlrdp_drive_read(&*handle, &file, 0, bytes.data(), bytes.size()); });
+  auto        read     = std::async(std::launch::async, [&] { return ReadAt(file, 0, bytes); });
   ASSERT_NO_FATAL_FAILURE(WhenReadWindowRefilled(observer));
   ASSERT_TRUE(client->Until([&] { return read.wait_for(0s) == std::future_status::ready; }));
-  EXPECT_EQ(read.get(), Narrowed<int>(bytes.size()));
+  EXPECT_EQ(read.get(), bytes.size());
   EXPECT_EQ(bytes, std::string(bytes.size(), 'x'));
   ThenHeldFileClosed(observer, file);
 }
@@ -191,9 +194,8 @@ TEST_F(DriveWire, UnknownCompletionIsIgnored) {
   packet.Write(std::uint32_t{ UINT32_MAX });
   packet.Write(std::uint32_t{ STATUS_SUCCESS });
   ASSERT_TRUE(observer.Send(packet));
-  ASSERT_TRUE(client->Until([&] { return Logged(SDLRDP_LOG_WARN, "Unknown drive completion id") == 1; }));
-  sdlrdp_drive value{ };
-  EXPECT_EQ(sdlrdp_drive_list(&*handle, &value, 1), 1);
+  ASSERT_TRUE(client->Until([&] { return logs.Count(LogLevel::Warn, "Unknown drive completion id") == 1; }));
+  EXPECT_EQ(Files().List().size(), 1u);
   ThenVideoMatches();
 }
 }

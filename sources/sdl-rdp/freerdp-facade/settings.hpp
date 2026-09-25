@@ -23,6 +23,7 @@ using KeyOf = typename std::ranges::range_value_t<EntriesTy>::first_type;
 auto Set(rdpSettings& settings, FreeRDP_Settings_Keys_Bool key, bool value)               -> bool;
 auto Set(rdpSettings& settings, FreeRDP_Settings_Keys_UInt32 key, std::uint32_t value)    -> bool;
 auto Set(rdpSettings& settings, FreeRDP_Settings_Keys_String key, std::string_view value) -> bool;
+auto Get(rdpSettings const& settings, FreeRDP_Settings_Keys_String key) -> std::optional<std::string_view>;
 auto KeyName(std::ptrdiff_t key)                                                          -> std::string_view;
 
 // Sets each entry in order and stops at the first key FreeRDP refuses, which it returns.
@@ -43,6 +44,7 @@ auto Refusal(std::string_view subject, std::optional<KeyTy> refused) -> std::str
 
 namespace sdl_rdp::freerdp_facade {
 using detail::settings::FirstRefused;
+using detail::settings::Get;
 using detail::settings::KeyName;
 using detail::settings::Refusal;
 using detail::settings::Set;

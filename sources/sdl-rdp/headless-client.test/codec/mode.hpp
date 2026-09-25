@@ -1,19 +1,20 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/configuration/codec.hpp>
 
 #include <gtest/gtest.h>
 #include <cstdint>
 #include <string>
 
 namespace sdl_rdp::headless_client_test::codec::detail::mode {
+using sdl_rdp::configuration::Codec;
 struct Mode {
 public:
-  bool         surface;
-  sdlrdp_codec codec;
+  bool  surface;
+  Codec codec;
 };
-auto ModeName(testing::TestParamInfo<Mode> const& info)    -> std::string;
-auto NegotiatedCodec(sdlrdp_codec requested, bool surface) -> sdlrdp_codec;
-auto CodecTolerance(sdlrdp_codec requested, bool surface)  -> std::uint32_t;
+auto ModeName(testing::TestParamInfo<Mode> const& info) -> std::string;
+auto NegotiatedCodec(Codec requested, bool surface)     -> Codec;
+auto CodecTolerance(Codec requested, bool surface)      -> std::uint32_t;
 }
 
 namespace sdl_rdp::headless_client_test::codec {

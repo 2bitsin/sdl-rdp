@@ -1,4 +1,7 @@
 #include <sdl-rdp/settings/settings.hpp>
+
+#include <sdl-rdp/configuration/auth-mode.hpp>
+#include <sdl-rdp/configuration/codec.hpp>
 #include <sdl-rdp/sample-gate.test/frame/pattern.hpp>
 #include <sdl-rdp/sample-gate.test/process/initialized-sdl.hpp>
 #include <sdl-rdp/sample-gate.test/process/process.hpp>
@@ -25,6 +28,8 @@
 #include <vector>
 
 namespace sdl_rdp::integration::sample_test::detail::settings {
+using sdl_rdp::configuration::AuthMode;
+using sdl_rdp::configuration::Codec;
 using namespace std::chrono_literals;
 using sdl_rdp::headless_client_test::client::Clock;
 using sdl_rdp::sample_gate_test::process::InitializedSdl;
@@ -32,7 +37,6 @@ using sdl_rdp::sample_gate_test::process::Process;
 using sdl_rdp::sample_gate_test::process::Storage;
 using sdl_rdp::sample_gate_test::process::Window;
 using sdl_rdp::sample_gate_test::sample::Arguments;
-using sdl_rdp::sample_gate_test::sample::BackendLibrary;
 using sdl_rdp::sample_gate_test::sample::BuildRoot;
 using sdl_rdp::sample_gate_test::sample::Hint;
 using sdl_rdp::sample_gate_test::sample::PrimaryDisplayPort;
@@ -73,10 +77,9 @@ auto AvailablePort() -> std::uint32_t {
 auto SettingsArguments(std::filesystem::path const& directory, std::filesystem::path const& certificates,
                        Words const& environment = { }, Words const& options = { }) -> Words {
   auto args = Arguments(certificates, environment, options);
-  std::erase_if(
-      args, [](auto const& arg) { return arg.starts_with("SDL_RDP_PORT=") || arg.starts_with("SDL_RDP_BACKEND="); });
-  args.insert(args.begin() + 1, { "-u", "SDL_RDP_PORT", "-u", "SDL_RDP_BACKEND", "-u", "SDL_RDP_SETTINGS", "-u",
-                                  "SDL_RDP_ASPECT", "-C", directory.string() });
+  std::erase_if(args, [](auto const& arg) { return arg.starts_with("SDL_RDP_PORT="); });
+  args.insert(args.begin() + 1,
+              { "-u", "SDL_RDP_PORT", "-u", "SDL_RDP_SETTINGS", "-u", "SDL_RDP_ASPECT", "-C", directory.string() });
   return args;
 }
 auto WrittenText(std::filesystem::path const& file, std::string_view text) -> std::filesystem::path {
@@ -90,17 +93,14 @@ auto WriteInvalidSettings(std::filesystem::path const& directory) -> void {
   WrittenText(directory / "libSDL3.yaml", "port: 1\nauth: invalid\n");
 }
 auto Served(std::uint32_t port) -> Settings {
-  return { .backend = BackendLibrary().string(),
-           .port    = Port{ Narrowed<std::uint16_t>(port) },
-           .aspect  = Aspect{ 4, 3 } };
+  return { .port = Port{ Narrowed<std::uint16_t>(port) }, .aspect = Aspect{ 4, 3 }, .codec = Codec::Planar };
 }
 auto WriteSettings(std::filesystem::path const& file, Settings const& settings) -> void {
   oxbox::serialization::SerializeTo(settings, file);
 }
 }
 TEST(SettingsHints, EveryFieldsHintIsThePatchesMacro) {
-  EXPECT_EQ(oxbox::serialization::FieldNames(Settings{ }).size(), 18U);
-  EXPECT_EQ(HintName<&Settings::backend>(), SDL_HINT_RDP_BACKEND);
+  EXPECT_EQ(oxbox::serialization::FieldNames(Settings{ }).size(), 17U);
   EXPECT_EQ(HintName<&Settings::bind>(), SDL_HINT_RDP_BIND);
   EXPECT_EQ(HintName<&Settings::port>(), SDL_HINT_RDP_PORT);
   EXPECT_EQ(HintName<&Settings::cert_dir>(), SDL_HINT_RDP_CERT_DIR);
@@ -133,8 +133,10 @@ TEST_P(SettingsSample, WorkingDirectoryFileWinsOverEnvironment) {
   oxbox::platform::ScratchArea const directory { "settings", "sdl-rdp" };
   auto                               port      = AvailablePort();
   WriteSettings(directory.Path() / "libSDL3.yaml", Served(port));
-  auto const overridden = GetParam() ? Words{ "SDL_RDP_PORT=1", "SDL_RDP_BACKEND=/missing/backend" } : Words{ };
-  ThenSettingsConnect(SettingsArguments(directory.Path(), certificates.Path(), overridden), port);
+  auto const overridden = GetParam() ? Words{ "SDL_RDP_PORT=1", "SDL_RDP_CODEC=raw" } : Words{ };
+  // The sample promotes SDL_RDP_CODEC into an application hint (main.cpp ConfigureVideo), and a hint beats the file.
+  ThenSettingsConnect(SettingsArguments(directory.Path(), certificates.Path(), overridden), port,
+                      GetParam() ? "raw" : "planar");
 }
 INSTANTIATE_TEST_SUITE_P(SettingsPrecedence, SettingsSample, testing::Bool());
 
@@ -145,7 +147,7 @@ protected:
     auto const port = AvailablePort();
     WriteSettings(chosen, Served(port));
     WriteInvalidSettings(directory);
-    ThenSettingsConnect(SettingsArguments(directory, certificates.Path(), environment), port);
+    ThenSettingsConnect(SettingsArguments(directory, certificates.Path(), environment), port, "planar");
   }
 };
 TEST_F(SettingsChoice, ExplicitPathWinsInAnyFormat) {
@@ -180,7 +182,7 @@ auto EverySetting(std::filesystem::path const& certificates, std::uint32_t port)
   settings.width.emplace(1024);
   settings.height.emplace(768);
   settings.refresh.emplace(Refresh::Rate{ 60 });
-  settings.codec.emplace(SDLRDP_CODEC_PLANAR);
+  settings.codec.emplace(Codec::Planar);
   settings.avc_bitrate.emplace(0);
   settings.vsync.emplace(false);
   settings.wait_for_client.emplace(false);
@@ -189,7 +191,7 @@ auto EverySetting(std::filesystem::path const& certificates, std::uint32_t port)
   settings.user.emplace("alice");
   settings.password.emplace("secret");
   settings.domain.emplace("example");
-  settings.auth.emplace(SDLRDP_AUTH_NONE);
+  settings.auth.emplace(AuthMode::None);
   return settings;
 }
 auto ThenEveryFieldSet(Settings const& settings) -> void {
@@ -203,16 +205,15 @@ TEST_F(Sample, SettingsNamingEveryFieldStartsAndConnects) {
   auto const                         settings  = EverySetting(certificates.Path(), port);
   ASSERT_NO_FATAL_FAILURE(ThenEveryFieldSet(settings));
   WriteSettings(directory.Path() / "libSDL3.yml", settings);
-  ThenSettingsConnect(SettingsArguments(directory.Path(), certificates.Path()), port);
+  ThenSettingsConnect(SettingsArguments(directory.Path(), certificates.Path()), port, "planar");
 }
 
 TEST_F(Sample, SettingsTypedValuesAndAnEmptyValueIsAbsent) {
   oxbox::platform::ScratchArea const directory { "settings-typed", "sdl-rdp" };
   auto const                         port      = AvailablePort();
   WrittenText(directory.Path() / "libSDL3.yaml",
-              std::format("port: {}\nbackend: {}\naspect: 4:3\ncodec: planar\nwait_for_client: false\ndomain:\n", port,
-                          BackendLibrary().string()));
-  ThenSettingsConnect(SettingsArguments(directory.Path(), certificates.Path()), port);
+              std::format("port: {}\naspect: 4:3\ncodec: planar\nwait_for_client: false\ndomain:\n", port));
+  ThenSettingsConnect(SettingsArguments(directory.Path(), certificates.Path()), port, "planar");
 }
 TEST_F(Sample, SettingsApplicationHintWins) {
   oxbox::platform::ScratchArea const directory{ "settings-hint", "sdl-rdp" };
@@ -321,7 +322,6 @@ auto ThenStorageSpaceIsNotImplemented(Storage const& storage) -> void {
 }
 auto WhenInitializedWith(Hint const& setting) -> void {
   EXPECT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));
-  EXPECT_TRUE(SDL_SetHint(SDL_HINT_RDP_BACKEND, "/missing/backend"));
   EXPECT_TRUE(SDL_SetHint(setting.name.c_str(), setting.value.c_str()));
   EXPECT_FALSE(SDL_Init(SDL_INIT_VIDEO));
 }
@@ -359,7 +359,7 @@ TEST_F(SettingsSession, StorageSpaceDiagnosesUnsupportedBackendOperation) {
   ThenStorageSpaceIsNotImplemented(storage);
 }
 class InvalidInteger : public Sample, public testing::WithParamInterface<Hint> { };
-TEST_P(InvalidInteger, FailsBeforeBackendLoadingAndNamesTheSetting) {
+TEST_P(InvalidInteger, FailsBeforeTheBackendStartsAndNamesTheSetting) {
   InitializedSdl const sdl{ [&] {
     WhenInitializedWith(GetParam());
     return true;

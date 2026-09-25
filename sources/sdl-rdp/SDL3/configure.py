@@ -90,7 +90,7 @@ def configure(release, source, fingerprint):
     command  = ["cmake", "-S", source, "-B", config, "-G", "Ninja", "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"]
     command += [f"-DSDL_{option}=OFF" for option in DISABLED]
     command += [f"-DSDL_{option}=ON" for option in ENABLED]
-    command += ["-DSDL_RDP_DYNAMIC=libbackend.so", "-DSDL_STATIC=OFF", "-DSDL_TEST_LIBRARY=OFF",
+    command += ["-DSDL_STATIC=OFF", "-DSDL_TEST_LIBRARY=OFF",
                 "-DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON"]
     bc.run(command, what="SDL's CMake configure")
     stamp.write_text(fingerprint)
@@ -153,26 +153,10 @@ def installed_headers(source, headers):
         bc.emit_bytes("headers.install/include/SDL3/" + name, header.read_bytes(), shared=True)
 
 
-def operation_header():
-    names   = (ROOT / "rdp/backend/operations.txt").read_text().splitlines()
-    enum    = ",\n  ".join(name.upper() for name in names)
-    types   = ",\n      ".join(f"decltype(&sdlrdp_{name})" for name in names)
-    symbols = ",\n      ".join(f'"sdlrdp_{name}"' for name in names)
-    header  = ("#pragma once\n#include <array>\n#include <tuple>\nnamespace sdl3::rdp::backend::detail::operations {\n"
-               f"enum class Operation {{ {enum}, COUNT }};\n"
-               "struct BackendCatalog {\n"
-               f"  using Symbols = std::tuple<{types}>;\n"
-               f"  static constexpr auto Names = std::to_array<char const*>({{{symbols}}});\n"
-               "};\n}\nnamespace sdl3::rdp::backend {\nusing detail::operations::Operation;\n"
-               "using detail::operations::BackendCatalog;\n}\n")
-    bc.emit("operations.generated.hpp", header)
-
-
 def main():
     release = pinned_release()
     release.root.mkdir(parents=True, exist_ok=True)
-    bc.depends(__file__, VERSIONS, PATCH, ROOT / "rdp/backend/operations.txt")
-    operation_header()
+    bc.depends(__file__, VERSIONS, PATCH)
     source_hash = release.sha256 + digest(PATCH)
     source      = patched_source(release, source_hash)
     config      = configure(release, source, source_hash + digest(Path(__file__)))

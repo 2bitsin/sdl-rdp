@@ -14,10 +14,9 @@ EXPORT = 'namespace sdl_rdp::video_codec {\n'
 @pytest.fixture
 def tree(tmp_path):
     subprocess.run(['git', 'init', '-q', str(tmp_path)], check=True)
-    for folder in ('video-codec', 'link', 'SDL3/rdp', 'abi'):
+    for folder in ('video-codec', 'link', 'SDL3/rdp'):
         (tmp_path / 'sources/sdl-rdp' / folder).mkdir(parents=True)
     (tmp_path / 'sources/sdl-rdp/link/peer-link.hpp').write_text('')
-    (tmp_path / 'sources/sdl-rdp/abi/backend.h').write_text('extern "C" {\nstruct sdlrdp_file;\n}\n')
     (tmp_path / 'sources/sdl-rdp/video-codec/clock.hpp').write_text('')
     return tmp_path
 
@@ -63,17 +62,10 @@ def test_include_only_headers_pass(tree):
     assert findings(tree, '#pragma once\nextern "C" {\n#include <x.h>\n}\n#include <y.h>\n') == []
 
 
-def test_abi_names_stay_global(tree):
-    text = ('struct sdlrdp_file {\n  auto Close() -> void;\n};\nauto sdlrdp_file::Close() -> void { }\n'
-            'struct SDL_VideoData {\n  auto Bind() -> void;\n};\nauto SDL_VideoData::Bind() -> void { }\n'
+def test_runtime_hooks_and_sdl_tags_stay_global(tree):
+    text = ('struct SDL_VideoData {\n  auto Bind() -> void;\n};\nauto SDL_VideoData::Bind() -> void { }\n'
             'extern "C" auto __libc_free(void* block) -> void;\nauto operator new(std::size_t size) -> void*;\n'
             f'{DETAIL}using sdl_rdp::link::PeerLink;\n}}\n')
-    assert findings(tree, text, SOURCE) == []
-
-
-def test_marked_abi_definitions_stay_global(tree):
-    text = f'{DETAIL}}}\nauto _Public_(ABI_VERSION)\n    sdlrdp_file_close(int handle) -> int {{ return handle; }}\n'
-    (tree / 'sources/sdl-rdp/abi/backend.h').write_text('int sdlrdp_file_close(int);\n')
     assert findings(tree, text, SOURCE) == []
 
 
@@ -110,10 +102,6 @@ def test_global_type_alias_in_a_source_file_fails(tree):
 def test_sdl_prefix_passes_only_for_sdl_tags(tree):
     text = 'auto SDL_MyHelper() -> int { return 1; }\nstruct SDL_Mine {\n  int x;\n};\n'
     assert findings(tree, text, SOURCE) == ['frame-rate.cpp:1', 'frame-rate.cpp:2']
-
-
-def test_abi_prefix_passes_only_for_names_the_abi_header_declares(tree):
-    assert findings(tree, 'static int sdlrdp_counter = 0;\n', SOURCE) == ['frame-rate.cpp:1']
 
 
 def test_source_files_import_at_file_scope_and_headers_do_not(tree):

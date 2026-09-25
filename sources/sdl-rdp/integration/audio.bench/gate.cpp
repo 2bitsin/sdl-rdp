@@ -1,10 +1,12 @@
 #include <sdl-rdp/headless-client.test/audio/gate.hpp>
-#include <sdl-rdp/abi/backend.h>
+
+#include <sdl-rdp/configuration/codec.hpp>
 #include <sdl-rdp/headless-client.test/audio/tone-measurements.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
 #include <sdl-rdp/headless-client.test/graphics/observer.hpp>
 #include <sdl-rdp/integration/support.bench/session.hpp>
 #include <sdl-rdp/utilities/deadline.hpp>
+#include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/utilities/stopwatch.hpp>
 
 #include <chrono>
@@ -15,8 +17,10 @@
 
 namespace sdl_rdp::integration::audio_bench::detail::gate {
 using namespace std::chrono_literals;
+using sdl_rdp::configuration::Codec;
 using sdl_rdp::headless_client_test::audio::AudioGate;
 using sdl_rdp::headless_client_test::audio::MaximumGapMs;
+using sdl_rdp::headless_client_test::audio::WriteFrames;
 using sdl_rdp::headless_client_test::backend::BackendInstance;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::Pixels;
@@ -28,17 +32,18 @@ using sdl_rdp::integration::support_bench::Measured;
 using sdl_rdp::integration::support_bench::OneSession;
 using sdl_rdp::integration::support_bench::Session;
 using sdl_rdp::utilities::DeadlineAfter;
+using sdl_rdp::utilities::Rect;
 using sdl_rdp::utilities::Throughout;
 using sdl_rdp::utilities::Timed;
 namespace {
 auto ProduceProgressiveFrames(BackendInstance const& backend) -> std::size_t {
-  Pixels            pixels(1280uz * 800);
-  sdlrdp_rect const full      { 0, 0, 1280, 800 };
-  std::size_t       presented = 0;
+  Pixels      pixels(1280uz * 800);
+  Rect const  full      { .x = 0, .y = 0, .w = 1280, .h = 800 };
+  std::size_t presented = 0;
   Throughout(DeadlineAfter(2s), [&] {
-    if (!sdlrdp_wait_frame(&*backend, 10)) return true;
+    if (!backend.WaitFrame(std::chrono::milliseconds{ 10 })) return true;
     MovingTilePattern(pixels, 1280, 800, presented);
-    if (backend.Present(pixels, 1280, 800, full) != 0) return false;
+    backend.Present(pixels, 1280, 800, full);
     ++presented;
     return true;
   });
@@ -72,21 +77,21 @@ BENCHMARK(Measured<AudioContinuousUnderProgressiveLoad>)->Apply(OneSession);
 BENCHMARK(Measured<AudioNeverConfirmsUsesServerClock>)->Apply(OneSession);
 
 auto AudioPlaybackConfirmsKeepRealtimeStreamContinuous::TestBody() -> void {
-  if (!Holds([this] { GivenUnconfirmedSession(); }, [this] { RunRealtimeAudio(ClientSession(), AudioSession()); }))
+  if (!Passes([this] { GivenUnconfirmedSession(); }, [this] { RunRealtimeAudio(ClientSession(), AudioSession()); }))
     return;
   Record("maximum_block_gap_ms", MaximumGapMs(AudioSession().CaptureState().received));
   ClientSession().Disconnect();
   backend.Close();
-  Holds([this] { CheckAudioStatistics(AudioSession()); });
+  Passes([this] { CheckAudioStatistics(AudioSession()); });
 }
 
 auto AudioContinuousUnderProgressiveLoad::TestBody() -> void {
-  if (!Holds([this] { Open(1280, 800, { }, SDLRDP_CODEC_PROGRESSIVE); })) return;
-  if (!Check(sdlrdp_audio_open(&*backend) == 0, "the backend opens audio")) return;
+  if (!Passes([this] { Open(1280, 800, { }, Codec::Progressive); })) return;
+  if (!Passes([this] { (*backend).Audio().Open(); })) return;
   auto [client, audio] = NewSession(1280, 800);
   client.EnableGraphics();
   GraphicsObserver observer(client);
-  if (!Holds([&] { GivenUnconfirmedAudio(client, audio); })) return;
+  if (!Passes([&] { GivenUnconfirmedAudio(client, audio); })) return;
   if (!Check(client.Until([this] { return logs.Contains("GFX confirmed"); }), "the client confirms GFX")) return;
   // Pixel decoding on the client pump thread would delay audio reception independently of server encoding.
   observer.Observed().decode = false;
@@ -95,18 +100,18 @@ auto AudioContinuousUnderProgressiveLoad::TestBody() -> void {
 auto AudioContinuousUnderProgressiveLoad::ThenProgressiveLoad(Client& client, SoundClient& audio,
                                                               GraphicsObserver const& observer) -> void {
   auto presenting = std::async(std::launch::async, [this] { return ProduceProgressiveFrames(backend); });
-  if (!Holds([&] { RunRealtimeAudio(client, audio); })) return;
+  if (!Passes([&] { RunRealtimeAudio(client, audio); })) return;
   Record("maximum_block_gap_ms", MaximumGapMs(audio.CaptureState().received));
   Check(presenting.get() >= 10, "the backend presents under audio load");
   Check(observer.Observed().frames.size() >= 10, "the client observes the progressive frames");
   Check(observer.Observed().progressive_headers > 0, "the payload uses the progressive codec");
   client.Disconnect();
   backend.Close();
-  Holds([&] { CheckAudioStatistics(audio); });
+  Passes([&] { CheckAudioStatistics(audio); });
 }
 
 auto AudioNeverConfirmsUsesServerClock::TestBody() -> void {
-  if (!Holds([this] { GivenUnconfirmedSession(); })) return;
+  if (!Passes([this] { GivenUnconfirmedSession(); })) return;
   std::vector<std::int16_t> const pcm(48000uz * 2, 1234);
   int                             written = 0;
   auto const                      span    = Timed([&] { written = WriteCaptured(pcm); });
@@ -117,7 +122,7 @@ auto AudioNeverConfirmsUsesServerClock::TestBody() -> void {
   Record("never_confirms_one_second_elapsed", std::chrono::duration<double>(span).count());
 }
 auto AudioNeverConfirmsUsesServerClock::WriteCaptured(std::vector<std::int16_t> const& pcm) -> int {
-  auto writing = std::async(std::launch::async, [&] { return sdlrdp_audio_write(&*backend, pcm.data(), 48000); });
+  auto writing = std::async(std::launch::async, [&] { return WriteFrames(*backend, pcm, 0, 48000); });
   Check(UntilCaptured(pcm.size()), "the client captures the second");
   return writing.get();
 }

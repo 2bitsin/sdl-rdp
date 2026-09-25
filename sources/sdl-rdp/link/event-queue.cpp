@@ -1,27 +1,23 @@
 #include <sdl-rdp/link/event-queue.hpp>
 
-#include <sdl-rdp/utilities/deadline.hpp>
-#include <sdl-rdp/utilities/narrowed.hpp>
-
-#include <algorithm>
-#include <chrono>
-#include <cstddef>
-#include <cstdint>
+#include <utility>
 
 namespace sdl_rdp::link::detail::event_queue {
-using sdl_rdp::utilities::Narrowed;
-
-auto EventQueue::Push(sdlrdp_event event) -> void {
-  Notify([&] { _events.push_back(event); });
+auto EventQueue::Push(Event event) -> void {
+  Notify([&] { _events.push_back(std::move(event)); });
 }
-auto EventQueue::Poll(std::span<sdlrdp_event> out) -> std::uint32_t {
+auto EventQueue::Poll() -> std::vector<Event> {
+  std::vector<Event> events;
+  Poll(events);
+  return events;
+}
+// The caller's buffer becomes the queue's, so a steady stream reuses two buffers and allocates nothing.
+auto EventQueue::Poll(std::vector<Event>& into) -> void {
+  into.clear();
   std::scoped_lock const lock(_guard);
-  auto const             count = std::min(out.size(), _events.size());
-  std::copy_n(_events.begin(), count, out.begin());
-  _events.erase(_events.begin(), _events.begin() + Narrowed<std::ptrdiff_t>(count));
-  return Narrowed<std::uint32_t>(count);
+  std::swap(into, _events);
 }
-auto EventQueue::Wait(Deadline deadline) -> int {
+auto EventQueue::Wait(Deadline deadline) -> bool {
   std::unique_lock lock(_guard);
   auto const       since = _generation;
   auto const       ready = [&] { return !_events.empty() || since != _generation; };

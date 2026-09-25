@@ -1,6 +1,6 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
 #include <sdl-rdp/diagnostics/forward.hpp>
+#include <sdl-rdp/drive/drive.hpp>
 #include <sdl-rdp/drive/packet.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/freerdp-facade/rdpdr.hpp>
@@ -17,9 +17,11 @@
 #include <mutex>
 #include <span>
 #include <string_view>
+#include <vector>
 
 namespace sdl_rdp::drive::detail::channel {
 using sdl_rdp::diagnostics::Diagnostics;
+using sdl_rdp::drive::Drive;
 using sdl_rdp::freerdp_facade::IrpMajor;
 using sdl_rdp::freerdp_facade::IrpMinor;
 using sdl_rdp::freerdp_facade::VirtualChannel;
@@ -53,7 +55,7 @@ public:
   auto Event() const                              -> WaitHandle;
   auto Disconnect()                               -> void;
   auto Abort(std::string const& cause)            -> void;
-  auto List(std::span<sdlrdp_drive> out)          -> int;
+  auto List()                                     -> std::vector<Drive>;
   auto Send(std::uint32_t drive, std::uint32_t file, IrpMajor major, DrivePacket const& body,
             IrpMinor minor = IrpMinor::None) -> std::shared_ptr<DriveRequest>;
   auto Wait(std::shared_ptr<DriveRequest> const& request, std::string const& path, bool end = false) -> DrivePacket;
@@ -62,10 +64,10 @@ public:
 
 private:
   struct DeviceEntry {
-    std::uint32_t wire;
-    sdlrdp_drive  drive;
+    std::uint32_t wire { };
+    Drive         drive;
   };
-  auto AnnounceDevice(std::uint32_t wire, std::string const& label)       -> void;
+  auto AnnounceDevice(std::uint32_t wire, std::string label)              -> void;
   auto Device(std::uint32_t id)                                           -> std::uint32_t;
   auto GeneralClientCapability(DrivePacket& packet, std::size_t start, std::size_t length, std::uint32_t version) const
       -> void;

@@ -2,10 +2,12 @@
 
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/failure-log.hpp>
+#include <sdl-rdp/diagnostics/log-level.hpp>
 #include <sdl-rdp/diagnostics/trace-queue.hpp>
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
 #include <sdl-rdp/freerdp-facade/handled.hpp>
 #include <sdl-rdp/link/event-queue.hpp>
+#include <sdl-rdp/link/event.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/link/session-access.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
@@ -25,8 +27,10 @@
 
 namespace sdl_rdp::audio::detail::channel {
 using sdl_rdp::diagnostics::FailuresThrough;
+using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::freerdp_facade::CallbackOwner;
 using sdl_rdp::freerdp_facade::VirtualChannel;
+using sdl_rdp::link::AudioChanged;
 using sdl_rdp::utilities::AllocationFailed;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
@@ -150,7 +154,7 @@ auto AudioChannel::AdoptServerClock() -> void {
   _clock_start  = now;
   _clock_frames = _confirmed;
   _pending.clear();
-  _diagnostics.Log(SDLRDP_LOG_WARN, "No audio confirmation after 500 ms; using server-clock pacing.");
+  _diagnostics.Log(LogLevel::Warn, "No audio confirmation after 500 ms; using server-clock pacing.");
 }
 
 auto AudioChannel::Send(std::span<std::int16_t const> samples) -> bool {
@@ -188,7 +192,7 @@ auto AudioChannel::LogAudio() const -> void {
   Expects(_sound != nullptr, "audio statistics have a channel");
   using Milliseconds = std::chrono::duration<double, std::milli>;
   _diagnostics.Log(
-      SDLRDP_LOG_INFO,
+      LogLevel::Info,
       std::format("Audio: {} blocks sent; gap {:.1f} ms mean, {:.1f} ms max; {} gaps over 40 ms.", _blocks_sent,
                   _blocks_sent > 1 ? Milliseconds{ _gap_total }.count() / static_cast<double>(_blocks_sent - 1) : 0,
                   Milliseconds{ _gap_max }.count(), _gaps_over_40ms));
@@ -231,13 +235,13 @@ auto AudioChannel::Activate() -> void {
   }
   auto const rate = _sound->client_formats[0].nSamplesPerSec;
   Select(0);
-  _diagnostics.Log(SDLRDP_LOG_INFO, std::format("Audio selected: stereo S16 at {} Hz.", rate));
-  _events.Push({ .type = SDLRDP_AUDIO, .audio = { .freq = rate, .connected = 1 } });
+  _diagnostics.Log(LogLevel::Info, std::format("Audio selected: stereo S16 at {} Hz.", rate));
+  _events.Push(AudioChanged{ .rate = rate, .connected = true });
 }
 auto AudioChannel::RejectFormats() -> void {
   _rejected = true;
-  _diagnostics.Log(SDLRDP_LOG_WARN, std::format("Audio unavailable: client version={}; client formats: {}.",
-                                                _sound->clientVersion, Formats(*_sound)));
+  _diagnostics.Log(LogLevel::Warn, std::format("Audio unavailable: client version={}; client formats: {}.",
+                                               _sound->clientVersion, Formats(*_sound)));
 }
 auto AudioChannel::Credit() -> std::uint64_t {
   if (!_server_clock) return _confirmed;
@@ -254,8 +258,8 @@ auto AudioChannel::ReportGate(bool available, std::uint64_t credit) -> void {
   if (!available && !_gate_warned) {
     _gate_warned = true;
     _diagnostics.Line("audio-gate", [&] { return std::format("behind={:.1f}", Behind(_sent, credit, Rate())); });
-    _diagnostics.Log(SDLRDP_LOG_WARN, std::format("Audio confirmation gate waiting: client is {:.3f} ms behind.",
-                                                  Behind(_sent, credit, Rate())));
+    _diagnostics.Log(LogLevel::Warn, std::format("Audio confirmation gate waiting: client is {:.3f} ms behind.",
+                                                 Behind(_sent, credit, Rate())));
   }
   if (available && _gate_warned && _diagnostics.Tracing()) {
     _gate_warned = false;
@@ -278,9 +282,9 @@ auto AudioChannel::Confirm(std::uint8_t id, std::uint16_t timestamp) -> std::uin
   auto rtt = std::chrono::duration<double, std::milli>(Clock::now() - found->sent).count();
   _traces.Defer("audio-confirm", [&] { return std::format("id={} rtt={:.1f}", id, rtt); });
   if (!_has_confirmation)
-    _diagnostics.Log(SDLRDP_LOG_INFO, std::format("Audio block confirm round trip: {:.3f} ms; client timestamp={}; "
-                                                  "block={}.",
-                                                  rtt, timestamp, id));
+    _diagnostics.Log(LogLevel::Info, std::format("Audio block confirm round trip: {:.3f} ms; client timestamp={}; "
+                                                 "block={}.",
+                                                 rtt, timestamp, id));
   _confirmed        += found->frames;
   _has_confirmation =  true;
   _pending.erase(found);
@@ -300,7 +304,7 @@ auto AudioChannel::RecordBlock(Clock::time_point now, std::uint8_t block) -> voi
 }
 auto AudioChannel::TransportEnded() -> void {
   _ready = false;
-  _diagnostics.Log(SDLRDP_LOG_WARN, "Audio transport ended; discarding samples until reconnection.");
+  _diagnostics.Log(LogLevel::Warn, "Audio transport ended; discarding samples until reconnection.");
   _session.AudioGone();
 }
 }

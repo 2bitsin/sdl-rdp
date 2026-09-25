@@ -8,8 +8,10 @@
 #include <utility>
 
 namespace sdl_rdp::picture::detail::frame_store {
+using sdl_rdp::utilities::AspectRatio;
 using sdl_rdp::utilities::Ensures;
 using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::Rect;
 using sdl_rdp::utilities::SameSize;
 using sdl_rdp::utilities::Whole;
 
@@ -19,12 +21,12 @@ auto EnsureConsistent(FrameSnapshot const& shadow, PictureGeometry const& geomet
   auto const consistent = !shadow || SameSize(shadow.Bounds(), geometry.Bounds());
   Ensures(consistent, "the shadow has the picture's size", where);
 }
-auto Blank(sdlrdp_rect bounds) -> FrameSnapshot {
+auto Blank(Rect bounds) -> FrameSnapshot {
   Extent const size{ .width = Narrowed<std::uint32_t>(bounds.w), .height = Narrowed<std::uint32_t>(bounds.h) };
   return { std::make_shared<std::vector<std::uint8_t> const>(FrameBytes(size)), size };
 }
 }
-FrameStore::FrameStore(Extent size, sdlrdp_aspect aspect) : _geometry{ size, aspect } { }
+FrameStore::FrameStore(Extent size, std::optional<AspectRatio> aspect) : _geometry{ size, aspect } { }
 auto FrameStore::Lock() -> FrameLock {
   return FrameLock{ _guard };
 }
@@ -34,11 +36,11 @@ auto FrameStore::Holds(FrameLock const& held) const noexcept -> bool {
 auto FrameStore::Notify() -> void {
   _changed.notify_all();
 }
-auto FrameStore::Picture(FrameLock const& held) const -> sdlrdp_rect {
+auto FrameStore::Picture(FrameLock const& held) const -> Rect {
   Expects(Holds(held), "reading the picture holds the frame lock");
   return _geometry.Desktop();
 }
-auto FrameStore::Bounds(FrameLock const& held) const -> sdlrdp_rect {
+auto FrameStore::Bounds(FrameLock const& held) const -> Rect {
   Expects(Holds(held), "reading the bounds holds the frame lock");
   return _geometry.Bounds();
 }
@@ -79,7 +81,7 @@ auto FrameStore::Resize(FrameLock const& held, Extent size) -> bool {
   EnsureConsistent(_shadow, _geometry);
   return true;
 }
-auto FrameStore::SetAspect(FrameLock const& held, sdlrdp_aspect value) -> void {
+auto FrameStore::SetAspect(FrameLock const& held, std::optional<AspectRatio> value) -> void {
   Expects(Holds(held), "changing the aspect holds the frame lock");
   _geometry.SetAspect(value);
 }

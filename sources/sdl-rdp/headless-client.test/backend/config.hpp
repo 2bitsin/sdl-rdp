@@ -1,18 +1,16 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/configuration/setup.hpp>
+#include <sdl-rdp/utilities/extent.hpp>
 
-#include <string>
+#include <filesystem>
 
 namespace sdl_rdp::headless_client_test::backend::detail::config {
-inline auto LoopbackConfig(std::string const& certificates) -> sdlrdp_config {
-  sdlrdp_config config{ };
-  config.bind     = "127.0.0.1";
-  config.cert_dir = certificates.c_str();
-  config.width    = 320;
-  config.height   = 200;
-  return config;
+using sdl_rdp::configuration::Setup;
+using sdl_rdp::utilities::Extent;
+inline auto LoopbackConfig(std::filesystem::path const& certificates, Extent size = { .width = 320, .height = 200 })
+    -> Setup {
+  return { .bind = "127.0.0.1", .cert_dir = certificates, .width = size.width, .height = size.height };
 }
-auto LoopbackConfig(std::string&& certificates) -> sdlrdp_config = delete;
 }
 
 namespace sdl_rdp::headless_client_test::backend {

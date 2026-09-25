@@ -16,11 +16,9 @@ public:
   auto Replace(std::string value) -> std::uint64_t;
   auto Text() const noexcept      -> std::string const&;
   auto Unicode() const noexcept   -> std::span<std::byte const>;
-  auto Export()                   -> std::string const&;
 
 private:
-  std::string            _exported;
-  std::vector<std::byte> _unicode { std::byte{ 0 }, std::byte{ 0 } };
+  std::vector<std::byte> _unicode{ std::byte{ 0 }, std::byte{ 0 } };
 };
 }
 

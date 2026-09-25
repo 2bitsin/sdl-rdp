@@ -1,2 +1,2 @@
 Init_submodule()
-Link_dependencies(oxbox::platform abi)
+Link_dependencies(oxbox::platform)

@@ -1,7 +1,7 @@
 #pragma once
 #include "defaults.hpp"
 #include "parsing.hpp"
-#include <sdl-rdp/SDL3/rdp/backend/sdl-internals.hpp>
+#include <sdl-rdp/SDL3/rdp/sdl/internals.hpp>
 #include <sdl-rdp/settings/hint.hpp>
 #include <sdl-rdp/settings/settings.hpp>
 

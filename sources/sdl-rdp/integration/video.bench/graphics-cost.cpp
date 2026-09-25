@@ -1,9 +1,11 @@
-#include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/configuration/codec.hpp>
+#include <sdl-rdp/diagnostics/log-level.hpp>
 #include <sdl-rdp/headless-client.test/backend/await-acknowledged.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
 #include <sdl-rdp/headless-client.test/graphics/cost.hpp>
 #include <sdl-rdp/integration/support.bench/session.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
+#include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/video/avc/encoder.hpp>
 
 #include <algorithm>
@@ -18,6 +20,8 @@
 #include <vector>
 
 namespace sdl_rdp::integration::video_bench::detail::graphics_cost {
+using sdl_rdp::configuration::Codec;
+using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::headless_client_test::backend::AwaitAllAcknowledged;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::Pixels;
@@ -30,6 +34,7 @@ using sdl_rdp::integration::support_bench::OneSession;
 using sdl_rdp::integration::support_bench::Session;
 using sdl_rdp::integration::support_bench::Skip;
 using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Rect;
 using sdl_rdp::video::avc::Encoder;
 constexpr std::size_t CostGroups = 6;
 struct CostLine {
@@ -81,8 +86,8 @@ auto GraphicsCostSession::EncodeCost(std::string_view pattern) -> std::optional<
 }
 
 auto FullRandomFrame::TestBody() -> void {
-  if (!Holds([this] { Open(); })) return;
-  Client client(sdlrdp_port(&*backend), true, 1280, 800);
+  if (!Passes([this] { Open(); })) return;
+  Client client(backend.Port(), true, 1280, 800);
   client.EnableGraphics();
   GraphicsObserver const observer(client);
   if (Connected(client) && PresentedRandomFrame(client)) ThenProgressiveCost(client, observer);
@@ -95,9 +100,9 @@ auto FullRandomFrame::PresentedRandomFrame(Client& client) -> bool {
   Pixels       pixels(1280uz * 800);
   std::mt19937 random(17);            // NOLINT(cert-msc32-c, cert-msc51-cpp): Reproducible codec input.
   std::ranges::generate(pixels, [&] { return random() & 0x00ffffff; });
-  sdlrdp_rect const full{ 0, 0, 1280, 800 };
-  return Check(backend.Present(pixels, 1280, 800, full) == 0, "the backend presents")
-         && Holds([&] { AwaitAllAcknowledged(client, backend, logs); });
+  Rect const full{ .x = 0, .y = 0, .w = 1280, .h = 800 };
+  return Passes([&] { backend.Present(pixels, 1280, 800, full); },
+                [&] { AwaitAllAcknowledged(client, backend, logs); });
 }
 auto FullRandomFrame::ThenProgressiveCost(Client& client, GraphicsObserver const& observer) -> void {
   if (!Check(observer.Observed().frames.size() == 1, "the client observes one frame")) return;
@@ -107,7 +112,7 @@ auto FullRandomFrame::ThenProgressiveCost(Client& client, GraphicsObserver const
                                R"(acknowledgement ([0-9.]+) ms mean, ([0-9.]+) ms max, ([0-9]+) over 100 ms, )"
                                R"([0-9]+ timed out\.)");
   if (!cost) return;
-  Check(logs.Count(SDLRDP_LOG_INFO, "Frames:") == 1, "one statistics line is logged");
+  Check(logs.Count(LogLevel::Info, "Frames:") == 1, "one statistics line is logged");
   Check(cost->groups[1] == cost->groups[2], "one frame's encode mean is its maximum");
   Check(cost->groups[3] == cost->groups[4], "one frame's acknowledgement mean is its maximum");
   Check(cost->encode_ms > 0.0, "encoding takes time");
@@ -118,8 +123,8 @@ auto AvcFullFrame::TestBody() -> void {
     Skip(Encoder::UnavailableReason());
     return;
   }
-  if (!Holds([this] { Open(1920, 1080, SDLRDP_CODEC_AVC420); })) return;
-  Client client(sdlrdp_port(&*backend), true, 1920, 1080);
+  if (!Passes([this] { Open(1920, 1080, Codec::Avc420); })) return;
+  Client client(backend.Port(), true, 1920, 1080);
   client.EnableGraphics({ .h264 = true });
   GraphicsObserver const observer(client);
   if (!PresentedTiles(client, observer)) return;
@@ -128,7 +133,7 @@ auto AvcFullFrame::TestBody() -> void {
   ThenAvcCost();
 }
 auto AvcFullFrame::PresentedTiles(Client& client, GraphicsObserver const& observer) -> bool {
-  return Holds([&] { ConnectGraphics(client); }, [&] { PresentMovingTiles(client, 10); })
+  return Passes([&] { ConnectGraphics(client); }, [&] { PresentMovingTiles(client, 10); })
          && Check(observer.Observed().avc_nals.size() == 10, "every frame is one AVC NAL unit")
          && Check(observer.Observed().frames.size() == 10, "the client observes every frame");
 }

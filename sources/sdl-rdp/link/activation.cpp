@@ -3,14 +3,13 @@
 #include <sdl-rdp/configuration/refresh.hpp>
 #include <sdl-rdp/link/event-queue.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
-#include <sdl-rdp/utilities/contract.hpp>
 
 #include <cstdint>
 #include <utility>
 
 namespace sdl_rdp::link::detail::activation {
+using sdl_rdp::configuration::Codec;
 using sdl_rdp::configuration::MillihertzPerHz;
-using sdl_rdp::utilities::Expects;
 
 Activation::Activation(EventQueue& events, PeerLink& link) noexcept : _events{ events }, _link{ link } { }
 auto Activation::Activate() -> void {
@@ -36,26 +35,24 @@ auto Activation::Finished() const noexcept -> bool {
 auto Activation::ActivatedAt() const noexcept -> Activation::Clock::time_point {
   return _activated_at;
 }
-auto Activation::Hold(sdlrdp_event connection, sdlrdp_event screen) -> void {
-  Expects(connection.type == SDLRDP_CONNECTED, "held event announces a connection");
-  Expects(screen.type == SDLRDP_SCREEN, "held screen event describes the client screen");
-  _connection = connection;
+auto Activation::Hold(Connected connection, ScreenChanged screen) -> void {
+  _connection = std::move(connection);
   _screen     = screen;
 }
 auto Activation::Holding() const noexcept -> bool {
   return _connection.has_value();
 }
-auto Activation::Announce(sdlrdp_codec codec, std::uint32_t refresh_hz) -> void {
+auto Activation::Announce(Codec codec, std::uint32_t refresh_hz) -> void {
   auto connection = std::exchange(_connection, std::nullopt);
   if (!connection) return;
-  connection->connected.codec              = codec;
-  connection->connected.refresh_millihertz = refresh_hz * MillihertzPerHz;
-  _events.Push(*connection);
+  connection->codec              = codec;
+  connection->refresh_millihertz = refresh_hz * MillihertzPerHz;
+  _events.Push(std::move(*connection));
   _events.Push(_screen);
   _link.Signal();
 }
-auto Activation::CodecChanged(sdlrdp_codec codec) -> void {
-  if (Active() && !Holding()) _events.Push({ .type = SDLRDP_CODEC_CHANGED, .codec_changed = { codec } });
+auto Activation::CodecChanged(Codec codec) -> void {
+  if (Active() && !Holding()) _events.Push(sdl_rdp::link::CodecChanged{ codec });
 }
 auto Activation::Suppress() noexcept -> void {
   _suppressed = true;

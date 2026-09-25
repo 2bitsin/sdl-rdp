@@ -1,5 +1,5 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/video/graphics-timing.hpp>
 
 #include <freerdp/peer.h>
@@ -10,12 +10,13 @@
 #include <optional>
 
 namespace sdl_rdp::peer::detail::status {
+using sdl_rdp::utilities::Rect;
 using sdl_rdp::video::GraphicsTiming;
 
 struct PeerStatus {
   std::reference_wrapper<freerdp_peer>                     client;
   std::optional<std::reference_wrapper<DispServerContext>> display;
-  sdlrdp_rect                                              desktop         { };
+  Rect                                                     desktop         { };
   bool                                                     resizing        { };
   bool                                                     holding         { };
   std::chrono::steady_clock::time_point                    activated_at;

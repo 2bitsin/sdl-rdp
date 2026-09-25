@@ -1,5 +1,5 @@
 #include "parsing.hpp"
-#include <sdl-rdp/SDL3/rdp/backend/sdl-internals.hpp>
+#include <sdl-rdp/SDL3/rdp/sdl/internals.hpp>
 #include <string>
 #include <string_view>
 namespace sdl3::rdp::settings::detail::parsing {

@@ -1,24 +1,25 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/utilities/rect.hpp>
 
 #include <freerdp/channels/rdpgfx.h>
 #include <cstddef>
 #include <vector>
 
 namespace sdl_rdp::video::avc::detail::regions {
+using sdl_rdp::utilities::Rect;
 class Regions {
 public:
-  auto Add(sdlrdp_rect area) -> void;
-  auto Bytes() const         -> std::size_t;
-  auto Areas()               -> std::vector<RECTANGLE_16>&;
-  auto Quality()             -> std::vector<RDPGFX_H264_QUANT_QUALITY>&;
-  auto Bounds() const        -> sdlrdp_rect;
-  auto Clear()               -> void;
+  auto Add(Rect area) -> void;
+  auto Bytes() const  -> std::size_t;
+  auto Areas()        -> std::vector<RECTANGLE_16>&;
+  auto Quality()      -> std::vector<RDPGFX_H264_QUANT_QUALITY>&;
+  auto Bounds() const -> Rect;
+  auto Clear()        -> void;
 
 private:
   std::vector<RECTANGLE_16>              areas;
   std::vector<RDPGFX_H264_QUANT_QUALITY> quality;
-  sdlrdp_rect                            bounds { };
+  Rect                                   bounds { };
 };
 }
 

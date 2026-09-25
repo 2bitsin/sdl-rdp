@@ -1,25 +1,24 @@
 #include <sdl-rdp/auth/account.hpp>
 
+#include <sdl-rdp/utilities/wiped-string.hpp>
+
 #include <gtest/gtest.h>
 #include <array>
 #include <cstdint>
 #include <ranges>
 
 namespace sdl_rdp::auth::detail::account {
+using sdl_rdp::configuration::Setup;
 namespace {
 // MS-NLMP 4.2.2.1.2: NTOWFv1 of "Password".
 constexpr std::array<std::uint8_t, 16> PasswordHash{ 0xa4, 0xf4, 0x9c, 0x40, 0x65, 0x10, 0xbd, 0xca,
                                                      0xb6, 0x82, 0x4e, 0xe7, 0xc3, 0x0f, 0xd8, 0x52 };
-auto Pair() -> sdlrdp_config {
-  sdlrdp_config config{ };
-  config.user     = "User";
-  config.password = "Password";
-  config.domain   = "Domain";
-  return config;
+auto Pair() -> Setup {
+  return { .user = "User", .password = WipedString{ "Password" }, .domain = "Domain" };
 }
-auto AnyDomain() -> sdlrdp_config {
+auto AnyDomain() -> Setup {
   auto config = Pair();
-  config.domain = nullptr;
+  config.domain.reset();
   return config;
 }
 }
@@ -42,8 +41,8 @@ TEST(Account, AnyDomainWhenNoneIsConfigured) {
 TEST(Account, NoPairWithoutUserOrPassword) {
   auto without_user     = AnyDomain();
   auto without_password = AnyDomain();
-  without_user.user         = nullptr;
-  without_password.password = nullptr;
+  without_user.user.reset();
+  without_password.password.reset();
   EXPECT_FALSE(Account{ without_user }.Verifies("", "", "Password"));
   EXPECT_FALSE(Account{ without_password }.Verifies("", "User", ""));
   EXPECT_FALSE(Account{ without_user }.NtHash("", "").has_value());

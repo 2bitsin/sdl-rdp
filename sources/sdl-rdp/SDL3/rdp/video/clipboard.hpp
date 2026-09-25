@@ -1,8 +1,8 @@
 #pragma once
 #include "videodata.hpp"
 namespace sdl3::rdp::video::detail::clipboard {
-auto InitClipboard(SDL_VideoDevice& device)     -> void;
-auto ClipboardUpdate(SDL_VideoData const& data) -> void;
+auto InitClipboard(SDL_VideoDevice& device) -> void;
+auto ClipboardUpdate(SDL_VideoData& data)   -> void;
 }
 
 namespace sdl3::rdp::video {

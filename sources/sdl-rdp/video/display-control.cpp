@@ -5,10 +5,12 @@
 #include <sdl-rdp/freerdp-facade/handled.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/event-queue.hpp>
+#include <sdl-rdp/link/event.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/picture/desktop-layout.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
+#include <sdl-rdp/utilities/rect.hpp>
 
 #include <freerdp/channels/wtsvc.h>
 #include <freerdp/settings.h>
@@ -23,9 +25,11 @@ using sdl_rdp::diagnostics::FailuresThrough;
 using sdl_rdp::freerdp_facade::BindContext;
 using sdl_rdp::freerdp_facade::CallbackOwner;
 using sdl_rdp::link::DynamicChannelsReady;
+using sdl_rdp::link::ScreenChanged;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::OperationName;
+using sdl_rdp::utilities::Rect;
 
 namespace {
 constexpr std::uint32_t MonitorLimit      = 16;
@@ -42,14 +46,17 @@ auto Edge(std::span<Monitor const> monitors, std::regular_invocable<Monitor cons
           std::regular_invocable<std::int64_t, std::int64_t> auto pick) -> std::int64_t {
   return std::ranges::fold_left(monitors | std::views::transform(edge), std::int64_t{ 0 }, pick);
 }
-auto Covering(std::span<Monitor const> monitors) -> sdlrdp_rect {
+auto Covering(std::span<Monitor const> monitors) -> Rect {
   auto const lower  = [](std::int64_t a, std::int64_t b) { return std::min(a, b); };
   auto const upper  = [](std::int64_t a, std::int64_t b) { return std::max(a, b); };
   auto const left   = Edge(monitors, [](auto const& m) { return std::int64_t{ m.Left }; }, lower);
   auto const top    = Edge(monitors, [](auto const& m) { return std::int64_t{ m.Top }; }, lower);
   auto const right  = Edge(monitors, [](auto const& m) { return std::int64_t{ m.Left } + m.Width; }, upper);
   auto const bottom = Edge(monitors, [](auto const& m) { return std::int64_t{ m.Top } + m.Height; }, upper);
-  return { Narrowed<int>(left), Narrowed<int>(top), Narrowed<int>(right - left), Narrowed<int>(bottom - top) };
+  return { .x = Narrowed<int>(left),
+           .y = Narrowed<int>(top),
+           .w = Narrowed<int>(right - left),
+           .h = Narrowed<int>(bottom - top) };
 }
 }
 class DisplayControl::Callbacks {
@@ -95,8 +102,7 @@ auto DisplayControl::Layout(DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const& pdu) -> st
   if (_desktop.Matches(extent)) return CHANNEL_RC_OK;
   if (extent.w <= 0 || extent.h <= 0) return ERROR_INVALID_DATA;
   _events.Push(
-      { .type   = SDLRDP_SCREEN,
-        .screen = { .width = Narrowed<std::uint32_t>(extent.w), .height = Narrowed<std::uint32_t>(extent.h) } });
+      ScreenChanged{ .width = Narrowed<std::uint32_t>(extent.w), .height = Narrowed<std::uint32_t>(extent.h) });
   return CHANNEL_RC_OK;
 }
 auto DisplayControl::FailureSource() const noexcept -> Diagnostics const& {

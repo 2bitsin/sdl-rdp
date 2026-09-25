@@ -1,36 +1,51 @@
 #include "drive.hpp"
-#include <sdl-rdp/SDL3/rdp/backend/boundary.hpp>
+#include <sdl-rdp/SDL3/rdp/driver.hpp>
 #include <sdl-rdp/SDL3/rdp/owneddriver.hpp>
-#include <sdl-rdp/utilities/narrowed.hpp>
+#include <sdl-rdp/SDL3/rdp/sdl/boundary.hpp>
+#include <sdl-rdp/SDL3/rdp/sdl/resources.hpp>
+#include <sdl-rdp/drive/directory-entry.hpp>
+#include <sdl-rdp/drive/file-status.hpp>
+#include <sdl-rdp/drive/files.hpp>
+#include <sdl-rdp/session/backend.hpp>
 #include <sdl-rdp/utilities/void-buffer.hpp>
+#include <array>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
+#include <memory>
+#include <optional>
 #include <span>
+#include <string>
+#include <string_view>
+#include <utility>
 namespace sdl3::rdp::storage::detail::bootstrap {
-using sdl3::rdp::backend::Boundary;
-using sdl3::rdp::backend::Operation;
-using sdl3::rdp::backend::StorageHandle;
+using sdl3::rdp::sdl::Boundary;
+using sdl3::rdp::sdl::StorageHandle;
+using sdl_rdp::drive::DirectoryEntry;
+using sdl_rdp::drive::DriveFiles;
+using sdl_rdp::drive::FileStatus;
 using sdl_rdp::utilities::ByteBuffer;
 using sdl_rdp::utilities::BytesOf;
-using sdl_rdp::utilities::Ensures;
 using sdl_rdp::utilities::Expects;
-using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::NotImplemented;
 using sdl_rdp::utilities::VoidBuffer;
 namespace {
 constexpr std::size_t DirectoryBatch = 32;
 constexpr std::size_t CopyChunkBytes = 65536;
-class Storage : private OwnedDriver<Driver const> {
+class Storage : private OwnedDriver {
 public:
-  using OwnedDriver<Driver const>::Backend;
-  using OwnedDriver<Driver const>::Owner;
-       Storage(std::shared_ptr<Driver const> driver, std::optional<std::string> name)
-      : OwnedDriver<Driver const>{ std::move(driver) }, _name{ std::move(name) } { }
+  using OwnedDriver::Driver;
+  using OwnedDriver::Owner;
+       Storage(std::shared_ptr<sdl3::rdp::Driver> driver, std::optional<std::string> name)
+      : OwnedDriver{ std::move(driver) }, _name{ std::move(name) } { }
   auto Drive() const -> std::uint32_t {
     return _drive;
   }
+  auto Files() -> DriveFiles {
+    return Driver().Backend().Drive();
+  }
   auto Resolve() -> void {
-    _drive = DriveId(Backend(), _name);
+    _drive = DriveId(Driver(), _name);
   }
 private:
   std::optional<std::string> _name;
@@ -53,18 +68,22 @@ auto StorageReady(void* context) -> bool {
     return true;
   });
 }
-// SDL path queries supply a borrowed path and an ABI output record.
+auto PathInfo(FileStatus const& value) -> SDL_PathInfo {
+  SDL_PathInfo info{ };
+  info.type        = value.directory ? SDL_PATHTYPE_DIRECTORY : SDL_PATHTYPE_FILE;
+  info.size        = value.size;
+  info.modify_time = static_cast<SDL_Time>(SDL_SECONDS_TO_NS(value.modified));
+  return info;
+}
+// SDL path queries supply a borrowed path and an output record.
 auto StorageInfo(void* context, char const* path, SDL_PathInfo* info) -> bool {
   Expects(path != nullptr, "path query has a path");
   Expects(info != nullptr, "path query has an output");
-  auto const& data  = Opened(context);
-  sdlrdp_stat value { };
-  if (data.Backend().Call<Operation::DRIVE_STAT>(data.Drive(), path, &value) < 0) return data.Backend().Fail();
-  *info             = { };
-  info->type        = value.directory ? SDL_PATHTYPE_DIRECTORY : SDL_PATHTYPE_FILE;
-  info->size        = value.size;
-  info->modify_time = static_cast<SDL_Time>(SDL_SECONDS_TO_NS(value.modified));
-  return true;
+  auto& data = Opened(context);
+  return Boundary([&] {
+    *info = PathInfo(data.Files().Stat(data.Drive(), path));
+    return true;
+  });
 }
 // Drive paths are client paths in UTF-8 with '/' separators, not host filesystem paths.
 auto DirectoryPrefix(std::string_view path) -> std::string {
@@ -72,41 +91,32 @@ auto DirectoryPrefix(std::string_view path) -> std::string {
   if (!prefix.empty() && !prefix.ends_with('/')) prefix += '/';
   return prefix;
 }
-auto ReadDirectory(Storage const& data, std::string const& path, std::uint32_t offset, std::span<sdlrdp_dirent> entries)
-    -> std::span<sdlrdp_dirent const> {
-  auto const count = data.Backend().Call<Operation::DRIVE_ENUMERATE>(data.Drive(), path.c_str(), offset, entries.data(),
-                                                                     Narrowed<std::uint32_t>(entries.size()));
-  if (count < 0) data.Backend().Throw();
-  Ensures(std::cmp_less_equal(count, entries.size()), "backend fills at most the directory buffer");
-  return entries.first(static_cast<std::size_t>(count));
-}
 template <typename ConsumerTy>
-concept EntryConsumer = std::is_invocable_r_v<SDL_EnumerationResult, ConsumerTy const&, sdlrdp_dirent const&>;
+concept EntryConsumer = std::is_invocable_r_v<SDL_EnumerationResult, ConsumerTy const&, DirectoryEntry const&>;
 template <EntryConsumer ConsumerTy>
-auto Deliver(std::span<sdlrdp_dirent const> entries, ConsumerTy const& consume) -> SDL_EnumerationResult {
+auto Deliver(std::span<DirectoryEntry const> entries, ConsumerTy const& consume) -> SDL_EnumerationResult {
   for (auto const& entry : entries)
     if (auto const result = consume(entry); result != SDL_ENUM_CONTINUE) return result;
   return SDL_ENUM_CONTINUE;
 }
 template <EntryConsumer ConsumerTy>
-auto Enumerate(Storage const& data, std::string const& path, ConsumerTy const& consume) -> bool {
-  std::array<sdlrdp_dirent, DirectoryBatch> entries{ };
-  for (std::uint32_t offset{ };; offset += Narrowed<std::uint32_t>(entries.size())) {
-    auto const batch  = ReadDirectory(data, path, offset, entries);
+auto Enumerate(Storage& data, std::string_view path, ConsumerTy const& consume) -> bool {
+  for (std::size_t offset{ };; offset += DirectoryBatch) {
+    auto const batch  = data.Files().Enumerate(data.Drive(), path, offset, DirectoryBatch);
     auto const result = Deliver(batch, consume);
     if (result != SDL_ENUM_CONTINUE) return result == SDL_ENUM_SUCCESS;
-    if (batch.size() < entries.size()) return true;
+    if (batch.size() < DirectoryBatch) return true;
   }
 }
 // SDL enumeration passes a borrowed path and the application's callback with its opaque context.
 auto StorageEnumerate(void* context, char const* path, SDL_EnumerateDirectoryCallback callback, void* user) -> bool {
   Expects(path != nullptr, "enumeration has a path");
   Expects(callback != nullptr, "enumeration has a consumer");
-  auto const& data = Opened(context);
+  auto& data = Opened(context);
   return Boundary([&] {
     auto const directory = DirectoryPrefix(path);
-    return Enumerate(data, path,
-                     [&](sdlrdp_dirent const& entry) { return callback(user, directory.c_str(), entry.name); });
+    return Enumerate(
+        data, path, [&](DirectoryEntry const& entry) { return callback(user, directory.c_str(), entry.name.c_str()); });
   });
 }
 template <ByteBuffer ByteTy> auto TransferAll(SDL_IOStream& stream, std::span<ByteTy> bytes) -> std::size_t {
@@ -137,12 +147,15 @@ auto StorageTransfer(void* context, char const* path, VoidTy* buffer, std::uint6
   });
 }
 // SDL storage mutation callbacks supply an opaque context and one or more borrowed paths.
-template <Operation OPERATION, typename... PathTy>
+template <auto OPERATION, typename... PathTy>
   requires(std::same_as<PathTy, char const*> && ...)
 auto StorageMutate(void* context, PathTy... path) -> bool {
   (Expects(path != nullptr, "storage mutation has its paths"), ...);
-  auto const& data = Opened(context);
-  return data.Backend().Call<OPERATION>(data.Drive(), path...) >= 0 || data.Backend().Fail();
+  auto& data = Opened(context);
+  return Boundary([&] {
+    std::invoke(OPERATION, data.Files(), data.Drive(), std::string_view{ path }...);
+    return true;
+  });
 }
 auto CopyStream(SDL_IOStream& source, SDL_IOStream& target) -> bool {
   std::array<std::uint8_t, CopyChunkBytes> buffer{ };
@@ -155,7 +168,7 @@ auto CopyStream(SDL_IOStream& source, SDL_IOStream& target) -> bool {
 auto StorageCopy(void* context, char const* from, char const* to) -> bool {
   Expects(from != nullptr, "storage copy has a source path");
   Expects(to != nullptr, "storage copy has a target path");
-  auto const& data = Opened(context);
+  auto& data = Opened(context);
   return Boundary([&] {
     if (std::string_view{ from } == to) return SDL_SetError("RDP copy source equals destination");
     auto       source        = OpenDriveFile(data.Owner(), data.Drive(), from, FileMode{ "rb" });
@@ -168,7 +181,7 @@ auto StorageCopy(void* context, char const* from, char const* to) -> bool {
 }
 // SDL storage space callbacks supply their opaque state.
 auto StorageSpace([[maybe_unused]] void* unused_context) -> std::uint64_t {
-  NotImplemented("RDP backend ABI has no free-space query");
+  NotImplemented("RDP drive redirection has no free-space query");
   constexpr std::uint64_t unknown_space = 0;
   return unknown_space;
 }
@@ -183,9 +196,9 @@ auto StorageOpen(char const* name, [[maybe_unused]] SDL_PropertiesID unused_prop
                                            StorageInfo,
                                            StorageTransfer<void>,
                                            StorageTransfer<void const>,
-                                           StorageMutate<Operation::DRIVE_MKDIR, char const*>,
-                                           StorageMutate<Operation::DRIVE_REMOVE, char const*>,
-                                           StorageMutate<Operation::DRIVE_RENAME, char const*, char const*>,
+                                           StorageMutate<&DriveFiles::MakeDirectory, char const*>,
+                                           StorageMutate<&DriveFiles::Remove, char const*>,
+                                           StorageMutate<&DriveFiles::Rename, char const*, char const*>,
                                            StorageCopy,
                                            StorageSpace };
     StorageHandle              storage   { &interface, data.get() };

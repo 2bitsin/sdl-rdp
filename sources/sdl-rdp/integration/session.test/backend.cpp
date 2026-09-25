@@ -1,7 +1,11 @@
-#include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/session/backend.hpp>
+
+#include <sdl-rdp/configuration/codec.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
+#include <sdl-rdp/diagnostics/log-level.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
-#include <sdl-rdp/headless-client.test/backend/certificate-directory.hpp>
+#include <sdl-rdp/headless-client.test/backend/config.hpp>
 #include <sdl-rdp/headless-client.test/backend/events.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
 #include <sdl-rdp/headless-client.test/client/has-cookie.hpp>
@@ -12,27 +16,35 @@
 #include <sdl-rdp/headless-client.test/utilities/io.hpp>
 #include <sdl-rdp/utilities/copy-rows.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
+#include <sdl-rdp/utilities/rect.hpp>
 
 #include <gtest/gtest.h>
 #include <openssl/pem.h>
 #include <openssl/x509v3.h>
+#include <oxbox/platform/scratch-area.hpp>
 #include <oxbox/utilities/span.hpp>
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <fcntl.h>
+#include <filesystem>
 #include <future>
 #include <span>
 #include <system_error>
+#include <utility>
 
 namespace sdl_rdp::integration::session_test::detail::backend {
+using oxbox::platform::ScratchArea;
+using sdl_rdp::configuration::Codec;
+using sdl_rdp::configuration::Setup;
+using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::freerdp_facade::Bio;
 using sdl_rdp::freerdp_facade::Certificate;
 using sdl_rdp::freerdp_facade::Settings;
 using sdl_rdp::headless_client_test::backend::BackendInstance;
-using sdl_rdp::headless_client_test::backend::CertificateDirectory;
 using sdl_rdp::headless_client_test::backend::Clock;
 using sdl_rdp::headless_client_test::backend::Logs;
+using sdl_rdp::headless_client_test::backend::LoopbackConfig;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::HasCookie;
 using sdl_rdp::headless_client_test::client::Pixels;
@@ -43,7 +55,9 @@ using sdl_rdp::headless_client_test::utilities::ChildProcess;
 using sdl_rdp::headless_client_test::utilities::ReadText;
 using sdl_rdp::utilities::CopyRows;
 using sdl_rdp::utilities::Descriptor;
+using sdl_rdp::utilities::Extent;
 using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::Rect;
 using sdl_rdp::utilities::Releases;
 
 namespace {
@@ -65,9 +79,9 @@ auto ThenCertificatePermissions(std::filesystem::path const& data) -> void {
             Perm::owner_read | Perm::owner_write);
 }
 auto ThenNewestRoute(Logs& first, Logs& second) -> void {
-  WLog_Print(WLog_GetRoot(), WLOG_WARN, "latest handle marker");
-  EXPECT_FALSE(first.Contains("latest handle marker"));
-  EXPECT_TRUE(second.Contains(SDLRDP_LOG_WARN, "latest handle marker"));
+  WLog_Print(WLog_GetRoot(), WLOG_WARN, "latest backend marker");
+  EXPECT_FALSE(first.Contains("latest backend marker"));
+  EXPECT_TRUE(second.Contains(LogLevel::Warn, "latest backend marker"));
 }
 auto RunLogChild(int output) -> int {
   if (dup2(output, STDOUT_FILENO) < 0) return 125;
@@ -89,42 +103,50 @@ TEST(CopyRows, PaddedRows) {
   EXPECT_EQ(destination, (std::array<std::uint8_t, 6>{ 3, 4, 8, 1, 2, 8 }));
   CopyRows({ }, { }, { });
 }
+namespace {
+// 192.0.2.1 is TEST-NET-1 (RFC 5737), an address no interface on the box carries.
+auto UnroutableConfig(std::filesystem::path const& certificates, Extent size) -> Setup {
+  auto config = LoopbackConfig(certificates, size);
+  config.bind = "192.0.2.1";
+  return config;
+}
+}
 TEST(Errors, WidthAndBind) {
-  CertificateDirectory const certificates;
-  sdlrdp_config              config       { "192.0.2.1", 0, certificates.Path().c_str(), 0, 200, 0 };
-  sdlrdp_handle*             handle       = nullptr;
-  ASSERT_EQ(sdlrdp_open(&config, &handle), -1);
-  EXPECT_EQ(handle, nullptr);
-  EXPECT_TRUE(std::string_view(sdlrdp_last_error()).contains("width"));
+  ScratchArea const certificates { "errors", "sdl-rdp" };
+  Logs              logs;
+  auto              config       = UnroutableConfig(certificates.Path(), { .width = 0, .height = 200 });
+  BackendInstance   backend;
+  auto const        width        = backend.TryOpen(config, logs);
+  ASSERT_FALSE(width.has_value()) << "a zero width is refused";
+  EXPECT_FALSE(backend);
+  EXPECT_TRUE(width.error().contains("width")) << width.error();
   config.width = 320;
-  ASSERT_EQ(sdlrdp_open(&config, &handle), -1);
-  EXPECT_TRUE(std::string_view(sdlrdp_last_error()).contains(std::system_category().message(EADDRNOTAVAIL)));
-  auto other = std::async(std::launch::async, [] { return std::string(sdlrdp_last_error()); });
-  EXPECT_TRUE(other.get().empty());
+  auto const bind = backend.TryOpen(config, logs);
+  ASSERT_FALSE(bind.has_value()) << "an unroutable bind address is refused";
+  EXPECT_TRUE(bind.error().contains(std::system_category().message(EADDRNOTAVAIL))) << bind.error();
 }
 
 namespace {
-auto MeasureFullFrame(BackendInstance const& handle, Client& client, Pixels const& pixels, sdlrdp_codec codec) -> void {
-  FrameCounter      counter(client);
-  auto              bytes   = client.Received();
-  auto              started = Clock::now();
-  sdlrdp_rect const area    { 0, 0, 1024, 768 };
-  ASSERT_EQ(handle.Present(pixels, 1024, 768, area), 0);
+auto MeasureFullFrame(BackendInstance const& backend, Client& client, Pixels const& pixels, Codec codec) -> void {
+  FrameCounter counter(client);
+  auto         bytes   = client.Received();
+  auto         started = Clock::now();
+  Rect const   area    { .x = 0, .y = 0, .w = 1024, .h = 768 };
+  backend.Present(pixels, 1024, 768, area);
   ASSERT_TRUE(client.Until([&] { return counter.Frames() == 1; }));
   auto elapsed = std::chrono::duration<double, std::milli>(Clock::now() - started).count();
   EXPECT_TRUE(client.Matches(pixels)) << client.MaxError(pixels);
-  auto name = std::to_string(codec);
+  auto name = std::to_string(std::to_underlying(codec));
   testing::Test::RecordProperty("codec_" + name + "_bytes", std::to_string(client.Received() - bytes));
   testing::Test::RecordProperty("codec_" + name + "_ms", std::to_string(elapsed));
   testing::Test::RecordProperty("codec_" + name + "_frames", std::to_string(counter.Frames()));
 }
-auto WhenFullFrameMeasured(CertificateDirectory const& certificates, Logs& logs, Pixels const& pixels,
-                           sdlrdp_codec codec) -> void {
-  sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), 1024, 768, 0, Logs::Collect, &logs };
+auto WhenFullFrameMeasured(ScratchArea const& certificates, Logs& logs, Pixels const& pixels, Codec codec) -> void {
+  auto config = LoopbackConfig(certificates.Path(), { .width = 1024, .height = 768 });
   config.codec = codec;
   BackendInstance backend;
-  ASSERT_NO_FATAL_FAILURE(backend.Open(config));
-  Client client(sdlrdp_port(&*backend), true, 1024, 768);
+  ASSERT_NO_FATAL_FAILURE(backend.Open(config, logs));
+  Client client(backend.Port(), true, 1024, 768);
   client.Tolerance(CodecTolerance(codec, true));
   ASSERT_TRUE(client.Connect()) << logs.Text(true);
   ASSERT_TRUE(client.Until([&] { return HasCookie(client); }));
@@ -150,11 +172,11 @@ auto ThenCertificate(std::string const& first, std::filesystem::path const& data
 }
 }
 TEST(Measurement, FullFrames1024x768) {
-  CertificateDirectory const certificates;
-  Logs                       logs;
-  Pixels                     pixels(1024uz * 768);
+  ScratchArea const certificates{ "measurement", "sdl-rdp" };
+  Logs              logs;
+  Pixels            pixels(1024uz * 768);
   HashPattern(pixels);
-  for (auto codec : { SDLRDP_CODEC_RAW, SDLRDP_CODEC_PLANAR, SDLRDP_CODEC_REMOTEFX, SDLRDP_CODEC_NSCODEC }) {
+  for (auto codec : { Codec::Raw, Codec::Planar, Codec::RemoteFx, Codec::NsCodec }) {
     ASSERT_NO_FATAL_FAILURE(WhenFullFrameMeasured(certificates, logs, pixels, codec));
   }
 }
@@ -178,32 +200,31 @@ TEST(Planar, SignedDelta64Rows) {
   EXPECT_EQ(decoded, pixels);
 }
 TEST(Logging, ListenerCallback) {
-  CertificateDirectory const certificates;
-  Logs                       logs;
+  ScratchArea const certificates{ "listener", "sdl-rdp" };
+  Logs              logs;
   ASSERT_EQ(setenv("WLOG_LEVEL", "INFO", 1), 0);
-  sdlrdp_config const config { "127.0.0.1", 0, certificates.Path().c_str(), 320, 200, 0, Logs::Collect, &logs };
-  BackendInstance     backend;
-  ASSERT_NO_FATAL_FAILURE(backend.Open(config));
-  EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, "Listening on socket"));
+  auto const      config  = LoopbackConfig(certificates.Path());
+  BackendInstance backend;
+  ASSERT_NO_FATAL_FAILURE(backend.Open(config, logs));
+  EXPECT_TRUE(logs.Contains(LogLevel::Info, "Listening on socket"));
   EXPECT_EQ(unsetenv("WLOG_LEVEL"), 0);
 }
-TEST(Logging, NewestHandleRoutesAndClears) {
-  CertificateDirectory const certificates;
-  Logs                       first;
-  Logs                       second;
-  sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), 320, 200, 0, Logs::Collect, &first };
-  BackendInstance            a;
-  BackendInstance            b;
-  ASSERT_NO_FATAL_FAILURE(a.Open(config));
-  config.log_user = &second;
-  ASSERT_NO_FATAL_FAILURE(b.Open(config));
+TEST(Logging, NewestBackendRoutesAndClears) {
+  ScratchArea const certificates { "routing", "sdl-rdp" };
+  Logs              first;
+  Logs              second;
+  auto const        config       = LoopbackConfig(certificates.Path());
+  BackendInstance   a;
+  BackendInstance   b;
+  ASSERT_NO_FATAL_FAILURE(a.Open(config, first));
+  ASSERT_NO_FATAL_FAILURE(b.Open(config, second));
   ThenNewestRoute(first, second);
   a.Close();
   WLog_Print(WLog_GetRoot(), WLOG_ERROR, "older close marker");
-  EXPECT_TRUE(second.Contains(SDLRDP_LOG_ERROR, "older close marker"));
+  EXPECT_TRUE(second.Contains(LogLevel::Error, "older close marker"));
   b.Close();
-  WLog_Print(WLog_GetRoot(), WLOG_WARN, "closed handle marker");
-  EXPECT_FALSE(second.Contains("closed handle marker"));
+  WLog_Print(WLog_GetRoot(), WLOG_WARN, "closed backend marker");
+  EXPECT_FALSE(second.Contains("closed backend marker"));
 }
 TEST(Logging, NoFreerdpStdout) {
   std::array<int, 2> pipefd{ };
@@ -235,19 +256,25 @@ private:
   std::filesystem::path      cwd  = std::filesystem::current_path();
   std::optional<std::string> data;
 };
+namespace {
+// No certificate directory: the backend generates its pair under the data home.
+auto DefaultCertificateConfig() -> Setup {
+  return { .bind = "127.0.0.1", .width = 320, .height = 200 };
+}
+}
 TEST(Certificate, StableDefaultAndPermissions) {
-  CertificateDirectory const temporary;
-  ProcessEnvironment const   restore;
-  auto                       data      = temporary.Path() / "data";
+  ScratchArea const        temporary { "certificate", "sdl-rdp" };
+  ProcessEnvironment const restore;
+  auto                     data      = temporary.Path() / "data";
   ASSERT_EQ(setenv("XDG_DATA_HOME", data.c_str(), 1), 0);
   std::string first;
   for (auto const& directory : { temporary.Path() / "one", temporary.Path() / "two" }) {
     std::filesystem::create_directory(directory);
     std::filesystem::current_path(directory);
-    sdlrdp_config const config { "127.0.0.1", 0, nullptr, 320, 200, 0 };
-    sdlrdp_handle*      handle = nullptr;
-    ASSERT_EQ(sdlrdp_open(&config, &handle), 0);
-    sdlrdp_close(handle);
+    Logs            logs;
+    BackendInstance backend;
+    ASSERT_NO_FATAL_FAILURE(backend.Open(DefaultCertificateConfig(), logs));
+    backend.Close();
     auto certificate = ReadText((data / "sdl-rdp/server.crt").c_str());
     if (first.empty())
       first = certificate;

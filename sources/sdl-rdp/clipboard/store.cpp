@@ -17,8 +17,4 @@ auto ClipboardStore::Text() const noexcept -> std::string const& {
 auto ClipboardStore::Unicode() const noexcept -> std::span<std::byte const> {
   return _unicode;
 }
-auto ClipboardStore::Export() -> std::string const& {
-  _exported = Value();
-  return _exported;
-}
 }

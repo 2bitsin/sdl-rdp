@@ -1,11 +1,11 @@
 #include "injected-faults.hpp"
 #include "method-fill.hpp"
-#include <sdl-rdp/abi/backend.h>
 #include <sdl-rdp/auth/certificate.hpp>
 #include <sdl-rdp/auth/exceptions.hpp>
 #include <sdl-rdp/auth/tls-rehearsal.hpp>
 #include <sdl-rdp/headless-client.test/backend/config.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
+#include <sdl-rdp/headless-client.test/backend/logs.hpp>
 #include <sdl-rdp/headless-client.test/client/client.hpp>
 #include <sdl-rdp/headless-client.test/utilities/child-process.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
@@ -48,6 +48,7 @@ using sdl_rdp::utilities::Narrowed;
 namespace {
 using namespace std::chrono_literals;
 using Outcome = auto (&)(int status) -> bool;
+using sdl_rdp::headless_client_test::backend::Logs;
 constexpr std::size_t   Children          = 200;
 constexpr std::size_t   FaultChildren     = 10;
 constexpr std::size_t   ChildrenPerWave   = 10;
@@ -137,22 +138,20 @@ auto RaceTwoRehearsals(Credentials const& credentials) -> int {
 auto RaceTwoPeerContexts(Credentials const& credentials) -> int {
   return RaceTwice([&] { [[maybe_unused]] TlsRehearsal const built{ credentials }; }, SocketMethod, Setter::Create);
 }
-auto OpenedBackend(std::string const& certificates) -> BackendInstance {
-  BackendInstance backend;
-  std::ignore = backend.TryOpen(LoopbackConfig(certificates));
-  return backend;
-}
 auto ConnectToOpenedBackend(std::string const& certificates) -> int {
-  auto const backend = OpenedBackend(certificates);
-  if (!backend) return FailedOtherwise;
+  Logs            logs;
+  BackendInstance backend;
+  if (!backend.TryOpen(LoopbackConfig(certificates), logs)) return FailedOtherwise;
   MethodFill::Shared().Arm(TlsMethod, Setter::Write);
-  Client     client(sdlrdp_port(&*backend), false);
+  Client     client(backend.Port(), false);
   auto const connected = client.Connect();
   return (connected ? 0 : FailedOtherwise) | (MethodFill::Shared().Fills() != 0 ? MethodFilledLate : 0);
 }
 auto OpenFailsWithMessage(std::string const& certificates) -> int {
-  auto const backend = OpenedBackend(certificates);
-  return !backend && !std::string(sdlrdp_last_error()).empty() ? 0 : FailedOtherwise;
+  Logs            logs;
+  BackendInstance backend;
+  auto const      failure = backend.TryOpen(LoopbackConfig(certificates), logs);
+  return !backend && !failure && !failure.error().empty() ? 0 : FailedOtherwise;
 }
 auto GivesUpWithin(std::chrono::milliseconds limit, Credentials const& credentials) -> int {
   TlsRehearsal rehearsal { credentials, limit };

@@ -5,14 +5,16 @@ TLS and standard RDP security, with no credential checks. `tls` accepts only TLS
 and verifies the plain credentials in Client Info. `nla` offers CredSSP/NTLM
 and also accepts TLS-only clients; NLA checks the NT hash first, then verifies
 the delegated plain credentials. A password hint defaults the driver to `nla`;
-without it the default is `none`. Backend configs default to `SDLRDP_AUTH_NONE`.
+without it the default is `none`.
 
 Set `SDL_HINT_RDP_USER`, `SDL_HINT_RDP_PASSWORD`, and optionally
 `SDL_HINT_RDP_DOMAIN` before initializing audio or video (environment names
 `SDL_RDP_USER`, `SDL_RDP_PASSWORD`, `SDL_RDP_DOMAIN`). An unset domain accepts
 any domain; a set domain must match exactly.
-The `SDL_RDP_PASSWORD` environment variable is readable by other processes of the same user; set the password hint from code or use a permission-restricted settings file as an alternative. Set `SDL_HINT_RDP_AUTH` to override
-the default. The sample accepts `--user <u> --password <p> [--domain <d>]
+The `SDL_RDP_PASSWORD` environment variable is readable by other processes of the same
+user; set the password hint from code or use a permission-restricted settings file as an
+alternative. Set `SDL_HINT_RDP_AUTH` to override the default. The sample accepts
+`--user <u> --password <p> [--domain <d>]
 [--auth none|tls|nla]`; `--verify-deny` exercises application rejection.
 
 After `SDL_Init`, an app can set these display pointer properties:
@@ -45,8 +47,6 @@ mstsc and the Mac Remote Desktop client prompt for NLA credentials.
 With xfreerdp use `/sec:nla` or `/sec:tls` and `/u:`, `/p:`, `/d:`.
 There is no lockout, PAM integration, or Kerberos authentication.
 
-Backend ABI 6 adds authentication and identity fields. The former log userdata
-field is now `log_user`; `user` is the fixed username. Config credential strings
-are copied by open. Callback pointers and `auth_user` must live through close.
-`sdlrdp_verify_pair` and `sdlrdp_lookup_pair` expose the same fixed-pair fallback
-for the dynamically loaded SDL driver.
+Every logon reads the three display properties at that moment: a verify or lookup
+callback that is set answers, and one left unset falls back to the configured user,
+password and domain.

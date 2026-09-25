@@ -1,12 +1,11 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
-#include <sdl-rdp/auth/account.hpp>
 #include <sdl-rdp/auth/credentials.hpp>
 #include <sdl-rdp/auth/state.hpp>
+#include <sdl-rdp/configuration/auth-mode.hpp>
 #include <sdl-rdp/configuration/forward.hpp>
 #include <sdl-rdp/diagnostics/forward.hpp>
-#include <sdl-rdp/freerdp-facade/ntlm.hpp>
 #include <sdl-rdp/link/forward.hpp>
+#include <sdl-rdp/utilities/nt-owf.hpp>
 #include <sdl-rdp/utilities/operation-name.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
@@ -18,11 +17,12 @@
 #include <string_view>
 
 namespace sdl_rdp::auth::detail::authenticator {
+using sdl_rdp::configuration::AuthMode;
 using sdl_rdp::configuration::Configuration;
 using sdl_rdp::diagnostics::Diagnostics;
 using sdl_rdp::diagnostics::FailureLog;
-using sdl_rdp::freerdp_facade::NtOwf;
 using sdl_rdp::link::PeerLink;
+using sdl_rdp::utilities::NtOwf;
 using sdl_rdp::utilities::OperationName;
 using sdl_rdp::utilities::Pinned;
 
@@ -36,7 +36,7 @@ public:
   auto Hash(SEC_WINNT_AUTH_IDENTITY const& identity, NtKey response) -> bool;
   auto End()                                                         -> void;
   auto InstallCredentials(rdpSettings& settings) const               -> void;
-  auto Auth() const noexcept                                         -> sdlrdp_auth;
+  auto Auth() const noexcept                                         -> AuthMode;
 
 private:
   auto Reject()                                                                              -> void;
@@ -49,15 +49,21 @@ private:
   PeerLink&            _link;
   Configuration const& _configuration;
   Diagnostics const&   _diagnostics;
-  Account              _account;
   Credentials          _credentials;
   AuthenticationState  _state;
 };
-auto AuthenticationIdentity(freerdp_peer const& client, sdlrdp_event& event) -> void;
+// Who the client said it was, and whether the server accepted it.
+struct ClientIdentity {
+  std::string user;
+  std::string domain;
+  bool        authenticated{ };
+};
+auto AuthenticationIdentity(freerdp_peer const& client) -> ClientIdentity;
 }
 
 namespace sdl_rdp::auth {
 using detail::authenticator::AuthenticationIdentity;
 using detail::authenticator::Authenticator;
+using detail::authenticator::ClientIdentity;
 using detail::authenticator::NtKey;
 }

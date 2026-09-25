@@ -1,53 +1,58 @@
 #include "configuration.hpp"
-#include <sdl-rdp/utilities/contract.hpp>
-#include <cstddef>
-#include <utility>
+#include <sdl-rdp/utilities/wiped-string.hpp>
+#include <cstdlib>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <string_view>
 namespace sdl3::rdp::settings::detail::configuration {
+using sdl_rdp::configuration::AuthMode;
 using sdl_rdp::settings::Settings;
-using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::WipedString;
 namespace {
-// The backend log callback carries an opaque context and a borrowed C string.
-auto Log([[maybe_unused]] void* unused, sdlrdp_log_level level, char const* text) -> void {
-  constexpr std::array priorities{ SDL_LOG_PRIORITY_ERROR, SDL_LOG_PRIORITY_WARN, SDL_LOG_PRIORITY_INFO };
-  Expects(std::cmp_less(std::to_underlying(level), priorities.size()), "backend log level is known");
-  Expects(text != nullptr, "backend log has text");
-  SDL_LogMessage(SDL_LOG_CATEGORY_VIDEO, priorities.at(static_cast<std::size_t>(level)), "%s", text);
+auto ChosenAuth(Options const& options) -> AuthMode {
+  return options.Get<&Settings::auth>().value_or(options.Get<&Settings::password>() ? AuthMode::Nla : AuthMode::None);
+}
+// SDL_RDP_TRACE is a diagnostic switch, not a setting: it has no hint and no file key.
+auto Tracing() -> bool {
+  auto const* trace = std::getenv("SDL_RDP_TRACE");
+  return trace && std::string_view(trace) == "1";
+}
+auto AsPath(std::string const& text) -> std::filesystem::path {
+  return text;
+}
+auto AsWiped(std::string const& text) -> WipedString {
+  return WipedString{ text };
+}
+auto Built(Options const& options) -> Setup {
+  return { .bind             = options.Get<&Settings::bind>(),
+           .port             = options.Value<&Settings::port>().Get(),
+           .cert_dir         = options.Get<&Settings::cert_dir>().transform(AsPath),
+           .width            = options.Value<&Settings::width>().Get(),
+           .height           = options.Value<&Settings::height>().Get(),
+           .wait_for_client  = options.Value<&Settings::wait_for_client>(),
+           .tracing          = Tracing(),
+           .codec            = options.Value<&Settings::codec>(),
+           .aspect           = options.Value<&Settings::aspect>().Ratio(),
+           .audio_latency_ms = options.Value<&Settings::audio_latency>().Get(),
+           .auth             = ChosenAuth(options),
+           .user             = options.Get<&Settings::user>(),
+           .password         = options.Get<&Settings::password>().transform(AsWiped),
+           .domain           = options.Get<&Settings::domain>(),
+           .avc_bitrate_kbps = options.Value<&Settings::avc_bitrate>().Get() };
 }
 }
-auto BackendAspect(Aspect const& aspect) -> sdlrdp_aspect {
-  return aspect.IsNone() ? sdlrdp_aspect{ } : aspect.Ratio();
+Configuration::Configuration(Options const& options) : _setup{ Built(options) } { }
+auto Configuration::Get() const noexcept -> Setup const& {
+  return _setup;
 }
-Configuration::Configuration(Options const& options)
-    : _text{ options }, _port{ options.Value<&Settings::port>().Get() },
-      _width{ options.Value<&Settings::width>().Get() }, _height{ options.Value<&Settings::height>().Get() },
-      _audio_latency_ms{ options.Value<&Settings::audio_latency>().Get() },
-      _avc_bitrate_kbps{ options.Value<&Settings::avc_bitrate>().Get()   },
-      _wait_for_client{ options.Value<&Settings::wait_for_client>() }, _codec{ options.Value<&Settings::codec>() },
-      _aspect{ BackendAspect(options.Value<&Settings::aspect>()) },
-      _auth{ options.Get<&Settings::auth>().value_or(options.Get<&Settings::password>() ? SDLRDP_AUTH_NLA
-                                                                                        : SDLRDP_AUTH_NONE) } { }
-auto Configuration::Get() const -> sdlrdp_config {
-  sdlrdp_config config{ };
-  _text.Fill(config);
-  config.port             = _port;
-  config.width            = _width;
-  config.height           = _height;
-  config.audio_latency_ms = _audio_latency_ms;
-  config.avc_bitrate_kbps = _avc_bitrate_kbps;
-  config.wait_for_client  = int{ _wait_for_client };
-  config.codec            = _codec;
-  config.aspect           = _aspect;
-  config.auth             = _auth;
-  config.log              = Log;
-  return config;
+auto Configuration::Width() const noexcept -> std::uint32_t {
+  return _setup.width;
 }
-auto Configuration::Width() const -> std::uint32_t {
-  return _width;
+auto Configuration::Height() const noexcept -> std::uint32_t {
+  return _setup.height;
 }
-auto Configuration::Height() const -> std::uint32_t {
-  return _height;
-}
-auto Configuration::AudioLatency() const -> std::uint32_t {
-  return _audio_latency_ms;
+auto Configuration::AudioLatency() const noexcept -> std::uint32_t {
+  return _setup.audio_latency_ms;
 }
 }

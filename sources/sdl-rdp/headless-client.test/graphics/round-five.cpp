@@ -1,9 +1,11 @@
 #include <sdl-rdp/headless-client.test/graphics/round-five.hpp>
-#include <sdl-rdp/abi/backend.h>
 
+#include <sdl-rdp/configuration/codec.hpp>
 #include <sdl-rdp/headless-client.test/backend/await-acknowledged.hpp>
+#include <sdl-rdp/headless-client.test/backend/events.hpp>
 #include <sdl-rdp/headless-client.test/backend/status.hpp>
 #include <sdl-rdp/headless-client.test/frame/pattern.hpp>
+#include <sdl-rdp/link/event.hpp>
 
 #include <freerdp/input.h>
 #include <freerdp/settings.h>
@@ -19,11 +21,18 @@
 #include <string>
 
 namespace sdl_rdp::headless_client_test::graphics::detail::round_five {
+using sdl_rdp::configuration::Codec;
 using sdl_rdp::headless_client_test::backend::AwaitAllAcknowledged;
+using sdl_rdp::headless_client_test::backend::FirstEvent;
+using sdl_rdp::headless_client_test::backend::As;
+using sdl_rdp::headless_client_test::backend::Holds;
 using sdl_rdp::headless_client_test::backend::RequiredStatus;
 using sdl_rdp::headless_client_test::client::Pixels;
 using sdl_rdp::headless_client_test::frame::GraphicsScene;
 using sdl_rdp::headless_client_test::frame::HashPattern;
+using sdl_rdp::link::CodecChanged;
+using sdl_rdp::link::MouseMove;
+using sdl_rdp::link::RefreshChanged;
 using sdl_rdp::utilities::Extent;
 
 auto RoundFive::WhenAcknowledgedFrame(Client& client, FrameObserver& observer, Pixels const& pixels, std::size_t i,
@@ -34,13 +43,13 @@ auto RoundFive::WhenAcknowledgedFrame(Client& client, FrameObserver& observer, P
   EXPECT_EQ(waiting.wait_for(std::chrono::milliseconds(0)), std::future_status::timeout);
   ASSERT_TRUE(observer.Ack());
   ASSERT_EQ(waiting.get(), 1);
-  EXPECT_TRUE(std::ranges::none_of(backend.Poll(), [](auto const& event) { return event.type == SDLRDP_REFRESH; }));
+  EXPECT_TRUE(std::ranges::none_of(backend.Poll(), Holds<RefreshChanged>));
 }
 auto RoundFive::ThenAcknowledgementTimeout(Pixels const& pixels) -> void {
-  EXPECT_EQ(sdlrdp_wait_frame(&*backend, 10000), 1);
+  EXPECT_TRUE(backend.WaitFrame(std::chrono::milliseconds{ 10000 }));
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
-  EXPECT_EQ(sdlrdp_wait_frame(&*backend, 10000), 1);
-  EXPECT_EQ(sdlrdp_wait_frame(&*backend, 0), 1);
+  EXPECT_TRUE(backend.WaitFrame(std::chrono::milliseconds{ 10000 }));
+  EXPECT_TRUE(backend.WaitFrame(std::chrono::milliseconds{ 0 }));
   EXPECT_EQ(RequiredStatus(*backend).acknowledgements, 0u);
   ThenTimedOutFrames("[0-9]+", 1);
 }
@@ -57,18 +66,19 @@ auto RoundFive::ThenAspectMouse(Client& client) -> void {
   ASSERT_TRUE(freerdp_input_send_mouse_event(client.Instance()->context->input, PTR_FLAGS_MOVE, 639, 479));
   auto events = Events(1);
   ASSERT_EQ(events.size(), 1u);
-  EXPECT_EQ(events[0].mouse_move.x, 639);
-  EXPECT_EQ(events[0].mouse_move.y, 349);
+  auto const& motion = As<MouseMove>(events[0]);
+  EXPECT_EQ(motion.x, 639);
+  EXPECT_EQ(motion.y, 349);
 }
 auto RoundFive::ThenAgedWindowResumes(Pixels const& pixels) -> void {
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
-  EXPECT_EQ(sdlrdp_wait_frame(&*backend, 0), 0);
+  EXPECT_FALSE(backend.WaitFrame(std::chrono::milliseconds{ 0 }));
   ASSERT_TRUE(Observer().AckFrame(4, 0));
   ASSERT_NO_FATAL_FAILURE(AwaitFrames(GraphicsClient(), Observer().Observed().frames, 7));
   ThenGraphicsTimeoutStatistics();
 }
 auto RoundFive::ThenColourDepth(std::uint32_t depth) -> void {
-  Client client(sdlrdp_port(&*backend), false);
+  Client client(backend.Port(), false);
   ASSERT_TRUE(freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_ColorDepth, depth));
   ASSERT_NO_FATAL_FAILURE(Connect(client, false));
   client.Tolerance(depth == 16 ? 7 : 0);
@@ -85,14 +95,15 @@ auto RoundFive::ThenProgressiveDamageCost(Client& client, GraphicsObserver& obse
   ThenQoe(client, observer);
 }
 auto RoundFive::ThenAutoChangesToRaw(Client& client, Pixels& pixels) -> void {
-  ASSERT_EQ(sdlrdp_set_codec(&*backend, SDLRDP_CODEC_RAW), 0);
+  (*backend).Presentation().SetCodec(Codec::Raw);
   pixels = GraphicsScene(4, false);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
-  ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(&*backend, 0) && client.Matches(pixels); }));
+  ASSERT_TRUE(
+      client.Until([&] { return backend.WaitFrame(std::chrono::milliseconds{ 0 }) && client.Matches(pixels); }));
   auto events  = backend.Poll();
-  auto changed = std::ranges::find(events, SDLRDP_CODEC_CHANGED, &sdlrdp_event::type);
-  ASSERT_NE(changed, events.end());
-  EXPECT_EQ(changed->codec_changed.codec, SDLRDP_CODEC_RAW);
+  auto changed = FirstEvent<CodecChanged>(events);
+  if (!changed) FAIL() << "a codec change is reported";
+  EXPECT_EQ(changed->codec, Codec::Raw);
   RecordProperty("trace", "auto connects as progressive; live raw preference produces exact RGB and CODEC_CHANGED raw");
 }
 auto RoundFive::ThenGraphicsTimeoutStatistics() -> void {
@@ -106,20 +117,20 @@ auto RoundFive::ThenGraphicsAcknowledgementsCounted() -> void {
 }
 auto RoundFive::ThenGraphicsWindowReleases(Pixels const& pixels) -> void {
   ASSERT_TRUE(Observer().AckFrame(0, 0));
-  ASSERT_TRUE(GraphicsClient().Until([&] { return sdlrdp_wait_frame(&*backend, 0) == 1; }));
+  ASSERT_TRUE(GraphicsClient().Until([&] { return backend.WaitFrame(std::chrono::milliseconds{ 0 }); }));
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
-  EXPECT_EQ(sdlrdp_wait_frame(&*backend, 1), 0);
+  EXPECT_FALSE(backend.WaitFrame(std::chrono::milliseconds{ 1 }));
 }
 auto RoundFive::ThenLegacyWindowReleases(Client& client, FrameObserver const& observer, Pixels const& pixels) -> void {
   auto* update = client.Instance()->context->update;
   ASSERT_TRUE(update->SurfaceFrameAcknowledge(update->context, observer.Frames().front()));
-  EXPECT_EQ(sdlrdp_wait_frame(&*backend, 10000), 1);
+  EXPECT_TRUE(backend.WaitFrame(std::chrono::milliseconds{ 10000 }));
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
-  EXPECT_EQ(sdlrdp_wait_frame(&*backend, 1), 0);
+  EXPECT_FALSE(backend.WaitFrame(std::chrono::milliseconds{ 1 }));
 }
 auto RoundFive::RunPictureSizes(bool graphics) -> void {
   ASSERT_NO_FATAL_FAILURE(Open());
-  Client client(sdlrdp_port(&*backend), true, 640, 480);
+  Client client(backend.Port(), true, 640, 480);
   if (graphics) client.EnableGraphics();
   GraphicsObserver observer(client);
   Pixels           pixels(640uz * 480, 0x123456);

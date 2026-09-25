@@ -1,5 +1,5 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/utilities/aspect-ratio.hpp>
 
 #include <cstdint>
 #include <optional>
@@ -8,6 +8,7 @@
 #include <utility>
 
 namespace sdl_rdp::settings::detail::aspect {
+using sdl_rdp::utilities::AspectRatio;
 // A display aspect written N:D, or None (also the default), written empty, for square pixels.
 class Aspect {
 public:
@@ -20,7 +21,7 @@ public:
   auto        _Encode() const                  -> std::string;
   auto        Text() const                     -> std::string;
   auto        IsNone() const                   -> bool;
-  auto        Ratio() const                    -> sdlrdp_aspect;
+  auto        Ratio() const                    -> std::optional<AspectRatio>;
   auto        operator==(Aspect const&) const  -> bool = default;
 private:
   using Parts = std::pair<std::uint32_t, std::uint32_t>;

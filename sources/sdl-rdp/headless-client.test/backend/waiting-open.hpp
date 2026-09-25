@@ -1,5 +1,5 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/headless-client.test/utilities/child-process.hpp>
 #include <sdl-rdp/utilities/descriptor.hpp>
 
@@ -8,12 +8,13 @@
 #include <optional>
 
 namespace sdl_rdp::headless_client_test::backend::detail::waiting_open {
+using sdl_rdp::configuration::Setup;
 using sdl_rdp::headless_client_test::utilities::ChildProcess;
 using sdl_rdp::utilities::Descriptor;
 
 class WaitingOpen {
 public:
-  explicit           WaitingOpen(sdlrdp_config const& config);
+  explicit           WaitingOpen(Setup const& config);
                      WaitingOpen(WaitingOpen const&)                                  = delete;
                      WaitingOpen(WaitingOpen&&)                                       = delete;
                      ~WaitingOpen();

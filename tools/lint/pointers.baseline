@@ -4,7 +4,6 @@ finding	sources/sdl-rdp/clipboard/channel.cpp	parameters	ClipboardChannel::Pump	
 finding	sources/sdl-rdp/clipboard/channel.cpp	returns	ClipboardChannel::Event	void *
 finding	sources/sdl-rdp/clipboard/channel.hpp	parameters	ClipboardChannel::Pump	std::span<void *const>
 finding	sources/sdl-rdp/clipboard/channel.hpp	returns	ClipboardChannel::Event	void *
-finding	sources/sdl-rdp/configuration/authentication.hpp	members	Authentication	sdlrdp_config
 finding	sources/sdl-rdp/drive/channel.cpp	parameters	ChannelEvent	void *
 finding	sources/sdl-rdp/drive/channel.cpp	parameters	DriveChannel::Pump	std::span<void *const>
 finding	sources/sdl-rdp/drive/channel.cpp	returns	ChannelEvent	void *

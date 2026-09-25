@@ -8,8 +8,8 @@ text input suppresses text without suppressing keys. UTF-16 surrogate pairs
 are assembled separately for key-down and key-up, and only down produces text.
 The sample starts text input; F2 toggles it and F3 toggles relative mouse mode.
 
-The negotiated Windows keyboard layout ID is reported in backend
-`connected.keyboard_layout` and window property `SDL_PROP_WINDOW_RDP_KEYBOARD_LAYOUT_NUMBER`.
+The negotiated Windows keyboard layout ID is the window property
+`SDL_PROP_WINDOW_RDP_KEYBOARD_LAYOUT_NUMBER`.
 SDL's `scancodes_windows.h` maps physical keys, not keyboard layouts. SDL builds
 Windows character keymaps using Windows `MapVirtualKey`/`ToUnicode` APIs; it
 ships no portable Windows-layout-to-character table. FreeRDP 3.32 has no
@@ -41,6 +41,6 @@ are normalized to the window (the sample also prints window pixel coordinates),
 pressure is normalized from 0..1024, and down, move, up and cancellation are
 reported as native finger events. Missing pressure defaults to 1.
 
-Backend ABI version 4 adds `sdlrdp_set_relative_mouse`, `SDLRDP_TEXT`,
-`SDLRDP_MOUSE_RELATIVE`, `SDLRDP_TOUCH`, and the negotiated layout ID; wheel
-components are now floating-point notch counts. Driver and backend must match.
+Relative mode follows `SDL_SetWindowRelativeMouseMode`; keys, text, relative
+motion and touch arrive as the native key, text-input, relative mouse-motion and
+finger events, and wheel events carry floating-point notch counts.

@@ -19,13 +19,13 @@ import shape
 
 ROOT            = pathlib.Path(__file__).resolve().parents[2]
 KINDS           = ('parameters', 'members', 'returns', 'null checks', 'unchecked')
-ABI_HOLDERS     = ('sdl-rdp/backend', 'sdl-rdp/SDL3')
+ABI_HOLDERS     = ('sdl-rdp/SDL3',)
 UNCONSTRAINED   = re.compile(r'^\s*(typename|class)\b')
 BINDING         = re.compile(r'^(/[^:]+):(\d+):(\d+): note: "(\w+)" binds here')
 PRINTED         = re.compile(r'^Binding for "(\w+)":$')
 DECLARED        = re.compile(r'(operator\s*(?:\(\)|\[\]|[^\s\w(]+|\s\w+)|[A-Za-z_]\w*)\s*\(')
 NOT_NAMES       = re.compile(r'\[\[.*?\]\]|"[^"]*"')
-NOT_DECLARED    = frozenset(('decltype', 'alignas', '__attribute__', '__declspec')) | shape.MARKS
+NOT_DECLARED    = frozenset(('decltype', 'alignas', '__attribute__', '__declspec'))
 HEAD_END        = re.compile(r'[{;]')
 THREADS         = os.cpu_count() or 1
 SITE            = ('sitefn', 'sitelambda', 'siteouter')
@@ -42,9 +42,8 @@ QUERIES         = r'''
 set traversal AsIs
 set output diag
 set bind-root false
-let own allOf(unless(isExpansionInSystemHeader()), isExpansionInFileMatching("^{sources}"),
-              unless(isExpansionInFileMatching("^{abi}")))
-let foreign anyOf(unless(isExpansionInFileMatching("^{sources}")), isExpansionInFileMatching("^{abi}"))
+let own allOf(unless(isExpansionInSystemHeader()), isExpansionInFileMatching("^{sources}"))
+let foreign unless(isExpansionInFileMatching("^{sources}"))
 let ptr hasCanonicalType(pointerType())
 let owning cxxRecordDecl(has(cxxDestructorDecl(isUserProvided())),
                          has(cxxConstructorDecl(isCopyConstructor(), isDeleted())))
@@ -224,34 +223,18 @@ match declRefExpr(own, to(functionDecl(hasAnyParameter(pparam)).bind("referee"))
 match fieldDecl(own, hasType(fnptr), hasParent(recordDecl().bind("regrecord"))).bind("regfn")
 match fieldDecl(own, hasType(voidptr), hasParent(recordDecl().bind("regrecord"))).bind("regvoid")
 match classTemplateSpecializationDecl(raii).bind("raiitype")
-let tableref anyOf(memberExpr(member(valueDecl().bind("ftable"))), declRefExpr(to(varDecl().bind("ftable"))))
-let throughtable callExpr(throughfn, callee(expr(anyOf(ignoringParenImpCasts(tableref), hasDescendant(tableref)))))
-let deduced functionDecl(hasReturnTypeLoc(loc(autoType()))).bind("rdeduced")
-let relay optionally(hasReturnValue(ignoringParenImpCasts(anyOf(throughtable,
-                                                                callExpr(callee(functionDecl().bind("relayed")))))))
-match returnStmt(own, forFunction(functionDecl(optionally(deduced)).bind("rfn")), relay).bind("rstmt")
-match typedefNameDecl(unless(isExpansionInSystemHeader()),
-                      hasType(qualType(hasDeclaration(typedefNameDecl().bind("aliased"))))).bind("alias")
 enable output print
-let named qualType(hasDeclaration(typedefNameDecl().bind("talias")))
-let spelled anyOf(named, references(named))
-let typed allOf(hasType(hasCanonicalType(qualType().bind("type"))), optionally(decl(isInstantiated()).bind("tinst")),
-                optionally(hasType(spelled)))
+let typed allOf(hasType(hasCanonicalType(qualType().bind("type"))), optionally(decl(isInstantiated()).bind("tinst")))
 match parmVarDecl(own, hasType(anyptr), typed).bind("typed")
 match fieldDecl(pfield, typed).bind("typed")
 match varDecl(pstatic, typed).bind("typed")
-let abifn functionDecl(isExternC(), isExpansionInFileMatching("^{abi}"),
-                       hasType(hasCanonicalType(qualType().bind("type"))))
-match declRefExpr(to(abifn), hasAncestor(typeLoc(loc(decltypeType()))),
-                  hasAncestor(decl(anyOf(typedefNameDecl(), declaratorDecl())).bind("abitable")))
-let argument parmVarDecl(own, hasType(anyptr)).bind("fnarg")
+let argument parmVarDecl(own, hasType(anyptr)).bind("escaped")
 let fnarg ignoringParenImpCasts(anyOf(declRefExpr(to(argument)),
                                       callExpr(callee(functionDecl(hasAnyName("::std::forward", "::std::move"))),
                                                hasArgument(0, ignoringParenImpCasts(declRefExpr(to(argument)))))))
-let tabled optionally(anyOf(ignoringParenImpCasts(tableref), hasDescendant(tableref)))
-match callExpr(own, throughfn, callee(expr(tabled)), forEachArgumentWithParamType(fnarg, qualType()))
+match callExpr(own, throughfn, forEachArgumentWithParamType(fnarg, qualType()))
 match functionDecl(pret, hasReturnTypeLoc(typeLoc().bind("rloc")), returns(hasCanonicalType(qualType().bind("type"))),
-                   optionally(returns(spelled)), optionally(functionDecl(isInstantiated()).bind("tinst")))
+                   optionally(functionDecl(isInstantiated()).bind("tinst")))
 '''
 
 
@@ -285,8 +268,7 @@ KIND_TEXT = {'parameters':  'pointer parameter',
 
 def query_text(root):
     sources = re.escape(f'{root}/sources/')
-    abi     = re.escape(f'{root}/sources/sdl-rdp/abi/')
-    return QUERIES.replace('{sources}', sources).replace('{abi}', abi).replace('{reflect}', REFLECT_ENTRY)
+    return QUERIES.replace('{sources}', sources).replace('{reflect}', REFLECT_ENTRY)
 
 
 def compiler_install_dir(compiler):
@@ -538,11 +520,7 @@ class Facts:
         self.extended, self.record_fields = {}, collections.defaultdict(set)
         self.types, self.references = collections.defaultdict(set), collections.defaultdict(set)
         self.instance_types, self.acquired = collections.defaultdict(set), collections.defaultdict(set)
-        self.tables, self.fnargs           = collections.defaultdict(set), collections.defaultdict(set)
-        self.aliases, self.named           = {}, {}
         self.instantiated, self.patterns   = set(), set()
-        self.deduced                       = set()
-        self.statements = collections.defaultdict(lambda: collections.defaultdict(set))
         self.registrations = collections.defaultdict(lambda: collections.defaultdict(set))
         for block in blocks:
             self.add(block)
@@ -577,24 +555,9 @@ class Facts:
         self.slots.update(block[name] for name in ('slot', 'lslot') if name in block)
         self.add_details(block)
 
-    def add_return_statement(self, block):
-        if 'rdeduced' in block:
-            self.deduced.add(block['rfn'])
-        self.statements[block['rfn']][block['rstmt']].add((block.get('ftable'), block.get('relayed')))
-
     def add_details(self, block):
-        if 'abitable' in block:
-            self.tables[block['abitable']].add(block['type'])
-        elif 'fnarg' in block:
-            self.fnargs[block['fnarg']].add(block.get('ftable'))
-        elif 'rstmt' in block and 'rfn' in block:
-            self.add_return_statement(block)
-        elif 'alias' in block:
-            self.aliases[block['alias']] = block['aliased']
-        elif 'type' in block and (typed := block.get('typed') or block.get('rloc')):
+        if 'type' in block and (typed := block.get('typed') or block.get('rloc')):
             (self.instance_types if 'tinst' in block else self.types)[typed].add(block['type'])
-            if 'talias' in block:
-                self.named[typed] = block['talias']
         if 'plambda' in block:
             enclosing = (block['lfn'], block.get('lclass'), None) if 'lfn' in block else (None, None, block.get('lvar'))
             self.lambdas[block['plambda']] = enclosing
@@ -618,8 +581,6 @@ class Facts:
         self.entries |= {definition for definition in self.cdefs if declared_name(definition) in declared}
         self.slots   |= {slot for slot, acquirers in self.acquired.items()
                          if any(self.function(acquirer) in registrars for acquirer in acquirers)}
-        self.escaped |= {argument for argument, tables in self.fnargs.items()
-                         if not all(self.abi_functions(table) for table in tables)}
 
     def function(self, location):
         """A function by its definition's body, so a forward declaration and its definition are one function."""
@@ -635,45 +596,16 @@ class Facts:
     def pointer(self, location):
         """A pointer anywhere in the canonical type, at any depth, an RAII type's own arguments apart."""
         types = self.types.get(location, set()) | self.instance_types.get(location, set())
-        return location in self.holders or any(self.pointer_text(text, location) for text in types)
+        return location in self.holders or any(pointer_text(text, self.raii_names) for text in types)
 
     def pattern_pointer(self, location):
-        return any(self.pointer_text(text, location) for text in self.types.get(location, set()))
-
-    def pointer_text(self, text, location):
-        """A pointer in a canonical type's text, an RAII type's arguments and, in the ABI's symbol table, the function
-        types its `decltype`s name apart."""
-        for function in self.abi_functions(location):
-            text = text.replace(function_pointer(function), '')
-        return pointer_text(text, self.raii_names)
+        return any(pointer_text(text, self.raii_names) for text in self.types.get(location, set()))
 
     def judged_returns(self):
         """Every return, an out-of-line member's instantiation apart when its pattern is judged at its own location."""
         patterns = {self.function(function) for function in self.patterns}
         return {function: found for function, found in self.returns.items()
                 if function in self.patterns or self.function(function) not in patterns}
-
-    @functools.cached_property
-    def abi_returns(self):
-        """Relays with a deduced return type (`-> decltype(auto)`) each of whose returns is a call through the ABI's
-        table, or to a function already one; a spelled pointer return is judged whatever it returns."""
-        statements = collections.defaultdict(list)
-        for function, found in self.statements.items():
-            if function in self.deduced:
-                statements[self.function(function)] += found.values()
-        found = set()
-        while grown := {function for function, returned in statements.items() if function not in found
-                        and all(any(self.abi_functions(table) or self.function(relayed) in found
-                                    for table, relayed in evidence) for evidence in returned)}:
-            found |= grown
-        return found
-
-    def abi_functions(self, location):
-        """The ABI function types a declaration's table is spelled from: `decltype(&abi_function)` in its own type or
-        in an alias it is declared through; none for any other declaration, whatever its type."""
-        while location is not None and location not in self.tables:
-            location = self.named.get(location) or self.aliases.get(location)
-        return self.tables.get(location, frozenset())
 
     def type_of(self, location):
         """The canonical type, a template's as its pattern declares it, so an instantiation cannot change the key."""
@@ -857,12 +789,6 @@ def pointer_text(text, raii_names):
     return '*' in text.replace('::*', '')
 
 
-def function_pointer(function_type):
-    """The text of a pointer to a function type: `int (*)(int)` for `int (int)`."""
-    split = function_type.index('(')
-    return f'{function_type[:split]}(*){function_type[split:]}'
-
-
 def strip_arguments(text, name):
     """The text with every `name<...>` reduced to `name`."""
     pattern = re.compile(rf'\b{re.escape(name)}<')
@@ -975,8 +901,7 @@ def findings_from(root, facts):
                   for member, record in facts.members.items() if member not in abi_shaped and facts.pointer(member)]
     found     += [finding(root, 'returns', function, facts.type_of(returned), facts.owner(function, closure, record))
                   for function, (record, returned, export, closure) in facts.judged_returns().items()
-                  if export not in facts.entries and not facts.allowed(function, closure) and facts.pointer(returned)
-                  and facts.function(function) not in facts.abi_returns]
+                  if export not in facts.entries and not facts.allowed(function, closure) and facts.pointer(returned)]
     return sorted(set(found))
 
 
@@ -994,7 +919,7 @@ def findings(root, build=None):
 def module(path):
     """The module a file belongs to, its tests apart: `sdl-rdp/video`, `sdl-rdp/video tests`."""
     parts = path.relative_to('sources').parts
-    depth = 2 if parts[0] in ('sdl-rdp', 'SDL3') and len(parts) > 2 else 1
+    depth = 2 if parts[0] == 'sdl-rdp' and len(parts) > 2 else 1
     name  = '/'.join(parts[:depth])
     return f'{name} tests' if shape.test_support(path) else name
 

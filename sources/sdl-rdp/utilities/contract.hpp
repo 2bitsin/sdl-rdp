@@ -15,8 +15,8 @@ consteval auto Mode() -> oxbox::platform::ContractMode {
   using enum oxbox::platform::ContractMode;
   constexpr std::array names { std::string_view{ "stop" }, std::string_view{ "complain" },
                                std::string_view{ "ignore" } };
-  constexpr auto       found = std::ranges::find(names, std::string_view{ BACKEND_CONTRACTS }) - names.begin();
-  static_assert(found != names.size(), "unknown BACKEND_CONTRACTS word");
+  constexpr auto       found = std::ranges::find(names, std::string_view{ SDL_RDP_CONTRACTS }) - names.begin();
+  static_assert(found != names.size(), "unknown SDL_RDP_CONTRACTS word");
   return std::array{ STOP, COMPLAIN, IGNORE }[found];
 }
 using Checked = oxbox::platform::Contracts<Mode()>;

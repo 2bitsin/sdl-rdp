@@ -14,7 +14,6 @@ EQUALS              = r'(?<![=!<>+*/%&|^\-])=(?!=|>)'
 DECL                = r'(.+?[\s*&])([A-Za-z_]\w*(?:\s*\[[^\]]*\])*)\s*(?:(' + EQUALS + r'|[{]|:(?!:))(.*))?;'
 FORBIDDEN           = {'return', 'co_return', 'throw', 'delete', 'using', 'typedef', 'case', 'goto',
                        'else', 'break', 'if', 'while', 'for', 'switch'}
-FROZEN              = 'sources/sdl-rdp/abi/backend.h'
 SOURCE_SUFFIXES     = frozenset({'.c', '.h', '.cpp', '.hpp'})
 COLUMN_LIMIT        = 120
 COMMENT_GAP         = 2
@@ -1105,10 +1104,9 @@ def align(text):
 
 
 def source_files(paths):
-    """The C and C++ files formatting owns: .c, .h, .cpp and .hpp, symlinks and the frozen ABI header aside."""
+    """The C and C++ files formatting owns: .c, .h, .cpp and .hpp, symlinks aside."""
     candidates = {path for root in paths for path in (root.rglob('*') if root.is_dir() else [root])}
-    return sorted(path for path in candidates if path.suffix in SOURCE_SUFFIXES and not path.is_symlink()
-                  and not path.as_posix().endswith(FROZEN))
+    return sorted(path for path in candidates if path.suffix in SOURCE_SUFFIXES and not path.is_symlink())
 
 
 def print_statistics(path, stats):

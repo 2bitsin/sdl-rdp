@@ -14,7 +14,7 @@ namespace sdl_rdp::sample_gate_test::audio::detail::driver {
 using sdl_rdp::sample_gate_test::process::Capture;
 using sdl_rdp::sample_gate_test::process::ListeningPort;
 using sdl_rdp::sample_gate_test::process::ProcfsSelf;
-using sdl_rdp::sample_gate_test::sample::SetBackendHints;
+using sdl_rdp::sample_gate_test::sample::SetCertificateHint;
 using sdl_rdp::utilities::Sleeping;
 using sdl_rdp::utilities::Until;
 
@@ -33,7 +33,7 @@ auto AudioDriver::ReceiveLead() -> void {
   ThenLead(*sound_client, *sound, 0, 140);
 }
 auto AudioDriver::GivenAudioBackend() -> void {
-  ASSERT_TRUE(SetBackendHints(certificates.Path()));
+  ASSERT_TRUE(SetCertificateHint(certificates.Path()));
 }
 auto AudioDriver::GivenAudioHints() -> void {
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "rdp"));
@@ -91,7 +91,7 @@ auto AudioDriver::TearDown() -> void {
   SDL_Quit();
   captured.reset();
   for (auto const* hint : { SDL_HINT_AUDIO_DRIVER, SDL_HINT_VIDEO_DRIVER, "SDL_RDP_PORT", "SDL_RDP_BIND",
-                            "SDL_RDP_CERT_DIR", "SDL_RDP_BACKEND", "SDL_RDP_CODEC", SDL_HINT_RDP_AUDIO_LEAD })
+                            "SDL_RDP_CERT_DIR", "SDL_RDP_CODEC", SDL_HINT_RDP_AUDIO_LEAD })
     SDL_ResetHint(hint);
 }
 }

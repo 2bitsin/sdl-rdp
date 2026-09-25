@@ -2,8 +2,10 @@
 
 #include <sdl-rdp/auth/tls-rehearsal.hpp>
 #include <sdl-rdp/configuration/configuration.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/failure-log.hpp>
+#include <sdl-rdp/diagnostics/log-level.hpp>
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
 #include <sdl-rdp/freerdp-facade/manual-reset-event.hpp>
 #include <sdl-rdp/peer/peer.hpp>
@@ -30,7 +32,9 @@
 
 namespace sdl_rdp::session::detail::listener {
 using sdl_rdp::auth::TlsRehearsal;
+using sdl_rdp::configuration::Setup;
 using sdl_rdp::diagnostics::FailureLog;
+using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::freerdp_facade::CallbackOwner;
 using sdl_rdp::freerdp_facade::ManualResetEvent;
 using sdl_rdp::freerdp_facade::WaitHandle;
@@ -58,12 +62,12 @@ auto InitializeProcess(Credentials const& credentials) -> void {
     TlsRehearsal{ credentials }.Perform();
   });
 }
-auto Address(sdlrdp_config const& config) -> sockaddr_in {
+auto Address(Setup const& config) -> sockaddr_in {
   sockaddr_in address{ };
   address.sin_family = AF_INET;
   address.sin_port   = htons(config.port);
-  auto const* const bind = config.bind ? config.bind : "0.0.0.0";
-  if (inet_pton(AF_INET, bind, &address.sin_addr) != 1) throw AddressNotIpv4{ bind };
+  auto const bind = config.bind.value_or("0.0.0.0");
+  if (inet_pton(AF_INET, bind.c_str(), &address.sin_addr) != 1) throw AddressNotIpv4{ bind };
   return address;
 }
 auto Generic(sockaddr_in& address) -> sockaddr& {
@@ -82,7 +86,7 @@ auto AdoptListenerSocket(freerdp_listener& listener, Descriptor socket) -> void 
   if (!listener.OpenFromSocket(&listener, socket.Get())) throw ListenerSetupFailed{ "socket adoption" };
   std::ignore = socket.Release();
 }
-auto Bind(freerdp_listener& listener, sdlrdp_config const& config) -> std::uint32_t {
+auto Bind(freerdp_listener& listener, Setup const& config) -> std::uint32_t {
   Descriptor socket  { SystemCall(::socket(AF_INET, SOCK_STREAM, 0), "Socket creation") };
   auto       address = Address(config);
   StartListening(socket, address);
@@ -116,7 +120,7 @@ Listener::Listener(Configuration const& configuration, Credentials const& creden
     // True transfers ownership even when construction failed and RAII already released the peer.
     return Contained(true, accepted, FailureLog{ owner._diagnostics, "Peer construction" });
   };
-  _diagnostics.Log(SDLRDP_LOG_INFO, std::format("Listening on port {}", _port));
+  _diagnostics.Log(LogLevel::Info, std::format("Listening on port {}", _port));
   _thread = std::jthread([this](std::stop_token const& quit) { Listen(quit); });
   Ensures(_port != 0, "bound port is available");
 }
@@ -124,7 +128,7 @@ auto Listener::Port() const noexcept -> std::uint32_t {
   return _port;
 }
 auto Listener::Accept(PeerHandle accepted) -> void {
-  _diagnostics.Log(SDLRDP_LOG_INFO, std::format("Peer accepted: {}.", accepted->hostname));
+  _diagnostics.Log(LogLevel::Info, std::format("Peer accepted: {}.", accepted->hostname));
   _session.Add(_make(std::move(accepted)));
 }
 auto Listener::Listen(std::stop_token const& quit) -> void {

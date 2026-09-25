@@ -1,10 +1,12 @@
 #pragma once
 #include <sdl-rdp/picture/frame-snapshot.hpp>
 #include <sdl-rdp/picture/geometry.hpp>
+#include <sdl-rdp/utilities/aspect-ratio.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/deadline.hpp>
 #include <sdl-rdp/utilities/extent.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
+#include <sdl-rdp/utilities/rect.hpp>
 
 #include <chrono>
 #include <concepts>
@@ -13,19 +15,22 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <utility>
 #include <vector>
 
 namespace sdl_rdp::picture::detail::frame_store {
+using sdl_rdp::utilities::AspectRatio;
 using sdl_rdp::utilities::Deadline;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Extent;
 using sdl_rdp::utilities::Pinned;
+using sdl_rdp::utilities::Rect;
 
 using FrameLock = std::unique_lock<std::mutex>;
 class FrameStore : private Pinned {
 public:
-                     FrameStore(Extent size, sdlrdp_aspect aspect);
+                     FrameStore(Extent size, std::optional<AspectRatio> aspect);
   [[nodiscard]] auto Lock()                                                                 -> FrameLock;
   auto               Holds(FrameLock const& held) const noexcept                            -> bool;
   auto               Notify()                                                               -> void;
@@ -37,15 +42,15 @@ public:
     auto const held = Lock();
     return std::invoke(query, std::as_const(*this), held);
   }
-  auto Picture(FrameLock const& held) const                  -> sdlrdp_rect;
-  auto Bounds(FrameLock const& held) const                   -> sdlrdp_rect;
-  auto Snapshot(FrameLock const& held) const                 -> FrameSnapshot const&;
-  auto Previous(FrameLock const& held, Extent size) const    -> FrameSnapshot;
-  auto Presented(FrameLock const& held) const                -> std::uint64_t;
+  auto Picture(FrameLock const& held) const                               -> Rect;
+  auto Bounds(FrameLock const& held) const                                -> Rect;
+  auto Snapshot(FrameLock const& held) const                              -> FrameSnapshot const&;
+  auto Previous(FrameLock const& held, Extent size) const                 -> FrameSnapshot;
+  auto Presented(FrameLock const& held) const                             -> std::uint64_t;
   auto Publish(FrameLock const& held, std::shared_ptr<std::vector<std::uint8_t> const> next, Extent size) -> bool;
-  auto Ensure(FrameLock const& held)                         -> bool;
-  auto Resize(FrameLock const& held, Extent size)            -> bool;
-  auto SetAspect(FrameLock const& held, sdlrdp_aspect value) -> void;
+  auto Ensure(FrameLock const& held)                                      -> bool;
+  auto Resize(FrameLock const& held, Extent size)                         -> bool;
+  auto SetAspect(FrameLock const& held, std::optional<AspectRatio> value) -> void;
 
 private:
   std::mutex              _guard;

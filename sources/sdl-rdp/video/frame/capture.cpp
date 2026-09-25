@@ -13,6 +13,7 @@
 namespace sdl_rdp::video::frame::detail::capture {
 using sdl_rdp::picture::ApplyDesktopSize;
 using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Rect;
 using sdl_rdp::utilities::SameSize;
 
 FrameCapture::FrameCapture(PeerLink& link, FrameStore& store, PeerFrames& frames, DesktopLayout& desktop,
@@ -33,16 +34,16 @@ auto FrameCapture::Begin() -> bool {
   _pacing.Begin();
   return true;
 }
-auto FrameCapture::Take() -> sdlrdp_rect {
+auto FrameCapture::Take() -> Rect {
   auto const frame = _store.Lock();
-  if (!_frames.Dirty(frame) || !_store.Snapshot(frame)) return _desktop.Rect();
+  if (!_frames.Dirty(frame) || !_store.Snapshot(frame)) return _desktop.Desktop();
   auto const picture = _store.Picture(frame);
   if (!_desktop.Matches(picture) || !SameSize(_frames.Snapshot().Bounds(), _store.Bounds(frame)))
     _pacing.Restart(frame);
   _statistics.Begin(_encoder.EncodeTime(), _frames.Capture(frame));
   return picture;
 }
-auto FrameCapture::Resize(sdlrdp_rect picture) -> bool {
+auto FrameCapture::Resize(Rect picture) -> bool {
   auto& context = _link.Context();
   _desktop.BeginResize(picture);
   if (!ApplyDesktopSize(*context.settings, picture) || !context.update->DesktopResize(&context)) return false;

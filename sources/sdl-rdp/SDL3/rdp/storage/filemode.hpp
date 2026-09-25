@@ -1,19 +1,21 @@
 #pragma once
-#include <cstdint>
+#include <sdl-rdp/drive/file-access.hpp>
 #include <string_view>
 namespace sdl3::rdp::storage::detail::filemode {
-// An SDL_IOFromFile mode string as backend drive flags.
+using sdl_rdp::drive::FileAccess;
+
+// An SDL_IOFromFile mode string as drive file access.
 class FileMode {
 public:
   explicit FileMode(std::string_view mode);
-  auto     Flags() const   -> std::uint32_t;
+  auto     Access() const  -> FileAccess;
   auto     Reads() const   -> bool;
   auto     Writes() const  -> bool;
   auto     Appends() const -> bool;
 private:
-  static auto FlagsOf(std::string_view mode) -> std::uint32_t;
-  std::uint32_t _flags;
-  bool          _append;
+  static auto AccessOf(std::string_view mode) -> FileAccess;
+  FileAccess _access;
+  bool       _append;
 };
 }
 

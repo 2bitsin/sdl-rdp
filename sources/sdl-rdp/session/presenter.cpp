@@ -18,15 +18,18 @@
 #include <utility>
 
 namespace sdl_rdp::session::detail::presenter {
+using sdl_rdp::configuration::Codec;
 using sdl_rdp::peer::Peer;
 using sdl_rdp::picture::Dimensions;
 using sdl_rdp::picture::FrameBytes;
 using sdl_rdp::picture::FrameLock;
 using sdl_rdp::picture::FrameSnapshot;
 using sdl_rdp::picture::ValidateDamage;
+using sdl_rdp::utilities::AspectRatio;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::PixelBytes;
+using sdl_rdp::utilities::Rect;
 using sdl_rdp::utilities::Whole;
 using sdl_rdp::video::avc::ReplicateEdges;
 using sdl_rdp::video::pointer::PointerShape;
@@ -41,7 +44,7 @@ auto ComposeRow(std::span<std::uint8_t const> source, std::span<std::uint8_t con
   for (int x = 0; x < width;) {
     auto covered{ std::ranges::find_if(damage, [x](auto rect) { return Spans(rect.x, rect.w, x); })               };
     auto ahead  { damage | std::views::filter([x](auto rect) { return rect.x > x; })                              };
-    auto nearest{ std::ranges::min_element(ahead, { }, &sdlrdp_rect::x)                                           };
+    auto nearest{ std::ranges::min_element(ahead, { }, &Rect::x)                                                  };
     auto end    { covered != damage.end() ? covered->x + covered->w : nearest != ahead.end() ? nearest->x : width };
     auto output { target.subspan(x * PixelBytes, (end - x) * PixelBytes)                                          };
     auto input  { covered != damage.end() ? source : former                                                       };
@@ -53,7 +56,7 @@ auto ComposeRow(std::span<std::uint8_t const> source, std::span<std::uint8_t con
   }
 }
 auto ComposePicture(std::span<std::uint8_t const> source, std::uint32_t pitch, FrameSnapshot const& former,
-                    std::span<std::uint8_t> target, std::span<sdlrdp_rect const> damage) -> void {
+                    std::span<std::uint8_t> target, std::span<Rect const> damage) -> void {
   auto const width  = former.Width();
   auto const stride = former.Stride();
   auto const row    = std::size_t{ width } * PixelBytes;
@@ -73,8 +76,8 @@ Presenter::Presenter(Diagnostics const& diagnostics, FrameStore& frames, Session
                      Configuration& configuration)
     : _diagnostics{ diagnostics }, _frames{ frames }, _session{ session }, _pointer{ pointer },
       _configuration{ configuration } { }
-auto Presenter::Present(std::span<std::uint8_t const> pixels, FrameLayout const& layout,
-                        std::span<sdlrdp_rect const> damage) -> void {
+auto Presenter::Present(std::span<std::uint8_t const> pixels, FrameLayout const& layout, std::span<Rect const> damage)
+    -> void {
   auto const bytes = layout.Bytes();
   Expects(pixels.size() >= bytes, "source framebuffer covers every row");
   auto const size  = layout.Size();
@@ -91,7 +94,7 @@ auto Presenter::Present(std::span<std::uint8_t const> pixels, FrameLayout const&
   Publish(std::move(next), size, damage);
 }
 auto Presenter::Publish(std::shared_ptr<std::vector<std::uint8_t> const> next, Extent size,
-                        std::span<sdlrdp_rect const> damage) -> void {
+                        std::span<Rect const> damage) -> void {
   auto const locked  = _session.LockPeersAndFrame();
   auto const resized = _frames.Publish(locked.Frame(), std::move(next), size);
   locked.ForEach([&](Peer& peer, FrameLock const& frame) {
@@ -123,17 +126,17 @@ auto Presenter::Resize(Extent requested) -> void {
   if (auto const current = _session.Current(session)) current->get().RestartPacing(locked.Frame());
   locked.ForEach([&](Peer& peer, FrameLock const& frame) { peer.Repaint(frame, Whole(size)); });
 }
-auto Presenter::SetAspect(sdlrdp_aspect value) -> void {
+auto Presenter::SetAspect(std::optional<AspectRatio> value) -> void {
   auto const locked = _session.LockPeersAndFrame();
   _frames.SetAspect(locked.Frame(), value);
   locked.ForEach([&](Peer& peer, FrameLock const& frame) { peer.Repaint(frame, _frames.Bounds(frame)); });
 }
-auto Presenter::SetRefresh(std::uint32_t mode, std::uint32_t ceiling) -> void {
+auto Presenter::SetRefresh(RefreshMode mode, std::uint32_t ceiling) -> void {
   auto const locked = _session.LockPeersAndFrame();
   _configuration.SetRefresh(mode, ceiling);
   locked.ForEach([](Peer& peer, FrameLock const& frame) { peer.RestartPacing(frame); });
 }
-auto Presenter::SetCodec(sdlrdp_codec codec) -> void {
+auto Presenter::SetCodec(Codec codec) -> void {
   _configuration.SetCodec(codec);
 }
 auto Presenter::SetPointer(PointerLayout const& layout, std::span<std::uint8_t const> argb) -> void {
@@ -142,7 +145,7 @@ auto Presenter::SetPointer(PointerLayout const& layout, std::span<std::uint8_t c
   _pointer.Replace(std::move(shape));
   _session.ForEachPeer([](Peer& peer) { peer.Signal(); });
 }
-auto Presenter::WaitFrame(Deadline deadline) -> int {
+auto Presenter::WaitFrame(Deadline deadline) -> bool {
   auto       frame  = _frames.Lock();
   auto const target = _frames.Presented(frame);
   return _frames.WaitFor(frame, deadline, [&] {

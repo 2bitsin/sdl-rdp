@@ -89,9 +89,8 @@ protected:
     window.reset();
     SDL_Quit();
     captured.reset();
-    for (auto const* hint :
-         { SDL_HINT_VIDEO_DRIVER, "SDL_RDP_PORT", "SDL_RDP_BIND", "SDL_RDP_CODEC", "SDL_RDP_WIDTH", "SDL_RDP_HEIGHT",
-           "SDL_RDP_VSYNC", "SDL_RDP_REFRESH", "SDL_RDP_CERT_DIR", "SDL_RDP_BACKEND" })
+    for (auto const* hint : { SDL_HINT_VIDEO_DRIVER, "SDL_RDP_PORT", "SDL_RDP_BIND", "SDL_RDP_CODEC", "SDL_RDP_WIDTH",
+                              "SDL_RDP_HEIGHT", "SDL_RDP_VSYNC", "SDL_RDP_REFRESH", "SDL_RDP_CERT_DIR" })
       SDL_ResetHint(hint);
     if (previous_trace.empty())
       unsetenv("SDL_RDP_TRACE");

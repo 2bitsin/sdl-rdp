@@ -1,7 +1,7 @@
 #include <sdl-rdp/video/avc/regions.hpp>
+
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
 
 #include <algorithm>
 #include <cstddef>
@@ -10,8 +10,9 @@
 namespace sdl_rdp::video::avc::detail::regions {
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::Rect;
 using sdl_rdp::utilities::Union;
-auto Regions::Add(sdlrdp_rect area) -> void {
+auto Regions::Add(Rect area) -> void {
   Expects(area.x >= 0, "region left edge is nonnegative");
   Expects(area.y >= 0, "region top edge is nonnegative");
   Expects(area.w > 0, "region width is positive");
@@ -33,7 +34,7 @@ auto Regions::Areas() -> std::vector<RECTANGLE_16>& {
 auto Regions::Quality() -> std::vector<RDPGFX_H264_QUANT_QUALITY>& {
   return quality;
 }
-auto Regions::Bounds() const -> sdlrdp_rect {
+auto Regions::Bounds() const -> Rect {
   return bounds;
 }
 auto Regions::Clear() -> void {

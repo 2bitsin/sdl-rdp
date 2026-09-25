@@ -7,12 +7,13 @@
 #include <cstddef>
 
 namespace sdl_rdp::utilities::detail::region {
+using sdl_rdp::utilities::Rect;
 namespace {
 constexpr std::size_t MaximumRects = 16;
 }
-auto Region::Add(sdlrdp_rect area) -> void {
+auto Region::Add(Rect area) -> void {
   ExpectsBand(area);
-  auto const touches = [&](sdlrdp_rect rect) { return Touches(rect, area); };
+  auto const touches = [&](Rect rect) { return Touches(rect, area); };
   for (auto found = std::ranges::find_if(rects, touches); found != rects.end();
        found = std::ranges::find_if(rects, touches)) {
     area = Union(area, *found);
@@ -28,7 +29,7 @@ auto Region::Clear() noexcept -> void {
 auto Region::Swap(Region& other) noexcept -> void {
   rects.swap(other.rects);
 }
-auto Region::Rects() const -> std::vector<sdlrdp_rect> const& {
+auto Region::Rects() const -> std::vector<Rect> const& {
   return rects;
 }
 }

@@ -33,8 +33,8 @@ public:
   }
 
 protected:
-  auto Holds(std::invocable auto&&... steps) -> bool {
-    return _measurement.get().Holds(steps...);
+  auto Passes(std::invocable auto&&... steps) -> bool {
+    return _measurement.get().Passes(steps...);
   }
   auto Measure(Duration span) -> void {
     _measurement.get().Measure(span);

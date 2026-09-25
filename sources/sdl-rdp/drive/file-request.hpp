@@ -1,4 +1,5 @@
 #pragma once
+#include <sdl-rdp/drive/file-access.hpp>
 #include <sdl-rdp/drive/packet.hpp>
 #include <sdl-rdp/freerdp-facade/rdpdr.hpp>
 
@@ -12,7 +13,7 @@ using sdl_rdp::freerdp_facade::AccessMask;
 enum class FileKind{ File, Directory, Any };
 class FileRequest {
 public:
-       FileRequest(std::uint32_t flags, FileKind kind, AccessMask extra_access = AccessMask::None);
+       FileRequest(FileAccess access, FileKind kind, AccessMask extra_access = AccessMask::None);
   auto Create(std::span<std::byte const> name) const -> DrivePacket;
 
 private:

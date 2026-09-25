@@ -14,7 +14,7 @@ using sdl_rdp::utilities::Expects;
 namespace {
 auto AutomaticMode(std::string_view text) -> std::optional<RefreshMode> {
   auto const mode = oxbox::serialization::FromString<RefreshMode>(text);
-  return mode == RefreshMode::FIXED ? std::nullopt : mode;
+  return mode == RefreshMode::Fixed ? std::nullopt : mode;
 }
 auto FixedRate(std::string_view text) -> std::optional<Refresh> {
   auto const number = oxbox::utilities::ParseNumber<std::int64_t>(text);
@@ -24,7 +24,7 @@ auto FixedRate(std::string_view text) -> std::optional<Refresh> {
 }
 Refresh::Refresh(Rate rate) : _rate{ rate } { }
 Refresh::Refresh(RefreshMode mode) : _mode{ mode } {
-  Expects(mode != RefreshMode::FIXED, "a fixed refresh names its rate");
+  Expects(mode != RefreshMode::Fixed, "a fixed refresh names its rate");
 }
 auto Refresh::Form() -> std::string_view {
   return "a refresh: auto-client, auto-client-average, auto-sender or a whole number of hertz";
@@ -38,7 +38,7 @@ auto Refresh::_Decode(std::string const& text) -> Refresh {
   return ParsedOrRefused<Refresh>(text);
 }
 auto Refresh::_Encode() const -> std::string {
-  if (_mode == RefreshMode::FIXED) return std::format("{}", _rate.Get());
+  if (_mode == RefreshMode::Fixed) return std::format("{}", _rate.Get());
   return std::string{ NameOf(_mode) };
 }
 auto Refresh::Mode() const -> RefreshMode {

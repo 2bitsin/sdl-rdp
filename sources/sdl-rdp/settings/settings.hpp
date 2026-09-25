@@ -1,5 +1,6 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/configuration/auth-mode.hpp>
+#include <sdl-rdp/configuration/codec.hpp>
 #include <sdl-rdp/settings/aspect.hpp>
 #include <sdl-rdp/settings/refresh.hpp>
 #include <sdl-rdp/utilities/bounded.hpp>
@@ -15,24 +16,9 @@
 #include <string_view>
 #include <utility>
 
-// ADL finds a scheme only in the enum's own namespace, and the C ABI declares these enums in the global one.
-constexpr auto reflect_scheme([[maybe_unused]] sdlrdp_codec* tag) {
-  return ::reflect::enum_scheme<
-      ::reflect::enumerator<"SDLRDP_CODEC_AUTO", SDLRDP_CODEC_AUTO, "", "auto">,
-      ::reflect::enumerator<"SDLRDP_CODEC_PLANAR", SDLRDP_CODEC_PLANAR, "", "planar">,
-      ::reflect::enumerator<"SDLRDP_CODEC_REMOTEFX", SDLRDP_CODEC_REMOTEFX, "", "remotefx">,
-      ::reflect::enumerator<"SDLRDP_CODEC_NSCODEC", SDLRDP_CODEC_NSCODEC, "", "nscodec">,
-      ::reflect::enumerator<"SDLRDP_CODEC_RAW", SDLRDP_CODEC_RAW, "", "raw">,
-      ::reflect::enumerator<"SDLRDP_CODEC_PROGRESSIVE", SDLRDP_CODEC_PROGRESSIVE, "", "progressive">,
-      ::reflect::enumerator<"SDLRDP_CODEC_AVC420", SDLRDP_CODEC_AVC420, "", "avc420">>{ };
-}
-constexpr auto reflect_scheme([[maybe_unused]] sdlrdp_auth* tag) {
-  return ::reflect::enum_scheme<::reflect::enumerator<"SDLRDP_AUTH_NONE", SDLRDP_AUTH_NONE, "", "none">,
-                                ::reflect::enumerator<"SDLRDP_AUTH_TLS", SDLRDP_AUTH_TLS, "", "tls">,
-                                ::reflect::enumerator<"SDLRDP_AUTH_NLA", SDLRDP_AUTH_NLA, "", "nla">>{ };
-}
-
 namespace sdl_rdp::settings::detail::settings {
+using sdl_rdp::configuration::AuthMode;
+using sdl_rdp::configuration::Codec;
 using sdl_rdp::utilities::Expects;
 
 // SDL carries window sizes and millisecond counts as int.
@@ -45,7 +31,6 @@ using Kilobits     = Bounded<std::uint32_t, 0, std::numeric_limits<std::uint32_t
 // Every field is optional so a key the file leaves out stays absent and the next source answers it.
 struct Settings {
   friend constexpr auto reflect_scheme(Settings* tag);
-  std::optional<std::string>  backend;
   std::optional<std::string>  bind;
   std::optional<Port>         port;
   std::optional<std::string>  cert_dir;
@@ -53,7 +38,7 @@ struct Settings {
   std::optional<Extent>       height;
   std::optional<Refresh>      refresh;
   std::optional<Aspect>       aspect;
-  std::optional<sdlrdp_codec> codec;
+  std::optional<Codec>        codec;
   std::optional<Kilobits>     avc_bitrate;
   std::optional<bool>         vsync;
   std::optional<bool>         wait_for_client;
@@ -62,7 +47,7 @@ struct Settings {
   std::optional<std::string>  user;
   std::optional<std::string>  password;
   std::optional<std::string>  domain;
-  std::optional<sdlrdp_auth>  auth;
+  std::optional<AuthMode>     auth;
   friend auto operator==(Settings const&, Settings const&) -> bool = default;
 };
 template <oxbox::serialization::HasEnumMap EnumTy>

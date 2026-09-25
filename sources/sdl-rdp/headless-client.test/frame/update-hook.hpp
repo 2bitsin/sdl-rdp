@@ -1,7 +1,7 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
 #include <sdl-rdp/headless-client.test/client/client.hpp>
 #include <sdl-rdp/utilities/extent.hpp>
+#include <sdl-rdp/utilities/rect.hpp>
 
 #include <functional>
 #include <memory>
@@ -10,13 +10,14 @@
 namespace sdl_rdp::headless_client_test::frame::detail::update_hook {
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::utilities::Extent;
+using sdl_rdp::utilities::Rect;
 
 enum class PictureCommand{ Surface, Bitmap };
 struct PictureUpdate {
-  PictureCommand               command;
-  std::span<sdlrdp_rect const> regions;
-  Extent                       desktop;
-  bool                         delivered;
+  PictureCommand        command;
+  std::span<Rect const> regions;
+  Extent                desktop;
+  bool                  delivered;
 };
 class PictureUpdateHook {
 public:

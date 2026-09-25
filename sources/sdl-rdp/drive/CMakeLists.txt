@@ -1,2 +1,2 @@
 Init_submodule()
-Link_dependencies(abi utilities freerdp-facade diagnostics link)
+Link_dependencies(utilities freerdp-facade diagnostics link)

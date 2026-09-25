@@ -17,15 +17,15 @@ using sdl_rdp::link::SessionLock;
 using sdl_rdp::utilities::Deadline;
 using sdl_rdp::utilities::Pinned;
 
-// The ABI's audio frame is one interleaved left and right sample.
+// An audio frame is one interleaved left and right sample.
 inline constexpr std::size_t StereoChannels = 2;
 class AudioOutput : private Pinned {
 public:
        AudioOutput(Session& session, Presenter& presenter, Configuration const& configuration) noexcept;
   auto Open()                                       -> void;
   auto Rate()                                       -> std::uint32_t;
-  auto Wait(Deadline deadline)                      -> int;
-  auto Write(std::span<std::int16_t const> samples) -> int;
+  auto Wait(Deadline deadline)                      -> bool;
+  auto Write(std::span<std::int16_t const> samples) -> std::size_t;
   auto Close()                                      -> void;
 
 private:

@@ -1,11 +1,13 @@
 #include <sdl-rdp/video/pointer/sender.hpp>
 
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
+#include <sdl-rdp/diagnostics/log-level.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/video/pointer/store.hpp>
 
 namespace sdl_rdp::video::pointer::detail::sender {
+using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::utilities::Unreachable;
 
 PointerSender::PointerSender(PointerStore& pointer, PeerLink& link, Diagnostics const& diagnostics) noexcept
@@ -16,7 +18,7 @@ auto PointerSender::Send() -> bool {
   switch (delivery) {
   case PointerDelivery::Failed: return false;
   case PointerDelivery::Unsupported:
-    _diagnostics.Log(SDLRDP_LOG_WARN, "Client does not support a 384x384 pointer.");
+    _diagnostics.Log(LogLevel::Warn, "Client does not support a 384x384 pointer.");
     break;
   case PointerDelivery::Sent: break;
   default:                    Unreachable(delivery);

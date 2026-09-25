@@ -1,8 +1,8 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
 #include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/picture/forward.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
+#include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/video/forward.hpp>
 #include <sdl-rdp/video/frame/forward.hpp>
 
@@ -11,6 +11,7 @@ using sdl_rdp::link::PeerLink;
 using sdl_rdp::picture::DesktopLayout;
 using sdl_rdp::picture::FrameStore;
 using sdl_rdp::utilities::Pinned;
+using sdl_rdp::utilities::Rect;
 
 enum class CaptureState{ Failed, Idle, Captured };
 class FrameCapture : private Pinned {
@@ -20,9 +21,9 @@ public:
   auto Next() -> CaptureState;
 
 private:
-  auto Begin()                     -> bool;
-  auto Take()                      -> sdlrdp_rect;
-  auto Resize(sdlrdp_rect picture) -> bool;
+  auto Begin()              -> bool;
+  auto Take()               -> Rect;
+  auto Resize(Rect picture) -> bool;
   PeerLink&        _link;
   FrameStore&      _store;
   PeerFrames&      _frames;

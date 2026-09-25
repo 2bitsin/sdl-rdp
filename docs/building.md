@@ -31,27 +31,28 @@ needs an NVIDIA driver with NVENC at runtime and is skipped without one.
 `./buildutil build` builds everything, `./buildutil test` runs the gate (Release,
 parallel CTest), and `./buildutil build --release` installs the release build
 into `_install/` at each module's source-relative path: `sdl-rdp/libSDL3.so`,
-`sdl-rdp/libbackend.so`, `sample`, and the headers under `include/`.
+`sample`, and the headers under `include/`.
 
-The SDL patch touches CMake/build configuration, public hint/video headers, `src/SDL_hints*`, and audio/video/storage bootstrap files to register RDP drivers and hints.
-It adds `src/{audio,storage}/rdp/` drivers; `src/video/SDL_video.c` preserves driver errors and reports initial refresh changes.
-`src/render/SDL_render.c` updates simulated vsync from the live current mode for RDP only, including exclusive fullscreen.
+The SDL patch touches CMake/build configuration, public hint/video headers,
+`src/SDL_hints*`, and audio/video/storage bootstrap files to register RDP drivers and
+hints. It adds `src/{audio,storage}/rdp/` drivers; `src/video/SDL_video.c` preserves driver
+errors and reports initial refresh changes. `src/render/SDL_render.c` updates simulated
+vsync from the live current mode for RDP only, including exclusive fullscreen.
 
 # Consuming
 
 `buildutil publish` packages `sdl-rdp` for conan. A project takes it with one
-`Require` line and links the `SDL3` component. The backend is a separate shared
-library that is never linked: only when the `rdp` driver is selected does it
-dlopen `libbackend.so` by that leaf name, which libSDL3's run path resolves
-beside `libSDL3.so`, or the path `SDL_RDP_BACKEND` or the settings file's
-`backend` names. An application that ships libSDL3
-ships `libbackend.so` beside it. The backend links the fork's
-`libfreerdp3.so.3`, `libfreerdp-server3.so.3` and `libwinpr3.so.3` and
-OpenSSL 3's `libssl.so.3` and `libcrypto.so.3`, and carries no run path to
-them: the install tree and the release archive do not include them, so the
-machine that runs the application provides them on the loader's path, the
-fork's build (`lib/` of its conan package) rather than a distribution's
-FreeRDP 3, whose older releases lack the fork's fixes.
+`Require` line and links the `SDL3` component. The backend is compiled into
+`libSDL3.so`: a consumer compiles against the SDL3 headers and links that one
+library, and nothing constructs a session, listener or FreeRDP object until the
+`rdp` driver is selected. At load time every program linking this `libSDL3.so`
+must find its five `NEEDED` libraries whether or not it selects `rdp`: the
+fork's `libfreerdp3.so.3`, `libfreerdp-server3.so.3` and `libwinpr3.so.3` and
+OpenSSL 3's `libssl.so.3` and `libcrypto.so.3`. `libSDL3.so` carries no run
+path to them and the install tree and the release archive do not include them,
+so the machine that runs the application provides them on the loader's path,
+from the fork's build (`lib/` of its conan package) rather than a
+distribution's FreeRDP 3, whose older releases lack the fork's fixes.
 
 # Quality gate
 
@@ -80,7 +81,7 @@ inspect shape failures, `python3 tools/lint/clones.py` for the clone gate (jscpd
 Test fixtures retain protected data members so derived test bodies can use them.
 The driver (`sources/sdl-rdp/SDL3/rdp`) is C++26 under clang-tidy like the backend;
 its settings file is the reflected record in `sources/sdl-rdp/settings/`, read through oxbox serialization,
-and the backend's C ABI header is the header-only module `sources/sdl-rdp/abi/`.
+and the backend is built from the `Setup` record in `sources/sdl-rdp/configuration/`.
 `tools/lint/` is a pytest suite that `buildutil test` runs after CTest:
 `test_gate.py` runs every lint over the tree, the other files test the lints.
 A lint whose tool is missing (`npx`, clang-format 20) fails with the reason

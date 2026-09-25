@@ -25,8 +25,11 @@ Call it with `("share", "disk.img", "r+b")`, then use `SDL_SeekIO`,
 `SDL_ReadIO`, `SDL_WriteIO`, `SDL_GetIOSize` and `SDL_CloseIO` normally.
 Modes follow `SDL_IOFromFile`; paths are UTF-8 with `/`. Operations block
 until the client responds or disconnects. There is no cache and no FUSE yet.
-Flush waits for a metadata round trip after acknowledged writes; it does not
-promise that the client's operating system has flushed physical media.
+`SDL_FlushIO` succeeds without a round trip: the stream leaves SDL's flush slot
+unset because FreeRDP 3.32's client drive channel (`drive_main.c`) handles no
+`IRP_MJ_FLUSH_BUFFERS` request, though MS-RDPEFS defines one. A write completes
+when the client has acknowledged it, which does not promise that the client's
+operating system has flushed physical media.
 
 `SDL_PROP_DISPLAY_RDP_DRIVES_STRING` contains drive names separated by newlines,
 updated when the application pumps SDL events. There is no native SDL signal
@@ -35,12 +38,11 @@ Disconnected streams fail; reconnecting clients receive fresh drive IDs.
 Close streams before shutting down SDL, and coordinate a stream's position and
 lifetime when sharing it between application threads.
 
-Backend ABI version 6 adds `SDLRDP_DRIVE` announcements and `sdlrdp_drive_*`.
-Enumeration uses an entry offset: add the returned count to the offset for the
-next page. A directory changed between calls may reorder entries. Modification
-times are Unix seconds. Drive names have a 511-byte UTF-8 limit and entry names
-1023 bytes. Each read/write ABI call accepts at most `INT_MAX` bytes, with
-64-bit file offsets, and sends up to eight 64 KiB requests concurrently.
+A share attaching or leaving updates the drives property at the next event pump.
+Storage enumeration reads a directory in pages; a directory changed between
+pages may reorder entries. Modification times are Unix seconds. Reads and
+writes take 64-bit file offsets and send up to eight 64 KiB requests
+concurrently.
 Calls from different threads can be outstanding together. The peer owns the
 static channel; transport loss wakes all waiters and removes its drives.
 

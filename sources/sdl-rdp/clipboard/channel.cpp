@@ -5,10 +5,12 @@
 #include <sdl-rdp/clipboard/text.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/failure-log.hpp>
+#include <sdl-rdp/diagnostics/log-level.hpp>
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
 #include <sdl-rdp/freerdp-facade/handled.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/event-queue.hpp>
+#include <sdl-rdp/link/event.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/operation-name.hpp>
@@ -23,8 +25,10 @@
 namespace sdl_rdp::clipboard::detail::channel {
 using sdl_rdp::diagnostics::FailureLog;
 using sdl_rdp::diagnostics::FailuresThrough;
+using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::freerdp_facade::BindContext;
 using sdl_rdp::freerdp_facade::CallbackOwner;
+using sdl_rdp::link::ClipboardChanged;
 using sdl_rdp::utilities::Contained;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::OperationName;
@@ -110,7 +114,7 @@ auto ClipboardChannel::Changed(std::string text) -> void {
   _announced = _store.Replace(std::move(text));
   _diagnostics.Line("clipboard",
                     [&] { return std::format("generation={} bytes={}", _store.Generation(), _store.Text().size()); });
-  _events.Push({ .type = SDLRDP_CLIPBOARD });
+  _events.Push(ClipboardChanged{ });
 }
 auto ClipboardChannel::RespondToList() -> std::uint32_t {
   CLIPRDR_FORMAT_LIST_RESPONSE response{ .common = { .msgType = CB_FORMAT_LIST_RESPONSE } };
@@ -171,7 +175,7 @@ auto ClipboardChannel::DataResponse(CLIPRDR_FORMAT_DATA_RESPONSE const& response
     return active && _requested != _offered && _has_unicode ? Request() : std::uint32_t{ CHANNEL_RC_OK };
   };
   return Contained(std::uint32_t{ CHANNEL_RC_OK }, received,
-                   FailureLog{ _diagnostics, "Clipboard text decoding", SDLRDP_LOG_WARN });
+                   FailureLog{ _diagnostics, "Clipboard text decoding", LogLevel::Warn });
 }
 auto ClipboardChannel::FailureSource() const noexcept -> Diagnostics const& {
   return _diagnostics;

@@ -1,2 +1,3 @@
 Init_submodule()
-Link_dependencies(abi utilities freerdp-facade auth clipboard drive peer session backend freerdp::freerdp-client)
+Link_dependencies(utilities freerdp-facade diagnostics configuration picture link auth clipboard drive peer session
+                  freerdp::freerdp-client)

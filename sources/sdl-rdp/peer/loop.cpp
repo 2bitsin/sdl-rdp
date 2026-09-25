@@ -1,7 +1,9 @@
 #include <sdl-rdp/peer/loop.hpp>
 
 #include <sdl-rdp/auth/authenticator.hpp>
+#include <sdl-rdp/configuration/auth-mode.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
+#include <sdl-rdp/diagnostics/log-level.hpp>
 #include <sdl-rdp/diagnostics/logging.hpp>
 #include <sdl-rdp/freerdp-facade/exceptions.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
@@ -16,6 +18,7 @@
 #include <sdl-rdp/picture/frame-store.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
+#include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/utilities/scoped.hpp>
 #include <sdl-rdp/video/acknowledgement-window.hpp>
 
@@ -33,6 +36,8 @@
 #include <utility>
 
 namespace sdl_rdp::peer::detail::loop {
+using sdl_rdp::configuration::AuthMode;
+using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::diagnostics::PeerNegotiationLogging;
 using sdl_rdp::diagnostics::ResetAuthenticationLogging;
 using sdl_rdp::freerdp_facade::EventWaitFailed;
@@ -43,30 +48,31 @@ using sdl_rdp::utilities::Contained;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::RAIIWrap;
+using sdl_rdp::utilities::Rect;
 using sdl_rdp::video::AcknowledgedFrameWindow;
 
 namespace {
 using sdl_rdp::freerdp_facade::FirstRefused;
 using sdl_rdp::freerdp_facade::Set;
 using SecurityFlags = std::array<std::pair<FreeRDP_Settings_Keys_Bool, bool>, 12>;
-auto Flags(sdlrdp_auth auth) -> SecurityFlags {
+auto Flags(AuthMode auth) -> SecurityFlags {
   return { {
-      { FreeRDP_NlaSecurity, auth == SDLRDP_AUTH_NLA },
+      { FreeRDP_NlaSecurity, auth == AuthMode::Nla },
       // sdl-rdp#41: FreeRDP 3.32 nla.c:943 sends Early User Authorization success before Logon decides.
-      { FreeRDP_ExtSecurity              , false                    },
-      { FreeRDP_TlsSecurity              , true                     },
-      { FreeRDP_RdpSecurity              , auth == SDLRDP_AUTH_NONE },
-      { FreeRDP_RemoteFxCodec            , true                     },
-      { FreeRDP_NSCodec                  , true                     },
-      { FreeRDP_SupportGraphicsPipeline  , true                     },
-      { FreeRDP_AutoReconnectionEnabled  , true                     },
-      { FreeRDP_WaitForOutputBufferFlush , false                    },
-      { FreeRDP_FrameMarkerCommandEnabled, true                     },
-      { FreeRDP_SupportDisplayControl    , true                     },
-      { FreeRDP_SuppressOutput           , true                     },
+      { FreeRDP_ExtSecurity              , false                  },
+      { FreeRDP_TlsSecurity              , true                   },
+      { FreeRDP_RdpSecurity              , auth == AuthMode::None },
+      { FreeRDP_RemoteFxCodec            , true                   },
+      { FreeRDP_NSCodec                  , true                   },
+      { FreeRDP_SupportGraphicsPipeline  , true                   },
+      { FreeRDP_AutoReconnectionEnabled  , true                   },
+      { FreeRDP_WaitForOutputBufferFlush , false                  },
+      { FreeRDP_FrameMarkerCommandEnabled, true                   },
+      { FreeRDP_SupportDisplayControl    , true                   },
+      { FreeRDP_SuppressOutput           , true                   },
   } };
 }
-auto ApplySettings(rdpSettings& settings, sdlrdp_auth auth, sdlrdp_rect picture) -> bool {
+auto ApplySettings(rdpSettings& settings, AuthMode auth, Rect picture) -> bool {
   std::array<std::pair<FreeRDP_Settings_Keys_UInt32, std::uint32_t>, 3> const numbers{ {
       { FreeRDP_EncryptionLevel , ENCRYPTION_LEVEL_CLIENT_COMPATIBLE                    },
       { FreeRDP_FrameAcknowledge, AcknowledgedFrameWindow                               },
@@ -122,7 +128,7 @@ auto PeerLoop::Serve(std::stop_token const& quit) -> void {
   };
   auto const               failed  = [this](std::string_view failure) {
     _diagnostics.Log(
-        SDLRDP_LOG_ERROR,
+        LogLevel::Error,
         std::format("{} FreeRDP: {}.", failure, freerdp_get_last_error_name(freerdp_get_last_error(&_link.Context()))));
   };
   std::ignore = Contained(false, served, failed);

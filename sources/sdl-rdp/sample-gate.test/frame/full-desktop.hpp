@@ -1,6 +1,7 @@
 #pragma once
 #include <sdl-rdp/headless-client.test/client/client.hpp>
 #include <sdl-rdp/headless-client.test/frame/update-hook.hpp>
+#include <sdl-rdp/utilities/rect.hpp>
 #include <cstddef>
 #include <vector>
 
@@ -9,6 +10,7 @@ using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::frame::PictureUpdate;
 using sdl_rdp::headless_client_test::frame::PictureUpdateHook;
 using sdl_rdp::utilities::Extent;
+using sdl_rdp::utilities::Rect;
 
 class FullDesktopFrames {
 public:
@@ -17,8 +19,8 @@ public:
   auto     Deliveries() const -> std::size_t;
 
 private:
-  auto Observe(PictureUpdate const& update)      -> void;
-  auto Cover(sdlrdp_rect region, Extent desktop) -> void;
+  auto Observe(PictureUpdate const& update) -> void;
+  auto Cover(Rect region, Extent desktop)   -> void;
   std::size_t       full       = 0;
   std::size_t       deliveries = 0;
   std::vector<bool> rows;

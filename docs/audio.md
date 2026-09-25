@@ -10,12 +10,11 @@ the server may run ahead of the client’s confirmed playback before it waits, i
 This window guards against a stalled client; the SDL driver paces the stream.
 Audio is sent in 20 ms blocks. The driver maintains a real-time
 audio clock even when no client is attached, discarding those samples.
-The backend does no rate conversion: `sdlrdp_audio_open(handle)` opens playback,
-`sdlrdp_audio_rate(handle)` returns the negotiated rate (0 without a playing
-client), and `sdlrdp_audio_write` accepts stereo S16 frames at that rate.
-`SDLRDP_AUDIO {freq, 1}` announces audio negotiation; `{0, 0}` announces loss
-of audio. A client advertising no compatible formats receives no audio; the
-sound channel is released, `{0, 0}` is queued, and the audio rate stays zero.
+There is no rate conversion: the device plays stereo S16 at the rate the client
+negotiates, and a negotiated rate that differs from the device's changes the
+device's format (`SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED`). A client advertising
+no compatible formats receives no audio; the sound channel is released and the
+audio rate stays zero.
 Video, input and clipboard continue on the same connection.
 Connection events are never revised after they are queued.
 Playback uses FreeRDP’s `SendSamples2` to send PCM directly as Wave2, requiring
@@ -31,8 +30,8 @@ the `SDL_RDP_AUDIO_LATENCY` window; zero restores pacing without a lead.
 
 Audio works without initializing video. An audio-only application opens
 the same listener using the RDP hints above, with a black desktop at the
-configured width and height. Audio and video share a reference-counted
-backend handle when both are selected. There is no recording device.
+configured width and height. When both are selected, audio and video share
+one session. There is no recording device.
 
 For mstsc, leave Remote audio playback set to **Play on this computer**
 (the default). Run the sample with `--tone` for a 440 Hz sine at -12 dBFS;
@@ -40,4 +39,7 @@ add `--tight` to exercise audio alongside frame acknowledgement pacing:
 
     SDL_VIDEO_DRIVER=rdp SDL_AUDIO_DRIVER=rdp <prefix>/sample --tone --tight
 
-FreeRDP 3.32 still leaks the private rdpsnd critical section and PDU stream after `Initialize(FALSE)` (`rdpsnd_server_stop` returns before any cleanup when it owns no thread; no public cleanup API); the destructor releases the leaked static channel through `WTSVirtualChannelOpen`/`WTSVirtualChannelClose`.
+FreeRDP 3.32 still leaks the private rdpsnd critical section and PDU stream after
+`Initialize(FALSE)` (`rdpsnd_server_stop` returns before any cleanup when it owns no
+thread; no public cleanup API); the sound channel's destructor releases the leaked
+static channel through `WTSVirtualChannelOpen`/`WTSVirtualChannelClose`.

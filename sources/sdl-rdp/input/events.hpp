@@ -1,11 +1,11 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
 #include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/diagnostics/forward.hpp>
 #include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/picture/forward.hpp>
 #include <sdl-rdp/utilities/operation-name.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
+#include <sdl-rdp/utilities/rect.hpp>
 
 #include <freerdp/freerdp.h>
 #include <freerdp/server/rdpei.h>
@@ -24,6 +24,7 @@ using sdl_rdp::picture::DesktopLayout;
 using sdl_rdp::picture::FrameStore;
 using sdl_rdp::utilities::OperationName;
 using sdl_rdp::utilities::Pinned;
+using sdl_rdp::utilities::Rect;
 
 enum class MouseMode{ Absolute, Relative };
 struct MouseState {
@@ -52,7 +53,7 @@ private:
   auto                         Motion(int x, int y)                                -> bool;
   auto                         Center()                                            -> bool;
   template <auto BUILD>
-    requires std::invocable<decltype(BUILD), int, int, sdlrdp_rect>
+    requires std::invocable<decltype(BUILD), int, int, Rect>
   auto Scaled(int x, int y) -> void;
   PeerLink&                                       _link;
   Activation const&                               _activation;

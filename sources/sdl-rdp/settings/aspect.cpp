@@ -1,4 +1,5 @@
 #include <sdl-rdp/settings/aspect.hpp>
+
 #include <sdl-rdp/settings/parsed.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 
@@ -8,6 +9,7 @@
 #include <format>
 
 namespace sdl_rdp::settings::detail::aspect {
+using sdl_rdp::utilities::AspectRatio;
 using sdl_rdp::utilities::Expects;
 
 Aspect::Aspect(std::uint32_t numerator, std::uint32_t denominator) : _parts{ Parts{ numerator, denominator } } {
@@ -40,9 +42,8 @@ auto Aspect::Text() const -> std::string {
 auto Aspect::IsNone() const -> bool {
   return !_parts.has_value();
 }
-auto Aspect::Ratio() const -> sdlrdp_aspect {
-  Expects(!IsNone(), "only a stated aspect has a ratio");
-  auto const parts = _parts.value_or(Parts{ });
-  return { parts.first, parts.second };
+auto Aspect::Ratio() const -> std::optional<AspectRatio> {
+  return _parts.transform(
+      [](Parts const& parts) { return AspectRatio{ .numerator = parts.first, .denominator = parts.second }; });
 }
 }

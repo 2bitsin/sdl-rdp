@@ -1,11 +1,13 @@
 #include "window.hpp"
 #include "device.hpp"
-#include <sdl-rdp/SDL3/rdp/backend/boundary.hpp>
+#include <sdl-rdp/SDL3/rdp/sdl/boundary.hpp>
+#include <sdl-rdp/session/backend.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 namespace sdl3::rdp::video::detail::window {
-using sdl3::rdp::backend::Boundary;
-using sdl3::rdp::backend::Operation;
+using sdl3::rdp::sdl::Boundary;
 using sdl_rdp::settings::Settings;
 using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::RAIIWrap;
 namespace {
 // SDL rejects desktop updates while fullscreen_active is set.
@@ -28,14 +30,14 @@ auto DesktopMode(SDL_VideoData const& data, int width, int height) -> void {
   FullscreenSuspension const suspended{ display };
   SDL_SetDesktopDisplayMode(&display, &mode);
 }
-auto ResizePicture(SDL_VideoData& data, int width, int height) -> bool {
+auto ResizePicture(SDL_VideoData& data, int width, int height) -> void {
   Expects(width > 0, "picture has width");
   Expects(height > 0, "picture has height");
-  if (data.Backend().Call<Operation::RESIZE>(width, height) != 0) return data.Backend().Fail();
+  data.Driver().Backend().Presentation().Resize(
+      { .width = Narrowed<std::uint32_t>(width), .height = Narrowed<std::uint32_t>(height) });
   data.Picture(width, height);
   auto const& mode = SDL_GetVideoDisplay(data.Display())->desktop_mode;
   if (mode.w != width || mode.h != height) DesktopMode(data, width, height);
-  return true;
 }
 namespace {
 auto PlaceAtOrigin(SDL_Window& window) -> void {
@@ -50,10 +52,10 @@ auto CreateWindow(SDL_VideoDevice* device, SDL_Window* window, [[maybe_unused]] 
   return Boundary([&] {
     auto& data = *device->internal;
     if (data.Window()) return SDL_SetError("RDP supports one window");
-    auto const aspect = data.Backend().Options().Value<&Settings::aspect>();
-    SetAspect(data.Backend(), aspect);
+    auto const aspect = data.Driver().Options().Value<&Settings::aspect>();
+    SetAspect(data.Driver(), aspect);
     PlaceAtOrigin(*window);
-    if (!ResizePicture(data, window->w, window->h)) return false;
+    ResizePicture(data, window->w, window->h);
     data.Bind(*window);
     PublishAspect(*window, aspect);
     SDL_SendWindowEvent(window, SDL_EVENT_WINDOW_OCCLUDED, 0, 0);
@@ -71,8 +73,10 @@ auto DestroyWindow(SDL_VideoDevice* device, SDL_Window* window) -> void {
 auto SetWindowSize(SDL_VideoDevice* device, SDL_Window* window) -> void {
   Expects(device != nullptr, "resize has a device");
   Expects(window != nullptr, "resize has a window");
-  if (ResizePicture(*device->internal, window->pending.w, window->pending.h))
+  Boundary([&] {
+    ResizePicture(*device->internal, window->pending.w, window->pending.h);
     SDL_SendWindowEvent(window, SDL_EVENT_WINDOW_RESIZED, window->pending.w, window->pending.h);
+  });
   window->last_size_pending = false;
 }
 // SDL's video callback table requires a show callback even for a headless window.
@@ -87,9 +91,13 @@ auto Fullscreen(SDL_VideoDevice* device, SDL_Window* window, SDL_VideoDisplay* d
   auto const& mode    = window->requested_fullscreen_mode.w ? window->requested_fullscreen_mode : display->desktop_mode;
   auto const  width   = leaving ? window->windowed.w : mode.w;
   auto const  height  = leaving ? window->windowed.h : mode.h;
-  if (!ResizePicture(*device->internal, width, height)) return SDL_FULLSCREEN_FAILED;
-  if (leaving) SDL_SendWindowEvent(window, SDL_EVENT_WINDOW_RESIZED, width, height);
-  return SDL_FULLSCREEN_SUCCEEDED;
+  return Boundary(
+      [&] {
+        ResizePicture(*device->internal, width, height);
+        if (leaving) SDL_SendWindowEvent(window, SDL_EVENT_WINDOW_RESIZED, width, height);
+        return SDL_FULLSCREEN_SUCCEEDED;
+      },
+      SDL_FULLSCREEN_FAILED);
 }
 }
 auto InitWindow(SDL_VideoDevice& device) -> void {

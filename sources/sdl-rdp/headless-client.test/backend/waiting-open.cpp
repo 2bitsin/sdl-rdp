@@ -1,12 +1,22 @@
 #include <sdl-rdp/headless-client.test/backend/waiting-open.hpp>
 #include <oxbox/utilities/number-text.hpp>
-#include <sdl-rdp/abi/backend.h>
-#include <sdl-rdp/headless-client.test/backend/events.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
+#include <sdl-rdp/diagnostics/log-level.hpp>
+#include <sdl-rdp/diagnostics/log-sink.hpp>
+#include <sdl-rdp/headless-client.test/backend/instance.hpp>
+#include <sdl-rdp/link/event.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
+#include <chrono>
 #include <poll.h>
+#include <string_view>
 #include <sys/socket.h>
+#include <variant>
 
 namespace sdl_rdp::headless_client_test::backend::detail::waiting_open {
+using sdl_rdp::configuration::Setup;
+using sdl_rdp::diagnostics::LogLevel;
+using sdl_rdp::diagnostics::LogSink;
+using sdl_rdp::link::Connected;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::Required;
@@ -22,34 +32,38 @@ auto SendOpeningResult(int socket, int value) -> void {
   auto sent = send(socket, &value, sizeof(value), MSG_NOSIGNAL);
   Expects(sent == sizeof(value), "opening process publishes its result");
 }
-auto PublishListeningPort(void* user, sdlrdp_log_level level, char const* text) -> void {
-  Expects(user != nullptr, "control socket exists");
-  Expects(text != nullptr, "log message exists");
-  std::string_view const     line(text);
-  constexpr std::string_view prefix = "Listening on port ";
-  if (level != SDLRDP_LOG_INFO || !line.starts_with(prefix)) return;
-  auto const port = Required(oxbox::utilities::ParseNumberAfter<int>(line, prefix), "listener logged a numeric port");
-  SendOpeningResult(*static_cast<int*>(user), port);
-}
-auto OpenedWithClient(sdlrdp_config const& config) -> bool {
+// Publishes the listener's port over the control socket as soon as the backend logs it.
+class PortPublisher final : public LogSink {
+public:
+  explicit PortPublisher(int socket) : _socket{ socket } { }
+  auto     Log(LogLevel level, std::string_view line) -> void override {
+    constexpr std::string_view prefix = "Listening on port ";
+    if (level != LogLevel::Info || !line.starts_with(prefix)) return;
+    auto const port = Required(oxbox::utilities::ParseNumberAfter<int>(line, prefix), "listener logged a numeric port");
+    SendOpeningResult(_socket, port);
+  }
+
+private:
+  int _socket;
+};
+auto OpenedWithClient(Setup const& config, LogSink& log) -> bool {
   BackendInstance backend;
-  if (backend.TryOpen(config) != 0) return false;
-  if (sdlrdp_wait(&*backend, 0) != 1) return false;
+  if (!backend.TryOpen(config, log)) return false;
+  if (!backend.Wait(std::chrono::milliseconds{ 0 })) return false;
   auto const events = backend.Poll();
-  return !events.empty() && events.front().type == SDLRDP_CONNECTED;
+  return !events.empty() && std::holds_alternative<Connected>(events.front());
 }
-auto RunOpeningProcess(sdlrdp_config config, int socket) -> int {
-  config.log      = PublishListeningPort;
-  config.log_user = &socket;
-  auto opened = OpenedWithClient(config);
+auto RunOpeningProcess(Setup const& config, int socket) -> int {
+  PortPublisher publisher { socket };
+  auto          opened    = OpenedWithClient(config, publisher);
   SendOpeningResult(socket, opened ? 0 : -1);
   return opened ? 0 : 1;
 }
 }
-WaitingOpen::WaitingOpen(sdlrdp_config const& config)
+WaitingOpen::WaitingOpen(Setup const& config)
     : sockets(OpeningSockets()), process([&] { return RunOpeningProcess(config, sockets[1].Get()); }) { }
 WaitingOpen::~WaitingOpen() {
-  // The ABI returns no handle until a blocking open completes; ending the process closes its listener.
+  // A waiting open returns only with a client; ending the process closes its listener.
   process.Kill();
 }
 auto WaitingOpen::Receive(std::chrono::milliseconds timeout) const -> std::optional<int> {

@@ -1,6 +1,7 @@
 #pragma once
 #include "session.hpp"
-#include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/headless-client.test/frame/observer.hpp>
+#include <sdl-rdp/session/backend.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -14,23 +15,24 @@ namespace sdl_rdp::headless_client_test::graphics::detail::round_five {
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::Pixels;
 using sdl_rdp::headless_client_test::frame::FrameObserver;
+using sdl_rdp::session::Backend;
 
-using Wait = auto (&)(sdlrdp_handle& handle) -> bool;
+using Wait = auto (&)(Backend& backend) -> bool;
 
 class RoundFive : public GraphicsSession {
 protected:
   auto ThenPipelinedWindow(Client& client, auto const& frames, Pixels const& pixels) -> void {
     ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
-    EXPECT_EQ(sdlrdp_wait_frame(&*backend, 0), 1);
+    EXPECT_TRUE(backend.WaitFrame(std::chrono::milliseconds{ 0 }));
     ASSERT_TRUE(client.Until([&] { return frames.size() == 1; }));
     ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
     ASSERT_TRUE(client.Until([&] { return frames.size() == 2; }));
-    EXPECT_EQ(sdlrdp_wait_frame(&*backend, 1), 0);
+    EXPECT_FALSE(backend.WaitFrame(std::chrono::milliseconds{ 1 }));
   }
   auto ThenNeverAcknowledges(auto timed) -> void {
     ASSERT_NO_FATAL_FAILURE(Open(320, 200));
-    EXPECT_EQ(sdlrdp_wait_frame(&*backend, 0), 1);
-    Client client(sdlrdp_port(&*backend), true);
+    EXPECT_TRUE(backend.WaitFrame(std::chrono::milliseconds{ 0 }));
+    Client client(backend.Port(), true);
     ASSERT_NO_FATAL_FAILURE(Connect(client));
     FrameObserver const observer(client);
     Pixels const        pixels(320uz * 200, 0x778899);

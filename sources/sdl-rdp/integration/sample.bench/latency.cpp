@@ -28,13 +28,13 @@
 #include <vector>
 
 namespace sdl_rdp::integration::sample_bench::detail::latency {
-using sdl_rdp::headless_client_test::utilities::Split;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::ClipboardClient;
 using sdl_rdp::headless_client_test::client::Clock;
 using sdl_rdp::headless_client_test::client::KeyState;
 using sdl_rdp::headless_client_test::client::SoundClient;
 using sdl_rdp::headless_client_test::frame::FrameObserver;
+using sdl_rdp::headless_client_test::utilities::Split;
 using sdl_rdp::headless_client_test::utilities::UnicodeText;
 using sdl_rdp::headless_client_test::utilities::WallMilliseconds;
 using sdl_rdp::integration::support_bench::Check;
@@ -95,7 +95,7 @@ BENCHMARK(Measured<InputAndClipboardUnderTightVideo>)->Apply(OneSession);
 
 auto InputAndClipboardUnderTightVideo::TestBody() -> void {
   Expects(process == nullptr, "sample has not started");
-  auto const launched = Holds([this] {
+  auto const launched = Passes([this] {
     GivenAudioProcess({ "SDL_AUDIO_DRIVER=rdp", "SDL_RDP_TRACE=1", "SDL_LOGGING=video=info" }, { "--tone", "--tight" });
   });
   if (!launched || !Exercised()) return;
@@ -108,13 +108,13 @@ auto InputAndClipboardUnderTightVideo::Exercised() -> bool {
   Client             client(audio_port, true, 640, 480);
   ClipboardClient    clipboard(client);
   SoundClient const  audio(client);
-  if (!Holds([&] { Connect(client); })) return false;
+  if (!Passes([&] { Connect(client); })) return false;
   FrameObserver frames(client);
   if (!MediaReady(client, frames, audio, clipboard)) return false;
   auto const before = frames.Frames().size();
   if (!Sampled(client, frames, clipboard)) return false;
   Check(frames.Frames().size() - before >= 60, "video keeps presenting under input");
-  return Holds([&] { Escape(client); });
+  return Passes([&] { Escape(client); });
 }
 auto InputAndClipboardUnderTightVideo::MediaReady(Client& client, FrameObserver& frames, SoundClient const& audio,
                                                   ClipboardClient const& clipboard) -> bool {

@@ -1,12 +1,15 @@
 #pragma once
+#include <sdl-rdp/configuration/refresh-mode.hpp>
+
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 
 namespace sdl_rdp::configuration::detail::refresh {
 inline constexpr std::uint32_t MillihertzPerHz = 1000;
-enum class Direction  { Down, Hold, Up                 };
-enum class RefreshMode{ Fixed, Client, Average, Sender };
+using sdl_rdp::configuration::RefreshMode;
+
+enum class Direction{ Down, Hold, Up };
 struct WireSample {
   bool          available    { };
   std::uint32_t outq         { };
@@ -48,6 +51,5 @@ private:
 namespace sdl_rdp::configuration {
 using detail::refresh::MillihertzPerHz;
 using detail::refresh::Refresh;
-using detail::refresh::RefreshMode;
 using detail::refresh::WireSample;
 }

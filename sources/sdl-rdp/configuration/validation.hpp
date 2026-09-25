@@ -1,17 +1,21 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/configuration/codec.hpp>
 #include <sdl-rdp/configuration/refresh.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
 
 #include <cstdint>
 
 namespace sdl_rdp::configuration::detail::validation {
-auto Validate(sdlrdp_config const& config)                   -> void;
-auto ValidateCodec(sdlrdp_codec codec)                       -> void;
-auto ValidRefresh(std::uint32_t mode, std::uint32_t ceiling) -> RefreshMode;
+using sdl_rdp::configuration::Codec;
+using sdl_rdp::configuration::RefreshMode;
+using sdl_rdp::configuration::Setup;
+auto Validate(Setup const& config)                            -> void;
+auto ValidateCodec(Codec codec)                               -> void;
+auto ValidateRefresh(RefreshMode mode, std::uint32_t ceiling) -> void;
 }
 
 namespace sdl_rdp::configuration {
-using detail::validation::ValidRefresh;
 using detail::validation::Validate;
 using detail::validation::ValidateCodec;
+using detail::validation::ValidateRefresh;
 }

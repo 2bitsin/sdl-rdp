@@ -1,7 +1,7 @@
 #pragma once
+#include <sdl-rdp/configuration/refresh-mode.hpp>
 #include <sdl-rdp/utilities/bounded.hpp>
 
-#include <_buildutil/reflect.hpp>
 #include <cstdint>
 #include <limits>
 #include <optional>
@@ -10,16 +10,9 @@
 #include <string_view>
 
 namespace sdl_rdp::settings::detail::refresh {
+using sdl_rdp::configuration::RefreshMode;
 using sdl_rdp::utilities::Bounded;
 
-// Values are the frozen backend set_refresh mode argument; the labels are the automatic modes' written names.
-enum class RefreshMode : std::uint32_t {
-  FIXED = 0,
-  CLIENT _Label("auto-client")                 = 1,
-  CLIENT_AVERAGE _Label("auto-client-average") = 2,
-  SENDER _Label("auto-sender")                 = 3
-};
-constexpr auto reflect_scheme(RefreshMode* tag);
 // A display refresh: a fixed rate, or a mode that follows the client or the sender from the initial rate.
 class Refresh {
 public:
@@ -37,12 +30,11 @@ public:
   auto        operator==(Refresh const&) const -> bool = default;
 private:
   static constexpr std::uint32_t InitialHz = 60;
-  RefreshMode                    _mode     { RefreshMode::FIXED };
+  RefreshMode                    _mode     { RefreshMode::Fixed };
   Rate                           _rate     { InitialHz          };
 };
 }
 
 namespace sdl_rdp::settings {
 using detail::refresh::Refresh;
-using detail::refresh::RefreshMode;
 }

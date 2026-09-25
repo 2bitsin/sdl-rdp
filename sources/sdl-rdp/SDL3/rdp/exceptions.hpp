@@ -24,9 +24,6 @@ using UnreadableSettings = RuntimeFailure<"UnreadableSettings"_hash, "Could not 
 using UnlocatedLibrary = RuntimeFailure<"UnlocatedLibrary"_hash, "The RDP driver could not locate its own library">;
 using LeadTooLong      = RuntimeFailure<"LeadTooLong"_hash, "RDP audio lead must be below the audio latency window">;
 
-using AbiMismatch = RuntimeFailure<"AbiMismatch"_hash, "RDP backend ABI version mismatch (found {}, expected {})",
-                                   std::uint32_t, std::uint32_t>;
-
 using UnknownName = RuntimeFailure<"UnknownName"_hash, "Invalid {} '{}'; valid names: {}", string_view, string_view,
                                    string_view>;
 
@@ -39,7 +36,6 @@ using IntegerOutOfRange = RuntimeFailure<"IntegerOutOfRange"_hash,
 }
 
 namespace sdl3::rdp {
-using detail::exceptions::AbiMismatch;
 using detail::exceptions::DriveUnavailable;
 using detail::exceptions::IntegerOutOfRange;
 using detail::exceptions::InvalidFileMode;

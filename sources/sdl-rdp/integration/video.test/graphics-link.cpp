@@ -1,8 +1,10 @@
 #include <sdl-rdp/video/graphics-link.hpp>
+
+#include <sdl-rdp/auth/account.hpp>
 #include <sdl-rdp/configuration/configuration.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/trace-queue.hpp>
-#include <sdl-rdp/headless-client.test/backend/certificate-directory.hpp>
 #include <sdl-rdp/headless-client.test/backend/contract-run.hpp>
 #include <sdl-rdp/headless-client.test/backend/logs.hpp>
 #include <sdl-rdp/link/activation.hpp>
@@ -16,15 +18,18 @@
 
 #include <freerdp/channels/channels.h>
 #include <gtest/gtest.h>
+#include <oxbox/platform/scratch-area.hpp>
 #include <winpr/wtsapi.h>
 #include <memory>
 
 namespace sdl_rdp::integration::video_test::detail::graphics_link {
+using oxbox::platform::ScratchArea;
+using sdl_rdp::auth::Account;
 using sdl_rdp::configuration::Configuration;
+using sdl_rdp::configuration::Setup;
 using sdl_rdp::diagnostics::Diagnostics;
 using sdl_rdp::diagnostics::TraceQueue;
 using sdl_rdp::freerdp_facade::PeerHandle;
-using sdl_rdp::headless_client_test::backend::CertificateDirectory;
 using sdl_rdp::headless_client_test::backend::ContractRun;
 using sdl_rdp::headless_client_test::backend::Logs;
 using sdl_rdp::link::Activation;
@@ -40,10 +45,8 @@ using sdl_rdp::video::frame::FrameStatistics;
 using sdl_rdp::video::gfx::GfxChannel;
 namespace {
 constexpr int Continued = 3;
-auto Config(CertificateDirectory const& certificates, Logs& logs) -> sdlrdp_config {
-  return {
-    .cert_dir = certificates.Path().c_str(), .width = 320, .height = 200, .log = Logs::Collect, .log_user = &logs
-  };
+auto Config(ScratchArea const& certificates) -> Setup {
+  return { .cert_dir = certificates.Path(), .width = 320, .height = 200 };
 }
 auto AcceptedPeer(SocketPair& sockets) -> PeerHandle {
   WTSRegisterWtsApiFunctionTable(FreeRDP_InitWtsApi());
@@ -51,14 +54,15 @@ auto AcceptedPeer(SocketPair& sockets) -> PeerHandle {
 }
 class PeerParts : public testing::Test {
 protected:
-  CertificateDirectory const _certificates;
-  Logs                       _logs;
-  Diagnostics const          _diagnostics  { Config(_certificates, _logs), false  };
-  EventQueue                 _events;
-  Configuration const        _configuration{ Config(_certificates, _logs)         };
-  FrameStore                 _store        { { .width = 320, .height = 200 }, { } };
-  SocketPair                 _sockets;
-  PeerLink                   _link         { AcceptedPeer(_sockets)               };
+  ScratchArea const   _certificates { "graphics-link", "sdl-rdp"           };
+  Logs                _logs;
+  Account             _account      { Config(_certificates)                };
+  Diagnostics const   _diagnostics  { _logs, false                         };
+  EventQueue          _events;
+  Configuration const _configuration{ Config(_certificates), _account      };
+  FrameStore          _store        { { .width = 320, .height = 200 }, { } };
+  SocketPair          _sockets;
+  PeerLink            _link         { AcceptedPeer(_sockets)               };
 };
 class GraphicsLinkParts : public PeerParts {
 protected:

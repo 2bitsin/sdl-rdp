@@ -340,7 +340,7 @@ PEER = '''
   Clock::time_point activated_at;
   std::chrono::nanoseconds         graphics_ready_time{};
   RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU graphics_qoe       {};
-  std::optional<sdlrdp_event> connection;
+  std::optional<driver_event> connection;
   bool sound_attempted = false;
   std::unique_ptr<AudioChannel> sound;
   PeerHandle                    client;
@@ -387,7 +387,7 @@ PEER_EXPECTED = '''
   Clock::time_point                        activated_at;
   std::chrono::nanoseconds                 graphics_ready_time    { };
   RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU         graphics_qoe           { };
-  std::optional<sdlrdp_event>              connection;
+  std::optional<driver_event>              connection;
   bool                                     sound_attempted        = false;
   std::unique_ptr<AudioChannel>            sound;
   PeerHandle                               client;
@@ -839,7 +839,7 @@ public:
   HANDLE Event() const { return event; }
   void Disconnect();
   void Abort(std::string const& /*cause*/);
-  int List(sdlrdp_drive* /*out*/, unsigned /*max*/);
+  int List(driver_drive* /*out*/, unsigned /*max*/);
   unsigned Device(unsigned id);
   std::shared_ptr<DriveRequest> Send(unsigned drive, unsigned file, unsigned major, DrivePacket const& body,
                                      unsigned minor = 0);
@@ -863,7 +863,7 @@ public:
   HANDLE                        Event() const { return event; }
   void                          Disconnect();
   void                          Abort(std::string const& /*cause*/);
-  int                           List(sdlrdp_drive* /*out*/, unsigned /*max*/);
+  int                           List(driver_drive* /*out*/, unsigned /*max*/);
   unsigned                      Device(unsigned id);
   std::shared_ptr<DriveRequest> Send(unsigned drive, unsigned file, unsigned major, DrivePacket const& body,
                                      unsigned minor = 0);
@@ -943,14 +943,14 @@ DRIVENAME_EXPECTED = '''\
 '''
 
 INPUT = '''\
-    self.owner.Push({ .type = SDLRDP_KEY,
+    self.owner.Push({ .type = DRIVER_KEY,
                       .key  = { .scancode = code,
                                 .extended = !!(flags & KBD_FLAGS_EXTENDED),
                                 .down     = !(flags & KBD_FLAGS_RELEASE) } });
 '''
 
 INPUT_EXPECTED = '''\
-    self.owner.Push({ .type = SDLRDP_KEY,
+    self.owner.Push({ .type = DRIVER_KEY,
                       .key  = { .scancode = code,
                                 .extended = !!(flags & KBD_FLAGS_EXTENDED),
                                 .down     = !(flags & KBD_FLAGS_RELEASE) } });
@@ -959,13 +959,13 @@ INPUT_EXPECTED = '''\
 AUTH = '''\
   PlainPassword const plain{ password };
   bool const accepted = config.verify ? config.verify(config.auth_user, domain, user, plain.Text()) != 0
-                                      : sdlrdp_verify_pair(&config, domain, user, plain.Text()) != 0;
+                                      : driver_verify_pair(&config, domain, user, plain.Text()) != 0;
 '''
 
 AUTH_EXPECTED = '''\
   PlainPassword const plain    { password };
   bool const          accepted = config.verify ? config.verify(config.auth_user, domain, user, plain.Text()) != 0
-                                               : sdlrdp_verify_pair(&config, domain, user, plain.Text()) != 0;
+                                               : driver_verify_pair(&config, domain, user, plain.Text()) != 0;
 '''
 
 LOCALS = '''\
@@ -1022,9 +1022,9 @@ LAMBDA2 = '''\
   auto* file     = held_file;
   auto& observer = *this->observer;
   auto stat      = std::async(std::launch::async, [&] {
-    sdlrdp_stat info{};
-    auto result = sdlrdp_drive_fstat(handle.get(), file, &info);
-    return std::pair(result, std::string(sdlrdp_last_error()));
+    driver_stat info{};
+    auto result = driver_drive_fstat(handle.get(), file, &info);
+    return std::pair(result, std::string(driver_last_error()));
   });
   ASSERT_TRUE(client->Until([&] { return observer.Observed().requests == 1; }));
 '''
@@ -1033,22 +1033,22 @@ LAMBDA2_EXPECTED = '''\
   auto* file     = held_file;
   auto& observer = *this->observer;
   auto  stat     = std::async(std::launch::async, [&] {
-    sdlrdp_stat info   { };
-    auto        result = sdlrdp_drive_fstat(handle.get(), file, &info);
-    return std::pair(result, std::string(sdlrdp_last_error()));
+    driver_stat info   { };
+    auto        result = driver_drive_fstat(handle.get(), file, &info);
+    return std::pair(result, std::string(driver_last_error()));
   });
   ASSERT_TRUE(client->Until([&] { return observer.Observed().requests == 1; }));
 '''
 
 DAMAGE = '''\
     auto bytes = client.Received();
-    std::array<sdlrdp_rect, 2> damage{ { { .x = 0, .y = 0, .w = 8, .h = 8 },
+    std::array<driver_rect, 2> damage{ { { .x = 0, .y = 0, .w = 8, .h = 8 },
                                          { .x = 1016, .y = 760, .w = 8, .h = 8 } } };
 '''
 
 DAMAGE_EXPECTED = '''\
     auto                       bytes  = client.Received();
-    std::array<sdlrdp_rect, 2> damage { { { .x = 0   , .y = 0  , .w = 8, .h = 8 },
+    std::array<driver_rect, 2> damage { { { .x = 0   , .y = 0  , .w = 8, .h = 8 },
                                           { .x = 1016, .y = 760, .w = 8, .h = 8 } } };
 '''
 

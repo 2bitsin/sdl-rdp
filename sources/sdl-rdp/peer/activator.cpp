@@ -43,8 +43,8 @@ auto Activator::Activate() -> bool {
     return true;
   }
   if (!_authenticator.VerifySettings() || !SendCookie(_link.Context())) return false;
-  if (!_encoder.Select(_link.Settings(), _configuration.Codec())) return false;
-  _arrival.Admit(_encoder.Codec());
+  if (!_encoder.Select(_link.Settings(), _configuration.CodecPreference())) return false;
+  _arrival.Admit(_encoder.SelectedCodec());
   return true;
 }
 }

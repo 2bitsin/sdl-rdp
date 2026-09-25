@@ -1,18 +1,17 @@
 diff -ruN a/CMakeLists.txt b/CMakeLists.txt
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -374,6 +374,10 @@
+@@ -374,6 +374,9 @@
  set_option(SDL_OPENVR              "Use OpenVR video driver" OFF)
  dep_option(SDL_KMSDRM              "Use KMS DRM video driver" ${UNIX_SYS} "SDL_VIDEO" OFF)
  dep_option(SDL_KMSDRM_SHARED       "Dynamically load KMS DRM support" ON "SDL_KMSDRM;SDL_DEPS_SHARED" OFF)
 +set_option(SDL_RDPSTORAGE "Use RDP storage driver" OFF)
 +set_option(SDL_RDPAUDIO            "Use RDP audio driver" OFF)
 +set_option(SDL_RDP                 "Use RDP video driver" OFF)
-+set(SDL_RDP_DYNAMIC "libbackend.so" CACHE STRING "RDP backend library")
  set_option(SDL_OFFSCREEN           "Use offscreen video driver" ON)
  dep_option(SDL_DUMMYCAMERA         "Support the dummy camera driver" ON SDL_CAMERA OFF)
  option_string(SDL_BACKGROUNDING_SIGNAL "number to use for magic backgrounding signal or 'OFF'" OFF)
-@@ -424,6 +428,7 @@
+@@ -424,6 +427,7 @@
    set(SDL_DUMMYAUDIO       OFF)
    set(SDL_DUMMYCAMERA      OFF)
    set(SDL_DUMMYVIDEO       OFF)
@@ -20,7 +19,7 @@ diff -ruN a/CMakeLists.txt b/CMakeLists.txt
    set(SDL_OFFSCREEN        OFF)
    set(SDL_RENDER_GPU       OFF)
    set(SDL_TRAY             OFF)
-@@ -1330,7 +1335,21 @@
+@@ -1330,7 +1334,21 @@
  
  
  # General SDL subsystem options, valid for all platforms
@@ -42,13 +41,12 @@ diff -ruN a/CMakeLists.txt b/CMakeLists.txt
    # CheckDummyAudio/CheckDiskAudio - valid for all platforms
    if(SDL_DUMMYAUDIO)
      set(SDL_AUDIO_DRIVER_DUMMY 1)
-@@ -3501,6 +3520,13 @@
+@@ -3501,6 +3519,12 @@
  # Platform-independent options
  
  if(SDL_VIDEO)
 +  if(SDL_RDP)
 +    set(SDL_VIDEO_DRIVER_RDP 1)
-+    set(SDL_VIDEO_DRIVER_RDP_DYNAMIC "\"${SDL_RDP_DYNAMIC}\"")
 +    sdl_glob_sources("${SDL3_SOURCE_DIR}/src/video/rdp/*.cpp")
 +    set(HAVE_RDP TRUE)
 +    set(HAVE_SDL_VIDEO TRUE)
@@ -59,7 +57,7 @@ diff -ruN a/CMakeLists.txt b/CMakeLists.txt
 diff -ruN a/include/SDL3/SDL_hints.h b/include/SDL3/SDL_hints.h
 --- a/include/SDL3/SDL_hints.h
 +++ b/include/SDL3/SDL_hints.h
-@@ -3163,6 +3163,31 @@
+@@ -3163,6 +3163,30 @@
   */
  #define SDL_HINT_QUIT_ON_LAST_WINDOW_CLOSE "SDL_QUIT_ON_LAST_WINDOW_CLOSE"
  
@@ -67,7 +65,6 @@ diff -ruN a/include/SDL3/SDL_hints.h b/include/SDL3/SDL_hints.h
 +/** Path to the settings file, any format oxbox reads; application hint over environment. */
 +#define SDL_HINT_RDP_SETTINGS "SDL_RDP_SETTINGS"
 +
-+#define SDL_HINT_RDP_BACKEND "SDL_RDP_BACKEND"
 +#define SDL_HINT_RDP_BIND "SDL_RDP_BIND"
 +#define SDL_HINT_RDP_CERT_DIR "SDL_RDP_CERT_DIR"
 +#define SDL_HINT_RDP_CODEC "SDL_RDP_CODEC"
@@ -144,22 +141,20 @@ diff -ruN a/include/SDL3/SDL_video.h b/include/SDL3/SDL_video.h
 diff -ruN a/include/build_config/SDL_build_config.h.cmake b/include/build_config/SDL_build_config.h.cmake
 --- a/include/build_config/SDL_build_config.h.cmake
 +++ b/include/build_config/SDL_build_config.h.cmake
-@@ -272,6 +272,9 @@
+@@ -272,6 +272,8 @@
  #cmakedefine SDL_AUDIO_DRIVER_COREAUDIO 1
  #cmakedefine SDL_AUDIO_DRIVER_DISK 1
  #cmakedefine SDL_AUDIO_DRIVER_DSOUND 1
 +#cmakedefine SDL_AUDIO_DRIVER_RDP 1
 +#cmakedefine SDL_STORAGE_DRIVER_RDP 1
-+#define SDL_RDP_DYNAMIC "@SDL_RDP_DYNAMIC@"
  #cmakedefine SDL_AUDIO_DRIVER_DUMMY 1
  #cmakedefine SDL_AUDIO_DRIVER_EMSCRIPTEN 1
  #cmakedefine SDL_AUDIO_DRIVER_HAIKU 1
-@@ -406,6 +409,8 @@
+@@ -406,6 +408,7 @@
  #cmakedefine SDL_VIDEO_DRIVER_KMSDRM_DYNAMIC_GBM @SDL_VIDEO_DRIVER_KMSDRM_DYNAMIC_GBM@
  #cmakedefine SDL_VIDEO_DRIVER_N3DS 1
  #cmakedefine SDL_VIDEO_DRIVER_NGAGE 1
 +#cmakedefine SDL_VIDEO_DRIVER_RDP 1
-+#cmakedefine SDL_VIDEO_DRIVER_RDP_DYNAMIC @SDL_VIDEO_DRIVER_RDP_DYNAMIC@
  #cmakedefine SDL_VIDEO_DRIVER_OFFSCREEN 1
  #cmakedefine SDL_VIDEO_DRIVER_PS2 1
  #cmakedefine SDL_VIDEO_DRIVER_PSP 1

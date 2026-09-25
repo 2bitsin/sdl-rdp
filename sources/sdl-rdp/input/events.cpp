@@ -6,6 +6,7 @@
 #include <sdl-rdp/freerdp-facade/handled.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/event-queue.hpp>
+#include <sdl-rdp/link/event.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/link/session-access.hpp>
 #include <sdl-rdp/picture/desktop-layout.hpp>
@@ -27,10 +28,19 @@
 
 namespace sdl_rdp::input::detail::events {
 using sdl_rdp::freerdp_facade::CallbackOwner;
+using sdl_rdp::link::Event;
+using sdl_rdp::link::MouseButton;
+using sdl_rdp::link::MouseMove;
+using sdl_rdp::link::MouseRelative;
+using sdl_rdp::link::MouseWheel;
+using sdl_rdp::link::TextInput;
+using sdl_rdp::link::Touch;
+using sdl_rdp::link::TouchPhase;
 using sdl_rdp::picture::FrameLock;
 using sdl_rdp::picture::Rescale;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::Rect;
 
 template <class Result> auto InputEvents::WhenActive(Result idle, std::invocable auto action) -> Result {
   auto const session = _session.Lock();
@@ -41,9 +51,7 @@ template <std::unsigned_integral Flags>
 auto PushButtons(EventQueue& events, std::span<Flags const> buttons, Flags flags, std::uint32_t first, bool down)
     -> void {
   for (auto const [index, button] : std::views::enumerate(buttons))
-    if (flags & button)
-      events.Push({ .type         = SDLRDP_MOUSE_BUTTON,
-                    .mouse_button = { .button = first + Narrowed<std::uint32_t>(index), .down = down } });
+    if (flags & button) events.Push(MouseButton{ .button = first + Narrowed<std::uint32_t>(index), .down = down });
 }
 constexpr std::uint32_t                FirstButton         = 1;
 constexpr std::uint32_t                FirstExtendedButton = 4;
@@ -56,9 +64,8 @@ auto PushMouseWheel(EventQueue& events, std::uint16_t flags) -> void {
   int rotation = flags & WheelRotationMask;
   if (flags & PTR_FLAGS_WHEEL_NEGATIVE) rotation -= WheelSignExtension;
   float const notches = static_cast<float>(rotation) / WheelNotch;
-  events.Push({ .type        = SDLRDP_MOUSE_WHEEL,
-                .mouse_wheel = { .dx = (flags & PTR_FLAGS_HWHEEL) ? notches : 0,
-                                 .dy = (flags & PTR_FLAGS_WHEEL) ? notches : 0 } });
+  events.Push(
+      MouseWheel{ .dx = (flags & PTR_FLAGS_HWHEEL) ? notches : 0, .dy = (flags & PTR_FLAGS_WHEEL) ? notches : 0 });
 }
 auto Owner(rdpInput const& input) -> InputEvents& {
   return CallbackOwner<InputEvents, &rdpInput::param1>(input);
@@ -91,7 +98,7 @@ auto InputEvents::Key(std::uint16_t flags, std::uint8_t code) -> bool {
     bool const down     = !(flags & KBD_FLAGS_RELEASE);
     _diagnostics.Line("key",
                       [&] { return std::format("code={} extended={} down={}", code, int{ extended }, int{ down }); });
-    _events.Push({ .type = SDLRDP_KEY, .key = { .scancode = code, .extended = extended, .down = down } });
+    _events.Push(sdl_rdp::link::Key{ .scancode = code, .extended = extended, .down = down });
     return true;
   });
 }
@@ -101,7 +108,7 @@ auto InputEvents::Text(std::uint16_t flags, std::uint16_t code) -> bool {
     auto const point = oxbox::utilities::UtfDecode(_unicode[down], code);
     if (!point || *point == oxbox::utilities::INVALID_CODEPOINT<>) return true;
     _diagnostics.Line("key", [&] { return std::format("codepoint={} down={}", std::uint32_t{ *point }, int{ down }); });
-    _events.Push({ .type = SDLRDP_TEXT, .text = { .codepoint = *point, .down = down } });
+    _events.Push(TextInput{ .codepoint = *point, .down = down });
     return true;
   });
 }
@@ -129,25 +136,24 @@ constexpr std::array<std::uint64_t, 5> AinputButtons { AINPUT_FLAGS_BUTTON1, AIN
 auto Outside(int value, int extent) -> bool {
   return value < extent / EdgeFraction || value >= extent * (EdgeFraction - 1) / EdgeFraction;
 }
-auto NearEdge(sdlrdp_rect desktop, int x, int y) -> bool {
+auto NearEdge(Rect desktop, int x, int y) -> bool {
   return Outside(x, desktop.w) || Outside(y, desktop.h);
 }
-auto AtCenter(sdlrdp_rect desktop, int x, int y) -> bool {
+auto AtCenter(Rect desktop, int x, int y) -> bool {
   return x == desktop.w / 2 && y == desktop.h / 2;
 }
-auto RelativeMotion(int dx, int dy, sdlrdp_rect /*bounds*/) -> sdlrdp_event {
-  return { .type = SDLRDP_MOUSE_RELATIVE, .mouse_relative = { .dx = dx, .dy = dy } };
+auto RelativeMotion(int dx, int dy, Rect /*bounds*/) -> Event {
+  return MouseRelative{ .dx = dx, .dy = dy };
 }
-auto AbsoluteMotion(int x, int y, sdlrdp_rect bounds) -> sdlrdp_event {
-  return { .type       = SDLRDP_MOUSE_MOVE,
-           .mouse_move = { .x = std::clamp(x, 0, bounds.w - 1), .y = std::clamp(y, 0, bounds.h - 1) } };
+auto AbsoluteMotion(int x, int y, Rect bounds) -> Event {
+  return MouseMove{ .x = std::clamp(x, 0, bounds.w - 1), .y = std::clamp(y, 0, bounds.h - 1) };
 }
 }
 template <auto BUILD>
-  requires std::invocable<decltype(BUILD), int, int, sdlrdp_rect>
+  requires std::invocable<decltype(BUILD), int, int, Rect>
 auto InputEvents::Scaled(int x, int y) -> void {
   auto const bounds  = _store.Read([](FrameStore const& store, FrameLock const& held) { return store.Bounds(held); });
-  auto const desktop = _desktop.Rect();
+  auto const desktop = _desktop.Desktop();
   _events.Push(BUILD(Rescale(x, desktop.w, bounds.w), Rescale(y, desktop.h, bounds.h), bounds));
 }
 auto InputEvents::Point(MouseMode mode) noexcept -> void {
@@ -156,7 +162,7 @@ auto InputEvents::Point(MouseMode mode) noexcept -> void {
 }
 auto InputEvents::Center() -> bool {
   Expects(_activation.Active(), "active peer has a desktop");
-  auto const                    desktop  = _desktop.Rect();
+  auto const                    desktop  = _desktop.Desktop();
   auto&                         context  = _link.Context();
   POINTER_POSITION_UPDATE const position { Narrowed<std::uint32_t>(desktop.w / 2),
                                            Narrowed<std::uint32_t>(desktop.h / 2) };
@@ -164,7 +170,7 @@ auto InputEvents::Center() -> bool {
   return _mouse.warp_requested;
 }
 auto InputEvents::Motion(int x, int y) -> bool {
-  auto const desktop = _desktop.Rect();
+  auto const desktop = _desktop.Desktop();
   Expects(desktop.w > 0, "desktop width is positive");
   Expects(desktop.h > 0, "desktop height is positive");
   int const dx = x - std::exchange(_mouse.last_x, x);
@@ -188,19 +194,17 @@ auto InputEvents::Pointer(std::uint64_t flags, std::int32_t x, std::int32_t y) -
     if (moved && !shifted && !Motion(x, y)) return std::uint32_t{ ERROR_INTERNAL_ERROR };
     PushButtons<std::uint64_t>(_events, AinputButtons, flags, FirstButton, flags & AINPUT_FLAGS_DOWN);
     if (flags & AINPUT_FLAGS_WHEEL)
-      _events.Push(
-          { .type        = SDLRDP_MOUSE_WHEEL,
-            .mouse_wheel = { .dx = static_cast<float>(x) / WheelUnit, .dy = static_cast<float>(y) / WheelUnit } });
+      _events.Push(MouseWheel{ .dx = static_cast<float>(x) / WheelUnit, .dy = static_cast<float>(y) / WheelUnit });
     return std::uint32_t{ CHANNEL_RC_OK };
   });
 }
 namespace {
 constexpr std::uint32_t PressureScale = 1024;
-auto Phase(std::uint32_t flags) -> sdlrdp_touch_phase {
-  if (flags & RDPINPUT_CONTACT_FLAG_CANCELED) return SDLRDP_TOUCH_CANCEL;
-  if (flags & RDPINPUT_CONTACT_FLAG_UP) return SDLRDP_TOUCH_UP;
-  if (flags & RDPINPUT_CONTACT_FLAG_DOWN) return SDLRDP_TOUCH_DOWN;
-  return SDLRDP_TOUCH_MOVE;
+auto Phase(std::uint32_t flags) -> TouchPhase {
+  if (flags & RDPINPUT_CONTACT_FLAG_CANCELED) return TouchPhase::Cancel;
+  if (flags & RDPINPUT_CONTACT_FLAG_UP) return TouchPhase::Up;
+  if (flags & RDPINPUT_CONTACT_FLAG_DOWN) return TouchPhase::Down;
+  return TouchPhase::Move;
 }
 auto Pressure(RDPINPUT_CONTACT_DATA const& contact) -> float {
   if (!(contact.fieldsPresent & CONTACT_DATA_PRESSURE_PRESENT)) return 1.0F;
@@ -209,15 +213,14 @@ auto Pressure(RDPINPUT_CONTACT_DATA const& contact) -> float {
 auto Unit(std::int32_t value, int extent) -> float {
   return std::clamp(static_cast<float>(value) / static_cast<float>(extent), 0.0F, 1.0F);
 }
-auto Contact(sdlrdp_rect desktop, RDPINPUT_CONTACT_DATA const& contact) -> sdlrdp_event {
+auto Contact(Rect desktop, RDPINPUT_CONTACT_DATA const& contact) -> Event {
   Expects(desktop.w > 0, "desktop width is positive");
   Expects(desktop.h > 0, "desktop height is positive");
-  return { .type  = SDLRDP_TOUCH,
-           .touch = { .id       = contact.contactId,
-                      .x        = Unit(contact.x, desktop.w),
-                      .y        = Unit(contact.y, desktop.h),
-                      .pressure = Pressure(contact),
-                      .phase    = Phase(contact.contactFlags) } };
+  return Touch{ .id       = contact.contactId,
+                .x        = Unit(contact.x, desktop.w),
+                .y        = Unit(contact.y, desktop.h),
+                .pressure = Pressure(contact),
+                .phase    = Phase(contact.contactFlags) };
 }
 auto Contacts(RDPINPUT_TOUCH_EVENT const& event) {
   return std::span(event.frames, event.frameCount) | std::views::transform([](RDPINPUT_TOUCH_FRAME const& frame) {
@@ -228,7 +231,7 @@ auto Contacts(RDPINPUT_TOUCH_EVENT const& event) {
 }
 auto InputEvents::Touch(RDPINPUT_TOUCH_EVENT const& event) -> std::uint32_t {
   return WhenActive(std::uint32_t{ CHANNEL_RC_OK }, [&] {
-    for (auto const& contact : Contacts(event)) _events.Push(Contact(_desktop.Rect(), contact));
+    for (auto const& contact : Contacts(event)) _events.Push(Contact(_desktop.Desktop(), contact));
     return std::uint32_t{ CHANNEL_RC_OK };
   });
 }

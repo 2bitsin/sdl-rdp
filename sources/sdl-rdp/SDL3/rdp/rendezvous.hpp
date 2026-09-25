@@ -3,7 +3,7 @@
 #include <memory>
 #include <mutex>
 namespace sdl3::rdp::detail::rendezvous {
-// SDL opens subsystems without shared context; its global properties supply the ABI rendezvous.
+// SDL opens subsystems without shared context; its global properties supply the rendezvous.
 class Rendezvous {
 public:
   static auto Acquire() -> std::shared_ptr<Driver>;

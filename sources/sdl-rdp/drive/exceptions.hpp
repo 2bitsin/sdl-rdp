@@ -21,11 +21,7 @@ using PeerDisconnected       = RuntimeFailure<"PeerDisconnected"_hash, "Drive pe
 using DriveRemoved           = RuntimeFailure<"DriveRemoved"_hash, "Drive removed: {}", string_view>;
 using NoDriveChannel         = RuntimeFailure<"NoDriveChannel"_hash, "Drive peer disconnected or no drives shared.">;
 
-using InvalidOpenFlags = ArgumentFailure<"InvalidOpenFlags"_hash, "Invalid drive open flags 0x{:x}: {}.", std::uint32_t,
-                                         string_view>;
-
-using EntryNameTooLong = RuntimeFailure<
-    "EntryNameTooLong"_hash, "Drive entry name of {} bytes exceeds ABI capacity {}.", std::size_t, std::size_t>;
+using InvalidOpenAccess = ArgumentFailure<"InvalidOpenAccess"_hash, "Invalid drive open access: {}.", string_view>;
 
 using ShortCapability = RuntimeFailure<"ShortCapability"_hash, "Drive capability {} of {} bytes is too short.",
                                        std::uint16_t, std::size_t>;
@@ -38,9 +34,8 @@ namespace sdl_rdp::drive {
 using detail::exceptions::CompletionIdsExhausted;
 using detail::exceptions::DriveChannelFailed;
 using detail::exceptions::DriveRemoved;
-using detail::exceptions::EntryNameTooLong;
 using detail::exceptions::InvalidDriveName;
-using detail::exceptions::InvalidOpenFlags;
+using detail::exceptions::InvalidOpenAccess;
 using detail::exceptions::MalformedResponse;
 using detail::exceptions::NoDriveChannel;
 using detail::exceptions::PeerDisconnected;

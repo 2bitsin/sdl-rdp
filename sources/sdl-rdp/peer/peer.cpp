@@ -13,6 +13,7 @@ namespace sdl_rdp::peer::detail::peer {
 using sdl_rdp::clipboard::ClipboardChannel;
 using sdl_rdp::drive::DriveChannel;
 using sdl_rdp::link::DynamicChannel;
+using sdl_rdp::utilities::Rect;
 using sdl_rdp::video::frame::FrameSources;
 using sdl_rdp::video::gfx::GfxChannel;
 Peer::Peer(PeerHandle accepted, Diagnostics const& diagnostics, EventQueue& events, Configuration const& configuration,
@@ -78,13 +79,13 @@ auto Peer::Evict() -> bool {
 auto Peer::Finished() const noexcept -> bool {
   return _activation.Finished();
 }
-auto Peer::Present(FrameLock const& held, std::span<sdlrdp_rect const> damage) -> void {
+auto Peer::Present(FrameLock const& held, std::span<Rect const> damage) -> void {
   if (!_activation.Active()) return;
   _frames.CountPresent(held);
-  std::ranges::for_each(damage, [&](sdlrdp_rect area) { _frames.Post(held, area); });
+  std::ranges::for_each(damage, [&](Rect area) { _frames.Post(held, area); });
   _link.Signal();
 }
-auto Peer::Repaint(FrameLock const& held, sdlrdp_rect area) -> void {
+auto Peer::Repaint(FrameLock const& held, Rect area) -> void {
   if (!_activation.Active()) return;
   _frames.Repaint(held, area);
   _link.Signal();
@@ -109,7 +110,7 @@ auto Peer::Status(FrameLock const& held) const -> PeerStatus {
   auto const timing = _graphics.Timing();
   return { .client           = std::ref(_link.Client()),
            .display          = _display.Opened(),
-           .desktop          = _desktop.Rect(),
+           .desktop          = _desktop.Desktop(),
            .resizing         = _desktop.Resizing(),
            .holding          = _activation.Holding(),
            .activated_at     = _activation.ActivatedAt(),

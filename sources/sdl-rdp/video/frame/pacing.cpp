@@ -2,9 +2,11 @@
 
 #include <sdl-rdp/configuration/configuration.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
+#include <sdl-rdp/diagnostics/log-level.hpp>
 #include <sdl-rdp/diagnostics/trace-queue.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/event-queue.hpp>
+#include <sdl-rdp/link/event.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/link/wire.hpp>
 #include <sdl-rdp/video/peer-frames.hpp>
@@ -16,6 +18,8 @@ namespace sdl_rdp::video::frame::detail::pacing {
 using sdl_rdp::configuration::MillihertzPerHz;
 using sdl_rdp::configuration::RefreshMode;
 using sdl_rdp::configuration::WireSample;
+using sdl_rdp::diagnostics::LogLevel;
+using sdl_rdp::link::RefreshChanged;
 using sdl_rdp::link::SampleWire;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Unreachable;
@@ -25,7 +29,7 @@ using Clock        = AcknowledgementWindow::Clock;
 using Milliseconds = std::chrono::duration<double, std::milli>;
 auto WarnUnmeasured(RefreshTracker& refresh, Diagnostics const& diagnostics, WireSample const& wire) -> void {
   if (wire.available || refresh.Mode() != RefreshMode::Sender || refresh.TestAndSetUnavailableLogged()) return;
-  diagnostics.Log(SDLRDP_LOG_WARN, "auto-sender TCP measurements unavailable; adapting only to blocked writes.");
+  diagnostics.Log(LogLevel::Warn, "auto-sender TCP measurements unavailable; adapting only to blocked writes.");
 }
 }
 FramePacing::FramePacing(Diagnostics const& diagnostics, EventQueue& events, Configuration const& configuration,
@@ -35,7 +39,7 @@ FramePacing::FramePacing(Diagnostics const& diagnostics, EventQueue& events, Con
       _activation{ activation }, _traces{ traces }, _statistics{ statistics } { }
 auto FramePacing::Adjust(std::invocable<Refresh&> auto step) -> void {
   if (!_refresh.Adjust(step) || !_activation.Active()) return;
-  _events.Push({ .type = SDLRDP_REFRESH, .refresh = { _refresh.Effective() * MillihertzPerHz } });
+  _events.Push(RefreshChanged{ _refresh.Effective() * MillihertzPerHz });
   _diagnostics.Line("refresh", [&] { return std::format("hz={}", _refresh.Effective()); });
 }
 auto FramePacing::Restart(FrameLock const& held) -> void {

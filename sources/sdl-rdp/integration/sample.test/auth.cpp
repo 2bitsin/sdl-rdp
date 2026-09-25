@@ -7,11 +7,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <string>
+#include <string_view>
 
 namespace sdl_rdp::integration::sample_test::detail::auth {
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::sample_gate_test::sample::AnnouncedPort;
-using sdl_rdp::sample_gate_test::sample::BackendLibrary;
 using sdl_rdp::sample_gate_test::sample::PrimaryDisplayPort;
 using sdl_rdp::sample_gate_test::sample::Sample;
 using sdl_rdp::utilities::Expects;
@@ -50,6 +51,7 @@ TEST_F(AuthenticationSample, AuthenticationPropertyDenies) {
 namespace {
 struct PropertyCredentials {
 public:
+  explicit PropertyCredentials(std::string_view expected = "property-secret") : password{ expected } { }
   // abi: SDL_PROP_DISPLAY_RDP_VERIFY_POINTER, the driver calls it with the userdata property
   static auto SDLCALL Verify(void* raw, char const* domain, char const* user, char const* password) -> bool {
     Expects(raw != nullptr, "the verifier names its credentials");
@@ -58,7 +60,7 @@ public:
     Expects(password != nullptr, "the verifier is handed a password");
     auto& self = *static_cast<PropertyCredentials*>(raw);
     self.arguments = self.arguments && std::string_view(domain) == "LAB" && std::string_view(user) == "alice"
-                     && std::string_view(password) == "property-secret";
+                     && std::string_view(password) == self.password;
     ++self.verified;
     return true;
   }
@@ -85,6 +87,7 @@ public:
   }
 
 private:
+  std::string              password;
   std::atomic<std::size_t> verified  = 0;
   std::atomic<std::size_t> looked_up = 0;
   std::atomic<bool>        arguments = true;
@@ -106,14 +109,26 @@ auto GivenAuthenticationHints(std::filesystem::path const& certificates) -> void
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_PORT, "0"));
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_CERT_DIR, certificates.c_str()));
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_AUTH, "nla"));
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_BACKEND, BackendLibrary().c_str()));
 }
-auto GivenPropertyCredentials(SDL_PropertiesID properties, PropertyCredentials& credentials) -> void {
+auto GivenAccountHints() -> void {
+  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_USER, "alice"));
+  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_PASSWORD, "account-secret"));
+  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_DOMAIN, "LAB"));
+}
+auto GivenVerifyProperty(SDL_PropertiesID properties, PropertyCredentials& credentials) -> void {
   ASSERT_TRUE(SDL_SetPointerProperty(properties, SDL_PROP_DISPLAY_RDP_AUTH_USERDATA_POINTER, &credentials));
   ASSERT_TRUE(SDL_SetPointerProperty(properties, SDL_PROP_DISPLAY_RDP_VERIFY_POINTER,
                                      reinterpret_cast<void*>(PropertyCredentials::Verify)));
+}
+auto GivenPropertyCredentials(SDL_PropertiesID properties, PropertyCredentials& credentials) -> void {
+  ASSERT_NO_FATAL_FAILURE(GivenVerifyProperty(properties, credentials));
   ASSERT_TRUE(SDL_SetPointerProperty(properties, SDL_PROP_DISPLAY_RDP_LOOKUP_POINTER,
                                      reinterpret_cast<void*>(PropertyCredentials::Lookup)));
+}
+auto ConnectNla(std::uint32_t port, std::string_view password) -> bool {
+  Client client(port, true);
+  client.Credentials({ .user = "alice", .password = password, .domain = "LAB" }, true);
+  return client.Connect();
 }
 auto ConnectPropertyCredentials(std::uint32_t port) -> void {
   {
@@ -144,6 +159,26 @@ TEST(DriverAuthentication, PropertiesReadAtCallTime) {
   EXPECT_EQ(credentials.LookedUp(), 1u);
   EXPECT_TRUE(credentials.Arguments());
   RecordProperty("trace", "post-init display properties: verify=2 lookup=1; domain/user/password/userdata match");
+}
+// The relay's own rule: a published verifier and no lookup leaves NLA's hash to the configured account.
+TEST(DriverAuthentication, VerifyOnlyLeavesTheHashToTheAccount) {
+  oxbox::platform::ScratchArea const certificates{ "driver-auth-account", "sdl-rdp" };
+  ASSERT_NO_FATAL_FAILURE(GivenAuthenticationHints(certificates.Path()));
+  ASSERT_NO_FATAL_FAILURE(GivenAccountHints());
+  PropertyCredentials credentials{ "account-secret" };
+  ASSERT_TRUE(SDL_Init(SDL_INIT_VIDEO));
+  Quit const quit;
+  auto       properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
+  auto       port       = PrimaryDisplayPort();
+  ASSERT_NO_FATAL_FAILURE(GivenVerifyProperty(properties, credentials));
+  EXPECT_FALSE(ConnectNla(port, "property-secret"));
+  EXPECT_TRUE(ConnectNla(port, "account-secret"));
+  SDL_Quit();
+  SDL_ResetHints();
+  EXPECT_EQ(credentials.Verified(), 1u);
+  EXPECT_EQ(credentials.LookedUp(), 0u);
+  EXPECT_TRUE(credentials.Arguments());
+  RecordProperty("trace", "verify published, lookup absent, nla: the account's hash rejects then admits; verify=1");
 }
 }
 }

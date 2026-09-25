@@ -54,7 +54,7 @@ def forbidden(relative):
 
 def words(text):
     """Code tokens outside comments and literals, directive bodies included, #include lines excluded."""
-    for token in shape.live_lexemes(text):
+    for token in shape.enabled_lexemes(text):
         if token.value.lstrip().startswith('#'):
             yield from directive_words(token)
         elif not token.value.startswith(('//', '/*', *shape.LITERALS, "'")):
@@ -93,7 +93,7 @@ def tracked(root):
 
 def checked(root):
     for relative in tracked(root):
-        if relative.suffix in shape.EXTENSIONS and (root / relative).is_file() and str(relative) not in shape.FROZEN:
+        if relative.suffix in shape.EXTENSIONS and (root / relative).is_file():
             yield relative
 
 

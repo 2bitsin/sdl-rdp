@@ -2,17 +2,19 @@
 #include <freerdp/channels/rdpdr.h>
 #include <oxbox/utilities/span.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
+#include <sdl-rdp/diagnostics/log-level.hpp>
 #include <sdl-rdp/drive/capabilities.hpp>
+#include <sdl-rdp/drive/drive.hpp>
 #include <sdl-rdp/drive/exceptions.hpp>
 #include <sdl-rdp/drive/label.hpp>
 #include <sdl-rdp/freerdp-facade/waitable.hpp>
 #include <sdl-rdp/link/event-queue.hpp>
+#include <sdl-rdp/link/event.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/link/session-access.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
-#include <sdl-rdp/utilities/terminated-copy.hpp>
 #include <winpr/nt.h>
 #include <algorithm>
 #include <array>
@@ -29,9 +31,12 @@
 #include <utility>
 
 namespace sdl_rdp::drive::detail::channel {
+using sdl_rdp::diagnostics::LogLevel;
+using sdl_rdp::drive::Drive;
 using sdl_rdp::freerdp_facade::Waitable;
+using sdl_rdp::link::DriveChanged;
+using sdl_rdp::link::Event;
 using sdl_rdp::utilities::Contained;
-using sdl_rdp::utilities::CopyTerminated;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
 namespace {
@@ -62,10 +67,8 @@ auto IoRequest(std::span<std::uint32_t const> header, DrivePacket const& body) -
   packet.Append(body.Bytes());
   return packet;
 }
-auto DriveEvent(bool added, sdlrdp_drive const& drive) -> sdlrdp_event {
-  sdlrdp_event event{ .type = SDLRDP_DRIVE, .drive = { .added = added ? 1 : 0, .id = drive.id, .name = { } } };
-  CopyTerminated(event.drive.name, drive.name);
-  return event;
+auto DriveEvent(bool added, Drive const& drive) -> Event {
+  return DriveChanged{ .added = added, .id = drive.id, .name = drive.name };
 }
 // Logs why the channel ends while its peer is connected; the caller shuts the channel down after it.
 auto Ending(DriveChannel const& channel) -> auto {
@@ -138,7 +141,7 @@ auto DriveChannel::Announce(DrivePacket& packet) -> void {
     Write(response);
     if (type != RDPDR_DTYP_FILESYSTEM) continue;
     auto label = Name(std::span(packet.Bytes()).subspan(begin, length), name.data());
-    AnnounceDevice(wire, label);
+    AnnounceDevice(wire, std::move(label));
   }
 }
 auto DriveChannel::ClientCapabilities(DrivePacket& packet) -> void {
@@ -161,7 +164,7 @@ auto DriveChannel::ClientCapabilities(DrivePacket& packet) -> void {
   }
 }
 auto DriveChannel::Warn(std::string_view cause) const -> void {
-  if (connected) _diagnostics.Log(SDLRDP_LOG_WARN, std::string{ cause });
+  if (connected) _diagnostics.Log(LogLevel::Warn, std::string{ cause });
 }
 auto DriveChannel::Fail(std::string_view cause) -> void {
   if (!connected) return;
@@ -251,12 +254,11 @@ auto DriveChannel::Send(std::uint32_t drive, std::uint32_t file, IrpMajor major,
   }
   return request;
 }
-auto DriveChannel::AnnounceDevice(std::uint32_t wire, std::string const& label) -> void {
-  auto        id    = _session.NextDrive();
-  DeviceEntry entry { .wire = wire, .drive = { id, { } } };
-  CopyTerminated(entry.drive.name, label);
-  devices.emplace(id, entry);
-  _events.Push(DriveEvent(true, entry.drive));
+auto DriveChannel::AnnounceDevice(std::uint32_t wire, std::string label) -> void {
+  auto const  id     = _session.NextDrive();
+  DeviceEntry entry  { .wire = wire, .drive = { .id = id, .name = std::move(label) } };
+  auto const& stored = devices.emplace(id, std::move(entry)).first->second;
+  _events.Push(DriveEvent(true, stored.drive));
 }
 auto DriveChannel::GeneralClientCapability(DrivePacket& packet, std::size_t start, std::size_t length,
                                            std::uint32_t version) const -> void {
@@ -270,7 +272,7 @@ auto DriveChannel::GeneralClientCapability(DrivePacket& packet, std::size_t star
   packet.Skip(io_code_fields_size);
   auto flags = packet.Read<std::uint32_t>();
   _diagnostics.Log(
-      SDLRDP_LOG_INFO,
+      LogLevel::Info,
       std::format("Drive client version {}.{}, general capability {}, extended PDU 0x{:08x}, device removal {}.", major,
                   minor, version, flags, (flags & RDPDR_DEVICE_REMOVE_PDUS) != 0));
 }
@@ -291,17 +293,9 @@ auto DriveChannel::PumpAvailable() -> bool {
   }
 }
 auto DriveChannel::Name(std::span<std::byte const> bytes, std::string_view dos) const -> std::string {
-  auto                  label    = Contained(
+  return Contained(
       std::string{ dos }, [&] { return DecodeLabel(bytes, drive_version, dos); },
       [&](std::string_view cause) { Warn(std::format("{} Using DOS name '{}'.", cause, dos)); });
-  constexpr std::size_t capacity = sizeof(sdlrdp_drive::name) - 1;
-  if (label.size() > capacity) {
-    Warn(std::format("Drive name exceeds {} bytes; truncating.", capacity));
-    auto end = capacity;
-    while ((std::bit_cast<std::uint8_t>(label[end]) & 0xc0) == 0x80) --end;
-    label.resize(end);
-  }
-  return label;
 }
 auto DriveChannel::Disconnect() -> void {
   std::scoped_lock const lock(mutex);
@@ -327,11 +321,9 @@ auto DriveChannel::Device(std::uint32_t id) -> std::uint32_t {
   if (found == devices.end()) throw DriveRemoved{ "the requested drive" };
   return found->second.wire;
 }
-auto DriveChannel::List(std::span<sdlrdp_drive> out) -> int {
+auto DriveChannel::List() -> std::vector<Drive> {
   std::scoped_lock const lock(mutex);
-  auto const             listed = devices | std::views::values | std::views::transform(&DeviceEntry::drive)
-                                  | std::views::take(out.size());
-  return Narrowed<int>(std::ranges::copy(listed, out.begin()).out - out.begin());
+  return std::ranges::to<std::vector>(devices | std::views::values | std::views::transform(&DeviceEntry::drive));
 }
 auto DriveChannel::WaitAny(std::span<Slot const> slots) -> std::size_t {
   Expects(std::ranges::any_of(slots, [](auto const& slot) { return slot.request != nullptr; }),

@@ -1,25 +1,25 @@
 #include <sdl-rdp/headless-client.test/graphics/backend.hpp>
 
+#include <sdl-rdp/configuration/setup.hpp>
+#include <sdl-rdp/headless-client.test/backend/config.hpp>
+
 #include <chrono>
 #include <cstdint>
-#include <cstdlib>
-#include <format>
 #include <string_view>
 
 namespace sdl_rdp::headless_client_test::graphics::detail::backend {
-auto GraphicsBackend::OpenGraphics(std::string_view purpose, std::uint32_t width, std::uint32_t height,
-                                   sdlrdp_codec codec) -> void {
-  auto  pattern = std::format("/tmp/sdlrdp-{}-XXXXXX", purpose);
-  auto* path    = mkdtemp(pattern.data());
-  ASSERT_NE(path, nullptr);
-  directory = path;
-  sdlrdp_config config{ "127.0.0.1", 0, directory.c_str(), width, height, 0, Logs::Collect, &logs };
+using sdl_rdp::configuration::Codec;
+using sdl_rdp::headless_client_test::backend::LoopbackConfig;
+auto GraphicsBackend::OpenGraphics(std::string_view purpose, std::uint32_t width, std::uint32_t height, Codec codec)
+    -> void {
+  directory.emplace(purpose, "sdl-rdp");
+  auto config = LoopbackConfig(directory->Path(), { .width = width, .height = height });
   config.codec = codec;
-  ASSERT_NO_FATAL_FAILURE(backend.Open(config));
+  ASSERT_NO_FATAL_FAILURE(backend.Open(config, logs));
 }
 auto GraphicsBackend::TearDown() -> void {
   backend.Close();
-  if (!directory.empty()) std::filesystem::remove_all(directory);
+  directory.reset();
 }
 auto GraphicsBackend::ConnectGraphics(Client& client) -> void {
   ASSERT_TRUE(client.Connect());

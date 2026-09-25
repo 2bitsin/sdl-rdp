@@ -1,62 +1,66 @@
-#include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/configuration/codec.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
+#include <sdl-rdp/headless-client.test/backend/config.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
 #include <sdl-rdp/headless-client.test/backend/status.hpp>
 #include <sdl-rdp/headless-client.test/frame/pattern.hpp>
 #include <sdl-rdp/headless-client.test/graphics/backend.hpp>
 #include <sdl-rdp/headless-client.test/graphics/cost.hpp>
 #include <sdl-rdp/headless-client.test/graphics/observer.hpp>
+#include <sdl-rdp/utilities/aspect-ratio.hpp>
 #include <sdl-rdp/utilities/extent.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
+#include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/video/gfx/protocol.hpp>
 
 #include <gtest/gtest.h>
+#include <oxbox/platform/scratch-area.hpp>
 #include <oxbox/utilities/span.hpp>
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <filesystem>
 #include <random>
 #include <ranges>
 #include <span>
 
 namespace sdl_rdp::integration::video_test::detail::gfx_resize {
+using sdl_rdp::configuration::Codec;
 using sdl_rdp::headless_client_test::backend::BackendInstance;
 using sdl_rdp::headless_client_test::backend::Logs;
+using sdl_rdp::headless_client_test::backend::LoopbackConfig;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::Pixels;
 using sdl_rdp::headless_client_test::frame::MovingTilePattern;
 using sdl_rdp::headless_client_test::graphics::GraphicsObserver;
+using sdl_rdp::utilities::AspectRatio;
 using sdl_rdp::utilities::Extent;
 using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::PixelBytes;
+using sdl_rdp::utilities::Rect;
 namespace {
 class GraphicsResize : public testing::Test {
 protected:
   auto SetUp() -> void override {
-    auto path = std::to_array("/tmp/sdlrdp-gfx-resize-XXXXXX");
-    ASSERT_NE(mkdtemp(path.data()), nullptr);
-    certificates = path.data();
-    sdlrdp_config config{ "127.0.0.1", 0, certificates.c_str(), 640, 480, 0, Logs::Collect, &logs };
-    config.codec = SDLRDP_CODEC_PROGRESSIVE;
-    ASSERT_NO_FATAL_FAILURE(backend.Open(config));
+    auto config = LoopbackConfig(certificates.Path(), { .width = 640, .height = 480 });
+    config.codec = Codec::Progressive;
+    ASSERT_NO_FATAL_FAILURE(backend.Open(config, logs));
   }
   auto TearDown() -> void override {
     backend.Close();
-    if (!certificates.empty()) std::filesystem::remove_all(certificates);
   }
   auto PresentProgressivePixel(Client& client, GraphicsObserver& observer, Pixels& pixels, Extent size,
                                std::size_t generations) -> void {
-    auto              frames = observer.Observed().frames.size();
-    sdlrdp_rect const damage = { .x = 0, .y = 0, .w = 1, .h = 1 };
+    auto       frames = observer.Observed().frames.size();
+    Rect const damage = { .x = 0, .y = 0, .w = 1, .h = 1 };
     pixels.front() ^= 0x222222;
-    ASSERT_EQ(backend.Present(pixels, size.width, size.height, damage), 0);
+    backend.Present(pixels, size.width, size.height, damage);
     ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() > frames; })) << logs.Text(true);
     EXPECT_LE(client.MaxError(pixels), client.Tolerance());
     EXPECT_EQ(observer.Observed().progressive_headers, generations);
   }
-  std::filesystem::path certificates;
-  Logs                  logs;
-  BackendInstance       backend;
+  oxbox::platform::ScratchArea certificates{ "gfx-resize", "sdl-rdp" };
+  Logs                         logs;
+  BackendInstance              backend;
 };
 auto Blend(std::uint32_t top, std::uint32_t bottom, float weight) -> std::uint32_t {
   std::uint32_t blended = 0;
@@ -100,17 +104,17 @@ auto ThenProgressiveGeneration(GraphicsObserver const& observer, std::size_t gen
 }
 constexpr std::array ResizeSequence{ std::pair{ 640u, 480u }, std::pair{ 320u, 200u }, std::pair{ 640u, 480u } };
 TEST_F(GraphicsResize, RawAspectMatchesBilinear) {
-  ASSERT_EQ(sdlrdp_set_codec(&*backend, SDLRDP_CODEC_RAW), 0);
-  ASSERT_EQ(sdlrdp_set_aspect(&*backend, { 4, 3 }), 0);
-  Client client(sdlrdp_port(&*backend), true, 320, 240);
+  (*backend).Presentation().SetCodec(Codec::Raw);
+  (*backend).Presentation().SetAspect(AspectRatio{ .numerator = 4, .denominator = 3 });
+  Client client(backend.Port(), true, 320, 240);
   client.EnableGraphics();
   GraphicsObserver observer(client);
   ASSERT_TRUE(client.Connect());
   Pixels       pixels(320uz * 200);
   std::mt19937 random(17);           // NOLINT(cert-msc32-c, cert-msc51-cpp): Reproducible codec input.
   std::ranges::generate(pixels, [&] { return random() & 0x00ffffff; });
-  sdlrdp_rect const full{ 0, 0, 320, 200 };
-  ASSERT_EQ(backend.Present(pixels, 320, 200, full), 0);
+  Rect const full{ .x = 0, .y = 0, .w = 320, .h = 200 };
+  backend.Present(pixels, 320, 200, full);
   ASSERT_TRUE(client.Until([&] { return !observer.Observed().frames.empty(); })) << logs.Text(true);
   auto* gdi = client.Instance()->context->gdi;
   ASSERT_EQ(gdi->width, 320);
@@ -119,7 +123,7 @@ TEST_F(GraphicsResize, RawAspectMatchesBilinear) {
   ThenBilinearPixels(*gdi, pixels);
 }
 TEST_F(GraphicsResize, ProgressiveContextAndFullDamage) {
-  Client client(sdlrdp_port(&*backend), true, 640, 480);
+  Client client(backend.Port(), true, 640, 480);
   client.EnableGraphics();
   client.Tolerance(24);
   GraphicsObserver observer(client);
@@ -128,8 +132,8 @@ TEST_F(GraphicsResize, ProgressiveContextAndFullDamage) {
   for (auto [w, h] : ResizeSequence) {
     Pixels pixels(static_cast<std::size_t>(w) * h, 0x335577 + (generations * 0x221100));
     SCOPED_TRACE(std::to_string(w) + "x" + std::to_string(h));
-    sdlrdp_rect const damage{ 0, 0, Narrowed<int>(w), Narrowed<int>(h) };
-    ASSERT_EQ(backend.Present(pixels, w, h, damage), 0);
+    Rect const damage{ .x = 0, .y = 0, .w = Narrowed<int>(w), .h = Narrowed<int>(h) };
+    backend.Present(pixels, w, h, damage);
     ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text(true);
     ++generations;
     ASSERT_NO_FATAL_FAILURE(ThenProgressiveGeneration(observer, generations, w, h));
@@ -139,7 +143,7 @@ TEST_F(GraphicsResize, ProgressiveContextAndFullDamage) {
 }
 using sdl_rdp::headless_client_test::graphics::GraphicsCost;
 
-auto ApplyPlanarDamage(Pixels& pixels, Pixels& expected, sdlrdp_rect part) -> void {
+auto ApplyPlanarDamage(Pixels& pixels, Pixels& expected, Rect part) -> void {
   std::ranges::for_each(std::views::iota(part.y, part.y + part.h), [&](int row) {
     std::ranges::fill(std::span(pixels).subspan((row * 354) + part.x, part.w), 0x55aaffu);
   });
@@ -148,16 +152,16 @@ auto ApplyPlanarDamage(Pixels& pixels, Pixels& expected, sdlrdp_rect part) -> vo
   pixels.back()  ^= 0x00ffffff;
 }
 TEST_F(GraphicsCost, PlanarPartialMatchesFull) {
-  ASSERT_NO_FATAL_FAILURE(Open(354, 226, SDLRDP_CODEC_PLANAR));
-  Client client(sdlrdp_port(&*backend), true, 354, 226);
+  ASSERT_NO_FATAL_FAILURE(Open(354, 226, Codec::Planar));
+  Client client(backend.Port(), true, 354, 226);
   client.EnableGraphics();
   GraphicsObserver observer(client);
   ASSERT_NO_FATAL_FAILURE(ConnectGraphics(client));
   Pixels pixels(354uz * 226);
   MovingTilePattern(pixels, 354, 226, 0);
-  sdlrdp_rect const full     { 0, 0, 354, 226   };
-  sdlrdp_rect const part     { 17, 19, 177, 113 };
-  auto              expected = pixels;
+  Rect const full     { .x = 0, .y = 0, .w = 354, .h = 226   };
+  Rect const part     { .x = 17, .y = 19, .w = 177, .h = 113 };
+  auto       expected = pixels;
   ASSERT_NO_FATAL_FAILURE(PresentPlanar(client, observer, pixels, expected, full));
   ApplyPlanarDamage(pixels, expected, part);
   ASSERT_NO_FATAL_FAILURE(PresentPlanar(client, observer, pixels, expected, part));

@@ -1,4 +1,5 @@
 #include <sdl-rdp/utilities/rect.hpp>
+
 #include <sdl-rdp/utilities/region.hpp>
 
 #include <gtest/gtest.h>
@@ -6,22 +7,23 @@
 #include <tuple>
 
 namespace sdl_rdp::utilities::detail::rect {
+using sdl_rdp::utilities::Rect;
 namespace {
-auto ThenOverlapBounds(sdlrdp_rect const& bounds) -> void {
+auto ThenOverlapBounds(Rect const& bounds) -> void {
   EXPECT_EQ(bounds.x, 0);
   EXPECT_EQ(bounds.y, 0);
   EXPECT_EQ(bounds.w, 30);
   EXPECT_EQ(bounds.h, 40);
 }
 auto ThenOverlap() -> void {
-  auto overlap = Intersect({ -10, -20, 40, 60 }, { 0, 0, 320, 200 });
+  auto overlap = Intersect({ .x = -10, .y = -20, .w = 40, .h = 60 }, { .x = 0, .y = 0, .w = 320, .h = 200 });
   ASSERT_TRUE(overlap.has_value());
   Expects(overlap.has_value(), "intersection exists before inspecting its bounds");
   if (!overlap.has_value()) return;
   ThenOverlapBounds(*overlap);
 }
 auto ThenContainment() -> void {
-  auto contained = Intersect({ 0, 0, 640, 480 }, { 0, 0, 320, 200 });
+  auto contained = Intersect({ .x = 0, .y = 0, .w = 640, .h = 480 }, { .x = 0, .y = 0, .w = 320, .h = 200 });
   ASSERT_TRUE(contained.has_value());
   Expects(contained.has_value(), "intersection exists before inspecting its bounds");
   if (!contained.has_value()) return;
@@ -35,25 +37,26 @@ auto ThenEmptyIntersections() -> void {
   EXPECT_FALSE(Intersect({ 0, 0, 0, 20 }, { 0, 0, 320, 200 }));
 }
 auto ThenMaximumCoordinate() -> void {
-  auto edge = Intersect({ std::numeric_limits<int>::max(), 0, 1, 1 }, { std::numeric_limits<int>::max(), 0, 1, 1 });
+  auto edge = Intersect({ .x = std::numeric_limits<int>::max(), .y = 0, .w = 1, .h = 1 },
+                        { .x = std::numeric_limits<int>::max(), .y = 0, .w = 1, .h = 1 });
   ASSERT_TRUE(edge.has_value());
   Expects(edge.has_value(), "intersection exists before inspecting its bounds");
   if (!edge.has_value()) return;
   EXPECT_EQ(edge->w, 1);
 }
 auto ThenBridge(Region& region) -> void {
-  region.Add({ 0, 0, 8, 8 });
-  region.Add({ 16, 0, 8, 8 });
+  region.Add({ .x = 0, .y = 0, .w = 8, .h = 8 });
+  region.Add({ .x = 16, .y = 0, .w = 8, .h = 8 });
   ASSERT_EQ(region.Rects().size(), 2u);
-  region.Add({ 8, 0, 8, 8 });
+  region.Add({ .x = 8, .y = 0, .w = 8, .h = 8 });
   ASSERT_EQ(region.Rects().size(), 1u);
   EXPECT_EQ(region.Rects()[0].w, 24);
 }
 auto ThenRegionCap(Region& region) -> void {
   region.Clear();
-  for (int i = 0; i < 16; ++i) region.Add({ i * 20, i * 20, 8, 8 });
+  for (int i = 0; i < 16; ++i) region.Add({ .x = i * 20, .y = i * 20, .w = 8, .h = 8 });
   ASSERT_EQ(region.Rects().size(), 16u);
-  region.Add({ 320, 320, 8, 8 });
+  region.Add({ .x = 320, .y = 320, .w = 8, .h = 8 });
   ASSERT_EQ(region.Rects().size(), 1u);
   EXPECT_EQ(region.Rects()[0].w, 328);
   EXPECT_EQ(region.Rects()[0].h, 328);

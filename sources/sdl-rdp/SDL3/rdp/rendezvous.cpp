@@ -1,10 +1,10 @@
 #include "rendezvous.hpp"
 #include "exceptions.hpp"
-#include <sdl-rdp/SDL3/rdp/backend/resources.hpp>
+#include <sdl-rdp/SDL3/rdp/sdl/resources.hpp>
 #include <memory>
 #include <stdexcept>
 namespace sdl3::rdp::detail::rendezvous {
-using sdl3::rdp::backend::ScopedPropertiesLock;
+using sdl3::rdp::sdl::ScopedPropertiesLock;
 using sdl_rdp::utilities::Expects;
 namespace {
 constexpr auto RendezvousProperty = "SDL.rdp.internal.driver";

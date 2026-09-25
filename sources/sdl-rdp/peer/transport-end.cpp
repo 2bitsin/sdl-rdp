@@ -2,6 +2,7 @@
 
 #include <sdl-rdp/auth/authenticator.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
+#include <sdl-rdp/diagnostics/log-level.hpp>
 #include <sdl-rdp/diagnostics/logging.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
@@ -20,6 +21,7 @@
 
 namespace sdl_rdp::peer::detail::transport_end {
 using sdl_rdp::diagnostics::ExpectedDisconnect;
+using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::diagnostics::NegotiationRefused;
 using sdl_rdp::diagnostics::SecurityNla;
 using sdl_rdp::diagnostics::SecurityNlaExt;
@@ -56,13 +58,13 @@ auto ReportDisconnect(Diagnostics const& diagnostics, Activation const& activati
                       std::string_view error) -> void {
   auto const activated = activation.Activated();
   if (ExpectedDisconnect(code))
-    diagnostics.Log(SDLRDP_LOG_INFO, activated ? std::format("Peer disconnected: {}.", error)
-                                               : std::format("Connection closed before activation: {}.", error));
+    diagnostics.Log(LogLevel::Info, activated ? std::format("Peer disconnected: {}.", error)
+                                              : std::format("Connection closed before activation: {}.", error));
   else if (activation.Active() && pending)
-    diagnostics.Log(SDLRDP_LOG_ERROR, std::format("Peer transport failed with pending data: {}.", error));
+    diagnostics.Log(LogLevel::Error, std::format("Peer transport failed with pending data: {}.", error));
   else if (!activated)
-    diagnostics.Log(SDLRDP_LOG_INFO, code ? std::format("Connection closed before activation: {}.", error)
-                                          : "Connection closed before activation.");
+    diagnostics.Log(LogLevel::Info, code ? std::format("Connection closed before activation: {}.", error)
+                                         : "Connection closed before activation.");
 }
 }
 TransportEnd::TransportEnd(PeerLink& link, Activation const& activation, Authenticator& authenticator,
@@ -75,7 +77,7 @@ auto TransportEnd::SecurityEnded() const -> bool {
   // FreeRDP 3.32 nego.c:1663 publishes requestedProtocols even after a failure response.
   auto const requested = freerdp_settings_get_uint32(&settings, FreeRDP_RequestedProtocols);
   auto const protocols = ProtocolNames(requested, !requested);
-  _diagnostics.Log(SDLRDP_LOG_WARN,
+  _diagnostics.Log(LogLevel::Warn,
                    NegotiationRefused() ? Refusal(settings, protocols) : HandshakeFailure(settings, protocols));
   return true;
 }

@@ -1,5 +1,4 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
 #include <sdl-rdp/auth/forward.hpp>
 #include <sdl-rdp/configuration/forward.hpp>
 #include <sdl-rdp/diagnostics/forward.hpp>

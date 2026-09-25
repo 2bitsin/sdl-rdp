@@ -2,7 +2,6 @@
 
 #include <sdl-rdp/configuration/exceptions.hpp>
 #include <sdl-rdp/configuration/validation.hpp>
-#include <sdl-rdp/utilities/contract.hpp>
 
 #include <array>
 #include <cstdint>
@@ -22,32 +21,36 @@ auto DefaultCertificateDirectory() -> std::filesystem::path {
   if (getpwuid_r(getuid(), &entry, buffer.data(), buffer.size(), &found) || !found) throw HomeUnavailable{ };
   return std::filesystem::path(entry.pw_dir) / ".local/share/sdl-rdp";
 }
-auto ChosenDirectory(sdlrdp_config const& config) -> std::filesystem::path {
-  return config.cert_dir ? std::filesystem::path(config.cert_dir) : DefaultCertificateDirectory();
+auto Validated(Setup const& setup) -> Setup {
+  Validate(setup);
+  return setup;
 }
 }
-Configuration::Configuration(sdlrdp_config const& config)
-    : _authentication{ config }, _certificate_directory{ ChosenDirectory(config) }, _codec{ config.codec },
-      _avc_bitrate_kbps{ config.avc_bitrate_kbps                                                 },
-      _audio_latency   { config.audio_latency_ms ? config.audio_latency_ms : DefaultAudioLatency } { }
-auto Configuration::Config() const noexcept -> sdlrdp_config const& {
-  return _authentication.Config();
+Configuration::Configuration(Setup const& setup, CredentialCheck const& credentials)
+    : _setup{ Validated(setup) }, _credentials{ credentials },
+      _certificate_directory{ setup.cert_dir.value_or(DefaultCertificateDirectory()) }, _codec{ setup.codec },
+      _audio_latency{ setup.audio_latency_ms ? setup.audio_latency_ms : DefaultAudioLatency } { }
+auto Configuration::Credentials() const noexcept -> CredentialCheck const& {
+  return _credentials;
+}
+auto Configuration::Config() const noexcept -> Setup const& {
+  return _setup;
 }
 auto Configuration::CertificateDirectory() const noexcept -> std::filesystem::path const& {
   return _certificate_directory;
 }
-auto Configuration::Auth() const noexcept -> sdlrdp_auth {
-  return Config().auth;
+auto Configuration::Auth() const noexcept -> AuthMode {
+  return _setup.auth;
 }
-auto Configuration::Codec() const noexcept -> sdlrdp_codec {
+auto Configuration::CodecPreference() const noexcept -> Codec {
   return _codec.load();
 }
-auto Configuration::SetCodec(sdlrdp_codec value) -> void {
+auto Configuration::SetCodec(Codec value) -> void {
   ValidateCodec(value);
   _codec.store(value);
 }
 auto Configuration::AvcBitrate() const noexcept -> std::uint32_t {
-  return _avc_bitrate_kbps;
+  return _setup.avc_bitrate_kbps;
 }
 auto Configuration::AudioLatency() const noexcept -> std::uint32_t {
   return _audio_latency;
@@ -55,8 +58,9 @@ auto Configuration::AudioLatency() const noexcept -> std::uint32_t {
 auto Configuration::RefreshPolicy() const noexcept -> Refresh const& {
   return _refresh;
 }
-auto Configuration::SetRefresh(std::uint32_t mode, std::uint32_t ceiling) -> void {
-  _refresh = Refresh(ValidRefresh(mode, ceiling), ceiling);
+auto Configuration::SetRefresh(RefreshMode mode, std::uint32_t ceiling) -> void {
+  ValidateRefresh(mode, ceiling);
+  _refresh = Refresh(mode, ceiling);
   _refresh.Restart();
 }
 }

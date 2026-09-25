@@ -58,7 +58,7 @@ auto VideoDriver::TearDown() -> void {
   SDL_Quit();
   captured.reset();
   for (auto const* hint : { SDL_HINT_VIDEO_DRIVER, "SDL_RDP_PORT", "SDL_RDP_BIND", "SDL_RDP_CODEC", "SDL_RDP_WIDTH",
-                            "SDL_RDP_HEIGHT", "SDL_RDP_CERT_DIR", "SDL_RDP_BACKEND" })
+                            "SDL_RDP_HEIGHT", "SDL_RDP_CERT_DIR" })
     SDL_ResetHint(hint);
   Sample::TearDown();
 }

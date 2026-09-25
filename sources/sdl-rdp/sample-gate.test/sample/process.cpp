@@ -1,5 +1,6 @@
 #include <sdl-rdp/sample-gate.test/sample/process.hpp>
 
+#include <sdl-rdp/diagnostics/log-level.hpp>
 #include <sdl-rdp/sample-gate.test/sample/launch.hpp>
 
 #include <SDL3/SDL.h>
@@ -8,6 +9,7 @@
 #include <cstdint>
 
 namespace sdl_rdp::sample_gate_test::sample::detail::process {
+using sdl_rdp::diagnostics::LogLevel;
 using namespace std::chrono_literals;
 
 auto SampleProcess::GivenProcess(Words const& environment, Words const& options) -> void {
@@ -77,9 +79,9 @@ auto SampleProcess::Escape(Client& client) -> void {
 auto SampleProcess::CollectClientLog(wLogMessage const& message) -> void {
   auto const collecting = client_logs.Peek();
   if (!collecting || message.TextString == nullptr) return;
-  auto const level = message.Level == WLOG_ERROR ? SDLRDP_LOG_ERROR
-                     : message.Level == WLOG_WARN ? SDLRDP_LOG_WARN
-                                                  : SDLRDP_LOG_INFO;
-  Logs::Collect(&collecting->get(), level, message.TextString);
+  auto const level = message.Level == WLOG_ERROR ? LogLevel::Error
+                     : message.Level == WLOG_WARN ? LogLevel::Warn
+                                                  : LogLevel::Info;
+  collecting->get().Log(level, message.TextString);
 }
 }

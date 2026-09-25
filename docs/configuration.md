@@ -37,7 +37,6 @@ vsync: false
 wait_for_client: false
 audio_latency: 500          # ms
 audio_lead: 150             # ms
-backend: /opt/sdl-rdp/libbackend.so
 user: me
 password: secret
 domain: example
@@ -47,9 +46,11 @@ auth: nla
 Every value has its real type: numbers are whole numbers within the setting's range,
 `vsync` and `wait_for_client` are `true` or `false`, `codec` and `auth` are one of their
 names, `refresh` is a mode name or a whole number of hertz, and `aspect` is `N:D` with two
-positive whole numbers. An unknown key, a value of the wrong type or outside its range, and a
-file the format cannot parse fail `SDL_Init` once, with the file and the cause in `SDL_GetError()`; values are
-never logged. Hints and environment variables keep SDL's text forms (`SDL_RDP_VSYNC=1`).
+positive whole numbers. An unknown key, a value of the wrong type or outside its range, and
+a file the format cannot parse fail `SDL_Init` once, with the file and the cause in
+`SDL_GetError()`; values are never logged. A file from an earlier release that nests the
+settings under a `backend:` key fails the same way, with `unknown key 'backend'`; the keys
+are top level. Hints and environment variables keep SDL's text forms (`SDL_RDP_VSYNC=1`).
 
 File permissions can restrict access to `password` in the file, unlike
 exposing it in the environment; keep the file readable only by the intended user.
@@ -58,11 +59,13 @@ those before the RDP driver runs. Set them through hints or the environment.
 
 Settings include:
 `SDL_RDP_PORT` (3389, 0 for ephemeral), `SDL_RDP_BIND` (0.0.0.0),
-`SDL_RDP_CERT_DIR` (`$XDG_DATA_HOME/sdl-rdp` or `~/.local/share/sdl-rdp`), `SDL_RDP_WIDTH`, `SDL_RDP_HEIGHT` (1024x768),
-`SDL_RDP_REFRESH` (integer Hz, `auto-client`, `auto-client-average`, or `auto-sender`; default 60, set before video initialization),
-`SDL_RDP_WAIT_FOR_CLIENT`, `SDL_RDP_BACKEND` (path of the backend library),
+`SDL_RDP_CERT_DIR` (`$XDG_DATA_HOME/sdl-rdp` or `~/.local/share/sdl-rdp`), `SDL_RDP_WIDTH`,
+`SDL_RDP_HEIGHT` (1024x768), `SDL_RDP_REFRESH` (integer Hz, `auto-client`, `auto-client-average`,
+or `auto-sender`; default 60, set before video initialization),
+`SDL_RDP_WAIT_FOR_CLIENT`,
 `SDL_RDP_AUDIO_LATENCY` (500 ms), `SDL_RDP_AUDIO_LEAD` (150 ms).
-`SDL_RDP_VSYNC` defaults to `0`: surface updates return as soon as the backend takes the frame, and SDL renderer vsync uses the display refresh rate for timed pacing.
+`SDL_RDP_VSYNC` defaults to `0`: surface updates return as soon as the driver takes the frame,
+and SDL renderer vsync uses the display refresh rate for timed pacing.
 Set it to `1` to wait up to 100 ms for client acknowledgements, allowing the latest present to remain in flight.
 `SDL_RDP_ASPECT` sets the picture's display aspect (for example `4:3`);
 empty means square pixels. It can change live, and
@@ -92,8 +95,9 @@ and `--aspect 4:3` declares the picture's display aspect. F4 toggles fullscreen;
 `--partial` submits only the animated strip between initial and exposed/resized full frames.
 
 `SDL_RDP_CODEC` accepts `auto` (default), `remotefx`, `nscodec`, `planar`,
-`raw`, `progressive`, and `avc420`. On legacy connections, auto selects RemoteFX, then NSCodec, then planar, then raw among
-negotiated codecs. An unsupported explicit preference uses that same fallback.
+`raw`, `progressive`, and `avc420`. On legacy connections, auto selects
+RemoteFX, then NSCodec, then planar, then raw among negotiated codecs. An
+unsupported explicit preference uses that same fallback.
 Planar is the explicit lossless choice; RemoteFX and NSCodec are lossy.
 The hint can change live; `SDL_PROP_WINDOW_RDP_CODEC_STRING` reports the
 negotiated codec on the window.
@@ -110,8 +114,9 @@ Session facts arrive as native SDL events: a client attaching is
 EXPOSED + FOCUS_GAINED, leaving is OCCLUDED + FOCUS_LOST, the display mode
 reports the client's screen. `SDL_RDP_REFRESH` accepts an application hint, environment variable or settings
 file `refresh` with the precedence above; an unknown value in the file fails `SDL_Init`, and
-one in a hint or the environment fails video initialization and logs one SDL error. The desktop mode declares the ceiling (60 Hz for adaptive modes),
-and the current mode exposes the effective rate used by simulated vsync and AVC.
+one in a hint or the environment fails video initialization and logs one SDL error. The
+desktop mode declares the ceiling (60 Hz for adaptive modes), and the current mode exposes the
+effective rate used by simulated vsync and AVC.
 
 - Integer Hz keeps a fixed declared rate, independent of transport or client timing.
   It gives predictable pacing but cannot adapt to a slow link.
@@ -144,12 +149,11 @@ refresh mode. `SDL_RDP_TRACE=1` includes `outq` bytes, `unacked` segments and
 `tcp_rtt` microseconds after writes; disconnect statistics include mean and
 maximum send-buffer occupancy.
 The current mode keeps the selected fullscreen size in exclusive fullscreen.
-Details are properties (bound port on the display, client name on the window). A failed open is in `SDL_GetError()`,
-backend diagnostics go to `SDL_Log`.
+Details are properties (bound port on the display, client name on the window). A failed open
+is in `SDL_GetError()`; the driver's diagnostics go to `SDL_Log` in the video category.
 
 `SDL_RDP_TRACE=1` prints a wall-clock stamped line per input event, audio block,
-confirmation, frame and acknowledgement through the backend log callback at info
-level, for correlating with a client-side recording. Timestamps are integer
+confirmation, frame and acknowledgement through `SDL_Log` at info level, for correlating with a client-side recording. Timestamps are integer
 milliseconds since the epoch. The variable is read once when the backend opens;
 tracing is disabled by default. Lines also include presentation, connection and
 audio gate transitions, with audio RMS and peak levels on the S16 scale.

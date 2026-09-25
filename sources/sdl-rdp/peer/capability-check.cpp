@@ -2,6 +2,7 @@
 
 #include <sdl-rdp/auth/authenticator.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
+#include <sdl-rdp/diagnostics/log-level.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/picture/desktop-layout.hpp>
@@ -13,6 +14,7 @@
 #include <cstdint>
 
 namespace sdl_rdp::peer::detail::capability_check {
+using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::picture::ApplyDesktopSize;
 
 namespace {
@@ -32,7 +34,7 @@ auto CapabilityCheck::Accept() -> bool {
     _desktop.RecordScreen(settings);
   }
   if (!std::ranges::contains(ColourDepths, freerdp_settings_get_uint32(&settings, FreeRDP_ColorDepth))) {
-    _diagnostics.Log(SDLRDP_LOG_WARN, "Connection refused: colour depth must be 16, 24 or 32 bpp.");
+    _diagnostics.Log(LogLevel::Warn, "Connection refused: colour depth must be 16, 24 or 32 bpp.");
     return false;
   }
   return ApplyDesktopSize(settings, _desktop.Offer(_store.Picture(frame)));

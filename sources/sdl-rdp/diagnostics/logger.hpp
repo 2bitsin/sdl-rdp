@@ -1,14 +1,15 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/diagnostics/log-level.hpp>
+#include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/diagnostics/logging.hpp>
 
-#include <string>
+#include <string_view>
 
 namespace sdl_rdp::diagnostics::detail::logger {
 class Logger {
 public:
-  explicit Logger(sdlrdp_config const& config);
-  auto     Log(sdlrdp_log_level level, std::string const& text) const -> void;
+  explicit Logger(LogSink& sink);
+  auto     Log(LogLevel level, std::string_view text) const -> void;
 
 private:
   LogRoute _route;

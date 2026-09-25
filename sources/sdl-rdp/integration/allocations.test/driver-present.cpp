@@ -12,7 +12,6 @@
 #include <utility>
 
 namespace sdl_rdp::integration::allocations_test::detail::driver_present {
-using sdl_rdp::sample_gate_test::sample::BackendLibrary;
 using sdl_rdp::utilities::Expects;
 namespace {
 using sdl_rdp::sample_gate_test::process::InitializedSdl;
@@ -23,15 +22,15 @@ constexpr int Height = 480;
 constexpr std::size_t WarmPresents     = 10;
 constexpr std::size_t MeasuredPresents = 100;
 // Several rectangles, so storage sized per present shows as one allocation per present.
-constexpr std::array Damage{ SDL_Rect{ 0, 40, Width, 32 }, SDL_Rect{ 64, 200, 64, 64 }, SDL_Rect{ 320, 400, 32, 32 } };
+constexpr std::array Damage{ SDL_Rect{ .x = 0, .y = 40, .w = Width, .h = 32 },
+                             SDL_Rect{ .x = 64, .y = 200, .w = 64, .h = 64  },
+                             SDL_Rect{ .x = 320, .y = 400, .w = 32, .h = 32 } };
 
 auto StartVideo(std::filesystem::path const& certificates) -> bool {
-  auto const backend = BackendLibrary();
   for (auto [name, value] : { std::pair{ SDL_HINT_VIDEO_DRIVER, "rdp" },
                               { SDL_HINT_RDP_PORT    , "0"                  },
                               { SDL_HINT_RDP_BIND    , "127.0.0.1"          },
-                              { SDL_HINT_RDP_CERT_DIR, certificates.c_str() },
-                              { SDL_HINT_RDP_BACKEND , backend.c_str()      } }) {
+                              { SDL_HINT_RDP_CERT_DIR, certificates.c_str() } }) {
     auto const accepted = SDL_SetHint(name, value);
     Expects(accepted, "the rdp hints are accepted");
   }

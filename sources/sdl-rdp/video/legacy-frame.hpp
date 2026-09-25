@@ -1,8 +1,8 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
 #include <sdl-rdp/configuration/forward.hpp>
 #include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
+#include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/video/forward.hpp>
 #include <sdl-rdp/video/frame/forward.hpp>
 #include <sdl-rdp/video/pixel-band.hpp>
@@ -19,6 +19,7 @@ using sdl_rdp::configuration::Configuration;
 using sdl_rdp::link::Activation;
 using sdl_rdp::link::PeerLink;
 using sdl_rdp::utilities::Pinned;
+using sdl_rdp::utilities::Rect;
 using sdl_rdp::video::frame::FramePacing;
 
 enum class LegacyWire{ Bitmap, Planar, Surface };
@@ -38,7 +39,7 @@ public:
 
 private:
   struct Band {
-    sdlrdp_rect            area { };
+    Rect                   area { };
     std::vector<std::byte> bytes;
   };
   struct Packet {
@@ -49,16 +50,15 @@ private:
     std::vector<Packet>        packets;
     std::optional<std::size_t> next;
   };
-  auto SelectEncoder()                -> bool;
-  auto AppendPlanar(Packet& packet, std::size_t& wire_size, sdlrdp_rect area, std::span<std::byte const> payload)
-      -> void;
-  auto AppendBand(PixelBand band)     -> bool;
-  auto Finish()                       -> bool;
-  auto Marker(std::uint16_t action)   -> bool;
-  auto Planar(sdlrdp_rect area)       -> bool;
-  auto Bands(sdlrdp_rect area)        -> bool;
-  auto Describe(Packet& packet) const -> void;
-  auto Write(Packet& packet)          -> bool;
+  auto SelectEncoder()                                                                                     -> bool;
+  auto AppendPlanar(Packet& packet, std::size_t& wire_size, Rect area, std::span<std::byte const> payload) -> void;
+  auto AppendBand(PixelBand band)                                                                          -> bool;
+  auto Finish()                                                                                            -> bool;
+  auto Marker(std::uint16_t action)                                                                        -> bool;
+  auto Planar(Rect area)                                                                                   -> bool;
+  auto Bands(Rect area)                                                                                    -> bool;
+  auto Describe(Packet& packet) const                                                                      -> void;
+  auto Write(Packet& packet)                                                                               -> bool;
   PeerLink&                 _link;
   Configuration const&      _configuration;
   Activation&               _activation;

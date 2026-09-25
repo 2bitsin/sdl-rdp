@@ -1,4 +1,5 @@
-#include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/diagnostics/log-level.hpp>
+#include <sdl-rdp/headless-client.test/frame/observer.hpp>
 #include <sdl-rdp/headless-client.test/graphics/observer.hpp>
 #include <sdl-rdp/headless-client.test/graphics/round-five.hpp>
 
@@ -7,6 +8,7 @@
 #include <regex>
 
 namespace sdl_rdp::integration::video_test::detail::graphics_pacing {
+using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::headless_client_test::backend::Logs;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::Pixels;
@@ -23,7 +25,7 @@ protected:
 };
 TEST_F(RoundFive, PipelinedLegacyPresent) {
   ASSERT_NO_FATAL_FAILURE(Open(320, 200));
-  Client client(sdlrdp_port(&*backend), true);
+  Client client(backend.Port(), true);
   ASSERT_NO_FATAL_FAILURE(Connect(client));
   FrameObserver const observer(client);
   Pixels const        pixels(320uz * 200, 0x123456);
@@ -37,8 +39,8 @@ TEST_F(PipelinedGraphics, PipelinedGraphicsPresent) {
 
 namespace {
 auto ThenFrameStatistics(Logs& logs) -> void {
-  EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "Frames:"), 1u);
-  EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, "Frames: 3 sent, 2 coalesced; encode ")) << logs.Text(true);
+  EXPECT_EQ(logs.Count(LogLevel::Info, "Frames:"), 1u);
+  EXPECT_TRUE(logs.Contains(LogLevel::Info, "Frames: 3 sent, 2 coalesced; encode ")) << logs.Text(true);
   auto text = logs.Text(true);
   EXPECT_TRUE(std::regex_search(
       text, std::regex(R"(acknowledgement [0-9.]+ ms mean, [0-9.]+ ms max, [0-9]+ over 100 ms, [0-9]+ timed out\.)")))
@@ -49,7 +51,7 @@ auto ThenFrameStatistics(Logs& logs) -> void {
 TEST_F(PipelinedGraphics, GraphicsFrameStatistics) {
   ASSERT_NO_FATAL_FAILURE(PresentGraphicsFrames(GraphicsClient(), Observer(), pixels, 1, 2));
   for (std::size_t count = 0; count < 3; ++count) Present(pixels, 320, 200);
-  EXPECT_EQ(sdlrdp_wait_frame(&*backend, 1), 0);
+  EXPECT_FALSE(backend.WaitFrame(std::chrono::milliseconds{ 1 }));
   ASSERT_TRUE(Observer().AckFrame(0, 0));
   ASSERT_NO_FATAL_FAILURE(AwaitFrames(GraphicsClient(), Observer().Observed().frames, 3));
   ASSERT_NO_FATAL_FAILURE(ThenGraphicsAcknowledgementsCounted());
@@ -60,7 +62,7 @@ TEST_F(PipelinedGraphics, GraphicsFrameStatistics) {
 TEST_F(PipelinedGraphics, GraphicsAcknowledgementsAgeOutAndResume) {
   ASSERT_NO_FATAL_FAILURE(PresentGraphicsFrames(GraphicsClient(), Observer(), pixels, 1, 4));
   ASSERT_TRUE(Observer().AckFrame(3, 0));
-  ASSERT_TRUE(GraphicsClient().Until([&] { return sdlrdp_wait_frame(&*backend, 0) != 0; }));
+  ASSERT_TRUE(GraphicsClient().Until([&] { return backend.WaitFrame(std::chrono::milliseconds{ 0 }); }));
   ASSERT_NO_FATAL_FAILURE(PresentGraphicsFrames(GraphicsClient(), Observer(), pixels, 5, 6));
   ThenAgedWindowResumes(pixels);
 }

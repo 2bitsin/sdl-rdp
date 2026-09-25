@@ -1,7 +1,5 @@
 #include <sdl-rdp/auth/identity.hpp>
 
-#include <sdl-rdp/abi/backend.h>
-
 #include <gtest/gtest.h>
 #include <oxbox/platform/scratch-area.hpp>
 #include <condition_variable>

@@ -2,7 +2,7 @@
 #include <type_traits>
 
 namespace sdl_rdp::utilities::support_test::detail::out_of_range_enum {
-// A C caller can pass any value in an ABI enum's storage; tests feed one the enum does not list.
+// An enum's storage holds values the enum does not list; tests feed one to the checks that refuse it.
 template <class EnumTy>
   requires std::is_enum_v<EnumTy>
 constexpr auto OutOfRangeEnum(std::underlying_type_t<EnumTy> value) -> EnumTy {

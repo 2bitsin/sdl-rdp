@@ -4,7 +4,6 @@
 #include <sdl-rdp/freerdp-facade/rdpdr.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
-#include <sdl-rdp/utilities/terminated-copy.hpp>
 
 #include <string_view>
 #include <utility>
@@ -12,17 +11,15 @@
 namespace sdl_rdp::drive::detail::listing {
 using sdl_rdp::freerdp_facade::FileAttribute;
 using sdl_rdp::freerdp_facade::InformationClass;
-using sdl_rdp::utilities::CopyTerminated;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
 
 namespace {
-auto Listed(sdlrdp_dirent const& entry) -> bool {
-  std::string_view const name = entry.name;
-  return name != "." && name != "..";
+auto Listed(DirectoryEntry const& entry) -> bool {
+  return entry.name != "." && entry.name != "..";
 }
 }
-Listing::Listing(std::uint32_t offset, std::span<sdlrdp_dirent> out) noexcept : _out{ out }, _offset{ offset } { }
+Listing::Listing(std::size_t offset, std::size_t limit) noexcept : _offset{ offset }, _limit{ limit } { }
 // MS-FSCC 2.4.10 FILE_DIRECTORY_INFORMATION entries chained by NextEntryOffset; false once the directory is done.
 auto Listing::Collect(DrivePacket response) -> bool {
   Expects(!Full(), "a full listing takes no further response");
@@ -41,29 +38,26 @@ auto Listing::Collect(DrivePacket response) -> bool {
   return length != 0;
 }
 auto Listing::Full() const noexcept -> bool {
-  return _count == _out.size();
+  return _entries.size() == _limit;
 }
-auto Listing::Count() const noexcept -> std::size_t {
-  return _count;
+auto Listing::Entries() && -> std::vector<DirectoryEntry> {
+  return std::move(_entries);
 }
-auto Listing::Take(sdlrdp_dirent const& entry) -> void {
+auto Listing::Take(DirectoryEntry entry) -> void {
   if (!Listed(entry)) return;
   if (_skipped++ < _offset) return;
   Expects(!Full(), "a listed entry has room in the output");
-  _out[_count++] = entry;
+  _entries.push_back(std::move(entry));
 }
-auto Entry(DrivePacket& packet) -> sdlrdp_dirent {
+auto Entry(DrivePacket& packet) -> DirectoryEntry {
   constexpr std::size_t end_of_file_offset         = 40;
   constexpr std::size_t allocation_size_field_size = 8;
   packet.Skip(end_of_file_offset);
-  sdlrdp_dirent entry{ };
+  DirectoryEntry entry;
   entry.size = packet.Read<std::uint64_t>();
   packet.Skip(allocation_size_field_size);
   entry.directory = (packet.Read<std::uint32_t>() & std::to_underlying(FileAttribute::Directory)) != 0;
-  auto const length = packet.Read<std::uint32_t>();
-  auto const name   = packet.Text(length);
-  if (name.size() >= sizeof(entry.name)) throw EntryNameTooLong{ name.size(), sizeof(entry.name) - 1 };
-  CopyTerminated(entry.name, name);
+  entry.name      = packet.Text(packet.Read<std::uint32_t>());
   return entry;
 }
 // MS-RDPEFS 2.2.3.3.10 DR_DRIVE_QUERY_DIRECTORY_REQ: the pattern only on the first query.

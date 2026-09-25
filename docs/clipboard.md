@@ -9,6 +9,5 @@ with ASCII fallback (`?` for non-ASCII characters).
 Clipboard redirection must be enabled in the RDP client (`/clipboard` in
 xfreerdp). Images and files are not supported yet.
 
-The backend ABI is version 7; graphics supports `SDLRDP_CODEC_PROGRESSIVE` and `SDLRDP_CODEC_AVC420`. Clipboard provides `sdlrdp_set_clipboard_text`,
-`sdlrdp_get_clipboard_text`, and `sdlrdp_has_clipboard_text`. The getter's
-pointer belongs to the handle; copy it before another clipboard API call.
+`SDL_GetClipboardText` returns a copy the application owns, as SDL specifies; a
+remote change reaches the application only as `SDL_EVENT_CLIPBOARD_UPDATE`.

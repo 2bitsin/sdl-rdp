@@ -74,11 +74,6 @@ def test_boundary_names_fail_outside_the_facade(tree):
         'a.cpp:1 HANDLE', 'a.cpp:2 FALSE']
 
 
-def test_frozen_abi_header_is_exempt(tree):
-    (tree / 'sources/sdl-rdp/abi').mkdir(parents=True)
-    assert findings(tree, 'sources/sdl-rdp/abi/backend.h', 'unsigned width;\n') == []
-
-
 def test_sdl_scalars_fail_like_the_winpr_ones(tree):
     text = 'Uint8 a;\nSint16 b;\nauto c = SDL_GetTicks() + Uint64{ 1 };\nauto d = event.Uint32;\n'
     assert findings(tree, 'sources/sdl-rdp/video/a.cpp', text) == ['a.cpp:1 Uint8', 'a.cpp:2 Sint16', 'a.cpp:3 Uint64']

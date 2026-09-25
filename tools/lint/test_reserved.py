@@ -45,13 +45,5 @@ def test_double_underscores_fail(tree):
 
 
 def test_unused_owner_names_are_not_allowed(tree):
-    assert findings(tree, 'auto _Public_name = 1;\nauto _Meta() -> int;\nauto _Help() -> int;\n') == [
-        'a.hpp:1 _Public_name', 'a.hpp:2 _Meta', 'a.hpp:3 _Help']
-
-
-def test_export_mark_passes(tree):
-    assert findings(tree, 'auto _Public_(ABI_VERSION) Exported() -> int { return 0; }\n') == []
-
-
-def test_a_bare_mark_is_a_reserved_name(tree):
-    assert findings(tree, 'int _Public_;\nauto _Public_ x = 1;\n') == ['a.hpp:1 _Public_', 'a.hpp:2 _Public_']
+    assert findings(tree, 'auto _Export_name = 1;\nauto _Meta() -> int;\nauto _Help() -> int;\n') == [
+        'a.hpp:1 _Export_name', 'a.hpp:2 _Meta', 'a.hpp:3 _Help']

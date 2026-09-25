@@ -1,6 +1,6 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
-#include <sdl-rdp/diagnostics/error-store.hpp>
+#include <sdl-rdp/diagnostics/log-level.hpp>
+#include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/diagnostics/logger.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
@@ -16,10 +16,10 @@ using sdl_rdp::utilities::Pinned;
 
 class Diagnostics : private Pinned {
 public:
-       Diagnostics(sdlrdp_config const& config, bool tracing);
-  auto Log(sdlrdp_log_level level, std::string const& text) const          -> void;
+       Diagnostics(LogSink& sink, bool tracing);
+  auto Log(LogLevel level, std::string_view text) const                    -> void;
   auto Tracing() const noexcept                                            -> bool;
-  auto Emit(std::string const& text) const                                 -> void;
+  auto Emit(std::string_view text) const                                   -> void;
   auto Line(std::string_view event, std::invocable auto&&... fields) const -> void {
     if (_tracing) Emit(Format(event, std::forward<decltype(fields)>(fields)...));
   }
@@ -31,12 +31,10 @@ public:
     ((text += std::format(" {}", std::forward<decltype(fields)>(fields)())), ...);
     return text;
   }
-  auto Fail(std::string text) -> void;
 
 private:
-  Logger     _logger;
-  ErrorStore _errors;
-  bool       _tracing;
+  Logger _logger;
+  bool   _tracing;
 };
 }
 

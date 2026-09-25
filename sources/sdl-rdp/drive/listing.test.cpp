@@ -11,6 +11,7 @@
 #include <initializer_list>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace sdl_rdp::drive::detail::listing {
@@ -61,53 +62,49 @@ TEST(Entry, ReadsSizeKindAndName) {
   auto packet = Record(File(u"žqs.txt", 42), true);
   auto entry  = Entry(packet);
   EXPECT_EQ(entry.size, 42U);
-  EXPECT_EQ(entry.directory, 0);
-  EXPECT_EQ(std::string_view(entry.name), "žqs.txt");
+  EXPECT_FALSE(entry.directory);
+  EXPECT_EQ(entry.name, "žqs.txt");
   packet = Record(Folder(u"dir"), true);
-  EXPECT_EQ(Entry(packet).directory, 1);
+  EXPECT_TRUE(Entry(packet).directory);
 }
-TEST(Entry, RefusesANameTheAbiCannotHold) {
+TEST(Entry, ReadsANameOfAnyLength) {
   std::u16string const long_name(1024, u'a');
   auto                 packet    = Record(File(long_name, 0), true);
-  EXPECT_THROW(Entry(packet), EntryNameTooLong);
+  EXPECT_EQ(Entry(packet).name.size(), 1024U);
 }
 TEST(Listing, SkipsDotEntriesAndTheOffset) {
-  std::array<sdlrdp_dirent, 8> out    { };
-  Listing                      listing{ 1, out };
+  Listing listing{ 1, 8 };
   EXPECT_TRUE(listing.Collect(Tree()));
-  ASSERT_EQ(listing.Count(), 2U);
-  EXPECT_EQ(std::string_view(out[0].name), "b");
-  EXPECT_EQ(out[0].directory, 1);
-  EXPECT_EQ(std::string_view(out[1].name), "ž.bin");
-  EXPECT_EQ(out[1].size, 7U);
   EXPECT_FALSE(listing.Full());
+  auto const out = std::move(listing).Entries();
+  ASSERT_EQ(out.size(), 2U);
+  EXPECT_EQ(out[0].name, "b");
+  EXPECT_TRUE(out[0].directory);
+  EXPECT_EQ(out[1].name, "ž.bin");
+  EXPECT_EQ(out[1].size, 7U);
 }
 TEST(Listing, StopsWhenTheOutputIsFull) {
-  std::array<sdlrdp_dirent, 1> out    { };
-  Listing                      listing{ 0, out };
+  Listing listing{ 0, 1 };
   EXPECT_TRUE(listing.Collect(Tree()));
   EXPECT_TRUE(listing.Full());
-  EXPECT_EQ(std::string_view(out[0].name), "a.txt");
+  EXPECT_EQ(std::move(listing).Entries().front().name, "a.txt");
 }
 TEST(Listing, AnEmptyResponseEndsTheDirectory) {
-  std::array<sdlrdp_dirent, 1> out    { };
-  Listing                      listing{ 0, out };
-  DrivePacket                  empty;
+  Listing     listing{ 0, 1 };
+  DrivePacket empty;
   empty.Write(std::uint32_t{ 0 });
   EXPECT_FALSE(listing.Collect(empty));
-  EXPECT_EQ(listing.Count(), 0U);
+  EXPECT_TRUE(std::move(listing).Entries().empty());
 }
 TEST(Listing, RefusesALengthPastTheResponse) {
-  std::array<sdlrdp_dirent, 1> out      { };
-  auto                         response = Tree();
+  auto response = Tree();
   response.Bytes().resize(response.Bytes().size() - 1);
-  EXPECT_THROW(Listing(0, out).Collect(response), MalformedResponse);
+  EXPECT_THROW(Listing(0, 1).Collect(response), MalformedResponse);
 }
 TEST(Listing, RefusesAnEntryOffsetOutsideTheListing) {
-  std::array<sdlrdp_dirent, 4> out      { };
-  auto                         response = Response({ File(u"a", 1), File(u"b", 1) });
+  auto response = Response({ File(u"a", 1), File(u"b", 1) });
   response.Bytes()[4] = std::byte{ 0xff };
-  EXPECT_THROW(Listing(0, out).Collect(response), MalformedResponse);
+  EXPECT_THROW(Listing(0, 4).Collect(response), MalformedResponse);
 }
 TEST(DirectoryQuery, CarriesThePatternOnlyFirst) {
   std::array const pattern { std::byte{ '*' }, std::byte{ 0 }, std::byte{ 0 }, std::byte{ 0 } };

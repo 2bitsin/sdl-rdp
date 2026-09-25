@@ -2,6 +2,7 @@
 #include <sdl-rdp/picture/frame-snapshot.hpp>
 #include <sdl-rdp/picture/frame-store.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
+#include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/utilities/region.hpp>
 
 #include <cstdint>
@@ -12,25 +13,26 @@ using sdl_rdp::picture::FrameLock;
 using sdl_rdp::picture::FrameSnapshot;
 using sdl_rdp::picture::FrameStore;
 using sdl_rdp::utilities::Pinned;
+using sdl_rdp::utilities::Rect;
 using sdl_rdp::utilities::Region;
 
 class PeerFrames : private Pinned {
 public:
   explicit PeerFrames(FrameStore& store) noexcept;
-  auto     Post(FrameLock const& held, sdlrdp_rect area)    -> void;
-  auto     Repaint(FrameLock const& held, sdlrdp_rect area) -> void;
-  auto     Refresh()                                        -> void;
-  auto     CountPresent(FrameLock const& held)              -> void;
-  auto     Dirty(FrameLock const& held) const               -> bool;
-  auto     Pending(FrameLock const& held) const             -> bool;
-  auto     Capture(FrameLock const& held)                   -> std::uint64_t;
-  auto     Invalidate(FrameLock const& held)                -> void;
-  auto     Include()                                        -> void;
-  auto     Resend()                                         -> void;
-  auto     Complete(FrameLock const& held)                  -> void;
-  auto     Snapshot() const noexcept                        -> FrameSnapshot const&;
-  auto     Sending() const noexcept                         -> std::vector<sdlrdp_rect> const&;
-  auto     Sequence() const noexcept                        -> std::uint64_t;
+  auto     Post(FrameLock const& held, Rect area)    -> void;
+  auto     Repaint(FrameLock const& held, Rect area) -> void;
+  auto     Refresh()                                 -> void;
+  auto     CountPresent(FrameLock const& held)       -> void;
+  auto     Dirty(FrameLock const& held) const        -> bool;
+  auto     Pending(FrameLock const& held) const      -> bool;
+  auto     Capture(FrameLock const& held)            -> std::uint64_t;
+  auto     Invalidate(FrameLock const& held)         -> void;
+  auto     Include()                                 -> void;
+  auto     Resend()                                  -> void;
+  auto     Complete(FrameLock const& held)           -> void;
+  auto     Snapshot() const noexcept                 -> FrameSnapshot const&;
+  auto     Sending() const noexcept                  -> std::vector<Rect> const&;
+  auto     Sequence() const noexcept                 -> std::uint64_t;
 
 private:
   FrameStore&   _store;

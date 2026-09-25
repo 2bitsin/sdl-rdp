@@ -1,6 +1,6 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
 #include <sdl-rdp/utilities/extent.hpp>
+#include <sdl-rdp/utilities/rect.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -10,6 +10,7 @@
 
 namespace sdl_rdp::picture::detail::frame_snapshot {
 using sdl_rdp::utilities::Extent;
+using sdl_rdp::utilities::Rect;
 
 auto FrameBytes(Extent size) -> std::size_t;
 class FrameSnapshot {
@@ -22,7 +23,7 @@ public:
   auto     Stride() const               -> std::size_t;
   auto     Width() const noexcept       -> std::uint32_t;
   auto     Height() const noexcept      -> std::uint32_t;
-  auto     Bounds() const noexcept      -> sdlrdp_rect;
+  auto     Bounds() const noexcept      -> Rect;
   auto     Matching(Extent size) const  -> FrameSnapshot;
   auto     Release() noexcept           -> void;
 

@@ -2,36 +2,35 @@
 #include "clipboard.hpp"
 #include "events.hpp"
 #include "window.hpp"
-#include <sdl-rdp/SDL3/rdp/backend/boundary.hpp>
 #include <sdl-rdp/SDL3/rdp/exceptions.hpp>
 #include <sdl-rdp/SDL3/rdp/input/mouse.hpp>
+#include <sdl-rdp/SDL3/rdp/sdl/boundary.hpp>
 #include <sdl-rdp/SDL3/rdp/settings/options.hpp>
+#include <sdl-rdp/session/backend.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
+#include <utility>
 namespace sdl3::rdp::video::detail::device {
-using sdl3::rdp::backend::Boundary;
-using sdl3::rdp::backend::Operation;
 using sdl3::rdp::input::InitMouse;
-using sdl3::rdp::settings::BackendAspect;
+using sdl3::rdp::sdl::Boundary;
 using sdl3::rdp::settings::Text;
 using sdl3::rdp::storage::UpdateDrives;
 using sdl_rdp::settings::Aspect;
 using sdl_rdp::settings::Settings;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
-auto SetAspect(Driver const& driver, Aspect const& value) -> void {
-  if (driver.Call<Operation::SET_ASPECT>(BackendAspect(value)) != 0) driver.Throw();
+auto SetAspect(Driver& driver, Aspect const& value) -> void {
+  driver.Backend().Presentation().SetAspect(value.Ratio());
 }
 auto PublishAspect(SDL_Window& window, Aspect const& value) -> void {
   SDL_SetStringProperty(SDL_GetWindowProperties(&window), SDL_PROP_WINDOW_RDP_ASPECT_STRING, value.Text().c_str());
 }
 namespace {
-auto StartRefresh(Driver const& driver) -> int {
+auto StartRefresh(Driver& driver) -> int {
   auto const refresh = driver.Options().Value<&Settings::refresh>();
-  auto const hz      = Narrowed<int>(refresh.Hz());
-  if (driver.Call<Operation::SET_REFRESH>(std::to_underlying(refresh.Mode()), hz) != 0) driver.Throw();
-  return hz;
+  driver.Backend().Presentation().SetRefresh(refresh.Mode(), refresh.Hz());
+  return Narrowed<int>(refresh.Hz());
 }
-auto DesktopDisplayMode(Driver const& driver) -> SDL_DisplayMode {
+auto DesktopDisplayMode(Driver& driver) -> SDL_DisplayMode {
   SDL_DisplayMode mode{ };
   mode.format                   = SDL_PIXELFORMAT_XRGB8888;
   mode.w                        = static_cast<int>(driver.Config().Width());
@@ -42,12 +41,12 @@ auto DesktopDisplayMode(Driver const& driver) -> SDL_DisplayMode {
   return mode;
 }
 auto InitDisplay(SDL_VideoData& data) -> void {
-  auto const mode = DesktopDisplayMode(data.Backend());
+  auto const mode = DesktopDisplayMode(data.Driver());
   data.Display(SDL_AddBasicVideoDisplay(&mode));
   if (!data.Display()) throw RelayedFailure{ SDL_GetError() };
   auto const properties = SDL_GetDisplayProperties(data.Display());
-  UpdateDrives(data.Backend(), properties);
-  if (!SDL_SetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, data.Backend().Call<Operation::PORT>()))
+  UpdateDrives(data.Driver(), properties);
+  if (!SDL_SetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, data.Driver().Backend().Port()))
     throw RelayedFailure{ SDL_GetError() };
 }
 constexpr auto StandardModes = std::to_array<std::pair<int, int>>({
@@ -87,11 +86,16 @@ auto DisplayMode(SDL_VideoDevice* device, [[maybe_unused]] SDL_VideoDisplay* unu
     -> bool {
   Expects(device != nullptr, "mode change has a device");
   Expects(mode != nullptr, "mode change has a mode");
-  return ResizePicture(*device->internal, mode->w, mode->h);
+  return Boundary([&] {
+    ResizePicture(*device->internal, mode->w, mode->h);
+    return true;
+  });
 }
 auto RelativeMouse(bool enabled) -> bool {
-  auto const& driver = CurrentVideo().Backend();
-  return driver.Call<Operation::SET_RELATIVE_MOUSE>(enabled) == 0 || driver.Fail();
+  return Boundary([&] {
+    CurrentVideo().Driver().Backend().SetRelativeMouse(enabled);
+    return true;
+  });
 }
 // SDL's video initialization callback borrows its device.
 auto VideoInit(SDL_VideoDevice* device) -> bool {

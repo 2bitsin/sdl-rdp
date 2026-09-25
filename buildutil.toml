@@ -1,7 +1,7 @@
 [project]
 name = "sdl-rdp"
-cmake_option_prefix = "BACKEND"
-module_define_prefix = "BACKEND"
+cmake_option_prefix = "SDL_RDP"
+module_define_prefix = "SDL_RDP"
 cxx_standard = 26
 
 [cmake]

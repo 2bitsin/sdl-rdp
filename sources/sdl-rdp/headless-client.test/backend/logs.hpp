@@ -1,5 +1,6 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/diagnostics/log-level.hpp>
+#include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 
 #include <algorithm>
@@ -15,17 +16,19 @@
 #include <vector>
 
 namespace sdl_rdp::headless_client_test::backend::detail::logs {
+using sdl_rdp::diagnostics::LogLevel;
+using sdl_rdp::diagnostics::LogSink;
 using sdl_rdp::utilities::Expects;
 
-class Logs {
+class Logs final : public LogSink {
 public:
-  static auto Collect(void* user, sdlrdp_log_level level, char const* text) -> void;
-  auto Text(bool include_info = false)                         -> std::string;
-  auto Count(sdlrdp_log_level level, std::string_view text)    -> std::size_t;
-  auto Contains(sdlrdp_log_level level, std::string_view text) -> bool;
-  auto Contains(std::string_view text)                         -> bool;
-  auto Entries()                                               -> std::vector<std::pair<sdlrdp_log_level, std::string>>;
-  auto Statistics(std::string_view pattern)                    -> std::optional<std::vector<std::string>>;
+  auto Log(LogLevel level, std::string_view text)      -> void override;
+  auto Text(bool include_info = false)                 -> std::string;
+  auto Count(LogLevel level, std::string_view text)    -> std::size_t;
+  auto Contains(LogLevel level, std::string_view text) -> bool;
+  auto Contains(std::string_view text)                 -> bool;
+  auto Entries()                                       -> std::vector<std::pair<LogLevel, std::string>>;
+  auto Statistics(std::string_view pattern)            -> std::optional<std::vector<std::string>>;
   template <typename Observe>
   auto Follow(std::size_t next, Observe observe) -> std::size_t {
     std::scoped_lock const lock(guard);
@@ -53,9 +56,9 @@ private:
     std::scoped_lock const lock(guard);
     return std::ranges::count_if(lines, project);
   }
-  std::condition_variable                               changed;
-  std::mutex                                            guard;
-  std::vector<std::pair<sdlrdp_log_level, std::string>> lines;
+  std::condition_variable                       changed;
+  std::mutex                                    guard;
+  std::vector<std::pair<LogLevel, std::string>> lines;
 };
 }
 

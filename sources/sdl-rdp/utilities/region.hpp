@@ -1,18 +1,19 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/utilities/rect.hpp>
 
 #include <vector>
 
 namespace sdl_rdp::utilities::detail::region {
+using sdl_rdp::utilities::Rect;
 class Region {
 public:
-  auto Add(sdlrdp_rect area)        -> void;
+  auto Add(Rect area)               -> void;
   auto Clear() noexcept             -> void;
   auto Swap(Region& other) noexcept -> void;
-  auto Rects() const                -> std::vector<sdlrdp_rect> const&;
+  auto Rects() const                -> std::vector<Rect> const&;
 
 private:
-  std::vector<sdlrdp_rect> rects;
+  std::vector<Rect> rects;
 };
 }
 

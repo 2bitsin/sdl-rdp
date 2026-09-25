@@ -1,12 +1,14 @@
 #include <sdl-rdp/link/peer-link.hpp>
 
 #include <sdl-rdp/freerdp-facade/manual-reset-event.hpp>
+#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/link/exceptions.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/exceptions.hpp>
 #include <sdl-rdp/utilities/terminated-copy.hpp>
 
 #include <freerdp/channels/wtsvc.h>
+#include <freerdp/settings.h>
 #include <freerdp/svc.h>
 #include <winpr/synch.h>
 #include <array>
@@ -14,6 +16,7 @@
 #include <utility>
 
 namespace sdl_rdp::link::detail::peer_link {
+using sdl_rdp::freerdp_facade::Get;
 using sdl_rdp::freerdp_facade::ManualResetEvent;
 using sdl_rdp::utilities::AllocationFailed;
 using sdl_rdp::utilities::CopyTerminated;
@@ -78,6 +81,10 @@ auto PeerLink::Refuse(std::uint32_t reason) -> void {
 }
 auto PeerLink::Close() -> void {
   _client->Close(_client.get());
+}
+// The name the client announced, else the address the listener accepted it from.
+auto ClientHostname(PeerLink const& link) -> std::string {
+  return std::string{ Get(link.Settings(), FreeRDP_ClientHostname).value_or(link.Client().hostname) };
 }
 auto DynamicChannelsReady(PeerLink const& link) -> bool {
   return WTSVirtualChannelManagerGetDrdynvcState(link.Channels()) == DRDYNVC_STATE_READY;

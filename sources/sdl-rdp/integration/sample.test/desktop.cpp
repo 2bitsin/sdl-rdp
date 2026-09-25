@@ -1,3 +1,4 @@
+#include <sdl-rdp/headless-client.test/frame/observer.hpp>
 #include <sdl-rdp/headless-client.test/utilities/octets.hpp>
 #include <sdl-rdp/sample-gate.test/client/pointer-observer.hpp>
 #include <sdl-rdp/sample-gate.test/client/steps.hpp>

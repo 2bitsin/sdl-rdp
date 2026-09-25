@@ -1,10 +1,10 @@
 #include <sdl-rdp/headless-client.test/frame/checks.hpp>
-#include <sdl-rdp/abi/backend.h>
+
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
-
 #include <sdl-rdp/headless-client.test/backend/status.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
+#include <sdl-rdp/utilities/rect.hpp>
 
 #include <freerdp/gdi/gdi.h>
 #include <freerdp/input.h>
@@ -21,10 +21,17 @@
 #include <utility>
 
 namespace sdl_rdp::headless_client_test::frame::detail::checks {
+using sdl_rdp::configuration::Codec;
 using sdl_rdp::freerdp_facade::WaitHandle;
+using sdl_rdp::headless_client_test::backend::As;
+using sdl_rdp::headless_client_test::backend::Holds;
 using sdl_rdp::headless_client_test::backend::RequiredGraphics;
 using sdl_rdp::headless_client_test::client::Pixels;
+using sdl_rdp::link::Connected;
+using sdl_rdp::link::Key;
+using sdl_rdp::link::ScreenChanged;
 using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::Rect;
 
 namespace {
 struct GraphicsCounts {
@@ -60,8 +67,8 @@ auto ThenGraphicsReset(GraphicsObserver const& observer, GraphicsCounts before, 
 }
 }
 auto FrameChecks::Present(Pixels const& pixels, std::uint32_t w, std::uint32_t h) -> void {
-  sdlrdp_rect const full{ 0, 0, Narrowed<int>(w), Narrowed<int>(h) };
-  ASSERT_EQ(backend.Present(pixels, w, h, full), 0);
+  Rect const full{ .x = 0, .y = 0, .w = Narrowed<int>(w), .h = Narrowed<int>(h) };
+  backend.Present(pixels, w, h, full);
 }
 auto FrameChecks::FillLegacyWindow(Client& client, FrameObserver& observer, Pixels& pixels) -> void {
   ASSERT_NO_FATAL_FAILURE(PresentObserved(client, observer, pixels, 1));
@@ -72,7 +79,7 @@ auto FrameChecks::FillLegacyWindow(Client& client, FrameObserver& observer, Pixe
     ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
   }
   EXPECT_EQ(observer.Frames().size(), 2u);
-  EXPECT_EQ(sdlrdp_wait_frame(&*backend, 0), 0);
+  EXPECT_FALSE(backend.WaitFrame(std::chrono::milliseconds{ 0 }));
 }
 auto FrameChecks::PresentObserved(Client& client, FrameObserver const& observer, Pixels const& pixels,
                                   std::size_t frames) -> void {
@@ -86,7 +93,7 @@ auto FrameChecks::SuppressAndCheckInput(Client& client) -> void {
   ASSERT_TRUE(freerdp_input_send_keyboard_event(client.Instance()->context->input, KBD_FLAGS_DOWN, 0x1e));
   auto suppressed = Events(1);  // Input follows SuppressOutput on the same connection.
   ASSERT_EQ(suppressed.size(), 1u);
-  ASSERT_EQ(suppressed.front().type, SDLRDP_KEY);
+  ASSERT_TRUE(Holds<Key>(suppressed.front()));
 }
 auto FrameChecks::ThenDesktopGeometry(Client& client, std::uint32_t w, std::uint32_t h) -> void {
   EXPECT_EQ(client.Instance()->context->gdi->width, Narrowed<int>(w));
@@ -95,9 +102,8 @@ auto FrameChecks::ThenDesktopGeometry(Client& client, std::uint32_t w, std::uint
 auto FrameChecks::ThenAspectGeometry(Client& client) -> void {
   auto events = Events(2);
   ASSERT_EQ(events.size(), 2u);
-  EXPECT_EQ(events[0].connected.screen_width, 1024u);
-  EXPECT_EQ(events[1].type, SDLRDP_SCREEN);
-  EXPECT_EQ(events[1].screen.height, 768u);
+  EXPECT_EQ(As<Connected>(events[0]).screen_width, 1024u);
+  EXPECT_EQ(As<ScreenChanged>(events[1]).height, 768u);
   ThenDesktopGeometry(client, 640, 480);
 }
 auto FrameChecks::ThenScaledHighlight(Client& client) -> void {
@@ -109,13 +115,13 @@ auto FrameChecks::ThenScaledHighlight(Client& client) -> void {
   EXPECT_LE(std::abs(*brightest - 240), 1);
 }
 auto FrameChecks::ThenSparseDamage(Client& client, FrameObserver& observer, Pixels const& pixels, std::size_t bounding,
-                                   sdlrdp_codec codec) -> void {
-  auto                       bytes  = client.Received();
-  std::array<sdlrdp_rect, 2> damage { { { .x = 0, .y = 0, .w = 8, .h = 8 }, { .x = 1016, .y = 760, .w = 8, .h = 8 } } };
-  ASSERT_EQ(sdlrdp_present(&*backend, pixels.data(), 4096, 1024, 768, damage.data(), 2), 0);
+                                   Codec codec) -> void {
+  auto                bytes  = client.Received();
+  std::array<Rect, 2> damage { { { .x = 0, .y = 0, .w = 8, .h = 8 }, { .x = 1016, .y = 760, .w = 8, .h = 8 } } };
+  backend.Present(pixels, 1024, 768, damage);
   ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == 3; }));
   auto used = client.Received() - bytes;
-  testing::Test::RecordProperty("region_bytes_" + std::to_string(codec), std::to_string(used));
+  testing::Test::RecordProperty("region_bytes_" + std::to_string(std::to_underlying(codec)), std::to_string(used));
   EXPECT_LT(used, bounding / 100);
 }
 auto FrameChecks::ThenProducerFrame(Client& client, FrameObserver& observer, std::atomic<std::size_t> const& presents)

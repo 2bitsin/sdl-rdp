@@ -1,28 +1,28 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/drive/directory-entry.hpp>
 #include <sdl-rdp/drive/packet.hpp>
 
 #include <cstddef>
-#include <cstdint>
 #include <span>
+#include <vector>
 
 namespace sdl_rdp::drive::detail::listing {
-// A directory read into the caller's entries, "." and ".." dropped, the first offset entries skipped.
+// A directory read into entries, "." and ".." dropped, the first offset entries skipped, at most limit kept.
 class Listing {
 public:
-       Listing(std::uint32_t offset, std::span<sdlrdp_dirent> out) noexcept;
+       Listing(std::size_t offset, std::size_t limit) noexcept;
   auto Collect(DrivePacket response) -> bool;
   auto Full() const noexcept         -> bool;
-  auto Count() const noexcept        -> std::size_t;
+  auto Entries() &&                  -> std::vector<DirectoryEntry>;
 
 private:
-  auto Take(sdlrdp_dirent const& entry) -> void;
-  std::span<sdlrdp_dirent> _out;
-  std::uint32_t            _offset;
-  std::size_t              _skipped{ };
-  std::size_t              _count  { };
+  auto Take(DirectoryEntry entry) -> void;
+  std::vector<DirectoryEntry> _entries;
+  std::size_t                 _offset;
+  std::size_t                 _limit;
+  std::size_t                 _skipped{ };
 };
-auto Entry(DrivePacket& packet)                                     -> sdlrdp_dirent;
+auto Entry(DrivePacket& packet)                                     -> DirectoryEntry;
 auto DirectoryQuery(bool first, std::span<std::byte const> pattern) -> DrivePacket;
 }
 

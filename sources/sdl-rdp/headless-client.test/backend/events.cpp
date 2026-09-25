@@ -1,44 +1,33 @@
 #include <sdl-rdp/headless-client.test/backend/events.hpp>
-#include <sdl-rdp/abi/backend.h>
 
 #include <gtest/gtest.h>
 #include <algorithm>
-#include <array>
+#include <chrono>
 #include <cstddef>
 #include <iterator>
 
 namespace sdl_rdp::headless_client_test::backend::detail::events {
+using sdl_rdp::configuration::Codec;
+using sdl_rdp::link::Connected;
+using sdl_rdp::link::Event;
+using sdl_rdp::link::RefreshChanged;
 
-namespace {
-auto Contains(sdlrdp_event_type type) {
-  return [type](std::vector<sdlrdp_event> const& events) {
-    return std::ranges::contains(events, type, &sdlrdp_event::type);
-  };
-}
-}
-auto BackendEvents::Events(std::size_t wanted) -> std::vector<sdlrdp_event> {
+auto BackendEvents::Events(std::size_t wanted) -> std::vector<Event> {
   return EventsUntil([=](auto const& events) { return events.size() >= wanted; }, false,
                      [this] { return AwaitBackend(); });
 }
-auto BackendEvents::UntilEvent(sdlrdp_event_type type, bool include_refresh) -> std::vector<sdlrdp_event> {
-  return EventsUntil(Contains(type), include_refresh, [this] { return AwaitBackend(); });
+auto BackendEvents::ThenConnectedCodec(Client& client, Codec expected) -> void {
+  auto const events    = UntilEvent<Connected>(client);
+  auto const connected = FirstEvent<Connected>(events);
+  if (!connected) FAIL() << logs.Text();
+  EXPECT_EQ(connected->codec, expected);
 }
-auto BackendEvents::UntilEvent(Client& client, sdlrdp_event_type type, bool include_refresh)
-    -> std::vector<sdlrdp_event> {
-  return EventsUntil(Contains(type), include_refresh, [&client] { return client.Pump(); });
-}
-auto BackendEvents::ThenConnectedCodec(Client& client, sdlrdp_codec expected) -> void {
-  auto const events    = UntilEvent(client, SDLRDP_CONNECTED);
-  auto const connected = std::ranges::find(events, SDLRDP_CONNECTED, &sdlrdp_event::type);
-  ASSERT_NE(connected, events.end()) << logs.Text();
-  EXPECT_EQ(connected->connected.codec, expected);
-}
-auto BackendEvents::Accumulate(std::vector<sdlrdp_event>& result, bool include_refresh) const -> void {
+auto BackendEvents::Accumulate(std::vector<Event>& result, bool include_refresh) const -> void {
   std::ranges::copy_if(backend.Poll(), std::back_inserter(result),
-                       [=](auto const& event) { return include_refresh || event.type != SDLRDP_REFRESH; });
+                       [=](auto const& event) { return include_refresh || !Holds<RefreshChanged>(event); });
 }
 auto BackendEvents::AwaitBackend() const -> bool {
-  sdlrdp_wait(&*backend, 50);
+  std::ignore = backend.Wait(std::chrono::milliseconds{ 50 });
   return true;
 }
 }

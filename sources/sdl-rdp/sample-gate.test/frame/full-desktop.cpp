@@ -6,6 +6,7 @@
 #include <utility>
 
 namespace sdl_rdp::sample_gate_test::frame::detail::full_desktop {
+using sdl_rdp::utilities::Rect;
 FullDesktopFrames::FullDesktopFrames(Client& client)
     : hook(client, std::bind_front(&FullDesktopFrames::Observe, this)) { }
 auto FullDesktopFrames::Full() const -> std::size_t {
@@ -18,7 +19,7 @@ auto FullDesktopFrames::Observe(PictureUpdate const& update) -> void {
   if (!update.delivered) return;
   for (auto region : update.regions) Cover(region, update.desktop);
 }
-auto FullDesktopFrames::Cover(sdlrdp_rect region, Extent desktop) -> void {
+auto FullDesktopFrames::Cover(Rect region, Extent desktop) -> void {
   ++deliveries;
   rows.resize(desktop.height);
   auto const bottom = region.y + region.h;

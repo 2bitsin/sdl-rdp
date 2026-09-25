@@ -4,13 +4,14 @@
 
 namespace sdl_rdp::video::detail::peer_frames {
 using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Rect;
 
 PeerFrames::PeerFrames(FrameStore& store) noexcept : _store{ store } { }
-auto PeerFrames::Post(FrameLock const& held, sdlrdp_rect area) -> void {
+auto PeerFrames::Post(FrameLock const& held, Rect area) -> void {
   Expects(_store.Holds(held), "posting damage holds the frame lock");
   _dirty.Add(area);
 }
-auto PeerFrames::Repaint(FrameLock const& held, sdlrdp_rect area) -> void {
+auto PeerFrames::Repaint(FrameLock const& held, Rect area) -> void {
   Expects(_store.Holds(held), "repainting holds the frame lock");
   _dirty.Clear();
   _dirty.Add(area);
@@ -60,7 +61,7 @@ auto PeerFrames::Complete(FrameLock const& held) -> void {
 auto PeerFrames::Snapshot() const noexcept -> FrameSnapshot const& {
   return _snapshot;
 }
-auto PeerFrames::Sending() const noexcept -> std::vector<sdlrdp_rect> const& {
+auto PeerFrames::Sending() const noexcept -> std::vector<Rect> const& {
   return _sending.Rects();
 }
 auto PeerFrames::Sequence() const noexcept -> std::uint64_t {

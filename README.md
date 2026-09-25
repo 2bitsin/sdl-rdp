@@ -7,8 +7,10 @@ over RDP: a Windows or Mac RDP client is its display, keyboard and mouse.
 SDL2 programs work through sdl2-compat; playback audio, clipboard text and
 shared drives are available with clients such as mstsc, Windows App on Mac
 and xfreerdp. Opt-in selection means probing never picks the driver and no
-listener opens unasked. SDL stays free of FreeRDP; the backend is dlopened
-only when the `rdp` driver is selected.
+listener opens unasked. The driver and the RDP backend are static modules
+compiled into one `libSDL3.so`: the driver composes the backend's classes
+directly and includes no FreeRDP header itself. Nothing constructs a
+session, listener or FreeRDP object until the `rdp` driver is selected.
 
 ## Screenshots
 
@@ -19,7 +21,8 @@ served from a headless Linux box and played in Microsoft Remote Desktop.
 
 ![SuperTux in Remote Desktop Connection on Windows](docs/screenshots/supertux-windows.png)
 
-Chocolate Doom with Freedoom, OpenTTD and DOSBox 0.74-3, SDL2 programs through sdl2-compat, captured on the box with xfreerdp at 1280x800.
+Chocolate Doom with Freedoom, OpenTTD and DOSBox 0.74-3, SDL2 programs through
+sdl2-compat, captured on the box with xfreerdp at 1280x800.
 
 ![Chocolate Doom running Freedoom](docs/screenshots/doom.png)
 
@@ -35,9 +38,10 @@ mstsc /v:host:3389
 ```
 
 The default port is 3389; set `SDL_RDP_PORT` to change it.
-Driver settings can live in a settings file named after the library, `libSDL3.yaml` beside `libSDL3.so`
-(`SDL3.yaml` beside `SDL3.dll`), in YAML or any other format oxbox serialization reads; see
-[Configuration](docs/configuration.md). `SDL_VIDEO_DRIVER` and `SDL_AUDIO_DRIVER` are read by SDL core and must be set
+Driver settings can live in a settings file named after the library, `libSDL3.yaml`
+beside `libSDL3.so`, in YAML or any other format oxbox serialization reads, or in the
+one file `SDL_RDP_SETTINGS` names; see [Configuration](docs/configuration.md).
+`SDL_VIDEO_DRIVER` and `SDL_AUDIO_DRIVER` are read by SDL core and must be set
 through hints or the environment:
 
 ```yaml
@@ -46,11 +50,10 @@ cert_dir: /home/me/.local/share/sdl-rdp
 codec: planar
 aspect: 4:3
 ```
-The backend library must sit next to `libSDL3.so` or be named by `SDL_RDP_BACKEND`.
 
 ## Documentation
 
-- [Shape](docs/shape.md): project layout and backend loading.
+- [Shape](docs/shape.md): project layout and modules.
 - [Configuration](docs/configuration.md): driver selection, settings and display modes.
 - [Graphics pipeline](docs/graphics.md): codecs, encoding and frame pacing.
 - [Authentication](docs/authentication.md): credentials, security modes and callbacks.

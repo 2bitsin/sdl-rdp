@@ -1,10 +1,12 @@
 #pragma once
+#include <sdl-rdp/diagnostics/log-level.hpp>
 #include <sdl-rdp/headless-client.test/backend/logs.hpp>
 
 #include <SDL3/SDL_log.h>
 #include <optional>
 
 namespace sdl_rdp::sample_gate_test::process::detail::captured_logs {
+using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::headless_client_test::backend::Logs;
 
 struct Capture {
@@ -12,7 +14,7 @@ struct Capture {
   std::optional<SDL_LogPriority> video     = std::nullopt;
 };
 
-auto LogLevel(SDL_LogPriority priority) -> sdlrdp_log_level;
+auto Level(SDL_LogPriority priority) -> LogLevel;
 
 class CapturedLogs {
 public:
@@ -37,5 +39,5 @@ private:
 namespace sdl_rdp::sample_gate_test::process {
 using detail::captured_logs::Capture;
 using detail::captured_logs::CapturedLogs;
-using detail::captured_logs::LogLevel;
+using detail::captured_logs::Level;
 }

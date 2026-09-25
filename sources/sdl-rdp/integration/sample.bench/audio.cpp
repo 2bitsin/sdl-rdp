@@ -154,13 +154,13 @@ auto NoClientTenSecondClock::ThenTenSeconds(Clock::duration elapsed) -> void {
 }
 
 auto InitialLeadClock::TestBody() -> void {
-  if (!Holds([this] { ReceiveLead(); })) return;
+  if (!Passes([this] { ReceiveLead(); })) return;
   auto const& received = sound->CaptureState().received;
   Check(received.back() <= received.front() + 100ms, "the lead arrives within 100 ms");
 }
 
 auto LeadCadence::TestBody() -> void {
-  if (!Holds([this] { ReceiveLead(); })) return;
+  if (!Passes([this] { ReceiveLead(); })) return;
   auto const first  = sound->CaptureState().received.size();
   auto const frames = sound->CaptureState().samples.size() / 2;
   auto const pumped = Throughout(DeadlineAfter(1s), [this] { return sound_client->Pump(1); });
@@ -190,7 +190,7 @@ auto StallRefillClock::TestBody() -> void {
 auto ZeroLeadKeepsRealtimeClock::TestBody() -> void {
   stream.reset();
   if (!Check(SDL_SetHint(SDL_HINT_RDP_AUDIO_LEAD, "0"), "the lead hint is set")) return;
-  if (!Holds([this] { OpenStream(); })) return;
+  if (!Passes([this] { OpenStream(); })) return;
   std::vector<std::int16_t> const pcm(48000uz * 2, 1234);
   auto const                      span = DrainedSpan(pcm, 3s, 1ms);
   if (!span) {

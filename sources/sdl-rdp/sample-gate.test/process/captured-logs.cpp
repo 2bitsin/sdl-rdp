@@ -3,11 +3,12 @@
 #include <sdl-rdp/utilities/contract.hpp>
 
 namespace sdl_rdp::sample_gate_test::process::detail::captured_logs {
+using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::utilities::Expects;
 
-auto LogLevel(SDL_LogPriority priority) -> sdlrdp_log_level {
-  if (priority >= SDL_LOG_PRIORITY_ERROR) return SDLRDP_LOG_ERROR;
-  return priority == SDL_LOG_PRIORITY_WARN ? SDLRDP_LOG_WARN : SDLRDP_LOG_INFO;
+auto Level(SDL_LogPriority priority) -> LogLevel {
+  if (priority >= SDL_LOG_PRIORITY_ERROR) return LogLevel::Error;
+  return priority == SDL_LOG_PRIORITY_WARN ? LogLevel::Warn : LogLevel::Info;
 }
 
 CapturedLogs::CapturedLogs(Logs& logs, Capture capture) : logs(logs), forwarded(capture.forwarded) {
@@ -26,7 +27,7 @@ auto CapturedLogs::Collect(void* user, int category, SDL_LogPriority priority, c
   Expects(user != nullptr, "the log output names its capture");
   Expects(text != nullptr, "SDL logs a message");
   auto const& self = *static_cast<CapturedLogs*>(user);
-  Logs::Collect(&self.logs, LogLevel(priority), text);
+  self.logs.Log(Level(priority), text);
   if (self.forwarded && self.previous != nullptr) self.previous(self.previous_user, category, priority, text);
 }
 }

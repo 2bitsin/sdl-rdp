@@ -12,7 +12,6 @@ SOURCES  = pathlib.Path('sources')
 DRIVER   = ('sdl-rdp', 'SDL3')
 FORWARD  = 'forward.hpp'
 SKIPPED  = ('//', '/*', "'", '#')
-BACKEND  = SOURCES / 'sdl-rdp' / 'abi' / 'backend.h'
 # The C++ runtime's entry and allocation hooks, glibc's allocator and oxbox's ADL hook are named globally.
 RUNTIME  = re.compile(r'main|operator(?:new|delete)|__libc_\w+|reflect_scheme')
 # The opaque driver-data tags SDL's internal headers leave a driver to define.
@@ -54,7 +53,7 @@ def detail_namespace(relative):
 
 
 def code(text):
-    return [token for token in shape.live_lexemes(text) if not token.value.lstrip().startswith(SKIPPED)]
+    return [token for token in shape.enabled_lexemes(text) if not token.value.lstrip().startswith(SKIPPED)]
 
 
 def closing(tokens, index):
@@ -202,24 +201,17 @@ class File(NamedTuple):
     own:      str
     header:   bool
     details:  frozenset
-    abi:      frozenset
 
 
 def finding(file, statement, message):
     return Finding(file.relative, statement[0].line, message)
 
 
-def abi_names(root):
-    """The global names the frozen C ABI header declares."""
-    backend = (root / BACKEND).read_text() if (root / BACKEND).exists() else ''
-    return frozenset(re.findall(r'\bsdlrdp_\w+', backend))
-
-
-def is_abi(file, statement, name):
-    """A runtime hook, a name the C ABI header declares, or an SDL tag's class definition or member."""
+def is_abi(statement, name):
+    """A runtime hook, or an SDL tag's class definition or member."""
     head = name.split('::')[0].lstrip('~')
     tag  = head in SDL_TAGS and (statement[0].value in KEYS or '::' in name)
-    return bool(RUNTIME.fullmatch(head)) or head in file.abi or tag
+    return bool(RUNTIME.fullmatch(head)) or tag
 
 
 def extern_findings(file, statement):
@@ -241,7 +233,7 @@ def global_findings(file, statement):
         return [finding(file, statement, 'a `using` at global scope; import inside the detail namespace')]
     names = declared(statement)
     name  = names[0] if names else ''
-    if name and is_abi(file, statement, name):
+    if name and is_abi(statement, name):
         return []
     return [finding(file, statement, f'`{name or values[0]}` at global scope; it belongs in `{file.own}`')]
 
@@ -369,10 +361,10 @@ def reach_findings(file, tokens):
             for token, parts in chains(tokens) if reaches_out(file, parts)]
 
 
-def file_findings(root, relative, details, abi):
+def file_findings(root, relative, details):
     tokens = code((root / relative).read_text(errors='replace'))
     file   = File(relative, folder_namespace(relative), detail_namespace(relative), relative.suffix == shape.HEADER,
-                  details, abi)
+                  details)
     tops   = statements(tokens)
     found  = reach_findings(file, tokens) + directive_findings(file, tokens)
     blocks = []
@@ -402,9 +394,8 @@ def checked(root):
 def findings(root):
     files   = checked(root)
     details = frozenset(detail_namespace(relative) for relative in files)
-    abi     = abi_names(root)
     for relative in files:
-        yield from file_findings(root, relative, details, abi)
+        yield from file_findings(root, relative, details)
 
 
 def main():

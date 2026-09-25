@@ -103,8 +103,8 @@ auto ThenRegionQuality(auto const& q) -> void {
 }
 TEST(Avc, RegionMetablock) {
   Regions regions;
-  regions.Add({ 17, 19, 7, 5 });
-  regions.Add({ 2, 3, 4, 6 });
+  regions.Add({ .x = 17, .y = 19, .w = 7, .h = 5 });
+  regions.Add({ .x = 2, .y = 3, .w = 4, .h = 6 });
   EXPECT_EQ(regions.Bytes(), 24u);
   ThenRegionBounds(regions);
   EXPECT_EQ(regions.Areas()[0].right, 24);

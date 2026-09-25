@@ -5,14 +5,15 @@ is available and the confirmed client capabilities allow AVC420, otherwise progr
 `planar` and `raw` select exact RGB transport; `progressive`, `remotefx`, and `nscodec`
 select progressive on the pipeline. RemoteFX and NSCodec remain legacy choices.
 Clients without GFX, with a rejected channel, or without confirmation within
-three seconds of activation use legacy codec selection. The connected event and `SDL_PROP_WINDOW_RDP_CODEC_STRING`
-report the negotiated codec; both sides need ABI 7.
+three seconds of activation use legacy codec selection. `SDL_PROP_WINDOW_RDP_CODEC_STRING`
+on the window reports the negotiated codec, set when a client attaches and on every change.
 
 Progressive encodes damaged tiles with FreeRDP's single-pass RemoteFX encoder,
 without refinement passes. SYNC/CONTEXT headers are sent once per surface.
 Graphics-pipeline encoding runs outside the session lock; legacy `SendFrame`
 encoding for clients without the graphics pipeline remains under it.
-Resize replaces the context and surface and sends a full picture without deactivating the session; pointer PDUs continue.
+Resize replaces the context and surface and sends a full picture without deactivating the
+session; pointer PDUs continue.
 
 At most two frames await acknowledgement. This project's byte-budget rule also
 limits pending payload bytes + nonzero client `queueDepth` + next payload to
@@ -51,10 +52,10 @@ the picture. Resize and switching into AVC420 force an IDR with SPS/PPS.
 
 | RDPGFX codec | Selection | Encoder |
 |---|---|---|
-| Progressive | `progressive` / `auto` when the encoder is unavailable or confirmed client capabilities disallow AVC420 | FreeRDP RemoteFX |
-| AVC420 | `avc420` / `auto` when the encoder is available and confirmed client capabilities allow AVC420 | NVIDIA NVENC H.264, lossy 4:2:0 |
+| Progressive | `progressive`; `auto` without the encoder or when the client disallows AVC420 | FreeRDP RemoteFX |
+| AVC420 | `avc420`; `auto` with the encoder when the client allows AVC420 | NVIDIA NVENC H.264, lossy 4:2:0 |
 | Planar | Explicit `planar` | Lossless RGB |
 | Raw | Explicit `raw` | Uncompressed RGB |
 
-ABI 7 appends `SDLRDP_CODEC_AVC420` and `sdlrdp_config.avc_bitrate_kbps`.
-Rebuild both the backend and driver together; the driver checks the version.
+Every surface update or renderer present hands the damaged rectangles to the
+encoder.

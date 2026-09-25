@@ -25,15 +25,8 @@ auto BuildRoot() -> std::filesystem::path {
   return { };
 }
 
-auto BackendLibrary() -> std::filesystem::path {
-  auto backend = BuildRoot() / "sources/sdl-rdp/backend/libbackend.so";
-  Expects(std::filesystem::is_regular_file(backend), "built backend exists");
-  return backend;
-}
-
-auto SetBackendHints(std::filesystem::path const& certificates) -> bool {
-  return SDL_SetHint("SDL_RDP_CERT_DIR", certificates.c_str())
-         && SDL_SetHint("SDL_RDP_BACKEND", BackendLibrary().c_str());
+auto SetCertificateHint(std::filesystem::path const& certificates) -> bool {
+  return SDL_SetHint("SDL_RDP_CERT_DIR", certificates.c_str());
 }
 
 // env applies its assignments in order, so an environment entry overrides the defaults before it.
@@ -42,7 +35,7 @@ auto SetLoopbackHints(std::filesystem::path const& certificates, std::initialize
                               Hint{ .name = "SDL_RDP_PORT", .value = "0"          },
                               Hint{ .name = "SDL_RDP_BIND", .value = "127.0.0.1" } };
   auto const       set      = [](Hint const& hint) { return SDL_SetHint(hint.name.c_str(), hint.value.c_str()); };
-  return std::ranges::all_of(loopback, set) && std::ranges::all_of(hints, set) && SetBackendHints(certificates);
+  return std::ranges::all_of(loopback, set) && std::ranges::all_of(hints, set) && SetCertificateHint(certificates);
 }
 
 auto Arguments(std::filesystem::path const& certificates, Words const& environment, Words const& options) -> Words {
@@ -52,7 +45,6 @@ auto Arguments(std::filesystem::path const& certificates, Words const& environme
                    "SDL_RDP_PORT=0",
                    "SDL_RDP_BIND=127.0.0.1",
                    "SDL_RDP_CERT_DIR=" + certificates.string(),
-                   "SDL_RDP_BACKEND=" + BackendLibrary().string(),
                    "SDL_RDP_CODEC=planar",
                    "SDL_RDP_WAIT_FOR_CLIENT=0" };
   arguments.append_range(environment);

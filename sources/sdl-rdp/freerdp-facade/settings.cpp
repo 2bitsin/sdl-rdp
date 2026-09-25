@@ -10,6 +10,11 @@ auto Set(rdpSettings& settings, FreeRDP_Settings_Keys_UInt32 key, std::uint32_t 
 auto Set(rdpSettings& settings, FreeRDP_Settings_Keys_String key, std::string_view value) -> bool {
   return freerdp_settings_set_string_len(&settings, key, value.data(), value.size());
 }
+auto Get(rdpSettings const& settings, FreeRDP_Settings_Keys_String key) -> std::optional<std::string_view> {
+  auto const* value = freerdp_settings_get_string(&settings, key);
+  if (value == nullptr) return std::nullopt;
+  return std::string_view{ value };
+}
 auto KeyName(std::ptrdiff_t key) -> std::string_view {
   auto const* name = freerdp_settings_get_name_for_key(key);
   return name ? std::string_view{ name } : std::string_view{ "an unknown setting" };

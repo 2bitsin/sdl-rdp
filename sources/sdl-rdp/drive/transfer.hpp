@@ -12,10 +12,11 @@
 #include <cstring>
 
 namespace sdl_rdp::drive::detail::transfer {
+using sdl_rdp::drive::File;
 using sdl_rdp::freerdp_facade::IrpMajor;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
-template <class Byte> auto Submit(sdlrdp_file& file, std::uint64_t offset, std::span<Byte> bytes)
+template <class Byte> auto Submit(File& file, std::uint64_t offset, std::span<Byte> bytes)
     -> std::shared_ptr<DriveRequest> {
   Expects(!bytes.empty(), "transfer chunk is nonempty");
   Expects(bytes.size() <= UINT32_MAX, "transfer length fits the wire field");
@@ -29,7 +30,7 @@ template <class Byte> auto Submit(sdlrdp_file& file, std::uint64_t offset, std::
   return file.Channel()->Send(file.Drive(), file.Id(), write ? IrpMajor::Write : IrpMajor::Read, packet);
 }
 template <class Byte>
-auto Finish(sdlrdp_file& file, std::shared_ptr<DriveRequest> const& request, std::span<Byte> bytes) -> std::size_t {
+auto Finish(File& file, std::shared_ptr<DriveRequest> const& request, std::span<Byte> bytes) -> std::size_t {
   constexpr bool write    = std::is_const_v<Byte>;
   auto           response = file.Channel()->Wait(request, file.Path(), !write);
   auto           received = response.Read<std::uint32_t>();
@@ -47,7 +48,7 @@ struct TransferProgress {
   std::exception_ptr failure;
 };
 template <class Byte>
-auto SubmitSlot(sdlrdp_file& file, std::uint64_t offset, std::span<Byte> bytes, TransferProgress& progress, Slot& slot)
+auto SubmitSlot(File& file, std::uint64_t offset, std::span<Byte> bytes, TransferProgress& progress, Slot& slot)
     -> void {
   if (progress.failure || progress.submitted >= progress.limit) return;
   Expects(!slot.request, "submission slot is empty");
@@ -58,7 +59,7 @@ auto SubmitSlot(sdlrdp_file& file, std::uint64_t offset, std::span<Byte> bytes, 
   ++progress.active;
 }
 template <class Byte>
-auto FinishSlot(sdlrdp_file& file, std::span<Byte> bytes, TransferProgress& progress, Slot& slot) -> void {
+auto FinishSlot(File& file, std::span<Byte> bytes, TransferProgress& progress, Slot& slot) -> void {
   try {
     auto received = Finish(file, slot.request, bytes.subspan(slot.offset, slot.count));
     if (received != slot.count) progress.limit = std::min(progress.limit, slot.offset + received);
@@ -70,7 +71,7 @@ auto FinishSlot(sdlrdp_file& file, std::span<Byte> bytes, TransferProgress& prog
   slot.request.reset();
   --progress.active;
 }
-template <class Byte> auto Transfer(sdlrdp_file& file, std::uint64_t offset, std::span<Byte> bytes) -> int {
+template <class Byte> auto Transfer(File& file, std::uint64_t offset, std::span<Byte> bytes) -> std::size_t {
   std::array<Slot, 8> slots   { };
   TransferProgress    progress{ .limit = bytes.size() };
   std::ranges::for_each(slots, [&](Slot& slot) { SubmitSlot(file, offset, bytes, progress, slot); });
@@ -80,7 +81,7 @@ template <class Byte> auto Transfer(sdlrdp_file& file, std::uint64_t offset, std
     SubmitSlot(file, offset, bytes, progress, slot);
   }
   if (progress.failure) std::rethrow_exception(progress.failure);
-  return Narrowed<int>(progress.limit);
+  return progress.limit;
 }
 }
 

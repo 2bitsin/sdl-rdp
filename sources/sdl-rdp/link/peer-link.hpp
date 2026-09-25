@@ -8,6 +8,7 @@
 #include <winpr/wtsapi.h>
 #include <concepts>
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 namespace sdl_rdp::link::detail::peer_link {
@@ -47,11 +48,13 @@ private:
   DynamicChannels _dynamic;
   std::uint32_t   _handle_count{ };
 };
+auto ClientHostname(PeerLink const& link)                -> std::string;
 auto DynamicChannelsReady(PeerLink const& link)          -> bool;
 auto Joined(PeerLink const& link, std::string_view name) -> bool;
 }
 
 namespace sdl_rdp::link {
+using detail::peer_link::ClientHostname;
 using detail::peer_link::DynamicChannelsReady;
 using detail::peer_link::Joined;
 using detail::peer_link::PeerLink;

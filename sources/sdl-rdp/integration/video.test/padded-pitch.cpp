@@ -1,13 +1,18 @@
-#include <sdl-rdp/abi/backend.h>
-#include <sdl-rdp/headless-client.test/backend/certificate-directory.hpp>
+#include <oxbox/utilities/span.hpp>
+#include <sdl-rdp/configuration/codec.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
+#include <sdl-rdp/headless-client.test/backend/config.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
 #include <sdl-rdp/headless-client.test/backend/logs.hpp>
 #include <sdl-rdp/headless-client.test/client/client.hpp>
 #include <sdl-rdp/headless-client.test/client/has-cookie.hpp>
 #include <sdl-rdp/headless-client.test/frame/counter.hpp>
 #include <sdl-rdp/headless-client.test/frame/pattern.hpp>
+#include <sdl-rdp/picture/frame-layout.hpp>
+#include <sdl-rdp/utilities/rect.hpp>
 
 #include <gtest/gtest.h>
+#include <oxbox/platform/scratch-area.hpp>
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -16,14 +21,18 @@
 #include <vector>
 
 namespace sdl_rdp::integration::video_test::detail::padded_pitch {
+using oxbox::platform::ScratchArea;
+using sdl_rdp::configuration::Codec;
 using sdl_rdp::headless_client_test::backend::BackendInstance;
-using sdl_rdp::headless_client_test::backend::CertificateDirectory;
 using sdl_rdp::headless_client_test::backend::Logs;
+using sdl_rdp::headless_client_test::backend::LoopbackConfig;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::HasCookie;
 using sdl_rdp::headless_client_test::client::Pixels;
 using sdl_rdp::headless_client_test::frame::FrameCounter;
 using sdl_rdp::headless_client_test::frame::HashPattern;
+using sdl_rdp::picture::FrameLayout;
+using sdl_rdp::utilities::Rect;
 
 namespace {
 constexpr std::uint32_t Width         = 320;
@@ -40,22 +49,22 @@ auto Padded(std::span<std::uint32_t const> rows) -> Pixels {
 }
 }
 TEST(PaddedPitch, ClientFrameEqualsTheSource) {
-  CertificateDirectory const certificates;
-  Logs                       logs;
-  sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), Width, Height, 0, Logs::Collect, &logs };
-  config.codec = SDLRDP_CODEC_RAW;
+  ScratchArea const certificates { "padded-pitch", "sdl-rdp" };
+  Logs              logs;
+  auto              config       = LoopbackConfig(certificates.Path(), { .width = Width, .height = Height });
+  config.codec = Codec::Raw;
   BackendInstance backend;
-  ASSERT_NO_FATAL_FAILURE(backend.Open(config));
-  Client client(sdlrdp_port(&*backend), true, Width, Height);
+  ASSERT_NO_FATAL_FAILURE(backend.Open(config, logs));
+  Client client(backend.Port(), true, Width, Height);
   ASSERT_TRUE(client.Connect()) << logs.Text(true);
   ASSERT_TRUE(client.Until([&] { return HasCookie(client); }));
   Pixels expected(std::size_t{ Width } * Height);
   HashPattern(expected);
   auto const        source  = Padded(expected);
   FrameCounter      counter(client);
-  sdlrdp_rect const area    { 0, 0, int{ Width }, int{ Height } };
-  ASSERT_EQ(sdlrdp_present(&*backend, source.data(), int{ Stride * sizeof(std::uint32_t) }, Width, Height, &area, 1), 0)
-      << sdlrdp_last_error();
+  Rect const        area    { .x = 0, .y = 0, .w = int{ Width }, .h = int{ Height } };
+  FrameLayout const layout  { Width, Height, int{ Stride * sizeof(std::uint32_t) }  };
+  backend.Present(source, layout, std::span{ &area, 1 });
   ASSERT_TRUE(client.Until([&] { return counter.Frames() == 1; }));
   EXPECT_TRUE(client.Matches(expected)) << client.MaxError(expected);
 }

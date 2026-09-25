@@ -1,6 +1,6 @@
 #pragma once
-#include <sdl-rdp/abi/backend.h>
-#include <sdl-rdp/freerdp-facade/log-registration.hpp>
+#include <sdl-rdp/diagnostics/log-level.hpp>
+#include <sdl-rdp/diagnostics/log-sink.hpp>
 
 #include <freerdp/settings.h>
 #include <winpr/wlog.h>
@@ -9,10 +9,9 @@
 #include <map>
 #include <mutex>
 #include <optional>
-#include <string>
+#include <string_view>
 #include <thread>
 namespace sdl_rdp::diagnostics::detail::logging {
-using sdl_rdp::freerdp_facade::LogRegistration;
 
 // MS-RDPBCGR 2.2.1.1.1 requestedProtocols (FreeRDP keeps these constants private).
 inline constexpr std::uint32_t SecurityTls = 0x01, SecurityNla = 0x02, SecurityRdstls = 0x04, SecurityNlaExt = 0x08,
@@ -31,14 +30,14 @@ public:
     bool                                                     negotiation_failed   { false };
     bool                                                     handshake_failed     { false };
   };
-  explicit    LogRoute(sdlrdp_config const& config);
-              LogRoute(LogRoute const&)                                               = delete;
-              LogRoute(LogRoute&&)                                                    = delete;
+  explicit    LogRoute(LogSink& sink);
+              LogRoute(LogRoute const&)                                     = delete;
+              LogRoute(LogRoute&&)                                          = delete;
               ~LogRoute();
-  auto        operator=(LogRoute const&)                                 -> LogRoute& = delete;
-  auto        operator=(LogRoute&&)                                      -> LogRoute& = delete;
-  auto        Log(sdlrdp_log_level level, std::string const& text) const -> void;
-  static auto WithFilter(auto operation)                                 -> decltype(auto) {
+  auto        operator=(LogRoute const&)                       -> LogRoute& = delete;
+  auto        operator=(LogRoute&&)                            -> LogRoute& = delete;
+  auto        Log(LogLevel level, std::string_view text) const -> void;
+  static auto WithFilter(auto operation)                       -> decltype(auto) {
     auto&                  routing = Shared();
     std::scoped_lock const lock(routing.guard);
     return operation(routing.filters[std::this_thread::get_id()]);
@@ -51,11 +50,11 @@ private:
     std::optional<std::reference_wrapper<LogRoute const>> active;
     std::map<std::thread::id, Filter>                     filters;
   };
-  static auto Shared()                                                          -> Routing&;
-  static auto Forward(wLogMessage const& message)                               -> void;
-  static auto Install()                                                         -> void;
-  auto        Deliver(sdlrdp_log_level level, wLogMessage const& message) const -> void;
-  LogRegistration _sink;
+  static auto Shared()                                                  -> Routing&;
+  static auto Forward(wLogMessage const& message)                       -> void;
+  static auto Install()                                                 -> void;
+  auto        Deliver(LogLevel level, wLogMessage const& message) const -> void;
+  std::reference_wrapper<LogSink> _sink;
 };
 }
 

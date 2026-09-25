@@ -7,7 +7,6 @@
 #include <sdl-rdp/session/presenter.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/deadline.hpp>
-#include <sdl-rdp/utilities/narrowed.hpp>
 
 #include <algorithm>
 #include <cstddef>
@@ -15,7 +14,6 @@
 
 namespace sdl_rdp::session::detail::audio_output {
 using sdl_rdp::utilities::Expects;
-using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::Required;
 
 namespace {
@@ -39,21 +37,21 @@ auto AudioOutput::Rate() -> std::uint32_t {
   auto const channel = Channel(held);
   return channel ? channel->get().Rate() : 0;
 }
-auto AudioOutput::Wait(Deadline deadline) -> int {
+auto AudioOutput::Wait(Deadline deadline) -> bool {
   auto held = _session.Lock();
   for (;;) {
-    if (!_open || !Rate()) return 1;
+    if (!_open || !Rate()) return true;
     auto& channel = Required(Channel(held), "a channel with a rate exists").get();
     channel.AdoptServerClock();
-    if (channel.Ready(_configuration.AudioLatency())) return 1;
+    if (channel.Ready(_configuration.AudioLatency())) return true;
     auto now = Clock::now();
-    if (now >= deadline) return 0;
+    if (now >= deadline) return false;
     _session.WaitAudio(held, std::min(deadline, now + AudioPollPeriod));
   }
 }
-auto AudioOutput::Write(std::span<std::int16_t const> samples) -> int {
+auto AudioOutput::Write(std::span<std::int16_t const> samples) -> std::size_t {
   Expects(samples.size() % StereoChannels == 0, "samples are whole stereo frames");
-  auto const count = Narrowed<int>(samples.size() / StereoChannels);
+  auto const count = samples.size() / StereoChannels;
   while (!samples.empty()) {
     Wait(Deadline::max());
     auto const held = _session.Lock();

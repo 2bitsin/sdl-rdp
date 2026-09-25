@@ -1,4 +1,8 @@
 #include <sdl-rdp/settings/file.hpp>
+
+#include <sdl-rdp/configuration/auth-mode.hpp>
+#include <sdl-rdp/configuration/codec.hpp>
+#include <sdl-rdp/configuration/refresh-mode.hpp>
 #include <sdl-rdp/settings/exceptions.hpp>
 
 #include <gtest/gtest.h>
@@ -16,21 +20,23 @@
 #include <vector>
 
 namespace sdl_rdp::settings::detail::file {
+using sdl_rdp::configuration::AuthMode;
+using sdl_rdp::configuration::Codec;
+using sdl_rdp::configuration::RefreshMode;
 namespace {
 auto Written(std::filesystem::path const& path, std::string_view text) -> std::filesystem::path {
   std::ofstream{ path } << text;
   return path;
 }
 auto EveryField() -> Settings {
-  return { .backend         = "/opt/backend.so",
-           .bind            = "127.0.0.1",
+  return { .bind            = "127.0.0.1",
            .port            = Port{ 3390 },
            .cert_dir        = "/tmp/certificates",
            .width           = Extent{ 640 },
            .height          = Extent{ 480 },
-           .refresh         = Refresh{ RefreshMode::CLIENT },
+           .refresh         = Refresh{ RefreshMode::Client },
            .aspect          = Aspect{ 4, 3 },
-           .codec           = SDLRDP_CODEC_PLANAR,
+           .codec           = Codec::Planar,
            .avc_bitrate     = Kilobits{ 8000 },
            .vsync           = true,
            .wait_for_client = false,
@@ -39,7 +45,7 @@ auto EveryField() -> Settings {
            .user            = "alice",
            .password        = "secret",
            .domain          = "example",
-           .auth            = SDLRDP_AUTH_TLS };
+           .auth            = AuthMode::Tls };
 }
 auto FailureOf(std::filesystem::path const& path) -> std::string {
   try {
@@ -86,7 +92,7 @@ TEST(SettingsFile, YamlReadsTypedValuesAndLeavesTheRestAbsent) {
   EXPECT_EQ(settings, (Settings{ .port    = Port{ 3390 },
                                  .refresh = Refresh{ Refresh::Rate{ 90 } },
                                  .aspect  = Aspect{ 4, 3 },
-                                 .codec   = SDLRDP_CODEC_PLANAR,
+                                 .codec   = Codec::Planar,
                                  .vsync   = true }));
 }
 TEST(SettingsFile, EveryFormatRoundTripsEveryField) {

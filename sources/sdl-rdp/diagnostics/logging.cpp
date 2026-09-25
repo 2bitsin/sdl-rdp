@@ -160,9 +160,9 @@ auto ExpectedPeerMessage(LogRoute::Filter& filter, wLogMessage const& message) -
 auto NtlmMessage(wLogMessage const& message) -> bool {
   return message.PrefixString && std::string_view(message.PrefixString) == "com.winpr.sspi.NTLM";
 }
-auto LibraryLevel(std::uint32_t level) -> sdlrdp_log_level {
-  if (level == WLOG_ERROR) return SDLRDP_LOG_ERROR;
-  return level == WLOG_WARN ? SDLRDP_LOG_WARN : SDLRDP_LOG_INFO;
+auto LibraryLevel(std::uint32_t level) -> LogLevel {
+  if (level == WLOG_ERROR) return LogLevel::Error;
+  return level == WLOG_WARN ? LogLevel::Warn : LogLevel::Info;
 }
 }
 auto LogRoute::Forward(wLogMessage const& message) -> void {
@@ -173,14 +173,14 @@ auto LogRoute::Forward(wLogMessage const& message) -> void {
   auto const expected = ExpectedPeerMessage(filter, message);
   // SSPI debug output can contain credentials and hashes, including binary dump callbacks.
   if (NtlmMessage(message) && !expected) return;
-  auto const level = expected ? SDLRDP_LOG_INFO : LibraryLevel(message.Level);
+  auto const level = expected ? LogLevel::Info : LibraryLevel(message.Level);
   if (routing.active) routing.active->get().Deliver(level, message);
 }
-auto LogRoute::Deliver(sdlrdp_log_level level, wLogMessage const& message) const -> void {
-  _sink(level, message);
+auto LogRoute::Deliver(LogLevel level, wLogMessage const& message) const -> void {
+  if (message.TextString) _sink.get().Log(level, message.TextString);
 }
-auto LogRoute::Log(sdlrdp_log_level level, std::string const& text) const -> void {
-  _sink(level, text);
+auto LogRoute::Log(LogLevel level, std::string_view text) const -> void {
+  _sink.get().Log(level, text);
 }
 auto LogRoute::Install() -> void {
   auto* root = WLog_GetRoot();
@@ -210,7 +210,7 @@ auto LogRoute::Shared() -> LogRoute::Routing& {
   static Routing routing;
   return routing;
 }
-LogRoute::LogRoute(sdlrdp_config const& config) : _sink{ config } {
+LogRoute::LogRoute(LogSink& sink) : _sink{ sink } {
   auto& routing = Shared();
   std::call_once(routing.installed, Install);
   std::scoped_lock const lock(routing.guard);

@@ -4,6 +4,7 @@
 #include <sdl-rdp/freerdp-facade/manual-reset-event.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/event-queue.hpp>
+#include <sdl-rdp/link/event.hpp>
 #include <sdl-rdp/peer/peer.hpp>
 
 #include <winpr/synch.h>
@@ -12,6 +13,7 @@
 
 namespace sdl_rdp::session::detail::session {
 using sdl_rdp::freerdp_facade::ManualResetEvent;
+using sdl_rdp::link::Disconnected;
 using sdl_rdp::peer::Peer;
 using sdl_rdp::utilities::Ensures;
 using sdl_rdp::utilities::Expects;
@@ -22,7 +24,7 @@ auto ReapSignal() -> EventHandle {
 }
 auto AnnounceDeparture(Session& session, EventQueue& events, Peer const& peer) -> void {
   auto const sound = peer.Redirected().Audio();
-  events.Push({ .type = SDLRDP_DISCONNECTED });
+  events.Push(Disconnected{ });
   if (sound && sound->get().Rate()) session.AudioGone();
 }
 }
@@ -85,7 +87,7 @@ auto Session::AudioChanged() -> void {
   _audio_changed.notify_all();
 }
 auto Session::AudioGone() -> void {
-  _events.Push({ .type = SDLRDP_AUDIO, .audio = { .freq = 0, .connected = 0 } });
+  _events.Push(sdl_rdp::link::AudioChanged{ });
   AudioChanged();
 }
 auto Session::WaitAudio(SessionLock& held, std::chrono::steady_clock::time_point deadline) -> void {

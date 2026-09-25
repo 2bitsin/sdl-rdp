@@ -27,7 +27,7 @@ public:
     };
     return sdl_rdp::utilities::Contained(false, ran, [phase](std::string_view text) { FailFatally(phase, text); });
   }
-  auto Holds(std::invocable auto&&... steps) -> bool {
+  auto Passes(std::invocable auto&&... steps) -> bool {
     return ((Contained("a rig step", steps) && Healthy()) && ...);
   }
   auto Healthy() const                               -> bool;

@@ -23,6 +23,7 @@
 #include <sdl-rdp/peer/wait.hpp>
 #include <sdl-rdp/picture/desktop-layout.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
+#include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/video/display-control.hpp>
 #include <sdl-rdp/video/encoder.hpp>
 #include <sdl-rdp/video/frame/capture.hpp>
@@ -60,6 +61,7 @@ using sdl_rdp::picture::DesktopLayout;
 using sdl_rdp::picture::FrameLock;
 using sdl_rdp::picture::FrameStore;
 using sdl_rdp::utilities::Pinned;
+using sdl_rdp::utilities::Rect;
 using sdl_rdp::video::DisplayControl;
 using sdl_rdp::video::Encoder;
 using sdl_rdp::video::GraphicsLink;
@@ -79,19 +81,19 @@ class Peer : private Pinned {
 public:
        Peer(PeerHandle accepted, Diagnostics const& diagnostics, EventQueue& events, Configuration const& configuration,
             FrameStore& store, PointerStore& pointer, ClipboardStore& clipboard, SessionAccess& session);
-  auto Start()                                                             -> void;
-  auto Stop()                                                              -> void;
-  auto Owns(PeerLink const& link) const noexcept                           -> bool;
-  auto Evict()                                                             -> bool;
-  auto Finished() const noexcept                                           -> bool;
-  auto Present(FrameLock const& held, std::span<sdlrdp_rect const> damage) -> void;
-  auto Repaint(FrameLock const& held, sdlrdp_rect area)                    -> void;
-  auto RestartPacing(FrameLock const& held)                                -> void;
-  auto Signal()                                                            -> void;
-  auto Settled(FrameLock const& held, std::uint64_t target) const          -> bool;
-  auto Redirected() const noexcept                                         -> Redirection const&;
-  auto Point(MouseMode mode)                                               -> void;
-  auto Status(FrameLock const& held) const                                 -> PeerStatus;
+  auto Start()                                                      -> void;
+  auto Stop()                                                       -> void;
+  auto Owns(PeerLink const& link) const noexcept                    -> bool;
+  auto Evict()                                                      -> bool;
+  auto Finished() const noexcept                                    -> bool;
+  auto Present(FrameLock const& held, std::span<Rect const> damage) -> void;
+  auto Repaint(FrameLock const& held, Rect area)                    -> void;
+  auto RestartPacing(FrameLock const& held)                         -> void;
+  auto Signal()                                                     -> void;
+  auto Settled(FrameLock const& held, std::uint64_t target) const   -> bool;
+  auto Redirected() const noexcept                                  -> Redirection const&;
+  auto Point(MouseMode mode)                                        -> void;
+  auto Status(FrameLock const& held) const                          -> PeerStatus;
 
 private:
   PeerLink        _link;

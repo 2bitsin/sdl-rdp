@@ -2,6 +2,7 @@
 
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/failure-log.hpp>
+#include <sdl-rdp/diagnostics/log-level.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/video/acknowledgement-window.hpp>
@@ -14,6 +15,7 @@
 #include <utility>
 
 namespace sdl_rdp::video::detail::graphics_link {
+using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::link::DynamicChannelsReady;
 using sdl_rdp::utilities::Expects;
 
@@ -72,7 +74,7 @@ auto GraphicsLink::Failures(OperationName operation) const noexcept -> FailureLo
 }
 auto GraphicsLink::Abandon(std::string_view reason) -> void {
   _channel.reset();
-  _diagnostics.Log(SDLRDP_LOG_WARN, std::string{ reason });
-  _activation.Announce(_encoder.Codec(), _pacing.Effective());
+  _diagnostics.Log(LogLevel::Warn, std::string{ reason });
+  _activation.Announce(_encoder.SelectedCodec(), _pacing.Effective());
 }
 }

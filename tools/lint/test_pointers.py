@@ -27,7 +27,6 @@ struct Pair { int (*on)(struct Dev*, int*); };
 void sdl_close(struct Dev*);
 int sdl_chain(struct Dev*);
 int sdl_lambda(struct Dev*);
-int sdl_marked(struct Dev*);
 typedef int (*Setter)(int (*)(struct Dev*));
 Setter c_lookup(void);
 struct Entry { int (*Open)(int (*cb)(struct Dev*)); };
@@ -36,11 +35,6 @@ int sdl_calls(int (*cb)(struct Dev*));
 int sdl_stores(int (*cb)(struct Dev*));
 int sdl_assigns(int (*cb)(struct Dev*));
 int sdl_fills(int (*cb)(struct Dev*));
-}
-'''
-ABI_HEADER = '''extern "C" {
-struct Dev;
-int abi_open(struct Dev* dev, char const* name);
 }
 '''
 LIB_HEADER = '''#include <functional>
@@ -63,7 +57,6 @@ PROBES = '''#include <array>
 #include <tuple>
 #include "c.h"
 #include "lib.h"
-#include <sdl-rdp/abi/abi.h>
 struct Loose { int value; };
 namespace probe {
 using P = int*;
@@ -208,15 +201,11 @@ auto Each(lib::Bench* each) -> void { if (!each) return; }
 template <class T> using O = std::optional<T>;
 class Calls {
 public:
-  template <class... ArgsTy> auto Call(ArgsTy&&... call_args) const -> int {
-    return std::get<0>(_symbols)(std::forward<ArgsTy>(call_args)...);
-  }
   template <class... ArgsTy> auto Other(ArgsTy&&... other_args) const -> int {
     return _other(std::forward<ArgsTy>(other_args)...);
   }
 private:
-  std::tuple<decltype(&abi_open)> _symbols;
-  std::tuple<int (*)(int*)>       _other_table;
+  std::tuple<int (*)(int*)> _other_table;
   int (*_other)(int*);
 };
 template <auto ACQUIRE> struct Checking {
@@ -225,9 +214,9 @@ template <auto ACQUIRE> struct Checking {
   }
 };
 auto Borrow(int* from) -> int*;
-auto UseCalls(Calls const& calls, Dev& dev, int& value) -> int {
+auto UseCalls(Calls const& calls, int& value) -> int {
   Wrap<int*, Checking<Borrow>{ }, c_free> const checked{ &value };
-  return calls.Call(&dev, "x") + calls.Other(&value);
+  return calls.Other(&value);
 }
 struct Deep {
   std::optional<std::vector<std::pair<int, std::span<int*>>>> deeper_member;
@@ -242,6 +231,31 @@ struct Deep {
 };
 }
 auto main(int argc, char** argv) -> int { return argc; }
+'''
+GETTERS = '''#include <tuple>
+#include <vector>
+namespace probe {
+struct Getters {
+  char const* (*name)();
+  unsigned (*count)();
+  std::vector<char const* (*)()> names;
+  void (*closer)(int*);
+  int* control;
+};
+auto TakeName(char const* (*taken_name)()) -> int;
+class Session {
+public:
+  auto Other() const -> decltype(auto) { return _other(); }
+private:
+  char const* (*_other)();
+};
+auto UseSession(Session const& session) -> bool { return session.Other() != nullptr; }
+struct Symbols {
+  std::tuple<char const* (*)()> symbols;
+};
+auto SpelledError(Symbols const& table) -> char const* { return std::get<0>(table.symbols)(); }
+auto SpelledRelay(Symbols const& table) -> char const* { return SpelledError(table); }
+}
 '''
 ADAPTERS = '''#include <concepts>
 #include <memory>
@@ -285,9 +299,6 @@ extern "C" auto sdl_lambda(Dev* captured) -> int {
   auto const run = [&] { return Stray(captured) + Inner(captured); };
   return run();
 }
-#define _Public_(version) __attribute__((visibility("default")))
-auto _Public_(7)
-    sdl_marked(Dev* marked) -> int { return Rooted(marked); }
 auto Unchecked(Dev* loose) -> Dev& { return *loose; }
 '''
 FACADE = '''#include <optional>
@@ -304,45 +315,6 @@ auto Optional(char const* optional_text) -> std::optional<std::string> {
 auto Record(Loose* record) -> int { if (!record) return 0; return 1; }
 extern "C" auto sdl_export(Dev* exported) -> char const*;
 auto Use(Dev* dev) -> char const* { return sdl_export(dev); }
-'''
-GETTERS = '''#include <sdl-rdp/abi/backend.h>
-#include <tuple>
-#include <vector>
-namespace probe {
-struct Getters {
-  char const* (*name)();
-  unsigned (*count)();
-  std::vector<char const* (*)()> names;
-  void (*closer)(sdlrdp_handle*);
-  int* control;
-};
-auto TakeName(char const* (*taken_name)()) -> int;
-struct Catalog {
-  using Symbols = std::tuple<decltype(&sdlrdp_last_error), decltype(&sdlrdp_version), decltype(&sdlrdp_close)>;
-};
-using CatalogSymbols = Catalog::Symbols;
-struct Table {
-  CatalogSymbols const catalog_symbols;
-};
-auto Loaded() -> CatalogSymbols;
-class Session {
-public:
-  template <class... ArgsTy> auto Call(ArgsTy... session_args) const -> decltype(auto) {
-    return std::get<0>(_symbols)(session_args...);
-  }
-  auto Error() const -> decltype(auto) { return Call(); }
-  auto Other() const -> decltype(auto) { return _other(); }
-private:
-  CatalogSymbols _symbols;
-  char const* (*_other)();
-};
-auto UseSession(Session const& session) -> bool { return session.Error() == session.Other(); }
-struct Symbols {
-  CatalogSymbols symbols;
-};
-auto SpelledError(Symbols const& table) -> char const* { return std::get<0>(table.symbols)(); }
-auto SpelledRelay(Symbols const& table) -> char const* { return SpelledError(table); }
-}
 '''
 SHAPES = '''#include <cstddef>
 #include <new>
@@ -433,9 +405,9 @@ auto operator delete(void* released_block) noexcept -> void { transcribed_free(r
 '''
 DEFINED = 'extern "C" auto project_defined(int* defined_param) -> int* { return defined_param; }\n'
 PROBE   = 'sources/sdl-rdp/video/probe.cpp'
-ADAPTER = 'sources/sdl-rdp/backend/adapter.cpp'
-FACADES = 'sources/sdl-rdp/freerdp-facade/facade.cpp'
+ADAPTER = 'sources/sdl-rdp/SDL3/adapter.cpp'
 GETTER  = 'sources/sdl-rdp/video/getters.cpp'
+FACADES = 'sources/sdl-rdp/freerdp-facade/facade.cpp'
 FILES   = {PROBE: PROBES, ADAPTER: ADAPTERS, FACADES: FACADE, GETTER: GETTERS}
 
 
@@ -448,9 +420,6 @@ def tree(root, files, compiled):
     (root / 'include').mkdir()
     (root / 'include/c.h').write_text(C_HEADER)
     (root / 'include/lib.h').write_text(LIB_HEADER)
-    (root / 'sources/sdl-rdp/abi').mkdir(parents=True)
-    (root / 'sources/sdl-rdp/abi/abi.h').write_text(ABI_HEADER)
-    (root / 'sources/sdl-rdp/abi/backend.h').write_text((pointers.ROOT / 'sources/sdl-rdp/abi/backend.h').read_text())
     for name, text in files.items():
         (root / name).parent.mkdir(parents=True, exist_ok=True)
         (root / name).write_text(text)
@@ -539,12 +508,8 @@ def test_an_adapter_reached_from_an_export_passes(found, needle):
     assert not at(found, ADAPTER, needle, 'parameters')
 
 
-def test_an_export_mark_is_not_the_exports_name(found):
-    assert not at(found, ADAPTER, 'Dev* marked', 'parameters')
-
-
 def test_an_attribute_string_does_not_end_the_declaration_head(tmp_path):
-    (tmp_path / 'a.cpp').write_text('[[deprecated("a;b{")]] auto _Public_(7)\n    exported(int x) -> int;\n')
+    (tmp_path / 'a.cpp').write_text('[[deprecated("a;b{")]] auto\n    exported(int x) -> int;\n')
     assert pointers.declared_name([str(tmp_path / 'a.cpp'), 1, 1]) == 'exported'
 
 
@@ -628,31 +593,6 @@ def test_a_member_function_pointer_with_a_pointer_parameter_is_seen(found, needl
 def test_a_function_type_in_a_signature_is_one_finding(listed, needle, kind):
     line = locate(PROBES, needle)
     assert [item.kind for item in listed if str(item.path) == PROBE and item.line == line] == [kind]
-
-
-@pytest.mark.parametrize('needle, kind', [('(*name)()', 'members'), ('(*count)()', 'members'), ('names;', 'members'),
-                                          ('(*closer)', 'members'), ('control;', 'members'),
-                                          ('taken_name', 'parameters')])
-def test_a_pointer_of_an_abi_functions_type_outside_its_table_is_a_finding(found, needle, kind):
-    assert at(found, GETTER, needle, kind)
-
-
-def test_the_abis_table_through_its_aliases_is_the_abi(found):
-    assert not at(found, GETTER, 'catalog_symbols;', 'members')
-    assert not at(found, GETTER, 'auto Loaded()', 'returns')
-    assert not at(found, GETTER, 'CatalogSymbols _symbols;', 'members')
-
-
-def test_a_return_of_a_call_through_the_abis_table_is_the_abi(found):
-    assert not at(found, GETTER, 'auto Call(ArgsTy... session_args)', 'returns')
-    assert not at(found, GETTER, 'auto Error()', 'returns')
-    assert at(found, GETTER, 'auto Other()', 'returns')
-    assert at(found, GETTER, '(*_other)();', 'members')
-
-
-@pytest.mark.parametrize('needle', ['auto SpelledError(', 'auto SpelledRelay('])
-def test_a_spelled_pointer_return_is_judged_whatever_it_relays(found, needle):
-    assert at(found, GETTER, needle, 'returns')
 
 
 def test_a_concept_constrained_void_pointee_is_a_c_adapter(found):
@@ -742,10 +682,26 @@ def test_a_test_in_a_later_definition_guards_the_parameter_handed_to_its_declara
     assert not at(found, ADAPTER, 'sdl_forward(Dev* forwarded)', 'unchecked')
 
 
-def test_the_abis_function_table_and_a_call_through_it_are_the_abi(found):
-    assert not at(found, PROBE, '_symbols;', 'members')
-    assert not at(found, PROBE, 'call_args', 'parameters')
+@pytest.mark.parametrize('needle, kind', [('(*name)()', 'members'), ('(*count)()', 'members'), ('names;', 'members'),
+                                          ('(*closer)', 'members'), ('control;', 'members'),
+                                          ('taken_name', 'parameters'), ('symbols;', 'members')])
+def test_a_function_pointer_outside_an_abis_table_is_a_finding(found, needle, kind):
+    assert at(found, GETTER, needle, kind)
+
+
+def test_a_deduced_return_of_a_call_through_a_pointer_member_is_a_finding(found):
+    assert at(found, GETTER, 'auto Other()', 'returns')
+    assert at(found, GETTER, '(*_other)();', 'members')
+
+
+@pytest.mark.parametrize('needle', ['auto SpelledError(', 'auto SpelledRelay('])
+def test_a_spelled_pointer_return_is_judged_whatever_it_relays(found, needle):
+    assert at(found, GETTER, needle, 'returns')
+
+
+def test_a_call_through_a_function_pointer_member_hands_its_arguments_on(found):
     assert at(found, PROBE, '_other_table;', 'members')
+    assert at(found, PROBE, '(*_other)(int*);', 'members')
     assert at(found, PROBE, 'other_args', 'parameters')
 
 
