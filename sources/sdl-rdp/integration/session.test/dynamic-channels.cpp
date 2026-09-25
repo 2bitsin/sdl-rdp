@@ -8,10 +8,15 @@
 #include <cstddef>
 #include <cstdint>
 
+namespace sdl_rdp::integration::session_test::detail::dynamic_channels {
+using sdl_rdp::headless_client_test::backend::ContractRun;
+using sdl_rdp::link::ChannelSlot;
+using sdl_rdp::link::DynamicChannel;
+using sdl_rdp::link::DynamicChannels;
 namespace {
 constexpr std::uint32_t AssignedId = 7;
 constexpr int           Continued  = 3;
-class Recorded final : public Backend::DynamicChannel {
+class Recorded final : public DynamicChannel {
 public:
   auto Activate() -> bool override {
     ++_activations;
@@ -32,19 +37,19 @@ private:
   std::size_t _rejections { };
 };
 auto ActivateUnowned() -> int {
-  Backend::DynamicChannels registry;
+  DynamicChannels registry;
   return registry.Activate(AssignedId) ? 0 : Continued;
 }
 auto RejectUnowned() -> int {
-  Backend::DynamicChannels registry;
+  DynamicChannels registry;
   registry.Reject(AssignedId);
   return Continued;
 }
 auto AssignDuplicate() -> int {
-  Backend::DynamicChannels registry;
-  Recorded                 first;
-  Recorded                 second;
-  auto const               kept     = registry.Assign(AssignedId, first);
+  DynamicChannels registry;
+  Recorded        first;
+  Recorded        second;
+  auto const      kept     = registry.Assign(AssignedId, first);
   {
     auto const duplicate = registry.Assign(AssignedId, second);
   }
@@ -52,42 +57,43 @@ auto AssignDuplicate() -> int {
 }
 }
 TEST(DynamicChannels, ActivationReachesTheChannelThatOwnsTheId) {
-  Backend::DynamicChannels registry;
-  Recorded                 channel;
-  Backend::ChannelSlot     slot    { registry, channel };
+  DynamicChannels registry;
+  Recorded        channel;
+  ChannelSlot     slot    { registry, channel };
   EXPECT_TRUE(slot.Assign(AssignedId));
   EXPECT_TRUE(registry.Activate(AssignedId));
   EXPECT_EQ(channel.Activations(), 1U);
   EXPECT_EQ(channel.Rejections(), 0U);
 }
 TEST(DynamicChannels, RejectionReachesTheChannelThatOwnsTheId) {
-  Backend::DynamicChannels registry;
-  Recorded                 channel;
-  Backend::ChannelSlot     slot    { registry, channel };
+  DynamicChannels registry;
+  Recorded        channel;
+  ChannelSlot     slot    { registry, channel };
   slot.Assign(AssignedId);
   registry.Reject(AssignedId);
   EXPECT_EQ(channel.Rejections(), 1U);
   EXPECT_EQ(channel.Activations(), 0U);
 }
 TEST(DynamicChannels, DestroyedSlotFreesItsIdForTheNextChannel) {
-  Backend::DynamicChannels registry;
-  Recorded                 first;
-  Recorded                 second;
+  DynamicChannels registry;
+  Recorded        first;
+  Recorded        second;
   {
-    Backend::ChannelSlot{ registry, first }.Assign(AssignedId);
+    ChannelSlot{ registry, first }.Assign(AssignedId);
   }
-  Backend::ChannelSlot slot{ registry, second };
+  ChannelSlot slot{ registry, second };
   slot.Assign(AssignedId);
   EXPECT_TRUE(registry.Activate(AssignedId));
   EXPECT_EQ(first.Activations(), 0U);
   EXPECT_EQ(second.Activations(), 1U);
 }
 TEST(DynamicChannels, ActivationForAnIdNoChannelOwnsFailsTheContract) {
-  Headless::ContractRun{ ActivateUnowned }.ExpectBroken("channel id was assigned at open", Continued);
+  ContractRun{ ActivateUnowned }.ExpectBroken("channel id was assigned at open", Continued);
 }
 TEST(DynamicChannels, RejectionForAnIdNoChannelOwnsFailsTheContract) {
-  Headless::ContractRun{ RejectUnowned }.ExpectBroken("channel id was assigned at open", Continued);
+  ContractRun{ RejectUnowned }.ExpectBroken("channel id was assigned at open", Continued);
 }
 TEST(DynamicChannels, DuplicateAssignmentFailsTheContractAndKeepsTheFirstOwner) {
-  Headless::ContractRun{ AssignDuplicate }.ExpectBroken("channel id is assigned once", Continued);
+  ContractRun{ AssignDuplicate }.ExpectBroken("channel id is assigned once", Continued);
+}
 }

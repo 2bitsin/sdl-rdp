@@ -10,7 +10,11 @@
 #include <freerdp/freerdp.h>
 #include <freerdp/update.h>
 
-namespace Backend {
+namespace sdl_rdp::video::frame::detail::capture {
+using sdl_rdp::picture::ApplyDesktopSize;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::SameSize;
+
 FrameCapture::FrameCapture(PeerLink& link, FrameStore& store, PeerFrames& frames, DesktopLayout& desktop,
                            FramePacing& pacing, FrameStatistics& statistics, Encoder const& encoder) noexcept
     : _link{ link }, _store{ store }, _frames{ frames }, _desktop{ desktop }, _pacing{ pacing },

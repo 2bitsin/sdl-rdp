@@ -7,7 +7,10 @@
 #include <span>
 #include <vector>
 
-namespace BackendGate {
+namespace sdl_rdp::headless_client_test::codec::detail::session {
+using sdl_rdp::headless_client_test::backend::BackendEvents;
+using sdl_rdp::headless_client_test::client::Client;
+
 class CodecSession : public testing::TestWithParam<Mode>, protected BackendEvents {
 protected:
   auto        SetUp()                                                       -> void override;
@@ -25,4 +28,8 @@ protected:
   auto        RecordFrameCost(Client& client, std::uint64_t bytes)          -> void;
   std::vector<std::uint32_t> pixels = std::vector<std::uint32_t>(320uz * 200);
 };
+}
+
+namespace sdl_rdp::headless_client_test::codec {
+using detail::session::CodecSession;
 }

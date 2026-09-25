@@ -8,12 +8,17 @@
 #include <ios>
 #include <ranges>
 
-namespace AuthenticationGate {
+namespace sdl_rdp::integration::auth_test::detail::authentication {
+using sdl_rdp::headless_client_test::backend::Authentication;
+using sdl_rdp::headless_client_test::backend::CurrentStatus;
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::utilities::Required;
+
 namespace {
 auto RejectCertificate(std::uint32_t port, bool& rejected) -> void {
   static thread_local bool verified;
   verified = false;
-  Headless::Client client(port, false);
+  Client client(port, false);
   client.Credentials({ .user = "alice", .password = "correct-secret", .domain = "LAB" }, true);
   auto* settings = client.Instance()->context->settings;
   ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_TlsSecurity, true));
@@ -154,7 +159,7 @@ namespace {
 auto DisconnectWithPending(sdlrdp_handle& handle, std::uint32_t code) -> void {
   auto const session = handle.Session().Lock();
   auto const frame   = handle.Frames().Lock();
-  auto&      current = utilities::Required(handle.Session().Current(frame), "a client is current").get();
+  auto&      current = Required(handle.Session().Current(frame), "a client is current").get();
   current.Repaint(frame, { 0, 0, 1, 1 });
   auto& client = current.Status(frame).client.get();
   freerdp_set_last_error(client.context, code);
@@ -167,7 +172,7 @@ TEST_F(Authentication, RefusedSecurityLogs) {
   for (bool const nla : { true, false }) {
     ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_TLS));
     {
-      Headless::Client client(sdlrdp_port(handle.Handle()), false);
+      Client client(sdlrdp_port(handle.Handle()), false);
       client.Credentials({ .user = "alice", .password = "correct-secret", .domain = "LAB" }, nla);
       auto* settings = client.Instance()->context->settings;
       ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_TlsSecurity, false));
@@ -201,7 +206,7 @@ TEST_F(Authentication, PendingDisconnectLogLevels) {
   for (auto code :
        { FREERDP_ERROR_CONNECT_TRANSPORT_FAILED, FREERDP_ERROR_LOGOFF_BY_USER, FREERDP_ERROR_CONNECT_FAILED }) {
     ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_TLS));
-    Headless::Client client(sdlrdp_port(handle.Handle()), false);
+    Client client(sdlrdp_port(handle.Handle()), false);
     client.Credentials({ .user = "alice", .password = "correct-secret", .domain = "LAB" });
     ASSERT_TRUE(client.Connect());
     ASSERT_TRUE(client.Until([&] { return CurrentStatus(*handle).has_value(); }));
@@ -220,7 +225,7 @@ TEST_F(Authentication, TenRejectionsThenSuccess) {
 TEST_F(Authentication, UnreadableKeyEndsThePeerWithItsReason) {
   ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_NONE, false));
   std::ofstream{ certificates.Path() / "server.key", std::ios::trunc } << "not a private key\n";
-  Headless::Client client(sdlrdp_port(handle.Handle()), false);
+  Client client(sdlrdp_port(handle.Handle()), false);
   EXPECT_FALSE(client.Connect());
   auto const reported = [&] {
     return std::ranges::any_of(logs, [](auto const& entry) { return entry.second.contains("private key loading"); });

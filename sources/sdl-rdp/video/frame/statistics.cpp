@@ -6,7 +6,9 @@
 #include <cstddef>
 #include <format>
 
-namespace Backend {
+namespace sdl_rdp::video::frame::detail::statistics {
+using sdl_rdp::utilities::Expects;
+
 namespace {
 using Milliseconds = std::chrono::duration<double, std::milli>;
 constexpr auto SlowAcknowledgement = std::chrono::milliseconds(100);

@@ -25,6 +25,7 @@ private:
 auto Entry(DrivePacket& packet)                                     -> sdlrdp_dirent;
 auto DirectoryQuery(bool first, std::span<std::byte const> pattern) -> DrivePacket;
 }
+
 namespace sdl_rdp::drive {
 using detail::listing::DirectoryQuery;
 using detail::listing::Entry;

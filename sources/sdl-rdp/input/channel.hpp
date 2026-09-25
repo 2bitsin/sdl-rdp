@@ -1,6 +1,7 @@
 #pragma once
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/input/activated-channel.hpp>
+#include <sdl-rdp/input/forward.hpp>
 #include <sdl-rdp/link/channel-slot.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
@@ -9,8 +10,13 @@
 #include <algorithm>
 #include <span>
 
-namespace Backend {
-class InputEvents;
+namespace sdl_rdp::input::detail::channel {
+using sdl_rdp::freerdp_facade::WaitHandle;
+using sdl_rdp::link::ChannelSlot;
+using sdl_rdp::link::PeerLink;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Pinned;
+
 template <class Protocol> class InputChannel final : private Pinned {
 public:
   InputChannel(PeerLink& link, InputEvents& events) noexcept
@@ -49,4 +55,8 @@ template <class Protocol> auto InputChannel<Protocol>::Activate() -> bool {
   _ready = true;
   return Protocol::Activate(_context);
 }
+}
+
+namespace sdl_rdp::input {
+using detail::channel::InputChannel;
 }

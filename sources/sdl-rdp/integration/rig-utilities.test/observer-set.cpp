@@ -10,23 +10,27 @@
 #include <thread>
 #include <type_traits>
 
+namespace sdl_rdp::integration::rig_utilities_test::detail::observer_set {
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::utilities::ObserverLease;
+using sdl_rdp::headless_client_test::utilities::ObserverSet;
 namespace {
 struct Probe {
   bool freed = false;
 };
-static_assert(!std::is_copy_constructible_v<Headless::ObserverLease<Probe>>);
-static_assert(std::is_nothrow_move_constructible_v<Headless::ObserverLease<Probe>>);
+static_assert(!std::is_copy_constructible_v<ObserverLease<Probe>>);
+static_assert(std::is_nothrow_move_constructible_v<ObserverLease<Probe>>);
 }
 TEST(ObserverSet, HeldObserverIsTheRegisteredOne) {
-  Headless::ObserverSet set;
-  Probe                 probe;
+  ObserverSet set;
+  Probe       probe;
   set.Add(probe);
   EXPECT_EQ(std::addressof(*set.Held<Probe>()), &probe);
   set.Remove<Probe>();
 }
 TEST(ObserverSet, RemoveWaitsForAnOutstandingLease) {
-  Headless::ObserverSet set;
-  Probe                 probe;
+  ObserverSet set;
+  Probe       probe;
   set.Add(probe);
   std::optional    lease  { set.Held<Probe>() };
   std::latch       started{ 1                 };
@@ -43,8 +47,8 @@ TEST(ObserverSet, RemoveWaitsForAnOutstandingLease) {
   EXPECT_TRUE(removed);
 }
 TEST(ObserverSet, AMovedLeaseReleasesOnce) {
-  Headless::ObserverSet set;
-  Probe                 probe;
+  ObserverSet set;
+  Probe       probe;
   set.Add(probe);
   {
     auto       first  = set.Held<Probe>();
@@ -56,12 +60,13 @@ TEST(ObserverSet, AMovedLeaseReleasesOnce) {
 TEST(ObserverSet, OutlivesTheClientsFreeRdpTeardown) {
   Probe probe;
   {
-    Headless::Client const client{ 1, false };
-    Headless::ObserverSet::Of(*client.Instance()->context).Add(probe);
+    Client const client{ 1, false };
+    ObserverSet::Of(*client.Instance()->context).Add(probe);
     // abi: pContextFree
     client.Instance()->ContextFree = [](freerdp*, rdpContext* context) {
-      Headless::ObserverSet::Of(*context).Held<Probe>()->freed = true;
+      ObserverSet::Of(*context).Held<Probe>()->freed = true;
     };
   }
   EXPECT_TRUE(probe.freed);
+}
 }

@@ -9,10 +9,13 @@
 #include <cstdint>
 #include <span>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::drive::detail::observer {
+using sdl_rdp::headless_client_test::client::SendStaticChannel;
+using sdl_rdp::utilities::Expects;
+
 namespace {
 auto ObserveDrive(DriveCapture& capture, std::span<std::byte const> bytes) -> void {
-  sdl_rdp::drive::DrivePacket packet;
+  DrivePacket packet;
   packet.Append(bytes);
   if (packet.Read<std::uint16_t>() == RDPDR_CTYP_CORE) {
     auto type = packet.Read<std::uint16_t>();
@@ -44,7 +47,7 @@ DriveObserver::~DriveObserver() {
   instance->ReceiveChannelData = original;
   active                       = nullptr;
 }
-auto DriveObserver::Send(sdl_rdp::drive::DrivePacket const& packet) -> bool {
+auto DriveObserver::Send(DrivePacket const& packet) -> bool {
   return SendStaticChannel(instance, RDPDR_CHANNEL_NAME, std::span(packet.Bytes()));
 }
 auto DriveObserver::Observed() -> DriveCapture& {

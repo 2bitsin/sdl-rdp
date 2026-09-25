@@ -1,5 +1,7 @@
 #pragma once
+#include <sdl-rdp/diagnostics/forward.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/link/forward.hpp>
 
 #include <freerdp/server/rdpsnd.h>
 #include <chrono>
@@ -10,14 +12,17 @@
 #include <span>
 #include <vector>
 
-namespace Backend {
+namespace sdl_rdp::audio::detail::channel {
+using sdl_rdp::diagnostics::Diagnostics;
+using sdl_rdp::diagnostics::TraceQueue;
+using sdl_rdp::freerdp_facade::WaitHandle;
+using sdl_rdp::link::EventQueue;
+using sdl_rdp::link::PeerLink;
+using sdl_rdp::link::SessionAccess;
+using sdl_rdp::utilities::Releases;
+
 inline constexpr std::uint32_t CompatibleRate = 44100;
 inline constexpr std::uint32_t NativeRate     = 48000;
-class Diagnostics;
-class EventQueue;
-class PeerLink;
-class SessionAccess;
-class TraceQueue;
 // abi: release steps no single FreeRDP free function performs as a plain call.
 auto FreeSoundContext(RdpsndServerContext* sound) noexcept -> void;
 using SoundContext = std::unique_ptr<RdpsndServerContext, Releases<FreeSoundContext>>;
@@ -84,4 +89,8 @@ private:
   std::deque<Block>         _pending;
   std::vector<std::int16_t> _buffer;
 };
+}
+
+namespace sdl_rdp::audio {
+using detail::channel::AudioChannel;
 }

@@ -5,7 +5,10 @@
 #include <gtest/gtest.h>
 #include <cstddef>
 #include <cstdint>
-namespace Headless {
+namespace sdl_rdp::headless_client_test::input::detail::steps {
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::Tap;
+
 inline auto SendMouse(Client& client, std::uint16_t x, std::uint16_t y) -> void {
   auto* input = client.Instance()->context->input;
   ASSERT_TRUE(freerdp_input_send_mouse_event(input, PTR_FLAGS_MOVE, x, y)) << "send motion";
@@ -35,4 +38,10 @@ inline auto ThenMouseButtons(std::span<sdlrdp_event const> events) -> void {
     EXPECT_EQ(events[i].mouse_button.down, i == 3);
   }
 }
+}
+
+namespace sdl_rdp::headless_client_test::input {
+using detail::steps::SendKeyboardAndMouse;
+using detail::steps::ThenKeyboard;
+using detail::steps::ThenMouseButtons;
 }

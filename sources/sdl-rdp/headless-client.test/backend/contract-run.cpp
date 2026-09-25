@@ -11,7 +11,14 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::backend::detail::contract_run {
+using sdl_rdp::headless_client_test::utilities::ChildProcess;
+using sdl_rdp::headless_client_test::utilities::ReadText;
+using sdl_rdp::utilities::Descriptor;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Mode;
+using sdl_rdp::utilities::Unreachable;
+
 namespace {
 constexpr int RedirectFailed = 125;
 auto Redirected(std::function<int()> const& body, int errors) -> int {
@@ -25,7 +32,7 @@ auto Spawned(std::function<int()> const& body, Descriptor const& errors) -> Chil
 ContractRun::ContractRun(std::function<int()> const& body) {
   std::array<int, 2> ends  { };
   auto const         piped = pipe2(ends.data(), O_CLOEXEC);
-  utilities::Expects(piped == 0, "the stderr pipe opens");
+  Expects(piped == 0, "the stderr pipe opens");
   Descriptor const input { ends[0] };
   auto             child = Spawned(body, Descriptor{ ends[1] });
   _errors = ReadText(input.Get());
@@ -33,12 +40,12 @@ ContractRun::ContractRun(std::function<int()> const& body) {
 }
 auto ContractRun::ExpectBroken(std::string_view text, int continuation) const -> void {
   using enum oxbox::platform::ContractMode;
-  constexpr auto mode = utilities::detail::contract::Mode();
+  constexpr auto mode = Mode();
   switch (mode) {
   case STOP:     ExpectStopped(text); return;
   case COMPLAIN: ExpectComplained(text, continuation); return;
   case IGNORE:   ExpectIgnored(continuation); return;
-  default:       utilities::Unreachable(static_cast<int>(mode));
+  default:       Unreachable(static_cast<int>(mode));
   }
 }
 auto ContractRun::ExpectStopped(std::string_view text) const -> void {

@@ -1,19 +1,29 @@
 #pragma once
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/input/input.hpp>
+#include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/peer/redirection.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
+#include <sdl-rdp/video/forward.hpp>
 #include <sdl-rdp/video/graphics-link.hpp>
 
 #include <cstddef>
 #include <cstdint>
 #include <span>
 
-namespace Backend {
+namespace sdl_rdp::peer::detail::channel_set {
+using sdl_rdp::freerdp_facade::WaitHandle;
+using sdl_rdp::input::Input;
+using sdl_rdp::input::InputHandleLimit;
+using sdl_rdp::link::Activation;
+using sdl_rdp::link::PeerLink;
+using sdl_rdp::utilities::Pinned;
+using sdl_rdp::utilities::Releases;
+using sdl_rdp::video::DisplayControl;
+using sdl_rdp::video::GraphicsHandleLimit;
+using sdl_rdp::video::GraphicsLink;
+
 inline constexpr std::size_t ChannelHandleLimit = InputHandleLimit + RedirectionHandleLimit + GraphicsHandleLimit;
-class Activation;
-class DisplayControl;
-class PeerLink;
 auto ForgetChannelCreation(WaitHandle manager) -> void;
 using CreationRegistration = std::unique_ptr<void, Releases<ForgetChannelCreation>>;
 class ChannelSet : private Pinned {
@@ -35,4 +45,9 @@ private:
   Input&               _input;
   CreationRegistration _registration;
 };
+}
+
+namespace sdl_rdp::peer {
+using detail::channel_set::ChannelHandleLimit;
+using detail::channel_set::ChannelSet;
 }

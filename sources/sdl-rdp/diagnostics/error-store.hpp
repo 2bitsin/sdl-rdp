@@ -5,7 +5,7 @@
 #include <string>
 #include <thread>
 
-namespace Backend {
+namespace sdl_rdp::diagnostics::detail::error_store {
 class ErrorStore {
 public:
   static auto Last()                            -> std::string const&;
@@ -20,4 +20,8 @@ private:
   std::mutex                                              guard;
   std::map<std::thread::id, std::shared_ptr<std::string>> errors;
 };
+}
+
+namespace sdl_rdp::diagnostics {
+using detail::error_store::ErrorStore;
 }

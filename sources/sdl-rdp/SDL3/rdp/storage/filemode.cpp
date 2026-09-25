@@ -5,9 +5,11 @@
 #include <algorithm>
 #include <cstdint>
 namespace sdl3::rdp::storage::detail::filemode {
+using sdl_rdp::utilities::Expects;
+
 namespace {
 auto AccessFlags(std::string_view mode) -> std::uint32_t {
-  utilities::Expects(!mode.empty(), "a file mode names its access");
+  Expects(!mode.empty(), "a file mode names its access");
   switch (mode.front()) {
   case 'r': return SDLRDP_FILE_READ;
   case 'w': return SDLRDP_FILE_WRITE | SDLRDP_FILE_CREATE | SDLRDP_FILE_TRUNCATE;

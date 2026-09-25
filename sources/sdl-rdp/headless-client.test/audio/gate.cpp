@@ -9,7 +9,9 @@
 #include <string>
 #include <thread>
 
-namespace BackendGate {
+namespace sdl_rdp::headless_client_test::audio::detail::gate {
+using sdl_rdp::headless_client_test::backend::Clock;
+
 namespace {
 auto ThenInitialVolumeSamples(SoundClient const& audio) -> void {
   for (auto frame : audio.CaptureState().samples | std::views::chunk(2)) {

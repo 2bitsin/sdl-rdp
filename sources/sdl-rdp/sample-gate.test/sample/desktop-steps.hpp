@@ -4,7 +4,9 @@
 #include <cstdint>
 #include <span>
 
-namespace SampleGate {
+namespace sdl_rdp::sample_gate_test::sample::detail::desktop_steps {
+using sdl_rdp::headless_client_test::client::Client;
+
 class SampleDesktopSteps : public SampleSession {
 protected:
   auto        GivenAdvancedSession()                                                        -> void;
@@ -21,4 +23,8 @@ protected:
   auto        WhenSmallerDesktop(Client& first)                                             -> void;
   auto        WhenWholeSampleReconnects(Client& client, std::uint32_t port)                 -> void;
 };
+}
+
+namespace sdl_rdp::sample_gate_test::sample {
+using detail::desktop_steps::SampleDesktopSteps;
 }

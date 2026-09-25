@@ -10,7 +10,7 @@
 #include <pwd.h>
 #include <unistd.h>
 
-namespace Backend {
+namespace sdl_rdp::configuration::detail::configuration {
 namespace {
 constexpr std::uint32_t DefaultAudioLatency = 500;
 auto DefaultCertificateDirectory() -> std::filesystem::path {
@@ -19,8 +19,7 @@ auto DefaultCertificateDirectory() -> std::filesystem::path {
   std::array<char, 16384> buffer { };
   passwd                  entry  { };
   passwd*                 found  = nullptr;
-  if (getpwuid_r(getuid(), &entry, buffer.data(), buffer.size(), &found) || !found)
-    throw sdl_rdp::configuration::HomeUnavailable{ };
+  if (getpwuid_r(getuid(), &entry, buffer.data(), buffer.size(), &found) || !found) throw HomeUnavailable{ };
   return std::filesystem::path(entry.pw_dir) / ".local/share/sdl-rdp";
 }
 auto ChosenDirectory(sdlrdp_config const& config) -> std::filesystem::path {
@@ -44,7 +43,7 @@ auto Configuration::Codec() const noexcept -> sdlrdp_codec {
   return _codec.load();
 }
 auto Configuration::SetCodec(sdlrdp_codec value) -> void {
-  sdl_rdp::configuration::ValidateCodec(value);
+  ValidateCodec(value);
   _codec.store(value);
 }
 auto Configuration::AvcBitrate() const noexcept -> std::uint32_t {
@@ -57,7 +56,7 @@ auto Configuration::RefreshPolicy() const noexcept -> Refresh const& {
   return _refresh;
 }
 auto Configuration::SetRefresh(std::uint32_t mode, std::uint32_t ceiling) -> void {
-  _refresh = Refresh(sdl_rdp::configuration::ValidRefresh(mode, ceiling), ceiling);
+  _refresh = Refresh(ValidRefresh(mode, ceiling), ceiling);
   _refresh.Restart();
 }
 }

@@ -14,6 +14,7 @@ namespace sdl3::rdp::settings::detail::options {
 using sdl_rdp::settings::HintName;
 using sdl_rdp::settings::HintText;
 using sdl_rdp::settings::Settings;
+using sdl_rdp::utilities::Expects;
 template <auto FIELD>
 using FieldValue = std::remove_cvref_t<decltype(*(std::declval<Settings>().*FIELD))>;
 // SDL hint and environment APIs return nullable borrowed C strings.
@@ -44,7 +45,7 @@ public:
   template <auto FIELD>
   static auto Default() -> FieldValue<FIELD> {
     auto const& fallback = Defaults().*FIELD;
-    utilities::Expects(fallback.has_value(), "the setting has a default");
+    Expects(fallback.has_value(), "the setting has a default");
     return fallback.value_or(FieldValue<FIELD>{ });
   }
 private:
@@ -58,8 +59,9 @@ private:
   Settings _file;
 };
 }
+
 namespace sdl3::rdp::settings {
 using detail::options::FieldValue;
-using detail::options::Text;
 using detail::options::Options;
+using detail::options::Text;
 }

@@ -8,6 +8,7 @@
 #include <string_view>
 #include <tuple>
 
+namespace sdl_rdp::integration::driver_test::detail::boundary {
 namespace {
 using sdl3::rdp::backend::Bounded;
 using sdl3::rdp::backend::ErrorRoutes;
@@ -36,4 +37,5 @@ TEST(Boundary, CompletesAnActionWithoutAResult) {
   std::ignore = SDL_ClearError();
   Bounded<DriverRoutes>([] { throw std::runtime_error("void failed"); });
   EXPECT_STREQ(SDL_GetError(), "void failed");
+}
 }

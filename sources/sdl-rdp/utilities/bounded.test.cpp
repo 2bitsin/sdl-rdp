@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <tuple>
 
-namespace sdl_rdp::utilities {
+namespace sdl_rdp::utilities::detail::bounded {
 namespace {
 using Percent = Bounded<std::uint8_t, 1, 100>;
 }
@@ -18,7 +18,7 @@ TEST(Bounded, AdmitsExactlyItsRange) {
 TEST(Bounded, DecodesAWireValueInsideAndRefusesOneOutside) {
   EXPECT_EQ(Percent::_Decode(42).Get(), 42);
   EXPECT_EQ(Percent::_Decode(42)._Encode(), 42);
-  EXPECT_THROW(std::ignore = Percent::_Decode(356), ::Backend::OutOfRange);
+  EXPECT_THROW(std::ignore = Percent::_Decode(356), OutOfRange);
 }
 TEST(BoundedDeathTest, ConstructionOutsideTheRangeBreaksTheContract) {
   EXPECT_DEATH(std::ignore = Percent{ 0 }, "within its range");

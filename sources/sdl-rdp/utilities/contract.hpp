@@ -10,7 +10,7 @@
 #include <string_view>
 #include <utility>
 
-namespace utilities::detail::contract {
+namespace sdl_rdp::utilities::detail::contract {
 consteval auto Mode() -> oxbox::platform::ContractMode {
   using enum oxbox::platform::ContractMode;
   constexpr std::array names { std::string_view{ "stop" }, std::string_view{ "complain" },
@@ -41,7 +41,7 @@ template <typename VTy>
 auto Required(std::optional<VTy> value, std::string_view text,
               std::source_location where = std::source_location::current()) -> VTy {
   Checked::Expects(value.has_value(), text, where);
-  if (!value) throw ::Backend::MissingRequired{ text };
+  if (!value) throw MissingRequired{ text };
   return *std::move(value);
 }
 
@@ -51,16 +51,11 @@ inline auto NotImplemented(std::string_view text, std::source_location where = s
 }
 }
 
-namespace utilities {
+namespace sdl_rdp::utilities {
 using detail::contract::Ensures;
 using detail::contract::Expects;
+using detail::contract::Mode;
 using detail::contract::NotImplemented;
 using detail::contract::Required;
 using detail::contract::Unreachable;
-}
-
-namespace Backend {
-using utilities::Ensures;
-using utilities::Expects;
-using utilities::Required;
 }

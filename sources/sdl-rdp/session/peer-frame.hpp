@@ -5,7 +5,11 @@
 #include <concepts>
 #include <functional>
 
-namespace Backend {
+namespace sdl_rdp::session::detail::peer_frame {
+using sdl_rdp::peer::Peer;
+using sdl_rdp::picture::FrameLock;
+using sdl_rdp::picture::FrameStore;
+
 // The one place the peer lock is taken before the frame lock.
 class PeerFrame {
 public:
@@ -21,4 +25,8 @@ private:
   PeersLock                       _held;
   FrameLock                       _frame;
 };
+}
+
+namespace sdl_rdp::session {
+using detail::peer_frame::PeerFrame;
 }

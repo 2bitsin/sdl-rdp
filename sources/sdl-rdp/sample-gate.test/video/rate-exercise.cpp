@@ -10,7 +10,16 @@
 #include <string>
 #include <utility>
 
-namespace SampleGate {
+namespace sdl_rdp::sample_gate_test::video::detail::rate_exercise {
+using namespace std::chrono_literals;
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::DisplayClient;
+using sdl_rdp::headless_client_test::frame::FrameObserver;
+using sdl_rdp::sample_gate_test::client::BoundedConnect;
+using sdl_rdp::sample_gate_test::process::TraceNumber;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Unreachable;
+
 namespace {
 struct Pace {
   std::int64_t milliseconds = 0;
@@ -79,20 +88,20 @@ auto ObserveRate(RateTrace& trace, std::string const& line) -> void {
   if (line.contains("trace frame ")) ObserveFrame(trace, line);
   ObserveRefresh(trace, line);
 }
-auto AwaitTrace(Headless::Logs& logs, RateTrace& trace, auto ready) -> void {
+auto AwaitTrace(Logs& logs, RateTrace& trace, auto ready) -> void {
   auto cursor = logs.WaitAfter(trace.cursor, [&](auto const& line) { ObserveRate(trace, line); }, ready);
   ASSERT_TRUE(cursor.has_value()) << "trace event deadline\n" << logs.Text(true);
   if (cursor) trace.cursor = *cursor;
 }
-auto ConnectRateClient(Client& client, Backend::RefreshMode mode) -> void {
-  if (mode == Backend::RefreshMode::Sender) {
+auto ConnectRateClient(Client& client, RefreshMode mode) -> void {
+  if (mode == RefreshMode::Sender) {
     auto callbacks = *freerdp_get_io_callbacks(client.Instance()->context);
     callbacks.TCPConnect = BoundedConnect;
     freerdp_set_io_callbacks(client.Instance()->context, &callbacks);
   }
   ASSERT_TRUE(client.Connect());
 }
-auto PumpUntil(Client& client, Headless::Logs& logs, RateTrace& trace, auto respond, auto ready) -> void {
+auto PumpUntil(Client& client, Logs& logs, RateTrace& trace, auto respond, auto ready) -> void {
   ASSERT_TRUE(client.Until(
       [&] {
         trace.cursor = logs.Follow(trace.cursor, [&](auto const& line) { ObserveRate(trace, line); });
@@ -104,8 +113,7 @@ auto PumpUntil(Client& client, Headless::Logs& logs, RateTrace& trace, auto resp
       << "trace event deadline\n"
       << logs.Text(true);
 }
-auto DrainUntil(Client& client, Headless::FrameObserver& frames, Headless::Logs& logs, RateTrace& trace, auto ready)
-    -> void {
+auto DrainUntil(Client& client, FrameObserver& frames, Logs& logs, RateTrace& trace, auto ready) -> void {
   std::size_t acknowledged = 0;
   PumpUntil(
       client, logs, trace,
@@ -116,22 +124,22 @@ auto DrainUntil(Client& client, Headless::FrameObserver& frames, Headless::Logs&
       },
       ready);
 }
-auto HoldUntil(Client& client, Headless::Logs& logs, RateTrace& trace, auto ready) -> void {
+auto HoldUntil(Client& client, Logs& logs, RateTrace& trace, auto ready) -> void {
   PumpUntil(client, logs, trace, [] { }, ready);
 }
-auto PauseForPressure(Headless::Logs& logs, RateTrace& trace) -> void {
+auto PauseForPressure(Logs& logs, RateTrace& trace) -> void {
   ASSERT_NO_FATAL_FAILURE(
       AwaitTrace(logs, trace, [&] { return trace.floors && trace.blocked >= trace.floor_blocked + 200; }));
   ASSERT_TRUE(trace.floor_after_pressure);
   EXPECT_LE(trace.pressure_frames, 5u);
   testing::Test::RecordProperty("frames_to_floor", trace.pressure_frames);
 }
-auto HeldLongEnough(RateTrace const& trace, Headless::FrameObserver const& frames) -> bool {
+auto HeldLongEnough(RateTrace const& trace, FrameObserver const& frames) -> bool {
   // SDL paces presents at the published refresh: six outlast the 2/60 s the estimator reads as a slow client.
   return !frames.Frames().empty() && std::cmp_equal(frames.Frames().back(), trace.sent_id)
          && trace.presents >= trace.presents_at_send + 6;
 }
-auto DelayUntilFloor(Client& client, Headless::FrameObserver& frames, Headless::Logs& logs, RateTrace& trace) -> void {
+auto DelayUntilFloor(Client& client, FrameObserver& frames, Logs& logs, RateTrace& trace) -> void {
   std::int64_t acknowledged = -1;
   auto const   acknowledge  = [&] {
     if (!HeldLongEnough(trace, frames) || acknowledged == trace.sent_id) return;
@@ -141,14 +149,13 @@ auto DelayUntilFloor(Client& client, Headless::FrameObserver& frames, Headless::
   ASSERT_NO_FATAL_FAILURE(PumpUntil(client, logs, trace, acknowledge, [&] { return trace.floors > 0; }));
   HoldUntil(client, logs, trace, [&] { return trace.timeouts > trace.floor_timeouts; });
 }
-auto ReachFloor(Client& client, Headless::FrameObserver& frames, Headless::Logs& logs, RateTrace& trace,
-                Backend::RefreshMode mode) -> void {
+auto ReachFloor(Client& client, FrameObserver& frames, Logs& logs, RateTrace& trace, RefreshMode mode) -> void {
   switch (mode) {
-  case Backend::RefreshMode::Client:
-  case Backend::RefreshMode::Average: DelayUntilFloor(client, frames, logs, trace); break;
-  case Backend::RefreshMode::Sender:  PauseForPressure(logs, trace); break;
-  case Backend::RefreshMode::Fixed:
-  default: utilities::Unreachable(mode);
+  case RefreshMode::Client:
+  case RefreshMode::Average: DelayUntilFloor(client, frames, logs, trace); break;
+  case RefreshMode::Sender:  PauseForPressure(logs, trace); break;
+  case RefreshMode::Fixed:
+  default: Unreachable(mode);
   }
 }
 auto PresentsPerSecond(Pace const& pace) -> double {
@@ -169,13 +176,12 @@ auto ThenPresentRecovery(RateTrace const& trace) -> void {
   testing::Test::RecordProperty("ceiling_publications", trace.ceilings);
 }
 auto Resized(Client& client, std::uint32_t width) -> bool {
-  return Headless::DisplayClient::Of(client, [width](auto const& display) { return display.Layout(width, 480); })
+  return DisplayClient::Of(client, [width](auto const& display) { return display.Layout(width, 480); })
          && client.Until([&] { return std::cmp_equal(client.Instance()->context->gdi->width, width); });
 }
-auto AwaitRateClient(Client& client, Headless::FrameObserver& frames) -> void {
-  ASSERT_TRUE(client.Until([&] {
-    return Headless::DisplayClient::Of(client, &Headless::DisplayClient::Ready) && !frames.Frames().empty();
-  }));
+auto AwaitRateClient(Client& client, FrameObserver& frames) -> void {
+  ASSERT_TRUE(
+      client.Until([&] { return DisplayClient::Of(client, &DisplayClient::Ready) && !frames.Frames().empty(); }));
   ASSERT_TRUE(frames.Ack());
 }
 auto ThenFixedRate(RateTrace const& trace, std::uint32_t held) -> void {
@@ -186,7 +192,7 @@ auto ThenFixedRate(RateTrace const& trace, std::uint32_t held) -> void {
   EXPECT_EQ(trace.ceilings, 0u);
   EXPECT_EQ(trace.rate, 60);
 }
-auto FixedRate(Client& client, Headless::FrameObserver& frames, Headless::Logs& logs, RateTrace& trace) -> void {
+auto FixedRate(Client& client, FrameObserver& frames, Logs& logs, RateTrace& trace) -> void {
   ASSERT_NO_FATAL_FAILURE(HoldUntil(client, logs, trace, [&] { return trace.timeouts > 0; }));
   auto held = trace.presents;
   ASSERT_TRUE(Resized(client, 800));
@@ -194,26 +200,26 @@ auto FixedRate(Client& client, Headless::FrameObserver& frames, Headless::Logs& 
   ASSERT_NO_FATAL_FAILURE(DrainUntil(client, frames, logs, trace, [&] { return trace.frames >= target; }));
   ThenFixedRate(trace, held);
 }
-auto RecoverToCeiling(Client& client, Headless::FrameObserver& frames, Headless::Logs& logs, RateTrace& trace) -> void {
+auto RecoverToCeiling(Client& client, FrameObserver& frames, Logs& logs, RateTrace& trace) -> void {
   ASSERT_NO_FATAL_FAILURE(
       DrainUntil(client, frames, logs, trace, [&] { return trace.recovered && trace.recovered_pace.presents >= 60; }));
   ThenPresentRecovery(trace);
 }
 }
-auto ExerciseRate(std::uint32_t port, Headless::Logs& logs, Backend::RefreshMode mode, RateRecovery recovery) -> void {
+auto ExerciseRate(std::uint32_t port, Logs& logs, RefreshMode mode, RateRecovery recovery) -> void {
   Expects(port > 0, "sample listener is open");
-  Client                        client(port, true, 640, 480);
-  Headless::DisplayClient const display(client);
-  RateTrace                     trace  { .cursor = logs.Entries().size() };
+  Client              client(port, true, 640, 480);
+  DisplayClient const display(client);
+  RateTrace           trace  { .cursor = logs.Entries().size() };
   ASSERT_NO_FATAL_FAILURE(ConnectRateClient(client, mode));
-  Headless::FrameObserver frames(client);
+  FrameObserver frames(client);
   ASSERT_NO_FATAL_FAILURE(AwaitRateClient(client, frames));
-  if (mode == Backend::RefreshMode::Fixed) {
+  if (mode == RefreshMode::Fixed) {
     FixedRate(client, frames, logs, trace);
     return;
   }
   ASSERT_NO_FATAL_FAILURE(ReachFloor(client, frames, logs, trace, mode));
-  if (recovery == RateRecovery::AfterResize || mode == Backend::RefreshMode::Average) ASSERT_TRUE(Resized(client, 800));
+  if (recovery == RateRecovery::AfterResize || mode == RefreshMode::Average) ASSERT_TRUE(Resized(client, 800));
   RecoverToCeiling(client, frames, logs, trace);
 }
 }

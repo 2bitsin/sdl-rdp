@@ -7,10 +7,10 @@
 #include <string_view>
 
 namespace sdl3::rdp::detail::exceptions {
-using ::Backend::operator""_hash;
-using ::Backend::ArgumentFailure;
-using ::Backend::LogicFailure;
-using ::Backend::RuntimeFailure;
+using oxbox::utilities::literals::operator""_hash;
+using sdl_rdp::utilities::ArgumentFailure;
+using sdl_rdp::utilities::LogicFailure;
+using sdl_rdp::utilities::RuntimeFailure;
 using std::string_view;
 
 using RelayedFailure   = RuntimeFailure<"RelayedFailure"_hash, "{}", string_view>;
@@ -37,6 +37,7 @@ using IntegerOutOfRange = RuntimeFailure<"IntegerOutOfRange"_hash,
                                          "Invalid {} '{}': expected a whole number from {} to {}", string_view,
                                          string_view, std::int64_t, std::int64_t>;
 }
+
 namespace sdl3::rdp {
 using detail::exceptions::AbiMismatch;
 using detail::exceptions::DriveUnavailable;

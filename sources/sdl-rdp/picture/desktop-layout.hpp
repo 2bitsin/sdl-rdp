@@ -4,7 +4,7 @@
 #include <freerdp/settings.h>
 #include <cstdint>
 
-namespace Backend {
+namespace sdl_rdp::picture::detail::desktop_layout {
 auto ApplyDesktopSize(rdpSettings& settings, sdlrdp_rect picture) -> bool;
 auto Rescale(int value, int extent, std::uint32_t target)         -> int;
 class DesktopLayout {
@@ -25,4 +25,10 @@ private:
   std::uint32_t _screen_height{ };
   bool          _resizing     { };
 };
+}
+
+namespace sdl_rdp::picture {
+using detail::desktop_layout::ApplyDesktopSize;
+using detail::desktop_layout::DesktopLayout;
+using detail::desktop_layout::Rescale;
 }

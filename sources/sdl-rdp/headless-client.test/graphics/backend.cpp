@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <cstdlib>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::graphics::detail::backend {
 auto GraphicsBackend::OpenGraphics(char* pattern, std::uint32_t width, std::uint32_t height, sdlrdp_codec codec)
     -> void {
   auto* path = mkdtemp(pattern);

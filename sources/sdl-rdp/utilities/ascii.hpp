@@ -6,6 +6,7 @@ constexpr auto AsciiUpper(char letter) -> char {
   return letter >= 'a' && letter <= 'z' ? static_cast<char>(letter - 'a' + 'A') : letter;
 }
 }
+
 namespace sdl_rdp::utilities {
 using detail::ascii::AsciiUpper;
 }

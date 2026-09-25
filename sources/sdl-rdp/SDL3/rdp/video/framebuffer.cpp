@@ -7,9 +7,12 @@
 #include <cstdint>
 #include <iterator>
 namespace sdl3::rdp::video::detail::framebuffer {
-using backend::Boundary;
-using backend::Operation;
-using backend::Surface;
+using sdl3::rdp::backend::Boundary;
+using sdl3::rdp::backend::Operation;
+using sdl3::rdp::backend::Surface;
+using sdl_rdp::settings::Settings;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
 namespace {
 constexpr int FrameAcknowledgementWaitMs = 100;
 auto BackendRect(SDL_Rect const& rect) noexcept -> sdlrdp_rect {
@@ -18,11 +21,11 @@ auto BackendRect(SDL_Rect const& rect) noexcept -> sdlrdp_rect {
 // SDL returns a framebuffer through format, pixels and pitch output parameters.
 auto CreateFramebuffer(SDL_VideoDevice* device, SDL_Window* window, SDL_PixelFormat* format, void** pixels, int* pitch)
     -> bool {
-  utilities::Expects(device != nullptr, "framebuffer has a device");
-  utilities::Expects(window != nullptr, "framebuffer has a window");
-  utilities::Expects(format != nullptr, "framebuffer format output exists");
-  utilities::Expects(pixels != nullptr, "framebuffer pixels output exists");
-  utilities::Expects(pitch != nullptr, "framebuffer pitch output exists");
+  Expects(device != nullptr, "framebuffer has a device");
+  Expects(window != nullptr, "framebuffer has a window");
+  Expects(format != nullptr, "framebuffer format output exists");
+  Expects(pixels != nullptr, "framebuffer pixels output exists");
+  Expects(pitch != nullptr, "framebuffer pitch output exists");
   return Boundary([&] {
     int width { };
     int height{ };
@@ -38,8 +41,8 @@ auto CreateFramebuffer(SDL_VideoDevice* device, SDL_Window* window, SDL_PixelFor
 // SDL supplies a borrowed device, window and counted rectangle buffer.
 auto UpdateFramebuffer(SDL_VideoDevice* device, [[maybe_unused]] SDL_Window* unused_window, SDL_Rect const* rects,
                        int count) -> bool {
-  utilities::Expects(device != nullptr, "frame update has a device");
-  utilities::Expects(count >= 0, "rectangle count is nonnegative");
+  Expects(device != nullptr, "frame update has a device");
+  Expects(count >= 0, "rectangle count is nonnegative");
   auto&      data        = *device->internal;
   auto const framebuffer = data.Framebuffer();
   if (!framebuffer) return SDL_SetError("Couldn't find RDP surface for window");
@@ -49,22 +52,22 @@ auto UpdateFramebuffer(SDL_VideoDevice* device, [[maybe_unused]] SDL_Window* unu
 }
 // SDL's framebuffer destruction callback borrows its device and window.
 auto DestroyFramebuffer(SDL_VideoDevice* device, [[maybe_unused]] SDL_Window* unused_window) -> void {
-  utilities::Expects(device != nullptr, "framebuffer destruction has a device");
+  Expects(device != nullptr, "framebuffer destruction has a device");
   device->internal->Detach();
 }
 }
 Framebuffer::Framebuffer(Surface surface) noexcept : _surface{ std::move(surface) } {
   auto const* const owned = _surface.Get();
-  utilities::Expects(owned != nullptr, "framebuffer owns its surface");
+  Expects(owned != nullptr, "framebuffer owns its surface");
 }
 auto Framebuffer::Present(Driver const& driver, std::span<SDL_Rect const> rects) -> bool {
   auto const& surface = *_surface.Get();
   auto const  damage  = Damage(rects);
   if (driver.Call<Operation::PRESENT>(surface.pixels, surface.pitch, surface.w, surface.h, damage.data(),
-                                      ::Backend::Narrowed<std::uint32_t>(damage.size()))
+                                      Narrowed<std::uint32_t>(damage.size()))
       != 0)
     return driver.Fail();
-  if (!driver.Options().Value<&sdl_rdp::settings::Settings::vsync>()) return true;
+  if (!driver.Options().Value<&Settings::vsync>()) return true;
   return driver.Call<Operation::WAIT_FRAME>(FrameAcknowledgementWaitMs) >= 0 || driver.Fail();
 }
 // The buffer keeps its capacity across presents, so a steady rectangle count allocates only on its first present.

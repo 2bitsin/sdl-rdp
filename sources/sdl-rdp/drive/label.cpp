@@ -9,7 +9,7 @@
 #include <string_view>
 
 namespace sdl_rdp::drive::detail::label {
-using Backend::TranscodeRange;
+using sdl_rdp::utilities::TranscodeRange;
 auto DecodeLabel(std::span<std::byte const> bytes, std::uint32_t drive_version, std::string_view dos) -> std::string {
   if (!bytes.empty()) {
     if (bytes.back() != std::byte{ }) throw InvalidDriveName{ "unterminated" };

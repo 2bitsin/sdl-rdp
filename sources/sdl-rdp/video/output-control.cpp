@@ -7,7 +7,8 @@
 #include <sdl-rdp/video/peer-frames.hpp>
 #include <cstdint>
 
-namespace Backend {
+namespace sdl_rdp::video::detail::output_control {
+
 OutputControl::OutputControl(PeerLink& link, GraphicsLink const& graphics, FramePacing& pacing, Activation& activation,
                              PeerFrames& frames) noexcept
     : _link{ link }, _graphics{ graphics }, _pacing{ pacing }, _activation{ activation }, _frames{ frames } { }

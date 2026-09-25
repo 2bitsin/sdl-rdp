@@ -16,7 +16,10 @@
 #include <mutex>
 #include <string_view>
 
-namespace Backend {
+namespace sdl_rdp::diagnostics::detail::logging {
+using sdl_rdp::utilities::Contained;
+using sdl_rdp::utilities::Expects;
+
 auto ResetAuthenticationLogging() -> void {
   LogRoute::WithFilter([](auto& filter) { filter = { }; });
 }
@@ -181,10 +184,10 @@ auto LogRoute::Log(sdlrdp_log_level level, std::string const& text) const -> voi
 }
 auto LogRoute::Install() -> void {
   auto* root = WLog_GetRoot();
-  utilities::Expects(root != nullptr, "WLog root exists");
+  Expects(root != nullptr, "WLog root exists");
   // abi: wLogCallbackMessage_t and its siblings, BOOL is int
   constexpr auto forward   = [](wLogMessage const* message) noexcept -> int {
-    utilities::Expects(message != nullptr, "WLog message exists");
+    Expects(message != nullptr, "WLog message exists");
     auto const forwarded = [&] {
       Forward(*message);
       return true;
@@ -195,7 +198,7 @@ auto LogRoute::Install() -> void {
   wLogCallbacks  callbacks { forward, forward, forward, forward };
   if (!WLog_SetLogAppenderType(root, WLOG_APPENDER_CALLBACK)
       || !WLog_ConfigureAppender(WLog_GetLogAppender(root), "callbacks", &callbacks))
-    throw sdl_rdp::diagnostics::LogCallbackFailed{ };
+    throw LogCallbackFailed{ };
   WLog_Layout_SetPrefixFormat(root, WLog_GetLogLayout(root), "%mn");
   if (auto* level = std::getenv("WLOG_LEVEL"))
     WLog_SetStringLogLevel(root, level);

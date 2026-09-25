@@ -6,16 +6,19 @@
 #include <cstdint>
 
 namespace sdl_rdp::drive::detail::information {
+using sdl_rdp::freerdp_facade::InformationClass;
+
 struct BasicInformation {
   bool         directory{ };
   std::int64_t modified { };
 };
-auto InformationRequest(freerdp_facade::InformationClass type, DrivePacket const& body) -> DrivePacket;
-auto Information(DrivePacket response)                                                  -> DrivePacket;
-auto Basic(DrivePacket basic)                                                           -> BasicInformation;
-auto EndOfFile(DrivePacket standard)                                                    -> std::uint64_t;
-auto UnixSeconds(std::uint64_t filetime)                                                -> std::int64_t;
+auto InformationRequest(InformationClass type, DrivePacket const& body) -> DrivePacket;
+auto Information(DrivePacket response)                                  -> DrivePacket;
+auto Basic(DrivePacket basic)                                           -> BasicInformation;
+auto EndOfFile(DrivePacket standard)                                    -> std::uint64_t;
+auto UnixSeconds(std::uint64_t filetime)                                -> std::int64_t;
 }
+
 namespace sdl_rdp::drive {
 using detail::information::Basic;
 using detail::information::BasicInformation;

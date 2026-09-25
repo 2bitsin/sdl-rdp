@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <ranges>
 
-namespace sdl_rdp::auth {
+namespace sdl_rdp::auth::detail::account {
 namespace {
 // MS-NLMP 4.2.2.1.2: NTOWFv1 of "Password".
 constexpr std::array<std::uint8_t, 16> PasswordHash{ 0xa4, 0xf4, 0x9c, 0x40, 0x65, 0x10, 0xbd, 0xca,
@@ -51,7 +51,7 @@ TEST(Account, NoPairWithoutUserOrPassword) {
 }
 TEST(Account, NtHashIsTheNtOwfV1OfThePassword) {
   auto const config  = Pair();
-  auto const matches = [](freerdp_facade::NtOwf const& hash) { return std::ranges::equal(hash.Bytes(), PasswordHash); };
+  auto const matches = [](NtOwf const& hash) { return std::ranges::equal(hash.Bytes(), PasswordHash); };
   EXPECT_TRUE(Account{ config }.NtHash("Domain", "User").transform(matches).value_or(false));
 }
 TEST(Account, NoNtHashForAnotherName) {

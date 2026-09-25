@@ -11,7 +11,10 @@
 #include <string_view>
 #include <vector>
 
-namespace BackendGate {
+namespace sdl_rdp::headless_client_test::graphics::detail::round_five {
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::frame::FrameObserver;
+
 class RoundFive : public GraphicsSession {
 protected:
   auto ThenPipelinedWindow(Client& client, auto const& frames, std::vector<std::uint32_t> const& pixels) -> void {
@@ -50,13 +53,17 @@ protected:
     ASSERT_EQ(waiting.get(), 1);
     EXPECT_TRUE(std::ranges::none_of(backend.Poll(), [](auto const& event) { return event.type == SDLRDP_REFRESH; }));
   }
-  auto ThenProgressiveDamageCost(Client& client, Headless::GraphicsObserver& observer, std::uint64_t before) -> void;
-  auto ThenAutoChangesToRaw(Client& client, std::vector<std::uint32_t>& pixels)                              -> void;
-  auto ThenGraphicsTimeoutStatistics()                                                                       -> void;
-  auto ThenGraphicsAcknowledgementsCounted()                                                                 -> void;
-  auto ThenGraphicsWindowReleases(std::vector<std::uint32_t> const& pixels)                                  -> void;
+  auto ThenProgressiveDamageCost(Client& client, GraphicsObserver& observer, std::uint64_t before) -> void;
+  auto ThenAutoChangesToRaw(Client& client, std::vector<std::uint32_t>& pixels)                    -> void;
+  auto ThenGraphicsTimeoutStatistics()                                                             -> void;
+  auto ThenGraphicsAcknowledgementsCounted()                                                       -> void;
+  auto ThenGraphicsWindowReleases(std::vector<std::uint32_t> const& pixels)                        -> void;
   auto ThenLegacyWindowReleases(Client& client, FrameObserver const& observer, std::vector<std::uint32_t> const& pixels)
       -> void;
-  auto RunPictureSizes(bool graphics)                                                                        -> void;
+  auto RunPictureSizes(bool graphics)                                                              -> void;
 };
+}
+
+namespace sdl_rdp::headless_client_test::graphics {
+using detail::round_five::RoundFive;
 }

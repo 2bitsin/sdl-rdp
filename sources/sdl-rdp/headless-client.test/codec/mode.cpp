@@ -5,10 +5,13 @@
 #include <array>
 #include <cstdint>
 
-namespace BackendGate {
+namespace sdl_rdp::headless_client_test::codec::detail::mode {
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Unreachable;
+
 auto ModeName(testing::TestParamInfo<Mode> const& info) -> std::string {
-  utilities::Expects(info.param.codec >= SDLRDP_CODEC_AUTO, "codec is at least the first enumerator");
-  utilities::Expects(info.param.codec <= SDLRDP_CODEC_AVC420, "codec does not exceed the final enumerator");
+  Expects(info.param.codec >= SDLRDP_CODEC_AUTO, "codec is at least the first enumerator");
+  Expects(info.param.codec <= SDLRDP_CODEC_AVC420, "codec does not exceed the final enumerator");
   constexpr std::array names{ "Auto", "Planar", "RemoteFX", "NSCodec", "Raw", "Progressive", "Avc420" };
   return std::string(names[info.param.codec]) + (info.param.surface ? "Surface" : "Bitmap");
 }
@@ -21,7 +24,7 @@ auto NegotiatedCodec(sdlrdp_codec requested, bool surface) -> sdlrdp_codec {
   case SDLRDP_CODEC_RAW:
   case SDLRDP_CODEC_PROGRESSIVE:
   case SDLRDP_CODEC_AVC420: return requested;
-  default:                  utilities::Unreachable(requested);
+  default:                  Unreachable(requested);
   }
 }
 // Lossy codecs: RemoteFX quantises, NSCodec subsamples chroma, progressive stops short of its last pass.

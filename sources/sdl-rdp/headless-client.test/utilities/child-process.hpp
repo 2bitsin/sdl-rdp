@@ -2,7 +2,7 @@
 #include <functional>
 #include <sys/types.h>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::utilities::detail::child_process {
 class ChildProcess {
 public:
   explicit           ChildProcess(std::function<int()> const& body);
@@ -19,4 +19,8 @@ private:
   static constexpr pid_t Reaped = 0;
   pid_t                  pid;
 };
+}
+
+namespace sdl_rdp::headless_client_test::utilities {
+using detail::child_process::ChildProcess;
 }

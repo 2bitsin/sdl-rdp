@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Backend {
+namespace sdl_rdp::utilities::detail::pinned {
 class Pinned {
 public:
        Pinned(Pinned const&)               = delete;
@@ -12,4 +12,8 @@ protected:
   Pinned()  = default;
   ~Pinned() = default;
 };
-} // namespace Backend
+}
+
+namespace sdl_rdp::utilities {
+using detail::pinned::Pinned;
+}

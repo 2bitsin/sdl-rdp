@@ -36,6 +36,7 @@ namespace sdl3::rdp::video::detail::videodata {
 auto BoundWindow(SDL_VideoData const& data) -> SDL_Window&;
 auto CurrentVideo()                         -> SDL_VideoData&;
 }
+
 namespace sdl3::rdp::video {
 using detail::videodata::BoundWindow;
 using detail::videodata::CurrentVideo;

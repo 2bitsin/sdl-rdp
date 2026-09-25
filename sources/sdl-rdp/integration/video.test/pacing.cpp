@@ -10,7 +10,19 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace BackendGate {
+namespace sdl_rdp::integration::video_test::detail::pacing {
+using sdl_rdp::headless_client_test::backend::AllAcknowledged;
+using sdl_rdp::headless_client_test::backend::AwaitAllAcknowledged;
+using sdl_rdp::headless_client_test::backend::BackendInstance;
+using sdl_rdp::headless_client_test::backend::Logs;
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::frame::FrameObserver;
+using sdl_rdp::headless_client_test::frame::HashPattern;
+using sdl_rdp::headless_client_test::frame::NoisePattern;
+using sdl_rdp::headless_client_test::graphics::RoundFive;
+using sdl_rdp::utilities::DeadlineAfter;
+using sdl_rdp::utilities::Expects;
+
 namespace {
 auto ThenSuppressed(Client& client, FrameObserver const& observer, std::uint64_t bytes) -> void {
   // Probe for forbidden output after the ordered suppression barrier. No
@@ -80,7 +92,7 @@ TEST_F(RoundFive, SparseRegions) {
     ASSERT_NO_FATAL_FAILURE(Connect(client, false));
     FrameObserver              observer(client);
     std::vector<std::uint32_t> pixels(1024uz * 768);
-    Headless::HashPattern(pixels);
+    HashPattern(pixels);
     ASSERT_NO_FATAL_FAILURE(Present(pixels, 1024, 768));
     ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == 1; }));
     auto bytes = client.Received();
@@ -98,8 +110,7 @@ auto WaitForAcknowledgement(sdlrdp_handle& handle) -> bool {
   auto       lock    = frames.Lock();
   auto const current = handle.Session().Current(lock);
   Expects(current.has_value(), "active peer owns the pending frame");
-  return frames.WaitFor(lock, Backend::DeadlineAfter(std::chrono::seconds(10)),
-                        [&] { return AllAcknowledged(handle, lock); });
+  return frames.WaitFor(lock, DeadlineAfter(std::chrono::seconds(10)), [&] { return AllAcknowledged(handle, lock); });
 }
 }
 TEST_F(RoundFive, WaitWithoutRefreshFeedback) {
@@ -126,8 +137,8 @@ TEST_F(RoundFive, ColourDepths) {
 }
 
 namespace {
-auto ProduceFrames(Headless::BackendInstance const& backend, std::atomic<std::size_t>& presents,
-                   std::stop_token const& stop) -> void {
+auto ProduceFrames(BackendInstance const& backend, std::atomic<std::size_t>& presents, std::stop_token const& stop)
+    -> void {
   std::vector<std::uint32_t> pixels(1024uz * 768);
   sdlrdp_rect const          area  { 0, 0, 1024, 768 };
   while (!stop.stop_requested()) {
@@ -179,8 +190,6 @@ constexpr auto ExpectedTransportMessages = std::array<std::pair<char const*, cha
     { "com.freerdp.core.transport", "BIO_read returned a system error 5: Input/output error"                         },
     { "com.freerdp.core"          , "ERRCONNECT_CONNECT_TRANSPORT_FAILED [0x0002000D]"                               } }
 };
-}
-namespace {
 auto ThenDisconnectReason(Logs& logs, wLog* peer, char const* name) -> void {
   WLog_Print(peer, WLOG_ERROR, "%s [0x00010000]", name);
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, name));
@@ -228,8 +237,8 @@ TEST_F(RoundFive, GraphicsDisconnectDuringWrite) {
   std::ignore = backend.Poll();
   std::vector<std::uint32_t> pixels(static_cast<std::size_t>(side) * side);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, side, side));
-  ASSERT_NO_FATAL_FAILURE(sdl_rdp::headless_client_test::backend::AwaitAllAcknowledged(client, backend, logs));
-  Headless::NoisePattern(pixels, 1);
+  ASSERT_NO_FATAL_FAILURE(AwaitAllAcknowledged(client, backend, logs));
+  NoisePattern(pixels, 1);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, side, side));
   ASSERT_NO_FATAL_FAILURE(ThenReadable(client));
   ThenWriteDisconnect(client);

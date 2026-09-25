@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 
-namespace Backend {
+namespace sdl_rdp::auth::detail::state {
 class AuthenticationState {
 public:
   auto Identify(std::string user_name, std::string domain_name) -> void;
@@ -20,4 +20,8 @@ private:
   bool        _rejected      { };
   bool        _hash_attempted{ };
 };
+}
+
+namespace sdl_rdp::auth {
+using detail::state::AuthenticationState;
 }

@@ -5,8 +5,8 @@
 #include <functional>
 #include <utility>
 
-namespace SampleGate {
-FullDesktopFrames::FullDesktopFrames(Headless::Client& client)
+namespace sdl_rdp::sample_gate_test::frame::detail::full_desktop {
+FullDesktopFrames::FullDesktopFrames(Client& client)
     : hook(client, std::bind_front(&FullDesktopFrames::Observe, this)) { }
 auto FullDesktopFrames::Full() const -> std::size_t {
   return full;
@@ -14,11 +14,11 @@ auto FullDesktopFrames::Full() const -> std::size_t {
 auto FullDesktopFrames::Deliveries() const -> std::size_t {
   return deliveries;
 }
-auto FullDesktopFrames::Observe(Headless::PictureUpdate const& update) -> void {
+auto FullDesktopFrames::Observe(PictureUpdate const& update) -> void {
   if (!update.delivered) return;
   for (auto region : update.regions) Cover(region, update.desktop);
 }
-auto FullDesktopFrames::Cover(sdlrdp_rect region, Backend::Extent desktop) -> void {
+auto FullDesktopFrames::Cover(sdlrdp_rect region, Extent desktop) -> void {
   ++deliveries;
   rows.resize(desktop.height);
   auto const bottom = region.y + region.h;

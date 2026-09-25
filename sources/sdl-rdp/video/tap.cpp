@@ -5,7 +5,9 @@
 #include <algorithm>
 #include <cstdint>
 
-namespace Backend {
+namespace sdl_rdp::video::detail::tap {
+using sdl_rdp::utilities::Expects;
+
 namespace {
 constexpr double PixelCenter = 0.5;
 auto Position(int index, double ratio, std::uint32_t extent) -> double {

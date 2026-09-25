@@ -12,6 +12,8 @@
 #include <string_view>
 
 namespace sdl_rdp::drive::detail::files {
+using sdl_rdp::freerdp_facade::InformationClass;
+
 // The file operations of the drive ABI over the current peer's drive channel, which may be absent.
 class DriveFiles {
 public:
@@ -30,11 +32,12 @@ private:
   auto Channel() const -> std::shared_ptr<DriveChannel> const&;
   auto Opened(std::uint32_t drive, std::string_view path, FileRequest const& request) const
       -> std::unique_ptr<sdlrdp_file>;
-  auto SetInformation(std::uint32_t drive, std::string_view path, freerdp_facade::InformationClass type,
-                      DrivePacket const& body) const -> void;
+  auto SetInformation(std::uint32_t drive, std::string_view path, InformationClass type, DrivePacket const& body) const
+      -> void;
   std::shared_ptr<DriveChannel> _channel;
 };
 }
+
 namespace sdl_rdp::drive {
 using detail::files::DriveFiles;
 }

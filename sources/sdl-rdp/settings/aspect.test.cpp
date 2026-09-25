@@ -5,7 +5,7 @@
 #include <string_view>
 #include <tuple>
 
-namespace sdl_rdp::settings {
+namespace sdl_rdp::settings::detail::aspect {
 TEST(Aspect, ReadsTwoPositiveWholeNumbersOrNothing) {
   EXPECT_EQ(Aspect::Parsed(" 16:9 "), (Aspect{ 16, 9 }));
   EXPECT_EQ(Aspect::Parsed(" "), Aspect::None());

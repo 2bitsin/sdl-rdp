@@ -9,6 +9,8 @@
 #include <string>
 #include <utility>
 namespace sdl3::rdp::settings::detail::configuration {
+using sdl_rdp::settings::Aspect;
+
 template <typename CredentialTy>
 concept AuthenticationCredential = std::same_as<CredentialTy, char const*> || std::same_as<CredentialTy, std::uint8_t*>;
 // SDL's display properties publish the application's C authentication callbacks with this signature.
@@ -18,7 +20,7 @@ using AuthenticationCallback = bool(SDLCALL*)(void* user, char const* domain, ch
 using ConfigurationString  = std::pair<char const * sdlrdp_config::*, std::optional<std::string>>;
 using ConfigurationStrings = std::array<ConfigurationString, 5>;
 // The backend reads a zero ratio as square pixels, which is what no stated aspect means.
-auto BackendAspect(sdl_rdp::settings::Aspect const& aspect) -> sdlrdp_aspect;
+auto BackendAspect(Aspect const& aspect) -> sdlrdp_aspect;
 class Configuration {
 public:
   // The backend calls these C callbacks with the opaque context.
@@ -35,9 +37,10 @@ private:
   sdlrdp_config        _value  { };
 };
 }
+
 namespace sdl3::rdp::settings {
-using detail::configuration::AuthenticationCredential;
 using detail::configuration::AuthenticationCallback;
+using detail::configuration::AuthenticationCredential;
 using detail::configuration::BackendAspect;
 using detail::configuration::Configuration;
 }

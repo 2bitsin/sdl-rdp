@@ -10,13 +10,12 @@
 #include <string>
 
 namespace sdl_rdp::integration::support_bench::detail::adapter {
-using support_bench::Measurement;
 struct PhaseCounts {
   std::size_t bodies    = 0;
   std::size_t teardowns = 0;
 };
 
-class ThrowingSetUp final : public support_bench::Session<testing::Test> {
+class ThrowingSetUp final : public Session<testing::Test> {
 public:
        ThrowingSetUp(Measurement& measurement, PhaseCounts& counts);
   auto TestBody() -> void override;
@@ -35,7 +34,7 @@ auto SetUpExceptionEndsTheSession(benchmark::State& state) -> void {
   for ([[maybe_unused]] auto _ : state) {
     PhaseCounts counts;
     Measurement measurement;
-    support_bench::RunSession<ThrowingSetUp>(measurement, counts);
+    RunSession<ThrowingSetUp>(measurement, counts);
     auto const failures = measurement.Failures();
     if (counts.bodies != 0)
       state.SkipWithError("the body ran after SetUp threw");

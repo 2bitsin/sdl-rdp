@@ -1,5 +1,6 @@
 #pragma once
 #include <oxbox/utilities/serdes.hpp>
+#include <sdl-rdp/drive/forward.hpp>
 #include <bit>
 #include <concepts>
 #include <cstddef>
@@ -10,9 +11,6 @@
 #include <string_view>
 #include <vector>
 
-namespace sdl_rdp::drive::detail::channel {
-class DriveChannel;
-}
 namespace sdl_rdp::drive::detail::packet {
 using ChannelOrigin = std::weak_ptr<channel::DriveChannel>;
 template <typename ValueTy>
@@ -51,8 +49,9 @@ template <WireField ValueTy> auto DrivePacket::Write(ValueTy value) -> void {
   Writer{ bytes }.Put(value);
 }
 }
+
 namespace sdl_rdp::drive {
-using detail::packet::WireField;
 using detail::packet::DrivePacket;
 using detail::packet::DrivePath;
+using detail::packet::WireField;
 }

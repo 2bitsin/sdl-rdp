@@ -9,7 +9,9 @@
 #include <functional>
 #include <optional>
 
-namespace Backend {
+namespace sdl_rdp::peer::detail::status {
+using sdl_rdp::video::GraphicsTiming;
+
 struct PeerStatus {
   std::reference_wrapper<freerdp_peer>                     client;
   std::optional<std::reference_wrapper<DispServerContext>> display;
@@ -23,4 +25,8 @@ struct PeerStatus {
   std::uint64_t                                            acknowledgements{ };
   std::chrono::nanoseconds                                 encode_time     { };
 };
+}
+
+namespace sdl_rdp::peer {
+using detail::status::PeerStatus;
 }

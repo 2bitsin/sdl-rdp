@@ -14,7 +14,12 @@
 #include <freerdp/update.h>
 #include <cstdint>
 
-namespace Backend {
+namespace sdl_rdp::peer::detail::callbacks {
+using sdl_rdp::auth::NtKey;
+using sdl_rdp::freerdp_facade::CallbackOwner;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::OperationName;
+
 namespace {
 auto PeerOwner(freerdp_peer const& client) -> PeerCallbacks& {
   return CallbackOwner<PeerCallbacks, &freerdp_peer::ContextExtra>(client);

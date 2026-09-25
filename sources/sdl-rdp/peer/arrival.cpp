@@ -14,7 +14,13 @@
 #include <freerdp/settings.h>
 #include <format>
 
-namespace Backend {
+namespace sdl_rdp::peer::detail::arrival {
+using sdl_rdp::auth::AuthenticationIdentity;
+using sdl_rdp::configuration::MillihertzPerHz;
+using sdl_rdp::utilities::CopyTerminated;
+using sdl_rdp::utilities::Whole;
+using sdl_rdp::video::frame::AcknowledgementMode;
+
 namespace {
 auto Connected(rdpSettings const& settings) -> sdlrdp_event {
   sdlrdp_event event{ .type = SDLRDP_CONNECTED };

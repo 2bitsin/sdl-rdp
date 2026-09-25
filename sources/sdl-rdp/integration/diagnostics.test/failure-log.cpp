@@ -6,21 +6,27 @@
 #include <gtest/gtest.h>
 #include <stdexcept>
 
+namespace sdl_rdp::integration::diagnostics_test::detail::failure_log {
+using sdl_rdp::diagnostics::Diagnostics;
+using sdl_rdp::diagnostics::FailureLog;
+using sdl_rdp::headless_client_test::backend::Logs;
+using sdl_rdp::utilities::Contained;
 namespace {
-auto Collected(Headless::Logs& logs) -> sdlrdp_config {
-  return { .log = Headless::Logs::Collect, .log_user = &logs };
+auto Collected(Logs& logs) -> sdlrdp_config {
+  return { .log = Logs::Collect, .log_user = &logs };
 }
 }
 TEST(FailureLog, LogsTheOperationAndTheFailureAtItsLevel) {
-  Headless::Logs             logs;
-  Backend::Diagnostics const diagnostics{ Collected(logs), false };
-  Backend::FailureLog{ diagnostics, "Clipboard text decoding", SDLRDP_LOG_WARN }("invalid UTF-16");
+  Logs              logs;
+  Diagnostics const diagnostics{ Collected(logs), false };
+  FailureLog{ diagnostics, "Clipboard text decoding", SDLRDP_LOG_WARN }("invalid UTF-16");
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_WARN, "Clipboard text decoding failed: invalid UTF-16.")) << logs.Text(true);
 }
 TEST(FailureLog, CarriesAContainedCallbackFailureToTheDiagnosticsLog) {
-  Headless::Logs             logs;
-  Backend::Diagnostics const diagnostics { Collected(logs), false };
-  auto const                 failing     = []() -> int { throw std::runtime_error("peer vanished"); };
-  EXPECT_EQ(Backend::Contained(-1, failing, Backend::FailureLog{ diagnostics, "Peer activation" }), -1);
+  Logs              logs;
+  Diagnostics const diagnostics { Collected(logs), false };
+  auto const        failing     = []() -> int { throw std::runtime_error("peer vanished"); };
+  EXPECT_EQ(Contained(-1, failing, FailureLog{ diagnostics, "Peer activation" }), -1);
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_ERROR, "Peer activation failed: peer vanished.")) << logs.Text(true);
+}
 }

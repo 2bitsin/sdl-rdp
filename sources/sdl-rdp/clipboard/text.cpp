@@ -1,3 +1,5 @@
+#include <sdl-rdp/clipboard/text.hpp>
+
 #include <sdl-rdp/clipboard/channel.hpp>
 #include <sdl-rdp/clipboard/exceptions.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
@@ -7,8 +9,11 @@
 #include <cstdint>
 #include <ranges>
 
-namespace Backend {
+namespace sdl_rdp::clipboard::detail::text {
 using oxbox::utilities::Encoding;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::TranscodeRange;
+using sdl_rdp::utilities::Utf16Little;
 auto ClipboardAnsi(std::string_view text) -> std::string {
   // No client code page is negotiated; ASCII is portable across ANSI code pages.
   return TranscodeRange<std::string>(std::as_bytes(std::span(text)), { }, { .encoding = Encoding::UCS1 },

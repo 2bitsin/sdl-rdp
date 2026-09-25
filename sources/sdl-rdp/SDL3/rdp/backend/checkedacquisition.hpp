@@ -17,6 +17,7 @@ public:
   }
 };
 }
+
 namespace sdl3::rdp::backend {
 using detail::checkedacquisition::CheckedAcquisition;
 }

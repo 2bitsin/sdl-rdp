@@ -1,5 +1,8 @@
 #pragma once
+#include <sdl-rdp/clipboard/forward.hpp>
+#include <sdl-rdp/diagnostics/forward.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/link/forward.hpp>
 
 #include <freerdp/server/cliprdr.h>
 #include <cstddef>
@@ -9,12 +12,14 @@
 #include <string_view>
 #include <vector>
 
-namespace Backend {
-class Activation;
-class ClipboardStore;
-class Diagnostics;
-class EventQueue;
-class PeerLink;
+namespace sdl_rdp::clipboard::detail::channel {
+using sdl_rdp::diagnostics::Diagnostics;
+using sdl_rdp::freerdp_facade::WaitHandle;
+using sdl_rdp::link::Activation;
+using sdl_rdp::link::EventQueue;
+using sdl_rdp::link::PeerLink;
+using sdl_rdp::utilities::Releases;
+
 class ClipboardChannel {
 public:
        ClipboardChannel(ClipboardChannel const&)                       = delete;
@@ -57,7 +62,8 @@ private:
   bool               _pending             { };
   bool               _has_unicode         { };
 };
-auto ClipboardAnsi(std::string_view text)            -> std::string;
-auto ClipboardUnicode(std::string_view text)         -> std::vector<std::byte>;
-auto ClipboardUtf8(std::span<std::byte const> bytes) -> std::string;
-} // namespace Backend
+}
+
+namespace sdl_rdp::clipboard {
+using detail::channel::ClipboardChannel;
+}

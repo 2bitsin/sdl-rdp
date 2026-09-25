@@ -2,14 +2,12 @@
 #include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/video/avc/encoding.hpp>
 
-#include <winpr/wtypes.h>
-// WinPR already supplies the ABI-compatible GUID type.
-#define GUID_DEFINED
 #include <algorithm>
 #include <cstdint>
-#include <ffnvcodec/nvEncodeAPI.h>
 
-namespace Backend::Avc {
+namespace sdl_rdp::video::avc::detail::preset {
+using sdl_rdp::utilities::Narrowed;
+
 namespace {
 auto ConfigureRate(NV_ENC_RC_PARAMS& rc, std::uint32_t bitrate, std::uint32_t fps) -> void {
   rc.enableLookahead  = 0;
@@ -48,4 +46,4 @@ auto ConfigurePreset(NV_ENC_CONFIG& config, std::uint32_t bitrate, std::uint32_t
   ConfigureRate(config.rcParams, bitrate, fps);
   ConfigureH264(config.encodeCodecConfig.h264Config, fps);
 }
-} // namespace Backend::Avc
+}

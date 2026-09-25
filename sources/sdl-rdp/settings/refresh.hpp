@@ -10,6 +10,8 @@
 #include <string_view>
 
 namespace sdl_rdp::settings::detail::refresh {
+using sdl_rdp::utilities::Bounded;
+
 // Values are the frozen backend set_refresh mode argument; the labels are the automatic modes' written names.
 enum class RefreshMode : std::uint32_t {
   FIXED = 0,
@@ -22,7 +24,7 @@ constexpr auto reflect_scheme(RefreshMode* tag);
 class Refresh {
 public:
   // SDL carries a display's rate in millihertz as int.
-  using Rate = utilities::Bounded<std::uint32_t, 1, std::numeric_limits<std::int32_t>::max() / std::milli::den>;
+  using Rate = Bounded<std::uint32_t, 1, std::numeric_limits<std::int32_t>::max() / std::milli::den>;
               Refresh()                                = default;
   explicit    Refresh(Rate rate);
   explicit    Refresh(RefreshMode mode);
@@ -39,7 +41,8 @@ private:
   Rate                           _rate     { InitialHz          };
 };
 }
+
 namespace sdl_rdp::settings {
-using detail::refresh::RefreshMode;
 using detail::refresh::Refresh;
+using detail::refresh::RefreshMode;
 }

@@ -7,7 +7,9 @@
 #include <span>
 #include <vector>
 
-namespace Backend {
+namespace sdl_rdp::video::pointer::detail::shape {
+using sdl_rdp::utilities::Extent;
+
 enum class PointerDelivery{ Sent, Failed, Unsupported };
 class PointerShape {
   // FreeRDP's pointer update structs take the buffers as non-const pointers, so each send lends copies.
@@ -18,7 +20,7 @@ class PointerShape {
 
 public:
        PointerShape() noexcept = default;
-       PointerShape(sdl_rdp::video::pointer::PointerLayout const& layout, std::span<std::uint8_t const> argb);
+       PointerShape(PointerLayout const& layout, std::span<std::uint8_t const> argb);
   auto Send(rdpContext& context) const -> PointerDelivery;
 
 private:
@@ -31,4 +33,9 @@ private:
   std::vector<std::uint8_t> _pixels;
   std::vector<std::uint8_t> _mask;
 };
+}
+
+namespace sdl_rdp::video::pointer {
+using detail::shape::PointerDelivery;
+using detail::shape::PointerShape;
 }

@@ -4,7 +4,9 @@
 #include <oxbox/utilities/hash.hpp>
 #include <string_view>
 
-namespace Backend::detail::exceptions {
+namespace sdl_rdp::auth::detail::exceptions {
+using oxbox::utilities::literals::operator""_hash;
+using sdl_rdp::utilities::RuntimeFailure;
 using std::string_view;
 
 using TlsAcceptRefused     = RuntimeFailure<"TlsAcceptRefused"_hash, "TLS rehearsal accept failed.">;
@@ -15,7 +17,8 @@ using CredentialFailed     = RuntimeFailure<"CredentialFailed"_hash, "Server cre
 using CertificateDirectoryFailed = RuntimeFailure<"CertificateDirectoryFailed"_hash,
                                                   "Certificate directory {} creation failed.", string_view>;
 }
-namespace Backend {
+
+namespace sdl_rdp::auth {
 using detail::exceptions::BioMethodSetupFailed;
 using detail::exceptions::CertificateDirectoryFailed;
 using detail::exceptions::CredentialFailed;

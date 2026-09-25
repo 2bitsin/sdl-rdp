@@ -11,8 +11,9 @@ extern "C" auto __libc_realloc(void* ptr, std::size_t size) noexcept -> void*;
 extern "C" auto __libc_memalign(std::size_t alignment, std::size_t size) noexcept -> void*;
 extern "C" auto __libc_free(void* block) noexcept -> void;
 
+namespace sdl_rdp::integration::allocations_test::detail::replacements {
+using sdl_rdp::integration::allocations_test::CountingHeap;
 namespace {
-using HeapCount::CountingHeap;
 template <auto VCount, auto VNext, typename... VArguments> auto Counted(VArguments... arguments) noexcept -> void* {
   (CountingHeap::Shared().*VCount)();
   return VNext(arguments...);
@@ -22,8 +23,7 @@ auto Required(void* block) -> void* {
   return block;
 }
 }
-
-// The C and C++ standards fix these signatures, pointers included.
+// The C and C++ standards fix these signatures, pointers included; C linkage names the global symbol.
 extern "C" [[gnu::visibility("default")]] auto malloc(std::size_t size) noexcept -> void* {
   return Counted<&CountingHeap::CountHeap, __libc_malloc>(size);
 }
@@ -33,6 +33,12 @@ extern "C" [[gnu::visibility("default")]] auto calloc(std::size_t nmemb, std::si
 extern "C" [[gnu::visibility("default")]] auto realloc(void* ptr, std::size_t size) noexcept -> void* {
   return Counted<&CountingHeap::CountHeap, __libc_realloc>(ptr, size);
 }
+}
+
+using sdl_rdp::integration::allocations_test::CountingHeap;
+using sdl_rdp::integration::allocations_test::detail::replacements::Counted;
+using sdl_rdp::integration::allocations_test::detail::replacements::Required;
+
 auto operator new(std::size_t size) -> void* {
   return Required(Counted<&CountingHeap::CountNew, __libc_malloc>(std::max(size, std::size_t{ 1 })));
 }

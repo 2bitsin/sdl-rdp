@@ -5,7 +5,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace utilities {
+namespace sdl_rdp::utilities::detail::scoped {
 template <typename ValueTy, auto IS_NULL, auto MAKE_NULL>
 concept NullableResource = std::predicate<decltype(IS_NULL), ValueTy const&>
                            && std::invocable<decltype(MAKE_NULL), ValueTy&>;
@@ -71,4 +71,8 @@ private:
   static constexpr bool Checked = NullableResource<VTy, IS_NULL, MAKE_NULL>;
   Stored                _value;
 };
+}
+
+namespace sdl_rdp::utilities {
+using detail::scoped::RAIIWrap;
 }

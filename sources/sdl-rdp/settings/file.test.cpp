@@ -15,7 +15,7 @@
 #include <variant>
 #include <vector>
 
-namespace sdl_rdp::settings {
+namespace sdl_rdp::settings::detail::file {
 namespace {
 auto Written(std::filesystem::path const& path, std::string_view text) -> std::filesystem::path {
   std::ofstream{ path } << text;

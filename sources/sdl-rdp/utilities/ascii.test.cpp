@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-namespace sdl_rdp::utilities {
+namespace sdl_rdp::utilities::detail::ascii {
 static_assert(AsciiUpper('a') == 'A');
 TEST(AsciiUpper, RaisesOnlyAsciiLowerCaseLetters) {
   EXPECT_EQ(AsciiUpper('z'), 'Z');

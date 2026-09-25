@@ -6,7 +6,7 @@
 #include <deque>
 #include <vector>
 
-namespace Backend {
+namespace sdl_rdp::video::detail::acknowledgement_window {
 // RDP has no acknowledgement deadline; one second bounds a viewer-tolerable frozen picture.
 inline constexpr auto        AcknowledgementTimeout  = std::chrono::seconds(1);
 inline constexpr std::size_t AcknowledgedFrameWindow = 2;
@@ -34,4 +34,10 @@ private:
   std::uint32_t         _frame_id    { };
   bool                  _enabled     { };
 };
+}
+
+namespace sdl_rdp::video {
+using detail::acknowledgement_window::AcknowledgedFrameWindow;
+using detail::acknowledgement_window::AcknowledgementWindow;
+using detail::acknowledgement_window::WaitMilliseconds;
 }

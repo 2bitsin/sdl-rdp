@@ -2,7 +2,7 @@
 
 #include <SDL3/SDL_init.h>
 
-namespace SampleGate {
+namespace sdl_rdp::sample_gate_test::process::detail::initialized_sdl {
 auto InitializeSdl(std::function<bool()> const& initialize) -> bool {
   return initialize();
 }

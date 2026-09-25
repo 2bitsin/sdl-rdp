@@ -1,4 +1,7 @@
 #pragma once
+#include <sdl-rdp/audio/forward.hpp>
+#include <sdl-rdp/configuration/forward.hpp>
+#include <sdl-rdp/session/forward.hpp>
 #include <sdl-rdp/session/session.hpp>
 #include <sdl-rdp/utilities/deadline.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
@@ -7,12 +10,15 @@
 #include <cstdint>
 #include <span>
 
-namespace Backend {
+namespace sdl_rdp::session::detail::audio_output {
+using sdl_rdp::audio::AudioChannel;
+using sdl_rdp::configuration::Configuration;
+using sdl_rdp::link::SessionLock;
+using sdl_rdp::utilities::Deadline;
+using sdl_rdp::utilities::Pinned;
+
 // The ABI's audio frame is one interleaved left and right sample.
 inline constexpr std::size_t StereoChannels = 2;
-class AudioChannel;
-class Configuration;
-class Presenter;
 class AudioOutput : private Pinned {
 public:
        AudioOutput(Session& session, Presenter& presenter, Configuration const& configuration) noexcept;
@@ -29,4 +35,9 @@ private:
   Configuration const& _configuration;
   bool                 _open         { };
 };
+}
+
+namespace sdl_rdp::session {
+using detail::audio_output::AudioOutput;
+using detail::audio_output::StereoChannels;
 }

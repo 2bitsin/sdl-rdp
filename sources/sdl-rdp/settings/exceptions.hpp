@@ -5,8 +5,8 @@
 #include <string_view>
 
 namespace sdl_rdp::settings::detail::exceptions {
-using ::Backend::operator""_hash;
-using ::Backend::RuntimeFailure;
+using oxbox::utilities::literals::operator""_hash;
+using sdl_rdp::utilities::RuntimeFailure;
 using std::string_view;
 
 using InvalidSettingsFile = RuntimeFailure<"InvalidSettingsFile"_hash, "Invalid RDP settings file {}: {}", string_view,
@@ -18,10 +18,11 @@ using UnknownSettingsFormat = RuntimeFailure<"UnknownSettingsFormat"_hash, "no s
                                              string_view>;
 using InvalidSettingValue = RuntimeFailure<"InvalidSettingValue"_hash, "'{}' is not {}", string_view, string_view>;
 }
+
 namespace sdl_rdp::settings {
-using detail::exceptions::InvalidSettingsFile;
 using detail::exceptions::AmbiguousSettings;
-using detail::exceptions::UnknownSettingsKey;
-using detail::exceptions::UnknownSettingsFormat;
 using detail::exceptions::InvalidSettingValue;
+using detail::exceptions::InvalidSettingsFile;
+using detail::exceptions::UnknownSettingsFormat;
+using detail::exceptions::UnknownSettingsKey;
 }

@@ -19,9 +19,23 @@
 #include <thread>
 #include <utility>
 
-namespace SampleGate {
+namespace sdl_rdp::integration::sample_test::detail::fullscreen {
+using namespace std::chrono_literals;
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::DisplayClient;
+using sdl_rdp::headless_client_test::client::Tap;
+using sdl_rdp::headless_client_test::frame::FrameObserver;
+using sdl_rdp::sample_gate_test::client::ChangeMonitor;
+using sdl_rdp::sample_gate_test::frame::FirstFrameSize;
+using sdl_rdp::sample_gate_test::frame::FullDesktopFrames;
+using sdl_rdp::sample_gate_test::sample::AnnouncedPort;
+using sdl_rdp::sample_gate_test::sample::AspectOptions;
+using sdl_rdp::sample_gate_test::sample::Sample;
+using sdl_rdp::sample_gate_test::sample::Words;
+using sdl_rdp::utilities::Expects;
+
 namespace {
-class FullscreenSample : public SampleGate::Sample {
+class FullscreenSample : public Sample {
 protected:
   static auto ThenWindowedPicture(Client& client) -> void {
     ASSERT_TRUE(client.UntilDesktop(640, 480));
@@ -83,8 +97,8 @@ TEST_F(FullscreenSample, ExplicitFullscreenRestoresWindow) {
 
 TEST_F(FullscreenSample, ExplicitFullscreenSurvivesScreenChange) {
   ASSERT_NO_FATAL_FAILURE(GivenFullscreen());
-  auto                          client  = AnnouncedClient(1280, 800);
-  Headless::DisplayClient const display(client);
+  auto                client  = AnnouncedClient(1280, 800);
+  DisplayClient const display(client);
   ASSERT_NO_FATAL_FAILURE(ConnectExposed(client));
   ASSERT_TRUE(Read("event GEOMETRY window=320x200 desktop=320x200"));
   ASSERT_NO_FATAL_FAILURE(ChangeMonitor(client));
@@ -109,7 +123,7 @@ protected:
   }
   auto WhenFocusSynchronized(Client& client) -> void {
     ASSERT_TRUE(ReadInput(client, "event FOCUS_GAINED "));
-    ASSERT_NO_FATAL_FAILURE(Headless::Tap(client, 0x30));
+    ASSERT_NO_FATAL_FAILURE(Tap(client, 0x30));
     ASSERT_TRUE(ReadInput(client, "event KEY_UP "));
   }
   auto Count(std::string_view event) -> std::size_t {
@@ -133,12 +147,12 @@ protected:
     if (kind == "exclusive") options.append_range(Words{ "--mode", "320x200" });
     GivenProcess(environment, options);
   }
-  auto RefreshSettings() -> fs::path {
+  auto RefreshSettings() -> std::filesystem::path {
     auto settings = certificates.Path() / "refresh.yaml";
     std::ofstream(settings) << "refresh: 90\n";
     return settings;
   }
-  static auto AcknowledgeCadence(Client& client, Headless::FrameObserver& frames) -> void {
+  static auto AcknowledgeCadence(Client& client, FrameObserver& frames) -> void {
     for (std::size_t i = 0; i < 6; ++i) {
       auto before = frames.Frames().size();
       std::this_thread::sleep_for(i % 2 ? 20ms : 120ms);
@@ -146,7 +160,7 @@ protected:
       ASSERT_TRUE(client.Until([&] { return frames.Frames().size() >= before + 2; }));
     }
   }
-  auto Observe(Client& client, Headless::FrameObserver& frames) -> void {
+  auto Observe(Client& client, FrameObserver& frames) -> void {
     Expects(process != nullptr, "sample is running");
     ASSERT_NO_FATAL_FAILURE(WhenFocusSynchronized(client));
     auto const modes = ModeChanges();
@@ -161,7 +175,7 @@ TEST_P(RefreshMode, AcknowledgementsPreserveDeclaredRate) {
   ASSERT_NO_FATAL_FAILURE(Start());
   auto client = AnnouncedClient(1024, 768);
   ASSERT_NO_FATAL_FAILURE(ConnectAcknowledging(client));
-  Headless::FrameObserver frames(client);
+  FrameObserver frames(client);
   ASSERT_TRUE(client.Until([&] { return !frames.Frames().empty(); }));
   ASSERT_TRUE(frames.Ack());
   ASSERT_NO_FATAL_FAILURE(Observe(client, frames));
@@ -172,15 +186,14 @@ INSTANTIATE_TEST_SUITE_P(Window, RefreshMode, testing::Values("windowed", "borde
 
 class ExclusiveFullscreen : public FullscreenSample, public testing::WithParamInterface<char const*> {
 protected:
-  auto WhenDesktopModeChanges(Client& client, Headless::DisplayClient& display, FullDesktopFrames const& desktop)
-      -> void {
+  auto WhenDesktopModeChanges(Client& client, DisplayClient& display, FullDesktopFrames const& desktop) -> void {
     ASSERT_GT(desktop.Full(), 0u);
     ASSERT_TRUE(display.Layout(1920, 1080));
     ASSERT_TRUE(ReadInput(client, "event DISPLAY_DESKTOP_MODE_CHANGED type="
                                       + std::to_string(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED)
                                       + " width=1920 height=1080"));
   }
-  static auto ThenNextWindow(Client& client, Headless::FrameObserver& frames) -> void {
+  static auto ThenNextWindow(Client& client, FrameObserver& frames) -> void {
     auto initial = frames.Frames().size();
     ASSERT_TRUE(frames.Ack());
     ASSERT_TRUE(client.Until([&] { return frames.Frames().size() >= initial + 2; }));
@@ -192,14 +205,14 @@ protected:
     EXPECT_EQ(client.Instance()->context->gdi->width, 320);
     EXPECT_EQ(client.Instance()->context->gdi->height, 200);
   }
-  auto DelayAcknowledgement(Client& client, Headless::FrameObserver& frames) -> void {
+  auto DelayAcknowledgement(Client& client, FrameObserver& frames) -> void {
     Expects(frames.Acknowledgements().size() >= 2, "two previous acknowledgements define the delay");
     ASSERT_NO_FATAL_FAILURE(WhenKeyDown(client));
     auto interval = frames.Acknowledgements().back() - frames.Acknowledgements()[frames.Acknowledgements().size() - 2];
     std::this_thread::sleep_until(frames.Acknowledgements().back() + (interval * 3));
   }
-  auto IncrementalFrames(Client& client, Headless::FrameObserver& frames, FullDesktopFrames& desktop,
-                         std::string_view change) -> void {
+  auto IncrementalFrames(Client& client, FrameObserver& frames, FullDesktopFrames& desktop, std::string_view change)
+      -> void {
     Expects(!change.empty(), "frame trigger is named");
     auto baseline   = desktop.Full();
     auto before     = frames.Frames().size();
@@ -219,7 +232,7 @@ protected:
     Expects(process == nullptr, "sample has not started");
     GivenProcess({ "SDL_RDP_CODEC=" + std::string(GetParam()) }, { "--fullscreen", "--mode", "320x200", "--partial" });
   }
-  auto InitialFrames(Client& client, Headless::DisplayClient& display, Headless::FrameObserver& frames) -> void {
+  auto InitialFrames(Client& client, DisplayClient& display, FrameObserver& frames) -> void {
     Expects(process != nullptr, "sample is running");
     ASSERT_TRUE(client.Until([&] { return !frames.Frames().empty(); }));
     auto initial = frames.Frames().size();
@@ -232,11 +245,11 @@ protected:
 
 TEST_P(ExclusiveFullscreen, DoesNotRepaintOnModeChanges) {
   ASSERT_NO_FATAL_FAILURE(Start());
-  auto                    client  = AnnouncedClient(1280, 800);
-  Headless::DisplayClient display(client);
+  auto          client  = AnnouncedClient(1280, 800);
+  DisplayClient display(client);
   ASSERT_NO_FATAL_FAILURE(ConnectAcknowledging(client));
-  FullDesktopFrames       desktop(client);
-  Headless::FrameObserver frames(client);
+  FullDesktopFrames desktop(client);
+  FrameObserver     frames(client);
   ASSERT_NO_FATAL_FAILURE(InitialFrames(client, display, frames));
   ASSERT_NO_FATAL_FAILURE(WhenDesktopModeChanges(client, display, desktop));
   ASSERT_NO_FATAL_FAILURE(IncrementalFrames(client, frames, desktop, "screen"));
@@ -264,14 +277,14 @@ TEST_F(FullscreenSample, AspectMapsMouse) {
 }
 
 namespace {
-auto ThenRefilledWindow(Client& client, Headless::FrameObserver& observer, std::size_t& acknowledged,
-                        std::size_t window) -> void {
+auto ThenRefilledWindow(Client& client, FrameObserver& observer, std::size_t& acknowledged, std::size_t window)
+    -> void {
   ASSERT_EQ(observer.Frames().size() - acknowledged, window);
   ASSERT_TRUE(observer.Ack());
   acknowledged = observer.Frames().size();
   ASSERT_TRUE(client.Until([&] { return observer.Frames().size() >= acknowledged + window; }));
 }
-auto FillSendWindow(Client& client, Headless::FrameObserver& observer) -> void {
+auto FillSendWindow(Client& client, FrameObserver& observer) -> void {
   Expects(observer.Installed(), "frame observer is installed");
   auto window = freerdp_settings_get_uint32(client.Instance()->context->settings, FreeRDP_FrameAcknowledge);
   ASSERT_EQ(window, 2u);
@@ -287,7 +300,7 @@ TEST_F(FullscreenSample, SendWindowWithoutRefreshFeedback) {
   ASSERT_NO_FATAL_FAILURE(GivenProcess({ }, { "--tight" }));
   auto client = AnnouncedClient(640, 480);
   ASSERT_NO_FATAL_FAILURE(ConnectAcknowledging(client));
-  Headless::FrameObserver observer(client);
+  FrameObserver observer(client);
   ASSERT_TRUE(ReadInput(client, "event FOCUS_GAINED "));
   auto mode = process->Transcript().rfind("event DISPLAY_CURRENT_MODE_CHANGED ");
   ASSERT_NO_FATAL_FAILURE(FillSendWindow(client, observer));

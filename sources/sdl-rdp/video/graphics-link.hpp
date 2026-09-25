@@ -1,9 +1,13 @@
 #pragma once
 #include <sdl-rdp/diagnostics/failure-log.hpp>
+#include <sdl-rdp/diagnostics/forward.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/link/dynamic-channel.hpp>
+#include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/utilities/factory.hpp>
 #include <sdl-rdp/utilities/operation-name.hpp>
+#include <sdl-rdp/video/forward.hpp>
+#include <sdl-rdp/video/frame/forward.hpp>
 #include <sdl-rdp/video/gfx/channel.hpp>
 
 #include <winpr/wtypes.h>
@@ -13,14 +17,20 @@
 #include <span>
 #include <string_view>
 
-namespace Backend {
+namespace sdl_rdp::video::detail::graphics_link {
+using sdl_rdp::diagnostics::Diagnostics;
+using sdl_rdp::diagnostics::FailureLog;
+using sdl_rdp::freerdp_facade::WaitHandle;
+using sdl_rdp::link::Activation;
+using sdl_rdp::link::DynamicChannel;
+using sdl_rdp::link::PeerLink;
+using sdl_rdp::utilities::Factory;
+using sdl_rdp::utilities::OperationName;
+using sdl_rdp::video::frame::FramePacing;
+using sdl_rdp::video::gfx::GfxChannel;
+
 inline constexpr auto        GraphicsConnectionWait = std::chrono::seconds(3);
 inline constexpr std::size_t GraphicsHandleLimit    = 1;
-class Activation;
-class Diagnostics;
-class Encoder;
-class FramePacing;
-class PeerLink;
 class GraphicsLink final : public DynamicChannel {
 public:
        GraphicsLink(PeerLink& link, Diagnostics const& diagnostics, Activation& activation, FramePacing const& pacing,
@@ -47,4 +57,10 @@ private:
   std::unique_ptr<GfxChannel>                           _channel;
   bool                                                  _attempted  { };
 };
+}
+
+namespace sdl_rdp::video {
+using detail::graphics_link::GraphicsConnectionWait;
+using detail::graphics_link::GraphicsHandleLimit;
+using detail::graphics_link::GraphicsLink;
 }

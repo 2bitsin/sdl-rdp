@@ -13,7 +13,10 @@
 #include <cstddef>
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::video::detail::graphics_link {
+using sdl_rdp::link::DynamicChannelsReady;
+using sdl_rdp::utilities::Expects;
+
 GraphicsLink::GraphicsLink(PeerLink& link, Diagnostics const& diagnostics, Activation& activation,
                            FramePacing const& pacing, Encoder const& encoder,
                            Factory<std::unique_ptr<GfxChannel>, DynamicChannel&> make) noexcept

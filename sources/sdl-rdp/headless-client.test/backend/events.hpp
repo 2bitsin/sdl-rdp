@@ -16,15 +16,14 @@
 #include <memory>
 #include <vector>
 
-namespace BackendGate {
+namespace sdl_rdp::headless_client_test::backend::detail::events {
 using Clock = std::chrono::steady_clock;
-using Headless::Client;
-using Headless::DisplayClient;
-using Headless::FrameObserver;
-using Headless::GraphicsScene;
-using Headless::Logs;
-using utilities::Expects;
-using utilities::Required;
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::DisplayClient;
+using sdl_rdp::headless_client_test::frame::FrameObserver;
+using sdl_rdp::headless_client_test::frame::GraphicsScene;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Required;
 // Both fixtures share the same bounded event accumulation; predicates inspect the
 // whole sequence, so an early poll cannot lose half of a transition.
 class BackendEvents {
@@ -44,8 +43,13 @@ protected:
   auto ThenConnectedCodec(Client& client, sdlrdp_codec expected)                       -> void;
   auto Accumulate(std::vector<sdlrdp_event>& result, bool include_refresh) const       -> void;
   auto AwaitBackend() const                                                            -> bool;
-  CertificateDirectory      certificates;
-  Logs                      logs;
-  Headless::BackendInstance backend;
+  CertificateDirectory certificates;
+  Logs                 logs;
+  BackendInstance      backend;
 };
+}
+
+namespace sdl_rdp::headless_client_test::backend {
+using detail::events::BackendEvents;
+using detail::events::Clock;
 }

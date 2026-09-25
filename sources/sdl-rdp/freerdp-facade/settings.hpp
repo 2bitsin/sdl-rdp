@@ -14,7 +14,9 @@
 #include <utility>
 
 namespace sdl_rdp::freerdp_facade::detail::settings {
-using Settings = std::unique_ptr<rdpSettings, Backend::Releases<freerdp_settings_free>>;
+using sdl_rdp::utilities::Releases;
+
+using Settings = std::unique_ptr<rdpSettings, Releases<freerdp_settings_free>>;
 template <std::ranges::input_range EntriesTy>
 using KeyOf = typename std::ranges::range_value_t<EntriesTy>::first_type;
 

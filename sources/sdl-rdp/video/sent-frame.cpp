@@ -1,7 +1,7 @@
 #include <sdl-rdp/video/sent-frame.hpp>
 #include <cstdint>
 
-namespace Backend {
+namespace sdl_rdp::video::detail::sent_frame {
 SentFrame::SentFrame(std::uint32_t frame, std::uint64_t presented, Clock::time_point at) noexcept
     : _id{ frame }, _presented{ presented }, _sent{ at } { }
 auto SentFrame::Id() const noexcept -> std::uint32_t {

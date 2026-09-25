@@ -13,6 +13,7 @@ public:
   }
 };
 }
+
 namespace sdl3::rdp::backend {
 using detail::pointerstate::PointerState;
 }

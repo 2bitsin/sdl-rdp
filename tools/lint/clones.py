@@ -8,12 +8,13 @@ import sys
 ROOT     = pathlib.Path(__file__).resolve().parents[2]
 JSCPD    = 'jscpd@4.0.5'
 INCLUDES = r'#include\s+[<"][^>"]*[>"]'
+IMPORTS  = r'using\s+[\w:]+(?:operator""\w+)?\s*;'
 
 
 def command():
     return ['npx', '--yes', JSCPD, '--min-tokens', '40', '--min-lines', '5', '--format', 'cpp',
-            '--formats-exts', 'cpp:cpp,hpp,c,h', '--ignore-pattern', INCLUDES, '--noSymlinks', '--exitCode', '1',
-            'sources']
+            '--formats-exts', 'cpp:cpp,hpp,c,h', '--ignore-pattern', f'{INCLUDES},{IMPORTS}', '--noSymlinks',
+            '--exitCode', '1', 'sources']
 
 
 def main():

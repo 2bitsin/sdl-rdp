@@ -6,9 +6,12 @@
 
 #include <gtest/gtest.h>
 
-namespace sdl_rdp::configuration {
+namespace sdl_rdp::configuration::detail::validation {
+using sdl_rdp::utilities::InvalidArguments;
+using sdl_rdp::utilities::OutOfRange;
+
 namespace {
-using utilities::support_test::OutOfRangeEnum;
+using sdl_rdp::utilities::support_test::OutOfRangeEnum;
 auto Valid() -> sdlrdp_config {
   sdlrdp_config config{ };
   config.width  = 640;
@@ -34,19 +37,19 @@ TEST(Validate, RefusesEachFieldOutsideItsRange) {
   codec.codec           = OutOfRangeEnum<sdlrdp_codec>(SDLRDP_CODEC_AVC420 + 1);
   port.port             = 65536;
   EXPECT_THROW(Validate(auth), InvalidChoice);
-  EXPECT_THROW(Validate(size), Backend::OutOfRange);
-  EXPECT_THROW(Validate(rate), Backend::OutOfRange);
+  EXPECT_THROW(Validate(size), OutOfRange);
+  EXPECT_THROW(Validate(rate), OutOfRange);
   EXPECT_THROW(Validate(codec), InvalidChoice);
-  EXPECT_THROW(Validate(port), Backend::OutOfRange);
+  EXPECT_THROW(Validate(port), OutOfRange);
 }
 TEST(ValidRefresh, NamesTheModeWithinItsCeiling) {
-  EXPECT_EQ(ValidRefresh(0, 1), Backend::RefreshMode::Fixed);
-  EXPECT_EQ(ValidRefresh(3, 10), Backend::RefreshMode::Sender);
+  EXPECT_EQ(ValidRefresh(0, 1), RefreshMode::Fixed);
+  EXPECT_EQ(ValidRefresh(3, 10), RefreshMode::Sender);
 }
 TEST(ValidRefresh, RefusesUnknownModesAndCeilings) {
-  EXPECT_THROW(ValidRefresh(4, 60), Backend::InvalidArguments);
-  EXPECT_THROW(ValidRefresh(0, 0), Backend::InvalidArguments);
-  EXPECT_THROW(ValidRefresh(1, 9), Backend::InvalidArguments);
-  EXPECT_THROW(ValidRefresh(0, 2147484), Backend::InvalidArguments);
+  EXPECT_THROW(ValidRefresh(4, 60), InvalidArguments);
+  EXPECT_THROW(ValidRefresh(0, 0), InvalidArguments);
+  EXPECT_THROW(ValidRefresh(1, 9), InvalidArguments);
+  EXPECT_THROW(ValidRefresh(0, 2147484), InvalidArguments);
 }
 }

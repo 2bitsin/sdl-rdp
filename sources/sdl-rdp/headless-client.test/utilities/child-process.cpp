@@ -11,16 +11,21 @@
 #include <unistd.h>
 #include <utility>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::utilities::detail::child_process {
+using sdl_rdp::utilities::Contained;
+using sdl_rdp::utilities::Ensures;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::SystemCall;
+
 namespace {
 constexpr int BodyThrew = 124;
 
 auto Run(std::function<int()> const& body) noexcept -> int {
-  return Backend::Contained(BodyThrew, body, [](std::string_view) noexcept { });
+  return Contained(BodyThrew, body, [](std::string_view) noexcept { });
 }
 auto Spawned(std::function<int()> const& body) -> pid_t {
-  utilities::Expects(static_cast<bool>(body), "the child has a body");
-  auto const pid = Backend::SystemCall(::fork(), "fork");
+  Expects(static_cast<bool>(body), "the child has a body");
+  auto const pid = SystemCall(::fork(), "fork");
   if (pid == 0) ::_exit(Run(body));
   return pid;
 }
@@ -31,10 +36,10 @@ ChildProcess::~ChildProcess() {
   if (pid != Reaped) std::ignore = Wait();
 }
 auto ChildProcess::Wait() -> int {
-  utilities::Expects(pid != Reaped, "the child is not reaped yet");
+  Expects(pid != Reaped, "the child is not reaped yet");
   int        status = 0;
   auto const reaped = waitpid(std::exchange(pid, Reaped), &status, 0);
-  utilities::Ensures(reaped > 0, "the child is reaped");
+  Ensures(reaped > 0, "the child is reaped");
   return status;
 }
 auto ChildProcess::ExitedCleanly() -> bool {

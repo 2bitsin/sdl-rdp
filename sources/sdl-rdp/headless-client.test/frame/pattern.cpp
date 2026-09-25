@@ -5,7 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::frame::detail::pattern {
 auto MovingTilePattern(std::span<std::uint32_t> pixels, std::size_t width, std::size_t height, std::size_t frame)
     -> void {
   constexpr std::array<std::uint32_t, 4> colors { 0x335577, 0x55aaff, 0x779933, 0xaa5533 };

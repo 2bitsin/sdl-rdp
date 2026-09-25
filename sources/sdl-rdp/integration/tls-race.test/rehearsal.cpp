@@ -34,11 +34,19 @@
 #include <utility>
 #include <vector>
 
+namespace sdl_rdp::integration::tls_race_test::detail::rehearsal {
+using sdl_rdp::auth::Credentials;
+using sdl_rdp::auth::EnsureCertificate;
+using sdl_rdp::auth::TlsAcceptRefused;
+using sdl_rdp::auth::TlsRehearsal;
+using sdl_rdp::headless_client_test::backend::BackendInstance;
+using sdl_rdp::headless_client_test::backend::LoopbackConfig;
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::utilities::ChildProcess;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
 namespace {
 using namespace std::chrono_literals;
-using Race::InjectedFaults;
-using Race::MethodFill;
-using Race::Setter;
 using Outcome = auto (*)(int status) -> bool;
 constexpr std::size_t   Children          = 200;
 constexpr std::size_t   FaultChildren     = 10;
@@ -51,8 +59,8 @@ constexpr int           MethodFilledLate  = 2;
 constexpr int           FailedOtherwise   = 4;
 constexpr int           Unbounded         = 8;
 
-auto Child(std::function<int()> const& body) -> Headless::ChildProcess {
-  return Headless::ChildProcess{ [&] {
+auto Child(std::function<int()> const& body) -> ChildProcess {
+  return ChildProcess{ [&] {
     WLog_SetLogLevel(WLog_GetRoot(), WLOG_OFF);
     alarm(ChildLimitSeconds);
     return body();
@@ -64,7 +72,7 @@ auto WaveStatuses(std::size_t size, std::function<int()> const& body) -> std::ve
   return children | std::views::transform([](auto& child) { return child.Wait(); }) | std::ranges::to<std::vector>();
 }
 auto Statuses(std::size_t count, std::function<int()> const& body) -> std::vector<int> {
-  utilities::Expects(count % ChildrenPerWave == 0, "the children fill whole waves");
+  Expects(count % ChildrenPerWave == 0, "the children fill whole waves");
   return std::views::iota(0uz, count / ChildrenPerWave)
          | std::views::transform([&](std::size_t) { return WaveStatuses(ChildrenPerWave, body); }) | std::views::join
          | std::ranges::to<std::vector>();
@@ -95,7 +103,7 @@ auto Unexplained(int status) -> bool {
   return std::ranges::none_of(Explained, [status](auto const& outcome) { return outcome.second(status); });
 }
 auto Count(std::vector<int> const& statuses, Outcome outcome) -> std::size_t {
-  return Backend::Narrowed<std::size_t>(std::ranges::count_if(statuses, outcome));
+  return Narrowed<std::size_t>(std::ranges::count_if(statuses, outcome));
 }
 auto RecordOutcomes(std::vector<int> const& statuses) -> void {
   for (auto const& [name, outcome] : Explained)
@@ -107,7 +115,7 @@ auto AsRacer(std::function<void()> const& step) -> int {
     try {
       step();
       return 0;
-    } catch (Backend::TlsAcceptRefused const&) {
+    } catch (TlsAcceptRefused const&) {
       return AcceptRefused;
     } catch (std::exception const&) {
       return FailedOtherwise;
@@ -123,33 +131,32 @@ auto RaceTwice(std::function<void()> const& step, std::string_view method, Sette
   auto const lost   = first.get() | second.get();
   return lost | (MethodFill::Shared().Fills() != 0 ? MethodFilledLate : 0);
 }
-auto RaceTwoRehearsals(Backend::Credentials const& credentials) -> int {
-  return RaceTwice([&] { Backend::TlsRehearsal{ credentials }.Perform(); }, Race::TlsMethod, Setter::Write);
+auto RaceTwoRehearsals(Credentials const& credentials) -> int {
+  return RaceTwice([&] { TlsRehearsal{ credentials }.Perform(); }, TlsMethod, Setter::Write);
 }
-auto RaceTwoPeerContexts(Backend::Credentials const& credentials) -> int {
-  return RaceTwice([&] { [[maybe_unused]] Backend::TlsRehearsal const built{ credentials }; }, Race::SocketMethod,
-                   Setter::Create);
+auto RaceTwoPeerContexts(Credentials const& credentials) -> int {
+  return RaceTwice([&] { [[maybe_unused]] TlsRehearsal const built{ credentials }; }, SocketMethod, Setter::Create);
 }
-auto OpenedBackend(std::string const& certificates) -> Headless::BackendInstance {
-  Headless::BackendInstance backend;
-  std::ignore = backend.TryOpen(Headless::LoopbackConfig(certificates));
+auto OpenedBackend(std::string const& certificates) -> BackendInstance {
+  BackendInstance backend;
+  std::ignore = backend.TryOpen(LoopbackConfig(certificates));
   return backend;
 }
 auto ConnectToOpenedBackend(std::string const& certificates) -> int {
   auto const backend = OpenedBackend(certificates);
   if (!backend) return FailedOtherwise;
-  MethodFill::Shared().Arm(Race::TlsMethod, Setter::Write);
-  Headless::Client client(sdlrdp_port(backend.Handle()), false);
-  auto const       connected = client.Connect();
+  MethodFill::Shared().Arm(TlsMethod, Setter::Write);
+  Client     client(sdlrdp_port(backend.Handle()), false);
+  auto const connected = client.Connect();
   return (connected ? 0 : FailedOtherwise) | (MethodFill::Shared().Fills() != 0 ? MethodFilledLate : 0);
 }
 auto OpenFailsWithMessage(std::string const& certificates) -> int {
   auto const backend = OpenedBackend(certificates);
   return !backend && !std::string(sdlrdp_last_error()).empty() ? 0 : FailedOtherwise;
 }
-auto GivesUpWithin(std::chrono::milliseconds limit, Backend::Credentials const& credentials) -> int {
-  Backend::TlsRehearsal rehearsal { credentials, limit };
-  auto const            start     = std::chrono::steady_clock::now();
+auto GivesUpWithin(std::chrono::milliseconds limit, Credentials const& credentials) -> int {
+  TlsRehearsal rehearsal { credentials, limit };
+  auto const   start     = std::chrono::steady_clock::now();
   try {
     std::move(rehearsal).Perform();
     return FailedOtherwise;
@@ -165,12 +172,12 @@ auto ExpectCleanChildren(std::size_t count, std::function<int()> const& body) ->
 class TlsRehearsalRace : public testing::Test {
 protected:
   auto SetUp() -> void override {
-    Backend::EnsureCertificate(credentials);
+    EnsureCertificate(credentials);
     ASSERT_TRUE(winpr_InitializeSSL(WINPR_SSL_INIT_DEFAULT));
-    if (MethodFill::Shared().Seen(Race::SocketMethod) || MethodFill::Shared().Seen(Race::TlsMethod))
+    if (MethodFill::Shared().Seen(SocketMethod) || MethodFill::Shared().Seen(TlsMethod))
       GTEST_SKIP() << "FreeRDP filled its BIO methods earlier in this process.";
   }
-  [[nodiscard]] auto ServerCredentials() const -> Backend::Credentials const& {
+  [[nodiscard]] auto ServerCredentials() const -> Credentials const& {
     return credentials;
   }
   [[nodiscard]] auto CertificateDirectory() const -> std::string const& {
@@ -180,11 +187,11 @@ protected:
 private:
   oxbox::platform::ScratchArea directory  { "tls-race", "sdl-rdp"     };
   std::string const            path       { directory.Path().string() };
-  Backend::Credentials const   credentials{ directory.Path()          };
+  Credentials const            credentials{ directory.Path()          };
 };
 TEST_F(TlsRehearsalRace, UnrehearsedTlsAcceptsRace) {
   auto const statuses = Statuses(Children, [this] {
-    [[maybe_unused]] Backend::TlsRehearsal const socket_tables_filled{ ServerCredentials() };
+    [[maybe_unused]] TlsRehearsal const socket_tables_filled{ ServerCredentials() };
     return RaceTwoRehearsals(ServerCredentials());
   });
   RecordOutcomes(statuses);
@@ -201,7 +208,7 @@ TEST_F(TlsRehearsalRace, UnrehearsedPeerContextsRace) {
 }
 TEST_F(TlsRehearsalRace, RehearsedFirstUsesNeverRace) {
   ExpectCleanChildren(Children, [this] {
-    Backend::TlsRehearsal{ ServerCredentials() }.Perform();
+    TlsRehearsal{ ServerCredentials() }.Perform();
     return RaceTwoPeerContexts(ServerCredentials()) | RaceTwoRehearsals(ServerCredentials());
   });
 }
@@ -225,5 +232,6 @@ TEST_F(TlsRehearsalRace, UnansweredClientGivesUpWithinLimit) {
     InjectedFaults::Shared().DropServerWrites();
     return GivesUpWithin(ShortCallLimit, ServerCredentials());
   });
+}
 }
 }

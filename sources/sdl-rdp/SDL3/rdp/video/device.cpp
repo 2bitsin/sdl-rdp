@@ -8,15 +8,18 @@
 #include <sdl-rdp/SDL3/rdp/settings/options.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 namespace sdl3::rdp::video::detail::device {
-using backend::Boundary;
-using backend::Operation;
-using input::InitMouse;
+using sdl3::rdp::backend::Boundary;
+using sdl3::rdp::backend::Operation;
+using sdl3::rdp::input::InitMouse;
+using sdl3::rdp::settings::BackendAspect;
+using sdl3::rdp::settings::Text;
+using sdl3::rdp::storage::UpdateDrives;
 using sdl_rdp::settings::Aspect;
 using sdl_rdp::settings::Settings;
-using settings::Text;
-using storage::UpdateDrives;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
 auto SetAspect(Driver const& driver, Aspect const& value) -> void {
-  if (driver.Call<Operation::SET_ASPECT>(settings::BackendAspect(value)) != 0) driver.Throw();
+  if (driver.Call<Operation::SET_ASPECT>(BackendAspect(value)) != 0) driver.Throw();
 }
 auto PublishAspect(SDL_Window& window, Aspect const& value) -> void {
   SDL_SetStringProperty(SDL_GetWindowProperties(&window), SDL_PROP_WINDOW_RDP_ASPECT_STRING, value.Text().c_str());
@@ -33,13 +36,13 @@ auto ApplyAspect(SDL_VideoData& data, Aspect const& value) -> void {
 template <auto FIELD, auto APPLY>
 auto SDLCALL HintChanged(void* context, [[maybe_unused]] char const* name, char const* old_value, char const* new_value)
     -> void {
-  utilities::Expects(context != nullptr, "hint observer has video state");
+  Expects(context != nullptr, "hint observer has video state");
   auto& data = *static_cast<SDL_VideoData*>(context);
   Boundary([&] { APPLY(data, data.Backend().Options().Changed<FIELD>(Text(old_value), Text(new_value))); });
 }
 auto StartRefresh(Driver const& driver) -> int {
   auto const refresh = driver.Options().Value<&Settings::refresh>();
-  auto const hz      = ::Backend::Narrowed<int>(refresh.Hz());
+  auto const hz      = Narrowed<int>(refresh.Hz());
   if (driver.Call<Operation::SET_REFRESH>(std::to_underlying(refresh.Mode()), hz) != 0) driver.Throw();
   return hz;
 }
@@ -84,7 +87,7 @@ constexpr auto StandardModes = std::to_array<std::pair<int, int>>({
 });
 // SDL's video callback table supplies a borrowed device and display.
 auto DisplayModes([[maybe_unused]] SDL_VideoDevice* unused_device, SDL_VideoDisplay* display) -> bool {
-  utilities::Expects(display != nullptr, "mode enumeration has a display");
+  Expects(display != nullptr, "mode enumeration has a display");
   auto mode = display->desktop_mode;
   SDL_AddFullscreenDisplayMode(display, &mode);
   for (auto const& [width, height] : StandardModes) {
@@ -97,8 +100,8 @@ auto DisplayModes([[maybe_unused]] SDL_VideoDevice* unused_device, SDL_VideoDisp
 // SDL's video callback table supplies borrowed device, display and mode pointers.
 auto DisplayMode(SDL_VideoDevice* device, [[maybe_unused]] SDL_VideoDisplay* unused_display, SDL_DisplayMode* mode)
     -> bool {
-  utilities::Expects(device != nullptr, "mode change has a device");
-  utilities::Expects(mode != nullptr, "mode change has a mode");
+  Expects(device != nullptr, "mode change has a device");
+  Expects(mode != nullptr, "mode change has a mode");
   return ResizePicture(*device->internal, mode->w, mode->h);
 }
 auto RelativeMouse(bool enabled) -> bool {
@@ -107,7 +110,7 @@ auto RelativeMouse(bool enabled) -> bool {
 }
 // SDL's video initialization callback borrows its device.
 auto VideoInit(SDL_VideoDevice* device) -> bool {
-  utilities::Expects(device != nullptr, "video initialization has a device");
+  Expects(device != nullptr, "video initialization has a device");
   return Boundary([&] {
     InitDisplay(*device->internal);
     SDL_AddKeyboard(SDL_DEFAULT_KEYBOARD_ID, nullptr);
@@ -119,12 +122,12 @@ auto VideoInit(SDL_VideoDevice* device) -> bool {
 }
 // SDL's video shutdown callback borrows its device.
 auto VideoQuit(SDL_VideoDevice* device) -> void {
-  utilities::Expects(device != nullptr, "video shutdown has a device");
+  Expects(device != nullptr, "video shutdown has a device");
   device->internal->Display(0);
 }
 // SDL returns ownership of the device and its opaque internal state to this callback.
 auto DeleteDevice(SDL_VideoDevice* device) -> void {
-  utilities::Expects(device != nullptr, "device destruction owns a device");
+  Expects(device != nullptr, "device destruction owns a device");
   std::unique_ptr<SDL_VideoDevice> const owner{ device                                  };
   std::unique_ptr<SDL_VideoData> const   state{ std::exchange(owner->internal, nullptr) };
 }
@@ -154,7 +157,6 @@ auto CreateDevice() -> SDL_VideoDevice* {
   });
 }
 }
+// SDL's C bootstrap table requires this named object with static storage; C linkage names the global symbol.
+extern "C" VideoBootStrap const RDP_bootstrap = { "rdp", "SDL RDP video driver", CreateDevice, nullptr, false };
 }
-// SDL's C bootstrap table requires this named object with static storage.
-extern "C" VideoBootStrap const RDP_bootstrap = { "rdp", "SDL RDP video driver",
-                                                  sdl3::rdp::video::detail::device::CreateDevice, nullptr, false };

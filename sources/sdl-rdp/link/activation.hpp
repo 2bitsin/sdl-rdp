@@ -1,14 +1,14 @@
 #pragma once
 #include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/link/forward.hpp>
 
 #include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <optional>
 
-namespace Backend {
-class EventQueue;
-class PeerLink;
+namespace sdl_rdp::link::detail::activation {
+
 class Activation {
 public:
   using Clock = std::chrono::steady_clock;
@@ -40,4 +40,8 @@ private:
   bool             _activated { };
   bool             _suppressed{ };
 };
+}
+
+namespace sdl_rdp::link {
+using detail::activation::Activation;
 }

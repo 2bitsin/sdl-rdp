@@ -8,6 +8,7 @@ struct DriveOptions {
 };
 auto RunDrives(DriveOptions const& /*options*/) -> bool;
 }
+
 namespace sample {
 using detail::drives::DriveOptions;
 using detail::drives::RunDrives;

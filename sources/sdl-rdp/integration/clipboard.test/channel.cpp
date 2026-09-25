@@ -15,6 +15,13 @@
 #include <cstring>
 #include <span>
 
+namespace sdl_rdp::integration::clipboard_test::detail::channel {
+using sdl_rdp::headless_client_test::backend::BackendInstance;
+using sdl_rdp::headless_client_test::backend::Logs;
+using sdl_rdp::headless_client_test::backend::LoopbackConfig;
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::ClipboardClient;
+using sdl_rdp::utilities::Narrowed;
 namespace {
 using sdl_rdp::headless_client_test::utilities::Octets;
 using sdl_rdp::headless_client_test::utilities::UnicodeText;
@@ -24,7 +31,7 @@ auto HasClipboardEvent(std::span<sdlrdp_event const> events) -> bool {
 class Clipboard : public testing::Test {
 protected:
   auto Poll(std::span<sdlrdp_event> events) -> std::span<sdlrdp_event const> {
-    return events.first(sdlrdp_poll(handle.Handle(), events.data(), Backend::Narrowed<std::uint32_t>(events.size())));
+    return events.first(sdlrdp_poll(handle.Handle(), events.data(), Narrowed<std::uint32_t>(events.size())));
   }
   auto Drain() -> void {
     std::array<sdlrdp_event, 32> events{ };
@@ -50,28 +57,28 @@ protected:
     EXPECT_STREQ(sdlrdp_get_clipboard_text(handle.Handle()), "world");
   }
   auto GivenClipboard() -> void {
-    client    = std::make_unique<Headless::Client>(sdlrdp_port(handle.Handle()), false);
-    clipboard = std::make_unique<Headless::ClipboardClient>(*client);
+    client    = std::make_unique<Client>(sdlrdp_port(handle.Handle()), false);
+    clipboard = std::make_unique<ClipboardClient>(*client);
     ConnectClipboard(*client, *clipboard);
   }
-  auto ConnectClipboard(Headless::Client& client, Headless::ClipboardClient& clipboard) -> void {
+  auto ConnectClipboard(Client& client, ClipboardClient& clipboard) -> void {
     ASSERT_TRUE(client.Connect()) << logs.Text(true);
     ASSERT_TRUE(client.Until([&] { return clipboard.Observed().accepted.load() == 1; }));
   }
   auto SetUp() -> void override {
     auto directory = certificates.Path().string();
-    auto config    = Headless::LoopbackConfig(directory);
-    config.log      = Headless::Logs::Collect;
+    auto config    = LoopbackConfig(directory);
+    config.log      = Logs::Collect;
     config.log_user = &logs;
     ASSERT_NO_FATAL_FAILURE(handle.Open(config));
   }
-  Headless::Logs                             logs;
-  oxbox::platform::ScratchArea               certificates{ "clipboard", "sdl-rdp" };
-  Headless::BackendInstance                  handle;
-  std::unique_ptr<Headless::Client>          client;
-  std::unique_ptr<Headless::ClipboardClient> clipboard;
+  Logs                             logs;
+  oxbox::platform::ScratchArea     certificates{ "clipboard", "sdl-rdp" };
+  BackendInstance                  handle;
+  std::unique_ptr<Client>          client;
+  std::unique_ptr<ClipboardClient> clipboard;
 };
-auto OfferMalformedText(Headless::Client& client, Headless::ClipboardClient& clipboard) -> void {
+auto OfferMalformedText(Client& client, ClipboardClient& clipboard) -> void {
   for (auto const& bytes : { Octets(0x7c), Octets(0, 0xdc, 0, 0), Octets('x', 0) }) {
     auto count = clipboard.Observed().requests.load();
     ASSERT_TRUE(clipboard.Offer(bytes));
@@ -114,8 +121,8 @@ TEST_F(Clipboard, LiveSetAndMalformedResponse) {
 }
 TEST_F(Clipboard, FirstOfferRetainsAppText) {
   ASSERT_EQ(sdlrdp_set_clipboard_text(handle.Handle(), "app"), 0);
-  Headless::Client          client(sdlrdp_port(handle.Handle()), false);
-  Headless::ClipboardClient clipboard(client, UnicodeText("client"));
+  Client          client(sdlrdp_port(handle.Handle()), false);
+  ClipboardClient clipboard(client, UnicodeText("client"));
   ASSERT_TRUE(client.Connect()) << logs.Text(true);
   ASSERT_TRUE(client.Until([&] { return clipboard.Received(UnicodeText("app")); }));
   EXPECT_EQ(clipboard.Observed().accepted.load(), 1u);
@@ -130,8 +137,8 @@ TEST_F(Clipboard, NonTextOfferClearsText) {
   ThenNonTextOffer();
 }
 TEST(ClipboardTranscode, ByteRanges) {
-  using namespace oxbox::utilities;
-  using Backend::TranscodeRange;
+  using oxbox::utilities::Encoding;
+  using sdl_rdp::utilities::TranscodeRange;
   std::string_view const text    = "Aż😀";
   auto                   input   = std::as_bytes(std::span(text));
   auto                   encoded = TranscodeRange<std::vector<std::uint8_t>>(
@@ -149,5 +156,6 @@ TEST(ClipboardTranscode, ByteRanges) {
                                            { Encoding::UTF16, std::endian::little }, { }),
                std::runtime_error);
   EXPECT_THROW(TranscodeRange<std::string>(input, { }, { Encoding::UCS1 }), std::runtime_error);
+}
 }
 }

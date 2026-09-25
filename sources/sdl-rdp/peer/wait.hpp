@@ -1,19 +1,24 @@
 #pragma once
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/peer/channel-set.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
+#include <sdl-rdp/video/frame/forward.hpp>
 
 #include <winpr/wtypes.h>
 #include <cstdint>
 #include <span>
 
-namespace Backend {
+namespace sdl_rdp::peer::detail::wait {
+using sdl_rdp::freerdp_facade::WaitHandle;
+using sdl_rdp::link::Activation;
+using sdl_rdp::link::PeerLink;
+using sdl_rdp::utilities::Pinned;
+using sdl_rdp::video::GraphicsLink;
+using sdl_rdp::video::frame::FramePacing;
+
 inline constexpr std::uint32_t LoopHandleCount     = 2;
 inline constexpr std::uint32_t AppendedHandleCount = ChannelHandleLimit + LoopHandleCount;
-class Activation;
-class FramePacing;
-class GraphicsLink;
-class PeerLink;
 struct WaitPlan {
   std::uint32_t count  { };
   std::uint32_t timeout{ };
@@ -33,4 +38,8 @@ private:
   FramePacing&      _pacing;
   GraphicsLink&     _graphics;
 };
+}
+
+namespace sdl_rdp::peer {
+using detail::wait::PeerWait;
 }

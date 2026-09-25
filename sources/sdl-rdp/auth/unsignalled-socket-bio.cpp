@@ -1,4 +1,4 @@
-#include "_detail/unsignalled-socket-bio.hpp"
+#include <sdl-rdp/auth/unsignalled-socket-bio.hpp>
 
 #include <sdl-rdp/auth/exceptions.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
@@ -13,9 +13,14 @@
 #include <sys/socket.h>
 #include <tuple>
 
-namespace Backend {
+namespace sdl_rdp::auth::detail::unsignalled_socket_bio {
+using sdl_rdp::utilities::AllocationFailed;
+using sdl_rdp::utilities::Contained;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Releases;
+
 namespace {
-using utilities::Expects;
+using sdl_rdp::utilities::Expects;
 using Method = std::unique_ptr<BIO_METHOD, Releases<BIO_meth_free>>;
 constexpr int Unset = -1;
 // OpenSSL's BIO control table dictates its C `long` argument and result.

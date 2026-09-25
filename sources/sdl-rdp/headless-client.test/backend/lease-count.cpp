@@ -2,7 +2,9 @@
 
 #include <sdl-rdp/utilities/contract.hpp>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::backend::detail::lease_count {
+using sdl_rdp::utilities::Expects;
+
 auto LeaseCount::Acquire() -> void {
   std::scoped_lock const lock(_guard);
   ++_leases;
@@ -10,7 +12,7 @@ auto LeaseCount::Acquire() -> void {
 // The notify stays under the lock so Drain cannot return, and its owner free this count, before it completes.
 auto LeaseCount::Release() noexcept -> void {
   std::scoped_lock const lock(_guard);
-  utilities::Expects(_leases > 0, "a lease is outstanding");
+  Expects(_leases > 0, "a lease is outstanding");
   --_leases;
   _released.notify_all();
 }

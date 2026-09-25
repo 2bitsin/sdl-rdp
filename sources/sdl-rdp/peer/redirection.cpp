@@ -11,8 +11,10 @@
 #include <algorithm>
 #include <utility>
 
-namespace Backend {
-using sdl_rdp::drive::DriveChannel;
+namespace sdl_rdp::peer::detail::redirection {
+using sdl_rdp::link::Joined;
+using sdl_rdp::utilities::Expects;
+
 Redirection::Redirection(PeerLink& link, Activation const& activation, SessionAccess& session,
                          Factory<std::unique_ptr<AudioChannel>> sound,
                          Factory<std::unique_ptr<ClipboardChannel>> clipboard,

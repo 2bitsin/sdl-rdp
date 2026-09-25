@@ -5,7 +5,9 @@
 #include <cstdint>
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::link::detail::dynamic_channels {
+using sdl_rdp::utilities::Expects;
+
 DynamicChannels::Assignment::Assignment(DynamicChannels& registry, std::uint32_t id, DynamicChannel& owner) noexcept
     : _registry{ registry }, _owner{ owner }, _id{ id } { }
 DynamicChannels::Assignment::Assignment(Assignment&& other) noexcept

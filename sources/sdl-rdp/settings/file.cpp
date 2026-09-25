@@ -15,6 +15,10 @@
 #include <variant>
 
 namespace sdl_rdp::settings::detail::file {
+using sdl_rdp::utilities::Ensures;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::OutOfRange;
+
 namespace {
 using oxbox::serialization::AnyFormat;
 using oxbox::serialization::FileOpenError;
@@ -39,7 +43,7 @@ auto FormatOf(std::filesystem::path const& path) -> AnyFormat {
 // oxbox's reader skips keys its scheme does not name (2bitsin/oxbox#3), so the document's own keys are read.
 template <typename FormatTy>
 auto DocumentKeys(std::filesystem::path const& path) -> std::optional<Keys> {
-  ::utilities::Expects(!path.empty(), "a settings document has a path");
+  Expects(!path.empty(), "a settings document has a path");
   std::ifstream stream{ path, std::ios::in | FormatTraits<FormatTy>::openmode };
   if (!stream) throw FileOpenError{ path };
   IstreamSource                                     source{ stream };
@@ -49,7 +53,7 @@ auto DocumentKeys(std::filesystem::path const& path) -> std::optional<Keys> {
   return reader.FieldNames() | std::ranges::to<Keys>();
 }
 auto RefuseUnknown(std::span<std::string const> keys) -> void {
-  ::utilities::Expects(std::ranges::none_of(keys, &std::string::empty), "a document key has a name");
+  Expects(std::ranges::none_of(keys, &std::string::empty), "a document key has a name");
   auto const known   = oxbox::serialization::FieldNames(Settings{ });
   auto const unknown = std::ranges::find_if(keys, [&](auto const& key) { return !std::ranges::contains(known, key); });
   if (unknown != keys.end()) throw UnknownSettingsKey{ *unknown };
@@ -79,18 +83,18 @@ auto Extensions() -> std::vector<std::string_view> {
   std::ranges::sort(extensions);
   auto const duplicates = std::ranges::unique(extensions);
   extensions.erase(duplicates.begin(), duplicates.end());
-  ::utilities::Ensures(!extensions.empty(), "oxbox claims an extension");
+  Ensures(!extensions.empty(), "oxbox claims an extension");
   return extensions;
 }
 auto SettingsName(std::filesystem::path const& library) -> std::string {
   auto const file = library.filename().string();
-  ::utilities::Expects(!file.empty(), "the library path names a file");
+  Expects(!file.empty(), "the library path names a file");
   auto name = file.substr(0, file.find('.'));
-  ::utilities::Ensures(!name.empty(), "the library name precedes its first dot");
+  Ensures(!name.empty(), "the library name precedes its first dot");
   return name;
 }
 auto Located(std::filesystem::path const& directory, std::string_view name) -> std::optional<std::filesystem::path> {
-  ::utilities::Expects(!name.empty(), "a settings file has a name");
+  Expects(!name.empty(), "a settings file has a name");
   auto const candidate = [&](std::string_view extension) { return directory / std::format("{}{}", name, extension); };
   auto const found     = Extensions() | std::views::transform(candidate)
                          | std::views::filter([](auto const& path) { return std::filesystem::exists(path); })
@@ -100,8 +104,8 @@ auto Located(std::filesystem::path const& directory, std::string_view name) -> s
   return found.front();
 }
 auto Load(std::filesystem::path const& path) -> Settings {
-  ::utilities::Expects(!path.empty(), "a settings file has a path");
+  Expects(!path.empty(), "a settings file has a path");
   return Refusing<ParseError, TypeMismatch, MissingField, FileOpenError, UnknownSettingsFormat, UnknownSettingsKey,
-                  InvalidSettingValue, ::Backend::OutOfRange>(path);
+                  InvalidSettingValue, OutOfRange>(path);
 }
 }

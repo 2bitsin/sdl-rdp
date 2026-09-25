@@ -17,8 +17,11 @@
 #include <string_view>
 #include <thread>
 
-namespace DriveGate {
-using namespace std::chrono_literals;
+namespace sdl_rdp::headless_client_test::drive::detail::session {
+using sdl_rdp::headless_client_test::backend::BackendInstance;
+using sdl_rdp::headless_client_test::backend::Logs;
+using sdl_rdp::headless_client_test::client::Client;
+
 auto Pattern(std::size_t size, std::uint32_t seed = 17) -> std::string;
 
 class DriveSession : public testing::Test {
@@ -38,13 +41,18 @@ protected:
   auto PolledDriveName(bool added, std::uint32_t id)                  -> std::optional<std::string>;
   auto ThenDriveFailure(sdlrdp_file* file, std::size_t warnings)      -> void;
   auto GivenDirectoryEntries()                                        -> std::set<std::string>;
-  sdlrdp_file*                             held_file = nullptr;
-  Headless::Logs                           logs;
-  oxbox::platform::ScratchArea             scratch   { "drive", "sdl-rdp" };
-  Headless::BackendInstance                handle;
-  std::unique_ptr<Headless::Client>        client;
-  std::unique_ptr<Headless::DriveObserver> observer;
-  std::jthread                             pump;
-  std::uint32_t                            drive     = 0;
+  sdlrdp_file*                   held_file = nullptr;
+  Logs                           logs;
+  oxbox::platform::ScratchArea   scratch   { "drive", "sdl-rdp" };
+  BackendInstance                handle;
+  std::unique_ptr<Client>        client;
+  std::unique_ptr<DriveObserver> observer;
+  std::jthread                   pump;
+  std::uint32_t                  drive     = 0;
 };
+}
+
+namespace sdl_rdp::headless_client_test::drive {
+using detail::session::DriveSession;
+using detail::session::Pattern;
 }

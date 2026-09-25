@@ -5,7 +5,9 @@
 #include <gtest/gtest.h>
 #include <array>
 
-namespace Backend {
+namespace sdl_rdp::picture::detail::geometry {
+using sdl_rdp::utilities::OutOfRange;
+
 TEST(Dimensions, AcceptsTheWholeRdpRange) {
   auto const size = Dimensions(MaximumPictureWidth, MaximumPictureHeight);
   EXPECT_EQ(size.width, MaximumPictureWidth);
@@ -24,8 +26,8 @@ TEST(ValidateDamage, AcceptsRectanglesInsideTheFrame) {
 }
 TEST(ValidateDamage, RefusesEmptyNegativeOrOverhangingRectangles) {
   Extent const size{ .width = 640, .height = 480 };
-  EXPECT_THROW(ValidateDamage(std::array{ sdlrdp_rect{ 0, 0, 0, 1 } }, size), sdl_rdp::picture::DamageOutOfBounds);
-  EXPECT_THROW(ValidateDamage(std::array{ sdlrdp_rect{ -1, 0, 1, 1 } }, size), sdl_rdp::picture::DamageOutOfBounds);
-  EXPECT_THROW(ValidateDamage(std::array{ sdlrdp_rect{ 600, 0, 41, 1 } }, size), sdl_rdp::picture::DamageOutOfBounds);
+  EXPECT_THROW(ValidateDamage(std::array{ sdlrdp_rect{ 0, 0, 0, 1 } }, size), DamageOutOfBounds);
+  EXPECT_THROW(ValidateDamage(std::array{ sdlrdp_rect{ -1, 0, 1, 1 } }, size), DamageOutOfBounds);
+  EXPECT_THROW(ValidateDamage(std::array{ sdlrdp_rect{ 600, 0, 41, 1 } }, size), DamageOutOfBounds);
 }
 }

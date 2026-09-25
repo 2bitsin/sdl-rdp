@@ -17,10 +17,23 @@
 #include <vector>
 
 namespace sdl_rdp::integration::video_bench::detail::measurement {
-using support_bench::Check;
-using support_bench::Fail;
-using support_bench::Measured;
-using support_bench::OneSession;
+using sdl_rdp::headless_client_test::backend::AllAcknowledged;
+using sdl_rdp::headless_client_test::backend::AwaitAllAcknowledged;
+using sdl_rdp::headless_client_test::backend::CurrentStatus;
+using sdl_rdp::headless_client_test::backend::RequiredGraphics;
+using sdl_rdp::headless_client_test::backend::RequiredStatus;
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::Clock;
+using sdl_rdp::headless_client_test::frame::GraphicsScene;
+using sdl_rdp::headless_client_test::graphics::RoundFive;
+using sdl_rdp::integration::support_bench::Check;
+using sdl_rdp::integration::support_bench::Fail;
+using sdl_rdp::integration::support_bench::Measured;
+using sdl_rdp::integration::support_bench::OneSession;
+using sdl_rdp::integration::support_bench::Session;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::Timed;
+using sdl_rdp::utilities::Unreachable;
 struct FrameCost {
   std::uint32_t maximum_error = 0;
   double        latency_ms    = 0;
@@ -29,36 +42,36 @@ enum class Scene{ MovingBlock, Noise };
 
 namespace {
 auto Pixels(Scene scene, std::uint32_t frame) -> std::vector<std::uint32_t> {
-  return Headless::GraphicsScene(frame, scene == Scene::Noise);
+  return GraphicsScene(frame, scene == Scene::Noise);
 }
 auto Damage(Scene scene, std::uint32_t frame) -> sdlrdp_rect {
   switch (scene) {
-  case Scene::MovingBlock: return { Backend::Narrowed<int>(frame - 1), 40, 33, 32 };
+  case Scene::MovingBlock: return { Narrowed<int>(frame - 1), 40, 33, 32 };
   case Scene::Noise:       return { 0, 0, 640, 480 };
-  default:                 ::utilities::Unreachable(scene);
+  default:                 Unreachable(scene);
   }
 }
 auto Tolerance(Scene scene) -> std::uint32_t {
   switch (scene) {
   case Scene::MovingBlock: return 24;
   case Scene::Noise:       return 48;
-  default:                 ::utilities::Unreachable(scene);
+  default:                 Unreachable(scene);
   }
 }
 }
 
-class GraphicsMeasurement : public support_bench::Session<BackendGate::RoundFive> {
+class GraphicsMeasurement : public Session<RoundFive> {
 public:
   using Session::Session;
 protected:
   auto MeasureCodec(sdlrdp_codec codec, Scene scene) -> void;
 
 private:
-  auto Prepared(Headless::Client& client, sdlrdp_codec codec, Scene scene)     -> bool;
-  auto MeasuredFrames(Headless::Client& client, Scene scene)                   -> std::optional<FrameCost>;
-  auto RecordFrames(Headless::Client& client, sdlrdp_codec codec, Scene scene) -> void;
-  auto RecordGraphicsTiming(Headless::Client& client)                          -> void;
-  auto EncodeDuration()                                                        -> std::chrono::nanoseconds;
+  auto Prepared(Client& client, sdlrdp_codec codec, Scene scene)     -> bool;
+  auto MeasuredFrames(Client& client, Scene scene)                   -> std::optional<FrameCost>;
+  auto RecordFrames(Client& client, sdlrdp_codec codec, Scene scene) -> void;
+  auto RecordGraphicsTiming(Client& client)                          -> void;
+  auto EncodeDuration()                                              -> std::chrono::nanoseconds;
 };
 template <sdlrdp_codec CODEC, Scene SCENE>
 class CodecMeasurement final : public GraphicsMeasurement {
@@ -79,39 +92,38 @@ BENCHMARK(Measured<RemoteFxNoise>)->Apply(OneSession);
 
 auto GraphicsMeasurement::MeasureCodec(sdlrdp_codec codec, Scene scene) -> void {
   if (!Holds([&] { Open(640, 480, { }, codec); })) return;
-  Headless::Client client(sdlrdp_port(backend.Handle()), true, 640, 480);
+  Client client(sdlrdp_port(backend.Handle()), true, 640, 480);
   if (Prepared(client, codec, scene)) RecordFrames(client, codec, scene);
 }
-auto GraphicsMeasurement::Prepared(Headless::Client& client, sdlrdp_codec codec, Scene scene) -> bool {
+auto GraphicsMeasurement::Prepared(Client& client, sdlrdp_codec codec, Scene scene) -> bool {
   auto const progressive = codec == SDLRDP_CODEC_PROGRESSIVE;
   if (progressive) client.EnableGraphics({ .qoe_acknowledgements = true });
   if (!Holds([&] { Connect(client); })) return false;
   if (progressive && !Check(client.Until([this] { return logs.Contains("GFX confirmed"); }), "the client confirms GFX"))
     return false;
-  return Holds([&] { Present(Pixels(scene, 0), 640, 480); },
-               [&] { sdl_rdp::headless_client_test::backend::AwaitAllAcknowledged(client, backend, logs); });
+  return Holds([&] { Present(Pixels(scene, 0), 640, 480); }, [&] { AwaitAllAcknowledged(client, backend, logs); });
 }
-auto GraphicsMeasurement::MeasuredFrames(Headless::Client& client, Scene scene) -> std::optional<FrameCost> {
+auto GraphicsMeasurement::MeasuredFrames(Client& client, Scene scene) -> std::optional<FrameCost> {
   FrameCost cost;
   for (std::uint32_t frame = 1; frame <= 20; ++frame) {
     auto const pixels    = Pixels(scene, frame);
-    auto const presented = Headless::Clock::now();
+    auto const presented = Clock::now();
     if (!Check(backend.Present(pixels, 640, 480, Damage(scene, frame)) == 0, "the backend presents"))
       return std::nullopt;
-    if (!client.Until([this] { return BackendGate::AllAcknowledged(*backend); })) {
+    if (!client.Until([this] { return AllAcknowledged(*backend); })) {
       Fail(std::format("frame {} is acknowledged: {}", frame, logs.Text(true)));
       return std::nullopt;
     }
-    cost.latency_ms    += std::chrono::duration<double, std::milli>(Headless::Clock::now() - presented).count();
+    cost.latency_ms    += std::chrono::duration<double, std::milli>(Clock::now() - presented).count();
     cost.maximum_error =  std::max(cost.maximum_error, client.MaxError(pixels));
   }
   return cost;
 }
-auto GraphicsMeasurement::RecordFrames(Headless::Client& client, sdlrdp_codec codec, Scene scene) -> void {
+auto GraphicsMeasurement::RecordFrames(Client& client, sdlrdp_codec codec, Scene scene) -> void {
   auto const               initial_encode = EncodeDuration();
   auto const               initial_bytes  = client.Received();
   std::optional<FrameCost> cost;
-  auto const               span           = Backend::Timed([&] { cost = MeasuredFrames(client, scene); });
+  auto const               span           = Timed([&] { cost = MeasuredFrames(client, scene); });
   if (!cost) return;
   Measure(span);
   auto const elapsed   = std::chrono::duration<double>(span).count();
@@ -125,13 +137,13 @@ auto GraphicsMeasurement::RecordFrames(Headless::Client& client, sdlrdp_codec co
   if (codec == SDLRDP_CODEC_PROGRESSIVE) RecordGraphicsTiming(client);
   Check(cost->maximum_error <= Tolerance(scene), "the codec stays within its channel error");
 }
-auto GraphicsMeasurement::RecordGraphicsTiming(Headless::Client& client) -> void {
+auto GraphicsMeasurement::RecordGraphicsTiming(Client& client) -> void {
   auto const qoe_arrived = client.Until([this] {
-    auto const status = BackendGate::CurrentStatus(*backend);
+    auto const status = CurrentStatus(*backend);
     return status.has_value() && status->graphics.has_value() && status->graphics->Qoe().frameId == status->frame;
   });
   if (!Check(qoe_arrived, "the client acknowledges the last frame's QoE")) return;
-  auto const timing = BackendGate::RequiredGraphics(*backend);
+  auto const timing = RequiredGraphics(*backend);
   Record("activation_to_gfx_ms", std::chrono::duration<double, std::milli>(timing.ReadyTime()).count());
   Record("client_decode_ms", timing.Qoe().timeDiffSE);
   Record("client_render_ms", timing.Qoe().timeDiffEDR);
@@ -139,6 +151,6 @@ auto GraphicsMeasurement::RecordGraphicsTiming(Headless::Client& client) -> void
   Check(!logs.Contains("GFX QoE"), "no QoE diagnostic is logged");
 }
 auto GraphicsMeasurement::EncodeDuration() -> std::chrono::nanoseconds {
-  return BackendGate::RequiredStatus(*backend).encode_time;
+  return RequiredStatus(*backend).encode_time;
 }
 }

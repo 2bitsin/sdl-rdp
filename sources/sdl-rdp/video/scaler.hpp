@@ -1,5 +1,7 @@
 #pragma once
+#include <sdl-rdp/picture/forward.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
+#include <sdl-rdp/video/forward.hpp>
 #include <sdl-rdp/video/pixel-band.hpp>
 #include <sdl-rdp/video/tap.hpp>
 
@@ -8,9 +10,10 @@
 #include <span>
 #include <vector>
 
-namespace Backend {
-class DesktopLayout;
-class PeerFrames;
+namespace sdl_rdp::video::detail::scaler {
+using sdl_rdp::picture::DesktopLayout;
+using sdl_rdp::utilities::Pinned;
+
 enum class RowOrder{ TopDown, BottomUp };
 class Scaler : private Pinned {
 public:
@@ -33,4 +36,9 @@ private:
   int                  _column_width { };
   std::uint32_t        _column_source{ };
 };
+}
+
+namespace sdl_rdp::video {
+using detail::scaler::RowOrder;
+using detail::scaler::Scaler;
 }

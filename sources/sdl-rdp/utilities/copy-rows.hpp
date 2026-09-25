@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <ranges>
 #include <span>
-namespace Backend {
+namespace sdl_rdp::utilities::detail::copy_rows {
 template <class Byte> struct Pitched {
   std::span<Byte> bytes;
   std::size_t     pitch{ };
@@ -20,14 +20,18 @@ template <class Byte> auto CoversRows(Pitched<Byte> image, RowBlock block) -> bo
 }
 inline auto CopyRows(Pitched<std::uint8_t const> source, Pitched<std::uint8_t> destination, RowBlock block,
                      bool flip = false) -> void {
-  utilities::Expects(source.pitch >= block.row_bytes, "pitches cover copied bytes");
-  utilities::Expects(destination.pitch >= block.row_bytes, "pitches cover copied bytes");
+  Expects(source.pitch >= block.row_bytes, "pitches cover copied bytes");
+  Expects(destination.pitch >= block.row_bytes, "pitches cover copied bytes");
   auto const source_covered      = CoversRows(source, block);
   auto const destination_covered = CoversRows(destination, block);
-  utilities::Expects(source_covered, "source covers rows");
-  utilities::Expects(destination_covered, "destination covers rows");
+  Expects(source_covered, "source covers rows");
+  Expects(destination_covered, "destination covers rows");
   for (auto row : std::views::iota(std::size_t{ 0 }, block.rows))
     std::ranges::copy(source.bytes.subspan(row * source.pitch, block.row_bytes),
                       destination.bytes.subspan((flip ? block.rows - row - 1 : row) * destination.pitch).begin());
 }
+}
+
+namespace sdl_rdp::utilities {
+using detail::copy_rows::CopyRows;
 }

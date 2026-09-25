@@ -18,7 +18,15 @@
 #include <ranges>
 #include <span>
 
-namespace Backend {
+namespace sdl_rdp::video::detail::display_control {
+using sdl_rdp::diagnostics::FailuresThrough;
+using sdl_rdp::freerdp_facade::BindContext;
+using sdl_rdp::freerdp_facade::CallbackOwner;
+using sdl_rdp::link::DynamicChannelsReady;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::OperationName;
+
 namespace {
 constexpr std::uint32_t MonitorLimit      = 16;
 constexpr std::uint32_t MonitorAreaFactor = 8192;

@@ -10,6 +10,9 @@
 #include <vector>
 
 namespace sdl_rdp::integration::support_bench::detail::measurement {
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Required;
+
 namespace {
 auto OneLine(std::string_view text) -> std::string {
   return text | std::views::split('\n') | std::views::filter([](auto line) { return !line.empty(); })
@@ -28,7 +31,7 @@ auto Measurement::Healthy() const -> bool {
   return std::ranges::none_of(_reporter.Snapshot(), Ended);
 }
 auto Measurement::Measure(Duration span) -> void {
-  ::utilities::Expects(!_span.has_value(), "a session measures one span");
+  Expects(!_span.has_value(), "a session measures one span");
   _span = span;
 }
 auto Measurement::MeasureBody(Duration span) -> void {
@@ -51,9 +54,9 @@ auto Measurement::Report(benchmark::State& state) const -> void {
   else if (auto const reason = Skipped())
     state.SkipWithMessage(*reason);
   else
-    state.SetIterationTime(std::chrono::duration<double>(::utilities::Required(_span.or_else([this] { return _body; }),
-                                                                               "the session measured a span"))
-                               .count());
+    state.SetIterationTime(
+        std::chrono::duration<double>(Required(_span.or_else([this] { return _body; }), "the session measured a span"))
+            .count());
 }
 auto Measurement::Failures() const -> std::string {
   return _reporter.Snapshot() | std::views::filter(&testing::TestPartResult::failed) | std::views::transform(Located)

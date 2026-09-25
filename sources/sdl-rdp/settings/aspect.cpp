@@ -8,9 +8,11 @@
 #include <format>
 
 namespace sdl_rdp::settings::detail::aspect {
+using sdl_rdp::utilities::Expects;
+
 Aspect::Aspect(std::uint32_t numerator, std::uint32_t denominator) : _parts{ Parts{ numerator, denominator } } {
-  ::utilities::Expects(numerator > 0, "an aspect numerator is positive");
-  ::utilities::Expects(denominator > 0, "an aspect denominator is positive");
+  Expects(numerator > 0, "an aspect numerator is positive");
+  Expects(denominator > 0, "an aspect denominator is positive");
 }
 auto Aspect::None() -> Aspect {
   return Aspect{ };
@@ -39,7 +41,7 @@ auto Aspect::IsNone() const -> bool {
   return !_parts.has_value();
 }
 auto Aspect::Ratio() const -> sdlrdp_aspect {
-  ::utilities::Expects(!IsNone(), "only a stated aspect has a ratio");
+  Expects(!IsNone(), "only a stated aspect has a ratio");
   auto const parts = _parts.value_or(Parts{ });
   return { parts.first, parts.second };
 }

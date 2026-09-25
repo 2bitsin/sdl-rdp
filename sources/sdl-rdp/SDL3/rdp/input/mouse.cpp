@@ -1,6 +1,9 @@
 #include "mouse.hpp"
 #include <sdl-rdp/SDL3/rdp/backend/boundary.hpp>
 #include <sdl-rdp/SDL3/rdp/video/videodata.hpp>
+
+using sdl3::rdp::backend::ConvertedSurface;
+
 // SDL declares this tag as a struct; the members stay private.
 struct SDL_CursorData {
 public:
@@ -16,15 +19,16 @@ public:
     return _hot_y;
   }
 private:
-  sdl3::rdp::backend::ConvertedSurface const _surface;
-  int                                        _hot_x;
-  int                                        _hot_y;
+  ConvertedSurface const _surface;
+  int                    _hot_x;
+  int                    _hot_y;
 };
 namespace sdl3::rdp::input::detail::mouse {
-using backend::Boundary;
-using backend::Operation;
-using backend::Surface;
-using video::CurrentVideo;
+using sdl3::rdp::backend::Boundary;
+using sdl3::rdp::backend::Operation;
+using sdl3::rdp::backend::Surface;
+using sdl3::rdp::video::CurrentVideo;
+using sdl_rdp::utilities::Expects;
 namespace {
 auto SetPointer(Driver const& driver, SDL_CursorData const& shape) -> int {
   auto const& surface = shape.Surface();
@@ -35,13 +39,13 @@ auto HidePointer(Driver const& driver) -> int {
 }
 // SDL returns cursor ownership through this destruction callback.
 auto FreeCursor(SDL_Cursor* cursor) -> void {
-  utilities::Expects(cursor != nullptr, "cursor destruction owns a cursor");
+  Expects(cursor != nullptr, "cursor destruction owns a cursor");
   std::unique_ptr<SDL_Cursor> const     owner{ cursor                                  };
   std::unique_ptr<SDL_CursorData> const state{ std::exchange(owner->internal, nullptr) };
 }
 // SDL lends the source surface and takes ownership of the created cursor.
 auto CreateCursor(SDL_Surface* surface, int hot_x, int hot_y) -> SDL_Cursor* {
-  utilities::Expects(surface != nullptr, "cursor creation has a surface");
+  Expects(surface != nullptr, "cursor creation has a surface");
   return Boundary([&] {
     auto cursor = std::make_unique<SDL_Cursor>();
     cursor->internal = std::make_unique<SDL_CursorData>(*surface, hot_x, hot_y).release();
@@ -50,7 +54,7 @@ auto CreateCursor(SDL_Surface* surface, int hot_x, int hot_y) -> SDL_Cursor* {
 }
 // SDL's context-free cursor callback borrows an optional cursor; its video accessor supplies the device.
 auto ShowPointer(Driver const& driver, SDL_Cursor const& cursor) -> int {
-  utilities::Expects(cursor.internal != nullptr, "a shown cursor has its image");
+  Expects(cursor.internal != nullptr, "a shown cursor has its image");
   return SetPointer(driver, *cursor.internal);
 }
 auto ShowCursor(SDL_Cursor* cursor) -> bool {

@@ -14,6 +14,7 @@ namespace sdl3::rdp::settings::detail::options {
 using sdl_rdp::settings::Load;
 using sdl_rdp::settings::Located;
 using sdl_rdp::settings::SettingsName;
+using sdl_rdp::utilities::Ensures;
 auto Text(char const* text) -> std::optional<std::string> {
   if (!text) return std::nullopt;
   return std::string{ text };
@@ -40,7 +41,7 @@ auto LoadedFile() -> std::filesystem::path {
 }
 auto LibraryPath() -> std::filesystem::path {
   auto path = LoadedFile();
-  utilities::Ensures(!path.empty(), "the loader names the library's file");
+  Ensures(!path.empty(), "the loader names the library's file");
   return path;
 }
 auto ExplicitPath() -> std::optional<std::filesystem::path> {

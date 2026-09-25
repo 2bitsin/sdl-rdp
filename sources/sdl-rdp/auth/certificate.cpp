@@ -27,9 +27,14 @@
 #include <unistd.h>
 #include <utility>
 
-namespace Backend {
-using utilities::Ensures;
-using utilities::Expects;
+namespace sdl_rdp::auth::detail::certificate {
+using sdl_rdp::freerdp_facade::Bio;
+using sdl_rdp::utilities::AllocationFailed;
+using sdl_rdp::utilities::Descriptor;
+using sdl_rdp::utilities::Ensures;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Releases;
+using sdl_rdp::utilities::SystemCall;
 namespace {
 using Key         = std::unique_ptr<EVP_PKEY, Releases<EVP_PKEY_free>>;
 using Certificate = std::unique_ptr<X509, Releases<X509_free>>;

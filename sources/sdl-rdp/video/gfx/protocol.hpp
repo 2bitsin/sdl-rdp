@@ -9,7 +9,9 @@
 #include <ranges>
 #include <span>
 
-namespace Backend {
+namespace sdl_rdp::video::gfx::detail::protocol {
+using sdl_rdp::utilities::Expects;
+
 inline constexpr std::array versions{ RDPGFX_CAPVERSION_8, RDPGFX_CAPVERSION_81, RDPGFX_CAPVERSION_10,
                                       RDPGFX_CAPVERSION_101, RDPGFX_CAPVERSION_102, RDPGFX_CAPVERSION_103,
                                       RDPGFX_CAPVERSION_104, RDPGFX_CAPVERSION_105, RDPGFX_CAPVERSION_106,
@@ -54,11 +56,17 @@ inline auto FrameTimestamp(SYSTEMTIME const& time) -> std::uint32_t {
   constexpr std::uint32_t MinuteBits      = 6;
   constexpr std::uint32_t SecondBits      = 6;
   constexpr std::uint32_t MillisecondBits = 10;
-  utilities::Expects(time.wHour < (1u << HourBits), "MS-RDPEGFX 2.2.2.11 timestamp fields fit");
-  utilities::Expects(time.wMinute < (1u << MinuteBits), "MS-RDPEGFX 2.2.2.11 timestamp fields fit");
-  utilities::Expects(time.wSecond < (1u << SecondBits), "MS-RDPEGFX 2.2.2.11 timestamp fields fit");
-  utilities::Expects(time.wMilliseconds < (1u << MillisecondBits), "MS-RDPEGFX 2.2.2.11 timestamp fields fit");
+  Expects(time.wHour < (1u << HourBits), "MS-RDPEGFX 2.2.2.11 timestamp fields fit");
+  Expects(time.wMinute < (1u << MinuteBits), "MS-RDPEGFX 2.2.2.11 timestamp fields fit");
+  Expects(time.wSecond < (1u << SecondBits), "MS-RDPEGFX 2.2.2.11 timestamp fields fit");
+  Expects(time.wMilliseconds < (1u << MillisecondBits), "MS-RDPEGFX 2.2.2.11 timestamp fields fit");
   return (std::uint32_t{ time.wHour } << HourShift) | (std::uint32_t{ time.wMinute } << MinuteShift)
          | (std::uint32_t{ time.wSecond } << SecondShift) | time.wMilliseconds;
 }
+}
+
+namespace sdl_rdp::video::gfx {
+using detail::protocol::AllowsAvc;
+using detail::protocol::FrameTimestamp;
+using detail::protocol::SelectCapability;
 }

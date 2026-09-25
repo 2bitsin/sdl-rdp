@@ -3,7 +3,7 @@
 #include <concepts>
 #include <cstdint>
 
-namespace Backend {
+namespace sdl_rdp::utilities::detail::running_statistics {
 template <typename Value>
 concept Accumulable = std::totally_ordered<Value> && std::default_initializable<Value>
                       && requires(Value sum, Value item) {
@@ -31,4 +31,8 @@ private:
   Value         _maximum{ };
   std::uint64_t _count  { };
 };
+}
+
+namespace sdl_rdp::utilities {
+using detail::running_statistics::RunningStatistics;
 }

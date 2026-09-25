@@ -13,7 +13,12 @@
 #include <cstdint>
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::link::detail::peer_link {
+using sdl_rdp::freerdp_facade::ManualResetEvent;
+using sdl_rdp::utilities::AllocationFailed;
+using sdl_rdp::utilities::CopyTerminated;
+using sdl_rdp::utilities::Expects;
+
 namespace {
 auto Accepted(PeerHandle accepted) -> PeerHandle {
   Expects(accepted != nullptr, "accepted peer exists");
@@ -28,8 +33,8 @@ auto OpenChannelManager(rdpContext& context) -> ChannelManager {
 }
 PeerLink::PeerLink(PeerHandle accepted)
     : _client{ Accepted(std::move(accepted)) }, _socket{ _client->sockfd },
-      _wake{ sdl_rdp::freerdp_facade::ManualResetEvent("Peer wake event") } {
-  if (!freerdp_peer_context_new(_client.get())) throw sdl_rdp::link::PeerContextFailed{ "Session" };
+      _wake{ ManualResetEvent("Peer wake event") } {
+  if (!freerdp_peer_context_new(_client.get())) throw PeerContextFailed{ "Session" };
   Expects(_client->context != nullptr, "the peer context exists once created");
   Expects(_client->context->update != nullptr, "the peer context carries its update table");
   _channels = OpenChannelManager(*_client->context);

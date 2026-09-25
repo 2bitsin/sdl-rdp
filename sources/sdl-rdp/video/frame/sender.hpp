@@ -1,17 +1,19 @@
 #pragma once
+#include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
+#include <sdl-rdp/video/forward.hpp>
+#include <sdl-rdp/video/frame/forward.hpp>
+#include <sdl-rdp/video/pointer/forward.hpp>
 
 #include <stop_token>
 
-namespace Backend {
-class Activation;
-class FrameCapture;
-class FrameGate;
-class GraphicsLink;
-class LegacyFrame;
-class PeerLink;
-class PointerSender;
-class SessionAccess;
+namespace sdl_rdp::video::frame::detail::sender {
+using sdl_rdp::link::Activation;
+using sdl_rdp::link::PeerLink;
+using sdl_rdp::link::SessionAccess;
+using sdl_rdp::utilities::Pinned;
+using sdl_rdp::video::pointer::PointerSender;
+
 enum class EncodeState{ Idle, Legacy, Graphics, LegacyReady };
 enum class Delivery   { Healthy, Stopped, Failed            };
 class FrameSender : private Pinned {
@@ -36,4 +38,9 @@ private:
   LegacyFrame&      _legacy;
   EncodeState       _state     { EncodeState::Idle };
 };
+}
+
+namespace sdl_rdp::video::frame {
+using detail::sender::Delivery;
+using detail::sender::FrameSender;
 }

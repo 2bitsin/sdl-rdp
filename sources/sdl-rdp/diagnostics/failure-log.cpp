@@ -4,7 +4,7 @@
 
 #include <format>
 
-namespace Backend {
+namespace sdl_rdp::diagnostics::detail::failure_log {
 FailureLog::FailureLog(Diagnostics const& diagnostics, OperationName operation, sdlrdp_log_level level) noexcept
     : _diagnostics{ diagnostics }, _operation{ operation }, _level{ level } { }
 auto FailureLog::operator()(std::string_view failure) const -> void {

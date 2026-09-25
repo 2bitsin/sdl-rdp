@@ -15,12 +15,16 @@
 #include <cstdint>
 #include <string>
 namespace sdl3::rdp::video::detail::events {
-using audio::AudioRate;
-using backend::Boundary;
-using backend::Operation;
+using sdl3::rdp::audio::AudioRate;
+using sdl3::rdp::backend::Boundary;
+using sdl3::rdp::backend::Operation;
+using sdl3::rdp::settings::MillihertzPerHertz;
+using sdl3::rdp::storage::UpdateDrives;
 using sdl_rdp::settings::NameOf;
-using settings::MillihertzPerHertz;
-using storage::UpdateDrives;
+using sdl_rdp::utilities::Ensures;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::Unreachable;
 namespace {
 constexpr SDL_TouchID TouchDevice       { 1 };
 constexpr auto        ExtendedScanCodes = std::size(windows_scancode_table) / 2;
@@ -38,7 +42,7 @@ auto CopyRefresh(SDL_DisplayMode& target, SDL_DisplayMode const& source) -> void
 }
 auto FullscreenMode(SDL_Window& window, SDL_DisplayMode const& mode) -> void {
   bool const accepted = SDL_SetWindowFullscreenMode(&window, &mode);
-  utilities::Ensures(accepted, "SDL accepts a desktop-sized fullscreen mode");
+  Ensures(accepted, "SDL accepts a desktop-sized fullscreen mode");
 }
 auto ScreenMode(SDL_VideoData& data, int width, int height) -> void {
   auto&           display   = *SDL_GetVideoDisplay(data.Display());
@@ -70,10 +74,10 @@ auto SameRefresh(std::uint32_t left_numerator, std::uint32_t left_denominator, s
   return left_denominator != 0 && right_denominator != 0 && left == right;
 }
 auto ApplyRefresh(SDL_VideoData& data, std::uint32_t millihertz) -> void {
-  utilities::Expects(millihertz > 0, "refresh event specifies positive millihertz");
+  Expects(millihertz > 0, "refresh event specifies positive millihertz");
   auto& display = *SDL_GetVideoDisplay(data.Display());
-  if (SameRefresh(::Backend::Narrowed<std::uint32_t>(display.current_mode->refresh_rate_numerator),
-                  ::Backend::Narrowed<std::uint32_t>(display.current_mode->refresh_rate_denominator), millihertz,
+  if (SameRefresh(Narrowed<std::uint32_t>(display.current_mode->refresh_rate_numerator),
+                  Narrowed<std::uint32_t>(display.current_mode->refresh_rate_denominator), millihertz,
                   MillihertzPerHertz))
     return;
   auto& mode = data.RefreshMode(*display.current_mode);
@@ -85,9 +89,9 @@ auto ApplyRefresh(SDL_VideoData& data, std::uint32_t millihertz) -> void {
 auto RestoreRefresh(SDL_VideoData& data) -> void {
   auto const& desktop = SDL_GetVideoDisplay(data.Display())->desktop_mode;
   if (desktop.refresh_rate_denominator <= 0) return;
-  ApplyRefresh(data, ::Backend::Narrowed<std::uint32_t>(
-                         ::Backend::Narrowed<std::uint64_t>(desktop.refresh_rate_numerator) * MillihertzPerHertz
-                         / ::Backend::Narrowed<std::uint64_t>(desktop.refresh_rate_denominator)));
+  ApplyRefresh(data,
+               Narrowed<std::uint32_t>(Narrowed<std::uint64_t>(desktop.refresh_rate_numerator) * MillihertzPerHertz
+                                       / Narrowed<std::uint64_t>(desktop.refresh_rate_denominator)));
 }
 auto PublishClient(SDL_Window& window, decltype(sdlrdp_event::connected) const& client) -> void {
   auto const        properties = SDL_GetWindowProperties(&window);
@@ -102,7 +106,7 @@ auto PublishClient(SDL_Window& window, decltype(sdlrdp_event::connected) const& 
   SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_RDP_KEYBOARD_LAYOUT_NUMBER, client.keyboard_layout);
 }
 auto Connected(SDL_VideoData& data, sdlrdp_event const& event) -> void {
-  utilities::Expects(event.type == SDLRDP_CONNECTED, "connection event has connection data");
+  Expects(event.type == SDLRDP_CONNECTED, "connection event has connection data");
   auto const& client = event.connected;
   auto&       window = BoundWindow(data);
   ApplyRefresh(data, client.refresh_millihertz);
@@ -123,13 +127,13 @@ auto Disconnected(SDL_VideoData& data) -> void {
 }
 auto SendText(SDL_Window& window, std::uint32_t codepoint) -> void {
   auto const code_point = IsCodePoint(codepoint);
-  utilities::Expects(code_point, "text is a Unicode code point");
+  Expects(code_point, "text is a Unicode code point");
   if (!SDL_TextInputActive(&window)) return;
   auto const [length, bytes] = oxbox::utilities::UtfEncode<char>(codepoint);
   SDL_SendKeyboardText(std::string(bytes.data(), length).c_str());
 }
 auto Text(SDL_Window& window, sdlrdp_event const& event) -> void {
-  utilities::Expects(event.type == SDLRDP_TEXT, "text event carries text");
+  Expects(event.type == SDLRDP_TEXT, "text event carries text");
   if (!event.text.down) return;
   SDL_SendKeyboardUnicodeKey(0, event.text.codepoint);
   SendText(window, event.text.codepoint);
@@ -139,7 +143,7 @@ auto Scancode(sdlrdp_event const& event) -> SDL_Scancode {
   return std::span(windows_scancode_table)[index];
 }
 auto Key(SDL_Window& window, sdlrdp_event const& event) -> void {
-  utilities::Expects(event.type == SDLRDP_KEY, "key event carries a key");
+  Expects(event.type == SDLRDP_KEY, "key event carries a key");
   auto const scancode = Scancode(event);
   SDL_SendKeyboardKey(0, SDL_DEFAULT_KEYBOARD_ID, static_cast<int>(event.key.scancode), scancode, event.key.down != 0);
   if (!event.key.down || !SDL_TextInputActive(&window)) return;
@@ -151,11 +155,11 @@ auto FingerEvent(sdlrdp_touch_phase phase) -> SDL_EventType {
   case SDLRDP_TOUCH_DOWN:   return SDL_EVENT_FINGER_DOWN;
   case SDLRDP_TOUCH_UP:     return SDL_EVENT_FINGER_UP;
   case SDLRDP_TOUCH_CANCEL: return SDL_EVENT_FINGER_CANCELED;
-  default:                  utilities::Unreachable(phase);
+  default:                  Unreachable(phase);
   }
 }
 auto Touch(SDL_Window& window, sdlrdp_event const& event) -> void {
-  utilities::Expects(event.type == SDLRDP_TOUCH, "touch event has touch data");
+  Expects(event.type == SDLRDP_TOUCH, "touch event has touch data");
   auto const& touch = event.touch;
   if (touch.phase == SDLRDP_TOUCH_MOVE)
     SDL_SendTouchMotion(0, TouchDevice, Finger(touch.id), &window, touch.x, touch.y, touch.pressure);
@@ -164,7 +168,7 @@ auto Touch(SDL_Window& window, sdlrdp_event const& event) -> void {
                   touch.pressure);
 }
 auto MouseButton(SDL_Window& window, sdlrdp_event const& event) -> void {
-  utilities::Expects(event.type == SDLRDP_MOUSE_BUTTON, "button event has button data");
+  Expects(event.type == SDLRDP_MOUSE_BUTTON, "button event has button data");
   constexpr auto buttons = std::to_array<std::uint8_t>(
       { SDL_BUTTON_LEFT, SDL_BUTTON_MIDDLE, SDL_BUTTON_RIGHT, SDL_BUTTON_X1, SDL_BUTTON_X2 });
   auto const     button  = event.mouse_button.button;
@@ -238,18 +242,18 @@ constexpr auto Handlers = [] {
 static_assert(std::ranges::none_of(Handlers, [](Handler handler) { return handler == nullptr; }),
               "every backend event type has a handler");
 auto Dispatch(SDL_VideoData& data, sdlrdp_event const& event) -> void {
-  utilities::Expects(std::cmp_less(std::to_underlying(event.type), Handlers.size()), "backend event type is known");
+  Expects(std::cmp_less(std::to_underlying(event.type), Handlers.size()), "backend event type is known");
   Handlers.at(static_cast<std::size_t>(event.type))(data, event);
 }
 // SDL event callbacks borrow their device and optional wakeup window.
 auto PumpEvents(SDL_VideoDevice* device) -> void {
-  utilities::Expects(device != nullptr, "event pump has a device");
+  Expects(device != nullptr, "event pump has a device");
   auto& data = *device->internal;
   Boundary([&] { data.Backend().Poll([&](sdlrdp_event const& event) { Dispatch(data, event); }); });
 }
 // SDL specifies nanoseconds and a borrowed device in its wait callback.
 auto WaitEvent(SDL_VideoDevice* device, std::int64_t timeout) -> int {
-  utilities::Expects(device != nullptr, "event wait has a device");
+  Expects(device != nullptr, "event wait has a device");
   auto const milliseconds = timeout < 0
                                 ? -1
                                 : std::chrono::ceil<std::chrono::milliseconds>(std::chrono::nanoseconds{ timeout })
@@ -259,7 +263,7 @@ auto WaitEvent(SDL_VideoDevice* device, std::int64_t timeout) -> int {
 }
 // SDL's wake callback receives a borrowed device and window.
 auto Wakeup(SDL_VideoDevice* device, [[maybe_unused]] SDL_Window* unused_window) -> void {
-  utilities::Expects(device != nullptr, "event wakeup has a device");
+  Expects(device != nullptr, "event wakeup has a device");
   device->internal->Backend().Call<Operation::WAKEUP>();
 }
 }

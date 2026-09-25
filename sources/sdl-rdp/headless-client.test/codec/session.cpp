@@ -10,7 +10,12 @@
 #include <filesystem>
 #include <string>
 
-namespace BackendGate {
+namespace sdl_rdp::headless_client_test::codec::detail::session {
+using sdl_rdp::headless_client_test::backend::Logs;
+using sdl_rdp::headless_client_test::input::SendKeyboardAndMouse;
+using sdl_rdp::headless_client_test::input::ThenKeyboard;
+using sdl_rdp::headless_client_test::input::ThenMouseButtons;
+
 auto CodecSession::SetUp() -> void {
   sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), 320, 200, 0, Logs::Collect, &logs };
   config.codec = GetParam().codec;
@@ -47,16 +52,16 @@ auto CodecSession::ThenMotion(sdlrdp_event const& event) -> void {
 }
 auto CodecSession::ThenPointerEvents(std::span<sdlrdp_event const> events) -> void {
   ThenMotion(events[2]);
-  Headless::ThenMouseButtons(events);
+  ThenMouseButtons(events);
   EXPECT_EQ(events[5].type, SDLRDP_MOUSE_WHEEL);
   EXPECT_EQ(events[5].mouse_wheel.dx, 0);
   EXPECT_EQ(events[5].mouse_wheel.dy, 1);
 }
 auto CodecSession::Input(Client& client) -> void {
-  ASSERT_NO_FATAL_FAILURE(Headless::SendKeyboardAndMouse(client, 10, 20));
+  ASSERT_NO_FATAL_FAILURE(SendKeyboardAndMouse(client, 10, 20));
   auto events = Events(6);
   ASSERT_EQ(events.size(), 6u);
-  Headless::ThenKeyboard(events);
+  ThenKeyboard(events);
   ThenPointerEvents(events);
 }
 auto CodecSession::ThenChangedCodec(sdlrdp_codec expected) -> void {

@@ -5,7 +5,9 @@
 
 #include <gtest/gtest.h>
 
-namespace sdl_rdp::picture {
+namespace sdl_rdp::picture::detail::frame_layout {
+using sdl_rdp::utilities::OutOfRange;
+
 TEST(FrameLayout, CoversEveryRowToTheLastPixel) {
   FrameLayout const layout{ 320, 200, 1536 };
   EXPECT_EQ(layout.Size().width, 320U);
@@ -18,7 +20,7 @@ TEST(FrameLayout, RefusesAPitchShorterThanARow) {
   EXPECT_THROW(FrameLayout(320, 200, -1), ShortPitch);
 }
 TEST(FrameLayout, RefusesSizesOutsideRdp) {
-  EXPECT_THROW(FrameLayout(0, 200, 1280), Backend::OutOfRange);
-  EXPECT_THROW(FrameLayout(320, 0, 1280), Backend::OutOfRange);
+  EXPECT_THROW(FrameLayout(0, 200, 1280), OutOfRange);
+  EXPECT_THROW(FrameLayout(320, 0, 1280), OutOfRange);
 }
 }

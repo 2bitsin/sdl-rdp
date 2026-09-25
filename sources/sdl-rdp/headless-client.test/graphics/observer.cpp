@@ -7,7 +7,12 @@
 #include <cstdint>
 #include <string_view>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::graphics::detail::observer {
+using sdl_rdp::headless_client_test::utilities::ObserverLease;
+using sdl_rdp::headless_client_test::utilities::ObserverSet;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
+
 namespace {
 auto Held(rdpContext* context) -> ObserverLease<GraphicsObserver> {
   Expects(context != nullptr, "callback names its client context");
@@ -147,7 +152,7 @@ auto GraphicsObserver::ObserveFrames() -> void {
     auto       result = self->end(channel, frame);
     if (result != CHANNEL_RC_OK) return result;
     RDPGFX_FRAME_ACKNOWLEDGE_PDU const ack{ 0, frame->frameId,
-                                            Backend::Narrowed<std::uint32_t>(self->observed.frames.size() + 1) };
+                                            Narrowed<std::uint32_t>(self->observed.frames.size() + 1) };
     self->observed.frames.push_back(ack);
     return self->observed.automatic ? self->original(channel, &ack) : CHANNEL_RC_OK;
   };

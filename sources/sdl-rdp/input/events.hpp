@@ -1,6 +1,9 @@
 #pragma once
 #include <sdl-rdp/abi/backend.h>
 #include <sdl-rdp/diagnostics/failure-log.hpp>
+#include <sdl-rdp/diagnostics/forward.hpp>
+#include <sdl-rdp/link/forward.hpp>
+#include <sdl-rdp/picture/forward.hpp>
 #include <sdl-rdp/utilities/operation-name.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
@@ -10,14 +13,18 @@
 #include <array>
 #include <cstdint>
 
-namespace Backend {
-class Activation;
-class DesktopLayout;
-class Diagnostics;
-class EventQueue;
-class FrameStore;
-class PeerLink;
-class SessionAccess;
+namespace sdl_rdp::input::detail::events {
+using sdl_rdp::diagnostics::Diagnostics;
+using sdl_rdp::diagnostics::FailureLog;
+using sdl_rdp::link::Activation;
+using sdl_rdp::link::EventQueue;
+using sdl_rdp::link::PeerLink;
+using sdl_rdp::link::SessionAccess;
+using sdl_rdp::picture::DesktopLayout;
+using sdl_rdp::picture::FrameStore;
+using sdl_rdp::utilities::OperationName;
+using sdl_rdp::utilities::Pinned;
+
 enum class MouseMode{ Absolute, Relative };
 struct MouseState {
   MouseMode mode          { MouseMode::Absolute };
@@ -55,4 +62,9 @@ private:
   std::array<oxbox::utilities::UtfDecodeState, 2> _unicode    { };
   MouseState                                      _mouse      { };
 };
+}
+
+namespace sdl_rdp::input {
+using detail::events::InputEvents;
+using detail::events::MouseMode;
 }

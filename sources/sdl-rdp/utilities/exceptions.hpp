@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <string_view>
 
-namespace Backend::detail::exceptions {
+namespace sdl_rdp::utilities::detail::exceptions {
 using oxbox::utilities::Exception;
 using oxbox::utilities::FixedString;
 using oxbox::utilities::literals::operator""_hash;
@@ -28,9 +28,8 @@ using InvalidArguments = ArgumentFailure<"InvalidArguments"_hash, "Invalid {} ar
 using OutOfRange = ArgumentFailure<"OutOfRange"_hash, "{} {} is outside {}..{}.", std::string_view, std::int64_t,
                                    std::int64_t, std::int64_t>;
 }
-namespace Backend {
-// Alias writers in every module name their ids with the literal.
-using oxbox::utilities::literals::operator""_hash;
+
+namespace sdl_rdp::utilities {
 using detail::exceptions::AllocationFailed;
 using detail::exceptions::ArgumentFailure;
 using detail::exceptions::InvalidArguments;

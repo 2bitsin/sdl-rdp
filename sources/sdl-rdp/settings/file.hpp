@@ -13,9 +13,10 @@ auto SettingsName(std::filesystem::path const& library)                     -> s
 auto Located(std::filesystem::path const& directory, std::string_view name) -> std::optional<std::filesystem::path>;
 auto Load(std::filesystem::path const& path)                                -> Settings;
 }
+
 namespace sdl_rdp::settings {
 using detail::file::Extensions;
-using detail::file::SettingsName;
-using detail::file::Located;
 using detail::file::Load;
+using detail::file::Located;
+using detail::file::SettingsName;
 }

@@ -7,9 +7,9 @@
 #include <string_view>
 
 namespace sdl_rdp::drive::detail::exceptions {
-using ::Backend::operator""_hash;
-using ::Backend::ArgumentFailure;
-using ::Backend::RuntimeFailure;
+using oxbox::utilities::literals::operator""_hash;
+using sdl_rdp::utilities::ArgumentFailure;
+using sdl_rdp::utilities::RuntimeFailure;
 using std::string_view;
 
 using MalformedResponse      = RuntimeFailure<"MalformedResponse"_hash, "Malformed drive response: {}.", string_view>;
@@ -33,6 +33,7 @@ using ShortCapability = RuntimeFailure<"ShortCapability"_hash, "Drive capability
 using StatusFailure = RuntimeFailure<"StatusFailure"_hash, "Drive '{}' failed: {} (0x{:08x})", string_view, string_view,
                                      std::uint32_t>;
 }
+
 namespace sdl_rdp::drive {
 using detail::exceptions::CompletionIdsExhausted;
 using detail::exceptions::DriveChannelFailed;

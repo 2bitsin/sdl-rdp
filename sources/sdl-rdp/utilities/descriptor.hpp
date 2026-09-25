@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Backend {
+namespace sdl_rdp::utilities::detail::descriptor {
 class Descriptor {
 public:
   explicit           Descriptor(int owned)                                 noexcept;
@@ -17,4 +17,8 @@ private:
   static constexpr int Closed     = -1;
   int                  descriptor;
 };
+}
+
+namespace sdl_rdp::utilities {
+using detail::descriptor::Descriptor;
 }

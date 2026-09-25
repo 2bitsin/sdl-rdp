@@ -20,9 +20,19 @@
 #include <ranges>
 #include <span>
 
+namespace sdl_rdp::integration::video_test::detail::gfx {
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::frame::MovingTilePattern;
+using sdl_rdp::headless_client_test::graphics::GraphicsBackend;
+using sdl_rdp::headless_client_test::graphics::GraphicsObserver;
+using sdl_rdp::picture::Aligned;
+using sdl_rdp::utilities::Extent;
+using sdl_rdp::utilities::PixelBytes;
+using sdl_rdp::utilities::Whole;
+using sdl_rdp::video::avc::Encoder;
+using sdl_rdp::video::avc::IntraRefreshFor;
 namespace {
-auto PadReference(std::vector<std::uint32_t> const& pixels, Backend::Extent size, Backend::Extent padded)
-    -> std::vector<std::uint32_t> {
+auto PadReference(std::vector<std::uint32_t> const& pixels, Extent size, Extent padded) -> std::vector<std::uint32_t> {
   auto const rows    = std::views::iota(0uz, std::size_t{ padded.height });
   auto const columns = std::views::iota(0uz, std::size_t{ padded.width });
   auto const edge    = [&](auto position) {
@@ -32,54 +42,52 @@ auto PadReference(std::vector<std::uint32_t> const& pixels, Backend::Extent size
   return std::views::cartesian_product(rows, columns) | std::views::transform(edge) | std::ranges::to<std::vector>();
 }
 template <typename Byte>
-auto Yuv420Planes(std::span<Byte> yuv, Backend::Extent size) -> std::array<Byte*, 3> {
+auto Yuv420Planes(std::span<Byte> yuv, Extent size) -> std::array<Byte*, 3> {
   auto const luma = std::size_t{ size.width } * size.height;
   return { yuv.data(), yuv.subspan(luma).data(), yuv.subspan(luma * 5 / 4).data() };
 }
-auto Yuv420Strides(Backend::Extent size) -> std::array<std::uint32_t, 3> {
+auto Yuv420Strides(Extent size) -> std::array<std::uint32_t, 3> {
   return { size.width, size.width / 2, size.width / 2 };
 }
-auto EncodeYuv420(std::vector<std::uint32_t> const& bgrx, Backend::Extent size) -> std::vector<std::uint8_t> {
+auto EncodeYuv420(std::vector<std::uint32_t> const& bgrx, Extent size) -> std::vector<std::uint8_t> {
   auto              yuv     { std::vector<std::uint8_t>(std::size_t{ size.width } * size.height * 3 / 2) };
   auto              planes  = Yuv420Planes(std::span(yuv), size);
   auto const        strides = Yuv420Strides(size);
   prim_size_t const area    { size.width, size.height                                                    };
   auto const        bytes   = oxbox::utilities::SpanCast<std::uint8_t const>(std::span(bgrx));
-  EXPECT_EQ(primitives_get()->RGBToYUV420_8u_P3AC4R(bytes.data(), PIXEL_FORMAT_BGRX32, size.width * Backend::PixelBytes,
+  EXPECT_EQ(primitives_get()->RGBToYUV420_8u_P3AC4R(bytes.data(), PIXEL_FORMAT_BGRX32, size.width * PixelBytes,
                                                     planes.data(), strides.data(), &area),
             0);
   return yuv;
 }
-auto DecodeYuv420(std::vector<std::uint8_t> const& yuv, Backend::Extent size) -> std::vector<std::uint32_t> {
+auto DecodeYuv420(std::vector<std::uint8_t> const& yuv, Extent size) -> std::vector<std::uint32_t> {
   auto              decoded { std::vector<std::uint32_t>(std::size_t{ size.width } * size.height) };
   auto              planes  = Yuv420Planes(std::span(yuv), size);
   auto const        strides = Yuv420Strides(size);
   prim_size_t const area    { size.width, size.height                                             };
   EXPECT_EQ(primitives_get()->YUV420ToRGB_8u_P3AC4R(planes.data(), strides.data(),
                                                     oxbox::utilities::SpanCast<std::uint8_t>(std::span(decoded)).data(),
-                                                    size.width * Backend::PixelBytes, PIXEL_FORMAT_BGRX32, &area),
+                                                    size.width * PixelBytes, PIXEL_FORMAT_BGRX32, &area),
             0);
   return decoded;
 }
-auto Cropped(std::span<std::uint32_t const> pixels, std::size_t stride, Backend::Extent size)
-    -> std::vector<std::uint32_t> {
+auto Cropped(std::span<std::uint32_t const> pixels, std::size_t stride, Extent size) -> std::vector<std::uint32_t> {
   return pixels | std::views::chunk(stride) | std::views::take(size.height)
          | std::views::transform([=](auto row) { return row | std::views::take(size.width); }) | std::views::join
          | std::ranges::to<std::vector>();
 }
-auto Yuv420Reference(std::vector<std::uint32_t> const& pixels, Backend::Extent size) -> std::vector<std::uint32_t> {
-  Backend::Extent const aligned { .width  = Backend::Avc::Aligned(size.width),
-                                  .height = Backend::Avc::Aligned(size.height) };
-  auto const            yuv     = EncodeYuv420(PadReference(pixels, size, aligned), aligned);
+auto Yuv420Reference(std::vector<std::uint32_t> const& pixels, Extent size) -> std::vector<std::uint32_t> {
+  Extent const aligned { .width = Aligned(size.width), .height = Aligned(size.height) };
+  auto const   yuv     = EncodeYuv420(PadReference(pixels, size, aligned), aligned);
   return Cropped(DecodeYuv420(yuv, aligned), aligned.width, size);
 }
-auto ThenScaledError(Headless::Client& client, std::vector<std::uint32_t> const& scaled,
+auto ThenScaledError(Client& client, std::vector<std::uint32_t> const& scaled,
                      std::vector<std::uint32_t> const& reference) -> void {
   auto error = client.MaxError(scaled, &reference);
   testing::Test::RecordProperty("scaled_maximum_channel_error", error);
   EXPECT_LE(error, 8u);
 }
-class AvcSession : public Headless::GraphicsBackend {
+class AvcSession : public GraphicsBackend {
 protected:
   auto GivenAutoFrame(bool avc = true) -> void {
     ASSERT_NO_FATAL_FAILURE(GivenGraphics(SDLRDP_CODEC_AUTO, 320, 200, avc));
@@ -87,17 +95,17 @@ protected:
   }
   auto PresentFrame(std::vector<std::uint32_t> const& pixels, std::uint32_t width = 320, std::uint32_t height = 200)
       -> void {
-    Backend::Extent const size{ .width = width, .height = height };
-    Frame(pixels, size, Backend::Whole(size));
+    Extent const size{ .width = width, .height = height };
+    Frame(pixels, size, Whole(size));
   }
   auto Open(sdlrdp_codec codec = SDLRDP_CODEC_AVC420, std::uint32_t width = 320, std::uint32_t height = 200) -> void {
     auto pattern = std::to_array("/tmp/sdlrdp-avc-XXXXXX");
     OpenGraphics(pattern.data(), width, height, codec);
   }
-  auto ClientSession() -> Headless::Client& {
+  auto ClientSession() -> Client& {
     return *graphics_client;
   }
-  auto ObserverSession() -> Headless::GraphicsObserver& {
+  auto ObserverSession() -> GraphicsObserver& {
     return *graphics_observer;
   }
   auto ThenProgressiveOnly() -> void {
@@ -107,14 +115,14 @@ protected:
   auto GivenGraphics(sdlrdp_codec codec = SDLRDP_CODEC_AVC420, std::uint32_t width = 320, std::uint32_t height = 200,
                      bool avc = true) -> void {
     ASSERT_NO_FATAL_FAILURE(Open(codec, width, height));
-    graphics_client = std::make_unique<Headless::Client>(sdlrdp_port(backend.Handle()), true);
+    graphics_client = std::make_unique<Client>(sdlrdp_port(backend.Handle()), true);
     graphics_client->EnableGraphics({ .h264 = avc });
     if (!avc)
       ASSERT_TRUE(freerdp_settings_set_bool(graphics_client->Instance()->context->settings, FreeRDP_GfxH264, false));
-    graphics_observer = std::make_unique<Headless::GraphicsObserver>(*graphics_client);
+    graphics_observer = std::make_unique<GraphicsObserver>(*graphics_client);
     ConnectGraphics(*graphics_client);
   }
-  auto ThenReported(Headless::Client& client, sdlrdp_codec codec) -> void {
+  auto ThenReported(Client& client, sdlrdp_codec codec) -> void {
     bool reported = false;
     ASSERT_TRUE(client.Until([&] {
       reported |= std::ranges::any_of(backend.Poll(), [=](auto const& event) {
@@ -124,16 +132,16 @@ protected:
       return reported;
     }));
   }
-  static auto ReadScaledPixels(Headless::Client& client, std::vector<std::uint32_t>& scaled) -> void {
+  static auto ReadScaledPixels(Client& client, std::vector<std::uint32_t>& scaled) -> void {
     auto const& gdi = *client.Instance()->context->gdi;
     ASSERT_EQ(gdi.width, 321);
     ASSERT_EQ(gdi.height, 214);
     auto const frame = std::span(gdi.primary_buffer, std::size_t{ gdi.stride } * 214);
-    scaled = Cropped(oxbox::utilities::SpanCast<std::uint32_t const>(frame), gdi.stride / Backend::PixelBytes,
+    scaled = Cropped(oxbox::utilities::SpanCast<std::uint32_t const>(frame), gdi.stride / PixelBytes,
                      { .width = 321, .height = 214 });
   }
 
-  auto Frame(std::vector<std::uint32_t> const& pixels, Backend::Extent size, sdlrdp_rect damage) -> void {
+  auto Frame(std::vector<std::uint32_t> const& pixels, Extent size, sdlrdp_rect damage) -> void {
     auto& client     = ClientSession();
     auto& observer   = ObserverSession();
     auto  before     { observer.Observed().frames.size()   };
@@ -161,8 +169,8 @@ protected:
       return changed;
     }));
   }
-  std::unique_ptr<Headless::Client>           graphics_client;
-  std::unique_ptr<Headless::GraphicsObserver> graphics_observer;
+  std::unique_ptr<Client>           graphics_client;
+  std::unique_ptr<GraphicsObserver> graphics_observer;
 };
 class AvcGraphics : public AvcSession {
 protected:
@@ -208,9 +216,8 @@ protected:
     EXPECT_EQ(ObserverSession().Observed().avc_rects[0].right, 26);
     ThenPFrameQuality();
   }
-  auto ThenScaledAvc(Headless::Client& client, Headless::GraphicsObserver& observer,
-                     std::vector<std::uint32_t> const& pixels, std::vector<std::uint32_t> const& scaled,
-                     sdlrdp_rect full) -> void {
+  auto ThenScaledAvc(Client& client, GraphicsObserver& observer, std::vector<std::uint32_t> const& pixels,
+                     std::vector<std::uint32_t> const& scaled, sdlrdp_rect full) -> void {
     auto reference = Yuv420Reference(scaled, { .width = 321, .height = 214 });
     ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.Handle(), 0) == 1; }));
     ASSERT_EQ(sdlrdp_set_codec(backend.Handle(), SDLRDP_CODEC_AVC420), 0);
@@ -231,8 +238,7 @@ protected:
     EXPECT_EQ(ObserverSession().Observed().avc_quality[0].qpVal, 0x9a);
     EXPECT_EQ(ObserverSession().Observed().avc_quality[0].qualityVal, 100);
   }
-  auto ScaledPattern(Headless::Client& client, Headless::GraphicsObserver& observer,
-                     std::vector<std::uint32_t> const& pixels) -> void {
+  auto ScaledPattern(Client& client, GraphicsObserver& observer, std::vector<std::uint32_t> const& pixels) -> void {
     ASSERT_EQ(sdlrdp_set_codec(backend.Handle(), SDLRDP_CODEC_RAW), 0);
     ASSERT_EQ(sdlrdp_set_aspect(backend.Handle(), { 3, 2 }), 0);
     auto              before{ observer.Observed().frames.size() };
@@ -256,7 +262,7 @@ class AvcAvailable : public AvcGraphics {
 protected:
   auto SetUp() -> void override {
     ASSERT_NO_FATAL_FAILURE(AvcGraphics::SetUp());
-    if (!Backend::Avc::Encoder::Available()) GTEST_SKIP() << Backend::Avc::Encoder::UnavailableReason();
+    if (!Encoder::Available()) GTEST_SKIP() << Encoder::UnavailableReason();
   }
 };
 
@@ -296,9 +302,6 @@ TEST_F(AvcGraphics, ClientWithoutAvcFallsBackAndReportsChange) {
   EXPECT_EQ(ObserverSession().Observed().progressive_headers, 1u);
   EXPECT_EQ(logs.Count(SDLRDP_LOG_INFO, "AVC420 falls back"), 1u);
 }
-}
-
-namespace {
 TEST_F(AvcAvailable, SmallSurfaceFallsBack) {
   std::vector<std::uint32_t> const pixels(32uz * 32, 0x55aaff);
   ASSERT_NO_FATAL_FAILURE(GivenSmallSurface(SDLRDP_CODEC_AVC420, pixels));
@@ -333,7 +336,7 @@ TEST_F(AvcAvailable, CodecSwitchRestoresFullSurfaceAndIdr) {
 TEST_F(AvcAvailable, KnownPatternColours) {
   ASSERT_NO_FATAL_FAILURE(GivenGraphics(SDLRDP_CODEC_AVC420));
   std::vector<std::uint32_t> pixels(320uz * 200);
-  Headless::MovingTilePattern(pixels, 320, 200, 0);
+  MovingTilePattern(pixels, 320, 200, 0);
   ASSERT_NO_FATAL_FAILURE(PresentFrame(pixels));
   EXPECT_EQ(ObserverSession().Observed().avc_nals.size(), 1u);
   ScaledPattern(ClientSession(), ObserverSession(), pixels);
@@ -350,10 +353,11 @@ TEST(AvcConfiguration, IntraRefreshUsesConfiguredFrameRate) {
     Case{ .fps = 60, .period = 120, .count = 30 }, Case{ .fps = 144, .period = 288, .count = 72 }
   };
   std::ranges::for_each(cases, [](auto value) {
-    auto refresh = Backend::Avc::IntraRefreshFor(value.fps);
+    auto refresh = IntraRefreshFor(value.fps);
     EXPECT_EQ(refresh.period, value.period);
     EXPECT_EQ(refresh.count, value.count);
   });
 }
 
+}
 }

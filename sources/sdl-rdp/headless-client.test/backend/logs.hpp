@@ -14,7 +14,9 @@
 #include <string_view>
 #include <vector>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::backend::detail::logs {
+using sdl_rdp::utilities::Expects;
+
 class Logs {
 public:
   static auto Collect(void* user, sdlrdp_log_level level, char const* text) -> void;
@@ -42,7 +44,7 @@ public:
 private:
   template <typename Observe>
   auto FollowLocked(std::size_t next, Observe& observe) -> std::size_t {
-    utilities::Expects(next <= lines.size(), "log cursor is within the collected trace");
+    Expects(next <= lines.size(), "log cursor is within the collected trace");
     std::ranges::for_each(std::span(lines).subspan(next), [&](auto const& entry) { observe(entry.second); });
     return lines.size();
   }
@@ -55,4 +57,8 @@ private:
   std::mutex                                            guard;
   std::vector<std::pair<sdlrdp_log_level, std::string>> lines;
 };
+}
+
+namespace sdl_rdp::headless_client_test::backend {
+using detail::logs::Logs;
 }

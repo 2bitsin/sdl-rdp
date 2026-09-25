@@ -11,11 +11,12 @@
 #include <memory>
 #include <utility>
 
+namespace sdl_rdp::integration::allocations_test::detail::driver_present {
+using sdl_rdp::sample_gate_test::sample::BackendLibrary;
+using sdl_rdp::utilities::Expects;
 namespace {
-using HeapCount::CountingHeap;
-using HeapCount::Tally;
-using SampleGate::InitializedSdl;
-using SampleGate::Window;
+using sdl_rdp::sample_gate_test::process::InitializedSdl;
+using sdl_rdp::sample_gate_test::process::Window;
 constexpr int Width  = 640;
 constexpr int Height = 480;
 // With no peer the backend's frame pool settles at 2 buffers on the second present (measured under gdb).
@@ -25,14 +26,14 @@ constexpr std::size_t MeasuredPresents = 100;
 constexpr std::array Damage{ SDL_Rect{ 0, 40, Width, 32 }, SDL_Rect{ 64, 200, 64, 64 }, SDL_Rect{ 320, 400, 32, 32 } };
 
 auto StartVideo(std::filesystem::path const& certificates) -> bool {
-  auto const backend = SampleGate::BackendLibrary();
+  auto const backend = BackendLibrary();
   for (auto [name, value] : { std::pair{ SDL_HINT_VIDEO_DRIVER, "rdp" },
                               { SDL_HINT_RDP_PORT    , "0"                  },
                               { SDL_HINT_RDP_BIND    , "127.0.0.1"          },
                               { SDL_HINT_RDP_CERT_DIR, certificates.c_str() },
                               { SDL_HINT_RDP_BACKEND , backend.c_str()      } }) {
     auto const accepted = SDL_SetHint(name, value);
-    utilities::Expects(accepted, "the rdp hints are accepted");
+    Expects(accepted, "the rdp hints are accepted");
   }
   return SDL_Init(SDL_INIT_VIDEO);
 }
@@ -62,4 +63,5 @@ TEST(DriverAllocations, NonePerPresentOnceWarm) {
   auto const before = CountingHeap::Shared().Current();
   ASSERT_NO_FATAL_FAILURE(PresentRepeatedly(*window, MeasuredPresents));
   ExpectNoneBetween(before, CountingHeap::Shared().Current());
+}
 }

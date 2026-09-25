@@ -12,11 +12,12 @@
 #include <utility>
 
 namespace sdl_rdp::drive::detail::packet {
-using Backend::InvalidEncoding;
-using Backend::NullArgument;
-using Backend::Reported;
-using Backend::TranscodeRange;
-using Backend::Utf16Little;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::InvalidEncoding;
+using sdl_rdp::utilities::NullArgument;
+using sdl_rdp::utilities::Reported;
+using sdl_rdp::utilities::TranscodeRange;
+using sdl_rdp::utilities::Utf16Little;
 // A malformed response leaves its channel out of step with the client, so the channel is aborted before the failure.
 auto DrivePacket::Invalid(std::string_view cause) const -> void {
   throw Reported(MalformedResponse{ cause }, [this](std::string_view text) {
@@ -24,7 +25,7 @@ auto DrivePacket::Invalid(std::string_view cause) const -> void {
   });
 }
 auto DrivePacket::Remaining() const -> oxbox::utilities::BoundedReader {
-  utilities::Expects(position <= bytes.size(), "packet cursor is bounded");
+  Expects(position <= bytes.size(), "packet cursor is bounded");
   return oxbox::utilities::BoundedReader{ std::span(bytes).subspan(position) };
 }
 auto DrivePacket::Consumed(oxbox::utilities::BoundedReader const& reader, std::string_view cause) -> void {
@@ -62,7 +63,7 @@ auto DrivePacket::Position() const -> std::size_t {
   return position;
 }
 auto DrivePacket::Seek(std::size_t offset) -> void {
-  utilities::Expects(offset <= bytes.size(), "packet cursor is bounded");
+  Expects(offset <= bytes.size(), "packet cursor is bounded");
   position = offset;
 }
 auto DrivePacket::Origin(ChannelOrigin channel) -> void {

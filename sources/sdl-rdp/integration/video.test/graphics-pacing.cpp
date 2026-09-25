@@ -6,7 +6,12 @@
 #include <cstdint>
 #include <regex>
 
-namespace BackendGate {
+namespace sdl_rdp::integration::video_test::detail::graphics_pacing {
+using sdl_rdp::headless_client_test::backend::Logs;
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::frame::FrameObserver;
+using sdl_rdp::headless_client_test::graphics::RoundFive;
+
 class PipelinedGraphics : public RoundFive {
 protected:
   auto SetUp() -> void override {
@@ -25,7 +30,7 @@ TEST_F(RoundFive, PipelinedLegacyPresent) {
   ThenLegacyWindowReleases(client, observer, pixels);
 }
 TEST_F(PipelinedGraphics, PipelinedGraphicsPresent) {
-  ASSERT_NO_FATAL_FAILURE(ThenPipelinedWindow(GraphicsClient(), GraphicsObserver().Observed().frames, pixels));
+  ASSERT_NO_FATAL_FAILURE(ThenPipelinedWindow(GraphicsClient(), Observer().Observed().frames, pixels));
   ThenGraphicsWindowReleases(pixels);
 }
 
@@ -41,21 +46,21 @@ auto ThenFrameStatistics(Logs& logs) -> void {
 }
 }
 TEST_F(PipelinedGraphics, GraphicsFrameStatistics) {
-  ASSERT_NO_FATAL_FAILURE(PresentGraphicsFrames(GraphicsClient(), GraphicsObserver(), pixels, 1, 2));
+  ASSERT_NO_FATAL_FAILURE(PresentGraphicsFrames(GraphicsClient(), Observer(), pixels, 1, 2));
   for (std::size_t count = 0; count < 3; ++count) Present(pixels, 320, 200);
   EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 1), 0);
-  ASSERT_TRUE(GraphicsObserver().AckFrame(0, 0));
-  ASSERT_NO_FATAL_FAILURE(AwaitFrames(GraphicsClient(), GraphicsObserver().Observed().frames, 3));
+  ASSERT_TRUE(Observer().AckFrame(0, 0));
+  ASSERT_NO_FATAL_FAILURE(AwaitFrames(GraphicsClient(), Observer().Observed().frames, 3));
   ASSERT_NO_FATAL_FAILURE(ThenGraphicsAcknowledgementsCounted());
   GraphicsClient().Disconnect();
   backend.Close();
   ThenFrameStatistics(logs);
 }
 TEST_F(PipelinedGraphics, GraphicsAcknowledgementsAgeOutAndResume) {
-  ASSERT_NO_FATAL_FAILURE(PresentGraphicsFrames(GraphicsClient(), GraphicsObserver(), pixels, 1, 4));
-  ASSERT_TRUE(GraphicsObserver().AckFrame(3, 0));
+  ASSERT_NO_FATAL_FAILURE(PresentGraphicsFrames(GraphicsClient(), Observer(), pixels, 1, 4));
+  ASSERT_TRUE(Observer().AckFrame(3, 0));
   ASSERT_TRUE(GraphicsClient().Until([&] { return sdlrdp_wait_frame(backend.Handle(), 0) != 0; }));
-  ASSERT_NO_FATAL_FAILURE(PresentGraphicsFrames(GraphicsClient(), GraphicsObserver(), pixels, 5, 6));
+  ASSERT_NO_FATAL_FAILURE(PresentGraphicsFrames(GraphicsClient(), Observer(), pixels, 5, 6));
   ThenAgedWindowResumes(pixels);
 }
 }

@@ -6,9 +6,13 @@
 #include <cstdint>
 #include <span>
 namespace sdl3::rdp::storage::detail::bootstrap {
-using backend::Boundary;
-using backend::Operation;
-using backend::StorageHandle;
+using sdl3::rdp::backend::Boundary;
+using sdl3::rdp::backend::Operation;
+using sdl3::rdp::backend::StorageHandle;
+using sdl_rdp::utilities::Ensures;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::NotImplemented;
 namespace {
 constexpr std::size_t DirectoryBatch = 32;
 constexpr std::size_t CopyChunkBytes = 65536;
@@ -30,7 +34,7 @@ private:
 };
 // SDL storage callbacks carry the Storage through an opaque context pointer.
 auto Opened(void* context) -> Storage& {
-  utilities::Expects(context != nullptr, "storage callback has its state");
+  Expects(context != nullptr, "storage callback has its state");
   return *static_cast<Storage*>(context);
 }
 // SDL returns ownership of opaque storage state to its close callback.
@@ -46,8 +50,8 @@ auto StorageReady(void* context) -> bool {
 }
 // SDL path queries supply a borrowed path and an ABI output record.
 auto StorageInfo(void* context, char const* path, SDL_PathInfo* info) -> bool {
-  utilities::Expects(path != nullptr, "path query has a path");
-  utilities::Expects(info != nullptr, "path query has an output");
+  Expects(path != nullptr, "path query has a path");
+  Expects(info != nullptr, "path query has an output");
   auto const& data  = Opened(context);
   sdlrdp_stat value { };
   if (data.Backend().Call<Operation::DRIVE_STAT>(data.Drive(), path, &value) < 0) return data.Backend().Fail();
@@ -65,10 +69,10 @@ auto DirectoryPrefix(std::string_view path) -> std::string {
 }
 auto ReadDirectory(Storage const& data, std::string const& path, std::uint32_t offset, std::span<sdlrdp_dirent> entries)
     -> std::span<sdlrdp_dirent const> {
-  auto const count = data.Backend().Call<Operation::DRIVE_ENUMERATE>(
-      data.Drive(), path.c_str(), offset, entries.data(), ::Backend::Narrowed<std::uint32_t>(entries.size()));
+  auto const count = data.Backend().Call<Operation::DRIVE_ENUMERATE>(data.Drive(), path.c_str(), offset, entries.data(),
+                                                                     Narrowed<std::uint32_t>(entries.size()));
   if (count < 0) data.Backend().Throw();
-  utilities::Ensures(std::cmp_less_equal(count, entries.size()), "backend fills at most the directory buffer");
+  Ensures(std::cmp_less_equal(count, entries.size()), "backend fills at most the directory buffer");
   return entries.first(static_cast<std::size_t>(count));
 }
 // SDL enumeration passes a borrowed path and callback with an opaque application context.
@@ -82,7 +86,7 @@ auto Enumerate(Storage const& data, std::string const& path, SDL_EnumerateDirect
     -> bool {
   auto const                                directory = DirectoryPrefix(path);
   std::array<sdlrdp_dirent, DirectoryBatch> entries   { };
-  for (std::uint32_t offset{ };; offset += ::Backend::Narrowed<std::uint32_t>(entries.size())) {
+  for (std::uint32_t offset{ };; offset += Narrowed<std::uint32_t>(entries.size())) {
     auto const batch  = ReadDirectory(data, path, offset, entries);
     auto const result = Deliver(batch, directory, callback, user);
     if (result != SDL_ENUM_CONTINUE) return result == SDL_ENUM_SUCCESS;
@@ -90,8 +94,8 @@ auto Enumerate(Storage const& data, std::string const& path, SDL_EnumerateDirect
   }
 }
 auto StorageEnumerate(void* context, char const* path, SDL_EnumerateDirectoryCallback callback, void* user) -> bool {
-  utilities::Expects(path != nullptr, "enumeration has a path");
-  utilities::Expects(callback != nullptr, "enumeration has a consumer");
+  Expects(path != nullptr, "enumeration has a path");
+  Expects(callback != nullptr, "enumeration has a consumer");
   auto const& data = Opened(context);
   return Boundary([&] { return Enumerate(data, std::string{ path }, callback, user); });
 }
@@ -107,7 +111,7 @@ auto TransferAll(SDL_IOStream& stream, ByteTy* buffer, std::size_t length) -> st
 template <typename ByteTy>
   requires IoBuffer<ByteTy>
 auto StorageTransfer(void* context, char const* path, ByteTy* buffer, std::uint64_t length) -> bool {
-  utilities::Expects(path != nullptr, "storage transfer has a path");
+  Expects(path != nullptr, "storage transfer has a path");
   auto const& data = Opened(context);
   return Boundary([&] {
     if (!std::in_range<std::size_t>(length)) return SDL_SetError("RDP storage transfer too large");
@@ -122,7 +126,7 @@ auto StorageTransfer(void* context, char const* path, ByteTy* buffer, std::uint6
 template <Operation OPERATION, typename... PathTy>
   requires(std::same_as<PathTy, char const*> && ...)
 auto StorageMutate(void* context, PathTy... path) -> bool {
-  (utilities::Expects(path != nullptr, "storage mutation has its paths"), ...);
+  (Expects(path != nullptr, "storage mutation has its paths"), ...);
   auto const& data = Opened(context);
   return data.Backend().Call<OPERATION>(data.Drive(), path...) >= 0 || data.Backend().Fail();
 }
@@ -135,8 +139,8 @@ auto CopyStream(SDL_IOStream& source, SDL_IOStream& target) -> bool {
 }
 // SDL copy callbacks supply an opaque context and borrowed source and target paths.
 auto StorageCopy(void* context, char const* from, char const* to) -> bool {
-  utilities::Expects(from != nullptr, "storage copy has a source path");
-  utilities::Expects(to != nullptr, "storage copy has a target path");
+  Expects(from != nullptr, "storage copy has a source path");
+  Expects(to != nullptr, "storage copy has a target path");
   auto const& data = Opened(context);
   return Boundary([&] {
     if (std::string_view{ from } == to) return SDL_SetError("RDP copy source equals destination");
@@ -150,7 +154,7 @@ auto StorageCopy(void* context, char const* from, char const* to) -> bool {
 }
 // SDL storage space callbacks supply their opaque state.
 auto StorageSpace([[maybe_unused]] void* unused_context) -> std::uint64_t {
-  utilities::NotImplemented("RDP backend ABI has no free-space query");
+  NotImplemented("RDP backend ABI has no free-space query");
   constexpr std::uint64_t unknown_space = 0;
   return unknown_space;
 }
@@ -182,10 +186,7 @@ auto UserStorageOpen([[maybe_unused]] char const* organization, char const* app,
   return StorageOpen(app, properties);
 }
 }
+// SDL's C storage tables require these named objects with static storage; C linkage names the global symbols.
+extern "C" TitleStorageBootStrap const RDP_titlebootstrap = { "rdp", "RDP client drive storage", StorageOpen };
+extern "C" UserStorageBootStrap const RDP_userbootstrap   = { "rdp", "RDP client drive storage", UserStorageOpen };
 }
-// SDL's C title storage table requires this named object with static storage.
-extern "C" TitleStorageBootStrap const RDP_titlebootstrap = { "rdp", "RDP client drive storage",
-                                                              sdl3::rdp::storage::detail::bootstrap::StorageOpen };
-// SDL's C user storage table requires this named object with static storage.
-extern "C" UserStorageBootStrap const RDP_userbootstrap = { "rdp", "RDP client drive storage",
-                                                            sdl3::rdp::storage::detail::bootstrap::UserStorageOpen };

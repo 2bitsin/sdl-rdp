@@ -6,7 +6,9 @@
 #include <cstddef>
 #include <tuple>
 
-namespace Race {
+namespace sdl_rdp::integration::tls_race_test::detail::method_fill {
+using sdl_rdp::utilities::Expects;
+
 namespace {
 constexpr auto StallLimit = std::chrono::seconds(2);
 }
@@ -15,13 +17,13 @@ auto MethodFill::Shared() -> MethodFill& {
   return fill;
 }
 auto MethodFill::Created(BIO_METHOD const* method, char const* name) -> void {
-  utilities::Expects(method != nullptr, "OpenSSL allocated the method");
-  utilities::Expects(name != nullptr, "the method is named");
+  Expects(method != nullptr, "OpenSSL allocated the method");
+  Expects(name != nullptr, "the method is named");
   std::scoped_lock const lock(guard);
   created.insert_or_assign(name, method);
 }
 auto MethodFill::Filling(BIO_METHOD const* method, Setter setter) -> void {
-  utilities::Expects(method != nullptr, "a method is being filled");
+  Expects(method != nullptr, "a method is being filled");
   std::unique_lock lock(guard);
   if (!Holds(method, setter)) return;
   ++fills;

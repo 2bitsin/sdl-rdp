@@ -12,9 +12,20 @@
 #include <fstream>
 #include <string>
 
-namespace SampleGate {
+namespace sdl_rdp::integration::sample_test::detail::drive {
+using namespace std::chrono_literals;
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::Clock;
+using sdl_rdp::headless_client_test::drive::DriveObserver;
+using sdl_rdp::headless_client_test::drive::ShareDrive;
+using sdl_rdp::headless_client_test::frame::FrameObserver;
+using sdl_rdp::sample_gate_test::frame::Pattern;
+using sdl_rdp::sample_gate_test::process::Process;
+using sdl_rdp::sample_gate_test::sample::AnnouncedPort;
+using sdl_rdp::sample_gate_test::sample::Sample;
+
 namespace {
-class DriveSample : public SampleGate::Sample {
+class DriveSample : public Sample {
 protected:
   auto ThenMissingCat(Client& client) -> void {
     ASSERT_TRUE(ReadInput(client, "cat failed: ")) << process->Transcript();
@@ -27,18 +38,14 @@ auto ThenCatFailure(Process const& process) -> void {
   EXPECT_EQ(process.Transcript().find("cat failed:", failure + 1), std::string::npos);
   EXPECT_EQ(process.Transcript().find("cat bytes="), std::string::npos);
 }
-}
-namespace {
-auto CreateHugeFile(fs::path const& share) -> void {
+auto CreateHugeFile(std::filesystem::path const& share) -> void {
   auto path = share / "huge.bin";
   {
     std::ofstream const file(path);
   }
-  fs::resize_file(path, static_cast<std::ptrdiff_t>(400 * 1024) * 1024);
+  std::filesystem::resize_file(path, static_cast<std::ptrdiff_t>(400 * 1024) * 1024);
 }
-}
-namespace {
-auto ThenCatNotRepeated(Process const& process, Headless::DriveObserver const& observer) -> void {
+auto ThenCatNotRepeated(Process const& process, DriveObserver const& observer) -> void {
   EXPECT_EQ(observer.Observed().requests, 0u);
   ThenCatFailure(process);
   SDL_Log("trace DRIVE second client connected, frame received, cat not repeated, sample exited 0");
@@ -53,9 +60,9 @@ TEST_F(DriveSample, DriveDisconnectDuringCat) {
   ASSERT_TRUE(Read("cat failed: ")) << process->Transcript();
   SDL_Log("trace DRIVE disconnected after read request: %s", line.c_str());
   Client second(port, true, 640, 480);
-  Headless::ShareDrive(second, share.Path().c_str());
+  ShareDrive(second, share.Path().c_str());
   ASSERT_NO_FATAL_FAILURE(Connect(second));
-  Headless::DriveObserver observer(second);
+  DriveObserver observer(second);
   ASSERT_TRUE(second.Until([&] { return !observer.Observed().replies.empty() && Pattern(second, false); }));
   ASSERT_NO_FATAL_FAILURE(Escape(second));
   while (process->Line(line, Clock::now() + 1s)) {
@@ -69,7 +76,7 @@ TEST_F(DriveSample, DriveMissingCatKeepsServing) {
   auto& client = SessionClient();
   ASSERT_NO_FATAL_FAILURE(ThenMissingCat(client));
   // Observe a new frame after the failure, rather than inspecting an old framebuffer.
-  Headless::FrameObserver observer(client);
+  FrameObserver observer(client);
   ASSERT_TRUE(client.Until([&] { return !observer.Frames().empty() && Pattern(client, false); }));
   ASSERT_NO_FATAL_FAILURE(Escape(client));
   while (process->Line(line, Clock::now() + 1s)) {

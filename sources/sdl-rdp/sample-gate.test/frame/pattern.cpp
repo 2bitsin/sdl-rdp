@@ -5,7 +5,7 @@
 #include <cstring>
 #include <ranges>
 
-namespace SampleGate {
+namespace sdl_rdp::sample_gate_test::frame::detail::pattern {
 auto PatternPixel(rdpGdi const* gdi, int index) -> std::uint32_t {
   std::uint32_t value = 0;
   std::memcpy(&value,
@@ -15,7 +15,7 @@ auto PatternPixel(rdpGdi const* gdi, int index) -> std::uint32_t {
   return value & 0xffffff;
 }
 
-auto Pattern(Headless::Client& client, bool /*pointer*/) -> testing::AssertionResult {
+auto Pattern(Client& client, bool /*pointer*/) -> testing::AssertionResult {
   auto* gdi = client.Instance()->context->gdi;
   if (!gdi || gdi->width != 640 || gdi->height != 480)
     return testing::AssertionFailure() << "framebuffer is not 640x480";

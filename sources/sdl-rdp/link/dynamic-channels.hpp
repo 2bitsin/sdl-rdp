@@ -6,7 +6,9 @@
 #include <functional>
 #include <map>
 
-namespace Backend {
+namespace sdl_rdp::link::detail::dynamic_channels {
+using sdl_rdp::utilities::Pinned;
+
 class DynamicChannels : private Pinned {
 public:
   class Assignment {
@@ -36,4 +38,8 @@ private:
   auto Owner(std::uint32_t id)                                        -> Owners::iterator;
   Owners _owners;
 };
+}
+
+namespace sdl_rdp::link {
+using detail::dynamic_channels::DynamicChannels;
 }

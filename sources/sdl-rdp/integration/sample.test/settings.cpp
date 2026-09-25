@@ -24,7 +24,22 @@
 #include <utility>
 #include <vector>
 
-namespace SampleGate {
+namespace sdl_rdp::integration::sample_test::detail::settings {
+using namespace std::chrono_literals;
+using sdl_rdp::headless_client_test::client::Clock;
+using sdl_rdp::sample_gate_test::process::InitializedSdl;
+using sdl_rdp::sample_gate_test::process::Process;
+using sdl_rdp::sample_gate_test::process::Window;
+using sdl_rdp::sample_gate_test::sample::Arguments;
+using sdl_rdp::sample_gate_test::sample::BackendLibrary;
+using sdl_rdp::sample_gate_test::sample::BuildRoot;
+using sdl_rdp::sample_gate_test::sample::PrimaryDisplayPort;
+using sdl_rdp::sample_gate_test::sample::Sample;
+using sdl_rdp::sample_gate_test::sample::Words;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Mode;
+using sdl_rdp::utilities::Narrowed;
+
 namespace {
 using sdl_rdp::settings::Aspect;
 using sdl_rdp::settings::Extent;
@@ -53,8 +68,8 @@ auto AvailablePort() -> std::uint32_t {
   close(socket_fd);
   return ntohs(address.sin_port);
 }
-auto SettingsArguments(fs::path const& directory, fs::path const& certificates, Words const& environment = { },
-                       Words const& options = { }) -> Words {
+auto SettingsArguments(std::filesystem::path const& directory, std::filesystem::path const& certificates,
+                       Words const& environment = { }, Words const& options = { }) -> Words {
   auto args = Arguments(certificates, environment, options);
   std::erase_if(
       args, [](auto const& arg) { return arg.starts_with("SDL_RDP_PORT=") || arg.starts_with("SDL_RDP_BACKEND="); });
@@ -62,22 +77,22 @@ auto SettingsArguments(fs::path const& directory, fs::path const& certificates, 
                                   "SDL_RDP_ASPECT", "-C", directory.string() });
   return args;
 }
-auto WrittenText(fs::path const& file, std::string_view text) -> fs::path {
+auto WrittenText(std::filesystem::path const& file, std::string_view text) -> std::filesystem::path {
   std::ofstream out(file);
   out << text;
   bool const written = !out.fail();
   Expects(written, "settings text written");
   return file;
 }
-auto WriteInvalidSettings(fs::path const& directory) -> void {
+auto WriteInvalidSettings(std::filesystem::path const& directory) -> void {
   WrittenText(directory / "libSDL3.yaml", "port: 1\nauth: invalid\n");
 }
 auto Served(std::uint32_t port) -> Settings {
   return { .backend = BackendLibrary().string(),
-           .port    = Port{ Backend::Narrowed<std::uint16_t>(port) },
+           .port    = Port{ Narrowed<std::uint16_t>(port) },
            .aspect  = Aspect{ 4, 3 } };
 }
-auto WriteSettings(fs::path const& file, Settings const& settings) -> void {
+auto WriteSettings(std::filesystem::path const& file, Settings const& settings) -> void {
   oxbox::serialization::SerializeTo(settings, file);
 }
 }
@@ -123,8 +138,8 @@ INSTANTIATE_TEST_SUITE_P(SettingsPrecedence, SettingsSample, testing::Bool());
 
 class SettingsChoice : public Sample {
 protected:
-  auto ThenChosenOverWorkingDirectory(fs::path const& chosen, fs::path const& directory, Words const& environment)
-      -> void {
+  auto ThenChosenOverWorkingDirectory(std::filesystem::path const& chosen, std::filesystem::path const& directory,
+                                      Words const& environment) -> void {
     auto const port = AvailablePort();
     WriteSettings(chosen, Served(port));
     WriteInvalidSettings(directory);
@@ -155,11 +170,8 @@ TEST_F(Sample, SettingsTwoFilesAtOneLocationFailStartup) {
   EXPECT_TRUE(process->Transcript().contains("libSDL3.json and libSDL3.yaml are both present"))
       << process->Transcript();
 }
-}
-
-namespace SampleGate {
 namespace {
-auto EverySetting(fs::path const& certificates, std::uint32_t port) -> Settings {
+auto EverySetting(std::filesystem::path const& certificates, std::uint32_t port) -> Settings {
   auto settings = Served(port);
   settings.bind.emplace("127.0.0.1");
   settings.cert_dir.emplace(certificates.string());
@@ -200,9 +212,6 @@ TEST_F(Sample, SettingsTypedValuesAndAnEmptyValueIsAbsent) {
                           BackendLibrary().string()));
   ThenSettingsConnect(SettingsArguments(directory.Path(), certificates.Path()), port);
 }
-}
-
-namespace SampleGate {
 TEST_F(Sample, SettingsApplicationHintWins) {
   oxbox::platform::ScratchArea const directory{ "settings-hint", "sdl-rdp" };
   WriteSettings(directory.Path() / "libSDL3.yaml", Served(0));
@@ -217,13 +226,10 @@ TEST_F(Sample, SettingsApplicationHintWins) {
 TEST_F(SettingsChoice, LibraryDirectoryWinsOverWorkingDirectory) {
   oxbox::platform::ScratchArea const directory { "settings-library", "sdl-rdp" };
   auto                               library   = directory.Path() / "library";
-  fs::create_directory(library);
-  fs::create_symlink(BuildRoot() / "sources/sdl-rdp/SDL3/libSDL3.so.0", library / "libSDL3.so.0");
+  std::filesystem::create_directory(library);
+  std::filesystem::create_symlink(BuildRoot() / "sources/sdl-rdp/SDL3/libSDL3.so.0", library / "libSDL3.so.0");
   ThenChosenOverWorkingDirectory(library / "libSDL3.yaml", directory.Path(), { "LD_LIBRARY_PATH=" + library.string() });
 }
-}
-
-namespace SampleGate {
 TEST_F(Sample, SettingsCodeHintsCacheAndLiveReset) {
   oxbox::platform::ScratchArea const directory { "settings-cache", "sdl-rdp" };
   auto                               file      = directory.Path() / "libSDL3.yaml";
@@ -240,9 +246,6 @@ TEST_F(Sample, SettingsCodeHintsCacheAndLiveReset) {
   WriteSettings(file, reloaded);
   ThenReloadedSettings(file);
 }
-}
-
-namespace SampleGate {
 namespace {
 using Storage = std::unique_ptr<SDL_Storage, decltype(&SDL_CloseStorage)>;
 class SettingsFile {
@@ -250,12 +253,12 @@ public:
   explicit SettingsFile(char const* name) : _directory{ name, "sdl-rdp" }, _path{ _directory.Path() / "libSDL3.yaml" } {
     WriteSettings(_path, Served(1));
   }
-  auto Path() const -> fs::path const& {
+  auto Path() const -> std::filesystem::path const& {
     return _path;
   }
 private:
   oxbox::platform::ScratchArea const _directory;
-  fs::path const                     _path;
+  std::filesystem::path const        _path;
 };
 auto RdpTitleStorage() -> Storage {
   EXPECT_TRUE(SDL_SetHint(SDL_HINT_STORAGE_TITLE_DRIVER, "rdp"));
@@ -264,7 +267,7 @@ auto RdpTitleStorage() -> Storage {
 auto WindowAspect(Window const& window) -> std::string {
   return SDL_GetStringProperty(SDL_GetWindowProperties(window.get()), SDL_PROP_WINDOW_RDP_ASPECT_STRING, "");
 }
-auto ThenVideoRejoinsDriver(fs::path const& file) -> void {
+auto ThenVideoRejoinsDriver(std::filesystem::path const& file) -> void {
   auto const port     = PrimaryDisplayPort();
   auto       reloaded = Served(1);
   reloaded.aspect.emplace(2, 1);
@@ -289,8 +292,8 @@ auto CurrentTest() -> std::string {
   return std::string(test.test_suite_name()) + "." + test.name();
 }
 auto RerunInChild() -> Process {
-  return Process{ { "env", std::string(StorageSpaceChild) + "=1", fs::read_symlink("/proc/self/exe").string(),
-                    "--gtest_filter=" + CurrentTest() } };
+  return Process{ { "env", std::string(StorageSpaceChild) + "=1",
+                    std::filesystem::read_symlink("/proc/self/exe").string(), "--gtest_filter=" + CurrentTest() } };
 }
 auto ThenChildStops(Process& child) -> void {
   std::string line;
@@ -308,7 +311,7 @@ auto ThenStorageSpaceStops(Storage const& storage) -> void {
   ThenChildStops(child);
 }
 auto ThenStorageSpaceIsNotImplemented(Storage const& storage) -> void {
-  if constexpr (utilities::detail::contract::Mode() == oxbox::platform::ContractMode::STOP)
+  if constexpr (Mode() == oxbox::platform::ContractMode::STOP)
     ThenStorageSpaceStops(storage);
   else
     EXPECT_EQ(SDL_GetStorageSpaceRemaining(storage.get()), 0);
@@ -329,7 +332,7 @@ protected:
       return true;
     });
   }
-  auto FilePath() const -> fs::path const& {
+  auto FilePath() const -> std::filesystem::path const& {
     return _file.Path();
   }
 private:
@@ -364,9 +367,6 @@ INSTANTIATE_TEST_SUITE_P(Settings, InvalidInteger,
                          testing::Values(std::pair{ SDL_HINT_RDP_PORT, "-5" }, std::pair{ SDL_HINT_RDP_WIDTH, "+640" },
                                          std::pair{ SDL_HINT_RDP_WIDTH, "-1" }, std::pair{ SDL_HINT_RDP_PORT, "3389x" },
                                          std::pair{ SDL_HINT_RDP_WIDTH, "640 480" }));
-}
-
-namespace SampleGate {
 using FileAndCause = std::pair<std::string_view, std::string_view>;
 class InvalidFile : public Sample, public testing::WithParamInterface<FileAndCause> { };
 TEST_P(InvalidFile, FailsInitOnceNamingTheFileAndTheCause) {

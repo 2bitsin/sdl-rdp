@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-namespace Backend {
+namespace sdl_rdp::utilities::detail::transcode {
 TEST(Utf16, WidensEveryCodePoint) {
   EXPECT_EQ(Utf16("Password"), u"Password");
   EXPECT_EQ(Utf16("\xC3\xA9\xF0\x9F\x98\x80"), u"é\U0001F600");

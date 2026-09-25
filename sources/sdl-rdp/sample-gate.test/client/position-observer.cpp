@@ -2,10 +2,10 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace SampleGate {
-using utilities::Expects;
+namespace sdl_rdp::sample_gate_test::client::detail::position_observer {
+using sdl_rdp::utilities::Expects;
 
-PositionObserver::PositionObserver(Headless::Client& client) {
+PositionObserver::PositionObserver(Client& client) {
   Expects(!active, "one pointer observer per thread");
   active = this;
   // abi: pPointerPosition, BOOL is int

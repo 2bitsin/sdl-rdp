@@ -1,7 +1,7 @@
 #pragma once
 #include <filesystem>
 
-namespace BackendGate {
+namespace sdl_rdp::headless_client_test::backend::detail::certificate_directory {
 class CertificateDirectory {
 public:
        CertificateDirectory(CertificateDirectory const&)               = delete;
@@ -15,4 +15,8 @@ public:
 private:
   std::filesystem::path path;
 };
+}
+
+namespace sdl_rdp::headless_client_test::backend {
+using detail::certificate_directory::CertificateDirectory;
 }

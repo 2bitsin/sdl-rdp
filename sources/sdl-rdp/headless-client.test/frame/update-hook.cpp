@@ -9,8 +9,8 @@
 #include <utility>
 #include <vector>
 
-namespace Headless {
-using utilities::Expects;
+namespace sdl_rdp::headless_client_test::frame::detail::update_hook {
+using sdl_rdp::utilities::Expects;
 
 namespace {
 auto Corners(std::uint32_t left, std::uint32_t top, std::uint32_t right, std::uint32_t bottom) -> sdlrdp_rect {
@@ -27,7 +27,7 @@ auto Regions(BITMAP_UPDATE const& command) -> std::vector<sdlrdp_rect> {
          })
          | std::ranges::to<std::vector>();
 }
-auto Desktop(rdpContext const* context) -> Backend::Extent {
+auto Desktop(rdpContext const* context) -> Extent {
   Expects(context, "callback context exists");
   Expects(context->gdi, "decoded framebuffer exists");
   return { .width  = static_cast<std::uint32_t>(context->gdi->width),

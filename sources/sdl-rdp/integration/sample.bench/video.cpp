@@ -10,12 +10,18 @@
 #include <ranges>
 
 namespace sdl_rdp::integration::sample_bench::detail::video {
-using support_bench::Check;
-using support_bench::Measured;
-using support_bench::OneSession;
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::frame::FrameObserver;
+using sdl_rdp::integration::support_bench::Check;
+using sdl_rdp::integration::support_bench::Measured;
+using sdl_rdp::integration::support_bench::OneSession;
+using sdl_rdp::integration::support_bench::Session;
+using sdl_rdp::sample_gate_test::sample::PrimaryDisplayPort;
+using sdl_rdp::sample_gate_test::video::VideoDriver;
+using sdl_rdp::utilities::Timed;
 using namespace std::chrono_literals;
 
-class DefaultPresentDoesNotWaitForAcknowledgements final : public support_bench::Session<SampleGate::VideoDriver> {
+class DefaultPresentDoesNotWaitForAcknowledgements final : public Session<VideoDriver> {
 public:
   using Session::Session;
   auto TestBody() -> void override;
@@ -23,13 +29,13 @@ public:
 BENCHMARK(Measured<DefaultPresentDoesNotWaitForAcknowledgements>)->Apply(OneSession);
 
 auto DefaultPresentDoesNotWaitForAcknowledgements::TestBody() -> void {
-  SampleGate::Client client(SampleGate::PrimaryDisplayPort(), true, 1280, 800);
+  Client client(PrimaryDisplayPort(), true, 1280, 800);
   if (!Check(client.Connect(), "the client connects")) return;
-  Headless::FrameObserver const observer(client);
+  FrameObserver const observer(client);
   SDL_PumpEvents();
   if (!Check(SDL_GetWindowSurface(window) != nullptr, "the window has a surface")) return;
   bool       updated = false;
-  auto const elapsed = Backend::Timed(
+  auto const elapsed = Timed(
       [&] { updated = std::ranges::all_of(std::views::repeat(window, 10), SDL_UpdateWindowSurface); });
   Measure(elapsed);
   if (!Check(updated, "every update presents")) return;

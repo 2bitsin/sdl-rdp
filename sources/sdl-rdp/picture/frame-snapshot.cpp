@@ -8,9 +8,14 @@
 #include <cstdint>
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::picture::detail::frame_snapshot {
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::PixelBytes;
+using sdl_rdp::utilities::SameSize;
+using sdl_rdp::utilities::Whole;
+
 auto FrameBytes(Extent size) -> std::size_t {
-  return std::size_t{ Avc::Aligned(size.width) } * Avc::Aligned(size.height) * PixelBytes;
+  return std::size_t{ Aligned(size.width) } * Aligned(size.height) * PixelBytes;
 }
 FrameSnapshot::FrameSnapshot(std::shared_ptr<std::vector<std::uint8_t> const> value, Extent size) noexcept
     : _pixels{ std::move(value) }, _size{ size } { }
@@ -26,7 +31,7 @@ auto FrameSnapshot::Row(std::uint32_t row) const -> std::span<std::uint8_t const
   return Pixels().subspan(std::size_t{ row } * Stride());
 }
 auto FrameSnapshot::Stride() const -> std::size_t {
-  return std::size_t{ Avc::Aligned(_size.width) } * PixelBytes;
+  return std::size_t{ Aligned(_size.width) } * PixelBytes;
 }
 auto FrameSnapshot::Width() const noexcept -> std::uint32_t {
   return _size.width;

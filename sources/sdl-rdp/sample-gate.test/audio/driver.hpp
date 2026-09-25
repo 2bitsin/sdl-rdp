@@ -8,14 +8,19 @@
 #include <memory>
 #include <span>
 
-namespace SampleGate {
-auto ThenLead(Client& client, Headless::SoundClient& audio, std::size_t after, std::size_t milliseconds) -> void;
+namespace sdl_rdp::sample_gate_test::audio::detail::driver {
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::Clock;
+using sdl_rdp::headless_client_test::client::SoundClient;
+using std::chrono_literals::operator""ms;
+
+auto ThenLead(Client& client, SoundClient& audio, std::size_t after, std::size_t milliseconds) -> void;
 
 class AudioDriver : public AudioSample {
 protected:
-  auto ThenAudioSurvivesVideoQuit(Client& client, Headless::SoundClient& audio) -> void;
-  auto ReceiveLead()                                                            -> void;
-  auto RefillLead(auto then_refilled)                                           -> void {
+  auto ThenAudioSurvivesVideoQuit(Client& client, SoundClient& audio) -> void;
+  auto ReceiveLead()                                                  -> void;
+  auto RefillLead(auto then_refilled)                                 -> void {
     ASSERT_NO_FATAL_FAILURE(ReceiveLead());
     auto& client = *sound_client;
     auto& audio  = *sound;
@@ -38,15 +43,19 @@ protected:
   auto PlayFlushed(std::span<std::int16_t const> pcm)                           -> Clock::time_point;
   auto QueueDrained(Clock::time_point deadline, std::chrono::milliseconds poll) -> bool;
   auto OpenStream()                                                             -> void;
-  auto ConnectAudio(Client& client, Headless::SoundClient& audio)               -> void;
-  auto ThenPcm(Client& client, Headless::SoundClient& audio)                    -> void;
+  auto ConnectAudio(Client& client, SoundClient& audio)                         -> void;
+  auto ThenPcm(Client& client, SoundClient& audio)                              -> void;
   auto CaptureLogs()                                                            -> void;
   auto SetUp()                                                                  -> void override;
   auto TearDown()                                                               -> void override;
-  std::unique_ptr<Client>                sound_client;
-  std::unique_ptr<Headless::SoundClient> sound;
-  SDL_LogOutputFunction                  previous_log      = nullptr;
-  void*                                  previous_log_user = nullptr;
+  std::unique_ptr<Client>      sound_client;
+  std::unique_ptr<SoundClient> sound;
+  SDL_LogOutputFunction        previous_log      = nullptr;
+  void*                        previous_log_user = nullptr;
   std::unique_ptr<SDL_AudioStream, decltype(&SDL_DestroyAudioStream)> stream{ nullptr, SDL_DestroyAudioStream };
 };
+}
+
+namespace sdl_rdp::sample_gate_test::audio {
+using detail::driver::AudioDriver;
 }

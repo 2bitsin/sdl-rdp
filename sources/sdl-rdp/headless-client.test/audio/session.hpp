@@ -5,8 +5,10 @@
 #include <chrono>
 #include <cstddef>
 
-namespace BackendGate {
-using Headless::SoundClient;
+namespace sdl_rdp::headless_client_test::audio::detail::session {
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::SoundClient;
+using sdl_rdp::headless_client_test::graphics::RoundFive;
 struct ConfirmationPace {
   std::size_t               frames;
   std::chrono::milliseconds delay;
@@ -27,4 +29,9 @@ protected:
   auto        ThenUnavailableAudio(Client& client, bool unmatched)                           -> void;
   auto        ThenLiveVideoAndInput(Client& client)                                          -> void;
 };
+}
+
+namespace sdl_rdp::headless_client_test::audio {
+using detail::session::AudioSession;
+using detail::session::ConfirmationPace;
 }

@@ -7,8 +7,10 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace Backend::Avc {
-using utilities::Expects;
+namespace sdl_rdp::video::avc::detail::regions {
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::Union;
 auto Regions::Add(sdlrdp_rect area) -> void {
   Expects(area.x >= 0, "region left edge is nonnegative");
   Expects(area.y >= 0, "region top edge is nonnegative");

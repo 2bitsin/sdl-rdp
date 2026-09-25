@@ -1,5 +1,6 @@
 #pragma once
 #include "client.hpp"
+#include <sdl-rdp/headless-client.test/client/forward.hpp>
 
 #include <freerdp/codec/audio.h>
 #include <winpr/wtsapi.h>
@@ -10,7 +11,8 @@
 #include <span>
 #include <vector>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::client::detail::sound {
+
 struct SoundCapture {
   struct Confirmation {
     std::uint16_t     timestamp = 0;
@@ -51,7 +53,7 @@ public:
   auto CaptureState() const -> SoundCapture const&;
 
 private:
-  friend struct                           SoundProtocol;
+  friend                                  SoundProtocol;
   SoundCapture                            capture;
   inline static thread_local SoundClient* active         = nullptr;
   Client&                                 client;
@@ -66,4 +68,9 @@ private:
   std::uint8_t                            block          = 0;
   bool                                    expecting_wave = false;
 };
+}
+
+namespace sdl_rdp::headless_client_test::client {
+using detail::sound::SoundCapture;
+using detail::sound::SoundClient;
 }

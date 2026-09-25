@@ -7,12 +7,15 @@
 #include <memory>
 #include <span>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::frame::detail::update_hook {
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::utilities::Extent;
+
 enum class PictureCommand{ Surface, Bitmap };
 struct PictureUpdate {
   PictureCommand               command;
   std::span<sdlrdp_rect const> regions;
-  Backend::Extent              desktop;
+  Extent                       desktop;
   bool                         delivered;
 };
 class PictureUpdateHook {
@@ -30,4 +33,10 @@ private:
   class Installation;
   std::unique_ptr<Installation> installation;
 };
+}
+
+namespace sdl_rdp::headless_client_test::frame {
+using detail::update_hook::PictureCommand;
+using detail::update_hook::PictureUpdate;
+using detail::update_hook::PictureUpdateHook;
 }

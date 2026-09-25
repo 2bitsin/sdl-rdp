@@ -29,15 +29,11 @@
 #include <utility>
 
 namespace sdl_rdp::drive::detail::channel {
-using Backend::Contained;
-using Backend::CopyTerminated;
-using Backend::Diagnostics;
-using Backend::EventQueue;
-using Backend::Narrowed;
-using Backend::PeerLink;
-using Backend::SessionAccess;
-using Backend::WaitHandle;
-using utilities::Expects;
+using sdl_rdp::freerdp_facade::Waitable;
+using sdl_rdp::utilities::Contained;
+using sdl_rdp::utilities::CopyTerminated;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
 namespace {
 auto Header(std::uint32_t type) -> DrivePacket {
   DrivePacket packet;
@@ -75,7 +71,7 @@ auto DriveEvent(bool added, sdlrdp_drive const& drive) -> sdlrdp_event {
 auto Ending(DriveChannel const& channel) -> auto {
   return [&channel](std::string_view cause) { channel.Warn(std::format("Drive channel ended: {}", cause)); };
 }
-} // namespace
+}
 auto DriveChannel::Abort(std::string const& cause) -> void {
   std::scoped_lock const lock(mutex);
   Fail(cause);
@@ -236,8 +232,8 @@ auto DriveChannel::Pump(std::span<WaitHandle const> signaled) -> bool {
   Shutdown();
   return true;
 }
-auto DriveChannel::Send(std::uint32_t drive, std::uint32_t file, freerdp_facade::IrpMajor major,
-                        DrivePacket const& body, freerdp_facade::IrpMinor minor) -> std::shared_ptr<DriveRequest> {
+auto DriveChannel::Send(std::uint32_t drive, std::uint32_t file, IrpMajor major, DrivePacket const& body,
+                        IrpMinor minor) -> std::shared_ptr<DriveRequest> {
   std::scoped_lock const lock(mutex);
   if (!connected) throw PeerDisconnected{ "request" };
   auto wire = Device(drive);
@@ -279,7 +275,7 @@ auto DriveChannel::GeneralClientCapability(DrivePacket& packet, std::size_t star
                   minor, version, flags, (flags & RDPDR_DEVICE_REMOVE_PDUS) != 0));
 }
 auto DriveChannel::PumpAvailable() -> bool {
-  sdl_rdp::freerdp_facade::Waitable const ready{ event };
+  Waitable const ready{ event };
   for (;;) {
     if (!ready.Signalled()) return true;
     std::uint32_t length = 0;

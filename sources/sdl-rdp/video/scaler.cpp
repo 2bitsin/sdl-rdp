@@ -15,7 +15,14 @@
 #include <ranges>
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::video::detail::scaler {
+using sdl_rdp::utilities::CopyRows;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::ExpectsBand;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::PixelBytes;
+using sdl_rdp::utilities::RowBytes;
+
 namespace {
 auto Destination(RowOrder order, int row, int rows) -> std::size_t {
   return Narrowed<std::size_t>(order == RowOrder::BottomUp ? rows - row - 1 : row);

@@ -14,7 +14,11 @@
 #include <iterator>
 #include <span>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::client::detail::sound_protocol {
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::Unreachable;
+
 namespace {
 // The MS-RDPEA Quality Mode PDU: its header, then HIGH_QUALITY and the padding.
 constexpr std::array<std::uint8_t, 8> QualityMode{ 12, 0, 4, 0, 2, 0, 0, 0 };
@@ -49,12 +53,12 @@ auto WriteSoundFormatHeader(wStream* out, SoundCapture const& capture, std::size
       std::as_writable_bytes(std::span(static_cast<std::byte*>(Stream_Pointer(out)), 24)));
   writer.Store<std::uint8_t>(7);
   writer.Store<std::uint8_t>(0);
-  writer.Store<std::uint16_t, std::endian::little>(Backend::Narrowed<std::uint16_t>(size - 4));
+  writer.Store<std::uint16_t, std::endian::little>(Narrowed<std::uint16_t>(size - 4));
   writer.Store<std::uint32_t, std::endian::little>(3);
   writer.Store<std::uint32_t, std::endian::little>(capture.volume);
   writer.Store<std::uint32_t, std::endian::little>(0);
   writer.Store<std::uint16_t, std::endian::little>(0);
-  writer.Store<std::uint16_t, std::endian::little>(Backend::Narrowed<std::uint16_t>(count));
+  writer.Store<std::uint16_t, std::endian::little>(Narrowed<std::uint16_t>(count));
   writer.Store<std::uint8_t>(0);
   writer.Store<std::uint16_t, std::endian::little>(capture.version);
   writer.Store<std::uint8_t>(0);
@@ -192,7 +196,7 @@ auto SoundProtocol::Dispatch(SoundClient& self, wStream* stream, std::uint8_t ty
   case 6:  Train(self); break;
   case 1:
   case 3:  break;
-  default: utilities::Unreachable(type);
+  default: Unreachable(type);
   }
 }
 }

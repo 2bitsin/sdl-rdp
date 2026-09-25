@@ -3,10 +3,10 @@
 #include <array>
 #include <string_view>
 
-namespace SampleGate {
-using utilities::Expects;
+namespace sdl_rdp::sample_gate_test::client::detail::input {
+using sdl_rdp::utilities::Expects;
 
-InputClient::InputClient(Headless::Client& client) {
+InputClient::InputClient(Client& client) {
   advanced = nullptr;
   touch    = nullptr;
   freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);

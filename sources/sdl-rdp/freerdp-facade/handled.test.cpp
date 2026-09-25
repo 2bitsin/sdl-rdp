@@ -11,6 +11,7 @@
 #include <string_view>
 #include <vector>
 
+namespace sdl_rdp::freerdp_facade::detail::handled {
 namespace {
 struct Pdu {
   int value;
@@ -47,8 +48,6 @@ using FlagSlot = auto (*)(Context*, int, Pdu const*) noexcept -> int;
 using UserSlot = auto (*)(void*, int) noexcept -> int;
 using VoidSlot = auto (*)(Context*, Pdu const*) noexcept -> void;
 using HashSlot = auto (*)(Context*, std::uint8_t*) noexcept -> int;
-using sdl_rdp::freerdp_facade::Handled;
-using sdl_rdp::freerdp_facade::Itself;
 }
 TEST(Handled, PassesThePduAsAReference) {
   Owner         owner;
@@ -100,4 +99,5 @@ TEST(Handled, HandsAFixedExtentBufferAsTheSpanTheHandlerTakes) {
   constexpr auto sum = [](Owner const&, std::span<std::uint8_t, 4> bytes) -> int { return bytes[0] + bytes[3]; };
   HashSlot const              slot    = Handled<Held, sum, Operation, &Owner::Failures, -1>;
   EXPECT_EQ(slot(&context, buffer.data()), 5);
+}
 }

@@ -17,9 +17,15 @@
 #include <utility>
 #include <vector>
 
+namespace sdl_rdp::integration::allocations_test::detail::per_frame {
+using sdl_rdp::headless_client_test::backend::AwaitAllAcknowledged;
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::frame::MovingTilePattern;
+using sdl_rdp::headless_client_test::graphics::GraphicsBackend;
+using sdl_rdp::headless_client_test::graphics::GraphicsObserver;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::video::avc::Encoder;
 namespace {
-using HeapCount::CountingHeap;
-using HeapCount::Tally;
 constexpr std::uint32_t Width          = 640;
 constexpr std::uint32_t Height         = 480;
 constexpr std::size_t   WarmFrames     = 10;
@@ -51,7 +57,7 @@ constexpr std::array Scenarios{
 };
 
 auto PerFrame(std::pair<Tally, Tally> const& counted, std::uint64_t Tally::* member) -> double {
-  utilities::Expects(counted.second.*member >= counted.first.*member, "allocation tallies only grow");
+  Expects(counted.second.*member >= counted.first.*member, "allocation tallies only grow");
   return static_cast<double>(counted.second.*member - counted.first.*member) / MeasuredFrames;
 }
 auto Damage(bool partial) -> sdlrdp_rect {
@@ -67,12 +73,12 @@ auto Report(Scenario const& scenario, std::pair<Tally, Tally> const& counted) ->
   EXPECT_LE(heap, static_cast<double>(scenario.ceiling.heap)) << scenario.name;
 }
 
-class Allocations : public Headless::GraphicsBackend, public testing::WithParamInterface<Scenario> {
+class Allocations : public GraphicsBackend, public testing::WithParamInterface<Scenario> {
 protected:
   auto Connect(Scenario const& scenario) -> void {
-    _client = std::make_unique<Headless::Client>(sdlrdp_port(backend.Handle()), true, Width, Height);
+    _client = std::make_unique<Client>(sdlrdp_port(backend.Handle()), true, Width, Height);
     _client->EnableGraphics({ .h264 = scenario.codec == SDLRDP_CODEC_AVC420 });
-    _observer = std::make_unique<Headless::GraphicsObserver>(*_client);
+    _observer = std::make_unique<GraphicsObserver>(*_client);
     ConnectGraphics(*_client);
   }
   auto Present(Scenario const& scenario, std::size_t first, std::size_t last) -> void {
@@ -82,22 +88,21 @@ protected:
 
 private:
   auto PresentOne(sdlrdp_rect const& area, std::size_t frame) -> void {
-    Headless::MovingTilePattern(_pixels, Width, Height, frame);
+    MovingTilePattern(_pixels, Width, Height, frame);
     auto const received = _observer->Observed().frames.size();
     ASSERT_EQ(backend.Present(_pixels, Width, Height, area), 0);
-    HeapCount::Uncounted const waiting;
+    Uncounted const waiting;
     ASSERT_TRUE(_client->Until([&] { return _observer->Observed().frames.size() > received; })) << logs.Text(true);
-    ASSERT_NO_FATAL_FAILURE(sdl_rdp::headless_client_test::backend::AwaitAllAcknowledged(*_client, backend, logs));
+    ASSERT_NO_FATAL_FAILURE(AwaitAllAcknowledged(*_client, backend, logs));
   }
-  std::vector<std::uint32_t>                  _pixels   = std::vector<std::uint32_t>(std::size_t{ Width } * Height);
-  std::unique_ptr<Headless::Client>           _client;
-  std::unique_ptr<Headless::GraphicsObserver> _observer;
+  std::vector<std::uint32_t>        _pixels   = std::vector<std::uint32_t>(std::size_t{ Width } * Height);
+  std::unique_ptr<Client>           _client;
+  std::unique_ptr<GraphicsObserver> _observer;
 };
 
 TEST_P(Allocations, PerPresentedFrame) {
   auto const& scenario = GetParam();
-  if (scenario.codec == SDLRDP_CODEC_AVC420 && !Backend::Avc::Encoder::Available())
-    GTEST_SKIP() << Backend::Avc::Encoder::UnavailableReason();
+  if (scenario.codec == SDLRDP_CODEC_AVC420 && !Encoder::Available()) GTEST_SKIP() << Encoder::UnavailableReason();
   auto pattern = std::to_array("/tmp/sdlrdp-allocations-XXXXXX");
   ASSERT_NO_FATAL_FAILURE(OpenGraphics(pattern.data(), Width, Height, scenario.codec));
   ASSERT_NO_FATAL_FAILURE(Connect(scenario));
@@ -108,4 +113,5 @@ TEST_P(Allocations, PerPresentedFrame) {
 }
 INSTANTIATE_TEST_SUITE_P(Codecs, Allocations, testing::ValuesIn(Scenarios),
                          [](auto const& info) { return std::string(info.param.name); });
+}
 }

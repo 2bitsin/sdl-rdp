@@ -10,7 +10,13 @@
 #include <string>
 #include <utility>
 
-namespace SampleGate {
+namespace sdl_rdp::integration::sample_test::detail::input {
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::Tap;
+using sdl_rdp::sample_gate_test::client::InputClient;
+using sdl_rdp::sample_gate_test::client::ThenAdvanced;
+using sdl_rdp::sample_gate_test::sample::AspectOptions;
+using sdl_rdp::sample_gate_test::sample::Sample;
 
 namespace {
 auto InputOf(Client& client) -> rdpInput* {
@@ -29,7 +35,7 @@ auto TouchChannel(Client& client) -> auto* {
            && InputClient::Touch().load()->GetVersion(InputClient::Touch().load()) == RDPINPUT_PROTOCOL_V10;
   });
   EXPECT_TRUE(ready);
-  return ready ? SampleGate::InputClient::Touch().load() : nullptr;
+  return ready ? InputClient::Touch().load() : nullptr;
 }
 
 }
@@ -118,7 +124,7 @@ TEST_F(Sample, AdvancedAspectRelative) {
 TEST_F(Sample, AdvancedWheelBothAxesPrecise) {
   ASSERT_NO_FATAL_FAILURE(GivenAdvancedSession());
   auto& client   = SessionClient();
-  auto* advanced = SampleGate::InputClient::Advanced().load();
+  auto* advanced = InputClient::Advanced().load();
   ASSERT_EQ(advanced->AInputSendInputEvent(advanced, AINPUT_FLAGS_WHEEL, 30 * 65536, -60 * 65536), CHANNEL_RC_OK);
   ASSERT_TRUE(ReadInput(client, "event MOUSE_WHEEL "));
   EXPECT_TRUE(line.ends_with(" x=0.25 y=-0.5")) << line;
@@ -131,7 +137,7 @@ TEST_F(Sample, ScancodeTextAndStopped) {
   ASSERT_NO_FATAL_FAILURE(WhenScancodeText(client));
   ASSERT_NO_FATAL_FAILURE(WhenTextStops(client));
   auto stopped = process->Transcript().size();
-  ASSERT_NO_FATAL_FAILURE(Headless::Tap(client, 0x1e));
+  ASSERT_NO_FATAL_FAILURE(Tap(client, 0x1e));
   ASSERT_TRUE(Read("event KEY_UP type=769 scancode=4 key=97 down=0"));
   ASSERT_NO_FATAL_FAILURE(Escape(client));
   ThenStoppedScancodeText(stopped);

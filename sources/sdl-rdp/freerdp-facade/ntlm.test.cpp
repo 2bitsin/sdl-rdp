@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <ranges>
 
-namespace sdl_rdp::freerdp_facade {
+namespace sdl_rdp::freerdp_facade::detail::ntlm {
 namespace {
 // MS-NLMP 4.2.2.1.2 and 4.2.4.1.1: User "User", UserDom "Domain", Passwd "Password".
 constexpr std::array<std::uint8_t, 16> PasswordV1{ 0xa4, 0xf4, 0x9c, 0x40, 0x65, 0x10, 0xbd, 0xca,

@@ -10,7 +10,11 @@
 #include <freerdp/channels/wtsvc.h>
 #include <cstdint>
 
-namespace Backend {
+namespace sdl_rdp::peer::detail::channel_set {
+using sdl_rdp::diagnostics::FailuresThrough;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::OperationName;
+
 namespace {
 constexpr OperationName ChannelCreation{ "Dynamic channel creation" };
 }

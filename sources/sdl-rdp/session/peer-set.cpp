@@ -4,7 +4,8 @@
 
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::session::detail::peer_set {
+
 PeerSet::~PeerSet() {
   // Declared before the lock, so the peers join after it is released.
   std::vector<std::unique_ptr<Peer>> retired;

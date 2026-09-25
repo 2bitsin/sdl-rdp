@@ -1,7 +1,12 @@
 #include "videodata.hpp"
 #include <sdl-rdp/SDL3/rdp/exceptions.hpp>
-SDL_VideoData::SDL_VideoData(std::shared_ptr<sdl3::rdp::Driver> driver, SDL_HintCallback codec, SDL_HintCallback aspect)
-    : sdl3::rdp::OwnedDriver<sdl3::rdp::Driver>{ std::move(driver) }, _codec{ SDL_HINT_RDP_CODEC, codec, this },
+
+using sdl3::rdp::Driver;
+using sdl3::rdp::OwnedDriver;
+using sdl3::rdp::backend::Surface;
+
+SDL_VideoData::SDL_VideoData(std::shared_ptr<Driver> driver, SDL_HintCallback codec, SDL_HintCallback aspect)
+    : OwnedDriver<Driver>{ std::move(driver) }, _codec{ SDL_HINT_RDP_CODEC, codec, this },
       _aspect{ SDL_HINT_RDP_ASPECT, aspect, this } { }
 auto SDL_VideoData::Display() const -> SDL_DisplayID {
   return _display;
@@ -42,13 +47,15 @@ auto SDL_VideoData::Framebuffer() noexcept -> FramebufferRef {
   if (!_framebuffer) return std::nullopt;
   return std::ref(*_framebuffer);
 }
-auto SDL_VideoData::Attach(sdl3::rdp::backend::Surface surface) noexcept -> void {
+auto SDL_VideoData::Attach(Surface surface) noexcept -> void {
   _framebuffer.emplace(std::move(surface));
 }
 auto SDL_VideoData::Detach() noexcept -> void {
   _framebuffer.reset();
 }
 namespace sdl3::rdp::video::detail::videodata {
+using sdl_rdp::utilities::Expects;
+
 auto BoundWindow(SDL_VideoData const& data) -> SDL_Window& {
   auto const window = data.Window();
   if (!window) throw NoWindow{ };
@@ -56,8 +63,8 @@ auto BoundWindow(SDL_VideoData const& data) -> SDL_Window& {
 }
 auto CurrentVideo() -> SDL_VideoData& {
   auto* const device = SDL_GetVideoDevice();
-  utilities::Expects(device != nullptr, "context-free video callbacks run while video is initialised");
-  utilities::Expects(device->internal != nullptr, "the RDP video device has its state");
+  Expects(device != nullptr, "context-free video callbacks run while video is initialised");
+  Expects(device->internal != nullptr, "the RDP video device has its state");
   return *device->internal;
 }
 }

@@ -16,6 +16,7 @@ private:
   std::weak_ptr<Driver> _driver;
 };
 }
+
 namespace sdl3::rdp {
 using detail::rendezvous::Rendezvous;
 }

@@ -8,7 +8,10 @@
 #include <cstdint>
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::link::detail::activation {
+using sdl_rdp::configuration::MillihertzPerHz;
+using sdl_rdp::utilities::Expects;
+
 Activation::Activation(EventQueue& events, PeerLink& link) noexcept : _events{ events }, _link{ link } { }
 auto Activation::Activate() -> void {
   _active       = true;

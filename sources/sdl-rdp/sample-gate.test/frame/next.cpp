@@ -6,10 +6,10 @@
 #include <cstdint>
 #include <functional>
 
-namespace SampleGate {
-using utilities::Expects;
+namespace sdl_rdp::sample_gate_test::frame::detail::next {
+using sdl_rdp::utilities::Expects;
 
-NextFrame::NextFrame(Headless::Client& value, std::uint32_t frame)
+NextFrame::NextFrame(Client& value, std::uint32_t frame)
     : client(value), column(frame % 640), hook(value, std::bind_front(&NextFrame::Observe, this)) { }
 auto NextFrame::Received() const -> bool {
   return received;
@@ -17,7 +17,7 @@ auto NextFrame::Received() const -> bool {
 auto NextFrame::Matches() const -> testing::AssertionResult const& {
   return matches;
 }
-auto NextFrame::Observe(Headless::PictureUpdate const& update) -> void {
+auto NextFrame::Observe(PictureUpdate const& update) -> void {
   auto const completes = [](sdlrdp_rect region) { return region.y + region.h == 480; };
   if (update.delivered && std::ranges::any_of(update.regions, completes)) Inspect();
 }

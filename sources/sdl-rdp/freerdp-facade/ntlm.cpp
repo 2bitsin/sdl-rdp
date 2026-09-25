@@ -9,6 +9,8 @@
 #include <string>
 
 namespace sdl_rdp::freerdp_facade::detail::ntlm {
+using sdl_rdp::utilities::Narrowed;
+
 namespace {
 // WinPR 3.32 ntlm.h:41 takes every string as a writable, terminated LPWSTR measured in bytes.
 class WideArgument {
@@ -25,7 +27,7 @@ public:
     return oxbox::utilities::SpanCast<std::uint16_t>(std::span(_text));
   }
   auto Bytes() const -> std::uint32_t {
-    return Backend::Narrowed<std::uint32_t>(_text.size() * sizeof(char16_t));
+    return Narrowed<std::uint32_t>(_text.size() * sizeof(char16_t));
   }
 
 private:
@@ -44,7 +46,7 @@ auto NtOwf::Bytes() const noexcept -> std::span<std::uint8_t const, 16> {
 auto NtOwfV1(std::u16string_view password) -> NtOwf {
   WideArgument written{ password };
   NtOwf        hash;
-  if (!NTOWFv1W(written.Units().data(), written.Bytes(), hash.Bytes().data())) throw Backend::NtlmHashFailed{ "v1" };
+  if (!NTOWFv1W(written.Units().data(), written.Bytes(), hash.Bytes().data())) throw NtlmHashFailed{ "v1" };
   return hash;
 }
 auto NtOwfV2(NtOwf const& v1, std::u16string_view user, std::u16string_view domain) -> NtOwf {
@@ -54,7 +56,7 @@ auto NtOwfV2(NtOwf const& v1, std::u16string_view user, std::u16string_view doma
   NtOwf        hash;
   if (!NTOWFv2FromHashW(key.Bytes().data(), account.Units().data(), account.Bytes(), realm.Units().data(),
                         realm.Bytes(), hash.Bytes().data()))
-    throw Backend::NtlmHashFailed{ "v2" };
+    throw NtlmHashFailed{ "v2" };
   return hash;
 }
 }

@@ -6,7 +6,10 @@
 #include <limits>
 #include <span>
 
-namespace Backend {
+namespace sdl_rdp::picture::detail::geometry {
+using sdl_rdp::utilities::Extent;
+using sdl_rdp::utilities::PixelBytes;
+
 // A 32-bit row must fit BitmapUpdate bitmapLength (UINT16); height is UINT16.
 inline constexpr std::uint32_t MaximumPictureWidth  = std::numeric_limits<std::uint16_t>::max() / PixelBytes;
 inline constexpr std::uint32_t MaximumPictureHeight = std::numeric_limits<std::uint16_t>::max();
@@ -25,8 +28,12 @@ private:
   Extent        _size;
   sdlrdp_aspect _aspect;
 };
+auto Aligned(std::uint32_t dimension) -> std::uint32_t;
 }
 
-namespace Backend::Avc {
-auto Aligned(std::uint32_t dimension) -> std::uint32_t;
+namespace sdl_rdp::picture {
+using detail::geometry::Aligned;
+using detail::geometry::Dimensions;
+using detail::geometry::PictureGeometry;
+using detail::geometry::ValidateDamage;
 }

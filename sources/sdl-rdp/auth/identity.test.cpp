@@ -10,9 +10,11 @@
 #include <string_view>
 #include <thread>
 
+namespace sdl_rdp::auth::detail::identity {
 namespace {
 TEST(AuthenticationIdentity, UnicodeAndAnsi) {
-  EXPECT_EQ(Backend::IdentityText(std::u16string_view{ u"žąsis" }), "žąsis");
-  EXPECT_EQ(Backend::IdentityText(std::string_view{ "Aé" }), "Aé");
+  EXPECT_EQ(IdentityText(std::u16string_view{ u"žąsis" }), "žąsis");
+  EXPECT_EQ(IdentityText(std::string_view{ "Aé" }), "Aé");
+}
 }
 }

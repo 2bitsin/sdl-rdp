@@ -14,7 +14,13 @@
 #include <cstdint>
 #include <span>
 
-namespace SampleGate {
+namespace sdl_rdp::sample_gate_test::sample::detail::checks {
+using sdl_rdp::drive::DrivePacket;
+using sdl_rdp::headless_client_test::client::Tap;
+using sdl_rdp::headless_client_test::drive::DriveObserver;
+using sdl_rdp::headless_client_test::drive::ShareDrive;
+using sdl_rdp::headless_client_test::utilities::ReadText;
+
 namespace {
 auto ThenWrittenBytes(std::string const& output) -> void {
   for (std::size_t i = 0; i < output.size(); ++i) {
@@ -47,12 +53,12 @@ auto SampleChecks::ThenAbsoluteMouse(rdpInput* input) -> void {
 auto SampleChecks::WhenShiftedText(Client& client) -> void {
   auto* input = client.Instance()->context->input;
   ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x2a));
-  ASSERT_NO_FATAL_FAILURE(Headless::Tap(client, 0x1e));
+  ASSERT_NO_FATAL_FAILURE(Tap(client, 0x1e));
   ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x2a));
   ASSERT_TRUE(Read("event TEXT_INPUT text=A"));
 }
 auto SampleChecks::WhenScancodeText(Client& client) -> void {
-  ASSERT_NO_FATAL_FAILURE(Headless::Tap(client, 0x1e));
+  ASSERT_NO_FATAL_FAILURE(Tap(client, 0x1e));
   ASSERT_TRUE(Read("event TEXT_INPUT text=a"));
   WhenShiftedText(client);
 }
@@ -75,14 +81,14 @@ auto SampleChecks::WhenUnicodeKeys(rdpInput* input) -> void {
   ASSERT_NO_FATAL_FAILURE(ThenUnicodeKeyEvents());
   WhenNonAsciiKey(input);
 }
-auto SampleChecks::ThenDriveOutput(fs::path const& share, std::string const& original) -> void {
+auto SampleChecks::ThenDriveOutput(std::filesystem::path const& share, std::string const& original) -> void {
   std::array<std::uint8_t, EVP_MAX_MD_SIZE> digest { };
   std::uint32_t                             length = 0;
   ASSERT_EQ(EVP_Digest(original.data(), original.size(), digest.data(), &length, EVP_sha256(), nullptr), 1);
   auto hex = oxbox::utilities::ToHex(std::as_bytes(std::span(digest).first(length)));
   ASSERT_TRUE(Read("cat bytes=21 sha256=" + hex)) << process->Transcript();
   ASSERT_TRUE(Read("write done")) << process->Transcript();
-  auto output = Headless::ReadText((share / "output").c_str());
+  auto output = ReadText((share / "output").c_str());
   ASSERT_EQ(output.size(), 3 * 1024uz * 1024u);
   ThenWrittenBytes(output);
 }
@@ -91,7 +97,7 @@ auto SampleChecks::WhenSettingsEnvironmentConflicts() -> void {
   ASSERT_TRUE(SDL_SetEnvironmentVariable(SDL_GetEnvironment(), SDL_HINT_RDP_SETTINGS, "/missing/settings.yaml", true));
   ASSERT_TRUE(SDL_Init(SDL_INIT_VIDEO)) << SDL_GetError();
 }
-auto SampleChecks::GivenSettingsHints(fs::path const& file) -> void {
+auto SampleChecks::GivenSettingsHints(std::filesystem::path const& file) -> void {
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_SETTINGS, file.c_str()));
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_CERT_DIR, certificates.Path().c_str()));
@@ -105,7 +111,7 @@ auto SampleChecks::ThenReloadedAspect() -> void {
   SDL_DestroyWindow(window);
   SDL_Quit();
 }
-auto SampleChecks::ThenReloadedSettings(fs::path const& file) -> void {
+auto SampleChecks::ThenReloadedSettings(std::filesystem::path const& file) -> void {
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_SETTINGS, file.c_str()));
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));
   ASSERT_TRUE(SDL_SetHintWithPriority(SDL_HINT_RDP_PORT, "0", SDL_HINT_OVERRIDE));
@@ -113,14 +119,14 @@ auto SampleChecks::ThenReloadedSettings(fs::path const& file) -> void {
   ASSERT_TRUE(SDL_Init(SDL_INIT_VIDEO)) << SDL_GetError();
   ThenReloadedAspect();
 }
-auto SampleChecks::DisconnectReading(std::uint32_t port, fs::path const& share) -> void {
+auto SampleChecks::DisconnectReading(std::uint32_t port, std::filesystem::path const& share) -> void {
   {
     Client client(port, true, 640, 480);
-    Headless::ShareDrive(client, share.c_str());
+    ShareDrive(client, share.c_str());
     ASSERT_NO_FATAL_FAILURE(Connect(client));
-    Headless::DriveObserver observer(client);
+    DriveObserver observer(client);
     ASSERT_TRUE(client.Until([&] {
-      return std::ranges::any_of(observer.Observed().io, [](sdl_rdp::drive::DrivePacket packet) {
+      return std::ranges::any_of(observer.Observed().io, [](DrivePacket packet) {
         packet.Skip(12);
         return packet.Read<std::uint32_t>() == IRP_MJ_READ;
       });
@@ -128,7 +134,7 @@ auto SampleChecks::DisconnectReading(std::uint32_t port, fs::path const& share) 
     ASSERT_TRUE(client.Disconnect());
   }
 }
-auto SampleChecks::ThenClipboardCleared(Client& client, Headless::ClipboardClient& clipboard) -> void {
+auto SampleChecks::ThenClipboardCleared(Client& client, ClipboardClient& clipboard) -> void {
   ASSERT_TRUE(clipboard.Offer({ }, false));
   ASSERT_TRUE(client.Until([&] { return clipboard.Observed().accepted.load() == 4; }));
   ASSERT_TRUE(Read("event CLIPBOARD text="));

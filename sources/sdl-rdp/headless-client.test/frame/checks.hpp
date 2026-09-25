@@ -8,7 +8,12 @@
 #include <cstdint>
 #include <vector>
 
-namespace BackendGate {
+namespace sdl_rdp::headless_client_test::frame::detail::checks {
+using sdl_rdp::headless_client_test::backend::BackendEvents;
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::graphics::GraphicsObserver;
+using sdl_rdp::utilities::Extent;
+
 class FrameChecks : protected BackendEvents {
 protected:
   auto        Present(std::vector<std::uint32_t> const& pixels, std::uint32_t w, std::uint32_t h)           -> void;
@@ -24,8 +29,12 @@ protected:
   static auto ThenProducerFrame(Client& client, FrameObserver& observer, std::atomic<std::size_t> const& presents)
       -> void;
   static auto ThenReadable(Client& client)                                                                  -> void;
-  auto        ThenQoe(Client& client, Headless::GraphicsObserver& observer)                                 -> void;
-  auto        ResizePicture(Client& client, Headless::GraphicsObserver& observer, std::vector<std::uint32_t>& pixels,
-                            Backend::Extent size, bool graphics) -> void;
+  auto        ThenQoe(Client& client, GraphicsObserver& observer)                                           -> void;
+  auto        ResizePicture(Client& client, GraphicsObserver& observer, std::vector<std::uint32_t>& pixels, Extent size,
+                            bool graphics) -> void;
 };
+}
+
+namespace sdl_rdp::headless_client_test::frame {
+using detail::checks::FrameChecks;
 }

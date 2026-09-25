@@ -1,6 +1,10 @@
 #pragma once
 #include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/configuration/forward.hpp>
+#include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
+#include <sdl-rdp/video/forward.hpp>
+#include <sdl-rdp/video/frame/forward.hpp>
 #include <sdl-rdp/video/pixel-band.hpp>
 
 #include <freerdp/update.h>
@@ -10,14 +14,13 @@
 #include <span>
 #include <vector>
 
-namespace Backend {
-class Activation;
-class Configuration;
-class Encoder;
-class FramePacing;
-class PeerFrames;
-class PeerLink;
-class Scaler;
+namespace sdl_rdp::video::detail::legacy_frame {
+using sdl_rdp::configuration::Configuration;
+using sdl_rdp::link::Activation;
+using sdl_rdp::link::PeerLink;
+using sdl_rdp::utilities::Pinned;
+using sdl_rdp::video::frame::FramePacing;
+
 enum class LegacyWire{ Bitmap, Planar, Surface };
 struct LegacyFormat {
   std::uint32_t depth{ 32                 };
@@ -67,4 +70,8 @@ private:
   std::vector<std::uint8_t> _scratch;
   LegacyFormat              _format       { };
 };
+}
+
+namespace sdl_rdp::video {
+using detail::legacy_frame::LegacyFrame;
 }

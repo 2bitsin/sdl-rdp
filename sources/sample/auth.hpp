@@ -26,6 +26,7 @@ private:
 };
 auto PrintAuthentication(SDL_Window* window) -> void;
 }
+
 namespace sample {
 using detail::auth::Authenticator;
 using detail::auth::PrintAuthentication;

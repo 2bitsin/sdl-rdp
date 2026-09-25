@@ -36,9 +36,13 @@ private:
   bool                                          closed { };
 };
 namespace sdl_rdp::drive::detail::file {
-auto Exchange(sdlrdp_file& file, freerdp_facade::IrpMajor major, DrivePacket const& packet,
-              freerdp_facade::IrpMinor minor = freerdp_facade::IrpMinor::None, bool end = false) -> DrivePacket;
+using sdl_rdp::freerdp_facade::IrpMajor;
+using sdl_rdp::freerdp_facade::IrpMinor;
+
+auto Exchange(sdlrdp_file& file, IrpMajor major, DrivePacket const& packet, IrpMinor minor = IrpMinor::None,
+              bool end = false) -> DrivePacket;
 }
+
 namespace sdl_rdp::drive {
 using detail::file::Exchange;
 }

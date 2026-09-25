@@ -10,6 +10,7 @@ inline auto Check(bool result) -> void {
   }
 }
 }
+
 namespace sample {
 using detail::check::Check;
 }

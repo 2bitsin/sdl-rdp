@@ -9,8 +9,12 @@
 #include <algorithm>
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::peer::detail::peer {
+using sdl_rdp::clipboard::ClipboardChannel;
 using sdl_rdp::drive::DriveChannel;
+using sdl_rdp::link::DynamicChannel;
+using sdl_rdp::video::frame::FrameSources;
+using sdl_rdp::video::gfx::GfxChannel;
 Peer::Peer(PeerHandle accepted, Diagnostics const& diagnostics, EventQueue& events, Configuration const& configuration,
            FrameStore& store, PointerStore& pointer, ClipboardStore& clipboard, SessionAccess& session)
     : _link{ std::move(accepted) }, _traces{ diagnostics }, _activation{ events, _link }, _frames{ store },

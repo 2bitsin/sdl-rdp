@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace Backend {
+namespace sdl_rdp::link::detail::channel_slot {
 ChannelSlot::ChannelSlot(DynamicChannels& registry, DynamicChannel& owner) noexcept
     : _registry{ registry }, _owner{ owner } { }
 auto ChannelSlot::Assign(std::uint32_t id) -> bool {

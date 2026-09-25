@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace Backend {
+namespace sdl_rdp::configuration::detail::refresh {
 inline constexpr std::uint32_t MillihertzPerHz = 1000;
 enum class Direction  { Down, Hold, Up                 };
 enum class RefreshMode{ Fixed, Client, Average, Sender };
@@ -16,7 +16,6 @@ struct WireSample {
   std::uint32_t mss          { };
   std::uint64_t delivery_rate{ };
 };
-auto SampleWire(int descriptor) -> WireSample;
 class Refresh {
 public:
   using Clock = std::chrono::steady_clock;
@@ -44,4 +43,11 @@ private:
   Clock::time_point last_ack;
   Clock::time_point last_blocked;
 };
+}
+
+namespace sdl_rdp::configuration {
+using detail::refresh::MillihertzPerHz;
+using detail::refresh::Refresh;
+using detail::refresh::RefreshMode;
+using detail::refresh::WireSample;
 }

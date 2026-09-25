@@ -5,7 +5,10 @@
 
 #include <chrono>
 
-namespace Backend {
+namespace sdl_rdp::auth::detail::tls_rehearsal {
+using sdl_rdp::freerdp_facade::PeerHandle;
+using sdl_rdp::utilities::SocketPair;
+
 // Bounds each blocked send or receive of the rehearsal client: a local handshake takes milliseconds, a hung peer never.
 inline constexpr std::chrono::milliseconds RehearsalBlockedCallLimit{ 10'000 };
 
@@ -20,4 +23,8 @@ private:
   SocketPair                ends;
   PeerHandle                server;
 };
+}
+
+namespace sdl_rdp::auth {
+using detail::tls_rehearsal::TlsRehearsal;
 }

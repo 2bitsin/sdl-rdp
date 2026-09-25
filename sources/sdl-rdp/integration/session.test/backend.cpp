@@ -24,16 +24,33 @@
 #include <span>
 #include <system_error>
 
-namespace BackendGate {
+namespace sdl_rdp::integration::session_test::detail::backend {
+using sdl_rdp::freerdp_facade::Settings;
+using sdl_rdp::headless_client_test::backend::BackendInstance;
+using sdl_rdp::headless_client_test::backend::CertificateDirectory;
+using sdl_rdp::headless_client_test::backend::Clock;
+using sdl_rdp::headless_client_test::backend::Logs;
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::HasCookie;
+using sdl_rdp::headless_client_test::codec::CodecTolerance;
+using sdl_rdp::headless_client_test::frame::FrameCounter;
+using sdl_rdp::headless_client_test::frame::HashPattern;
+using sdl_rdp::headless_client_test::utilities::ChildProcess;
+using sdl_rdp::headless_client_test::utilities::ReadText;
+using sdl_rdp::utilities::CopyRows;
+using sdl_rdp::utilities::Descriptor;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::Releases;
+
 namespace {
-using PlanarContext = std::unique_ptr<BITMAP_PLANAR_CONTEXT, Backend::Releases<freerdp_bitmap_planar_context_free>>;
+using PlanarContext = std::unique_ptr<BITMAP_PLANAR_CONTEXT, Releases<freerdp_bitmap_planar_context_free>>;
 auto ThenCertificateLifetime(X509* cert) -> void {
   int days    = 0;
   int seconds = 0;
   ASSERT_TRUE(ASN1_TIME_diff(&days, &seconds, X509_get0_notBefore(cert), X509_get0_notAfter(cert)));
   EXPECT_EQ(days, 3650);
 }
-auto ThenLoggingChild(Headless::ChildProcess& child, std::string const& output) -> void {
+auto ThenLoggingChild(ChildProcess& child, std::string const& output) -> void {
   EXPECT_TRUE(child.ExitedCleanly()) << output;
   EXPECT_FALSE(output.contains("com.freerdp")) << output;
 }
@@ -55,20 +72,18 @@ auto RunLogChild(int output) -> int {
         "--gtest_output=", nullptr);
   return 126;
 }
-auto LoggingChild(Backend::Descriptor output) -> Headless::ChildProcess {
-  return Headless::ChildProcess{ [&output] { return RunLogChild(output.Get()); } };
+auto LoggingChild(Descriptor output) -> ChildProcess {
+  return ChildProcess{ [&output] { return RunLogChild(output.Get()); } };
 }
 }
 TEST(CopyRows, PaddedRows) {
   std::array<std::uint8_t, 8> source     { 1, 2, 9, 9, 3, 4, 9, 9 };
   std::array<std::uint8_t, 6> destination{ 8, 8, 8, 8, 8, 8       };
-  Backend::CopyRows({ .bytes = source, .pitch = 4 }, { .bytes = destination, .pitch = 3 },
-                    { .rows = 2, .row_bytes = 2 });
+  CopyRows({ .bytes = source, .pitch = 4 }, { .bytes = destination, .pitch = 3 }, { .rows = 2, .row_bytes = 2 });
   EXPECT_EQ(destination, (std::array<std::uint8_t, 6>{ 1, 2, 8, 3, 4, 8 }));
-  Backend::CopyRows({ .bytes = source, .pitch = 4 }, { .bytes = destination, .pitch = 3 },
-                    { .rows = 2, .row_bytes = 2 }, true);
+  CopyRows({ .bytes = source, .pitch = 4 }, { .bytes = destination, .pitch = 3 }, { .rows = 2, .row_bytes = 2 }, true);
   EXPECT_EQ(destination, (std::array<std::uint8_t, 6>{ 3, 4, 8, 1, 2, 8 }));
-  Backend::CopyRows({ }, { }, { });
+  CopyRows({ }, { }, { });
 }
 TEST(Errors, WidthAndBind) {
   CertificateDirectory const certificates;
@@ -85,7 +100,7 @@ TEST(Errors, WidthAndBind) {
 }
 
 namespace {
-auto MeasureFullFrame(Headless::BackendInstance const& handle, Client& client, std::vector<std::uint32_t> const& pixels,
+auto MeasureFullFrame(BackendInstance const& handle, Client& client, std::vector<std::uint32_t> const& pixels,
                       sdlrdp_codec codec) -> void {
   FrameCounter      counter(client);
   auto              bytes   = client.Received();
@@ -104,7 +119,7 @@ auto WhenFullFrameMeasured(CertificateDirectory const& certificates, Logs& logs,
                            std::vector<std::uint32_t> const& pixels, sdlrdp_codec codec) -> void {
   sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), 1024, 768, 0, Logs::Collect, &logs };
   config.codec = codec;
-  Headless::BackendInstance backend;
+  BackendInstance backend;
   ASSERT_NO_FATAL_FAILURE(backend.Open(config));
   Client client(sdlrdp_port(backend.Handle()), true, 1024, 768);
   client.Tolerance(CodecTolerance(codec, true));
@@ -121,10 +136,8 @@ auto CompressSignedDelta(BITMAP_PLANAR_CONTEXT* encoder, std::vector<std::uint32
   ASSERT_NE(compressed.front() & PLANAR_FORMAT_HEADER_RLE, 0);
 }
 auto ThenCertificate(std::string const& first, std::filesystem::path const& data) -> void {
-  std::unique_ptr<BIO, Backend::Releases<BIO_free>> const   bio(
-      BIO_new_mem_buf(first.data(), Backend::Narrowed<int>(first.size())));
-  std::unique_ptr<X509, Backend::Releases<X509_free>> const cert(
-      PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
+  std::unique_ptr<BIO, Releases<BIO_free>> const   bio(BIO_new_mem_buf(first.data(), Narrowed<int>(first.size())));
+  std::unique_ptr<X509, Releases<X509_free>> const cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
   ASSERT_TRUE(cert);
   std::array<char, 256> hostname{ };
   ASSERT_EQ(gethostname(hostname.data(), hostname.size()), 0);
@@ -137,7 +150,7 @@ TEST(Measurement, FullFrames1024x768) {
   CertificateDirectory const certificates;
   Logs                       logs;
   std::vector<std::uint32_t> pixels(1024uz * 768);
-  Headless::HashPattern(pixels);
+  HashPattern(pixels);
   for (auto codec : { SDLRDP_CODEC_RAW, SDLRDP_CODEC_PLANAR, SDLRDP_CODEC_REMOTEFX, SDLRDP_CODEC_NSCODEC }) {
     ASSERT_NO_FATAL_FAILURE(WhenFullFrameMeasured(certificates, logs, pixels, codec));
   }
@@ -154,7 +167,7 @@ TEST(Planar, SignedDelta64Rows) {
   ASSERT_TRUE(encoder && decoder);
   freerdp_planar_topdown_image(encoder.get(), true);
   std::vector<std::uint8_t> compressed((pixels.size() * 4) + 1024);
-  auto                      size       = Backend::Narrowed<std::uint32_t>(compressed.size());
+  auto                      size       = Narrowed<std::uint32_t>(compressed.size());
   ASSERT_NO_FATAL_FAILURE(CompressSignedDelta(encoder.get(), pixels, compressed, size));
   auto const target = oxbox::utilities::SpanCast<std::uint8_t>(std::span(decoded));
   ASSERT_TRUE(freerdp_bitmap_decompress_planar(decoder.get(), compressed.data(), size, width, height, target.data(),
@@ -165,8 +178,8 @@ TEST(Logging, ListenerCallback) {
   CertificateDirectory const certificates;
   Logs                       logs;
   ASSERT_EQ(setenv("WLOG_LEVEL", "INFO", 1), 0);
-  sdlrdp_config const       config { "127.0.0.1", 0, certificates.Path().c_str(), 320, 200, 0, Logs::Collect, &logs };
-  Headless::BackendInstance backend;
+  sdlrdp_config const config { "127.0.0.1", 0, certificates.Path().c_str(), 320, 200, 0, Logs::Collect, &logs };
+  BackendInstance     backend;
   ASSERT_NO_FATAL_FAILURE(backend.Open(config));
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_INFO, "Listening on socket"));
   EXPECT_EQ(unsetenv("WLOG_LEVEL"), 0);
@@ -176,8 +189,8 @@ TEST(Logging, NewestHandleRoutesAndClears) {
   Logs                       first;
   Logs                       second;
   sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), 320, 200, 0, Logs::Collect, &first };
-  Headless::BackendInstance  a;
-  Headless::BackendInstance  b;
+  BackendInstance            a;
+  BackendInstance            b;
   ASSERT_NO_FATAL_FAILURE(a.Open(config));
   config.log_user = &second;
   ASSERT_NO_FATAL_FAILURE(b.Open(config));
@@ -192,9 +205,9 @@ TEST(Logging, NewestHandleRoutesAndClears) {
 TEST(Logging, NoFreerdpStdout) {
   std::array<int, 2> pipefd{ };
   ASSERT_EQ(pipe2(pipefd.data(), O_CLOEXEC), 0);
-  Backend::Descriptor const input  { pipefd[0] };
-  auto                      child  = LoggingChild(Backend::Descriptor{ pipefd[1] });
-  auto                      output = Headless::ReadText(input.Get());
+  Descriptor const input  { pipefd[0] };
+  auto             child  = LoggingChild(Descriptor{ pipefd[1] });
+  auto             output = ReadText(input.Get());
   ThenLoggingChild(child, output);
 }
 
@@ -232,7 +245,7 @@ TEST(Certificate, StableDefaultAndPermissions) {
     sdlrdp_handle*      handle = nullptr;
     ASSERT_EQ(sdlrdp_open(&config, &handle), 0);
     sdlrdp_close(handle);
-    auto certificate = Headless::ReadText((data / "sdl-rdp/server.crt").c_str());
+    auto certificate = ReadText((data / "sdl-rdp/server.crt").c_str());
     if (first.empty())
       first = certificate;
     else
@@ -242,7 +255,7 @@ TEST(Certificate, StableDefaultAndPermissions) {
 }
 
 TEST(Planar, Noisy640Rows) {
-  sdl_rdp::freerdp_facade::Settings const settings(freerdp_settings_new(0));
+  Settings const settings(freerdp_settings_new(0));
   ASSERT_TRUE(freerdp_settings_set_uint32(settings.get(), FreeRDP_ColorDepth, 32));
   PlanarContext const encoder(
       freerdp_bitmap_planar_context_new(PLANAR_FORMAT_HEADER_RLE | PLANAR_FORMAT_HEADER_NA, 1, 1));
@@ -254,8 +267,8 @@ TEST(Planar, Noisy640Rows) {
   auto const                 source  = oxbox::utilities::SpanCast<std::uint8_t const>(std::span(pixels));
   auto const                 target  = oxbox::utilities::SpanCast<std::uint8_t>(std::span(decoded));
   for (std::uint32_t y = 0; y < 480; ++y) {
-    Headless::HashPattern(pixels, y * 640);
-    auto size = Backend::Narrowed<std::uint32_t>(payload.size());
+    HashPattern(pixels, y * 640);
+    auto size = Narrowed<std::uint32_t>(payload.size());
     ASSERT_TRUE(freerdp_bitmap_compress_planar(encoder.get(), source.data(), PIXEL_FORMAT_BGRA32, 640, 1, 2560,
                                                payload.data(), &size));
     ASSERT_TRUE(freerdp_bitmap_decompress_planar(decoder.get(), payload.data(), size, 640, 1, target.data(),

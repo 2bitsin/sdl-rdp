@@ -10,6 +10,12 @@
 #include <utility>
 
 namespace sdl_rdp::drive::detail::listing {
+using sdl_rdp::freerdp_facade::FileAttribute;
+using sdl_rdp::freerdp_facade::InformationClass;
+using sdl_rdp::utilities::CopyTerminated;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
+
 namespace {
 auto Listed(sdlrdp_dirent const& entry) -> bool {
   std::string_view const name = entry.name;
@@ -19,7 +25,7 @@ auto Listed(sdlrdp_dirent const& entry) -> bool {
 Listing::Listing(std::uint32_t offset, std::span<sdlrdp_dirent> out) noexcept : _out{ out }, _offset{ offset } { }
 // MS-FSCC 2.4.10 FILE_DIRECTORY_INFORMATION entries chained by NextEntryOffset; false once the directory is done.
 auto Listing::Collect(DrivePacket response) -> bool {
-  utilities::Expects(!Full(), "a full listing takes no further response");
+  Expects(!Full(), "a full listing takes no further response");
   auto const length = response.Read<std::uint32_t>();
   if (length > response.Bytes().size() - response.Position()) response.Invalid("truncated directory listing");
   auto const limit = response.Position() + length;
@@ -43,7 +49,7 @@ auto Listing::Count() const noexcept -> std::size_t {
 auto Listing::Take(sdlrdp_dirent const& entry) -> void {
   if (!Listed(entry)) return;
   if (_skipped++ < _offset) return;
-  utilities::Expects(!Full(), "a listed entry has room in the output");
+  Expects(!Full(), "a listed entry has room in the output");
   _out[_count++] = entry;
 }
 auto Entry(DrivePacket& packet) -> sdlrdp_dirent {
@@ -53,21 +59,21 @@ auto Entry(DrivePacket& packet) -> sdlrdp_dirent {
   sdlrdp_dirent entry{ };
   entry.size = packet.Read<std::uint64_t>();
   packet.Skip(allocation_size_field_size);
-  entry.directory = (packet.Read<std::uint32_t>() & std::to_underlying(freerdp_facade::FileAttribute::Directory)) != 0;
+  entry.directory = (packet.Read<std::uint32_t>() & std::to_underlying(FileAttribute::Directory)) != 0;
   auto const length = packet.Read<std::uint32_t>();
   auto const name   = packet.Text(length);
   if (name.size() >= sizeof(entry.name)) throw EntryNameTooLong{ name.size(), sizeof(entry.name) - 1 };
-  Backend::CopyTerminated(entry.name, name);
+  CopyTerminated(entry.name, name);
   return entry;
 }
 // MS-RDPEFS 2.2.3.3.10 DR_DRIVE_QUERY_DIRECTORY_REQ: the pattern only on the first query.
 auto DirectoryQuery(bool first, std::span<std::byte const> pattern) -> DrivePacket {
-  if (first) utilities::Expects(!pattern.empty(), "the first query carries its pattern");
+  if (first) Expects(!pattern.empty(), "the first query carries its pattern");
   constexpr std::size_t padding_after_path_length = 23;
   DrivePacket           packet;
-  packet.Write(std::to_underlying(freerdp_facade::InformationClass::Directory));
+  packet.Write(std::to_underlying(InformationClass::Directory));
   packet.Write(std::uint8_t{ first });
-  packet.Write(Backend::Narrowed<std::uint32_t>(first ? pattern.size() : 0));
+  packet.Write(Narrowed<std::uint32_t>(first ? pattern.size() : 0));
   packet.Zero(padding_after_path_length);
   if (first) packet.Append(pattern);
   return packet;

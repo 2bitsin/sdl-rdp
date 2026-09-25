@@ -9,7 +9,10 @@
 #include <sdl-rdp/video/legacy-frame.hpp>
 #include <sdl-rdp/video/pointer/sender.hpp>
 
-namespace Backend {
+namespace sdl_rdp::video::frame::detail::sender {
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Unreachable;
+
 FrameSender::FrameSender(PeerLink& link, Activation const& activation, SessionAccess& session, FrameGate& gate,
                          FrameCapture& capture, PointerSender& pointer, GraphicsLink& graphics,
                          LegacyFrame& legacy) noexcept
@@ -26,7 +29,7 @@ auto FrameSender::Drain() -> bool {
   case CaptureState::Failed:   return false;
   case CaptureState::Idle:     return true;
   case CaptureState::Captured: return Prepare();
-  default:                     utilities::Unreachable(captured);
+  default:                     Unreachable(captured);
   }
 }
 auto FrameSender::Encode(std::stop_token const& quit) -> Delivery {
@@ -60,7 +63,7 @@ auto FrameSender::Transition(EncodeState next) -> void {
   case EncodeState::Legacy: Expects(next == EncodeState::LegacyReady, "legacy encoding produces packets"); break;
   case EncodeState::Graphics:
   case EncodeState::LegacyReady: Expects(next == EncodeState::Idle, "completed encoding returns to idle"); break;
-  default:                       utilities::Unreachable(_state);
+  default:                       Unreachable(_state);
   }
   _state = next;
 }

@@ -5,8 +5,7 @@
 #include <unistd.h>
 #include <utility>
 
-namespace Backend {
-using utilities::Expects;
+namespace sdl_rdp::utilities::detail::descriptor {
 
 Descriptor::Descriptor(int owned) noexcept : descriptor(owned) {
   Expects(owned >= 0, "an owned descriptor is open");

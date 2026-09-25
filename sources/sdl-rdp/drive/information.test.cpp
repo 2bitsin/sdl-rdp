@@ -6,7 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace sdl_rdp::drive {
+namespace sdl_rdp::drive::detail::information {
 namespace {
 // 2024-01-01T00:00:00Z: (1704067200 + 11644473600) seconds of 10^7 FILETIME ticks.
 constexpr std::uint64_t NewYear2024     = 133485408000000000;
@@ -59,7 +59,7 @@ TEST(Information, RefusesALengthPastTheResponse) {
 TEST(InformationRequest, CarriesTypeLengthPaddingAndBody) {
   DrivePacket body;
   body.Write(std::uint8_t{ 1 });
-  auto request = InformationRequest(freerdp_facade::InformationClass::Disposition, body);
+  auto request = InformationRequest(InformationClass::Disposition, body);
   EXPECT_EQ(request.Bytes().size(), 33U);
   EXPECT_EQ(request.Read<std::uint32_t>(), 13U);
   EXPECT_EQ(request.Read<std::uint32_t>(), 1U);

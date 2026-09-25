@@ -8,7 +8,9 @@
 #include <utility>
 #include <vector>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::graphics::detail::observer {
+using sdl_rdp::headless_client_test::client::Client;
+
 struct GraphicsCapture {
   struct Reset {
     std::uint32_t            width    = 0;
@@ -64,4 +66,8 @@ private:
   pcRdpgfxResetGraphics    reset          = nullptr;
   pDesktopResize           desktop_resize = nullptr;
 };
+}
+
+namespace sdl_rdp::headless_client_test::graphics {
+using detail::observer::GraphicsObserver;
 }

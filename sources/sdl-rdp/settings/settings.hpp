@@ -33,9 +33,11 @@ constexpr auto reflect_scheme([[maybe_unused]] sdlrdp_auth* tag) {
 }
 
 namespace sdl_rdp::settings::detail::settings {
+using sdl_rdp::utilities::Expects;
+
 // SDL carries window sizes and millisecond counts as int.
 inline constexpr std::uint32_t IntMaximum = std::numeric_limits<std::int32_t>::max();
-using utilities::Bounded;
+using sdl_rdp::utilities::Bounded;
 using Port         = Bounded<std::uint16_t, 0, std::numeric_limits<std::uint16_t>::max()>;
 using Extent       = Bounded<std::uint32_t, 1, IntMaximum>;
 using Milliseconds = Bounded<std::uint32_t, 0, IntMaximum>;
@@ -66,7 +68,7 @@ struct Settings {
 template <oxbox::serialization::HasEnumMap EnumTy>
 constexpr auto NameOf(EnumTy value) -> std::string_view {
   auto const name = oxbox::serialization::EnumMapFor<EnumTy>().ToString(value);
-  ::utilities::Expects(name.has_value(), "the enumerator has a name");
+  Expects(name.has_value(), "the enumerator has a name");
   return name.value_or("");
 }
 template <oxbox::serialization::HasEnumMap EnumTy>
@@ -75,12 +77,13 @@ auto JoinedNames() -> std::string {
   return oxbox::utilities::Joined(map.entries, ", ", &std::pair<EnumTy, std::string_view>::second);
 }
 }
+
 namespace sdl_rdp::settings {
-using detail::settings::Port;
 using detail::settings::Extent;
-using detail::settings::Milliseconds;
-using detail::settings::Kilobits;
-using detail::settings::Settings;
-using detail::settings::NameOf;
 using detail::settings::JoinedNames;
+using detail::settings::Kilobits;
+using detail::settings::Milliseconds;
+using detail::settings::NameOf;
+using detail::settings::Port;
+using detail::settings::Settings;
 }

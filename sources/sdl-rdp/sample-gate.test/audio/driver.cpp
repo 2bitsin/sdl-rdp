@@ -10,13 +10,20 @@
 #include <cstdint>
 #include <vector>
 
-namespace SampleGate {
-auto ThenLead(Client& client, Headless::SoundClient& audio, std::size_t after, std::size_t milliseconds) -> void {
+namespace sdl_rdp::sample_gate_test::audio::detail::driver {
+using sdl_rdp::headless_client_test::backend::Logs;
+using sdl_rdp::sample_gate_test::process::ListeningPort;
+using sdl_rdp::sample_gate_test::process::ProcfsSelf;
+using sdl_rdp::sample_gate_test::sample::SetBackendHints;
+using sdl_rdp::utilities::Sleeping;
+using sdl_rdp::utilities::Until;
+
+auto ThenLead(Client& client, SoundClient& audio, std::size_t after, std::size_t milliseconds) -> void {
   ASSERT_TRUE(client.Until([&] {
     return (audio.CaptureState().samples.size() / 2) - after >= audio.CaptureState().rate * milliseconds / 1000;
   }));
 }
-auto AudioDriver::ThenAudioSurvivesVideoQuit(Client& client, Headless::SoundClient& audio) -> void {
+auto AudioDriver::ThenAudioSurvivesVideoQuit(Client& client, SoundClient& audio) -> void {
   ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
   ASSERT_NO_FATAL_FAILURE(ThenPcm(client, audio));
 }
@@ -38,7 +45,7 @@ auto AudioDriver::GivenAudioHints() -> void {
 }
 auto AudioDriver::GivenSoundClient() -> void {
   sound_client = std::make_unique<Client>(ListeningPort(ProcfsSelf()), true);
-  sound        = std::make_unique<Headless::SoundClient>(*sound_client);
+  sound        = std::make_unique<SoundClient>(*sound_client);
   ASSERT_NO_FATAL_FAILURE(Connect(*sound_client));
 }
 auto AudioDriver::PlayPcm(std::size_t count) -> void {
@@ -54,19 +61,18 @@ auto AudioDriver::PlayFlushed(std::span<std::int16_t const> pcm) -> Clock::time_
   return started;
 }
 auto AudioDriver::QueueDrained(Clock::time_point deadline, std::chrono::milliseconds poll) -> bool {
-  return Backend::Until(deadline, Backend::Sleeping(poll),
-                        [this] { return SDL_GetAudioStreamQueued(stream.get()) == 0; });
+  return Until(deadline, Sleeping(poll), [this] { return SDL_GetAudioStreamQueued(stream.get()) == 0; });
 }
 auto AudioDriver::OpenStream() -> void {
   SDL_AudioSpec const spec{ SDL_AUDIO_S16, 2, 48000 };
   stream.reset(SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr));
   ASSERT_TRUE(stream) << SDL_GetError();
 }
-auto AudioDriver::ConnectAudio(Client& client, Headless::SoundClient& audio) -> void {
+auto AudioDriver::ConnectAudio(Client& client, SoundClient& audio) -> void {
   ASSERT_NO_FATAL_FAILURE(Connect(client));
   ASSERT_TRUE(client.Until([&] { return audio.CaptureState().ready; }));
 }
-auto AudioDriver::ThenPcm(Client& client, Headless::SoundClient& audio) -> void {
+auto AudioDriver::ThenPcm(Client& client, SoundClient& audio) -> void {
   ASSERT_NO_FATAL_FAILURE(PlayPcm(4800uz * 2));
   ASSERT_TRUE(client.Until([&] { return std::ranges::count(audio.CaptureState().samples, 1234) >= 960; }));
 }
@@ -78,7 +84,7 @@ auto AudioDriver::CaptureLogs() -> void {
         auto  level = priority >= SDL_LOG_PRIORITY_ERROR ? SDLRDP_LOG_ERROR
                       : priority == SDL_LOG_PRIORITY_WARN ? SDLRDP_LOG_WARN
                                                           : SDLRDP_LOG_INFO;
-        Headless::Logs::Collect(&self.logs, level, text);
+        Logs::Collect(&self.logs, level, text);
         if (self.previous_log) self.previous_log(self.previous_log_user, category, priority, text);
       },
       this);

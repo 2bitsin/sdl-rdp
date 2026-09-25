@@ -9,7 +9,9 @@
 #include <string>
 #include <vector>
 
-namespace Backend::Avc {
+namespace sdl_rdp::video::avc::detail::encoder {
+using sdl_rdp::utilities::Extent;
+
 class Encoder {
 public:
               Encoder();
@@ -34,4 +36,8 @@ private:
   struct Impl;
   std::unique_ptr<Impl> impl;
 };
-} // namespace Backend::Avc
+}
+
+namespace sdl_rdp::video::avc {
+using detail::encoder::Encoder;
+}

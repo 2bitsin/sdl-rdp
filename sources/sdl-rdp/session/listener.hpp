@@ -1,6 +1,11 @@
 #pragma once
 #include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/auth/forward.hpp>
+#include <sdl-rdp/configuration/forward.hpp>
+#include <sdl-rdp/diagnostics/forward.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/peer/forward.hpp>
+#include <sdl-rdp/session/forward.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
 #include <freerdp/listener.h>
@@ -10,12 +15,16 @@
 #include <stop_token>
 #include <thread>
 
-namespace Backend {
-class Configuration;
-class Credentials;
-class Diagnostics;
-class Peer;
-class Session;
+namespace sdl_rdp::session::detail::listener {
+using sdl_rdp::auth::Credentials;
+using sdl_rdp::configuration::Configuration;
+using sdl_rdp::diagnostics::Diagnostics;
+using sdl_rdp::freerdp_facade::EventHandle;
+using sdl_rdp::freerdp_facade::PeerHandle;
+using sdl_rdp::peer::Peer;
+using sdl_rdp::utilities::Pinned;
+using sdl_rdp::utilities::Releases;
+
 // abi: release steps no single FreeRDP free function performs as a plain call.
 auto CloseListener(freerdp_listener* listener) noexcept -> void;
 using ListenerHandle = std::unique_ptr<freerdp_listener, Releases<CloseListener, freerdp_listener_free>>;
@@ -37,4 +46,8 @@ private:
   std::uint32_t      _port       { };
   std::jthread       _thread;
 };
+}
+
+namespace sdl_rdp::session {
+using detail::listener::Listener;
 }

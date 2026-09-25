@@ -8,8 +8,10 @@
 #include <span>
 #include <vector>
 
-namespace Headless {
-using BackendHandle = std::unique_ptr<sdlrdp_handle, Backend::Releases<sdlrdp_close>>;
+namespace sdl_rdp::headless_client_test::backend::detail::instance {
+using sdl_rdp::utilities::Releases;
+
+using BackendHandle = std::unique_ptr<sdlrdp_handle, Releases<sdlrdp_close>>;
 class BackendInstance {
 public:
   auto     Open(sdlrdp_config const& config)    -> void;
@@ -25,4 +27,8 @@ public:
 private:
   BackendHandle _handle;
 };
+}
+
+namespace sdl_rdp::headless_client_test::backend {
+using detail::instance::BackendInstance;
 }

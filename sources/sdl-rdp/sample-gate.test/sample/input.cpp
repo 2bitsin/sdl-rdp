@@ -10,13 +10,20 @@
 #include <string>
 #include <utility>
 
-namespace SampleGate {
+namespace sdl_rdp::sample_gate_test::sample::detail::input {
+using namespace std::chrono_literals;
+using sdl_rdp::headless_client_test::client::Tap;
+using sdl_rdp::headless_client_test::input::SendKeyboardAndMouse;
+using sdl_rdp::sample_gate_test::frame::NextFrame;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Required;
+
 auto SampleInput::ThenInputEvent(std::string_view event, std::string_view text, std::uint32_t& motion_frame) -> void {
   ASSERT_TRUE(Read("event " + std::string(event) + " ")) << event << text << ": " << process->Transcript();
   ASSERT_TRUE(line.contains(text)) << "expected " << event << text << ", actual: " << line;
   if (event == "MOUSE_MOTION") {
-    motion_frame = utilities::Required(oxbox::utilities::ParseNumberAfter<std::uint32_t>(line, " frame="),
-                                       "motion events carry a frame identifier");
+    motion_frame = Required(oxbox::utilities::ParseNumberAfter<std::uint32_t>(line, " frame="),
+                            "motion events carry a frame identifier");
   }
 }
 auto SampleInput::GivenFocus(Client& client) -> void {
@@ -24,11 +31,11 @@ auto SampleInput::GivenFocus(Client& client) -> void {
   ASSERT_TRUE(Read("event FOCUS_GAINED "));
 }
 auto SampleInput::WhenTextStops(Client& client) -> void {
-  ASSERT_NO_FATAL_FAILURE(Headless::Tap(client, 0x3c));
+  ASSERT_NO_FATAL_FAILURE(Tap(client, 0x3c));
   ASSERT_TRUE(Read("event TEXT_MODE active=0"));
 }
 auto SampleInput::WhenRelative(Client& client) -> void {
-  ASSERT_NO_FATAL_FAILURE(Headless::Tap(client, 0x3d));
+  ASSERT_NO_FATAL_FAILURE(Tap(client, 0x3d));
   ASSERT_TRUE(Read("event RELATIVE_MODE active=1"));
 }
 auto SampleInput::WhenKeyDown(Client& client) -> void {
@@ -42,7 +49,7 @@ auto SampleInput::ReadInput(Client& client, std::string_view expected, std::chro
 }
 auto SampleInput::Input(Client& client) -> void {
   std::uint32_t motion_frame = 0;
-  ASSERT_NO_FATAL_FAILURE(Headless::SendKeyboardAndMouse(client, 100, 120));
+  ASSERT_NO_FATAL_FAILURE(SendKeyboardAndMouse(client, 100, 120));
   for (auto [event, text] :
        std::array<std::pair<std::string_view, std::string_view>, 6>{ { { "KEY_DOWN"         , " scancode=4 " },
                                                                        { "KEY_UP"           , " scancode=4 " },

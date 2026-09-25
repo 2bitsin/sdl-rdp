@@ -17,27 +17,35 @@
 #include <string>
 #include <vector>
 
-namespace SampleGate {
+namespace sdl_rdp::integration::sample_test::detail::audio {
+using sdl_rdp::headless_client_test::audio::ToneMeasurements;
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::Clock;
+using sdl_rdp::headless_client_test::client::SoundClient;
+using sdl_rdp::headless_client_test::frame::FrameObserver;
+using sdl_rdp::sample_gate_test::audio::AudioDriver;
+using sdl_rdp::sample_gate_test::audio::AudioSample;
+using sdl_rdp::sample_gate_test::process::ListeningPort;
+using sdl_rdp::sample_gate_test::process::ProcfsSelf;
+using sdl_rdp::utilities::Narrowed;
+
 namespace {
-auto ThenDeviceTone(Headless::SoundClient const& audio, std::string const& line) -> void {
-  auto [frequency, db] = Headless::ToneMeasurements(audio.CaptureState().samples, audio.CaptureState().rate);
+auto ThenDeviceTone(SoundClient const& audio, std::string const& line) -> void {
+  auto [frequency, db] = ToneMeasurements(audio.CaptureState().samples, audio.CaptureState().rate);
   EXPECT_NEAR(frequency, 440, 8.8);
   EXPECT_NEAR(db, -12, 0.3);
   testing::Test::RecordProperty("device_format", line);
   testing::Test::RecordProperty("tone_hz", std::to_string(frequency));
   testing::Test::RecordProperty("tone_dbfs", std::to_string(db));
 }
-auto ThenTone(Headless::SoundClient const& audio, Headless::FrameObserver const& frames, bool tight) -> void {
+auto ThenTone(SoundClient const& audio, FrameObserver const& frames, bool tight) -> void {
   ThenDeviceTone(audio, tight ? "tight vsync" : "default vsync");
   if (tight) EXPECT_GE(frames.Frames().size(), 2u);
 }
-auto ToneCaptured(Headless::SoundClient const& audio, Headless::FrameObserver const& frames) -> bool {
+auto ToneCaptured(SoundClient const& audio, FrameObserver const& frames) -> bool {
   return audio.CaptureState().samples.size() >= std::size_t{ audio.CaptureState().rate } * 2
          && frames.Frames().size() >= 2;
 }
-}
-
-namespace {
 TEST_F(AudioSample, ToneAndVsync) {
   WhenTonePlayedTwice(ToneCaptured, ThenTone);
 }
@@ -53,7 +61,7 @@ TEST_F(AudioDriver, ClientReceivesOneLeadOnAttach) {
   ReceiveLead();
 }
 TEST_F(AudioDriver, StallRefillsTheLead) {
-  RefillLead([](Headless::SoundClient const& /*audio*/, Clock::time_point /*resumed*/) { });
+  RefillLead([](SoundClient const& /*audio*/, Clock::time_point /*resumed*/) { });
 }
 TEST_F(AudioDriver, LeadAtOrAboveLatencyFailsOpen) {
   stream.reset();
@@ -71,8 +79,8 @@ TEST_F(AudioDriver, AudioBeforeVideoSurvivesVideoQuit) {
   ASSERT_GT(port, 0);
   SDL_QuitSubSystem(SDL_INIT_VIDEO);
   EXPECT_EQ(SDL_WasInit(SDL_INIT_VIDEO), 0u);
-  Client                client(port, true);
-  Headless::SoundClient audio(client);
+  Client      client(port, true);
+  SoundClient audio(client);
   ASSERT_NO_FATAL_FAILURE(ThenAudioSurvivesVideoQuit(client, audio));
   ASSERT_TRUE(SDL_InitSubSystem(SDL_INIT_VIDEO)) << SDL_GetError();
   EXPECT_EQ(SDL_GetNumberProperty(SDL_GetDisplayProperties(SDL_GetPrimaryDisplay()), "SDL.display.rdp.port", 0), port);
@@ -82,11 +90,11 @@ TEST_F(AudioDriver, AudioOnlyPlaysBlackDesktop) {
   EXPECT_EQ(SDL_WasInit(SDL_INIT_VIDEO), 0u);
   auto port = ListeningPort(ProcfsSelf());
   ASSERT_GT(port, 0u);
-  Client                client(port, true);
-  Headless::SoundClient audio(client);
+  Client      client(port, true);
+  SoundClient audio(client);
   ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
   auto*                      gdi   = client.Instance()->context->gdi;
-  std::vector<std::uint32_t> black(Backend::Narrowed<std::size_t>(gdi->width) * gdi->height);
+  std::vector<std::uint32_t> black(Narrowed<std::size_t>(gdi->width) * gdi->height);
   ASSERT_TRUE(client.Until([&] { return client.Matches(black); }));
   ASSERT_NO_FATAL_FAILURE(ThenPcm(client, audio));
   EXPECT_EQ(SDL_WasInit(SDL_INIT_VIDEO), 0u);

@@ -19,7 +19,15 @@
 #include <optional>
 #include <tuple>
 
-namespace Backend {
+namespace sdl_rdp::auth::detail::authenticator {
+using sdl_rdp::diagnostics::AuthenticationRejectedLogging;
+using sdl_rdp::freerdp_facade::NtOwfV2;
+using sdl_rdp::utilities::Contained;
+using sdl_rdp::utilities::CopyTerminated;
+using sdl_rdp::utilities::Ensures;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Utf16;
+
 namespace {
 struct SettingsPassword {
 public:
@@ -145,11 +153,10 @@ auto Authenticator::VerifySettings() -> bool {
   Reject();
   return Denied();
 }
-auto Authenticator::NtHash(std::string const& domain, std::string const& user) const
-    -> std::optional<sdl_rdp::freerdp_facade::NtOwf> {
+auto Authenticator::NtHash(std::string const& domain, std::string const& user) const -> std::optional<NtOwf> {
   auto const& config = _configuration.Config();
   if (!config.lookup) return _account.NtHash(domain, user);
-  sdl_rdp::freerdp_facade::NtOwf hash;
+  NtOwf hash;
   if (!config.lookup(config.auth_user, domain.c_str(), user.c_str(), hash.Bytes().data())) return std::nullopt;
   return hash;
 }
@@ -159,7 +166,7 @@ auto Authenticator::ResponseKey(SEC_WINNT_AUTH_IDENTITY const& identity, NtKey r
   auto const hash = NtHash(_state.Domain(), _state.User());
   if (!hash) return false;
   // FreeRDP 3.32 ntlm_compute.c:513 takes the NTLMv2 response key, not the NT hash.
-  auto const key = sdl_rdp::freerdp_facade::NtOwfV2(*hash, Utf16(_state.User()), Utf16(_state.Domain()));
+  auto const key = NtOwfV2(*hash, Utf16(_state.User()), Utf16(_state.Domain()));
   std::ranges::copy(key.Bytes(), response.begin());
   return true;
 }

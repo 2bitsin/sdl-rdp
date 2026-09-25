@@ -6,12 +6,20 @@
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/event-queue.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
+#include <sdl-rdp/link/wire.hpp>
 #include <sdl-rdp/video/peer-frames.hpp>
 
 #include <cstdint>
 #include <format>
 
-namespace Backend {
+namespace sdl_rdp::video::frame::detail::pacing {
+using sdl_rdp::configuration::MillihertzPerHz;
+using sdl_rdp::configuration::RefreshMode;
+using sdl_rdp::configuration::WireSample;
+using sdl_rdp::link::SampleWire;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Unreachable;
+
 namespace {
 using Clock        = AcknowledgementWindow::Clock;
 using Milliseconds = std::chrono::duration<double, std::milli>;
@@ -83,7 +91,7 @@ auto FramePacing::Acknowledgements(AcknowledgementMode mode) -> void {
     case AcknowledgementMode::Suspended: _window.Disable(); break;
     case AcknowledgementMode::Restarted: _window.Clear(); [[fallthrough]];
     case AcknowledgementMode::Tracking:  _window.Enable(); break;
-    default:                             utilities::Unreachable(mode);
+    default:                             Unreachable(mode);
     }
   }
   _store.Notify();

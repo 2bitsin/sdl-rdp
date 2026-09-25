@@ -7,7 +7,9 @@
 #include <string>
 #include <vector>
 
-namespace Backend {
+namespace sdl_rdp::clipboard::detail::store {
+using sdl_rdp::utilities::Generational;
+
 class ClipboardStore : private Generational<std::string> {
 public:
   using Generational::Generation;
@@ -20,4 +22,8 @@ private:
   std::string            _exported;
   std::vector<std::byte> _unicode { std::byte{ 0 }, std::byte{ 0 } };
 };
+}
+
+namespace sdl_rdp::clipboard {
+using detail::store::ClipboardStore;
 }

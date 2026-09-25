@@ -1,15 +1,17 @@
 #pragma once
 #include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/link/forward.hpp>
+#include <sdl-rdp/picture/forward.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
+#include <sdl-rdp/video/forward.hpp>
+#include <sdl-rdp/video/frame/forward.hpp>
 
-namespace Backend {
-class DesktopLayout;
-class Encoder;
-class FramePacing;
-class FrameStatistics;
-class FrameStore;
-class PeerFrames;
-class PeerLink;
+namespace sdl_rdp::video::frame::detail::capture {
+using sdl_rdp::link::PeerLink;
+using sdl_rdp::picture::DesktopLayout;
+using sdl_rdp::picture::FrameStore;
+using sdl_rdp::utilities::Pinned;
+
 enum class CaptureState{ Failed, Idle, Captured };
 class FrameCapture : private Pinned {
 public:
@@ -29,4 +31,9 @@ private:
   FrameStatistics& _statistics;
   Encoder const&   _encoder;
 };
+}
+
+namespace sdl_rdp::video::frame {
+using detail::capture::CaptureState;
+using detail::capture::FrameCapture;
 }

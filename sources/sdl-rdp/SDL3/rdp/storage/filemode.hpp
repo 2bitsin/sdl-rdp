@@ -16,6 +16,7 @@ private:
   bool          _append;
 };
 }
+
 namespace sdl3::rdp::storage {
 using detail::filemode::FileMode;
 }

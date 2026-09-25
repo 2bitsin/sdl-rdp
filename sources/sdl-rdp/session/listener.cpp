@@ -28,7 +28,19 @@
 #include <tuple>
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::session::detail::listener {
+using sdl_rdp::auth::TlsRehearsal;
+using sdl_rdp::diagnostics::FailureLog;
+using sdl_rdp::freerdp_facade::CallbackOwner;
+using sdl_rdp::freerdp_facade::ManualResetEvent;
+using sdl_rdp::freerdp_facade::WaitHandle;
+using sdl_rdp::utilities::AllocationFailed;
+using sdl_rdp::utilities::Contained;
+using sdl_rdp::utilities::Descriptor;
+using sdl_rdp::utilities::Ensures;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::SystemCall;
+
 auto CloseListener(freerdp_listener* listener) noexcept -> void {
   listener->Close(listener);
 }
@@ -84,7 +96,7 @@ auto NewListener(Credentials const& credentials) -> ListenerHandle {
   return listener;
 }
 auto NewStopEvent() -> EventHandle {
-  return sdl_rdp::freerdp_facade::ManualResetEvent("Listener stop event");
+  return ManualResetEvent("Listener stop event");
 }
 }
 Listener::Listener(Configuration const& configuration, Credentials const& credentials, Diagnostics const& diagnostics,

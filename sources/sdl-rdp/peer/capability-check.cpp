@@ -12,7 +12,9 @@
 #include <array>
 #include <cstdint>
 
-namespace Backend {
+namespace sdl_rdp::peer::detail::capability_check {
+using sdl_rdp::picture::ApplyDesktopSize;
+
 namespace {
 constexpr std::array<std::uint32_t, 3> ColourDepths{ 16, 24, 32 };
 }

@@ -10,10 +10,15 @@
 #include <cstdint>
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::session::detail::session {
+using sdl_rdp::freerdp_facade::ManualResetEvent;
+using sdl_rdp::peer::Peer;
+using sdl_rdp::utilities::Ensures;
+using sdl_rdp::utilities::Expects;
+
 namespace {
 auto ReapSignal() -> EventHandle {
-  return sdl_rdp::freerdp_facade::ManualResetEvent("Peer reaping event");
+  return ManualResetEvent("Peer reaping event");
 }
 auto AnnounceDeparture(Session& session, EventQueue& events, Peer const& peer) -> void {
   auto const sound = peer.Redirected().Audio();

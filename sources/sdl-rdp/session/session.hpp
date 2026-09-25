@@ -1,5 +1,6 @@
 #pragma once
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/link/session-access.hpp>
 #include <sdl-rdp/picture/frame-store.hpp>
 #include <sdl-rdp/session/peer-frame.hpp>
@@ -16,8 +17,18 @@
 #include <optional>
 #include <type_traits>
 
-namespace Backend {
-class EventQueue;
+namespace sdl_rdp::session::detail::session {
+using sdl_rdp::freerdp_facade::EventHandle;
+using sdl_rdp::freerdp_facade::WaitHandle;
+using sdl_rdp::link::Activation;
+using sdl_rdp::link::EventQueue;
+using sdl_rdp::link::PeerLink;
+using sdl_rdp::link::SessionAccess;
+using sdl_rdp::link::SessionLock;
+using sdl_rdp::peer::Peer;
+using sdl_rdp::picture::FrameLock;
+using sdl_rdp::picture::FrameStore;
+
 using CurrentPeer = std::optional<std::reference_wrapper<Peer>>;
 class Session final : public SessionAccess {
 public:
@@ -62,4 +73,9 @@ template <std::invocable<Peer&> Act> auto OnCurrent(Session& session, Act act) -
     return current ? act(current->get()) : Result{ };
   }
 }
+}
+
+namespace sdl_rdp::session {
+using detail::session::OnCurrent;
+using detail::session::Session;
 }

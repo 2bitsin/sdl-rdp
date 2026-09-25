@@ -11,7 +11,9 @@
 #include <string_view>
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::diagnostics::detail::diagnostics {
+using sdl_rdp::utilities::Pinned;
+
 class Diagnostics : private Pinned {
 public:
        Diagnostics(sdlrdp_config const& config, bool tracing);
@@ -36,4 +38,8 @@ private:
   ErrorStore _errors;
   bool       _tracing;
 };
+}
+
+namespace sdl_rdp::diagnostics {
+using detail::diagnostics::Diagnostics;
 }

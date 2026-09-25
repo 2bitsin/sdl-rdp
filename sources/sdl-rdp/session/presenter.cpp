@@ -17,7 +17,20 @@
 #include <ranges>
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::session::detail::presenter {
+using sdl_rdp::peer::Peer;
+using sdl_rdp::picture::Dimensions;
+using sdl_rdp::picture::FrameBytes;
+using sdl_rdp::picture::FrameLock;
+using sdl_rdp::picture::FrameSnapshot;
+using sdl_rdp::picture::ValidateDamage;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::PixelBytes;
+using sdl_rdp::utilities::Whole;
+using sdl_rdp::video::avc::ReplicateEdges;
+using sdl_rdp::video::pointer::PointerShape;
+
 namespace {
 auto Spans(int start, int length, int value) -> bool {
   return start <= value && value < start + length;
@@ -60,7 +73,7 @@ Presenter::Presenter(Diagnostics const& diagnostics, FrameStore& frames, Session
                      Configuration& configuration)
     : _diagnostics{ diagnostics }, _frames{ frames }, _session{ session }, _pointer{ pointer },
       _configuration{ configuration } { }
-auto Presenter::Present(std::span<std::uint8_t const> pixels, sdl_rdp::picture::FrameLayout const& layout,
+auto Presenter::Present(std::span<std::uint8_t const> pixels, FrameLayout const& layout,
                         std::span<sdlrdp_rect const> damage) -> void {
   auto const bytes = layout.Bytes();
   Expects(pixels.size() >= bytes, "source framebuffer covers every row");
@@ -74,7 +87,7 @@ auto Presenter::Present(std::span<std::uint8_t const> pixels, sdl_rdp::picture::
   auto const             previous = _frames.Read(
       [size](FrameStore const& frames, FrameLock const& held) { return frames.Previous(held, size); });
   ComposePicture(pixels, pitch, previous, *next, damage);
-  Avc::ReplicateEdges(*next, size);
+  ReplicateEdges(*next, size);
   Publish(std::move(next), size, damage);
 }
 auto Presenter::Publish(std::shared_ptr<std::vector<std::uint8_t> const> next, Extent size,
@@ -123,8 +136,7 @@ auto Presenter::SetRefresh(std::uint32_t mode, std::uint32_t ceiling) -> void {
 auto Presenter::SetCodec(sdlrdp_codec codec) -> void {
   _configuration.SetCodec(codec);
 }
-auto Presenter::SetPointer(sdl_rdp::video::pointer::PointerLayout const& layout, std::span<std::uint8_t const> argb)
-    -> void {
+auto Presenter::SetPointer(PointerLayout const& layout, std::span<std::uint8_t const> argb) -> void {
   PointerShape shape   { layout, argb };
   auto const   session = _session.Lock();
   _pointer.Replace(std::move(shape));

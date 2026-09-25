@@ -7,7 +7,10 @@
 #include <array>
 #include <cstdint>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::graphics::detail::cost {
+using sdl_rdp::headless_client_test::backend::AwaitAllAcknowledged;
+using sdl_rdp::headless_client_test::frame::MovingTilePattern;
+
 auto GraphicsCost::Open(std::uint32_t width, std::uint32_t height, sdlrdp_codec codec) -> void {
   auto pattern = std::to_array("/tmp/sdlrdp-cost-XXXXXX");
   OpenGraphics(pattern.data(), width, height, codec);
@@ -18,7 +21,7 @@ auto GraphicsCost::PresentMovingTiles(Client& client, std::size_t frames) -> voi
   for (std::size_t frame = 0; frame < frames; ++frame) {
     MovingTilePattern(pixels, 1920, 1080, frame);
     ASSERT_EQ(backend.Present(pixels, 1920, 1080, full), 0);
-    ASSERT_NO_FATAL_FAILURE(sdl_rdp::headless_client_test::backend::AwaitAllAcknowledged(client, backend, logs));
+    ASSERT_NO_FATAL_FAILURE(AwaitAllAcknowledged(client, backend, logs));
   }
 }
 auto GraphicsCost::PresentPlanar(Client& client, GraphicsObserver& observer, std::vector<std::uint32_t> const& pixels,

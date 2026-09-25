@@ -14,7 +14,8 @@
 #include <algorithm>
 #include <cstdint>
 
-namespace Backend {
+namespace sdl_rdp::peer::detail::activator {
+
 namespace {
 constexpr std::uint32_t CookieLength   = 28;
 constexpr std::uint32_t SessionLogonId = 1;

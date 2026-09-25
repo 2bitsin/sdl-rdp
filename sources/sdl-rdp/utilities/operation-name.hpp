@@ -2,7 +2,7 @@
 #include <cstddef>
 #include <string_view>
 
-namespace Backend {
+namespace sdl_rdp::utilities::detail::operation_name {
 // Built only at compile time from an array, so the view it keeps points at static storage and cannot dangle.
 class OperationName {
 public:
@@ -14,4 +14,8 @@ public:
 private:
   std::string_view _text;
 };
+}
+
+namespace sdl_rdp::utilities {
+using detail::operation_name::OperationName;
 }

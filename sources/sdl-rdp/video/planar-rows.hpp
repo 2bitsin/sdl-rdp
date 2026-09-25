@@ -12,7 +12,10 @@
 #include <span>
 #include <vector>
 
-namespace Backend {
+namespace sdl_rdp::video::detail::planar_rows {
+using sdl_rdp::utilities::RowBytes;
+using sdl_rdp::utilities::Rows;
+
 template <std::predicate<sdlrdp_rect, std::span<std::byte const>> Consume>
 auto EncodePlanarRows(Encoder& encoder, Scaler& scaler, sdlrdp_rect area, Consume consume) -> bool {
   std::vector<std::uint8_t> scratch(RowBytes(area.w));
@@ -21,4 +24,4 @@ auto EncodePlanarRows(Encoder& encoder, Scaler& scaler, sdlrdp_rect area, Consum
     return encoder.Encode(pixels.Pixels(), row.w, 1) && consume(row, encoder.Payload());
   });
 }
-} // namespace Backend
+}

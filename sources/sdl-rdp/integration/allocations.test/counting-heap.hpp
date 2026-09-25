@@ -5,7 +5,9 @@
 #include <cstdint>
 #include <utility>
 
-namespace HeapCount {
+namespace sdl_rdp::integration::allocations_test::detail::counting_heap {
+using sdl_rdp::utilities::RAIIWrap;
+
 struct Tally {
   std::uint64_t news = 0;
   std::uint64_t heap = 0;
@@ -27,5 +29,11 @@ private:
   std::atomic<std::uint64_t> heap     { 0 };
 };
 
-using Uncounted = utilities::RAIIWrap<bool, &CountingHeap::Suspend, &CountingHeap::Restore>;
+using Uncounted = RAIIWrap<bool, &CountingHeap::Suspend, &CountingHeap::Restore>;
+}
+
+namespace sdl_rdp::integration::allocations_test {
+using detail::counting_heap::CountingHeap;
+using detail::counting_heap::Tally;
+using detail::counting_heap::Uncounted;
 }

@@ -13,7 +13,9 @@
 #include <string_view>
 #include <vector>
 
-namespace sdl_rdp::drive {
+namespace sdl_rdp::drive::detail::listing {
+using sdl_rdp::utilities::Narrowed;
+
 namespace {
 constexpr std::uint32_t Directory   = 0x10;
 constexpr std::size_t   EntryHeader = 64;
@@ -31,13 +33,13 @@ auto Folder(std::u16string_view name) -> Named {
 auto Record(Named const& entry, bool last) -> DrivePacket {
   auto const  name   = oxbox::utilities::AsBytes(entry.name);
   DrivePacket record;
-  record.Write(Backend::Narrowed<std::uint32_t>(last ? 0 : EntryHeader + name.size()));
+  record.Write(Narrowed<std::uint32_t>(last ? 0 : EntryHeader + name.size()));
   record.Write(std::uint32_t{ 0 });
   record.Zero(32);
   record.Write(entry.size);
   record.Write(std::uint64_t{ 4096 });
   record.Write(entry.attributes);
-  record.Write(Backend::Narrowed<std::uint32_t>(name.size()));
+  record.Write(Narrowed<std::uint32_t>(name.size()));
   record.Append(name);
   return record;
 }
@@ -47,7 +49,7 @@ auto Response(std::initializer_list<Named> entries) -> DrivePacket {
   std::size_t index = 0;
   for (auto const& entry : entries) body.Append(Record(entry, ++index == entries.size()).Bytes());
   DrivePacket response;
-  response.Write(Backend::Narrowed<std::uint32_t>(body.Bytes().size()));
+  response.Write(Narrowed<std::uint32_t>(body.Bytes().size()));
   response.Append(body.Bytes());
   return response;
 }

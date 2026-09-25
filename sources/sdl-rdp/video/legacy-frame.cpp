@@ -5,10 +5,10 @@
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/utilities/rect.hpp>
-#include <sdl-rdp/video/_detail/planar-rows.hpp>
 #include <sdl-rdp/video/encoder.hpp>
 #include <sdl-rdp/video/frame/pacing.hpp>
 #include <sdl-rdp/video/peer-frames.hpp>
+#include <sdl-rdp/video/planar-rows.hpp>
 
 #include <freerdp/codec/color.h>
 #include <freerdp/constants.h>
@@ -22,7 +22,14 @@
 #include <functional>
 #include <ranges>
 #include <span>
-namespace Backend {
+namespace sdl_rdp::video::detail::legacy_frame {
+using sdl_rdp::utilities::AreaBytes;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::RowBytes;
+using sdl_rdp::utilities::Unreachable;
+using sdl_rdp::video::detail::planar_rows::EncodePlanarRows;
+
 namespace {
 constexpr std::size_t BITMAP_RECTANGLE_LIMIT = 0xFFFF;
 constexpr std::size_t BitmapHeaderReserve    = 1024;
@@ -102,7 +109,7 @@ auto PacketBytes(auto const& packets) -> std::size_t {
                | std::views::join | std::views::transform([](auto const& band) { return band.bytes.size(); });
   return std::ranges::fold_left(sizes, std::size_t{ 0 }, std::plus{ });
 }
-} // namespace
+}
 LegacyFrame::LegacyFrame(PeerLink& link, Configuration const& configuration, Activation& activation, PeerFrames& frames,
                          FramePacing& pacing, Encoder& encoder, Scaler& scaler) noexcept
     : _link{ link }, _configuration{ configuration }, _activation{ activation }, _frames{ frames }, _pacing{ pacing },
@@ -217,7 +224,7 @@ auto LegacyFrame::Write(Packet& packet) -> bool {
     return SendSurfaceBits(update, packet.bands.front().area, packet.bands.front().bytes, _format.codec);
   case LegacyWire::Bitmap:
   case LegacyWire::Planar: return SendBitmapBand(update, packet.rectangles);
-  default:                 utilities::Unreachable(_format.wire);
+  default:                 Unreachable(_format.wire);
   }
 }
 auto LegacyFrame::Finish() -> bool {
@@ -243,4 +250,4 @@ auto LegacyFrame::Send() -> bool {
 auto LegacyFrame::Delivered() const noexcept -> bool {
   return !_frames.Snapshot();
 }
-} // namespace Backend
+}

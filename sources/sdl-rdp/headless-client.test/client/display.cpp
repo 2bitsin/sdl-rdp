@@ -12,9 +12,10 @@
 #include <string_view>
 #include <utility>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::client::detail::display {
 using sdl_rdp::freerdp_facade::FirstRefused;
 using sdl_rdp::freerdp_facade::Refusal;
+using sdl_rdp::utilities::Expects;
 namespace {
 // abi: pLoadChannels, BOOL is int
 auto LoadDisplayChannel(freerdp* instance) -> int {

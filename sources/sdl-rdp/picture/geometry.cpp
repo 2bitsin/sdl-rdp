@@ -10,7 +10,12 @@
 #include <numeric>
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::picture::detail::geometry {
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::OutOfRange;
+using sdl_rdp::utilities::Whole;
+
 namespace {
 auto Inside(sdlrdp_rect area, Extent size) -> bool {
   return area.x >= 0 && area.y >= 0 && area.w > 0 && area.h > 0
@@ -24,8 +29,7 @@ auto Dimensions(std::uint32_t width, std::uint32_t height) -> Extent {
   return { .width = width, .height = height };
 }
 auto ValidateDamage(std::span<sdlrdp_rect const> damage, Extent size) -> void {
-  if (!std::ranges::all_of(damage, [=](sdlrdp_rect area) { return Inside(area, size); }))
-    throw sdl_rdp::picture::DamageOutOfBounds{ };
+  if (!std::ranges::all_of(damage, [=](sdlrdp_rect area) { return Inside(area, size); })) throw DamageOutOfBounds{ };
 }
 PictureGeometry::PictureGeometry(Extent size, sdlrdp_aspect aspect) : _size{ size }, _aspect{ aspect } {
   std::ignore = Desktop();
@@ -42,7 +46,7 @@ auto PictureGeometry::Desktop(Extent size) const -> sdlrdp_rect {
   std::uint64_t const d       = _aspect.den / divisor;
   auto                units   = std::max((size.width + n - 1) / n, (size.height + d - 1) / d);
   if (units * n > MaximumPictureWidth || units * d > MaximumPictureHeight)
-    throw sdl_rdp::picture::DesktopExceedsLimits{ units * n, units * d };
+    throw DesktopExceedsLimits{ units * n, units * d };
   return Whole({ .width = Narrowed<std::uint32_t>(units * n), .height = Narrowed<std::uint32_t>(units * d) });
 }
 auto PictureGeometry::Bounds() const noexcept -> sdlrdp_rect {
@@ -63,9 +67,6 @@ auto PictureGeometry::SetAspect(sdlrdp_aspect value) -> void {
     throw;
   }
 }
-}
-
-namespace Backend::Avc {
 auto Aligned(std::uint32_t dimension) -> std::uint32_t {
   Expects(dimension > 0, "surface dimension is positive");
   Expects(dimension <= 32766, "surface dimension fits the graphics protocol");

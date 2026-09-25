@@ -1,6 +1,6 @@
 #include <sdl-rdp/video/graphics-timing.hpp>
 
-namespace Backend {
+namespace sdl_rdp::video::detail::graphics_timing {
 auto GraphicsTiming::Ready(std::chrono::nanoseconds elapsed) noexcept -> void {
   _ready_time = elapsed;
 }

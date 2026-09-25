@@ -15,9 +15,13 @@
 #include <thread>
 #include <vector>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::client::detail::client {
+using sdl_rdp::headless_client_test::utilities::ObserverSet;
+using sdl_rdp::utilities::DeadlineAfter;
+using sdl_rdp::utilities::Releases;
+
 using Clock = std::chrono::steady_clock;
-using utilities::Expects;
+using sdl_rdp::utilities::Expects;
 enum class KeyState{ Down, Up };
 struct Login {
   std::string_view user;
@@ -31,8 +35,8 @@ struct GraphicsOptions {
 };
 // gdi_free, called here so <freerdp/gdi/gdi.h> stays in client.cpp.
 auto FreeGraphics(freerdp* instance) noexcept -> void;
-using ClientInstance = std::unique_ptr<
-    freerdp, Backend::Releases<freerdp_disconnect, FreeGraphics, freerdp_context_free, freerdp_free>>;
+using ClientInstance = std::unique_ptr<freerdp,
+                                       Releases<freerdp_disconnect, FreeGraphics, freerdp_context_free, freerdp_free>>;
 class Client {
 public:
   explicit Client(std::uint32_t port, bool surface, std::uint32_t width = 320, std::uint32_t height = 200);
@@ -50,7 +54,7 @@ public:
     auto const pumped = [this] {
       return std::ranges::all_of(std::views::iota(0u, 16u), [this](std::size_t batch) { return Pump(batch ? 0 : 10); });
     };
-    return Backend::Until(Backend::DeadlineAfter(timeout), pumped, ready);
+    return sdl_rdp::utilities::Until(DeadlineAfter(timeout), pumped, ready);
   }
   auto UntilDesktop(std::uint32_t width, std::uint32_t height) -> bool;
   auto Instance() const                                        -> ClientInstance const&;
@@ -64,4 +68,11 @@ private:
 };
 auto PumpInBackground(Client& client)            -> std::jthread;
 auto Tap(Client& client, std::uint16_t scancode) -> void;
+}
+
+namespace sdl_rdp::headless_client_test::client {
+using detail::client::Client;
+using detail::client::Clock;
+using detail::client::KeyState;
+using detail::client::Tap;
 }

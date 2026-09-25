@@ -13,7 +13,11 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace Backend {
+namespace sdl_rdp::session::detail::audio_output {
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::Required;
+
 namespace {
 using Clock = std::chrono::steady_clock;
 constexpr auto AudioPollPeriod = std::chrono::milliseconds(2);
@@ -39,7 +43,7 @@ auto AudioOutput::Wait(Deadline deadline) -> int {
   auto held = _session.Lock();
   for (;;) {
     if (!_open || !Rate()) return 1;
-    auto& channel = utilities::Required(Channel(held), "a channel with a rate exists").get();
+    auto& channel = Required(Channel(held), "a channel with a rate exists").get();
     channel.AdoptServerClock();
     if (channel.Ready(_configuration.AudioLatency())) return 1;
     auto now = Clock::now();
@@ -55,7 +59,7 @@ auto AudioOutput::Write(std::span<std::int16_t const> samples) -> int {
     auto const held = _session.Lock();
     if (!_open) throw AudioDeviceState{ "not open" };
     if (!Rate()) return count;
-    auto& audio = utilities::Required(Channel(held), "a channel with a rate exists").get();
+    auto& audio = Required(Channel(held), "a channel with a rate exists").get();
     if (!audio.Ready(_configuration.AudioLatency())) continue;
     auto size = std::min(samples.size(), std::size_t{ audio.Remaining() } * StereoChannels);
     if (!audio.Send(samples.first(size))) return count;

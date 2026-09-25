@@ -5,7 +5,9 @@
 #include <string>
 #include <vector>
 
-namespace Backend {
+namespace sdl_rdp::diagnostics::detail::trace_queue {
+using sdl_rdp::utilities::Pinned;
+
 class TraceQueue : private Pinned {
 public:
   explicit TraceQueue(Diagnostics const& diagnostics) noexcept;
@@ -18,4 +20,8 @@ private:
   Diagnostics const&       _diagnostics;
   std::vector<std::string> _lines;
 };
+}
+
+namespace sdl_rdp::diagnostics {
+using detail::trace_queue::TraceQueue;
 }

@@ -27,6 +27,7 @@ private:
   std::optional<Parts> _parts;
 };
 }
+
 namespace sdl_rdp::settings {
 using detail::aspect::Aspect;
 }

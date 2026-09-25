@@ -7,11 +7,13 @@
 #include <bit>
 
 namespace sdl_rdp::headless_client_test::utilities::detail::octets {
+using sdl_rdp::utilities::TranscodeRange;
+using sdl_rdp::utilities::Utf16Little;
+
 auto UnicodeText(std::string_view utf8) -> std::vector<std::byte> {
   using oxbox::utilities::Encoding;
-  auto text = Backend::TranscodeRange<std::vector<std::byte>>(
-      oxbox::utilities::AsBytes(utf8), { .encoding = Encoding::UTF8, .order = std::endian::native },
-      Backend::Utf16Little);
+  auto text = TranscodeRange<std::vector<std::byte>>(
+      oxbox::utilities::AsBytes(utf8), { .encoding = Encoding::UTF8, .order = std::endian::native }, Utf16Little);
   text.resize(text.size() + sizeof(char16_t));
   return text;
 }

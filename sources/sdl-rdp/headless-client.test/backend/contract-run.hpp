@@ -3,7 +3,7 @@
 #include <string>
 #include <string_view>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::backend::detail::contract_run {
 class ContractRun {
 public:
   explicit ContractRun(std::function<int()> const& body);
@@ -18,4 +18,8 @@ private:
   int         _status{ };
   std::string _errors;
 };
+}
+
+namespace sdl_rdp::headless_client_test::backend {
+using detail::contract_run::ContractRun;
 }

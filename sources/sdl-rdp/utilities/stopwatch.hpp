@@ -4,7 +4,7 @@
 #include <functional>
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::utilities::detail::stopwatch {
 class Stopwatch {
 public:
   using Clock = std::chrono::steady_clock;
@@ -20,4 +20,9 @@ auto Timed(StepTy&& step) -> Stopwatch::Clock::duration {
   std::invoke(std::forward<StepTy>(step));
   return watch.Elapsed();
 }
+}
+
+namespace sdl_rdp::utilities {
+using detail::stopwatch::Stopwatch;
+using detail::stopwatch::Timed;
 }

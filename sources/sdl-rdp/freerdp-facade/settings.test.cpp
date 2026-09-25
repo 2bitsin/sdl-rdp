@@ -7,11 +7,8 @@
 #include <string_view>
 #include <utility>
 
+namespace sdl_rdp::freerdp_facade::detail::settings {
 namespace {
-using sdl_rdp::freerdp_facade::FirstRefused;
-using sdl_rdp::freerdp_facade::Refusal;
-using sdl_rdp::freerdp_facade::Set;
-using sdl_rdp::freerdp_facade::Settings;
 TEST(Settings, AppliesEveryEntryOfEachKind) {
   Settings const settings(freerdp_settings_new(0));
   ASSERT_TRUE(settings);
@@ -45,5 +42,6 @@ TEST(Settings, StopsAtTheFirstRefusedEntry) {
 TEST(Settings, RefusalNamesTheRefusedKey) {
   EXPECT_EQ(Refusal("codecs", std::optional{ FreeRDP_NSCodec }), "codecs: FreeRDP refused FreeRDP_NSCodec");
   EXPECT_EQ(Refusal("codecs", std::optional<FreeRDP_Settings_Keys_Bool>{ }), "codecs");
+}
 }
 }

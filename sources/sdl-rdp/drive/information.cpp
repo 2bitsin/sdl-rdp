@@ -8,11 +8,14 @@
 #include <utility>
 
 namespace sdl_rdp::drive::detail::information {
-auto InformationRequest(freerdp_facade::InformationClass type, DrivePacket const& body) -> DrivePacket {
+using sdl_rdp::freerdp_facade::FileAttribute;
+using sdl_rdp::utilities::Narrowed;
+
+auto InformationRequest(InformationClass type, DrivePacket const& body) -> DrivePacket {
   constexpr std::size_t padding_after_length = 24;
   DrivePacket           packet;
   packet.Write(std::to_underlying(type));
-  packet.Write(Backend::Narrowed<std::uint32_t>(body.Bytes().size()));
+  packet.Write(Narrowed<std::uint32_t>(body.Bytes().size()));
   packet.Zero(padding_after_length);
   packet.Append(body.Bytes());
   return packet;
@@ -30,7 +33,7 @@ auto Basic(DrivePacket basic) -> BasicInformation {
   auto const modified = basic.Read<std::uint64_t>();
   basic.Skip(change_time_size);
   auto const attributes = basic.Read<std::uint32_t>();
-  return { .directory = (attributes & std::to_underlying(freerdp_facade::FileAttribute::Directory)) != 0,
+  return { .directory = (attributes & std::to_underlying(FileAttribute::Directory)) != 0,
            .modified  = UnixSeconds(modified) };
 }
 // MS-FSCC 2.4.41 FILE_STANDARD_INFORMATION.
@@ -45,6 +48,6 @@ auto UnixSeconds(std::uint64_t filetime) -> std::int64_t {
   using namespace std::chrono;
   constexpr auto epoch = duration_cast<seconds>(sys_days{ 1970y / January / 1 } - sys_days{ 1601y / January / 1 })
                              .count();
-  return Backend::Narrowed<std::int64_t>(filetime / filetime_ticks_per_second) - epoch;
+  return Narrowed<std::int64_t>(filetime / filetime_ticks_per_second) - epoch;
 }
 }

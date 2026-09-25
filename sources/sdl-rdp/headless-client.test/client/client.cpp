@@ -25,10 +25,14 @@
 #include <string_view>
 #include <utility>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::client::detail::client {
 using sdl_rdp::freerdp_facade::FirstRefused;
 using sdl_rdp::freerdp_facade::Refusal;
 using sdl_rdp::freerdp_facade::Set;
+using sdl_rdp::freerdp_facade::WaitHandle;
+using sdl_rdp::utilities::Ensures;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::Unreachable;
 auto FreeGraphics(freerdp* instance) noexcept -> void {
   gdi_free(instance);
 }
@@ -104,14 +108,14 @@ auto KeyboardFlags(KeyState state) -> std::uint16_t {
   switch (state) {
   case KeyState::Down: return KBD_FLAGS_DOWN;
   case KeyState::Up:   return KBD_FLAGS_RELEASE;
-  default:             ::utilities::Unreachable(state);
+  default:             Unreachable(state);
   }
 }
 auto ChannelError(std::uint32_t a, std::uint32_t b) -> std::uint32_t {
   auto channel = [&](std::uint32_t shift) {
-    return std::abs(Backend::Narrowed<int>((a >> shift) & 255) - Backend::Narrowed<int>((b >> shift) & 255));
+    return std::abs(Narrowed<int>((a >> shift) & 255) - Narrowed<int>((b >> shift) & 255));
   };
-  return Backend::Narrowed<std::uint32_t>(std::max({ channel(0), channel(8), channel(16) }));
+  return Narrowed<std::uint32_t>(std::max({ channel(0), channel(8), channel(16) }));
 }
 }
 
@@ -165,8 +169,8 @@ auto Client::Credentials(Login const& login, bool nla) -> void {
 auto Client::Connect() -> bool {
   auto const connected = freerdp_connect(instance.get()) != 0;
   if (connected)
-    utilities::Ensures(instance->context->codecs->ThreadingFlags == THREADING_FLAGS_DISABLE_THREADS,
-                       "the connected client decodes on its pump thread");
+    Ensures(instance->context->codecs->ThreadingFlags == THREADING_FLAGS_DISABLE_THREADS,
+            "the connected client decodes on its pump thread");
   return connected;
 }
 auto Client::Key(std::uint16_t scancode, KeyState state) -> bool {
@@ -176,8 +180,8 @@ auto Client::Disconnect() -> bool {
   return freerdp_disconnect(instance.get()) != 0;
 }
 auto Client::Pump(std::uint32_t timeout) -> bool {
-  std::array<Backend::WaitHandle, 64> handles{ };
-  auto count = freerdp_get_event_handles(instance->context, handles.data(), handles.size());
+  std::array<WaitHandle, 64> handles { };
+  auto                       count   = freerdp_get_event_handles(instance->context, handles.data(), handles.size());
   return count && WaitForMultipleObjects(count, handles.data(), false, timeout) != WAIT_FAILED
          && freerdp_check_event_handles(instance->context);
 }
@@ -194,7 +198,7 @@ auto PumpInBackground(Client& client) -> std::jthread {
 auto Client::Matches(Pixels const& pixels) -> bool {
   auto* gdi = instance->context->gdi;
   Expects(std::cmp_equal(gdi->stride, gdi->width * 4), "decoded rows are packed");
-  if (pixels.size() != Backend::Narrowed<std::size_t>(gdi->width) * gdi->height) return false;
+  if (pixels.size() != Narrowed<std::size_t>(gdi->width) * gdi->height) return false;
   auto const* actual = reinterpret_cast<std::uint32_t const*>(gdi->primary_buffer);
   if (!tolerance)
     return std::equal(pixels.begin(), pixels.end(), actual, [](auto a, auto b) { return ((a ^ b) & 0x00ffffff) == 0; });

@@ -1,12 +1,13 @@
 #pragma once
+#include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/picture/frame-store.hpp>
 
 #include <cstdint>
 #include <mutex>
 
-namespace Backend {
-class Activation;
-class PeerLink;
+namespace sdl_rdp::link::detail::session_access {
+using sdl_rdp::picture::FrameLock;
+
 using SessionLock = std::unique_lock<std::recursive_mutex>;
 class SessionAccess {
 public:
@@ -23,4 +24,9 @@ public:
   virtual auto               AudioChanged()                                       -> void           = 0;
   virtual auto               AudioGone()                                          -> void           = 0;
 };
+}
+
+namespace sdl_rdp::link {
+using detail::session_access::SessionAccess;
+using detail::session_access::SessionLock;
 }

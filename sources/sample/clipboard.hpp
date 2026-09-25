@@ -13,6 +13,7 @@ inline auto PrintClipboardEvent(SDL_Event const& event) -> bool {
   return true;
 }
 }
+
 namespace sample {
 using detail::clipboard::PrintClipboardEvent;
 }

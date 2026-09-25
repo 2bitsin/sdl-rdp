@@ -2,7 +2,9 @@
 
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::video::detail::peer_frames {
+using sdl_rdp::utilities::Expects;
+
 PeerFrames::PeerFrames(FrameStore& store) noexcept : _store{ store } { }
 auto PeerFrames::Post(FrameLock const& held, sdlrdp_rect area) -> void {
   Expects(_store.Holds(held), "posting damage holds the frame lock");

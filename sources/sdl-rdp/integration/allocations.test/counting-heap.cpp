@@ -1,6 +1,6 @@
 #include "counting-heap.hpp"
 
-namespace HeapCount {
+namespace sdl_rdp::integration::allocations_test::detail::counting_heap {
 thread_local bool CountingHeap::suspended = false;
 
 auto CountingHeap::Shared() noexcept -> CountingHeap& {

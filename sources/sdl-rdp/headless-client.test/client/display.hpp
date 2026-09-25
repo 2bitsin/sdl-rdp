@@ -10,7 +10,9 @@
 #include <functional>
 #include <type_traits>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::client::detail::display {
+using sdl_rdp::headless_client_test::utilities::ObserverSet;
+
 struct DisplayCapture {
   bool                  echo_resize = false;
   std::function<void()> finalizing;
@@ -48,4 +50,8 @@ template <std::invocable<DisplayClient&> UseTy>
 auto DisplayClient::Of(Client& client, UseTy const& use) -> std::invoke_result_t<UseTy const&, DisplayClient&> {
   return std::invoke(use, *ObserverSet::Of(*client.Instance()->context).Held<DisplayClient>());
 }
+}
+
+namespace sdl_rdp::headless_client_test::client {
+using detail::display::DisplayClient;
 }

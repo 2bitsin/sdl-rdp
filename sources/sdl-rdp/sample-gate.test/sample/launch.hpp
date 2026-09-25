@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-namespace SampleGate {
+namespace sdl_rdp::sample_gate_test::sample::detail::launch {
 using Words = std::vector<std::string>;
 using Hint  = std::pair<char const*, char const*>;
 
@@ -20,4 +20,16 @@ auto Arguments(std::filesystem::path const& certificates, Words const& environme
 auto AnnouncedPort(std::string_view line)                       -> std::uint32_t;
 auto PrimaryDisplayPort()                                       -> std::uint32_t;
 auto AspectOptions()                                            -> Words;
+}
+
+namespace sdl_rdp::sample_gate_test::sample {
+using detail::launch::AnnouncedPort;
+using detail::launch::Arguments;
+using detail::launch::AspectOptions;
+using detail::launch::BackendLibrary;
+using detail::launch::BuildRoot;
+using detail::launch::PrimaryDisplayPort;
+using detail::launch::SetBackendHints;
+using detail::launch::SetLoopbackHints;
+using detail::launch::Words;
 }

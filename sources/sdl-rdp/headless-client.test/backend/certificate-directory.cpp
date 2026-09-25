@@ -7,12 +7,14 @@
 #include <cstdlib>
 #include <string>
 
-namespace BackendGate {
+namespace sdl_rdp::headless_client_test::backend::detail::certificate_directory {
+using sdl_rdp::utilities::Expects;
+
 CertificateDirectory::CertificateDirectory() {
   std::array<char, 40> pattern{ };
   std::ranges::copy(std::string("/tmp/sdlrdp-gate-XXXXXX"), pattern.begin());
   auto* result = mkdtemp(pattern.data());
-  utilities::Expects(result != nullptr, "temporary directory created");
+  Expects(result != nullptr, "temporary directory created");
   path = result;
 }
 CertificateDirectory::~CertificateDirectory() {

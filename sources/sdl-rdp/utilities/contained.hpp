@@ -9,7 +9,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace Backend::detail::contained {
+namespace sdl_rdp::utilities::detail::contained {
 inline constexpr OperationName UnknownException{ "unknown exception" };
 // A function or one call operator taking text: an overload set would promise typed failures Contained never delivers.
 template <typename SinkTy>
@@ -80,31 +80,34 @@ template <std::invocable BodyTy> auto Completing(BodyTy const& body) -> auto {
     return true;
   };
 }
-}
-namespace Backend {
-using detail::contained::ContainedSink;
-using detail::contained::FailureRoutes;
-using detail::contained::UnknownException;
 // A C caller cannot unwind: an exception from the body becomes the failure status and goes to the sink.
 template <std::invocable BodyTy, ContainedSink SinkTy>
 auto Contained(std::invoke_result_t<BodyTy> failure, BodyTy const& body, SinkTy const& on_failure) noexcept
     -> std::invoke_result_t<BodyTy> {
-  if constexpr (detail::contained::IsRoutes<SinkTy>)
-    return detail::contained::Routed(std::move(failure), body, on_failure);
+  if constexpr (IsRoutes<SinkTy>)
+    return Routed(std::move(failure), body, on_failure);
   else
-    return detail::contained::Routed(std::move(failure), body, detail::contained::TextRoutes(on_failure));
+    return Routed(std::move(failure), body, TextRoutes(on_failure));
 }
 // A body without a result answers whether it completed.
 template <std::invocable BodyTy, ContainedSink SinkTy>
   requires std::is_void_v<std::invoke_result_t<BodyTy>>
 auto Contained(BodyTy const& body, SinkTy const& on_failure) noexcept -> bool {
-  return Contained(false, detail::contained::Completing(body), on_failure);
+  return Contained(false, Completing(body), on_failure);
 }
 // Reports the failure where it is raised and hands it back for the caller to throw.
-template <std::derived_from<std::exception> ExceptionTy, detail::contained::TextSink ReportTy>
+template <std::derived_from<std::exception> ExceptionTy, TextSink ReportTy>
 auto Reported(ExceptionTy failure, ReportTy const& report) noexcept -> ExceptionTy {
-  auto const routes = detail::contained::TextRoutes(report);
-  detail::contained::Report(routes, &std::remove_const_t<decltype(routes)>::Text, std::string_view{ failure.what() });
+  auto const routes = TextRoutes(report);
+  Report(routes, &std::remove_const_t<decltype(routes)>::Text, std::string_view{ failure.what() });
   return failure;
 }
+}
+
+namespace sdl_rdp::utilities {
+using detail::contained::Contained;
+using detail::contained::ContainedSink;
+using detail::contained::FailureRoutes;
+using detail::contained::Reported;
+using detail::contained::UnknownException;
 }

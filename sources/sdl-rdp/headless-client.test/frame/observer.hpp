@@ -5,7 +5,10 @@
 #include <cstdint>
 #include <vector>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::frame::detail::observer {
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::Clock;
+
 struct FrameObserver {
 public:
            FrameObserver(FrameObserver const&)               = delete;
@@ -34,4 +37,8 @@ private:
   bool                                      coherent  = true;
   std::vector<Clock::time_point>            ack_times;
 };
+}
+
+namespace sdl_rdp::headless_client_test::frame {
+using detail::observer::FrameObserver;
 }

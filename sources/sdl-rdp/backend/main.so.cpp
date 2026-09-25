@@ -26,22 +26,31 @@
 #include <type_traits>
 #include <utility>
 
-namespace {
-using Backend::InvalidArguments;
-using Backend::NullArgument;
+namespace sdl_rdp::backend::detail::main {
+using sdl_rdp::diagnostics::ErrorStore;
 using sdl_rdp::drive::DriveFiles;
+using sdl_rdp::session::SetError;
+using sdl_rdp::utilities::Contained;
+using sdl_rdp::utilities::InvalidArguments;
+using sdl_rdp::utilities::NullArgument;
+static_assert(std::is_same_v<decltype(sdlrdp_version()), std::uint32_t>,
+              "the ABI's unsigned is the std::uint32_t these definitions spell");
+static_assert(std::is_same_v<decltype(&sdlrdp_lookup_pair),
+                             auto (*)(sdlrdp_config const*, char const*, char const*, std::uint8_t*)->int>,
+              "the ABI's unsigned char hash[16] is the std::uint8_t* defined here");
+namespace {
 template <class BodyTy> using Result = std::invoke_result_t<BodyTy, sdlrdp_handle&>;
 template <class ResultTy> auto Refused(ResultTy failure, std::string_view subject) noexcept -> ResultTy {
   auto const publish = [&] {
-    Backend::ErrorStore::PublishDetached(NullArgument{ subject }.what());
+    ErrorStore::PublishDetached(NullArgument{ subject }.what());
     return failure;
   };
-  return Backend::Contained(failure, publish, [](std::string_view) noexcept { });
+  return Contained(failure, publish, [](std::string_view) noexcept { });
 }
 template <std::invocable<sdlrdp_handle&> BodyTy>
 auto Serviced(sdlrdp_handle& handle, Result<BodyTy> failure, BodyTy const& body) noexcept -> Result<BodyTy> {
-  auto const failing = [&handle](std::string_view text) { Backend::SetError(handle, std::string{ text }); };
-  return Backend::Contained(failure, [&] { return body(handle); }, failing);
+  auto const failing = [&handle](std::string_view text) { SetError(handle, std::string{ text }); };
+  return Contained(failure, [&] { return body(handle); }, failing);
 }
 // An sdlrdp_* caller may pass a null handle: refused here once, the body receives the open handle.
 template <std::invocable<sdlrdp_handle&> BodyTy>
@@ -94,61 +103,79 @@ auto Tracing() -> bool {
   return trace && std::string_view(trace) == "1";
 }
 }
-auto sdlrdp_last_error() -> char const* {
-  return Backend::ErrorStore::Last().c_str();
 }
-static_assert(std::is_same_v<decltype(sdlrdp_version()), std::uint32_t>,
-              "the ABI's unsigned is the std::uint32_t these definitions spell");
+
+using sdl_rdp::auth::Account;
+using sdl_rdp::backend::detail::main::Buffer;
+using sdl_rdp::backend::detail::main::Guarded;
+using sdl_rdp::backend::detail::main::OnDrive;
+using sdl_rdp::backend::detail::main::OnFile;
+using sdl_rdp::backend::detail::main::OnPath;
+using sdl_rdp::backend::detail::main::Refused;
+using sdl_rdp::backend::detail::main::Tracing;
+using sdl_rdp::backend::detail::main::Transferred;
+using sdl_rdp::configuration::Validate;
+using sdl_rdp::diagnostics::ErrorStore;
+using sdl_rdp::drive::DriveFiles;
+using sdl_rdp::picture::FrameLayout;
+using sdl_rdp::session::StereoChannels;
+using sdl_rdp::utilities::AbiDeadline;
+using sdl_rdp::utilities::Contained;
+using sdl_rdp::utilities::Deadline;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::InvalidArguments;
+using sdl_rdp::utilities::NullArgument;
+using sdl_rdp::video::pointer::PointerLayout;
+
+auto sdlrdp_last_error() -> char const* {
+  return ErrorStore::Last().c_str();
+}
 auto sdlrdp_version() -> std::uint32_t {
   return SDLRDP_ABI_VERSION;
 }
 auto sdlrdp_verify_pair(sdlrdp_config const* config, char const* domain, char const* user, char const* password)
     -> int {
   if (!config || !domain || !user || !password) return 0;
-  return int{ sdl_rdp::auth::Account{ *config }.Verifies(domain, user, password) };
+  return int{ Account{ *config }.Verifies(domain, user, password) };
 }
-static_assert(std::is_same_v<decltype(&sdlrdp_lookup_pair),
-                             auto (*)(sdlrdp_config const*, char const*, char const*, std::uint8_t*)->int>,
-              "the ABI's unsigned char hash[16] is the std::uint8_t* defined here");
 auto sdlrdp_lookup_pair(sdlrdp_config const* config, char const* domain, char const* user, std::uint8_t hash[16])
     -> int {
   if (!config || !domain || !user || !hash) return 0;
   auto const looked_up = [&] {
-    auto const found = sdl_rdp::auth::Account{ *config }.NtHash(domain, user);
+    auto const found = Account{ *config }.NtHash(domain, user);
     if (found) std::ranges::copy(found->Bytes(), hash);
     return int{ found.has_value() };
   };
-  return Backend::Contained(0, looked_up,
-                            [](std::string_view text) { Backend::ErrorStore::PublishDetached(std::string{ text }); });
+  return Contained(0, looked_up, [](std::string_view text) { ErrorStore::PublishDetached(std::string{ text }); });
 }
 auto sdlrdp_open(sdlrdp_config const* config, sdlrdp_handle** out) -> int {
   auto const opened = [&] {
     if (!out) throw NullArgument{ "Open handle output" };
     *out = nullptr;
     if (!config) throw NullArgument{ "Open configuration" };
-    sdl_rdp::configuration::Validate(*config);
+    Validate(*config);
     auto handle = std::make_unique<sdlrdp_handle>(*config, Tracing());
-    if (config->wait_for_client) handle->Events().Wait(Backend::Deadline::max());
+    if (config->wait_for_client) handle->Events().Wait(Deadline::max());
     *out = handle.release();
     return 0;
   };
   auto const failed = [](std::string_view text) {
-    Backend::ErrorStore::PublishDetached(std::format("sdlrdp_open failed: {}", text));
+    ErrorStore::PublishDetached(std::format("sdlrdp_open failed: {}", text));
   };
-  return Backend::Contained(-1, opened, failed);
+  return Contained(-1, opened, failed);
 }
 auto sdlrdp_close(sdlrdp_handle* handle) -> void {
   std::unique_ptr<sdlrdp_handle> const closed{ handle };
 }
 auto sdlrdp_port(sdlrdp_handle const* handle) -> std::uint32_t {
-  Backend::Expects(handle != nullptr, "backend is open");
+  Expects(handle != nullptr, "backend is open");
   auto const& open = *handle;
   return open.Port();
 }
 auto sdlrdp_present(sdlrdp_handle* handle, void const* pixels, int pitch, std::uint32_t width, std::uint32_t height,
                     sdlrdp_rect const* rects, std::uint32_t count) -> int {
   return Guarded(handle, -1, "Backend handle", [&](sdlrdp_handle& open) {
-    sdl_rdp::picture::FrameLayout const layout{ width, height, pitch };
+    FrameLayout const layout{ width, height, pitch };
     if (!pixels || (!rects && count)) throw InvalidArguments{ "present", "pixels or rectangles" };
     open.Presentation().Present({ static_cast<std::uint8_t const*>(pixels), layout.Bytes() }, layout, { rects, count });
     return 0;
@@ -162,10 +189,10 @@ auto sdlrdp_poll(sdlrdp_handle* handle, sdlrdp_event* out, std::uint32_t max) ->
 }
 auto sdlrdp_wait(sdlrdp_handle* handle, int timeout) -> int {
   return Guarded(handle, -1, "Backend handle",
-                 [&](sdlrdp_handle& open) { return open.Events().Wait(Backend::AbiDeadline(timeout)); });
+                 [&](sdlrdp_handle& open) { return open.Events().Wait(AbiDeadline(timeout)); });
 }
 auto sdlrdp_wakeup(sdlrdp_handle* handle) -> void {
-  Backend::Expects(handle != nullptr, "backend is open");
+  Expects(handle != nullptr, "backend is open");
   auto& open = *handle;
   open.Events().Wakeup();
 }
@@ -189,12 +216,12 @@ auto sdlrdp_set_aspect(sdlrdp_handle* handle, sdlrdp_aspect aspect) -> int {
 }
 auto sdlrdp_wait_frame(sdlrdp_handle* handle, int timeout) -> int {
   return Guarded(handle, -1, "Backend handle",
-                 [&](sdlrdp_handle& open) { return open.Presentation().WaitFrame(Backend::AbiDeadline(timeout)); });
+                 [&](sdlrdp_handle& open) { return open.Presentation().WaitFrame(AbiDeadline(timeout)); });
 }
 auto sdlrdp_set_pointer(sdlrdp_handle* handle, std::uint32_t w, std::uint32_t h, std::uint32_t x, std::uint32_t y,
                         void const* argb) -> int {
   return Guarded(handle, -1, "Pointer handle", [&](sdlrdp_handle& open) {
-    sdl_rdp::video::pointer::PointerLayout const layout{ { .width = w, .height = h }, x, y };
+    PointerLayout const layout{ { .width = w, .height = h }, x, y };
     if (!argb && layout.Bytes()) throw NullArgument{ "Pointer pixels" };
     open.Presentation().SetPointer(layout, { static_cast<std::uint8_t const*>(argb), argb ? layout.Bytes() : 0 });
     return 0;
@@ -227,13 +254,12 @@ auto sdlrdp_audio_write(sdlrdp_handle* handle, void const* frames, std::uint32_t
   return Guarded(handle, -1, "Audio handle", [&](sdlrdp_handle& open) {
     if ((!frames && count) || std::cmp_greater(count, std::numeric_limits<int>::max()))
       throw InvalidArguments{ "audio write", "frames or count" };
-    return open.Audio().Write(
-        { static_cast<std::int16_t const*>(frames), std::size_t{ count } * Backend::StereoChannels });
+    return open.Audio().Write({ static_cast<std::int16_t const*>(frames), std::size_t{ count } * StereoChannels });
   });
 }
 auto sdlrdp_audio_wait(sdlrdp_handle* handle, int timeout) -> int {
   return Guarded(handle, -1, "Audio handle",
-                 [&](sdlrdp_handle& open) { return open.Audio().Wait(Backend::AbiDeadline(timeout)); });
+                 [&](sdlrdp_handle& open) { return open.Audio().Wait(AbiDeadline(timeout)); });
 }
 auto sdlrdp_audio_close(sdlrdp_handle* handle) -> void {
   std::ignore = Guarded(handle, 0, "Audio handle", [](sdlrdp_handle& open) {

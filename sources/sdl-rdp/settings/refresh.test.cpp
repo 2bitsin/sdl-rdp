@@ -5,7 +5,7 @@
 #include <string_view>
 #include <tuple>
 
-namespace sdl_rdp::settings {
+namespace sdl_rdp::settings::detail::refresh {
 TEST(Refresh, ReadsAModeNameOrARate) {
   EXPECT_EQ(Refresh::Parsed("auto-client"), Refresh{ RefreshMode::CLIENT });
   EXPECT_EQ(Refresh::Parsed("auto-client-average"), Refresh{ RefreshMode::CLIENT_AVERAGE });

@@ -9,7 +9,9 @@
 #include <mutex>
 #include <span>
 
-namespace Backend {
+namespace sdl_rdp::link::detail::event_queue {
+using sdl_rdp::utilities::Deadline;
+
 class EventQueue {
 public:
   auto Push(sdlrdp_event event)          -> void;
@@ -30,4 +32,8 @@ private:
   std::deque<sdlrdp_event> _events;
   std::uint64_t            _generation{ };
 };
+}
+
+namespace sdl_rdp::link {
+using detail::event_queue::EventQueue;
 }

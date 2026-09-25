@@ -4,7 +4,7 @@
 
 #include <string>
 
-namespace Backend {
+namespace sdl_rdp::diagnostics::detail::logger {
 class Logger {
 public:
   explicit Logger(sdlrdp_config const& config);
@@ -13,4 +13,8 @@ public:
 private:
   LogRoute _route;
 };
+}
+
+namespace sdl_rdp::diagnostics {
+using detail::logger::Logger;
 }

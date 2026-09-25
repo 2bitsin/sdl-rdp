@@ -17,6 +17,10 @@
 #include <utility>
 
 namespace sdl_rdp::integration::support_bench::detail::session {
+using sdl_rdp::utilities::ParseReal;
+using sdl_rdp::utilities::RAIIWrap;
+using sdl_rdp::utilities::Timed;
+
 // A rig fixture run as one benchmark session: SetUp, the case's body, TearDown, each reported to the measurement.
 template <std::derived_from<testing::Test> Fixture>
 class Session : public Fixture {
@@ -25,8 +29,7 @@ public:
 
   auto Run(std::invocable auto body) -> void {
     Torn const torn(*this);
-    if (_set_up)
-      _measurement.get().MeasureBody(Backend::Timed([&] { _measurement.get().Contained("the test body", body); }));
+    if (_set_up) _measurement.get().MeasureBody(Timed([&] { _measurement.get().Contained("the test body", body); }));
   }
 
 protected:
@@ -40,7 +43,7 @@ protected:
     _measurement.get().Record(name, value);
   }
   auto Recorded(std::string const& name, std::string_view text) -> std::optional<double> {
-    auto const value = Backend::ParseReal<double>(text);
+    auto const value = ParseReal<double>(text);
     if (!value)
       Fail(std::format("{} is a number: '{}'", name, text));
     else
@@ -60,7 +63,7 @@ private:
   static auto MeasuredTearDown(Session& session) -> void {
     session._measurement.get().Contained("TearDown()", [&session] { session.TearDown(); });
   }
-  using Torn = ::utilities::RAIIWrap<Session&, &Session::MeasuredSetUp, &Session::MeasuredTearDown>;
+  using Torn = RAIIWrap<Session&, &Session::MeasuredSetUp, &Session::MeasuredTearDown>;
 
   std::reference_wrapper<Measurement> _measurement;
   bool                                _set_up      = false;

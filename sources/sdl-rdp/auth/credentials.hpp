@@ -1,7 +1,7 @@
 #pragma once
 #include <filesystem>
 
-namespace Backend {
+namespace sdl_rdp::auth::detail::credentials {
 class Credentials {
 public:
   explicit Credentials(std::filesystem::path const& directory);
@@ -15,4 +15,8 @@ private:
   std::filesystem::path _certificate;
   std::filesystem::path _key;
 };
+}
+
+namespace sdl_rdp::auth {
+using detail::credentials::Credentials;
 }

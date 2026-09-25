@@ -1,12 +1,14 @@
 #pragma once
 #include <sdl-rdp/headless-client.test/client/client.hpp>
 
-namespace SampleGate {
+namespace sdl_rdp::sample_gate_test::frame::detail::first_size {
+using sdl_rdp::headless_client_test::client::Client;
+
 class FirstFrameSize {
 public:
            FirstFrameSize(FirstFrameSize const&)               = delete;
            FirstFrameSize(FirstFrameSize&&)                    = delete;
-  explicit FirstFrameSize(Headless::Client& value);
+  explicit FirstFrameSize(Client& value);
            ~FirstFrameSize();
   auto     operator=(FirstFrameSize const&) -> FirstFrameSize& = delete;
   auto     operator=(FirstFrameSize&&)      -> FirstFrameSize& = delete;
@@ -22,9 +24,13 @@ private:
   int  height   = 0;
 
   inline static thread_local FirstFrameSize* active           = nullptr;
-  Headless::Client&                          client;
+  Client&                                    client;
   decltype(freerdp::PostConnect)             original_connect;
   pEndPaint                                  original_paint   = nullptr;
   bool                                       paint_installed  = false;
 };
+}
+
+namespace sdl_rdp::sample_gate_test::frame {
+using detail::first_size::FirstFrameSize;
 }

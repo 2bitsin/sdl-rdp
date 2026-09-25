@@ -11,6 +11,8 @@
 #include <type_traits>
 
 namespace sdl_rdp::settings::detail::hint {
+using sdl_rdp::utilities::AsciiUpper;
+
 inline constexpr std::string_view HintPrefix = "SDL_RDP_";
 template <typename MemberTy, auto FIELD>
 consteval auto Names() -> bool {
@@ -37,7 +39,7 @@ template <std::size_t LENGTH>
 consteval auto Spelled(std::string_view field) -> std::array<char, HintPrefix.size() + LENGTH + 1> {
   std::array<char, HintPrefix.size() + LENGTH + 1> text{ };
   std::ranges::copy(HintPrefix, text.begin());
-  std::ranges::transform(field, text.begin() + HintPrefix.size(), utilities::AsciiUpper);
+  std::ranges::transform(field, text.begin() + HintPrefix.size(), AsciiUpper);
   return text;
 }
 template <auto FIELD>
@@ -48,6 +50,7 @@ constexpr auto HintName() -> std::string_view {
   return { HintText<FIELD>.data(), HintText<FIELD>.size() - 1 };
 }
 }
+
 namespace sdl_rdp::settings {
 using detail::hint::FieldName;
 using detail::hint::HintName;

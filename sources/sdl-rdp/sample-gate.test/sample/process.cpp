@@ -7,7 +7,9 @@
 #include <freerdp/settings.h>
 #include <cstdint>
 
-namespace SampleGate {
+namespace sdl_rdp::sample_gate_test::sample::detail::process {
+using namespace std::chrono_literals;
+
 auto SampleProcess::GivenProcess(Words const& environment, Words const& options) -> void {
   Launch(Arguments(certificates.Path(), environment, options));
 }
@@ -81,7 +83,7 @@ auto SampleProcess::CollectClientLog(wLogMessage const& message) -> void {
     auto level = message.Level == WLOG_ERROR ? SDLRDP_LOG_ERROR
                  : message.Level == WLOG_WARN ? SDLRDP_LOG_WARN
                                               : SDLRDP_LOG_INFO;
-    Headless::Logs::Collect(client_logs, level, message.TextString);
+    Logs::Collect(client_logs, level, message.TextString);
   }
 }
 }

@@ -9,11 +9,14 @@
 #include <cstdint>
 #include <span>
 namespace sdl3::rdp::storage::detail::drive {
-using backend::Boundary;
-using backend::Operation;
-using backend::PointerState;
-using backend::Stream;
-using settings::Text;
+using sdl3::rdp::backend::Boundary;
+using sdl3::rdp::backend::Operation;
+using sdl3::rdp::backend::PointerState;
+using sdl3::rdp::backend::Stream;
+using sdl3::rdp::settings::Text;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::RAIIWrap;
 namespace {
 constexpr std::size_t InitialDriveCapacity = 16;
 template <typename ElementTy, typename FillTy>
@@ -30,8 +33,7 @@ auto GrowUntilFits(std::size_t capacity, FillTy const& fill) -> std::vector<Elem
 }
 auto ListDrives(Driver const& driver, std::span<sdlrdp_drive> drives) -> std::size_t {
   if (!std::in_range<std::uint32_t>(drives.size())) throw TooManyDrives{ drives.size() };
-  auto const count = driver.Call<Operation::DRIVE_LIST>(drives.data(),
-                                                        ::Backend::Narrowed<std::uint32_t>(drives.size()));
+  auto const count = driver.Call<Operation::DRIVE_LIST>(drives.data(), Narrowed<std::uint32_t>(drives.size()));
   if (count < 0) driver.Throw();
   return std::min(static_cast<std::size_t>(count), drives.size());
 }
@@ -60,8 +62,8 @@ auto CloseHandle(std::pair<std::reference_wrapper<Driver const>, sdlrdp_file*> c
 }
 using DriveFileState = PointerState<std::pair<std::reference_wrapper<Driver const>, sdlrdp_file*>,
                                     &std::pair<std::reference_wrapper<Driver const>, sdlrdp_file*>::second>;
-using DriveFile = utilities::RAIIWrap<std::pair<std::reference_wrapper<Driver const>, sdlrdp_file*>, OpenHandle,
-                                      CloseHandle, DriveFileState::IsNull, DriveFileState::MakeNull>;
+using DriveFile = RAIIWrap<std::pair<std::reference_wrapper<Driver const>, sdlrdp_file*>, OpenHandle, CloseHandle,
+                           DriveFileState::IsNull, DriveFileState::MakeNull>;
 class File : private OwnedDriver<Driver const> {
 public:
   using OwnedDriver<Driver const>::Backend;
@@ -105,12 +107,12 @@ auto SeekBase(File const& file, SDL_IOWhence origin) -> std::int64_t {
 }
 // SDL stream callbacks carry their owned File through an opaque context pointer.
 auto SDLCALL FileSize(void* context) -> std::int64_t {
-  utilities::Expects(context != nullptr, "stream size has state");
+  Expects(context != nullptr, "stream size has state");
   return Size(*static_cast<File*>(context));
 }
 // SDL stream seek borrows its opaque state and supplies a signed offset and origin.
 auto SDLCALL FileSeek(void* context, std::int64_t offset, SDL_IOWhence origin) -> std::int64_t {
-  utilities::Expects(context != nullptr, "stream seek has state");
+  Expects(context != nullptr, "stream seek has state");
   auto&      file = *static_cast<File*>(context);
   auto const base = SeekBase(file, origin);
   if (base < 0 || offset < -base || offset > SDL_MAX_SINT64 - base) {
@@ -134,8 +136,8 @@ auto Advance(File& file, int count, std::size_t size, SDL_IOStatus short_status)
 template <Operation OPERATION, typename ByteTy>
   requires IoBuffer<ByteTy>
 auto SDLCALL Transfer(void* context, ByteTy* buffer, std::size_t size, SDL_IOStatus* status) -> std::size_t {
-  utilities::Expects(context != nullptr, "stream transfer has state");
-  utilities::Expects(status != nullptr, "stream transfer has a status output");
+  Expects(context != nullptr, "stream transfer has state");
+  Expects(status != nullptr, "stream transfer has a status output");
   auto&          file         = *static_cast<File*>(context);
   constexpr auto short_status = OPERATION == Operation::DRIVE_READ ? SDL_IO_STATUS_EOF : SDL_IO_STATUS_ERROR;
   if (OPERATION == Operation::DRIVE_WRITE && file.Mode().Appends() && FileSeek(context, 0, SDL_IO_SEEK_END) < 0) {
@@ -150,8 +152,8 @@ auto SDLCALL Transfer(void* context, ByteTy* buffer, std::size_t size, SDL_IOSta
 }
 // SDL stream flush borrows its opaque state and provides a status output.
 auto SDLCALL FileFlush(void* context, SDL_IOStatus* status) -> bool {
-  utilities::Expects(context != nullptr, "stream flush has state");
-  utilities::Expects(status != nullptr, "stream flush has a status output");
+  Expects(context != nullptr, "stream flush has state");
+  Expects(status != nullptr, "stream flush has a status output");
   auto const& file = *static_cast<File*>(context);
   if (file.Backend().Call<Operation::DRIVE_FLUSH>(file.Handle()) >= 0) return true;
   *status = SDL_IO_STATUS_ERROR;
@@ -159,7 +161,7 @@ auto SDLCALL FileFlush(void* context, SDL_IOStatus* status) -> bool {
 }
 // SDL returns ownership of stream state to its close callback.
 auto SDLCALL FileClose(void* context) -> bool {
-  utilities::Expects(context != nullptr, "stream close owns state");
+  Expects(context != nullptr, "stream close owns state");
   return std::unique_ptr<File>{ static_cast<File*>(context) }->Close();
 }
 auto FileInterface(FileMode mode) -> SDL_IOStreamInterface {
@@ -203,7 +205,7 @@ auto SDLCALL OpenFile(char const* drive, char const* path, char const* mode) -> 
   });
 }
 auto UpdateDrives(Driver const& driver, SDL_PropertiesID properties) -> void {
-  utilities::Expects(properties != 0, "drive publication has display properties");
+  Expects(properties != 0, "drive publication has display properties");
   auto const names = oxbox::utilities::Joined(Drives(driver), "\n", &sdlrdp_drive::name);
   SDL_SetStringProperty(properties, SDL_PROP_DISPLAY_RDP_DRIVES_STRING, names.c_str());
   SDL_SetPointerProperty(properties, SDL_PROP_DISPLAY_RDP_OPEN_FILE_POINTER, reinterpret_cast<void*>(OpenFile));

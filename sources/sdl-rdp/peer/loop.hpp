@@ -1,5 +1,10 @@
 #pragma once
+#include <sdl-rdp/auth/forward.hpp>
+#include <sdl-rdp/diagnostics/forward.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/link/forward.hpp>
+#include <sdl-rdp/peer/forward.hpp>
+#include <sdl-rdp/picture/forward.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
 #include <winpr/wtypes.h>
@@ -8,15 +13,15 @@
 #include <stop_token>
 #include <thread>
 
-namespace Backend {
-class Authenticator;
-class Departure;
-class Diagnostics;
-class FrameStore;
-class PeerLink;
-class PeerPump;
-class PeerWait;
-class SessionAccess;
+namespace sdl_rdp::peer::detail::loop {
+using sdl_rdp::auth::Authenticator;
+using sdl_rdp::diagnostics::Diagnostics;
+using sdl_rdp::freerdp_facade::WaitHandle;
+using sdl_rdp::link::PeerLink;
+using sdl_rdp::link::SessionAccess;
+using sdl_rdp::picture::FrameStore;
+using sdl_rdp::utilities::Pinned;
+
 class PeerLoop : private Pinned {
 public:
   PeerLoop(PeerLink& link, SessionAccess& session, Diagnostics const& diagnostics, Authenticator const& authenticator,
@@ -40,4 +45,8 @@ private:
   Departure&           _departure;
   std::jthread         _thread;
 };
+}
+
+namespace sdl_rdp::peer {
+using detail::loop::PeerLoop;
 }

@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::video::detail::refresh_tracker {
 auto RefreshTracker::Effective() const noexcept -> std::uint32_t {
   return _effective.load();
 }

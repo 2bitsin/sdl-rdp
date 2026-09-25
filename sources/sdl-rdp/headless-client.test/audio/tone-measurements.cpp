@@ -10,9 +10,11 @@
 #include <numbers>
 #include <ranges>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::audio::detail::tone_measurements {
+using sdl_rdp::utilities::Expects;
+
 auto ToneMeasurements(std::vector<std::int16_t> const& samples, std::uint32_t rate) -> std::pair<double, double> {
-  using utilities::Expects;
+  using sdl_rdp::utilities::Expects;
   auto start = std::ranges::find_if(samples, [](auto value) { return std::abs(value) > 100; }) - samples.begin();
   start += start % 2;
   Expects(start < samples.size(), "captured tone contains signal");
@@ -31,7 +33,7 @@ auto ToneMeasurements(std::vector<std::int16_t> const& samples, std::uint32_t ra
   return { frequency, db };
 }
 auto MaximumGapMs(std::span<std::chrono::steady_clock::time_point const> received) -> double {
-  utilities::Expects(received.size() > 1, "a gap needs two receptions");
+  Expects(received.size() > 1, "a gap needs two receptions");
   auto const gap = [](auto earlier, auto later) {
     return std::chrono::duration<double, std::milli>(later - earlier).count();
   };

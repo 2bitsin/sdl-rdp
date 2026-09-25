@@ -3,7 +3,7 @@
 
 #include <string>
 
-namespace Backend {
+namespace sdl_rdp::configuration::detail::authentication {
 class Authentication {
 public:
            Authentication(Authentication const&)               = delete;
@@ -20,4 +20,8 @@ private:
   std::string   _password;
   std::string   _domain;
 };
+}
+
+namespace sdl_rdp::configuration {
+using detail::authentication::Authentication;
 }

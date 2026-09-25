@@ -7,7 +7,9 @@
 #include <cstdint>
 #include <iterator>
 
-namespace Backend {
+namespace sdl_rdp::video::detail::acknowledgement_window {
+using sdl_rdp::utilities::Narrowed;
+
 auto WaitMilliseconds(std::chrono::nanoseconds remaining, std::int64_t floor) -> std::uint32_t {
   return Narrowed<std::uint32_t>(std::max(floor, std::chrono::ceil<std::chrono::milliseconds>(remaining).count()));
 }

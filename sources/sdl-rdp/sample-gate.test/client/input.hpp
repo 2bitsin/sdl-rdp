@@ -5,10 +5,12 @@
 #include <sdl-rdp/headless-client.test/client/client.hpp>
 #include <atomic>
 
-namespace SampleGate {
+namespace sdl_rdp::sample_gate_test::client::detail::input {
+using sdl_rdp::headless_client_test::client::Client;
+
 struct InputClient {
 public:
-  explicit    InputClient(Headless::Client& client);
+  explicit    InputClient(Client& client);
   static auto Advanced() -> std::atomic<AInputClientContext*> const&;
   static auto Touch()    -> std::atomic<RdpeiClientContext*> const&;
 
@@ -16,4 +18,8 @@ private:
   inline static std::atomic<AInputClientContext*> advanced = nullptr;
   inline static std::atomic<RdpeiClientContext*>  touch    = nullptr;
 };
+}
+
+namespace sdl_rdp::sample_gate_test::client {
+using detail::input::InputClient;
 }

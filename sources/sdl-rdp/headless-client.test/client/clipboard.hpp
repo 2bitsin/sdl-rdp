@@ -10,7 +10,7 @@
 #include <span>
 #include <vector>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::client::detail::clipboard {
 struct ClipboardCapture {
   std::atomic<std::size_t> requests  = 0;
   std::atomic<std::size_t> responses = 0;
@@ -44,4 +44,8 @@ private:
   std::vector<std::uint32_t>         formats;
   std::atomic<CliprdrClientContext*> channel  = nullptr;
 };
+}
+
+namespace sdl_rdp::headless_client_test::client {
+using detail::clipboard::ClipboardClient;
 }

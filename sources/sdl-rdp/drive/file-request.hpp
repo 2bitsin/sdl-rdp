@@ -7,11 +7,12 @@
 #include <span>
 
 namespace sdl_rdp::drive::detail::file_request {
+using sdl_rdp::freerdp_facade::AccessMask;
+
 enum class FileKind{ File, Directory, Any };
 class FileRequest {
 public:
-       FileRequest(std::uint32_t flags, FileKind kind,
-                   freerdp_facade::AccessMask extra_access = freerdp_facade::AccessMask::None);
+       FileRequest(std::uint32_t flags, FileKind kind, AccessMask extra_access = AccessMask::None);
   auto Create(std::span<std::byte const> name) const -> DrivePacket;
 
 private:
@@ -20,6 +21,7 @@ private:
   FileKind      _kind;
 };
 }
+
 namespace sdl_rdp::drive {
 using detail::file_request::FileKind;
 using detail::file_request::FileRequest;

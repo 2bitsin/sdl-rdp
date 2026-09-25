@@ -1,9 +1,9 @@
 #include <sdl-rdp/utilities/deadline.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 
-namespace Backend {
+namespace sdl_rdp::utilities::detail::deadline {
 auto DeadlineAfter(std::chrono::milliseconds timeout) -> Deadline {
-  utilities::Expects(timeout >= std::chrono::milliseconds::zero(), "a deadline lies in the future");
+  Expects(timeout >= std::chrono::milliseconds::zero(), "a deadline lies in the future");
   return std::chrono::steady_clock::now() + timeout;
 }
 // The C ABI spells an unbounded wait as a negative timeout.

@@ -5,7 +5,9 @@
 #include <cstdint>
 #include <optional>
 
-namespace Backend {
+namespace sdl_rdp::link::detail::channel_slot {
+using sdl_rdp::utilities::Pinned;
+
 class ChannelSlot : private Pinned {
 public:
        ChannelSlot(DynamicChannels& registry, DynamicChannel& owner) noexcept;
@@ -16,4 +18,8 @@ private:
   DynamicChannel&                            _owner;
   std::optional<DynamicChannels::Assignment> _assignment;
 };
+}
+
+namespace sdl_rdp::link {
+using detail::channel_slot::ChannelSlot;
 }

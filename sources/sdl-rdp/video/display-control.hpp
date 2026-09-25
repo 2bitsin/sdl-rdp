@@ -1,18 +1,25 @@
 #pragma once
+#include <sdl-rdp/diagnostics/forward.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/link/channel-slot.hpp>
+#include <sdl-rdp/link/forward.hpp>
+#include <sdl-rdp/picture/forward.hpp>
 
 #include <freerdp/server/disp.h>
 #include <cstdint>
 #include <functional>
 #include <optional>
 
-namespace Backend {
-class Activation;
-class DesktopLayout;
-class Diagnostics;
-class EventQueue;
-class PeerLink;
+namespace sdl_rdp::video::detail::display_control {
+using sdl_rdp::diagnostics::Diagnostics;
+using sdl_rdp::link::Activation;
+using sdl_rdp::link::ChannelSlot;
+using sdl_rdp::link::DynamicChannel;
+using sdl_rdp::link::EventQueue;
+using sdl_rdp::link::PeerLink;
+using sdl_rdp::picture::DesktopLayout;
+using sdl_rdp::utilities::Releases;
+
 class DisplayControl final : public DynamicChannel {
 public:
        DisplayControl(PeerLink& link, Activation const& activation, DesktopLayout const& desktop, EventQueue& events,
@@ -36,4 +43,8 @@ private:
   ChannelSlot          _slot;
   bool                 _open       { };
 };
+}
+
+namespace sdl_rdp::video {
+using detail::display_control::DisplayControl;
 }

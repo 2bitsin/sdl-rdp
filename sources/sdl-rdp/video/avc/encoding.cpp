@@ -8,9 +8,11 @@
 #include <cstdint>
 #include <ranges>
 
-namespace Backend::Avc {
-using utilities::Ensures;
-using utilities::Expects;
+namespace sdl_rdp::video::avc::detail::encoding {
+using sdl_rdp::picture::Aligned;
+using sdl_rdp::utilities::Ensures;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
 auto IntraRefreshFor(std::uint32_t fps) -> IntraRefresh {
   Expects(fps, "refresh rate is positive");
   Expects(fps <= UINT32_MAX / 2, "doubled refresh rate fits NVENC");

@@ -2,7 +2,7 @@
 #include <chrono>
 #include <cstdint>
 
-namespace Backend {
+namespace sdl_rdp::video::detail::sent_frame {
 class SentFrame {
 public:
   using Clock = std::chrono::steady_clock;
@@ -16,4 +16,8 @@ private:
   std::uint64_t     _presented;
   Clock::time_point _sent;
 };
+}
+
+namespace sdl_rdp::video {
+using detail::sent_frame::SentFrame;
 }

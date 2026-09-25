@@ -1,7 +1,7 @@
 #include <sdl-rdp/configuration/refresh.hpp>
 #include <gtest/gtest.h>
+namespace sdl_rdp::configuration::detail::refresh {
 using namespace std::chrono_literals;
-namespace Backend {
 TEST(RefreshEstimator, ClientLatencyIgnoresPresentSpacing) {
   Refresh value{ RefreshMode::Client };
   value.Restart();

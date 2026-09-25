@@ -12,7 +12,10 @@
 #include <string_view>
 #include <type_traits>
 
-namespace Backend {
+namespace sdl_rdp::auth::detail::identity {
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::TranscodeRange;
+
 struct IdentityNames {
   std::string user;
   std::string domain;
@@ -40,7 +43,7 @@ inline auto IdentityView(std::span<std::uint16_t const> utf16) -> std::u16string
 template <auto TEXT, auto LENGTH, class Identity> auto IdentityField(Identity const& identity) -> decltype(auto) {
   auto const* const text   = identity.*TEXT;
   auto const        length = std::size_t{ identity.*LENGTH };
-  if (length) utilities::Expects(text != nullptr, "identity buffer covers length");
+  if (length) Expects(text != nullptr, "identity buffer covers length");
   return IdentityView(std::span{ text, length });
 }
 template <class Identity> auto NamesOf(Identity const& identity) -> IdentityNames {
@@ -53,4 +56,9 @@ inline auto ClientNames(SEC_WINNT_AUTH_IDENTITY const& identity) -> IdentityName
   // WinPR declares the W and A identities with one layout (sspi.h); Flags says which pointer type is live.
   return NamesOf(std::bit_cast<SEC_WINNT_AUTH_IDENTITY_A>(identity));
 }
+}
+
+namespace sdl_rdp::auth {
+using detail::identity::ClientNames;
+using detail::identity::QualifiedName;
 }

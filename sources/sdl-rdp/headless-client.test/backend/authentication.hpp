@@ -18,10 +18,8 @@
 #include <utility>
 #include <vector>
 
-namespace AuthenticationGate {
-using BackendGate::CurrentStatus;
-using BackendGate::RequiredStatus;
-using utilities::Expects;
+namespace sdl_rdp::headless_client_test::backend::detail::authentication {
+using sdl_rdp::utilities::Expects;
 struct CallbackRecord {
   std::string     order;
   std::string     user;
@@ -48,7 +46,7 @@ protected:
   auto        ThenCertificateDisconnect(std::string_view closed)                                           -> void;
   auto        ThenPendingDisconnect(std::uint32_t code)                                                    -> void;
   oxbox::platform::ScratchArea                          certificates  { "auth", "sdl-rdp" };
-  Headless::BackendInstance                             handle;
+  BackendInstance                                       handle;
   sdlrdp_config                                         config        { };
   std::mutex                                            guard;
   std::condition_variable                               logged;
@@ -58,4 +56,8 @@ protected:
   bool                                                  permit        = true;
   std::thread::id                                       client_thread = std::this_thread::get_id();
 };
+}
+
+namespace sdl_rdp::headless_client_test::backend {
+using detail::authentication::Authentication;
 }

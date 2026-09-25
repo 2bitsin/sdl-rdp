@@ -5,7 +5,7 @@
 #include <span>
 #include <vector>
 
-namespace Backend {
+namespace sdl_rdp::utilities::detail::transcode {
 auto Utf16(std::string_view utf8) -> std::u16string {
   using oxbox::utilities::Encoding;
   auto const bytes = TranscodeRange<std::vector<std::byte>>(

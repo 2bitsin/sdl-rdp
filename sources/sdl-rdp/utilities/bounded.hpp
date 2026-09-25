@@ -18,7 +18,7 @@ public:
   constexpr          Bounded() = default;
   constexpr explicit Bounded(ValueTy value) : _value{ value } {
     auto const admitted = Admits(value);
-    ::utilities::Expects(admitted, "a bounded value is within its range");
+    Expects(admitted, "a bounded value is within its range");
   }
   static constexpr auto Minimum() -> std::int64_t {
     return MINIMUM;
@@ -30,7 +30,7 @@ public:
     return std::cmp_greater_equal(value, MINIMUM) && std::cmp_less_equal(value, MAXIMUM);
   }
   static auto _Decode(std::int64_t wire) -> Bounded {
-    if (!Admits(wire)) throw ::Backend::OutOfRange{ "Value", wire, Minimum(), Maximum() };
+    if (!Admits(wire)) throw OutOfRange{ "Value", wire, Minimum(), Maximum() };
     return Bounded{ static_cast<ValueTy>(wire) };
   }
   constexpr auto _Encode() const -> std::int64_t {
@@ -50,6 +50,7 @@ inline constexpr bool IsBounded<Bounded<ValueTy, MINIMUM, MAXIMUM>> = true;
 template <typename ValueTy>
 concept BoundedInteger = IsBounded<ValueTy>;
 }
+
 namespace sdl_rdp::utilities {
 using detail::bounded::Bounded;
 using detail::bounded::BoundedInteger;

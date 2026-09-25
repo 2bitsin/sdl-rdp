@@ -11,13 +11,15 @@
 #include <string_view>
 #include <vector>
 
-namespace Backend {
+namespace sdl_rdp::utilities::detail::transcode {
 inline constexpr oxbox::utilities::TextFormat Utf16Little{ .encoding = oxbox::utilities::Encoding::UTF16,
                                                            .order    = std::endian::little };
 template <class Output, class Map = std::identity>
 auto TranscodeRange(std::span<std::byte const> input, oxbox::utilities::TextFormat source,
                     oxbox::utilities::TextFormat target, Map map = { }) -> Output {
-  using namespace oxbox::utilities;
+  using oxbox::utilities::DecodeFromBytes;
+  using oxbox::utilities::EncodeAppend;
+  using oxbox::utilities::SpanCast;
   static_assert(sizeof(typename Output::value_type) == sizeof(std::byte));
   std::vector<std::byte> encoded;
   while (!input.empty()) {
@@ -33,4 +35,10 @@ auto TranscodeRange(std::span<std::byte const> input, oxbox::utilities::TextForm
   return Output(text.begin(), text.end());
 }
 auto Utf16(std::string_view utf8) -> std::u16string;
+}
+
+namespace sdl_rdp::utilities {
+using detail::transcode::TranscodeRange;
+using detail::transcode::Utf16;
+using detail::transcode::Utf16Little;
 }

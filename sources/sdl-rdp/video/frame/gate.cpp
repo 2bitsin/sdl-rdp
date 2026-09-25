@@ -9,7 +9,8 @@
 
 #include <freerdp/freerdp.h>
 
-namespace Backend {
+namespace sdl_rdp::video::frame::detail::gate {
+
 FrameGate::FrameGate(PeerLink& link, FrameStore& store, PeerFrames& frames, DesktopLayout& desktop, FramePacing& pacing,
                      Activation const& activation, GraphicsLink const& graphics) noexcept
     : _link{ link }, _store{ store }, _frames{ frames }, _desktop{ desktop }, _pacing{ pacing },

@@ -6,7 +6,7 @@
 #include <string_view>
 #include <system_error>
 
-namespace Backend {
+namespace sdl_rdp::utilities::detail::real_text {
 // oxbox #49: number_text::WholeNumber widened to floating point replaces this.
 template <std::floating_point RealTy>
 auto ParseReal(std::string_view text) -> std::optional<RealTy> {
@@ -17,4 +17,8 @@ auto ParseReal(std::string_view text) -> std::optional<RealTy> {
   if (parsed.ec != std::errc{ } || parsed.ptr != last) return std::nullopt;
   return value;
 }
+}
+
+namespace sdl_rdp::utilities {
+using detail::real_text::ParseReal;
 }

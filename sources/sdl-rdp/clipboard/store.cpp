@@ -1,11 +1,12 @@
 #include <sdl-rdp/clipboard/store.hpp>
 
 #include <sdl-rdp/clipboard/channel.hpp>
+#include <sdl-rdp/clipboard/text.hpp>
 
 #include <cstdint>
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::clipboard::detail::store {
 auto ClipboardStore::Replace(std::string value) -> std::uint64_t {
   _unicode = ClipboardUnicode(value);
   return Generational::Replace(std::move(value));

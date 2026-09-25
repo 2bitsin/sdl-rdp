@@ -16,7 +16,12 @@
 #include <utility>
 #include <vector>
 
-namespace Backend {
+namespace sdl_rdp::picture::detail::frame_store {
+using sdl_rdp::utilities::Deadline;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Extent;
+using sdl_rdp::utilities::Pinned;
+
 using FrameLock = std::unique_lock<std::mutex>;
 class FrameStore : private Pinned {
 public:
@@ -49,4 +54,9 @@ private:
   FrameSnapshot           _shadow;
   std::uint64_t           _presented{ };
 };
+}
+
+namespace sdl_rdp::picture {
+using detail::frame_store::FrameLock;
+using detail::frame_store::FrameStore;
 }

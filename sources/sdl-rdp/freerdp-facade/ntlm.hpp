@@ -23,6 +23,7 @@ private:
 auto NtOwfV1(std::u16string_view password)                                          -> NtOwf;
 auto NtOwfV2(NtOwf const& v1, std::u16string_view user, std::u16string_view domain) -> NtOwf;
 }
+
 namespace sdl_rdp::freerdp_facade {
 using detail::ntlm::NtOwf;
 using detail::ntlm::NtOwfV1;

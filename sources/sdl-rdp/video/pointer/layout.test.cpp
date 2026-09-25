@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-namespace sdl_rdp::video::pointer {
+namespace sdl_rdp::video::pointer::detail::layout {
 TEST(PointerLayout, CoversEveryPixel) {
   PointerLayout const layout{ { .width = 32, .height = 16 }, 31, 15 };
   EXPECT_EQ(layout.Bytes(), 32U * 16U * 4U);

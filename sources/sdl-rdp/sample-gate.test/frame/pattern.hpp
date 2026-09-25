@@ -3,7 +3,14 @@
 #include <sdl-rdp/headless-client.test/client/client.hpp>
 #include <cstdint>
 
-namespace SampleGate {
-auto PatternPixel(rdpGdi const* gdi, int index)          -> std::uint32_t;
-auto Pattern(Headless::Client& client, bool /*pointer*/) -> testing::AssertionResult;
+namespace sdl_rdp::sample_gate_test::frame::detail::pattern {
+using sdl_rdp::headless_client_test::client::Client;
+
+auto PatternPixel(rdpGdi const* gdi, int index) -> std::uint32_t;
+auto Pattern(Client& client, bool /*pointer*/)  -> testing::AssertionResult;
+}
+
+namespace sdl_rdp::sample_gate_test::frame {
+using detail::pattern::Pattern;
+using detail::pattern::PatternPixel;
 }

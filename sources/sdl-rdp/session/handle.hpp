@@ -16,17 +16,17 @@
 #include <string>
 #include <string_view>
 
-struct sdlrdp_handle : private Backend::Pinned {
+struct sdlrdp_handle : private sdl_rdp::utilities::Pinned {
 public:
        sdlrdp_handle(sdlrdp_config const& config, bool tracing);
   auto Port() const noexcept                   -> std::uint32_t;
-  auto Diagnostics() noexcept                  -> Backend::Diagnostics&;
-  auto Events() noexcept                       -> Backend::EventQueue&;
-  auto Presentation() noexcept                 -> Backend::Presenter&;
-  auto Audio() noexcept                        -> Backend::AudioOutput&;
-  auto Session() noexcept                      -> Backend::Session&;
-  auto Clipboard() noexcept                    -> Backend::ClipboardStore&;
-  auto Frames() noexcept                       -> Backend::FrameStore&;
+  auto Diagnostics() noexcept                  -> sdl_rdp::diagnostics::Diagnostics&;
+  auto Events() noexcept                       -> sdl_rdp::link::EventQueue&;
+  auto Presentation() noexcept                 -> sdl_rdp::session::Presenter&;
+  auto Audio() noexcept                        -> sdl_rdp::session::AudioOutput&;
+  auto Session() noexcept                      -> sdl_rdp::session::Session&;
+  auto Clipboard() noexcept                    -> sdl_rdp::clipboard::ClipboardStore&;
+  auto Frames() noexcept                       -> sdl_rdp::picture::FrameStore&;
   auto Drive()                                 -> sdl_rdp::drive::DriveFiles;
   auto SetClipboardText(std::string_view utf8) -> void;
   auto ClipboardText()                         -> std::string const&;
@@ -34,17 +34,21 @@ public:
   auto SetRelativeMouse(bool relative)         -> void;
 
 private:
-  Backend::Diagnostics    _diagnostics;
-  Backend::EventQueue     _events;
-  Backend::Configuration  _configuration;
-  Backend::FrameStore     _frames;
-  Backend::PointerStore   _pointer;
-  Backend::ClipboardStore _clipboard;
-  Backend::Session        _session;
-  Backend::Presenter      _presenter;
-  Backend::AudioOutput    _audio;
-  Backend::Listener       _listener;
+  sdl_rdp::diagnostics::Diagnostics     _diagnostics;
+  sdl_rdp::link::EventQueue             _events;
+  sdl_rdp::configuration::Configuration _configuration;
+  sdl_rdp::picture::FrameStore          _frames;
+  sdl_rdp::video::pointer::PointerStore _pointer;
+  sdl_rdp::clipboard::ClipboardStore    _clipboard;
+  sdl_rdp::session::Session             _session;
+  sdl_rdp::session::Presenter           _presenter;
+  sdl_rdp::session::AudioOutput         _audio;
+  sdl_rdp::session::Listener            _listener;
 };
-namespace Backend {
+namespace sdl_rdp::session::detail::handle {
 auto SetError(sdlrdp_handle& handle, std::string text) -> void;
+}
+
+namespace sdl_rdp::session {
+using detail::handle::SetError;
 }

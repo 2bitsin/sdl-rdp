@@ -13,7 +13,11 @@
 #include <cstdint>
 #include <ranges>
 
-namespace BackendGate {
+namespace sdl_rdp::headless_client_test::graphics::detail::session {
+using sdl_rdp::headless_client_test::backend::AwaitAllAcknowledged;
+using sdl_rdp::headless_client_test::backend::Logs;
+using sdl_rdp::headless_client_test::client::HasCookie;
+
 namespace {
 auto ConnectConfirmed(Client& client, Logs& logs, std::invocable<Client&> auto connect) -> void {
   ASSERT_NO_FATAL_FAILURE(connect(client));
@@ -40,13 +44,13 @@ auto GraphicsSession::Open(std::uint32_t w, std::uint32_t h, sdlrdp_aspect aspec
 auto GraphicsSession::GraphicsClient() -> Client& {
   return *graphics_client;
 }
-auto GraphicsSession::GraphicsObserver() -> Headless::GraphicsObserver& {
+auto GraphicsSession::Observer() -> GraphicsObserver& {
   return *graphics_observer;
 }
 auto GraphicsSession::PresentProgressiveDamage(Client& client, std::vector<std::uint32_t> const& pixels,
                                                sdlrdp_rect damage) -> void {
   ASSERT_EQ(backend.Present(pixels, 640, 480, damage), 0);
-  ASSERT_NO_FATAL_FAILURE(sdl_rdp::headless_client_test::backend::AwaitAllAcknowledged(client, backend, logs));
+  ASSERT_NO_FATAL_FAILURE(AwaitAllAcknowledged(client, backend, logs));
   EXPECT_LE(client.MaxError(pixels), 24u);
 }
 auto GraphicsSession::ConnectPipeline(Client& client) -> void {
@@ -62,7 +66,7 @@ auto GraphicsSession::GivenPipelinedGraphics() -> void {
   ASSERT_NO_FATAL_FAILURE(Open(320, 200, { }, SDLRDP_CODEC_PROGRESSIVE));
   graphics_client = std::make_unique<Client>(sdlrdp_port(backend.Handle()), true);
   graphics_client->EnableGraphics();
-  graphics_observer = std::make_unique<Headless::GraphicsObserver>(*graphics_client);
+  graphics_observer = std::make_unique<GraphicsObserver>(*graphics_client);
   ConnectGraphics(*graphics_client, *graphics_observer);
 }
 auto GraphicsSession::ThenLegacyFallback(Client& client) -> void {
@@ -74,7 +78,7 @@ auto GraphicsSession::PresentMatching(Client& client, std::vector<std::uint32_t>
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
   ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text(true);
 }
-auto GraphicsSession::PresentGraphicsFrames(Client& client, Headless::GraphicsObserver& observer,
+auto GraphicsSession::PresentGraphicsFrames(Client& client, GraphicsObserver& observer,
                                             std::vector<std::uint32_t> const& pixels, std::uint32_t first,
                                             std::uint32_t last) -> void {
   std::ranges::for_each(std::views::iota(first, last + 1), [&](std::size_t count) {
@@ -82,7 +86,7 @@ auto GraphicsSession::PresentGraphicsFrames(Client& client, Headless::GraphicsOb
     ASSERT_NO_FATAL_FAILURE(AwaitFrames(client, observer.Observed().frames, count));
   });
 }
-auto GraphicsSession::ConnectGraphics(Client& client, Headless::GraphicsObserver& observer) -> void {
+auto GraphicsSession::ConnectGraphics(Client& client, GraphicsObserver& observer) -> void {
   observer.Observed().automatic = false;
   ConnectConfirmed(client, logs, [this](Client& connecting) { Connect(connecting); });
 }

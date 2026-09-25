@@ -17,13 +17,19 @@
 #include <string>
 #include <unistd.h>
 
-namespace BackendGate {
+namespace sdl_rdp::headless_client_test::codec::detail::gate {
+using sdl_rdp::headless_client_test::client::HasCookie;
+using sdl_rdp::headless_client_test::frame::FrameCounter;
+using sdl_rdp::headless_client_test::utilities::ReadText;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::Required;
+
 namespace {
 auto ResidentBytes() -> std::size_t {
-  auto const statm = Headless::ReadText("/proc/self/statm");
+  auto const statm = ReadText("/proc/self/statm");
   auto const pages = Required(oxbox::utilities::ParseNumbers<std::size_t, 7>(oxbox::utilities::Trimmed(statm), ' '),
                               "statm holds seven page counts");
-  return pages[1] * Backend::Narrowed<std::size_t>(sysconf(_SC_PAGESIZE));
+  return pages[1] * Narrowed<std::size_t>(sysconf(_SC_PAGESIZE));
 }
 }
 auto Gate::ThenPictureDesktop(Client& client) -> void {
@@ -38,8 +44,7 @@ auto Gate::WhenBurstPictures(Client& client, sdlrdp_rect area) -> void {
     ASSERT_EQ(backend.Present(pixels, 320, 200, area), 0);
   }
   auto after = ResidentBytes();
-  RecordProperty("burst_rss_growth",
-                 std::to_string(Backend::Narrowed<std::int64_t>(after) - Backend::Narrowed<std::int64_t>(before)));
+  RecordProperty("burst_rss_growth", std::to_string(Narrowed<std::int64_t>(after) - Narrowed<std::int64_t>(before)));
   EXPECT_LE(after, before + (pixels.size() * 16));
   ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text();
 }

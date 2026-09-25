@@ -7,7 +7,13 @@
 #include <cstdint>
 #include <vector>
 
-namespace Backend {
+namespace sdl_rdp::video::detail::peer_frames {
+using sdl_rdp::picture::FrameLock;
+using sdl_rdp::picture::FrameSnapshot;
+using sdl_rdp::picture::FrameStore;
+using sdl_rdp::utilities::Pinned;
+using sdl_rdp::utilities::Region;
+
 class PeerFrames : private Pinned {
 public:
   explicit PeerFrames(FrameStore& store) noexcept;
@@ -35,4 +41,9 @@ private:
   std::uint64_t _presents{ };
 };
 auto ExpectCaptured(PeerFrames const& frames) -> void;
+}
+
+namespace sdl_rdp::video {
+using detail::peer_frames::ExpectCaptured;
+using detail::peer_frames::PeerFrames;
 }

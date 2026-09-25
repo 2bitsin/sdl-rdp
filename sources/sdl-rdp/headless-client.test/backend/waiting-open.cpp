@@ -6,13 +6,17 @@
 #include <poll.h>
 #include <sys/socket.h>
 
-namespace BackendGate {
+namespace sdl_rdp::headless_client_test::backend::detail::waiting_open {
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::Required;
+
 namespace {
-auto OpeningSockets() -> std::array<Backend::Descriptor, 2> {
+auto OpeningSockets() -> std::array<Descriptor, 2> {
   std::array<int, 2> sockets { };
   auto               result  = socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sockets.data());
   Expects(result == 0, "opening process has a control socket");
-  return { Backend::Descriptor(sockets[0]), Backend::Descriptor(sockets[1]) };
+  return { Descriptor(sockets[0]), Descriptor(sockets[1]) };
 }
 auto SendOpeningResult(int socket, int value) -> void {
   auto sent = send(socket, &value, sizeof(value), MSG_NOSIGNAL);
@@ -28,7 +32,7 @@ auto PublishListeningPort(void* user, sdlrdp_log_level level, char const* text) 
   SendOpeningResult(*static_cast<int*>(user), port);
 }
 auto OpenedWithClient(sdlrdp_config const& config) -> bool {
-  Headless::BackendInstance backend;
+  BackendInstance backend;
   if (backend.TryOpen(config) != 0) return false;
   if (sdlrdp_wait(backend.Handle(), 0) != 1) return false;
   auto const events = backend.Poll();
@@ -50,7 +54,7 @@ WaitingOpen::~WaitingOpen() {
 }
 auto WaitingOpen::Receive(std::chrono::milliseconds timeout) const -> std::optional<int> {
   pollfd ready  { .fd = sockets[0].Get(), .events = POLLIN, .revents = 0 };
-  auto   polled = poll(&ready, 1, Backend::Narrowed<int>(timeout.count()));
+  auto   polled = poll(&ready, 1, Narrowed<int>(timeout.count()));
   if (polled != 1) return std::nullopt;
   int  value    = -1;
   auto received = recv(ready.fd, &value, sizeof(value), MSG_DONTWAIT);

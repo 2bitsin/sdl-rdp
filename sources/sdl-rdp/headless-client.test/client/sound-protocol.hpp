@@ -1,4 +1,5 @@
 #pragma once
+#include <sdl-rdp/headless-client.test/client/forward.hpp>
 
 #include <freerdp/svc.h>
 #include <winpr/stream.h>
@@ -7,11 +8,11 @@
 #include <cstdint>
 #include <span>
 
-namespace Headless {
-class SoundClient;
+namespace sdl_rdp::headless_client_test::client::detail::sound_protocol {
+
 struct SoundProtocol {
 private:
-  friend class SoundClient;
+  friend SoundClient;
   static auto EntryPoint() -> PVIRTUALCHANNELENTRYEX;
   static auto Register(SoundClient& self, CHANNEL_ENTRY_POINTS_EX const& points, void* handle)    -> bool;
   static auto Initialized(SoundClient& self, std::uint32_t event)                                 -> void;
@@ -24,4 +25,8 @@ private:
   static auto Train(SoundClient& self)                                                            -> void;
   static auto Dispatch(SoundClient& self, wStream* stream, std::uint8_t type, std::uint16_t size) -> void;
 };
+}
+
+namespace sdl_rdp::headless_client_test::client {
+using detail::sound_protocol::SoundProtocol;
 }

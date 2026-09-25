@@ -7,7 +7,15 @@
 #include <cstdint>
 #include <future>
 #include <utility>
-namespace DriveGate {
+namespace sdl_rdp::integration::drive_test::detail::channel {
+using namespace std::chrono_literals;
+using sdl_rdp::headless_client_test::client::Clock;
+using sdl_rdp::headless_client_test::drive::DriveChecks;
+using sdl_rdp::headless_client_test::drive::DriveObserver;
+using sdl_rdp::headless_client_test::drive::Pattern;
+using sdl_rdp::headless_client_test::drive::ReplyTo;
+using sdl_rdp::headless_client_test::utilities::ReadText;
+
 namespace {
 auto ReadSharedFile(sdlrdp_handle* handle, std::uint32_t drive, std::string const& name, std::string const& source)
     -> bool {
@@ -39,17 +47,12 @@ std::array<std::pair<std::uint32_t, char const*>, 13> constexpr FailureStatusNam
     { STATUS_UNSUCCESSFUL         , "STATUS_UNSUCCESSFUL (0xc0000001)"          },
     { 0xdeadbeef                  , "unknown NTSTATUS (0xdeadbeef)"             },
 } };
-}
-
-namespace {
 auto ThenMissingDriveFile(sdlrdp_handle* handle, std::uint32_t drive) -> void {
   auto* file = reinterpret_cast<sdlrdp_file*>(1);
   EXPECT_EQ(sdlrdp_drive_open(handle, drive, "missing.img", SDLRDP_FILE_READ, &file), -1);
   EXPECT_EQ(file, nullptr);
   EXPECT_NE(std::string(sdlrdp_last_error()).find("missing.img"), std::string::npos);
 }
-}
-namespace {
 class Drive : public DriveChecks {
 protected:
   auto WhenDirectoryPaged(std::array<sdlrdp_dirent, 32>& entries, std::set<std::string>& actual, std::uint32_t& offset)
@@ -64,10 +67,9 @@ protected:
     }
   }
   auto ThenRemovedEvent(std::uint32_t old) -> void {
-    auto         deadline = Headless::Clock::now() + 2s;
+    auto         deadline = Clock::now() + 2s;
     sdlrdp_drive value    { };
-    while (sdlrdp_drive_list(handle.Handle(), &value, 1) && Headless::Clock::now() < deadline)
-      std::this_thread::sleep_for(1ms);
+    while (sdlrdp_drive_list(handle.Handle(), &value, 1) && Clock::now() < deadline) std::this_thread::sleep_for(1ms);
     EXPECT_EQ(sdlrdp_drive_list(handle.Handle(), &value, 1), 0);
     EXPECT_EQ(PolledDriveName(false, old), "share");
   }
@@ -78,7 +80,7 @@ protected:
     EXPECT_FALSE(info.directory);
     EXPECT_GT(info.modified, 0);
   }
-  auto ThenNoDriveRequests(Headless::DriveObserver const& observer) -> void {
+  auto ThenNoDriveRequests(DriveObserver const& observer) -> void {
     for (std::size_t i = 0; i < 10; ++i) ASSERT_TRUE(client->Pump());
     EXPECT_EQ(observer.Observed().requests, 0u);
   }
@@ -93,14 +95,14 @@ protected:
     EXPECT_EQ(std::string(bytes.data(), bytes.size()), "data");
     EXPECT_EQ(sdlrdp_drive_close(handle.Handle(), file), 0);
   }
-  auto ThenOversizedRead(sdlrdp_file* file, Headless::DriveObserver const& observer) -> void {
+  auto ThenOversizedRead(sdlrdp_file* file, DriveObserver const& observer) -> void {
     char byte{ };
     EXPECT_EQ(sdlrdp_drive_flush(handle.Handle(), file), 0);
     EXPECT_EQ(sdlrdp_drive_read(handle.Handle(), file, 0, &byte, std::size_t{ INT_MAX } + 1), -1);
     EXPECT_NE(std::string(sdlrdp_last_error()).find("Invalid drive transfer"), std::string::npos);
     ASSERT_NO_FATAL_FAILURE(ThenNoDriveRequests(observer));
   }
-  auto ThenClientFailure(Headless::DriveObserver& observer, std::uint32_t status, char const* text) -> void {
+  auto ThenClientFailure(DriveObserver& observer, std::uint32_t status, char const* text) -> void {
     SCOPED_TRACE(text);
     observer.Observed().io.clear();
     auto open = std::async(std::launch::async, [&] {
@@ -135,7 +137,7 @@ protected:
     }
     EXPECT_EQ(sdlrdp_drive_flush(handle.Handle(), file), 0);
     EXPECT_EQ(sdlrdp_drive_close(handle.Handle(), file), 0);
-    EXPECT_EQ(Headless::ReadText((scratch.Path() / "disk.img").c_str()), source);
+    EXPECT_EQ(ReadText((scratch.Path() / "disk.img").c_str()), source);
   }
 };
 TEST_F(Drive, ReadWriteMetadataAndDirectories) {
@@ -250,7 +252,7 @@ TEST_F(Drive, OversizedReadSendsNoRequest) {
   pump.request_stop();
   pump.join();
   {
-    Headless::DriveObserver const observer(*client);
+    DriveObserver const observer(*client);
     ASSERT_NO_FATAL_FAILURE(ThenOversizedRead(file, observer));
   }
   pump = PumpInBackground(*client);
@@ -261,8 +263,8 @@ TEST_F(Drive, TwoSharesIncludingUnicodeName) {
   ASSERT_NO_FATAL_FAILURE(Connect("żółw", true));
   Write("file", "data");
   std::array<sdlrdp_drive, 2> drives   { };
-  auto                        deadline = Headless::Clock::now() + 2s;
-  while (sdlrdp_drive_list(handle.Handle(), drives.data(), 2) != 2 && Headless::Clock::now() < deadline)
+  auto                        deadline = Clock::now() + 2s;
+  while (sdlrdp_drive_list(handle.Handle(), drives.data(), 2) != 2 && Clock::now() < deadline)
     std::this_thread::sleep_for(1ms);
   ASSERT_EQ(sdlrdp_drive_list(handle.Handle(), drives.data(), 2), 2);
   EXPECT_EQ((std::set<std::string>{ drives[0].name, drives[1].name }), (std::set<std::string>{ "żółw", "second" }));

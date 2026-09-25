@@ -3,7 +3,7 @@
 
 #include <vector>
 
-namespace Backend {
+namespace sdl_rdp::utilities::detail::region {
 class Region {
 public:
   auto Add(sdlrdp_rect area)        -> void;
@@ -14,4 +14,8 @@ public:
 private:
   std::vector<sdlrdp_rect> rects;
 };
+}
+
+namespace sdl_rdp::utilities {
+using detail::region::Region;
 }

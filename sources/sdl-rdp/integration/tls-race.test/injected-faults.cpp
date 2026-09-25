@@ -1,6 +1,6 @@
 #include "injected-faults.hpp"
 
-namespace Race {
+namespace sdl_rdp::integration::tls_race_test::detail::injected_faults {
 auto InjectedFaults::Shared() -> InjectedFaults& {
   static InjectedFaults faults;
   return faults;

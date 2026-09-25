@@ -7,8 +7,8 @@
 #include <cstdint>
 
 namespace sdl_rdp::drive::detail::capabilities {
-using Backend::Narrowed;
-using utilities::Expects;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
 namespace {
 auto Capability(DrivePacket& packet, std::uint32_t type, std::uint32_t version, DrivePacket const& body) -> void {
   constexpr std::size_t header_size = (sizeof(std::uint16_t) * 2) + sizeof(std::uint32_t);
@@ -18,7 +18,7 @@ auto Capability(DrivePacket& packet, std::uint32_t type, std::uint32_t version, 
   packet.Write(version);
   packet.Append(body.Bytes());
 }
-} // namespace
+}
 auto GeneralCapability(DrivePacket& packet) -> void {
   DrivePacket body;
   body.Write(std::uint32_t{ 0 });

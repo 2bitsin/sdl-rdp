@@ -2,7 +2,7 @@
 
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::utilities::detail::stopwatch {
 auto Stopwatch::Elapsed() const noexcept -> Clock::duration {
   return Clock::now() - _start;
 }

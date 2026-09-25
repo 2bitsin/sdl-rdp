@@ -1,7 +1,7 @@
 #include <sdl-rdp/auth/tls-rehearsal.hpp>
 
-#include "_detail/unsignalled-socket-bio.hpp"
 #include <sdl-rdp/auth/exceptions.hpp>
+#include <sdl-rdp/auth/unsignalled-socket-bio.hpp>
 #include <sdl-rdp/link/exceptions.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
@@ -22,10 +22,21 @@
 #include <tuple>
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::auth::detail::tls_rehearsal {
+using sdl_rdp::auth::detail::unsignalled_socket_bio::UnsignalledSocketBio;
+using sdl_rdp::freerdp_facade::Bio;
+using sdl_rdp::link::PeerContextFailed;
+using sdl_rdp::utilities::AllocationFailed;
+using sdl_rdp::utilities::Contained;
+using sdl_rdp::utilities::Descriptor;
+using sdl_rdp::utilities::Ensures;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Releases;
+using sdl_rdp::utilities::SystemCall;
+
 namespace {
-using utilities::Ensures;
-using utilities::Expects;
+using sdl_rdp::utilities::Ensures;
+using sdl_rdp::utilities::Expects;
 using SslContext = std::unique_ptr<SSL_CTX, Releases<SSL_CTX_free>>;
 using SslSession = std::unique_ptr<SSL, Releases<SSL_free>>;
 
@@ -38,7 +49,7 @@ auto AdoptedPeer(Descriptor socket) -> PeerHandle {
 auto ServingPeer(Descriptor socket, Credentials const& credentials) -> PeerHandle {
   Expects(socket.Owns(), "the server end is open");
   auto peer = AdoptedPeer(std::move(socket));
-  if (!freerdp_peer_context_new(peer.get())) throw sdl_rdp::link::PeerContextFailed{ "TLS rehearsal" };
+  if (!freerdp_peer_context_new(peer.get())) throw PeerContextFailed{ "TLS rehearsal" };
   Ensures(peer->context != nullptr, "the peer has a context");
   InstallServerCredentials(*peer->context->settings, credentials);
   return peer;

@@ -250,7 +250,10 @@ auto Main(int argc, char** argv) -> void {
 }
 }
 }
+
+using sample::detail::main::Main;
+
 auto main(int argc,
           char** argv) -> int { // NOLINT(bugprone-exception-escape): Allocation failure terminates the sample.
-  sample::detail::main::Main(argc, argv);
+  Main(argc, argv);
 }

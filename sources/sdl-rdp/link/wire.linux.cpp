@@ -1,3 +1,5 @@
+#include <sdl-rdp/link/wire.hpp>
+
 #include <sdl-rdp/configuration/refresh.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
@@ -9,9 +11,12 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 
-namespace Backend {
+namespace sdl_rdp::link::detail::wire {
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
+
 auto SampleWire(int descriptor) -> WireSample {
-  utilities::Expects(descriptor >= 0, "peer socket is open");
+  Expects(descriptor >= 0, "peer socket is open");
   tcp_info  info   { };
   socklen_t length = sizeof(info);
   int       outq   = 0;

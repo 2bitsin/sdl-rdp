@@ -7,7 +7,11 @@
 #include <cstdint>
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::picture::detail::desktop_layout {
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::SameSize;
+
 auto ApplyDesktopSize(rdpSettings& settings, sdlrdp_rect picture) -> bool {
   return freerdp_settings_set_uint32(&settings, FreeRDP_DesktopWidth, picture.w)
          && freerdp_settings_set_uint32(&settings, FreeRDP_DesktopHeight, picture.h);

@@ -3,7 +3,7 @@
 
 #include <string>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::backend::detail::config {
 inline auto LoopbackConfig(std::string const& certificates) -> sdlrdp_config {
   sdlrdp_config config{ };
   config.bind     = "127.0.0.1";
@@ -13,4 +13,8 @@ inline auto LoopbackConfig(std::string const& certificates) -> sdlrdp_config {
   return config;
 }
 auto LoopbackConfig(std::string&& certificates) -> sdlrdp_config = delete;
+}
+
+namespace sdl_rdp::headless_client_test::backend {
+using detail::config::LoopbackConfig;
 }

@@ -8,7 +8,9 @@
 #include <span>
 #include <vector>
 
-namespace Backend {
+namespace sdl_rdp::picture::detail::frame_snapshot {
+using sdl_rdp::utilities::Extent;
+
 auto FrameBytes(Extent size) -> std::size_t;
 class FrameSnapshot {
 public:
@@ -28,4 +30,9 @@ private:
   std::shared_ptr<std::vector<std::uint8_t> const> _pixels;
   Extent                                           _size;
 };
+}
+
+namespace sdl_rdp::picture {
+using detail::frame_snapshot::FrameBytes;
+using detail::frame_snapshot::FrameSnapshot;
 }

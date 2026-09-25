@@ -1,4 +1,5 @@
 #pragma once
+#include <sdl-rdp/peer/forward.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 
 #include <algorithm>
@@ -7,8 +8,10 @@
 #include <mutex>
 #include <vector>
 
-namespace Backend {
-class Peer;
+namespace sdl_rdp::session::detail::peer_set {
+using sdl_rdp::peer::Peer;
+using sdl_rdp::utilities::Expects;
+
 using PeersLock = std::unique_lock<std::mutex>;
 class PeerSet {
 public:
@@ -30,4 +33,9 @@ private:
   std::mutex                         _guard;
   std::vector<std::unique_ptr<Peer>> _peers;
 };
+}
+
+namespace sdl_rdp::session {
+using detail::peer_set::PeerSet;
+using detail::peer_set::PeersLock;
 }

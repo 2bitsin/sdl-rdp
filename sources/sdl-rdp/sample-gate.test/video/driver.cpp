@@ -4,8 +4,11 @@
 
 #include <utility>
 
-namespace SampleGate {
-auto VideoDriver::ThenDesktopPicture(Client& client, Headless::DisplayClient& display) -> void {
+namespace sdl_rdp::sample_gate_test::video::detail::driver {
+using sdl_rdp::headless_client_test::backend::Logs;
+using sdl_rdp::sample_gate_test::sample::SetLoopbackHints;
+
+auto VideoDriver::ThenDesktopPicture(Client& client, DisplayClient& display) -> void {
   EXPECT_EQ(client.Instance()->context->gdi->width, 1280);
   EXPECT_EQ(client.Instance()->context->gdi->height, 800);
   EXPECT_FALSE(logs.Contains("Unexpected client message")) << logs.Text(true);
@@ -35,11 +38,11 @@ auto VideoDriver::SetUp() -> void {
   SDL_GetLogOutputFunction(&log_output, &log_userdata);
   SDL_SetLogOutputFunction(
       [](void* user, int, SDL_LogPriority priority, char const* message) {
-        Headless::Logs::Collect(user,
-                                priority >= SDL_LOG_PRIORITY_ERROR ? SDLRDP_LOG_ERROR
-                                : priority == SDL_LOG_PRIORITY_WARN ? SDLRDP_LOG_WARN
-                                                                    : SDLRDP_LOG_INFO,
-                                message);
+        Logs::Collect(user,
+                      priority >= SDL_LOG_PRIORITY_ERROR ? SDLRDP_LOG_ERROR
+                      : priority == SDL_LOG_PRIORITY_WARN ? SDLRDP_LOG_WARN
+                                                          : SDLRDP_LOG_INFO,
+                      message);
       },
       &logs);
   ASSERT_NO_FATAL_FAILURE(GivenVideoHints());
@@ -69,14 +72,14 @@ auto VideoDriver::TearDown() -> void {
     SDL_ResetHint(hint);
   Sample::TearDown();
 }
-auto VideoDriver::ThenResizeStorm(Client& client, Headless::DisplayClient& display) -> void {
+auto VideoDriver::ThenResizeStorm(Client& client, DisplayClient& display) -> void {
   EXPECT_FALSE(freerdp_shall_disconnect_context(client.Instance()->context));
   EXPECT_EQ(display.Observed().desktops, 1u);
   EXPECT_EQ(display.Observed().echoes, 1u);
   ThenDesktopPicture(client, display);
 }
-auto VideoDriver::ThenExclusivePicture(Client& client, Headless::DisplayClient& display,
-                                       FullDesktopFrames const& frames) -> void {
+auto VideoDriver::ThenExclusivePicture(Client& client, DisplayClient& display, FullDesktopFrames const& frames)
+    -> void {
   EXPECT_EQ(frames.Deliveries(), 0u);
   EXPECT_EQ(display.Observed().desktops, 0u);
   ThenDesktopPicture(client, display);

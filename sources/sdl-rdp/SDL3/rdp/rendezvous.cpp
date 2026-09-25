@@ -4,12 +4,13 @@
 #include <memory>
 #include <stdexcept>
 namespace sdl3::rdp::detail::rendezvous {
-using backend::ScopedPropertiesLock;
+using sdl3::rdp::backend::ScopedPropertiesLock;
+using sdl_rdp::utilities::Expects;
 namespace {
 constexpr auto RendezvousProperty = "SDL.rdp.internal.driver";
 }
 auto SDLCALL Rendezvous::Cleanup([[maybe_unused]] void* unused, void* value) -> void {
-  utilities::Expects(value != nullptr, "rendezvous property owns its value");
+  Expects(value != nullptr, "rendezvous property owns its value");
   std::unique_ptr<Rendezvous> const owner{ static_cast<Rendezvous*>(value) };
 }
 auto Rendezvous::Published() -> Rendezvous& {

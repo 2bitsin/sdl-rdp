@@ -3,7 +3,7 @@
 
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::utilities::detail::socket_pair {
 class SocketPair {
 public:
                      SocketPair();
@@ -15,4 +15,8 @@ private:
   Descriptor server;
   Descriptor client;
 };
+}
+
+namespace sdl_rdp::utilities {
+using detail::socket_pair::SocketPair;
 }

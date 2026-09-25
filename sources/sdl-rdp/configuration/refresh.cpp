@@ -7,9 +7,13 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace Backend {
+namespace sdl_rdp::configuration::detail::refresh {
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::Unreachable;
+
 Refresh::Refresh(RefreshMode selected, std::uint32_t limit) : mode(selected), ceiling(limit) {
-  utilities::Expects(limit > 0, "refresh ceiling is positive");
+  Expects(limit > 0, "refresh ceiling is positive");
 }
 auto Refresh::Rate() const -> std::uint32_t {
   return rate;
@@ -21,7 +25,7 @@ auto Refresh::AwaitingEmpty() const -> bool {
   return awaiting_empty != 0;
 }
 auto Refresh::Restart() -> void {
-  utilities::Expects(ceiling > 0, "declared refresh is positive");
+  Expects(ceiling > 0, "declared refresh is positive");
   rate           = ceiling;
   average        = 1.0 / ceiling;
   last_ack       = { };
@@ -29,30 +33,30 @@ auto Refresh::Restart() -> void {
   awaiting_empty = 0;
 }
 auto Refresh::Step(Direction direction) -> void {
-  utilities::Expects(ceiling >= 10, "adaptive ceiling reaches the floor");
+  Expects(ceiling >= 10, "adaptive ceiling reaches the floor");
   switch (direction) {
   case Direction::Down: rate = rate > 20 ? rate - 10 : 10; break;
   case Direction::Hold: break;
   case Direction::Up:   rate = std::min(ceiling, rate + 10); break;
-  default:              utilities::Unreachable(direction);
+  default:              Unreachable(direction);
   }
 }
 auto Refresh::FromLatency(Clock::duration latency) const -> Direction {
-  utilities::Expects(latency >= Clock::duration::zero(), "acknowledgement follows send");
-  utilities::Expects(ceiling >= 10, "adaptive ceiling reaches the floor");
+  Expects(latency >= Clock::duration::zero(), "acknowledgement follows send");
+  Expects(ceiling >= 10, "adaptive ceiling reaches the floor");
   auto seconds = std::chrono::duration<double>(latency).count();
   if (seconds > 2.0 / ceiling) return Direction::Down;
   return seconds < 1.0 / ceiling ? Direction::Up : Direction::Hold;
 }
 auto Refresh::FromWire(WireSample const& wire, std::size_t bytes) -> Direction {
-  utilities::Expects(bytes > 0, "a frame was written");
+  Expects(bytes > 0, "a frame was written");
   if (!wire.available) return Direction::Hold;
   auto segments = wire.mss ? (bytes + wire.mss - 1) / wire.mss : 0;
   if (wire.outq > bytes || (segments && wire.unacked > segments)) return Direction::Down;
   return wire.outq == 0 ? Direction::Up : Direction::Hold;
 }
 auto Refresh::Blocked(Clock::time_point now) -> void {
-  utilities::Expects(rate > 0, "effective refresh is positive");
+  Expects(rate > 0, "effective refresh is positive");
   if (mode != RefreshMode::Sender) return;
   awaiting_empty = 0;
   if (last_blocked != Clock::time_point{ } && now - last_blocked < std::chrono::duration<double>(1.0 / rate)) return;
@@ -60,7 +64,7 @@ auto Refresh::Blocked(Clock::time_point now) -> void {
   Step(Direction::Down);
 }
 auto Refresh::Acknowledge(Clock::time_point now, Clock::duration latency) -> void {
-  utilities::Expects(latency >= Clock::duration::zero(), "acknowledgement follows send");
+  Expects(latency >= Clock::duration::zero(), "acknowledgement follows send");
   if (mode == RefreshMode::Client) Step(FromLatency(latency));
   if (mode == RefreshMode::Average) Average(now);
 }
@@ -74,7 +78,7 @@ auto Refresh::Estimate(Clock::duration interval) -> void {
   if (std::abs(static_cast<double>(estimate) - rate) > rate * 0.05) rate = estimate;
 }
 auto Refresh::Written(WireSample const& wire, std::size_t bytes) -> void {
-  utilities::Expects(bytes > 0, "a frame was written");
+  Expects(bytes > 0, "a frame was written");
   awaiting_empty = 0;
   if (mode != RefreshMode::Sender || !wire.available) return;
   auto direction = FromWire(wire, bytes);
@@ -83,7 +87,7 @@ auto Refresh::Written(WireSample const& wire, std::size_t bytes) -> void {
   if (direction == Direction::Hold) awaiting_empty = bytes;
 }
 auto Refresh::Drained(WireSample const& wire) -> void {
-  utilities::Expects(rate > 0, "effective refresh is positive");
+  Expects(rate > 0, "effective refresh is positive");
   if (!awaiting_empty || FromWire(wire, awaiting_empty) != Direction::Up) return;
   awaiting_empty = 0;
   Step(Direction::Up);

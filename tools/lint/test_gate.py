@@ -10,6 +10,7 @@ import columns
 import contracts
 import format as formatter
 import includes
+import namespaces
 import pointers
 import prefixes
 import reserved
@@ -74,3 +75,7 @@ def test_casts():
 
 def test_reserved():
     assert reserved.main() == 0
+
+
+def test_namespaces():
+    assert namespaces.main() == 0

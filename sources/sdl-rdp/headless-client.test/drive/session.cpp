@@ -14,7 +14,9 @@
 #include <span>
 #include <vector>
 
-namespace DriveGate {
+namespace sdl_rdp::headless_client_test::drive::detail::session {
+using sdl_rdp::headless_client_test::backend::LoopbackConfig;
+
 auto DriveSession::ThenPartialReads(sdlrdp_file* file, std::string const& source, std::string& result) -> void {
   for (std::size_t const offset : { 13u, 1048577u, 3145697u }) {
     result.resize(65536);
@@ -25,17 +27,17 @@ auto DriveSession::ThenPartialReads(sdlrdp_file* file, std::string const& source
 }
 auto DriveSession::SetUp() -> void {
   auto path   = scratch.Path().string();
-  auto config = Headless::LoopbackConfig(path);
+  auto config = LoopbackConfig(path);
   config.log_user = &logs;
-  config.log      = Headless::Logs::Collect;
+  config.log      = Logs::Collect;
   ASSERT_NO_FATAL_FAILURE(handle.Open(config));
   Connect();
 }
 auto DriveSession::Connect(char const* name, bool second) -> void {
-  client = std::make_unique<Headless::Client>(sdlrdp_port(handle.Handle()), false);
+  client = std::make_unique<Client>(sdlrdp_port(handle.Handle()), false);
   auto path = scratch.Path().string();
-  Headless::ShareDrive(*client, path.c_str(), name);
-  if (second) Headless::ShareDrive(*client, path.c_str(), "second");
+  ShareDrive(*client, path.c_str(), name);
+  if (second) ShareDrive(*client, path.c_str(), "second");
   ASSERT_TRUE(client->Connect()) << logs.Text(true);
   ASSERT_TRUE(client->Until([&] {
     sdlrdp_drive value{ };
@@ -55,7 +57,7 @@ auto DriveSession::GivenHeldFile() -> void {
 auto DriveSession::HoldRequests() -> void {
   pump.request_stop();
   pump.join();
-  observer                  = std::make_unique<Headless::DriveObserver>(*client);
+  observer                  = std::make_unique<DriveObserver>(*client);
   observer->Observed().hold = true;
 }
 auto DriveSession::ThenVideoMatches() -> void {

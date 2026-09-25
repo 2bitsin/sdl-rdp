@@ -10,7 +10,13 @@
 #include <cstdint>
 #include <string_view>
 
-namespace Backend {
+namespace sdl_rdp::link::detail::peer_link {
+using sdl_rdp::freerdp_facade::PeerHandle;
+using sdl_rdp::freerdp_facade::WaitHandle;
+using sdl_rdp::freerdp_facade::WakeEvent;
+using sdl_rdp::utilities::Pinned;
+using sdl_rdp::utilities::Releases;
+
 using ChannelManager = std::unique_ptr<void, Releases<WTSCloseServer>>;
 class PeerLink : private Pinned {
 public:
@@ -43,4 +49,10 @@ private:
 };
 auto DynamicChannelsReady(PeerLink const& link)          -> bool;
 auto Joined(PeerLink const& link, std::string_view name) -> bool;
+}
+
+namespace sdl_rdp::link {
+using detail::peer_link::DynamicChannelsReady;
+using detail::peer_link::Joined;
+using detail::peer_link::PeerLink;
 }

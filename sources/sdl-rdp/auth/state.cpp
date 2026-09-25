@@ -2,7 +2,7 @@
 
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::auth::detail::state {
 auto AuthenticationState::Identify(std::string user_name, std::string domain_name) -> void {
   _user   = std::move(user_name);
   _domain = std::move(domain_name);

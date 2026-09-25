@@ -11,7 +11,12 @@
 #include <algorithm>
 #include <cstdint>
 
-namespace Backend {
+namespace sdl_rdp::peer::detail::wait {
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::video::GraphicsConnectionWait;
+using sdl_rdp::video::WaitMilliseconds;
+
 namespace {
 // WinPR BIO signals readability only; retry blocked output every 5 ms for static frames.
 constexpr std::uint32_t BlockedRetry = 5;

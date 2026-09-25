@@ -9,6 +9,7 @@ auto Boundary(ActionTy const& action) noexcept -> std::invoke_result_t<ActionTy>
   return Bounded<ErrorRoutes<&SDL_SetError, &SDL_OutOfMemory>>(action);
 }
 }
+
 namespace sdl3::rdp::backend {
 using detail::boundary::Boundary;
 }

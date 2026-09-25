@@ -7,7 +7,10 @@
 #include <chrono>
 #include <optional>
 
-namespace BackendGate {
+namespace sdl_rdp::headless_client_test::backend::detail::waiting_open {
+using sdl_rdp::headless_client_test::utilities::ChildProcess;
+using sdl_rdp::utilities::Descriptor;
+
 class WaitingOpen {
 public:
   explicit           WaitingOpen(sdlrdp_config const& config);
@@ -19,7 +22,11 @@ public:
   [[nodiscard]] auto Receive(std::chrono::milliseconds timeout) const -> std::optional<int>;
 
 private:
-  std::array<Backend::Descriptor, 2> sockets;
-  Headless::ChildProcess             process;
+  std::array<Descriptor, 2> sockets;
+  ChildProcess              process;
 };
+}
+
+namespace sdl_rdp::headless_client_test::backend {
+using detail::waiting_open::WaitingOpen;
 }

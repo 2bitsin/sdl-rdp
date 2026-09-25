@@ -12,9 +12,8 @@
 #define FFNV_LOG_FUNC(ctx, msg, ...) WLog_ERR("sdlrdp.avc", msg, __VA_ARGS__)
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage): Required by the ffnvcodec loader.
 #define FFNV_DEBUG_LOG_FUNC(ctx, msg, ...) static_cast<void>(0)
-// WinPR already supplies the ABI-compatible GUID type.
-#define GUID_DEFINED
 #include <freerdp/primitives.h>
+#include <sdl-rdp/freerdp-facade/nvenc.hpp>
 #include <cstdint>
 #include <ffnvcodec/dynlink_loader.h>
 #include <format>
@@ -24,9 +23,11 @@
 #include <string_view>
 #include <utility>
 
-namespace Backend::Avc {
-using utilities::Ensures;
-using utilities::Expects;
+namespace sdl_rdp::video::avc::detail::encoder {
+using sdl_rdp::picture::Aligned;
+using sdl_rdp::utilities::Ensures;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Stopwatch;
 namespace {
 template <auto FREE> struct FreesLibrary {
   auto operator()(auto* functions) const noexcept -> void {
@@ -370,4 +371,4 @@ auto Encoder::Encode(std::span<std::uint8_t const> bgrx, std::uint32_t stride, b
   Ensures(!encoded.empty(), "one access unit produced synchronously");
   return encoded;
 }
-} // namespace Backend::Avc
+}

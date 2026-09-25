@@ -10,15 +10,29 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace BackendGate {
+namespace sdl_rdp::integration::video_test::detail::graphics {
+using sdl_rdp::headless_client_test::backend::AwaitAllAcknowledged;
+using sdl_rdp::headless_client_test::backend::Clock;
+using sdl_rdp::headless_client_test::backend::RequiredStatus;
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::DisplayClient;
+using sdl_rdp::headless_client_test::codec::CodecTolerance;
+using sdl_rdp::headless_client_test::codec::Gate;
+using sdl_rdp::headless_client_test::codec::Mode;
+using sdl_rdp::headless_client_test::codec::ModeName;
+using sdl_rdp::headless_client_test::frame::GraphicsScene;
+using sdl_rdp::headless_client_test::graphics::GraphicsObserver;
+using sdl_rdp::headless_client_test::graphics::RoundFive;
+using sdl_rdp::video::GraphicsConnectionWait;
+
 class GraphicsGate : public Gate {
 protected:
-  auto ThenFullGraphicsWindow(Headless::GraphicsObserver& observer, sdlrdp_rect full) -> void {
+  auto ThenFullGraphicsWindow(GraphicsObserver& observer, sdlrdp_rect full) -> void {
     ASSERT_EQ(backend.Present(pixels, 320, 200, full), 0);
     EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 1), 0);
     EXPECT_EQ(observer.Observed().frames.size(), 2u);
   }
-  auto ThenCumulativeAcknowledgement(Client& client, Headless::GraphicsObserver& observer) -> void {
+  auto ThenCumulativeAcknowledgement(Client& client, GraphicsObserver& observer) -> void {
     EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 0), 0);
     ASSERT_TRUE(observer.Ack());
     ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.Handle(), 0) == 1; }));
@@ -41,14 +55,14 @@ protected:
     EXPECT_FALSE(freerdp_settings_get_bool(legacy.Instance()->context->settings, FreeRDP_SupportGraphicsPipeline));
     ThenGraphicsTakeover(graphics);
   }
-  auto WhenQueuedGraphics(Client& client, Headless::GraphicsObserver& observer, sdlrdp_rect full) -> void {
+  auto WhenQueuedGraphics(Client& client, GraphicsObserver& observer, sdlrdp_rect full) -> void {
     ASSERT_TRUE(observer.AckFrame(0, 10000000));
     ASSERT_EQ(backend.Present(pixels, 320, 200, full), 0);
     auto deadline = Clock::now() + std::chrono::milliseconds(80);
     while (Clock::now() < deadline) ASSERT_TRUE(client.Pump());
     EXPECT_EQ(observer.Observed().frames.size(), 2u);
   }
-  auto ThenDecodedGraphics(Client& client, Headless::GraphicsObserver& observer) -> void {
+  auto ThenDecodedGraphics(Client& client, GraphicsObserver& observer) -> void {
     ASSERT_NO_FATAL_FAILURE(Frame(client, { 0, 0, 320, 200 }));
     RecordProperty("maximum_channel_error", client.MaxError(pixels));
     EXPECT_LE(client.MaxError(pixels), client.Tolerance());
@@ -57,12 +71,12 @@ protected:
     ASSERT_NO_FATAL_FAILURE(ThenResized(client, observer));
     RecordProperty("trace", logs.Text(true));
   }
-  auto ThenSuspensionAcknowledged(Client& client, Headless::GraphicsObserver& observer) -> void {
+  auto ThenSuspensionAcknowledged(Client& client, GraphicsObserver& observer) -> void {
     EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 0), 1);
     ASSERT_TRUE(observer.Ack());
     ASSERT_TRUE(client.Pump(20));
   }
-  static auto ThenResizedSurface(Headless::GraphicsObserver const& observer) -> void {
+  static auto ThenResizedSurface(GraphicsObserver const& observer) -> void {
     ASSERT_EQ(observer.Observed().surfaces.size(), 2u);
     EXPECT_EQ(observer.Observed().deleted, 1u);
     EXPECT_EQ(observer.Observed().surfaces.back().width, 352);
@@ -72,23 +86,22 @@ protected:
   auto GivenUnacknowledged() -> void {
     graphics_client = std::make_unique<Client>(sdlrdp_port(backend.Handle()), true);
     graphics_client->EnableGraphics();
-    graphics_observer = std::make_unique<Headless::GraphicsObserver>(*graphics_client);
+    graphics_observer = std::make_unique<GraphicsObserver>(*graphics_client);
     ConnectUnacknowledged(*graphics_client, *graphics_observer);
   }
-  auto ConnectUnacknowledged(Client& client, Headless::GraphicsObserver& observer) -> void {
+  auto ConnectUnacknowledged(Client& client, GraphicsObserver& observer) -> void {
     observer.Observed().automatic = false;
     ASSERT_TRUE(client.Connect());
     ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
   }
-  auto PresentFrames(Client& client, Headless::GraphicsObserver& observer, std::uint32_t first, std::uint32_t last)
-      -> void {
+  auto PresentFrames(Client& client, GraphicsObserver& observer, std::uint32_t first, std::uint32_t last) -> void {
     sdlrdp_rect const full{ 0, 0, 320, 200 };
     std::ranges::for_each(std::views::iota(first, last + 1), [&](std::size_t count) {
       ASSERT_EQ(backend.Present(pixels, 320, 200, full), 0);
       ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() == count; }));
     });
   }
-  auto ThenResized(Client& client, Headless::GraphicsObserver& observer) -> void {
+  auto ThenResized(Client& client, GraphicsObserver& observer) -> void {
     std::vector<std::uint32_t> resized(352uz * 224, 0x0055aaff);
     sdlrdp_rect const          full   { 0, 0, 352, 224 };
     ASSERT_EQ(backend.Present(resized, 352, 224, full), 0);
@@ -96,21 +109,21 @@ protected:
     EXPECT_EQ(client.Instance()->context->gdi->width, 352);
     ThenResizedSurface(observer);
   }
-  auto FillGraphicsWindow(Client& client, Headless::GraphicsObserver& observer, sdlrdp_rect full) -> void {
+  auto FillGraphicsWindow(Client& client, GraphicsObserver& observer, sdlrdp_rect full) -> void {
     for (std::size_t count = 1; count <= 2; ++count) {
       std::ranges::fill(pixels, count * 0x00202020u);
       ASSERT_EQ(backend.Present(pixels, 320, 200, full), 0);
       ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() == count; })) << logs.Text(true);
     }
   }
-  auto ThenSuspendedWindow(Client& client, Headless::GraphicsObserver& observer) -> void {
+  auto ThenSuspendedWindow(Client& client, GraphicsObserver& observer) -> void {
     EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 0), 0);
     ASSERT_TRUE(observer.Ack(SUSPEND_FRAME_ACKNOWLEDGEMENT));
     ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() == 3; }));
     ThenSuspensionAcknowledged(client, observer);
   }
-  std::unique_ptr<Client>                     graphics_client;
-  std::unique_ptr<Headless::GraphicsObserver> graphics_observer;
+  std::unique_ptr<Client>           graphics_client;
+  std::unique_ptr<GraphicsObserver> graphics_observer;
 };
 namespace {
 auto RecordDamageCost(Client& client, std::vector<std::uint32_t> const& pixels, std::uint64_t before) -> void {
@@ -123,7 +136,7 @@ auto RecordDamageCost(Client& client, std::vector<std::uint32_t> const& pixels, 
 TEST_P(GraphicsGate, DecodesAndResizes) {
   Client client(sdlrdp_port(backend.Handle()), true);
   client.EnableGraphics();
-  Headless::GraphicsObserver observer(client);
+  GraphicsObserver observer(client);
   client.Tolerance(CodecTolerance(GetParam().codec, GetParam().surface));
   ASSERT_TRUE(client.Connect());
   ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); })) << logs.Text(true);
@@ -157,7 +170,7 @@ TEST_P(GraphicsGate, QueueDepthThrottlesBytes) {
 TEST_P(GraphicsGate, RejectedChannelUsesLegacy) {
   Client client(sdlrdp_port(backend.Handle()), true);
   client.EnableGraphics();
-  Headless::DisplayClient const display(client);
+  DisplayClient const display(client);
   client.Tolerance(CodecTolerance(GetParam().codec, GetParam().surface));
   ASSERT_TRUE(client.Connect());
   ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX channel rejected"); })) << logs.Text(true);
@@ -192,13 +205,13 @@ TEST_F(RoundFive, GraphicsAutoUsesProgressive) {
 
 TEST_F(RoundFive, ProgressiveDamageAndQoe) {
   ASSERT_NO_FATAL_FAILURE(GivenGraphicsClient(SDLRDP_CODEC_PROGRESSIVE));
-  auto&                      client   = GraphicsClient();
-  Headless::GraphicsObserver observer(client);
+  auto&            client   = GraphicsClient();
+  GraphicsObserver observer(client);
   ASSERT_NO_FATAL_FAILURE(Connect(client));
   ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
   auto pixels = GraphicsScene(5, false);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
-  ASSERT_NO_FATAL_FAILURE(sdl_rdp::headless_client_test::backend::AwaitAllAcknowledged(client, backend, logs));
+  ASSERT_NO_FATAL_FAILURE(AwaitAllAcknowledged(client, backend, logs));
   auto              before = client.Received();
   sdlrdp_rect const damage { 17, 19, 7, 5 };
   std::ranges::for_each(std::views::iota(damage.y, damage.y + damage.h), [&](int y) {
@@ -233,7 +246,7 @@ TEST_F(RoundFive, GraphicsWithoutDynamicChannelsUsesLegacy) {
   {
     auto const status  = RequiredStatus(*backend);
     auto const elapsed = Clock::now() - status.activated_at;
-    EXPECT_GE(elapsed, Backend::GraphicsConnectionWait);
+    EXPECT_GE(elapsed, GraphicsConnectionWait);
     EXPECT_FALSE(status.graphics.has_value());
     EXPECT_FALSE(status.holding);
     RecordProperty("activation_to_legacy_ms",
@@ -245,8 +258,8 @@ TEST_F(RoundFive, GraphicsWithoutDynamicChannelsUsesLegacy) {
 }
 TEST_F(RoundFive, GraphicsWithoutCapabilitiesUsesLegacy) {
   ASSERT_NO_FATAL_FAILURE(GivenGraphicsClient(SDLRDP_CODEC_RAW));
-  auto&                      client   = GraphicsClient();
-  Headless::GraphicsObserver observer(client);
+  auto&            client   = GraphicsClient();
+  GraphicsObserver observer(client);
   observer.Observed().advertise = false;
   ASSERT_NO_FATAL_FAILURE(ThenLegacyFallback(client));
   EXPECT_FALSE(logs.Contains("GFX confirmed"));

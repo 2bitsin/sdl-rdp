@@ -2,7 +2,7 @@
 
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::session::detail::peer_frame {
 PeerFrame::PeerFrame(PeerSet& peers, FrameStore& frames)
     : _peers{ peers }, _held{ peers.Lock() }, _frame{ frames.Lock() } { }
 auto PeerFrame::Frame() const noexcept -> FrameLock const& {

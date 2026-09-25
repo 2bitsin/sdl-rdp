@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <span>
 
-namespace Backend {
+namespace sdl_rdp::video::detail::pixel_band {
 class PixelBand {
 public:
        PixelBand(sdlrdp_rect value, std::span<std::uint8_t> bytes) noexcept;
@@ -15,4 +15,8 @@ private:
   sdlrdp_rect             _area;
   std::span<std::uint8_t> _pixels;
 };
+}
+
+namespace sdl_rdp::video {
+using detail::pixel_band::PixelBand;
 }

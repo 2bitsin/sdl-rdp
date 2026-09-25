@@ -5,11 +5,11 @@ namespace sdl_rdp::freerdp_facade::detail::waitable {
 // A handle WinPR lends for waiting; the object it came from owns and closes it.
 class Waitable {
 public:
-  explicit Waitable(Backend::WaitHandle handle);
+  explicit Waitable(WaitHandle handle);
   auto     Signalled() const -> bool;
 
 private:
-  Backend::WaitHandle _handle;
+  WaitHandle _handle;
 };
 }
 

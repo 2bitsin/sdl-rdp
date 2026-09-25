@@ -4,7 +4,7 @@
 #include <concepts>
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::clipboard::detail::capabilities {
 template <std::invocable<CLIPRDR_CAPABILITIES const&> Send>
 auto SendGeneralCapabilities(Send send) -> decltype(auto) {
   CLIPRDR_GENERAL_CAPABILITY_SET general{ CB_CAPSTYPE_GENERAL, CB_CAPSTYPE_GENERAL_LEN, CB_CAPS_VERSION_2,
@@ -15,4 +15,8 @@ auto SendGeneralCapabilities(Send send) -> decltype(auto) {
   caps.capabilitySets = reinterpret_cast<CLIPRDR_CAPABILITY_SET*>(&general);
   return send(std::as_const(caps));
 }
+}
+
+namespace sdl_rdp::clipboard {
+using detail::capabilities::SendGeneralCapabilities;
 }

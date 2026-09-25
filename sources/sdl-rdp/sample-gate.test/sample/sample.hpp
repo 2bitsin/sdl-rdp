@@ -3,7 +3,9 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace SampleGate {
+namespace sdl_rdp::sample_gate_test::sample::detail::sample {
+using sdl_rdp::headless_client_test::client::Client;
+
 class Sample : public SampleDesktopSteps {
 protected:
   auto ThenTouchEvent(Client& client, std::string_view event, std::string_view detail) -> void;
@@ -26,4 +28,8 @@ protected:
   auto ThenStoppedUnicode(rdpInput* input)                                                             -> void;
   auto GivenFrenchKeyboard(Client& client)                                                             -> void;
 };
+}
+
+namespace sdl_rdp::sample_gate_test::sample {
+using detail::sample::Sample;
 }

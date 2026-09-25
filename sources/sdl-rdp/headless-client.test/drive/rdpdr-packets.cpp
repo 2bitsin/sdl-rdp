@@ -8,9 +8,11 @@
 #include <cstdint>
 #include <span>
 
-namespace DriveGate {
-auto Completion(std::uint32_t device, std::uint32_t id, std::uint32_t status) -> sdl_rdp::drive::DrivePacket {
-  sdl_rdp::drive::DrivePacket response;
+namespace sdl_rdp::headless_client_test::drive::detail::rdpdr_packets {
+using sdl_rdp::utilities::Narrowed;
+
+auto Completion(std::uint32_t device, std::uint32_t id, std::uint32_t status) -> DrivePacket {
+  DrivePacket response;
   response.Write(std::uint16_t{ RDPDR_CTYP_CORE });
   response.Write(std::uint16_t{ PAKID_CORE_DEVICE_IOCOMPLETION });
   response.Write(device);
@@ -18,14 +20,13 @@ auto Completion(std::uint32_t device, std::uint32_t id, std::uint32_t status) ->
   response.Write(status);
   return response;
 }
-auto ReplyTo(sdl_rdp::drive::DrivePacket request, std::uint32_t status) -> sdl_rdp::drive::DrivePacket {
+auto ReplyTo(DrivePacket request, std::uint32_t status) -> DrivePacket {
   auto device = request.Read<std::uint32_t>();
   request.Skip(4);
   return Completion(device, request.Read<std::uint32_t>(), status);
 }
-auto DeviceAnnouncement(std::uint32_t type, std::uint32_t id, std::span<std::byte const> name)
-    -> sdl_rdp::drive::DrivePacket {
-  sdl_rdp::drive::DrivePacket packet;
+auto DeviceAnnouncement(std::uint32_t type, std::uint32_t id, std::span<std::byte const> name) -> DrivePacket {
+  DrivePacket packet;
   packet.Write(std::uint16_t{ RDPDR_CTYP_CORE });
   packet.Write(std::uint16_t{ PAKID_CORE_DEVICELIST_ANNOUNCE });
   packet.Write(std::uint32_t{ 1 });
@@ -33,7 +34,7 @@ auto DeviceAnnouncement(std::uint32_t type, std::uint32_t id, std::span<std::byt
   packet.Write(id);
   constexpr std::array<char, 8> dos{ 'd', 'o', 's' };
   packet.Append(std::as_bytes(std::span(dos)));
-  packet.Write(Backend::Narrowed<std::uint32_t>(name.size()));
+  packet.Write(Narrowed<std::uint32_t>(name.size()));
   packet.Append(name);
   return packet;
 }

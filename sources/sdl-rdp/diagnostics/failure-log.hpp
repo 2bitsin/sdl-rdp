@@ -1,12 +1,14 @@
 #pragma once
 #include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/diagnostics/forward.hpp>
 #include <sdl-rdp/utilities/operation-name.hpp>
 
 #include <functional>
 #include <string_view>
 
-namespace Backend {
-class Diagnostics;
+namespace sdl_rdp::diagnostics::detail::failure_log {
+using sdl_rdp::utilities::OperationName;
+
 class FailureLog {
 public:
        FailureLog(Diagnostics const& diagnostics, OperationName operation,
@@ -29,4 +31,9 @@ template <auto SOURCE>
 constexpr auto FailuresThrough = [](auto const& owner, OperationName operation) noexcept -> FailureLog {
   return FailuresOf(std::invoke(SOURCE, owner), operation);
 };
+}
+
+namespace sdl_rdp::diagnostics {
+using detail::failure_log::FailureLog;
+using detail::failure_log::FailuresThrough;
 }

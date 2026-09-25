@@ -25,6 +25,7 @@ auto ParsedOrRefused(std::string_view text) -> ValueTy {
   return ParsedOr<ValueTy>(text, [&] -> ValueTy { throw InvalidSettingValue{ text, ValueTy::Form() }; });
 }
 }
+
 namespace sdl_rdp::settings {
 using detail::parsed::ParsedFromText;
 using detail::parsed::ParsedOr;

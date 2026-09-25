@@ -18,7 +18,16 @@
 #include <utility>
 #include <vector>
 
-namespace Backend {
+namespace sdl_rdp::peer::detail::transport_end {
+using sdl_rdp::diagnostics::ExpectedDisconnect;
+using sdl_rdp::diagnostics::NegotiationRefused;
+using sdl_rdp::diagnostics::SecurityNla;
+using sdl_rdp::diagnostics::SecurityNlaExt;
+using sdl_rdp::diagnostics::SecurityRdsaad;
+using sdl_rdp::diagnostics::SecurityRdstls;
+using sdl_rdp::diagnostics::SecurityTls;
+using sdl_rdp::diagnostics::TlsHandshakeFailed;
+
 namespace {
 constexpr std::array<std::pair<std::uint32_t, char const*>, 5> ProtocolFlags{ { { SecurityTls   , "TLS"     },
                                                                                 { SecurityNla   , "NLA"     },

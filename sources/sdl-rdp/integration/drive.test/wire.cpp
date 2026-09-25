@@ -12,14 +12,26 @@
 #include <future>
 #include <string>
 #include <utility>
-namespace DriveGate {
+namespace sdl_rdp::integration::drive_test::detail::wire {
+using namespace std::chrono_literals;
+using sdl_rdp::drive::DrivePacket;
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::SendStaticChannel;
+using sdl_rdp::headless_client_test::drive::Completion;
+using sdl_rdp::headless_client_test::drive::DeviceAnnouncement;
+using sdl_rdp::headless_client_test::drive::DriveChecks;
+using sdl_rdp::headless_client_test::drive::DriveObserver;
+using sdl_rdp::headless_client_test::drive::Pattern;
+using sdl_rdp::headless_client_test::drive::ReplyTo;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::TranscodeRange;
+
 namespace {
-auto SendMalformedDrivePacket(Headless::Client& client) -> void {
+auto SendMalformedDrivePacket(Client& client) -> void {
   std::array<std::uint8_t, 4> const malformed{ 0x72, 0x44, 0x41, 0x44 };
-  ASSERT_TRUE(
-      Headless::SendStaticChannel(client.Instance().get(), RDPDR_CHANNEL_NAME, std::as_bytes(std::span(malformed))));
+  ASSERT_TRUE(SendStaticChannel(client.Instance().get(), RDPDR_CHANNEL_NAME, std::as_bytes(std::span(malformed))));
 }
-auto EmptyBasicInformation(Headless::DriveObserver& observer) -> sdl_rdp::drive::DrivePacket {
+auto EmptyBasicInformation(DriveObserver& observer) -> DrivePacket {
   auto request = observer.Observed().io.front();
   auto device  = request.Read<std::uint32_t>();
   request.Skip(4);
@@ -31,15 +43,15 @@ auto EmptyBasicInformation(Headless::DriveObserver& observer) -> sdl_rdp::drive:
   response.Write(std::uint32_t{ 0 });
   return response;
 }
-auto CompleteRead(Headless::DriveObserver& observer, std::size_t index) -> void {
+auto CompleteRead(DriveObserver& observer, std::size_t index) -> void {
   auto response = ReplyTo(observer.Observed().io[index], STATUS_SUCCESS);
   response.Write(std::uint32_t{ 65536 });
   response.Bytes().resize(response.Bytes().size() + 65536, std::byte{ 'x' });
   EXPECT_TRUE(observer.Send(response));
 }
-auto AnnounceDriveNames(Headless::DriveObserver& observer) -> void {
+auto AnnounceDriveNames(DriveObserver& observer) -> void {
   std::string_view const label = "żółw";
-  auto                   wide  = Backend::TranscodeRange<std::vector<std::byte>>(
+  auto                   wide  = TranscodeRange<std::vector<std::byte>>(
       std::as_bytes(std::span(label)), { },
       { .encoding = oxbox::utilities::Encoding::UTF16, .order = std::endian::little });
   wide.resize(wide.size() + 2);
@@ -51,9 +63,6 @@ auto AnnounceDriveNames(Headless::DriveObserver& observer) -> void {
       observer.Send(DeviceAnnouncement(RDPDR_DTYP_FILESYSTEM, 102, std::array{ std::byte{ 0xff }, std::byte{ 0 } })));
   ASSERT_TRUE(observer.Send(DeviceAnnouncement(RDPDR_DTYP_PRINT, 103, { })));
 }
-}
-
-namespace {
 auto ReadLargeFile(sdlrdp_handle* handle, sdlrdp_file* file) -> int {
   std::string bytes(static_cast<std::ptrdiff_t>(3 * 1024) * 1024, '\0');
   return sdlrdp_drive_read(handle, file, 0, bytes.data(), bytes.size());
@@ -63,11 +72,9 @@ auto StatWithError(sdlrdp_handle* handle, sdlrdp_file* file) -> std::pair<int, s
   auto        result = sdlrdp_drive_fstat(handle, file, &info);
   return { result, sdlrdp_last_error() };
 }
-}
-namespace {
 class DriveWire : public DriveChecks {
 protected:
-  auto ThenRecoverableAnnouncements(Headless::DriveObserver& observer) -> void {
+  auto ThenRecoverableAnnouncements(DriveObserver& observer) -> void {
     auto rejected = std::ranges::find(observer.Observed().replies, 103u,
                                       &std::pair<std::uint32_t, std::uint32_t>::first);
     ASSERT_NE(rejected, observer.Observed().replies.end());
@@ -83,13 +90,13 @@ protected:
     EXPECT_EQ(std::string(drives[2].name), std::string(511, 'x'));
     EXPECT_STREQ(drives[3].name, "dos");
   }
-  auto ThenHeldFileClosed(Headless::DriveObserver& observer, sdlrdp_file* file) -> void {
+  auto ThenHeldFileClosed(DriveObserver& observer, sdlrdp_file* file) -> void {
     observer.Observed().hold = false;
     auto close = std::async(std::launch::async, [&] { return sdlrdp_drive_close(handle.Handle(), file); });
     ASSERT_TRUE(client->Until([&] { return close.wait_for(0s) == std::future_status::ready; }));
     EXPECT_EQ(close.get(), 0);
   }
-  auto WhenReadWindowRefilled(Headless::DriveObserver& observer) -> void {
+  auto WhenReadWindowRefilled(DriveObserver& observer) -> void {
     ASSERT_TRUE(client->Until([&] { return observer.Observed().requests == 8; }));
     CompleteRead(observer, 7);
     ASSERT_TRUE(client->Until([&] { return observer.Observed().requests == 9; }));
@@ -155,7 +162,7 @@ TEST_F(DriveWire, SlidingWindowRefillsOnOutOfOrderCompletion) {
                          [&] { return sdlrdp_drive_read(handle.Handle(), file, 0, bytes.data(), bytes.size()); });
   ASSERT_NO_FATAL_FAILURE(WhenReadWindowRefilled(observer));
   ASSERT_TRUE(client->Until([&] { return read.wait_for(0s) == std::future_status::ready; }));
-  EXPECT_EQ(read.get(), Backend::Narrowed<int>(bytes.size()));
+  EXPECT_EQ(read.get(), Narrowed<int>(bytes.size()));
   EXPECT_EQ(bytes, std::string(bytes.size(), 'x'));
   ThenHeldFileClosed(observer, file);
 }
@@ -173,8 +180,8 @@ TEST_F(DriveWire, UnicodeWireNameAndRecoverableAnnouncements) {
 TEST_F(DriveWire, UnknownCompletionIsIgnored) {
   pump.request_stop();
   pump.join();
-  Headless::DriveObserver     observer(*client);
-  sdl_rdp::drive::DrivePacket packet;
+  DriveObserver observer(*client);
+  DrivePacket   packet;
   packet.Write(std::uint16_t{ RDPDR_CTYP_CORE });
   packet.Write(std::uint16_t{ PAKID_CORE_DEVICE_IOCOMPLETION });
   packet.Write(std::uint32_t{ 0 });

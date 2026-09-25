@@ -3,7 +3,10 @@
 #include <sdl-rdp/auth/account.hpp>
 #include <sdl-rdp/auth/credentials.hpp>
 #include <sdl-rdp/auth/state.hpp>
+#include <sdl-rdp/configuration/forward.hpp>
+#include <sdl-rdp/diagnostics/forward.hpp>
 #include <sdl-rdp/freerdp-facade/ntlm.hpp>
+#include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/utilities/operation-name.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
@@ -14,11 +17,15 @@
 #include <string>
 #include <string_view>
 
-namespace Backend {
-class Configuration;
-class Diagnostics;
-class FailureLog;
-class PeerLink;
+namespace sdl_rdp::auth::detail::authenticator {
+using sdl_rdp::configuration::Configuration;
+using sdl_rdp::diagnostics::Diagnostics;
+using sdl_rdp::diagnostics::FailureLog;
+using sdl_rdp::freerdp_facade::NtOwf;
+using sdl_rdp::link::PeerLink;
+using sdl_rdp::utilities::OperationName;
+using sdl_rdp::utilities::Pinned;
+
 // NTLM keys are an MD5 digest wide (MS-NLMP 3.3.2).
 using NtKey = std::span<std::uint8_t, 16>;
 class Authenticator : private Pinned {
@@ -37,15 +44,20 @@ private:
   auto Unauthenticated(std::string const& domain, std::string const& user)                   -> bool;
   auto Denied()                                                                              -> bool;
   auto ResponseKey(SEC_WINNT_AUTH_IDENTITY const& identity, NtKey response)                  -> bool;
-  auto NtHash(std::string const& domain, std::string const& user) const
-      -> std::optional<sdl_rdp::freerdp_facade::NtOwf>;
+  auto NtHash(std::string const& domain, std::string const& user) const                      -> std::optional<NtOwf>;
   auto Failures(OperationName operation) const noexcept                                      -> FailureLog;
-  PeerLink&              _link;
-  Configuration const&   _configuration;
-  Diagnostics const&     _diagnostics;
-  sdl_rdp::auth::Account _account;
-  Credentials            _credentials;
-  AuthenticationState    _state;
+  PeerLink&            _link;
+  Configuration const& _configuration;
+  Diagnostics const&   _diagnostics;
+  Account              _account;
+  Credentials          _credentials;
+  AuthenticationState  _state;
 };
 auto AuthenticationIdentity(freerdp_peer const& client, sdlrdp_event& event) -> void;
+}
+
+namespace sdl_rdp::auth {
+using detail::authenticator::AuthenticationIdentity;
+using detail::authenticator::Authenticator;
+using detail::authenticator::NtKey;
 }

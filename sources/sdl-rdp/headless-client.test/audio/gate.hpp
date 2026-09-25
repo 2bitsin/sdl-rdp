@@ -8,7 +8,10 @@
 #include <utility>
 #include <vector>
 
-namespace BackendGate {
+namespace sdl_rdp::headless_client_test::audio::detail::gate {
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::SoundClient;
+
 auto ThenCapturedPcm(SoundClient const& audio, std::vector<std::int16_t> const& pcm) -> void;
 auto ThenMissingAudioHandle()                                                        -> void;
 
@@ -35,4 +38,10 @@ private:
   std::unique_ptr<Client>      connected_client;
   std::unique_ptr<SoundClient> connected_audio;
 };
+}
+
+namespace sdl_rdp::headless_client_test::audio {
+using detail::gate::AudioGate;
+using detail::gate::ThenCapturedPcm;
+using detail::gate::ThenMissingAudioHandle;
 }

@@ -1,8 +1,12 @@
 #pragma once
+#include <sdl-rdp/configuration/forward.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
+#include <sdl-rdp/diagnostics/forward.hpp>
+#include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/picture/frame-store.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 #include <sdl-rdp/video/acknowledgement-window.hpp>
+#include <sdl-rdp/video/forward.hpp>
 #include <sdl-rdp/video/frame/statistics.hpp>
 #include <sdl-rdp/video/refresh-tracker.hpp>
 
@@ -10,13 +14,18 @@
 #include <cstdint>
 #include <format>
 
-namespace Backend {
-class Activation;
-class Configuration;
-class EventQueue;
-class PeerFrames;
-class PeerLink;
-class TraceQueue;
+namespace sdl_rdp::video::frame::detail::pacing {
+using sdl_rdp::configuration::Configuration;
+using sdl_rdp::configuration::Refresh;
+using sdl_rdp::diagnostics::Diagnostics;
+using sdl_rdp::diagnostics::TraceQueue;
+using sdl_rdp::link::Activation;
+using sdl_rdp::link::EventQueue;
+using sdl_rdp::link::PeerLink;
+using sdl_rdp::picture::FrameLock;
+using sdl_rdp::picture::FrameStore;
+using sdl_rdp::utilities::Pinned;
+
 enum class AcknowledgementMode{ Suspended, Tracking, Restarted };
 class FramePacing : private Pinned {
 public:
@@ -57,4 +66,9 @@ private:
   AcknowledgementWindow _window;
   RefreshTracker        _refresh;
 };
+}
+
+namespace sdl_rdp::video::frame {
+using detail::pacing::AcknowledgementMode;
+using detail::pacing::FramePacing;
 }

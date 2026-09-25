@@ -9,6 +9,8 @@
 #include <format>
 
 namespace sdl_rdp::settings::detail::refresh {
+using sdl_rdp::utilities::Expects;
+
 namespace {
 auto AutomaticMode(std::string_view text) -> std::optional<RefreshMode> {
   auto const mode = oxbox::serialization::FromString<RefreshMode>(text);
@@ -22,7 +24,7 @@ auto FixedRate(std::string_view text) -> std::optional<Refresh> {
 }
 Refresh::Refresh(Rate rate) : _rate{ rate } { }
 Refresh::Refresh(RefreshMode mode) : _mode{ mode } {
-  ::utilities::Expects(mode != RefreshMode::FIXED, "a fixed refresh names its rate");
+  Expects(mode != RefreshMode::FIXED, "a fixed refresh names its rate");
 }
 auto Refresh::Form() -> std::string_view {
   return "a refresh: auto-client, auto-client-average, auto-sender or a whole number of hertz";

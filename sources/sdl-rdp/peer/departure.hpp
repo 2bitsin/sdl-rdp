@@ -1,13 +1,18 @@
 #pragma once
+#include <sdl-rdp/diagnostics/forward.hpp>
+#include <sdl-rdp/link/forward.hpp>
+#include <sdl-rdp/peer/forward.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
+#include <sdl-rdp/video/frame/forward.hpp>
 
-namespace Backend {
-class Activation;
-class Diagnostics;
-class FrameStatistics;
-class PeerLink;
-class Redirection;
-class SessionAccess;
+namespace sdl_rdp::peer::detail::departure {
+using sdl_rdp::diagnostics::Diagnostics;
+using sdl_rdp::link::Activation;
+using sdl_rdp::link::PeerLink;
+using sdl_rdp::link::SessionAccess;
+using sdl_rdp::utilities::Pinned;
+using sdl_rdp::video::frame::FrameStatistics;
+
 class Departure : private Pinned {
 public:
        Departure(PeerLink& link, SessionAccess& session, Activation& activation, Redirection& redirection,
@@ -23,4 +28,8 @@ private:
   FrameStatistics const& _statistics;
   Diagnostics const&     _diagnostics;
 };
+}
+
+namespace sdl_rdp::peer {
+using detail::departure::Departure;
 }

@@ -4,7 +4,9 @@
 
 #include <openssl/crypto.h>
 
-namespace Backend {
+namespace sdl_rdp::configuration::detail::authentication {
+using sdl_rdp::utilities::Expects;
+
 Authentication::Authentication(sdlrdp_config const& value)
     : _config{ value }, _user{ value.user ? value.user : "" }, _password{ value.password ? value.password : "" },
       _domain{ value.domain ? value.domain : "" } {

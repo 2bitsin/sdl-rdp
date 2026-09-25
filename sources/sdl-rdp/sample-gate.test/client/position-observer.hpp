@@ -3,12 +3,14 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace SampleGate {
+namespace sdl_rdp::sample_gate_test::client::detail::position_observer {
+using sdl_rdp::headless_client_test::client::Client;
+
 struct PositionObserver {
 public:
            PositionObserver(PositionObserver const&)               = delete;
            PositionObserver(PositionObserver&&)                    = delete;
-  explicit PositionObserver(Headless::Client& client);
+  explicit PositionObserver(Client& client);
            ~PositionObserver();
   auto     operator=(PositionObserver const&) -> PositionObserver& = delete;
   auto     operator=(PositionObserver&&)      -> PositionObserver& = delete;
@@ -23,4 +25,8 @@ private:
   std::uint32_t                                x      = 0;
   std::uint32_t                                y      = 0;
 };
+}
+
+namespace sdl_rdp::sample_gate_test::client {
+using detail::position_observer::PositionObserver;
 }

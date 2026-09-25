@@ -5,7 +5,7 @@
 #include <cstddef>
 #include <vector>
 
-namespace Backend::Avc {
+namespace sdl_rdp::video::avc::detail::regions {
 class Regions {
 public:
   auto Add(sdlrdp_rect area) -> void;
@@ -20,4 +20,8 @@ private:
   std::vector<RDPGFX_H264_QUANT_QUALITY> quality;
   sdlrdp_rect                            bounds { };
 };
-} // namespace Backend::Avc
+}
+
+namespace sdl_rdp::video::avc {
+using detail::regions::Regions;
+}

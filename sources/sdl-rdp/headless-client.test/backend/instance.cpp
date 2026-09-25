@@ -6,7 +6,9 @@
 #include <array>
 #include <cstdint>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::backend::detail::instance {
+using sdl_rdp::utilities::Expects;
+
 auto BackendInstance::Open(sdlrdp_config const& config) -> void {
   ASSERT_EQ(TryOpen(config), 0) << sdlrdp_last_error();
 }
@@ -23,7 +25,7 @@ auto BackendInstance::Handle() const noexcept -> sdlrdp_handle* {
   return _handle.get();
 }
 auto BackendInstance::operator*() const -> sdlrdp_handle& {
-  utilities::Expects(_handle != nullptr, "the backend is open");
+  Expects(_handle != nullptr, "the backend is open");
   return *_handle;
 }
 BackendInstance::operator bool() const noexcept {

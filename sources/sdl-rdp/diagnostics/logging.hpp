@@ -11,7 +11,9 @@
 #include <optional>
 #include <string>
 #include <thread>
-namespace Backend {
+namespace sdl_rdp::diagnostics::detail::logging {
+using sdl_rdp::freerdp_facade::LogRegistration;
+
 // MS-RDPBCGR 2.2.1.1.1 requestedProtocols (FreeRDP keeps these constants private).
 inline constexpr std::uint32_t SecurityTls = 0x01, SecurityNla = 0x02, SecurityRdstls = 0x04, SecurityNlaExt = 0x08,
                                SecurityRdsaad = 0x10;
@@ -53,6 +55,21 @@ private:
   static auto Forward(wLogMessage const& message)                               -> void;
   static auto Install()                                                         -> void;
   auto        Deliver(sdlrdp_log_level level, wLogMessage const& message) const -> void;
-  sdl_rdp::freerdp_facade::LogRegistration _sink;
+  LogRegistration _sink;
 };
+}
+
+namespace sdl_rdp::diagnostics {
+using detail::logging::AuthenticationRejectedLogging;
+using detail::logging::ExpectedDisconnect;
+using detail::logging::LogRoute;
+using detail::logging::NegotiationRefused;
+using detail::logging::PeerNegotiationLogging;
+using detail::logging::ResetAuthenticationLogging;
+using detail::logging::SecurityNla;
+using detail::logging::SecurityNlaExt;
+using detail::logging::SecurityRdsaad;
+using detail::logging::SecurityRdstls;
+using detail::logging::SecurityTls;
+using detail::logging::TlsHandshakeFailed;
 }

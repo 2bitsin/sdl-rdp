@@ -7,9 +7,12 @@
 #include <winpr/synch.h>
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::freerdp_facade::detail::wake_event {
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Unreachable;
+
 WakeEvent::WakeEvent(EventHandle value) : handle(std::move(value)) {
-  utilities::Expects(handle != nullptr, "wake event owns an event");
+  Expects(handle != nullptr, "wake event owns an event");
 }
 auto WakeEvent::get() const -> HANDLE {
   return handle.get();
@@ -23,7 +26,7 @@ auto WakeEvent::Transition(Phase next) -> void {
     ResetEvent(get());
     phase.store(next);
     break;
-  default: utilities::Unreachable("known wake phase");
+  default: Unreachable("known wake phase");
   }
 }
 }

@@ -9,7 +9,9 @@
 #include <ranges>
 #include <string>
 
-namespace SampleGate {
+namespace sdl_rdp::sample_gate_test::sample::detail::sample {
+using sdl_rdp::sample_gate_test::client::InputClient;
+
 auto Sample::ThenTouchEvent(Client& client, std::string_view event, std::string_view detail) -> void {
   ASSERT_TRUE(ReadInput(client, event));
   EXPECT_TRUE(line.contains(detail)) << line;
@@ -47,7 +49,7 @@ auto Sample::WhenAdvancedMotion(Client& client) -> void {
 }
 auto Sample::WhenRelativeAdvanced(Client& client, std::int32_t x, std::int32_t y, std::string_view expected) -> void {
   ASSERT_NO_FATAL_FAILURE(WhenRelative(client));
-  auto* advanced = SampleGate::InputClient::Advanced().load();
+  auto* advanced = InputClient::Advanced().load();
   ASSERT_EQ(advanced->AInputSendInputEvent(advanced, AINPUT_FLAGS_MOVE | AINPUT_FLAGS_REL, x, y), CHANNEL_RC_OK);
   ASSERT_TRUE(ReadInput(client, "event MOUSE_MOTION "));
   EXPECT_TRUE(line.contains(expected)) << line;

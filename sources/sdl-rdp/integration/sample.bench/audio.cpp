@@ -20,38 +20,47 @@
 #include <vector>
 
 namespace sdl_rdp::integration::sample_bench::detail::audio {
-using support_bench::Check;
-using support_bench::Fail;
-using support_bench::Measured;
-using support_bench::OneSession;
+using sdl_rdp::headless_client_test::audio::MaximumGapMs;
+using sdl_rdp::headless_client_test::client::Clock;
+using sdl_rdp::headless_client_test::client::SoundClient;
+using sdl_rdp::headless_client_test::frame::FrameObserver;
+using sdl_rdp::integration::support_bench::Check;
+using sdl_rdp::integration::support_bench::Fail;
+using sdl_rdp::integration::support_bench::Measured;
+using sdl_rdp::integration::support_bench::OneSession;
+using sdl_rdp::integration::support_bench::Session;
+using sdl_rdp::sample_gate_test::audio::AudioDriver;
+using sdl_rdp::sample_gate_test::audio::AudioSample;
+using sdl_rdp::utilities::DeadlineAfter;
+using sdl_rdp::utilities::Throughout;
 using namespace std::chrono_literals;
 namespace {
-auto ThreeSecondsCaptured(Headless::SoundClient const& audio, Headless::FrameObserver const& /*frames*/) -> bool {
+auto ThreeSecondsCaptured(SoundClient const& audio, FrameObserver const& /*frames*/) -> bool {
   auto const& received = audio.CaptureState().received;
-  return !received.empty() && Headless::Clock::now() >= received.front() + 3s;
+  return !received.empty() && Clock::now() >= received.front() + 3s;
 }
-auto BlocksInSecond(Headless::SoundClient const& audio, std::chrono::seconds second) -> std::ptrdiff_t {
+auto BlocksInSecond(SoundClient const& audio, std::chrono::seconds second) -> std::ptrdiff_t {
   auto const& received = audio.CaptureState().received;
   auto const  start    = received.front() + second;
   return std::ranges::count_if(received, [&](auto time) { return time >= start && time < start + 1s; });
 }
 }
 
-class BlockCadence final : public support_bench::Session<SampleGate::AudioSample> {
+class BlockCadence final : public Session<AudioSample> {
 public:
   using Session::Session;
   auto TestBody() -> void override;
 
 private:
-  auto ThenBlockCadence(Headless::SoundClient const& audio, bool tight) -> void;
+  auto ThenBlockCadence(SoundClient const& audio, bool tight) -> void;
 };
-class DrainingSession : public support_bench::Session<SampleGate::AudioDriver> {
+class DrainingSession : public Session<AudioDriver> {
 public:
   using Session::Session;
 
 protected:
   auto DrainedSpan(std::span<std::int16_t const> pcm, std::chrono::seconds timeout, std::chrono::milliseconds poll)
-      -> std::optional<Headless::Clock::duration>;
+      -> std::optional<Clock::duration>;
 };
 class NoClientTenSecondClock final : public DrainingSession {
 public:
@@ -59,14 +68,14 @@ public:
   auto TestBody() -> void override;
 
 private:
-  auto ThenTenSeconds(Headless::Clock::duration elapsed) -> void;
+  auto ThenTenSeconds(Clock::duration elapsed) -> void;
 };
-class InitialLeadClock final : public support_bench::Session<SampleGate::AudioDriver> {
+class InitialLeadClock final : public Session<AudioDriver> {
 public:
   using Session::Session;
   auto TestBody() -> void override;
 };
-class LeadCadence final : public support_bench::Session<SampleGate::AudioDriver> {
+class LeadCadence final : public Session<AudioDriver> {
 public:
   using Session::Session;
   auto TestBody() -> void override;
@@ -74,7 +83,7 @@ public:
 private:
   auto ThenLeadCadence(std::size_t first, std::size_t frames) -> void;
 };
-class StallRefillClock final : public support_bench::Session<SampleGate::AudioDriver> {
+class StallRefillClock final : public Session<AudioDriver> {
 public:
   using Session::Session;
   auto TestBody() -> void override;
@@ -93,10 +102,10 @@ BENCHMARK(Measured<ZeroLeadKeepsRealtimeClock>)->Apply(OneSession);
 
 // Measures from the flushed play to the drained queue whether or not it drains; nullopt when it does not.
 auto DrainingSession::DrainedSpan(std::span<std::int16_t const> pcm, std::chrono::seconds timeout,
-                                  std::chrono::milliseconds poll) -> std::optional<Headless::Clock::duration> {
+                                  std::chrono::milliseconds poll) -> std::optional<Clock::duration> {
   auto const started = PlayFlushed(pcm);
   auto const drained = QueueDrained(started + timeout, poll);
-  auto const span    = Headless::Clock::now() - started;
+  auto const span    = Clock::now() - started;
   Measure(span);
   if (!drained) return std::nullopt;
   return span;
@@ -107,7 +116,7 @@ auto BlockCadence::TestBody() -> void {
     ThenBlockCadence(audio, tight);
   });
 }
-auto BlockCadence::ThenBlockCadence(Headless::SoundClient const& audio, bool tight) -> void {
+auto BlockCadence::ThenBlockCadence(SoundClient const& audio, bool tight) -> void {
   for (auto const second : { 0s, 1s, 2s }) {
     auto const blocks = BlocksInSecond(audio, second);
     Record(std::format("{}_second_{}_blocks", tight ? "tight" : "loose", second.count()), static_cast<double>(blocks));
@@ -131,7 +140,7 @@ auto NoClientTenSecondClock::TestBody() -> void {
   }
   ThenTenSeconds(*span);
 }
-auto NoClientTenSecondClock::ThenTenSeconds(Headless::Clock::duration elapsed) -> void {
+auto NoClientTenSecondClock::ThenTenSeconds(Clock::duration elapsed) -> void {
   int           buffer_frames = 0;
   SDL_AudioSpec format        { };
   if (!Check(SDL_GetAudioDeviceFormat(SDL_GetAudioStreamDevice(stream.get()), &format, &buffer_frames),
@@ -154,14 +163,14 @@ auto LeadCadence::TestBody() -> void {
   if (!Holds([this] { ReceiveLead(); })) return;
   auto const first  = sound->CaptureState().received.size();
   auto const frames = sound->CaptureState().samples.size() / 2;
-  auto const pumped = Backend::Throughout(Backend::DeadlineAfter(1s), [this] { return sound_client->Pump(1); });
+  auto const pumped = Throughout(DeadlineAfter(1s), [this] { return sound_client->Pump(1); });
   if (!Check(pumped, "the client pumps")) return;
   ThenLeadCadence(first, frames);
 }
 auto LeadCadence::ThenLeadCadence(std::size_t first, std::size_t frames) -> void {
   auto const& capture = sound->CaptureState();
   if (!Check(capture.received.size() > first, "blocks follow the lead")) return;
-  auto const maximum_gap = Headless::MaximumGapMs(std::span(capture.received).subspan(first - 1));
+  auto const maximum_gap = MaximumGapMs(std::span(capture.received).subspan(first - 1));
   auto const sent_frames = (capture.samples.size() / 2) - frames;
   auto const block_ms = 1000.0 * static_cast<double>(sent_frames) / static_cast<double>(capture.received.size() - first)
                         / capture.rate;
@@ -173,7 +182,7 @@ auto LeadCadence::ThenLeadCadence(std::size_t first, std::size_t frames) -> void
 }
 
 auto StallRefillClock::TestBody() -> void {
-  RefillLead([this](Headless::SoundClient const& audio, Headless::Clock::time_point resumed) {
+  RefillLead([this](SoundClient const& audio, Clock::time_point resumed) {
     Check(audio.CaptureState().received.back() <= resumed + 100ms, "the refill arrives within 100 ms");
   });
 }

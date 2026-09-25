@@ -10,7 +10,8 @@
 #include <freerdp/settings.h>
 #include <format>
 
-namespace Backend {
+namespace sdl_rdp::peer::detail::departure {
+
 Departure::Departure(PeerLink& link, SessionAccess& session, Activation& activation, Redirection& redirection,
                      FrameStatistics const& statistics, Diagnostics const& diagnostics) noexcept
     : _link{ link }, _session{ session }, _activation{ activation }, _redirection{ redirection },

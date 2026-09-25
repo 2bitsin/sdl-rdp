@@ -4,7 +4,9 @@
 
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::input::detail::activated_channel {
+using sdl_rdp::utilities::Expects;
+
 ActivatedChannel::ActivatedChannel(std::move_only_function<auto()->bool> activate) noexcept
     : _activate{ std::move(activate) } { }
 auto ActivatedChannel::Activate() -> bool {

@@ -7,7 +7,12 @@
 #include <cstdint>
 #include <numeric>
 
-namespace BackendGate {
+namespace sdl_rdp::integration::audio_test::detail::gate {
+using sdl_rdp::headless_client_test::audio::AudioGate;
+using sdl_rdp::headless_client_test::audio::ConfirmationPace;
+using sdl_rdp::headless_client_test::audio::ThenCapturedPcm;
+using sdl_rdp::headless_client_test::audio::ThenMissingAudioHandle;
+
 TEST_F(AudioGate, AudioAbsentDiscards) {
   ASSERT_NO_FATAL_FAILURE(ThenMissingAudioHandle());
   ASSERT_NO_FATAL_FAILURE(GivenAudioServer());

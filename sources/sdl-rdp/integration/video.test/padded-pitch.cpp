@@ -15,7 +15,15 @@
 #include <span>
 #include <vector>
 
-namespace sdl_rdp::integration::video_test {
+namespace sdl_rdp::integration::video_test::detail::padded_pitch {
+using sdl_rdp::headless_client_test::backend::BackendInstance;
+using sdl_rdp::headless_client_test::backend::CertificateDirectory;
+using sdl_rdp::headless_client_test::backend::Logs;
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::HasCookie;
+using sdl_rdp::headless_client_test::frame::FrameCounter;
+using sdl_rdp::headless_client_test::frame::HashPattern;
+
 namespace {
 constexpr std::uint32_t Width         = 320;
 constexpr std::uint32_t Height        = 200;
@@ -31,20 +39,20 @@ auto Padded(std::span<std::uint32_t const> rows) -> std::vector<std::uint32_t> {
 }
 }
 TEST(PaddedPitch, ClientFrameEqualsTheSource) {
-  BackendGate::CertificateDirectory const certificates;
-  Headless::Logs                          logs;
-  sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), Width, Height, 0, Headless::Logs::Collect, &logs };
+  CertificateDirectory const certificates;
+  Logs                       logs;
+  sdlrdp_config config{ "127.0.0.1", 0, certificates.Path().c_str(), Width, Height, 0, Logs::Collect, &logs };
   config.codec = SDLRDP_CODEC_RAW;
-  Headless::BackendInstance backend;
+  BackendInstance backend;
   ASSERT_NO_FATAL_FAILURE(backend.Open(config));
-  Headless::Client client(sdlrdp_port(backend.Handle()), true, Width, Height);
+  Client client(sdlrdp_port(backend.Handle()), true, Width, Height);
   ASSERT_TRUE(client.Connect()) << logs.Text(true);
-  ASSERT_TRUE(client.Until([&] { return BackendGate::HasCookie(client); }));
+  ASSERT_TRUE(client.Until([&] { return HasCookie(client); }));
   std::vector<std::uint32_t> expected(std::size_t{ Width } * Height);
-  Headless::HashPattern(expected);
-  auto const                source  = Padded(expected);
-  BackendGate::FrameCounter counter(client);
-  sdlrdp_rect const         area    { 0, 0, int{ Width }, int{ Height } };
+  HashPattern(expected);
+  auto const        source  = Padded(expected);
+  FrameCounter      counter(client);
+  sdlrdp_rect const area    { 0, 0, int{ Width }, int{ Height } };
   ASSERT_EQ(
       sdlrdp_present(backend.Handle(), source.data(), int{ Stride * sizeof(std::uint32_t) }, Width, Height, &area, 1),
       0)

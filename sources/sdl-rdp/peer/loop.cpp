@@ -32,7 +32,19 @@
 #include <tuple>
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::peer::detail::loop {
+using sdl_rdp::diagnostics::PeerNegotiationLogging;
+using sdl_rdp::diagnostics::ResetAuthenticationLogging;
+using sdl_rdp::freerdp_facade::EventWaitFailed;
+using sdl_rdp::freerdp_facade::Waitable;
+using sdl_rdp::picture::ApplyDesktopSize;
+using sdl_rdp::picture::FrameLock;
+using sdl_rdp::utilities::Contained;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::RAIIWrap;
+using sdl_rdp::video::AcknowledgedFrameWindow;
+
 namespace {
 using sdl_rdp::freerdp_facade::FirstRefused;
 using sdl_rdp::freerdp_facade::Set;
@@ -71,14 +83,14 @@ auto BeginNegotiationLogging(rdpSettings& settings) -> rdpSettings& {
 auto EndNegotiationLogging(rdpSettings& /*settings*/) noexcept -> void {
   ResetAuthenticationLogging();
 }
-using NegotiationLogging = utilities::RAIIWrap<rdpSettings&, BeginNegotiationLogging, EndNegotiationLogging>;
+using NegotiationLogging = RAIIWrap<rdpSettings&, BeginNegotiationLogging, EndNegotiationLogging>;
 struct LiveConnection {
   std::reference_wrapper<PeerLink>      link;
   std::reference_wrapper<SessionAccess> session;
 };
 auto Connect(PeerLink& link, SessionAccess& session) -> LiveConnection {
   auto& client = link.Client();
-  if (!client.Initialize(&client)) throw sdl_rdp::peer::PeerSetupFailed{ "initialization" };
+  if (!client.Initialize(&client)) throw PeerSetupFailed{ "initialization" };
   return { .link = link, .session = session };
 }
 auto Disconnect(LiveConnection const& live) noexcept -> void {
@@ -86,7 +98,7 @@ auto Disconnect(LiveConnection const& live) noexcept -> void {
   auto&      client = live.link.get().Client();
   client.Disconnect(&client);
 }
-using Connection = utilities::RAIIWrap<LiveConnection, Connect, Disconnect>;
+using Connection = RAIIWrap<LiveConnection, Connect, Disconnect>;
 }
 PeerLoop::PeerLoop(PeerLink& link, SessionAccess& session, Diagnostics const& diagnostics,
                    Authenticator const& authenticator, FrameStore& store, PeerWait& wait, PeerPump& pump,
@@ -104,7 +116,7 @@ auto PeerLoop::Serve(std::stop_token const& quit) -> void {
   std::stop_callback const wake(quit, [this] { _link.Signal(); });
   NegotiationLogging const logging { _link.Settings() };
   auto const               served  = [&] {
-    if (!Configure()) throw sdl_rdp::peer::PeerSetupFailed{ "configuration" };
+    if (!Configure()) throw PeerSetupFailed{ "configuration" };
     Run(quit);
     return true;
   };
@@ -142,7 +154,7 @@ auto PeerLoop::Dispatch(std::stop_token const& quit, std::span<WaitHandle> handl
   WaitHandle*                                  end      { };
   try {
     end = std::ranges::copy_if(handles, signalled.begin(), [](WaitHandle handle) {
-            return sdl_rdp::freerdp_facade::Waitable{ handle }.Signalled();
+            return Waitable{ handle }.Signalled();
           }).out;
   } catch (EventWaitFailed const&) {
     return false;

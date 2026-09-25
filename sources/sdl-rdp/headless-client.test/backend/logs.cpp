@@ -2,10 +2,10 @@
 #include <cstddef>
 #include <regex>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::backend::detail::logs {
 auto Logs::Collect(void* user, sdlrdp_log_level level, char const* text) -> void {
-  utilities::Expects(user != nullptr, "log sink exists");
-  utilities::Expects(text != nullptr, "log line exists");
+  Expects(user != nullptr, "log sink exists");
+  Expects(text != nullptr, "log line exists");
   auto&                  self = *static_cast<Logs*>(user);
   std::scoped_lock const lock(self.guard);
   self.lines.emplace_back(level, text);

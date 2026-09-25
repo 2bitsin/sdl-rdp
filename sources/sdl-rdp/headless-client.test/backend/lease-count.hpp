@@ -5,8 +5,10 @@
 #include <cstddef>
 #include <mutex>
 
-namespace Headless {
-class LeaseCount : private Backend::Pinned {
+namespace sdl_rdp::headless_client_test::backend::detail::lease_count {
+using sdl_rdp::utilities::Pinned;
+
+class LeaseCount : private Pinned {
 public:
        LeaseCount() = default;
   auto Acquire()          -> void;
@@ -18,4 +20,8 @@ private:
   std::condition_variable _released;
   std::size_t             _leases  { };
 };
+}
+
+namespace sdl_rdp::headless_client_test::backend {
+using detail::lease_count::LeaseCount;
 }

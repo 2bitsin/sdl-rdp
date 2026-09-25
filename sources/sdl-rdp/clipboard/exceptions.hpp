@@ -4,7 +4,11 @@
 #include <oxbox/utilities/hash.hpp>
 #include <cstddef>
 
-namespace Backend::detail::exceptions {
+namespace sdl_rdp::clipboard::detail::exceptions {
+using oxbox::utilities::literals::operator""_hash;
+using sdl_rdp::utilities::ArgumentFailure;
+using sdl_rdp::utilities::RuntimeFailure;
+
 using UnterminatedClipboard = RuntimeFailure<"UnterminatedClipboard"_hash, "Clipboard text lacks a terminator.">;
 
 using ClipboardTextTooLarge = ArgumentFailure<"ClipboardTextTooLarge"_hash, "Clipboard text of {} bytes is too large.",
@@ -13,7 +17,8 @@ using ClipboardTextTooLarge = ArgumentFailure<"ClipboardTextTooLarge"_hash, "Cli
 using InvalidClipboardLength = RuntimeFailure<"InvalidClipboardLength"_hash, "Invalid UTF-16LE clipboard length {}.",
                                               std::size_t>;
 }
-namespace Backend {
+
+namespace sdl_rdp::clipboard {
 using detail::exceptions::ClipboardTextTooLarge;
 using detail::exceptions::InvalidClipboardLength;
 using detail::exceptions::UnterminatedClipboard;

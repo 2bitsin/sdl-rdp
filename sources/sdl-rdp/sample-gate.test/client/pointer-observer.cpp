@@ -3,8 +3,8 @@
 #include <algorithm>
 #include <cstdint>
 
-namespace SampleGate {
-PointerObserver::PointerObserver(Headless::Client& client) {
+namespace sdl_rdp::sample_gate_test::client::detail::pointer_observer {
+PointerObserver::PointerObserver(Client& client) {
   active = this;
   // abi: pPointerNew, BOOL is int
   client.Instance()->context->update->pointer->PointerNew = [](rdpContext*, POINTER_NEW_UPDATE const* update) -> int {

@@ -8,7 +8,10 @@
 #include <sdl-rdp/peer/transport-end.hpp>
 #include <sdl-rdp/video/frame/sender.hpp>
 
-namespace Backend {
+namespace sdl_rdp::peer::detail::pump {
+using sdl_rdp::utilities::Unreachable;
+using sdl_rdp::video::frame::Delivery;
+
 PeerPump::PeerPump(PeerLink& link, SessionAccess& session, ChannelSet& channels, Redirection& redirection,
                    FrameSender& sender, TransportEnd& end, TraceQueue& traces) noexcept
     : _link{ link }, _session{ session }, _channels{ channels }, _redirection{ redirection }, _sender{ sender },
@@ -39,7 +42,7 @@ auto PeerPump::Deliver(std::stop_token const& quit) -> bool {
     auto const session = _session.Lock();
     return Ended();
   }
-  default: utilities::Unreachable(delivery);
+  default: Unreachable(delivery);
   }
 }
 }

@@ -4,6 +4,8 @@
 #include <filesystem>
 #include <tuple>
 namespace sdl3::rdp::backend::detail::backend {
+using sdl_rdp::utilities::RAIIWrap;
+
 using BackendSymbols = BackendCatalog::Symbols;
 static_assert(std::tuple_size_v<BackendSymbols> == std::to_underlying(Operation::COUNT));
 static_assert(BackendCatalog::Names.size() == std::tuple_size_v<BackendSymbols>);
@@ -29,18 +31,18 @@ using SessionValue = std::pair<std::reference_wrapper<Backend const>, sdlrdp_han
 auto OpenSession(Backend const& backend, sdlrdp_config const& config) -> SessionValue;
 auto CloseSession(SessionValue const& session) noexcept               -> void;
 using SessionState = PointerState<SessionValue, &SessionValue::second>;
-using Session = utilities::RAIIWrap<SessionValue, OpenSession, CloseSession, SessionState::IsNull,
-                                    SessionState::MakeNull>;
+using Session      = RAIIWrap<SessionValue, OpenSession, CloseSession, SessionState::IsNull, SessionState::MakeNull>;
 }
+
 namespace sdl3::rdp::backend {
-using detail::backend::BackendSymbols;
-using detail::backend::BackendOperation;
-using detail::backend::LoadLibrary;
-using detail::backend::Library;
 using detail::backend::Backend;
-using detail::backend::SessionValue;
-using detail::backend::OpenSession;
+using detail::backend::BackendOperation;
+using detail::backend::BackendSymbols;
 using detail::backend::CloseSession;
-using detail::backend::SessionState;
+using detail::backend::Library;
+using detail::backend::LoadLibrary;
+using detail::backend::OpenSession;
 using detail::backend::Session;
+using detail::backend::SessionState;
+using detail::backend::SessionValue;
 }

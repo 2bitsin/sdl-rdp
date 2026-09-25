@@ -10,11 +10,21 @@
 #include <string>
 #include <utility>
 
-namespace SampleGate {
+namespace sdl_rdp::integration::sample_test::detail::vsync {
+using namespace std::chrono_literals;
+using sdl_rdp::configuration::RefreshMode;
+using sdl_rdp::headless_client_test::backend::Logs;
+using sdl_rdp::sample_gate_test::sample::PrimaryDisplayPort;
+using sdl_rdp::sample_gate_test::sample::Sample;
+using sdl_rdp::sample_gate_test::sample::SetLoopbackHints;
+using sdl_rdp::sample_gate_test::video::ExerciseRate;
+using sdl_rdp::sample_gate_test::video::RateRecovery;
+using sdl_rdp::utilities::Expects;
+
 namespace {
 struct RefreshCase {
-  char const*          hint;
-  Backend::RefreshMode mode;
+  char const* hint;
+  RefreshMode mode;
 };
 auto PrintTo(RefreshCase const& value, std::ostream* output) -> void {
   *output << '"' << value.hint << '"';
@@ -42,9 +52,8 @@ protected:
     priority = SDL_GetLogPriority(SDL_LOG_CATEGORY_VIDEO);
     SDL_SetLogPriority(SDL_LOG_CATEGORY_VIDEO, SDL_LOG_PRIORITY_INFO);
     SDL_GetLogOutputFunction(&output, &userdata);
-    SDL_SetLogOutputFunction([](void* user, int, SDL_LogPriority,
-                                char const* text) { Headless::Logs::Collect(user, SDLRDP_LOG_INFO, text); },
-                             &logs);
+    SDL_SetLogOutputFunction(
+        [](void* user, int, SDL_LogPriority, char const* text) { Logs::Collect(user, SDLRDP_LOG_INFO, text); }, &logs);
     ASSERT_TRUE(SDL_SetHint("SDL_RDP_REFRESH", GetParam().hint));
     CreateRenderer();
   }
@@ -113,10 +122,10 @@ class AdaptiveRecovery : public VsyncRecovery { };
 TEST_P(AdaptiveRecovery, ResizeRestartsAtCeiling) {
   Run(RateRecovery::AfterResize);
 }
-constexpr RefreshCase FixedRefresh  { .hint = "60", .mode = Backend::RefreshMode::Fixed                    };
-constexpr RefreshCase ClientRefresh { .hint = "auto-client", .mode = Backend::RefreshMode::Client          };
-constexpr RefreshCase AverageRefresh{ .hint = "auto-client-average", .mode = Backend::RefreshMode::Average };
-constexpr RefreshCase SenderRefresh { .hint = "auto-sender", .mode = Backend::RefreshMode::Sender          };
+constexpr RefreshCase FixedRefresh  { .hint = "60", .mode = RefreshMode::Fixed                    };
+constexpr RefreshCase ClientRefresh { .hint = "auto-client", .mode = RefreshMode::Client          };
+constexpr RefreshCase AverageRefresh{ .hint = "auto-client-average", .mode = RefreshMode::Average };
+constexpr RefreshCase SenderRefresh { .hint = "auto-sender", .mode = RefreshMode::Sender          };
 INSTANTIATE_TEST_SUITE_P(Rates, VsyncRecovery,
                          testing::Values(FixedRefresh, ClientRefresh, AverageRefresh, SenderRefresh));
 INSTANTIATE_TEST_SUITE_P(Client, ClientRecovery, testing::Values(ClientRefresh));

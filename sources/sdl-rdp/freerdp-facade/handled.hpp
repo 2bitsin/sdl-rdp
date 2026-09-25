@@ -13,6 +13,9 @@
 #include <utility>
 
 namespace sdl_rdp::freerdp_facade::detail::handled {
+using sdl_rdp::utilities::Contained;
+using sdl_rdp::utilities::Expects;
+
 struct                  NoFailure{ };
 template <class> struct Signature;
 template <class ResultTy, class OwnerTy,
@@ -49,10 +52,10 @@ template <class ParameterTy, class ArgTy> auto Referenced(ArgTy argument) -> dec
   if constexpr (!std::is_pointer_v<ArgTy>) {
     return argument;
   } else if constexpr (FixedSpan<ParameterTy>) {
-    ::utilities::Expects(argument != nullptr, "the callback buffer is supplied");
+    Expects(argument != nullptr, "the callback buffer is supplied");
     return ParameterTy{ argument, ParameterTy::extent };
   } else {
-    ::utilities::Expects(argument != nullptr, "the callback argument is supplied");
+    Expects(argument != nullptr, "the callback argument is supplied");
     return *argument;
   }
 }
@@ -85,7 +88,7 @@ template <auto OWNER, auto HANDLER, auto const& OPERATION, auto FAILURES, auto F
           class ContextTy, class... ArgsTy>
 auto Handled(ContextTy* context, ArgsTy... args) noexcept -> ResultTy {
   static_assert(std::is_void_v<ResultTy> || !std::same_as<decltype(FAILURE), NoFailure>, "a result names its failure");
-  ::utilities::Expects(context != nullptr, "callback context exists");
+  Expects(context != nullptr, "callback context exists");
   auto&      owner    = [&] -> decltype(auto) {
     if constexpr (std::is_void_v<ContextTy>)
       return std::invoke(OWNER, *static_cast<UserData<OWNER>*>(context));
@@ -95,9 +98,9 @@ auto Handled(ContextTy* context, ArgsTy... args) noexcept -> ResultTy {
   auto const reported = [&](std::string_view failure) { std::invoke(FAILURES, owner, OPERATION)(failure); };
   auto const handled  = [&] -> decltype(auto) { return Invoked<HANDLER>(owner, args...); };
   if constexpr (std::is_void_v<ResultTy>)
-    std::ignore = Backend::Contained([&] { handled(); }, reported);
+    std::ignore = Contained([&] { handled(); }, reported);
   else
-    return Backend::Contained(ResultTy{ FAILURE }, [&] -> ResultTy { return handled(); }, reported);
+    return Contained(ResultTy{ FAILURE }, [&] -> ResultTy { return handled(); }, reported);
 }
 }
 

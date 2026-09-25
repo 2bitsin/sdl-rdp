@@ -14,7 +14,22 @@
 #include <future>
 #include <utility>
 
-namespace BackendGate {
+namespace sdl_rdp::integration::session_test::detail::codecs {
+using sdl_rdp::headless_client_test::backend::Clock;
+using sdl_rdp::headless_client_test::backend::Logs;
+using sdl_rdp::headless_client_test::backend::WaitingOpen;
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::codec::CodecTolerance;
+using sdl_rdp::headless_client_test::codec::Gate;
+using sdl_rdp::headless_client_test::codec::Mode;
+using sdl_rdp::headless_client_test::codec::ModeName;
+using sdl_rdp::headless_client_test::codec::NegotiatedCodec;
+using sdl_rdp::headless_client_test::frame::HashPattern;
+using sdl_rdp::utilities::Descriptor;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::SystemCall;
+using sdl_rdp::utilities::support_test::OutOfRangeEnum;
+
 namespace {
 // A flat colour survives every lossy codec within three levels per channel.
 constexpr std::uint32_t FlatColourError = 3;
@@ -83,7 +98,7 @@ TEST_P(Gate, DesktopIsPicture) {
   config.codec = GetParam().codec;
   ASSERT_NO_FATAL_FAILURE(backend.Open(config));
   std::vector<std::uint32_t> frame(640uz * 480);
-  Headless::HashPattern(frame);
+  HashPattern(frame);
   sdlrdp_rect const area{ 0, 0, 640, 480 };
   ASSERT_EQ(backend.Present(frame, 640, 480, area), 0);
   Client client(sdlrdp_port(backend.Handle()), GetParam().surface);
@@ -99,7 +114,7 @@ TEST_P(Gate, WaitForClient) {
   auto              port    = opening.Receive(std::chrono::seconds(15)).value_or(0);
   ASSERT_GT(port, 0);
   EXPECT_FALSE(opening.Receive(std::chrono::milliseconds(0)).has_value());
-  Client client(Backend::Narrowed<std::uint32_t>(port), GetParam().surface);
+  Client client(Narrowed<std::uint32_t>(port), GetParam().surface);
   ASSERT_NO_FATAL_FAILURE(ConnectCodec(client));
   EXPECT_EQ(opening.Receive(std::chrono::seconds(15)), std::optional(0));
 }
@@ -112,7 +127,7 @@ TEST_P(Gate, BlockedSinglePresent) {
   ASSERT_EQ(events.size(), 2u);
   ASSERT_EQ(events.front().type, SDLRDP_CONNECTED);
   pixels.resize(2048uz * 1536);
-  Headless::HashPattern(pixels);
+  HashPattern(pixels);
   sdlrdp_rect area{ 0, 0, 2048, 1536 };
   // Keep the client unpumped until the presenter completes. Completion therefore
   // cannot depend on the client draining output; ten seconds is a progress bound.
@@ -145,14 +160,13 @@ TEST_P(Gate, LiveCodecChange) {
        { SDLRDP_CODEC_RAW, SDLRDP_CODEC_PLANAR, SDLRDP_CODEC_REMOTEFX, SDLRDP_CODEC_NSCODEC, SDLRDP_CODEC_AUTO }) {
     ASSERT_EQ(sdlrdp_set_codec(backend.Handle(), codec), 0);
     client.Tolerance(CodecTolerance(codec, GetParam().surface));
-    std::ranges::fill(pixels,
-                      0x00404040u + (Backend::Narrowed<std::uint32_t>(std::to_underlying(codec)) * 0x00040404u));
+    std::ranges::fill(pixels, 0x00404040u + (Narrowed<std::uint32_t>(std::to_underlying(codec)) * 0x00040404u));
     ASSERT_NO_FATAL_FAILURE(Frame(client, { 0, 0, 320, 200 }));
     auto expected = NegotiatedCodec(codec, GetParam().surface);
     ASSERT_NO_FATAL_FAILURE(ThenCodecChange(expected, previous));
     previous = expected;
   }
-  auto const unlisted = sdl_rdp::utilities::support_test::OutOfRangeEnum<sdlrdp_codec>(99);
+  auto const unlisted = OutOfRangeEnum<sdlrdp_codec>(99);
   EXPECT_EQ(sdlrdp_set_codec(backend.Handle(), unlisted), -1);
 }
 TEST_P(Gate, ExactFlatColour) {
@@ -175,8 +189,8 @@ TEST_P(Gate, TinyDamage) {
 }
 TEST_P(Gate, ProbeClosesBeforeActivation) {
   {
-    Backend::Descriptor const socket { Backend::SystemCall(::socket(AF_INET, SOCK_STREAM, 0), "probe socket") };
-    sockaddr_in               address{ };
+    Descriptor const socket { SystemCall(::socket(AF_INET, SOCK_STREAM, 0), "probe socket") };
+    sockaddr_in      address{ };
     address.sin_family      = AF_INET;
     address.sin_port        = htons(sdlrdp_port(backend.Handle()));
     address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);

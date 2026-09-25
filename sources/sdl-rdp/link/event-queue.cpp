@@ -8,7 +8,9 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace Backend {
+namespace sdl_rdp::link::detail::event_queue {
+using sdl_rdp::utilities::Narrowed;
+
 auto EventQueue::Push(sdlrdp_event event) -> void {
   Notify([&] { _events.push_back(event); });
 }

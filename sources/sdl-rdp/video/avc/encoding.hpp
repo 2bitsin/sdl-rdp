@@ -5,7 +5,9 @@
 #include <cstdint>
 #include <span>
 
-namespace Backend::Avc {
+namespace sdl_rdp::video::avc::detail::encoding {
+using sdl_rdp::utilities::Extent;
+
 struct IntraRefresh {
   std::uint32_t period;
   std::uint32_t count;
@@ -19,4 +21,11 @@ struct EncodingTimes {
   std::chrono::nanoseconds encode { };
 };
 auto operator+=(EncodingTimes& total, EncodingTimes const& frame) noexcept -> EncodingTimes&;
-} // namespace Backend::Avc
+}
+
+namespace sdl_rdp::video::avc {
+using detail::encoding::Bitrate;
+using detail::encoding::EncodingTimes;
+using detail::encoding::IntraRefreshFor;
+using detail::encoding::ReplicateEdges;
+}

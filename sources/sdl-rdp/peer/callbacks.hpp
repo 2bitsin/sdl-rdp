@@ -1,16 +1,21 @@
 #pragma once
+#include <sdl-rdp/auth/forward.hpp>
 #include <sdl-rdp/diagnostics/failure-log.hpp>
+#include <sdl-rdp/input/forward.hpp>
+#include <sdl-rdp/link/forward.hpp>
+#include <sdl-rdp/peer/forward.hpp>
 #include <sdl-rdp/utilities/operation-name.hpp>
+#include <sdl-rdp/video/forward.hpp>
 
 #include <cstdint>
 
-namespace Backend {
-class Activator;
-class Authenticator;
-class CapabilityCheck;
-class InputEvents;
-class OutputControl;
-class PeerLink;
+namespace sdl_rdp::peer::detail::callbacks {
+using sdl_rdp::auth::Authenticator;
+using sdl_rdp::diagnostics::FailuresThrough;
+using sdl_rdp::input::InputEvents;
+using sdl_rdp::link::PeerLink;
+using sdl_rdp::video::OutputControl;
+
 class PeerCallbacks {
 public:
        PeerCallbacks(PeerCallbacks const&)               = delete;
@@ -38,4 +43,8 @@ private:
   InputEvents const&    _input;
   static constexpr auto _failures      = FailuresThrough<&PeerCallbacks::FailureSource>;
 };
+}
+
+namespace sdl_rdp::peer {
+using detail::callbacks::PeerCallbacks;
 }

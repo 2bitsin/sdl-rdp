@@ -1,7 +1,9 @@
 #pragma once
 #include "session.hpp"
 
-namespace BackendGate {
+namespace sdl_rdp::headless_client_test::codec::detail::gate {
+using sdl_rdp::headless_client_test::client::Client;
+
 class Gate : public CodecSession {
 protected:
   auto        ThenPictureDesktop(Client& client)                  -> void;
@@ -13,4 +15,8 @@ protected:
   auto        WhenDamagedBlock(Client& client)                    -> void;
   auto        ThenClientDisconnects(Client& client)               -> void;
 };
+}
+
+namespace sdl_rdp::headless_client_test::codec {
+using detail::gate::Gate;
 }

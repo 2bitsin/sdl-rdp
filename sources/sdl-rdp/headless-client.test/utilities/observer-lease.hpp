@@ -6,7 +6,9 @@
 #include <optional>
 #include <utility>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::utilities::detail::observer_lease {
+using sdl_rdp::headless_client_test::backend::LeaseCount;
+
 template <class ObserverTy> class ObserverLease {
 public:
        ObserverLease(ObserverTy& observer, LeaseCount& leases);
@@ -39,4 +41,8 @@ template <class ObserverTy> auto ObserverLease<ObserverTy>::operator->() const n
 template <class ObserverTy> auto ObserverLease<ObserverTy>::operator*() const noexcept -> ObserverTy& {
   return _observer.get();
 }
+}
+
+namespace sdl_rdp::headless_client_test::utilities {
+using detail::observer_lease::ObserverLease;
 }

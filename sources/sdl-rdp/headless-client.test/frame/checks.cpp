@@ -20,34 +20,36 @@
 #include <string>
 #include <utility>
 
-namespace BackendGate {
+namespace sdl_rdp::headless_client_test::frame::detail::checks {
+using sdl_rdp::freerdp_facade::WaitHandle;
+using sdl_rdp::headless_client_test::backend::RequiredGraphics;
+using sdl_rdp::utilities::Narrowed;
+
 namespace {
 struct GraphicsCounts {
   std::size_t desktops;
   std::size_t resets;
   std::size_t frames;
 };
-auto ThenMonitor(MONITOR_DEF const& monitor, Backend::Extent size) -> void {
+auto ThenMonitor(MONITOR_DEF const& monitor, Extent size) -> void {
   EXPECT_EQ(monitor.left, 0);
   EXPECT_EQ(monitor.top, 0);
   EXPECT_EQ(monitor.right, static_cast<std::int32_t>(size.width) - 1);
   EXPECT_EQ(monitor.bottom, static_cast<std::int32_t>(size.height) - 1);
   EXPECT_EQ(monitor.flags, 1u);
 }
-auto CountsOf(Headless::GraphicsObserver const& observer) -> GraphicsCounts {
+auto CountsOf(GraphicsObserver const& observer) -> GraphicsCounts {
   return { .desktops = observer.Observed().desktops.size(),
            .resets   = observer.Observed().resets.size(),
            .frames   = observer.Observed().frames.size() };
 }
-auto ThenResetGeometry(Headless::GraphicsObserver::Reset const& reset, GraphicsCounts before, Backend::Extent size)
-    -> void {
+auto ThenResetGeometry(GraphicsObserver::Reset const& reset, GraphicsCounts before, Extent size) -> void {
   EXPECT_EQ(reset.width, size.width);
   EXPECT_EQ(reset.height, size.height);
   EXPECT_EQ(reset.desktops, before.desktops + 1);
   EXPECT_EQ(reset.frames, before.frames);
 }
-auto ThenGraphicsReset(Headless::GraphicsObserver const& observer, GraphicsCounts before, Backend::Extent size)
-    -> void {
+auto ThenGraphicsReset(GraphicsObserver const& observer, GraphicsCounts before, Extent size) -> void {
   ASSERT_EQ(observer.Observed().resets.size(), before.resets + 1);
   auto const& reset = observer.Observed().resets.back();
   ThenResetGeometry(reset, before, size);
@@ -57,7 +59,7 @@ auto ThenGraphicsReset(Headless::GraphicsObserver const& observer, GraphicsCount
 }
 }
 auto FrameChecks::Present(std::vector<std::uint32_t> const& pixels, std::uint32_t w, std::uint32_t h) -> void {
-  sdlrdp_rect const full{ 0, 0, Backend::Narrowed<int>(w), Backend::Narrowed<int>(h) };
+  sdlrdp_rect const full{ 0, 0, Narrowed<int>(w), Narrowed<int>(h) };
   ASSERT_EQ(backend.Present(pixels, w, h, full), 0);
 }
 auto FrameChecks::FillLegacyWindow(Client& client, FrameObserver& observer, std::vector<std::uint32_t>& pixels)
@@ -87,8 +89,8 @@ auto FrameChecks::SuppressAndCheckInput(Client& client) -> void {
   ASSERT_EQ(suppressed.front().type, SDLRDP_KEY);
 }
 auto FrameChecks::ThenDesktopGeometry(Client& client, std::uint32_t w, std::uint32_t h) -> void {
-  EXPECT_EQ(client.Instance()->context->gdi->width, Backend::Narrowed<int>(w));
-  EXPECT_EQ(client.Instance()->context->gdi->height, Backend::Narrowed<int>(h));
+  EXPECT_EQ(client.Instance()->context->gdi->width, Narrowed<int>(w));
+  EXPECT_EQ(client.Instance()->context->gdi->height, Narrowed<int>(h));
 }
 auto FrameChecks::ThenAspectGeometry(Client& client) -> void {
   auto events = Events(2);
@@ -132,12 +134,12 @@ auto FrameChecks::ThenProducerFrame(Client& client, FrameObserver& observer, std
   testing::Test::RecordProperty("acknowledged_frames", std::to_string(observer.Frames().size()));
 }
 auto FrameChecks::ThenReadable(Client& client) -> void {
-  std::array<Backend::WaitHandle, 64> handles{ };
+  std::array<WaitHandle, 64> handles{ };
   auto count = freerdp_get_event_handles(client.Instance()->context, handles.data(), handles.size());
   ASSERT_GT(count, 0u);
   ASSERT_LT(WaitForMultipleObjects(count, handles.data(), false, 10000), WAIT_OBJECT_0 + count);
 }
-auto FrameChecks::ThenQoe(Client& client, Headless::GraphicsObserver& observer) -> void {
+auto FrameChecks::ThenQoe(Client& client, GraphicsObserver& observer) -> void {
   RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU qoe{ observer.Observed().frames.back().frameId, 1234, 7, 9 };
   ASSERT_EQ(observer.Channel()->QoeFrameAcknowledge(observer.Channel(), &qoe), CHANNEL_RC_OK);
   ASSERT_TRUE(client.Until([&] {
@@ -146,8 +148,8 @@ auto FrameChecks::ThenQoe(Client& client, Headless::GraphicsObserver& observer) 
   }));
   EXPECT_FALSE(logs.Contains("GFX QoE"));
 }
-auto FrameChecks::ResizePicture(Client& client, Headless::GraphicsObserver& observer,
-                                std::vector<std::uint32_t>& pixels, Backend::Extent size, bool graphics) -> void {
+auto FrameChecks::ResizePicture(Client& client, GraphicsObserver& observer, std::vector<std::uint32_t>& pixels,
+                                Extent size, bool graphics) -> void {
   auto const before = CountsOf(observer);
   pixels.assign(static_cast<std::size_t>(size.width) * size.height, 0x654321);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, size.width, size.height));

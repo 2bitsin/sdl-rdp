@@ -8,7 +8,10 @@
 #include <freerdp/client/cmdline.h>
 #include <array>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::drive::detail::share_drive {
+using sdl_rdp::headless_client_test::client::LoadStaticChannel;
+using sdl_rdp::utilities::Expects;
+
 auto ShareDrive(Client& client, char const* path, char const* name) -> void {
   Expects(path != nullptr, "shared directory supplied");
   freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);

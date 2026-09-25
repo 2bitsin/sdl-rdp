@@ -1,7 +1,7 @@
 #pragma once
 #include <spawn.h>
 
-namespace SampleGate {
+namespace sdl_rdp::sample_gate_test::process::detail::spawn_actions {
 class SpawnActions {
 public:
        SpawnActions();
@@ -16,4 +16,8 @@ public:
 private:
   posix_spawn_file_actions_t actions{ };
 };
+}
+
+namespace sdl_rdp::sample_gate_test::process {
+using detail::spawn_actions::SpawnActions;
 }

@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Backend {
+namespace sdl_rdp::link::detail::dynamic_channel {
 class DynamicChannel {
 public:
   DynamicChannel()                      = default;
@@ -13,4 +13,8 @@ public:
   virtual auto Activate()                       -> bool            = 0;
   virtual auto Reject()                         -> void            = 0;
 };
+}
+
+namespace sdl_rdp::link {
+using detail::dynamic_channel::DynamicChannel;
 }

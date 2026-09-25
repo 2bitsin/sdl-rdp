@@ -5,9 +5,11 @@
 #include <winpr/synch.h>
 
 namespace sdl_rdp::freerdp_facade::detail::manual_reset_event {
-auto ManualResetEvent(std::string_view subject) -> ::Backend::EventHandle {
-  ::Backend::EventHandle event{ CreateEvent(nullptr, true, false, nullptr) };
-  if (!event) throw ::Backend::AllocationFailed{ subject };
+using sdl_rdp::utilities::AllocationFailed;
+
+auto ManualResetEvent(std::string_view subject) -> EventHandle {
+  EventHandle event{ CreateEvent(nullptr, true, false, nullptr) };
+  if (!event) throw AllocationFailed{ subject };
   return event;
 }
 }

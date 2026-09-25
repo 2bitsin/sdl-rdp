@@ -3,6 +3,7 @@
 namespace sdl3::rdp::video::detail::events {
 auto InitEvents(SDL_VideoDevice& device) -> void;
 }
+
 namespace sdl3::rdp::video {
 using detail::events::InitEvents;
 }

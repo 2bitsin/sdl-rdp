@@ -10,7 +10,9 @@
 #include <typeindex>
 #include <unordered_map>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::utilities::detail::observer_set {
+using sdl_rdp::headless_client_test::backend::LeaseCount;
+
 class ObserverSet {
 public:
   static auto                      ContextSize()             -> std::size_t;
@@ -46,4 +48,8 @@ template <class ObserverTy> auto ObserverSet::Held() -> ObserverLease<ObserverTy
   auto&                  found = Attached(typeid(ObserverTy));
   return { std::any_cast<std::reference_wrapper<ObserverTy>>(found.observer).get(), found.leases };
 }
+}
+
+namespace sdl_rdp::headless_client_test::utilities {
+using detail::observer_set::ObserverSet;
 }

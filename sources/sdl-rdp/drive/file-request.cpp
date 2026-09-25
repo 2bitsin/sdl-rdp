@@ -11,7 +11,8 @@
 #include <utility>
 
 namespace sdl_rdp::drive::detail::file_request {
-using Backend::Narrowed;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::Unreachable;
 namespace {
 constexpr std::uint32_t AllowedFlags = SDLRDP_FILE_READ | SDLRDP_FILE_WRITE | SDLRDP_FILE_CREATE | SDLRDP_FILE_TRUNCATE
                                        | SDLRDP_FILE_DIRECTORY;
@@ -37,11 +38,11 @@ auto CreateOptions(FileKind kind) -> std::uint32_t {
   case FileKind::Directory: return FILE_DIRECTORY_FILE;
   case FileKind::File:      return FILE_NON_DIRECTORY_FILE;
   case FileKind::Any:       return 0;
-  default:                  utilities::Unreachable(kind);
+  default:                  Unreachable(kind);
   }
 }
 }
-FileRequest::FileRequest(std::uint32_t flags, FileKind file_kind, freerdp_facade::AccessMask extra_access)
+FileRequest::FileRequest(std::uint32_t flags, FileKind file_kind, AccessMask extra_access)
     : _access{ Access(Validated(flags), std::to_underlying(extra_access)) }, _disposition{ Disposition(flags) },
       _kind{ file_kind } { }
 auto FileRequest::Create(std::span<std::byte const> name) const -> DrivePacket {

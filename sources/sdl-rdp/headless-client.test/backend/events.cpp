@@ -7,7 +7,8 @@
 #include <cstddef>
 #include <iterator>
 
-namespace BackendGate {
+namespace sdl_rdp::headless_client_test::backend::detail::events {
+
 namespace {
 auto Contains(sdlrdp_event_type type) {
   return [type](std::vector<sdlrdp_event> const& events) {

@@ -2,6 +2,7 @@
 
 #include <sdl-rdp/clipboard/capabilities.hpp>
 #include <sdl-rdp/clipboard/store.hpp>
+#include <sdl-rdp/clipboard/text.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
@@ -19,7 +20,15 @@
 #include <array>
 #include <cstdint>
 
-namespace Backend {
+namespace sdl_rdp::clipboard::detail::channel {
+using sdl_rdp::diagnostics::FailureLog;
+using sdl_rdp::diagnostics::FailuresThrough;
+using sdl_rdp::freerdp_facade::BindContext;
+using sdl_rdp::freerdp_facade::CallbackOwner;
+using sdl_rdp::utilities::Contained;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::OperationName;
+
 namespace {
 auto Owner(CliprdrServerContext const& context) -> ClipboardChannel& {
   return CallbackOwner<ClipboardChannel, &CliprdrServerContext::custom>(context);
@@ -167,4 +176,4 @@ auto ClipboardChannel::DataResponse(CLIPRDR_FORMAT_DATA_RESPONSE const& response
 auto ClipboardChannel::FailureSource() const noexcept -> Diagnostics const& {
   return _diagnostics;
 }
-} // namespace Backend
+}

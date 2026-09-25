@@ -2,8 +2,8 @@
 
 #include <sdl-rdp/utilities/contract.hpp>
 
-namespace SampleGate {
-using utilities::Expects;
+namespace sdl_rdp::sample_gate_test::process::detail::spawn_actions {
+using sdl_rdp::utilities::Expects;
 
 SpawnActions::SpawnActions() {
   auto const initialized = posix_spawn_file_actions_init(&actions);

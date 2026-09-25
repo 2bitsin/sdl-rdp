@@ -12,14 +12,14 @@
 #include <string_view>
 #include <vector>
 
-namespace SampleGate {
-namespace fs = std::filesystem;
+namespace sdl_rdp::sample_gate_test::process::detail::procfs {
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Required;
 
 namespace {
 auto ProcfsPort(std::string_view address) -> std::uint32_t {
-  return utilities::Required(
-      oxbox::utilities::ParseNumberAfter<std::uint32_t>(address, ":", oxbox::utilities::Radix::HEX),
-      "a procfs socket address ends in a hex port");
+  return Required(oxbox::utilities::ParseNumberAfter<std::uint32_t>(address, ":", oxbox::utilities::Radix::HEX),
+                  "a procfs socket address ends in a hex port");
 }
 
 auto ProcId() -> pid_t {
@@ -27,22 +27,22 @@ auto ProcId() -> pid_t {
   std::ifstream children("/proc/thread-self/children");
   pid_t         child    = 0;
   bool const    read     = !(children >> child).fail();
-  utilities::Expects(read, "spawned child visible in procfs");
+  Expects(read, "spawned child visible in procfs");
   return child;
 }
 }
 
 auto ProcfsSelf() -> pid_t {
-  return utilities::Required(oxbox::utilities::ParseNumber<pid_t>(fs::read_symlink("/proc/self").string()),
-                             "/proc/self links to a process id");
+  return Required(oxbox::utilities::ParseNumber<pid_t>(std::filesystem::read_symlink("/proc/self").string()),
+                  "/proc/self links to a process id");
 }
 
 auto ListeningPort(pid_t pid) -> std::uint32_t {
   if (!pid) pid = ProcId();
   std::vector<std::string> sockets;
-  for (auto const& entry : fs::directory_iterator("/proc/" + std::to_string(pid) + "/fd")) {
+  for (auto const& entry : std::filesystem::directory_iterator("/proc/" + std::to_string(pid) + "/fd")) {
     std::error_code error;
-    auto            target = fs::read_symlink(entry.path(), error).string();
+    auto            target = std::filesystem::read_symlink(entry.path(), error).string();
     if (!error && target.starts_with("socket:[")) sockets.push_back(target);
   }
   std::ifstream tcp("/proc/net/tcp");

@@ -14,7 +14,11 @@
 #include <span>
 #include <vector>
 
-namespace Backend {
+namespace sdl_rdp::video::pointer::detail::shape {
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::PixelBytes;
+
 namespace {
 constexpr std::uint32_t ColorPointerLimit = 96;
 constexpr std::uint16_t ColorBits         = 32;
@@ -31,7 +35,7 @@ auto Delivered(bool sent) -> PointerDelivery {
   return sent ? PointerDelivery::Sent : PointerDelivery::Failed;
 }
 }
-PointerShape::PointerShape(sdl_rdp::video::pointer::PointerLayout const& layout, std::span<std::uint8_t const> argb)
+PointerShape::PointerShape(PointerLayout const& layout, std::span<std::uint8_t const> argb)
     : _size{ layout.Size() }, _hot_x{ layout.X() }, _hot_y{ layout.Y() }, _pixels(layout.Bytes()),
       _mask(MaskStride(_size.width) * _size.height) {
   Expects(argb.size() >= _pixels.size(), "source covers every pointer pixel");

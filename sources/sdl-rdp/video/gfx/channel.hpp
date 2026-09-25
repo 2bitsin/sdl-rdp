@@ -1,8 +1,12 @@
 #pragma once
 #include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/configuration/forward.hpp>
+#include <sdl-rdp/diagnostics/forward.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/link/channel-slot.hpp>
+#include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/utilities/extent.hpp>
+#include <sdl-rdp/utilities/forward.hpp>
 #include <sdl-rdp/video/avc/encoder.hpp>
 #include <sdl-rdp/video/avc/encoding.hpp>
 #include <sdl-rdp/video/avc/regions.hpp>
@@ -19,14 +23,24 @@
 #include <string_view>
 #include <vector>
 
-namespace Backend {
+namespace sdl_rdp::video::gfx::detail::channel {
+using sdl_rdp::configuration::Configuration;
+using sdl_rdp::diagnostics::Diagnostics;
+using sdl_rdp::freerdp_facade::WaitHandle;
+using sdl_rdp::link::Activation;
+using sdl_rdp::link::ChannelSlot;
+using sdl_rdp::link::DynamicChannel;
+using sdl_rdp::link::PeerLink;
+using sdl_rdp::utilities::Extent;
+using sdl_rdp::utilities::Releases;
+using sdl_rdp::utilities::Stopwatch;
+using sdl_rdp::video::avc::Encoder;
+using sdl_rdp::video::avc::EncodingTimes;
+using sdl_rdp::video::avc::Regions;
+using sdl_rdp::video::frame::FrameSources;
+
 inline constexpr std::uint16_t GraphicsSurfaceId = 1;
 inline constexpr std::uint32_t GraphicsContextId = 1;
-class Activation;
-class Configuration;
-class Diagnostics;
-class PeerLink;
-class Stopwatch;
 class GfxChannel {
 public:
        GfxChannel(GfxChannel const&)               = delete;
@@ -54,34 +68,34 @@ private:
     std::size_t   length{ };
     std::uint32_t codec { };
   };
-  auto Caps(RDPGFX_CAPS_ADVERTISE_PDU const& caps)                      -> std::uint32_t;
-  auto FailureSource() const noexcept                                   -> Diagnostics const&;
-  auto Ack(RDPGFX_FRAME_ACKNOWLEDGE_PDU const& ack)                     -> std::uint32_t;
-  auto Qoe(RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU const& ack)                 -> std::uint32_t;
-  auto CompressProgressive(REGION16& damage, Stopwatch const& watch)    -> bool;
-  auto CodecChoice()                                                    -> sdlrdp_codec;
-  auto AvcFailure()                                                     -> std::string;
-  auto ProgressiveDamage(REGION16& damage) const                        -> bool;
-  auto FinishFrame()                                                    -> bool;
-  auto LogCapabilities(std::span<RDPGFX_CAPSET const> advertised) const -> void;
-  auto ActivateCapabilities(RDPGFX_CAPSET const& selected, bool wanted) -> std::uint32_t;
-  auto ResetSurface()                                                   -> bool;
-  auto AvcTimes() const                                                 -> std::optional<Avc::EncodingTimes>;
-  auto Surface()                                                        -> bool;
-  auto Select()                                                         -> bool;
-  auto Progressive()                                                    -> bool;
-  auto Avc420()                                                         -> bool;
-  auto Picture()                                                        -> std::span<std::uint8_t const>;
-  auto SelectAvc()                                                      -> bool;
-  auto ResetAvc()                                                       -> void;
-  auto ConfirmedCapability(RDPGFX_CAPSET const& cap)                    -> void;
-  auto ProgressivePayload(std::span<std::byte const> data)              -> bool;
-  auto Raw()                                                            -> bool;
-  auto Planar()                                                         -> bool;
-  auto BeginPayload()                                                   -> void;
-  auto WriteCommand(Packet const& packet)                               -> bool;
+  auto Caps(RDPGFX_CAPS_ADVERTISE_PDU const& caps)                                     -> std::uint32_t;
+  auto FailureSource() const noexcept                                                  -> Diagnostics const&;
+  auto Ack(RDPGFX_FRAME_ACKNOWLEDGE_PDU const& ack)                                    -> std::uint32_t;
+  auto Qoe(RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU const& ack)                                -> std::uint32_t;
+  auto CompressProgressive(REGION16& damage, Stopwatch const& watch)                   -> bool;
+  auto CodecChoice()                                                                   -> sdlrdp_codec;
+  auto AvcFailure()                                                                    -> std::string;
+  auto ProgressiveDamage(REGION16& damage) const                                       -> bool;
+  auto FinishFrame()                                                                   -> bool;
+  auto LogCapabilities(std::span<RDPGFX_CAPSET const> advertised) const                -> void;
+  auto ActivateCapabilities(RDPGFX_CAPSET const& selected, bool wanted)                -> std::uint32_t;
+  auto ResetSurface()                                                                  -> bool;
+  auto AvcTimes() const                                                                -> std::optional<EncodingTimes>;
+  auto Surface()                                                                       -> bool;
+  auto Select()                                                                        -> bool;
+  auto Progressive()                                                                   -> bool;
+  auto Avc420()                                                                        -> bool;
+  auto Picture()                                                                       -> std::span<std::uint8_t const>;
+  auto SelectAvc()                                                                     -> bool;
+  auto ResetAvc()                                                                      -> void;
+  auto ConfirmedCapability(RDPGFX_CAPSET const& cap)                                   -> void;
+  auto ProgressivePayload(std::span<std::byte const> data)                             -> bool;
+  auto Raw()                                                                           -> bool;
+  auto Planar()                                                                        -> bool;
+  auto BeginPayload()                                                                  -> void;
+  auto WriteCommand(Packet const& packet)                                              -> bool;
   auto Command(sdlrdp_rect area, std::span<std::byte const> data, std::uint32_t codec) -> bool;
-  auto Check(std::uint32_t result, std::string_view operation) const    -> bool;
+  auto Check(std::uint32_t result, std::string_view operation) const                   -> bool;
   using GraphicsContext    = std::unique_ptr<RdpgfxServerContext, Releases<rdpgfx_server_context_free>>;
   using ProgressiveContext = std::unique_ptr<PROGRESSIVE_CONTEXT, Releases<progressive_context_free>>;
   PeerLink&                 _link;
@@ -91,7 +105,7 @@ private:
   FrameSources              _sources;
   GraphicsContext           _context;
   ProgressiveContext        _progressive;
-  Avc::Encoder              _avc;
+  Encoder                   _avc;
   GraphicsTiming            _timing;
   ChannelSlot               _slot;
   Extent                    _surface      { };
@@ -107,10 +121,14 @@ private:
   std::uint32_t             _queue_depth  { };
   std::size_t               _frame_bytes  { };
   std::size_t               _last_bytes   { };
-  Avc::Regions              _regions;
+  Regions                   _regions;
   std::vector<std::byte>    _payload;
   std::vector<Packet>       _prepared;
   std::vector<std::uint8_t> _pixels;
   std::vector<std::uint8_t> _band;
 };
+}
+
+namespace sdl_rdp::video::gfx {
+using detail::channel::GfxChannel;
 }

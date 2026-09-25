@@ -1,10 +1,9 @@
 #include <sdl-rdp/sample-gate.test/frame/first-size.hpp>
 
-namespace SampleGate {
-using utilities::Expects;
+namespace sdl_rdp::sample_gate_test::frame::detail::first_size {
+using sdl_rdp::utilities::Expects;
 
-FirstFrameSize::FirstFrameSize(Headless::Client& value)
-    : client(value), original_connect(value.Instance()->PostConnect) {
+FirstFrameSize::FirstFrameSize(Client& value) : client(value), original_connect(value.Instance()->PostConnect) {
   Expects(!active, "no observer is already installed");
   Expects(original_connect, "original connection callback is installed");
   active = this;

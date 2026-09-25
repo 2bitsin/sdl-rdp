@@ -11,8 +11,7 @@
 #include <ranges>
 #include <source_location>
 
-namespace Backend {
-using utilities::Expects;
+namespace sdl_rdp::utilities::detail::rect {
 inline auto Rows(sdlrdp_rect area) {
   return std::views::iota(area.y, area.y + area.h)
          | std::views::transform([area](int y) { return sdlrdp_rect{ area.x, y, area.w, 1 }; });
@@ -59,4 +58,14 @@ inline auto Intersect(sdlrdp_rect left, sdlrdp_rect right) -> std::optional<sdlr
   if (end_x <= x || end_y <= y) return std::nullopt;
   return sdlrdp_rect{ x, y, Narrowed<int>(end_x - x), Narrowed<int>(end_y - y) };
 }
+}
+
+namespace sdl_rdp::utilities {
+using detail::rect::AreaBytes;
+using detail::rect::ExpectsBand;
+using detail::rect::RowBytes;
+using detail::rect::Rows;
+using detail::rect::SameSize;
+using detail::rect::Touches;
+using detail::rect::Union;
 }

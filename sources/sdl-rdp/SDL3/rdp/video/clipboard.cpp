@@ -1,10 +1,11 @@
 #include "clipboard.hpp"
 #include <sdl-rdp/SDL3/rdp/backend/boundary.hpp>
 namespace sdl3::rdp::video::detail::clipboard {
-using backend::Boundary;
-using backend::Operation;
-using backend::Resource;
-using settings::Text;
+using sdl3::rdp::backend::Boundary;
+using sdl3::rdp::backend::Operation;
+using sdl3::rdp::backend::Resource;
+using sdl3::rdp::settings::Text;
+using sdl_rdp::utilities::Expects;
 namespace {
 constexpr auto TextMimeTypes = std::to_array({ "text/plain;charset=utf-8" });
 // SDL takes ownership of the SDL-allocated string this produces.
@@ -14,14 +15,14 @@ auto CopyText(std::string const& text) -> char* {
 using ClipboardText = Resource<char*, CopyText, SDL_free>;
 // SDL's clipboard callback borrows its device and a null-terminated string.
 auto SetText(SDL_VideoDevice* device, char const* text) -> bool {
-  utilities::Expects(device != nullptr, "clipboard write has a device");
-  utilities::Expects(text != nullptr, "clipboard write has text");
+  Expects(device != nullptr, "clipboard write has a device");
+  Expects(text != nullptr, "clipboard write has text");
   auto const& driver = device->internal->Backend();
   return driver.Call<Operation::SET_CLIPBOARD_TEXT>(text) == 0 || driver.Fail();
 }
 // SDL takes ownership of the returned SDL-allocated clipboard string.
 auto GetText(SDL_VideoDevice* device) -> char* {
-  utilities::Expects(device != nullptr, "clipboard read has a device");
+  Expects(device != nullptr, "clipboard read has a device");
   auto const& driver = device->internal->Backend();
   return Boundary([&] {
     auto const text = Text(driver.Call<Operation::GET_CLIPBOARD_TEXT>());
@@ -31,7 +32,7 @@ auto GetText(SDL_VideoDevice* device) -> char* {
 }
 // SDL's clipboard predicate borrows its device.
 auto HasText(SDL_VideoDevice* device) -> bool {
-  utilities::Expects(device != nullptr, "clipboard predicate has a device");
+  Expects(device != nullptr, "clipboard predicate has a device");
   auto const& driver = device->internal->Backend();
   auto const  result = driver.Call<Operation::HAS_CLIPBOARD_TEXT>();
   return result < 0 ? driver.Fail() : result != 0;

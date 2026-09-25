@@ -8,9 +8,15 @@
 #include <cstdint>
 #include <filesystem>
 
-namespace SampleGate {
+namespace sdl_rdp::integration::sample_test::detail::auth {
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::sample_gate_test::sample::AnnouncedPort;
+using sdl_rdp::sample_gate_test::sample::BackendLibrary;
+using sdl_rdp::sample_gate_test::sample::PrimaryDisplayPort;
+using sdl_rdp::sample_gate_test::sample::Sample;
+
 namespace {
-class AuthenticationSample : public SampleGate::Sample {
+class AuthenticationSample : public Sample {
 protected:
   auto ThenWrongPassword(std::uint32_t port) -> void {
     Client wrong(port, true);
@@ -72,8 +78,6 @@ private:
   std::atomic<std::size_t> looked_up = 0;
   std::atomic<bool>        arguments = true;
 };
-}
-namespace {
 struct Quit {
 public:
   Quit(Quit const&) = delete;
@@ -86,7 +90,7 @@ public:
   auto operator=(Quit const&) -> Quit& = delete;
   auto operator=(Quit&&)      -> Quit& = delete;
 };
-auto GivenAuthenticationHints(fs::path const& certificates) -> void {
+auto GivenAuthenticationHints(std::filesystem::path const& certificates) -> void {
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_PORT, "0"));
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_CERT_DIR, certificates.c_str()));

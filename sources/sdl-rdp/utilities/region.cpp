@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <cstddef>
 
-namespace Backend {
+namespace sdl_rdp::utilities::detail::region {
 namespace {
 constexpr std::size_t MaximumRects = 16;
 }

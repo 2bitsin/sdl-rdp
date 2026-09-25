@@ -7,7 +7,12 @@
 #include <source_location>
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::picture::detail::frame_store {
+using sdl_rdp::utilities::Ensures;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::SameSize;
+using sdl_rdp::utilities::Whole;
+
 namespace {
 auto EnsureConsistent(FrameSnapshot const& shadow, PictureGeometry const& geometry,
                       std::source_location where = std::source_location::current()) -> void {

@@ -4,20 +4,28 @@
 #include <sdl-rdp/headless-client.test/frame/update-hook.hpp>
 #include <cstdint>
 
-namespace SampleGate {
+namespace sdl_rdp::sample_gate_test::frame::detail::next {
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::frame::PictureUpdate;
+using sdl_rdp::headless_client_test::frame::PictureUpdateHook;
+
 class NextFrame {
 public:
-  explicit NextFrame(Headless::Client& value, std::uint32_t frame);
+  explicit NextFrame(Client& value, std::uint32_t frame);
   auto     Received() const -> bool;
   auto     Matches() const  -> testing::AssertionResult const&;
 
 private:
-  auto Observe(Headless::PictureUpdate const& update) -> void;
-  auto Inspect()                                      -> void;
-  bool                        received = false;
-  testing::AssertionResult    matches  = testing::AssertionFailure() << "no complete frame";
-  Headless::Client&           client;
-  std::uint32_t               column;
-  Headless::PictureUpdateHook hook;
+  auto Observe(PictureUpdate const& update) -> void;
+  auto Inspect()                            -> void;
+  bool                     received = false;
+  testing::AssertionResult matches  = testing::AssertionFailure() << "no complete frame";
+  Client&                  client;
+  std::uint32_t            column;
+  PictureUpdateHook        hook;
 };
+}
+
+namespace sdl_rdp::sample_gate_test::frame {
+using detail::next::NextFrame;
 }

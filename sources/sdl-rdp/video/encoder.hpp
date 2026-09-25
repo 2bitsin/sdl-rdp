@@ -15,7 +15,10 @@
 #include <span>
 #include <vector>
 
-namespace Backend {
+namespace sdl_rdp::video::detail::encoder {
+using sdl_rdp::utilities::Extent;
+using sdl_rdp::utilities::Releases;
+
 // abi: release steps no single FreeRDP free function performs as a plain call.
 auto FreeStream(wStream* stream) noexcept -> void;
 using StreamHandle    = std::unique_ptr<wStream, Releases<FreeStream>>;
@@ -60,4 +63,8 @@ private:
   NsCodecContext           nsc;
   StreamHandle             stream;
 };
+}
+
+namespace sdl_rdp::video {
+using detail::encoder::Encoder;
 }

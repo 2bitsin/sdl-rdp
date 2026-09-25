@@ -7,7 +7,14 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace BackendGate {
+namespace sdl_rdp::integration::session_test::detail::trace {
+using sdl_rdp::headless_client_test::audio::AudioGate;
+using sdl_rdp::headless_client_test::backend::AllAcknowledged;
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::SoundClient;
+using sdl_rdp::headless_client_test::utilities::WallMilliseconds;
+using sdl_rdp::utilities::Required;
+
 class TraceGate : public AudioGate {
 protected:
   auto ThenTraceEvents() -> void {
@@ -21,8 +28,8 @@ protected:
   }
   static auto ThenTraceTime(sdlrdp_log_level level, std::string const& line, std::int64_t now) -> void {
     EXPECT_EQ(level, SDLRDP_LOG_INFO);
-    auto const time = Backend::Required(oxbox::utilities::ParseNumberAfter<std::int64_t>(line, " t="),
-                                        "trace lines carry a whole-millisecond time");
+    auto const time = Required(oxbox::utilities::ParseNumberAfter<std::int64_t>(line, " t="),
+                               "trace lines carry a whole-millisecond time");
     EXPECT_LE(std::abs(now - time), 60000) << line;
   }
   auto Exercise() -> void {
@@ -45,7 +52,7 @@ protected:
     })) << logs.Text(true);
   }
   auto CheckTimes() -> void {
-    auto const now = Headless::WallMilliseconds();
+    auto const now = WallMilliseconds();
     for (auto const& [level, line] : logs.Entries()) {
       if (!line.starts_with("trace ")) continue;
       ASSERT_NO_FATAL_FAILURE(ThenTraceTime(level, line, now));

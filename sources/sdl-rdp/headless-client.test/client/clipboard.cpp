@@ -17,7 +17,12 @@
 #include <string_view>
 #include <utility>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::client::detail::clipboard {
+using sdl_rdp::clipboard::SendGeneralCapabilities;
+using sdl_rdp::headless_client_test::utilities::ObserverSet;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
+
 namespace {
 auto HeldClipboard(CliprdrClientContext* context) -> ClipboardClient& {
   Expects(context, "callback context exists");
@@ -25,8 +30,8 @@ auto HeldClipboard(CliprdrClientContext* context) -> ClipboardClient& {
   return *static_cast<ClipboardClient*>(context->custom);
 }
 auto AnnounceFormat(CliprdrClientContext& context, bool unicode) -> std::uint32_t {
-  CLIPRDR_FORMAT      format{ Backend::Narrowed<std::uint32_t>(unicode ? CF_UNICODETEXT : CF_DIB), nullptr };
-  CLIPRDR_FORMAT_LIST list  { .common = { .msgType = CB_FORMAT_LIST }                                      };
+  CLIPRDR_FORMAT      format{ Narrowed<std::uint32_t>(unicode ? CF_UNICODETEXT : CF_DIB), nullptr };
+  CLIPRDR_FORMAT_LIST list  { .common = { .msgType = CB_FORMAT_LIST }                             };
   list.numFormats = 1;
   list.formats    = &format;
   return context.ClientFormatList(&context, &list);
@@ -126,8 +131,7 @@ auto ClipboardClient::Accepted() -> std::uint32_t {
   return CHANNEL_RC_OK;
 }
 auto ClipboardClient::Ready(CliprdrClientContext& context) -> std::uint32_t {
-  auto result = Backend::SendGeneralCapabilities(
-      [&](auto const& caps) { return context.ClientCapabilities(&context, &caps); });
+  auto result = SendGeneralCapabilities([&](auto const& caps) { return context.ClientCapabilities(&context, &caps); });
   if (result != CHANNEL_RC_OK) return result;
   if (!outgoing.empty()) return AnnounceFormat(context, true);
   CLIPRDR_FORMAT_LIST const list{ .common = { .msgType = CB_FORMAT_LIST } };

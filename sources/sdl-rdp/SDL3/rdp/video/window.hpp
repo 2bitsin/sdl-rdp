@@ -6,8 +6,9 @@ auto InitWindow(SDL_VideoDevice& device)                           -> void;
 auto DesktopMode(SDL_VideoData const& data, int width, int height) -> void;
 auto ResizePicture(SDL_VideoData& data, int width, int height)     -> bool;
 }
+
 namespace sdl3::rdp::video {
-using detail::window::InitWindow;
 using detail::window::DesktopMode;
+using detail::window::InitWindow;
 using detail::window::ResizePicture;
 }

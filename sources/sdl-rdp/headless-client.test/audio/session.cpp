@@ -15,7 +15,11 @@
 #include <thread>
 #include <vector>
 
-namespace BackendGate {
+namespace sdl_rdp::headless_client_test::audio::detail::session {
+using sdl_rdp::headless_client_test::backend::Clock;
+using sdl_rdp::headless_client_test::frame::FrameObserver;
+using sdl_rdp::utilities::Expects;
+
 namespace {
 auto WriteRealtimeAudio(sdlrdp_handle* backend) -> int {
   std::array<std::int16_t, 480uz * 2> pcm     { };
@@ -39,7 +43,7 @@ auto ConfirmDue(SoundClient& audio, std::chrono::milliseconds delay) -> void {
 }
 auto ThenAudioCadence(SoundClient const& audio) -> void {
   ASSERT_GT(audio.CaptureState().received.size(), 1u);
-  auto const maximum_gap = Headless::MaximumGapMs(audio.CaptureState().received);
+  auto const maximum_gap = MaximumGapMs(audio.CaptureState().received);
   auto       block_ms    = 1000.0 * static_cast<double>(audio.CaptureState().samples.size()) / 2
                            / static_cast<double>(audio.CaptureState().received.size()) / audio.CaptureState().rate;
   EXPECT_LE(maximum_gap, (2 * block_ms) + 10);

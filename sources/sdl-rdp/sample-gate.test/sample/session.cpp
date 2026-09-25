@@ -7,12 +7,15 @@
 #include <cstdint>
 #include <utility>
 
-namespace SampleGate {
+namespace sdl_rdp::sample_gate_test::sample::detail::session {
+using sdl_rdp::sample_gate_test::client::ConnectDrive;
+using sdl_rdp::sample_gate_test::frame::Pattern;
+
 auto SampleSession::GivenDesktopProcess(Words const& environment, Words const& options) -> void {
   ASSERT_NO_FATAL_FAILURE(GivenSession(environment, options, 1280, 800));
   ConnectExposed(*session);
 }
-auto SampleSession::GivenDriveProcess(Words const& options, fs::path const& share) -> void {
+auto SampleSession::GivenDriveProcess(Words const& options, std::filesystem::path const& share) -> void {
   ASSERT_NO_FATAL_FAILURE(GivenSession({ }, options));
   ConnectDrive(*session, share);
 }
@@ -56,12 +59,12 @@ auto SampleSession::ThenSettingsConnect(std::vector<std::string> const& args, st
   ASSERT_TRUE(client.Until([&] { return Pattern(client, false); }));
   Escape(client);
 }
-auto SampleSession::ClipboardSession() -> Headless::ClipboardClient& {
+auto SampleSession::ClipboardSession() -> ClipboardClient& {
   return *clipboard;
 }
 auto SampleSession::GivenClipboard(std::string const& text) -> void {
   ASSERT_NO_FATAL_FAILURE(GivenSession({ }, { "--clip", text }));
-  clipboard = std::make_unique<Headless::ClipboardClient>(*session);
+  clipboard = std::make_unique<ClipboardClient>(*session);
   ASSERT_NO_FATAL_FAILURE(Connect(*session));
 }
 auto SampleSession::GivenSession(Words const& environment, Words const& options, std::uint32_t width,

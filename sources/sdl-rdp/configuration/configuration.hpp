@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <filesystem>
 
-namespace Backend {
+namespace sdl_rdp::configuration::detail::configuration {
 class Configuration {
 public:
   explicit Configuration(sdlrdp_config const& config);
@@ -29,4 +29,8 @@ private:
   std::uint32_t             _audio_latency;
   Refresh                   _refresh;
 };
+}
+
+namespace sdl_rdp::configuration {
+using detail::configuration::Configuration;
 }

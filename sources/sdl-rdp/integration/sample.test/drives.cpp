@@ -17,7 +17,16 @@
 #include <string>
 #include <thread>
 
-namespace SampleGate {
+namespace sdl_rdp::integration::sample_test::detail::drives {
+using namespace std::chrono_literals;
+using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::Clock;
+using sdl_rdp::headless_client_test::utilities::ReadText;
+using sdl_rdp::sample_gate_test::client::ConnectDrive;
+using sdl_rdp::sample_gate_test::sample::BackendLibrary;
+using sdl_rdp::sample_gate_test::sample::PrimaryDisplayPort;
+using sdl_rdp::sample_gate_test::sample::Sample;
+
 namespace {
 auto ThenDriveStorage(SDL_PropertiesID properties) -> void {
   auto deadline = Clock::now() + 3s;
@@ -105,7 +114,7 @@ auto VerifyAppendAndDefaultDrive(SDL_PropertiesID properties) -> void {
   ASSERT_NO_FATAL_FAILURE(ThenAppendExtends(open));
   ThenEmptyNameSelectsFirstDrive(open);
 }
-auto VerifyStream(SDL_PropertiesID properties, fs::path const& path) -> void {
+auto VerifyStream(SDL_PropertiesID properties, std::filesystem::path const& path) -> void {
   using Open = SDL_IOStream*(SDLCALL*)(char const*, char const*, char const*);
   auto open = reinterpret_cast<Open>(
       SDL_GetPointerProperty(properties, SDL_PROP_DISPLAY_RDP_OPEN_FILE_POINTER, nullptr));
@@ -115,9 +124,9 @@ auto VerifyStream(SDL_PropertiesID properties, fs::path const& path) -> void {
   ASSERT_NO_FATAL_FAILURE(ThenStreamRead(stream));
   ASSERT_NO_FATAL_FAILURE(ThenStreamWrite(stream));
   EXPECT_TRUE(SDL_CloseIO(stream));
-  EXPECT_EQ(Headless::ReadText((path / "whole").c_str()), "content!");
+  EXPECT_EQ(ReadText((path / "whole").c_str()), "content!");
 }
-auto InitializeRdpVideo(fs::path const& certificates) -> void {
+auto InitializeRdpVideo(std::filesystem::path const& certificates) -> void {
   auto backend = BackendLibrary();
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_BACKEND, backend.c_str()));

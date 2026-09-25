@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 
-namespace Backend {
+namespace sdl_rdp::video::detail::tap {
 class Tap {
 public:
        Tap(int index, double ratio, std::uint32_t extent);
@@ -14,4 +14,8 @@ private:
   std::uint32_t _second;
   float         _weight;
 };
+}
+
+namespace sdl_rdp::video {
+using detail::tap::Tap;
 }

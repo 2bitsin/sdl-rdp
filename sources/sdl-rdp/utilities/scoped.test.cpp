@@ -5,6 +5,7 @@
 #include <optional>
 #include <stdexcept>
 
+namespace sdl_rdp::utilities::detail::scoped {
 namespace {
 using Count = std::optional<std::reference_wrapper<int>>;
 auto Open(int& count) -> Count {
@@ -12,7 +13,7 @@ auto Open(int& count) -> Count {
   return count;
 }
 auto Close(Count count) noexcept -> bool {
-  --utilities::Required(count, "RAIIWrap closes only an open count").get();
+  --Required(count, "RAIIWrap closes only an open count").get();
   return true;
 }
 auto IsNull(Count const& count) noexcept -> bool {
@@ -28,13 +29,13 @@ auto Enter(int& count) -> int& {
 auto Leave(int& count) noexcept -> void {
   --count;
 }
-using Counted = utilities::RAIIWrap<Count, Open, Close, IsNull, MakeNull>;
-using Entered = utilities::RAIIWrap<int&, Enter, Leave>;
+using Counted = RAIIWrap<Count, Open, Close, IsNull, MakeNull>;
+using Entered = RAIIWrap<int&, Enter, Leave>;
 static_assert(!std::copy_constructible<Counted>);
 static_assert(std::is_nothrow_move_constructible_v<Counted>);
 static_assert(std::is_nothrow_move_assignable_v<Counted>);
 static_assert(!std::move_constructible<Entered>);
-static_assert(!std::move_constructible<utilities::RAIIWrap<Count, Open, Close, IsNull>>);
+static_assert(!std::move_constructible<RAIIWrap<Count, Open, Close, IsNull>>);
 auto MoveTwiceIntoOccupied(int& first, int& second) -> void {
   Counted source     { first             };
   Counted destination{ second            };
@@ -63,7 +64,7 @@ TEST(ScopedResource, ReleaseHandsTheValueOverWithoutClosing) {
   std::array<int, 1> count{ };
   {
     Counted owner{ count.front() };
-    EXPECT_EQ(&utilities::Required(owner.Release(), "release hands the count over").get(), &count.front());
+    EXPECT_EQ(&Required(owner.Release(), "release hands the count over").get(), &count.front());
   }
   EXPECT_EQ(count.front(), 1);
 }
@@ -71,5 +72,6 @@ TEST(ScopedResource, ReferencePairLeavesScopeDuringUnwinding) {
   int active{ };
   EXPECT_THROW(EnterAndThrow(active), std::runtime_error);
   EXPECT_EQ(active, 0);
+}
 }
 }

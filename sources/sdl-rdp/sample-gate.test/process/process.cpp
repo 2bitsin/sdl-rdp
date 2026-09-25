@@ -16,9 +16,10 @@
 #include <thread>
 #include <unistd.h>
 
-namespace SampleGate {
-using Headless::Clock;
-using utilities::Expects;
+namespace sdl_rdp::sample_gate_test::process::detail::process {
+using sdl_rdp::utilities::Descriptor;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
 using namespace std::chrono_literals;
 
 namespace {
@@ -28,8 +29,8 @@ auto Spawn(std::vector<std::string> arguments, int& output) -> pid_t {
   auto const         piped       = pipe2(descriptors.data(), O_CLOEXEC);
   Expects(piped == 0, "stdout pipe created");
   output = descriptors[0];
-  Backend::Descriptor const write_end{ descriptors[1] };
-  SpawnActions              actions;
+  Descriptor const write_end{ descriptors[1] };
+  SpawnActions     actions;
   actions.Redirect(write_end.Get(), STDERR_FILENO);
   actions.Redirect(write_end.Get(), STDOUT_FILENO);
   std::vector<char*> argv;
@@ -63,7 +64,7 @@ auto Process::Line(std::string& line, Clock::time_point deadline) -> bool {
     auto left = std::chrono::ceil<std::chrono::milliseconds>(deadline - Clock::now()).count();
     if (left <= 0) return false;
     pollfd descriptor{ .fd = output, .events = POLLIN, .revents = 0 };
-    if (poll(&descriptor, 1, Backend::Narrowed<int>(left)) <= 0) return false;
+    if (poll(&descriptor, 1, Narrowed<int>(left)) <= 0) return false;
     std::array<char, 4096> buffer { };
     auto                   count  = read(output, buffer.data(), buffer.size());
     if (count <= 0) return false;

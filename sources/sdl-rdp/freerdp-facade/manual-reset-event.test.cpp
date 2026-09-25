@@ -5,13 +5,15 @@
 #include <gtest/gtest.h>
 #include <winpr/synch.h>
 
+namespace sdl_rdp::freerdp_facade::detail::manual_reset_event {
 TEST(ManualResetEvent, StartsClearAndStaysSetUntilReset) {
-  auto const event = sdl_rdp::freerdp_facade::ManualResetEvent("Test event");
+  auto const event = ManualResetEvent("Test event");
   ASSERT_TRUE(event);
-  EXPECT_FALSE(sdl_rdp::freerdp_facade::Waitable{ event.get() }.Signalled());
+  EXPECT_FALSE(Waitable{ event.get() }.Signalled());
   ASSERT_TRUE(SetEvent(event.get()));
-  EXPECT_TRUE(sdl_rdp::freerdp_facade::Waitable{ event.get() }.Signalled());
-  EXPECT_TRUE(sdl_rdp::freerdp_facade::Waitable{ event.get() }.Signalled());
+  EXPECT_TRUE(Waitable{ event.get() }.Signalled());
+  EXPECT_TRUE(Waitable{ event.get() }.Signalled());
   ASSERT_TRUE(ResetEvent(event.get()));
-  EXPECT_FALSE(sdl_rdp::freerdp_facade::Waitable{ event.get() }.Signalled());
+  EXPECT_FALSE(Waitable{ event.get() }.Signalled());
+}
 }

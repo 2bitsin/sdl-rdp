@@ -15,7 +15,10 @@
 #include <string_view>
 #include <vector>
 
-namespace AuthenticationGate {
+namespace sdl_rdp::headless_client_test::backend::detail::authentication {
+using sdl_rdp::auth::QualifiedName;
+using sdl_rdp::headless_client_test::client::Client;
+
 namespace {
 struct Identity {
   std::string_view user;
@@ -94,12 +97,12 @@ auto Authentication::Lookup(void* raw, char const* domain, char const* user, std
 }
 auto Authentication::Attempt(char const* user, char const* password, char const* domain, bool nla, bool accepted)
     -> void {
-  Headless::Client client(sdlrdp_port(handle.Handle()), false);
+  Client client(sdlrdp_port(handle.Handle()), false);
   client.Credentials({ .user = user, .password = password, .domain = domain }, nla);
   ASSERT_EQ(client.Connect(), accepted);
   if (!accepted)
     rejections.push_back(
-        std::format("Authentication rejected: user \"{}\" from 127.0.0.1", Backend::QualifiedName(domain, user)));
+        std::format("Authentication rejected: user \"{}\" from 127.0.0.1", QualifiedName(domain, user)));
   Identity const expected  { .user = user, .domain = domain, .authenticated = config.auth != SDLRDP_AUTH_NONE };
   bool           connected = false;
   auto           receive   = [&] {

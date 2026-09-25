@@ -5,7 +5,7 @@
 #include <thread>
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::utilities::detail::deadline {
 using Deadline = std::chrono::steady_clock::time_point;
 auto DeadlineAfter(std::chrono::milliseconds timeout) -> Deadline;
 auto AbiDeadline(int timeout_ms)                      -> Deadline;
@@ -28,4 +28,13 @@ auto Sleeping(std::chrono::duration<RepTy, PeriodTy> interval) -> std::predicate
     return true;
   };
 }
+}
+
+namespace sdl_rdp::utilities {
+using detail::deadline::AbiDeadline;
+using detail::deadline::Deadline;
+using detail::deadline::DeadlineAfter;
+using detail::deadline::Sleeping;
+using detail::deadline::Throughout;
+using detail::deadline::Until;
 }

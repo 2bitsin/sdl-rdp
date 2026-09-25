@@ -10,7 +10,10 @@
 #include <cstdint>
 #include <cstring>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::client::detail::sound {
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
+
 SoundClient::SoundClient(Client& target) : client(target), previous_load(client.Instance()->LoadChannels) {
   auto const playback = freerdp_settings_set_bool(client.Instance()->context->settings, FreeRDP_AudioPlayback, true);
   Expects(playback, "sound playback enabled");
@@ -40,8 +43,7 @@ auto SoundClient::Capture(std::span<std::byte const> bytes) -> void {
   capture.samples.resize(start + (bytes.size() / 2));
   std::memcpy(capture.samples.data() + start, bytes.data(), bytes.size());
   capture.received.push_back(Clock::now());
-  capture.pending.push_back(
-      { timestamp, block, Backend::Narrowed<std::uint32_t>(bytes.size() / 4), capture.received.back() });
+  capture.pending.push_back({ timestamp, block, Narrowed<std::uint32_t>(bytes.size() / 4), capture.received.back() });
   capture.maximum_pending_frames = std::max(capture.maximum_pending_frames,
                                             (capture.samples.size() / 2) - capture.confirmed_frames);
   if (!capture.auto_confirm) return;
@@ -63,7 +65,7 @@ auto SoundClient::Confirm(std::size_t index) -> bool {
                                      0 };
   if (!Send(std::as_bytes(std::span(bytes)))) return false;
   capture.confirmed_frames += confirmation.frames;
-  capture.pending.erase(capture.pending.begin() + Backend::Narrowed<std::ptrdiff_t>(index));
+  capture.pending.erase(capture.pending.begin() + Narrowed<std::ptrdiff_t>(index));
   return true;
 }
 auto SoundClient::CaptureState() -> SoundCapture& {

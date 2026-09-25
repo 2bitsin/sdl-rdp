@@ -12,7 +12,9 @@
 #include <cstring>
 
 namespace sdl_rdp::drive::detail::transfer {
-using utilities::Expects;
+using sdl_rdp::freerdp_facade::IrpMajor;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
 template <class Byte> auto Submit(sdlrdp_file& file, std::uint64_t offset, std::span<Byte> bytes)
     -> std::shared_ptr<DriveRequest> {
   Expects(!bytes.empty(), "transfer chunk is nonempty");
@@ -20,12 +22,11 @@ template <class Byte> auto Submit(sdlrdp_file& file, std::uint64_t offset, std::
   constexpr bool        write                = std::is_const_v<Byte>;
   DrivePacket           packet;
   constexpr std::size_t padding_after_offset = 20;
-  packet.Write(Backend::Narrowed<std::uint32_t>(bytes.size()));
+  packet.Write(Narrowed<std::uint32_t>(bytes.size()));
   packet.Write(offset);
   packet.Zero(padding_after_offset);
   if constexpr (write) packet.Append(bytes);
-  return file.Channel()->Send(file.Drive(), file.Id(),
-                              write ? freerdp_facade::IrpMajor::Write : freerdp_facade::IrpMajor::Read, packet);
+  return file.Channel()->Send(file.Drive(), file.Id(), write ? IrpMajor::Write : IrpMajor::Read, packet);
 }
 template <class Byte>
 auto Finish(sdlrdp_file& file, std::shared_ptr<DriveRequest> const& request, std::span<Byte> bytes) -> std::size_t {
@@ -79,14 +80,15 @@ template <class Byte> auto Transfer(sdlrdp_file& file, std::uint64_t offset, std
     SubmitSlot(file, offset, bytes, progress, slot);
   }
   if (progress.failure) std::rethrow_exception(progress.failure);
-  return Backend::Narrowed<int>(progress.limit);
+  return Narrowed<int>(progress.limit);
 }
 }
+
 namespace sdl_rdp::drive {
-using detail::transfer::Submit;
 using detail::transfer::Finish;
-using detail::transfer::TransferProgress;
-using detail::transfer::SubmitSlot;
 using detail::transfer::FinishSlot;
+using detail::transfer::Submit;
+using detail::transfer::SubmitSlot;
 using detail::transfer::Transfer;
+using detail::transfer::TransferProgress;
 }

@@ -2,7 +2,9 @@
 
 #include <sdl-rdp/utilities/contract.hpp>
 
-namespace Backend {
+namespace sdl_rdp::auth::detail::credentials {
+using sdl_rdp::utilities::Expects;
+
 Credentials::Credentials(std::filesystem::path const& directory)
     : _directory{ directory }, _certificate{ directory / "server.crt" }, _key{ directory / "server.key" } {
   Expects(!directory.empty(), "certificate directory is nonempty");

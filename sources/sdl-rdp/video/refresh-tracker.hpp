@@ -6,7 +6,11 @@
 #include <concepts>
 #include <cstdint>
 
-namespace Backend {
+namespace sdl_rdp::video::detail::refresh_tracker {
+using sdl_rdp::configuration::Refresh;
+using sdl_rdp::configuration::RefreshMode;
+using sdl_rdp::utilities::Expects;
+
 inline constexpr std::uint32_t DefaultRefreshRate = 60;
 class RefreshTracker {
 public:
@@ -27,4 +31,8 @@ private:
   std::atomic<std::uint32_t> _effective         { DefaultRefreshRate };
   bool                       _unavailable_logged{ };
 };
+}
+
+namespace sdl_rdp::video {
+using detail::refresh_tracker::RefreshTracker;
 }

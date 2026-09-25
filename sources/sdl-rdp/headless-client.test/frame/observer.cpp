@@ -4,7 +4,9 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::frame::detail::observer {
+using sdl_rdp::utilities::Expects;
+
 FrameObserver::FrameObserver(Client& client)
     : update(client.Instance()->context->update), original(update->SurfaceFrameMarker) {
   Expects(!active, "one frame observer per thread");

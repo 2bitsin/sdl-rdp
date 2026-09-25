@@ -8,7 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace Headless {
+namespace sdl_rdp::headless_client_test::client::detail::channels {
 namespace {
 auto LoadAddin(freerdp* instance, char const* name, std::span<char const* const> dynamic) -> bool {
   auto* settings = instance->context->settings;

@@ -31,6 +31,7 @@ enum class AccessMask : std::uint32_t {
   Delete = 0x00010000,
 };
 }
+
 namespace sdl_rdp::freerdp_facade {
 using detail::rdpdr::AccessMask;
 using detail::rdpdr::FileAttribute;

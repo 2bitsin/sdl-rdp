@@ -12,7 +12,9 @@
 #include <string_view>
 
 namespace sdl_rdp::integration::support_bench::detail::measurement {
-using Duration = Backend::Stopwatch::Clock::duration;
+using sdl_rdp::utilities::Stopwatch;
+
+using Duration = Stopwatch::Clock::duration;
 
 // One session's outcome: the rig's gtest results, counters, label and the measured span, reported once.
 class Measurement {
@@ -23,7 +25,7 @@ public:
       std::invoke(step);
       return true;
     };
-    return Backend::Contained(false, ran, [phase](std::string_view text) { FailFatally(phase, text); });
+    return sdl_rdp::utilities::Contained(false, ran, [phase](std::string_view text) { FailFatally(phase, text); });
   }
   auto Holds(std::invocable auto&&... steps) -> bool {
     return ((Contained("a rig step", steps) && Healthy()) && ...);

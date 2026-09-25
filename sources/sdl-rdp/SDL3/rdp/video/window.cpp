@@ -2,8 +2,11 @@
 #include "device.hpp"
 #include <sdl-rdp/SDL3/rdp/backend/boundary.hpp>
 namespace sdl3::rdp::video::detail::window {
-using backend::Boundary;
-using backend::Operation;
+using sdl3::rdp::backend::Boundary;
+using sdl3::rdp::backend::Operation;
+using sdl_rdp::settings::Settings;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::RAIIWrap;
 namespace {
 // SDL rejects desktop updates while fullscreen_active is set.
 using FullscreenState = std::pair<std::reference_wrapper<SDL_VideoDisplay>, bool>;
@@ -13,11 +16,11 @@ auto SuspendFullscreen(SDL_VideoDisplay& display) -> FullscreenState {
 auto RestoreFullscreen(FullscreenState const& state) noexcept -> void {
   state.first.get().fullscreen_active = state.second;
 }
-using FullscreenSuspension = utilities::RAIIWrap<FullscreenState, SuspendFullscreen, RestoreFullscreen>;
+using FullscreenSuspension = RAIIWrap<FullscreenState, SuspendFullscreen, RestoreFullscreen>;
 }
 auto DesktopMode(SDL_VideoData const& data, int width, int height) -> void {
-  utilities::Expects(width > 0, "desktop has width");
-  utilities::Expects(height > 0, "desktop has height");
+  Expects(width > 0, "desktop has width");
+  Expects(height > 0, "desktop has height");
   auto& display = *SDL_GetVideoDisplay(data.Display());
   auto  mode    = display.desktop_mode;
   mode.w = width;
@@ -26,8 +29,8 @@ auto DesktopMode(SDL_VideoData const& data, int width, int height) -> void {
   SDL_SetDesktopDisplayMode(&display, &mode);
 }
 auto ResizePicture(SDL_VideoData& data, int width, int height) -> bool {
-  utilities::Expects(width > 0, "picture has width");
-  utilities::Expects(height > 0, "picture has height");
+  Expects(width > 0, "picture has width");
+  Expects(height > 0, "picture has height");
   if (data.Backend().Call<Operation::RESIZE>(width, height) != 0) return data.Backend().Fail();
   data.Picture(width, height);
   auto const& mode = SDL_GetVideoDisplay(data.Display())->desktop_mode;
@@ -42,12 +45,12 @@ auto PlaceAtOrigin(SDL_Window& window) -> void {
 // SDL's video callback table supplies borrowed device and window pointers.
 auto CreateWindow(SDL_VideoDevice* device, SDL_Window* window, [[maybe_unused]] SDL_PropertiesID unused_properties)
     -> bool {
-  utilities::Expects(device != nullptr, "window creation has a device");
-  utilities::Expects(window != nullptr, "window creation has a window");
+  Expects(device != nullptr, "window creation has a device");
+  Expects(window != nullptr, "window creation has a window");
   return Boundary([&] {
     auto& data = *device->internal;
     if (data.Window()) return SDL_SetError("RDP supports one window");
-    auto const aspect = data.Backend().Options().Value<&sdl_rdp::settings::Settings::aspect>();
+    auto const aspect = data.Backend().Options().Value<&Settings::aspect>();
     SetAspect(data.Backend(), aspect);
     PlaceAtOrigin(*window);
     if (!ResizePicture(data, window->w, window->h)) return false;
@@ -59,14 +62,14 @@ auto CreateWindow(SDL_VideoDevice* device, SDL_Window* window, [[maybe_unused]] 
 }
 // SDL's video callback table supplies borrowed device and window pointers.
 auto DestroyWindow(SDL_VideoDevice* device, SDL_Window* window) -> void {
-  utilities::Expects(device != nullptr, "window destruction has a device");
+  Expects(device != nullptr, "window destruction has a device");
   auto& data = *device->internal;
   if (data.Window() && &BoundWindow(data) == window) data.Unbind();
 }
 // SDL's video callback table supplies borrowed device and window pointers.
 auto SetWindowSize(SDL_VideoDevice* device, SDL_Window* window) -> void {
-  utilities::Expects(device != nullptr, "resize has a device");
-  utilities::Expects(window != nullptr, "resize has a window");
+  Expects(device != nullptr, "resize has a device");
+  Expects(window != nullptr, "resize has a window");
   if (ResizePicture(*device->internal, window->pending.w, window->pending.h))
     SDL_SendWindowEvent(window, SDL_EVENT_WINDOW_RESIZED, window->pending.w, window->pending.h);
   window->last_size_pending = false;
@@ -76,9 +79,9 @@ auto ShowWindow([[maybe_unused]] SDL_VideoDevice* unused_device, [[maybe_unused]
 // SDL's fullscreen callback supplies borrowed device, window and display pointers.
 auto Fullscreen(SDL_VideoDevice* device, SDL_Window* window, SDL_VideoDisplay* display, SDL_FullscreenOp operation)
     -> SDL_FullscreenResult {
-  utilities::Expects(device != nullptr, "fullscreen has a device");
-  utilities::Expects(window != nullptr, "fullscreen has a window");
-  utilities::Expects(display != nullptr, "fullscreen has a display");
+  Expects(device != nullptr, "fullscreen has a device");
+  Expects(window != nullptr, "fullscreen has a window");
+  Expects(display != nullptr, "fullscreen has a display");
   auto const  leaving = operation == SDL_FULLSCREEN_OP_LEAVE;
   auto const& mode    = window->requested_fullscreen_mode.w ? window->requested_fullscreen_mode : display->desktop_mode;
   auto const  width   = leaving ? window->windowed.w : mode.w;

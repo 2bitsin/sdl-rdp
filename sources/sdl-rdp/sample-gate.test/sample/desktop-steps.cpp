@@ -10,7 +10,13 @@
 #include <format>
 #include <utility>
 
-namespace SampleGate {
+namespace sdl_rdp::sample_gate_test::sample::detail::desktop_steps {
+using namespace std::chrono_literals;
+using sdl_rdp::headless_client_test::client::Clock;
+using sdl_rdp::headless_client_test::utilities::UnicodeText;
+using sdl_rdp::sample_gate_test::client::ThenAdvanced;
+using sdl_rdp::sample_gate_test::frame::Pattern;
+
 auto SampleDesktopSteps::GivenAdvancedSession() -> void {
   ASSERT_NO_FATAL_FAILURE(GivenInputSession(true));
   ThenAdvanced(SessionClient());
@@ -27,12 +33,12 @@ auto SampleDesktopSteps::WhenUnicodeClipboardOffered(Client& client, std::span<s
   SDL_Log("trace CLIPBOARD client formats=13 request=13 utf16le=7c01f300420177000000 text=żółw");
 }
 auto SampleDesktopSteps::WhenClipboardEmptied(Client& client) -> void {
-  ASSERT_TRUE(ClipboardSession().Offer(sdl_rdp::headless_client_test::utilities::UnicodeText("")));
+  ASSERT_TRUE(ClipboardSession().Offer(UnicodeText("")));
   ASSERT_TRUE(client.Until([&] { return ClipboardSession().Observed().requests.load() == 1; }));
   ASSERT_TRUE(Read("event CLIPBOARD text="));
 }
 auto SampleDesktopSteps::WhenAsciiClipboardOffered(Client& client) -> void {
-  ASSERT_TRUE(ClipboardSession().Offer(sdl_rdp::headless_client_test::utilities::UnicodeText("world")));
+  ASSERT_TRUE(ClipboardSession().Offer(UnicodeText("world")));
   ASSERT_TRUE(client.Until([&] { return ClipboardSession().Observed().requests.load() == 1; }));
   ASSERT_TRUE(Read("event CLIPBOARD text=world"));
   SDL_Log("trace CLIPBOARD client formats=13 request=13 utf16le=77006f0072006c0064000000 text=world");

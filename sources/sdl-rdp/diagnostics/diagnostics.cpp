@@ -1,6 +1,6 @@
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 
-namespace Backend {
+namespace sdl_rdp::diagnostics::detail::diagnostics {
 Diagnostics::Diagnostics(sdlrdp_config const& config, bool tracing) : _logger{ config }, _tracing{ tracing } { }
 auto Diagnostics::Log(sdlrdp_log_level level, std::string const& text) const -> void {
   _logger.Log(level, text);

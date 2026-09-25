@@ -15,7 +15,13 @@
 #include <regex>
 #include <string>
 
-namespace BackendGate {
+namespace sdl_rdp::headless_client_test::graphics::detail::round_five {
+using sdl_rdp::headless_client_test::backend::AwaitAllAcknowledged;
+using sdl_rdp::headless_client_test::backend::RequiredStatus;
+using sdl_rdp::headless_client_test::frame::GraphicsScene;
+using sdl_rdp::headless_client_test::frame::HashPattern;
+using sdl_rdp::utilities::Extent;
+
 auto RoundFive::ThenAcknowledgementTimeout(std::vector<std::uint32_t> const& pixels) -> void {
   EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 10000), 1);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
@@ -43,8 +49,8 @@ auto RoundFive::ThenAspectMouse(Client& client) -> void {
 auto RoundFive::ThenAgedWindowResumes(std::vector<std::uint32_t> const& pixels) -> void {
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
   EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 0), 0);
-  ASSERT_TRUE(GraphicsObserver().AckFrame(4, 0));
-  ASSERT_NO_FATAL_FAILURE(AwaitFrames(GraphicsClient(), GraphicsObserver().Observed().frames, 7));
+  ASSERT_TRUE(Observer().AckFrame(4, 0));
+  ASSERT_NO_FATAL_FAILURE(AwaitFrames(GraphicsClient(), Observer().Observed().frames, 7));
   ThenGraphicsTimeoutStatistics();
 }
 auto RoundFive::ThenColourDepth(std::uint32_t depth) -> void {
@@ -54,12 +60,11 @@ auto RoundFive::ThenColourDepth(std::uint32_t depth) -> void {
   client.Tolerance(depth == 16 ? 7 : 0);
   EXPECT_EQ(freerdp_settings_get_uint32(client.Instance()->context->settings, FreeRDP_ColorDepth), depth);
   std::vector<std::uint32_t> pixels(320uz * 200);
-  Headless::HashPattern(pixels);
+  HashPattern(pixels);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
   ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text();
 }
-auto RoundFive::ThenProgressiveDamageCost(Client& client, Headless::GraphicsObserver& observer, std::uint64_t before)
-    -> void {
+auto RoundFive::ThenProgressiveDamageCost(Client& client, GraphicsObserver& observer, std::uint64_t before) -> void {
   EXPECT_EQ(observer.Observed().progressive_headers, 1u);
   EXPECT_EQ(observer.Observed().surfaces.size(), 1u);
   EXPECT_LT(client.Received() - before, 4096u);
@@ -78,16 +83,15 @@ auto RoundFive::ThenAutoChangesToRaw(Client& client, std::vector<std::uint32_t>&
 }
 auto RoundFive::ThenGraphicsTimeoutStatistics() -> void {
   ASSERT_NO_FATAL_FAILURE(ThenTimedOutFrames("7", 2));
-  EXPECT_EQ(GraphicsObserver().Observed().frames.size(), 7u);
+  EXPECT_EQ(Observer().Observed().frames.size(), 7u);
 }
 auto RoundFive::ThenGraphicsAcknowledgementsCounted() -> void {
-  ASSERT_TRUE(GraphicsObserver().Ack());
-  ASSERT_NO_FATAL_FAILURE(
-      sdl_rdp::headless_client_test::backend::AwaitAllAcknowledged(GraphicsClient(), backend, logs));
+  ASSERT_TRUE(Observer().Ack());
+  ASSERT_NO_FATAL_FAILURE(AwaitAllAcknowledged(GraphicsClient(), backend, logs));
   EXPECT_EQ(RequiredStatus(*backend).acknowledgements, 3u);
 }
 auto RoundFive::ThenGraphicsWindowReleases(std::vector<std::uint32_t> const& pixels) -> void {
-  ASSERT_TRUE(GraphicsObserver().AckFrame(0, 0));
+  ASSERT_TRUE(Observer().AckFrame(0, 0));
   ASSERT_TRUE(GraphicsClient().Until([&] { return sdlrdp_wait_frame(backend.Handle(), 0) == 1; }));
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
   EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 1), 0);
@@ -104,10 +108,10 @@ auto RoundFive::RunPictureSizes(bool graphics) -> void {
   ASSERT_NO_FATAL_FAILURE(Open());
   Client client(sdlrdp_port(backend.Handle()), true, 640, 480);
   if (graphics) client.EnableGraphics();
-  Headless::GraphicsObserver observer(client);
+  GraphicsObserver           observer(client);
   std::vector<std::uint32_t> pixels(640uz * 480, 0x123456);
   ASSERT_NO_FATAL_FAILURE(ShowFirstPicture(client, pixels));
-  for (auto size : { Backend::Extent{ .width = 320, .height = 200 }, Backend::Extent{ .width = 640, .height = 480 } }) {
+  for (auto size : { Extent{ .width = 320, .height = 200 }, Extent{ .width = 640, .height = 480 } }) {
     ASSERT_NO_FATAL_FAILURE(ResizePicture(client, observer, pixels, size, graphics));
   }
 }

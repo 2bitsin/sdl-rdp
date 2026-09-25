@@ -6,7 +6,10 @@
 #include <array>
 #include <ranges>
 
-namespace Backend {
+namespace sdl_rdp::input::detail::input {
+using sdl_rdp::link::DynamicChannelsReady;
+using sdl_rdp::utilities::Expects;
+
 Input::Input(PeerLink& link, InputEvents& events) noexcept
     : _link{ link }, _advanced{ link, events }, _touch{ link, events } { }
 auto Input::Channels(std::span<WaitHandle const> ready) -> bool {

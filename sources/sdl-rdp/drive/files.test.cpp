@@ -6,7 +6,7 @@
 #include <array>
 #include <span>
 
-namespace sdl_rdp::drive {
+namespace sdl_rdp::drive::detail::files {
 TEST(DriveFiles, NoChannelListsNoDrives) {
   std::array<sdlrdp_drive, 2> out{ };
   EXPECT_EQ(DriveFiles{ nullptr }.List(out), 0);

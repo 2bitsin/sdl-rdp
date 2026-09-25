@@ -2,7 +2,7 @@
 
 #include <utility>
 
-namespace Backend {
+namespace sdl_rdp::diagnostics::detail::error_store {
 auto ErrorStore::Last() -> std::string const& {
   return *CallingThread().text;
 }

@@ -8,12 +8,15 @@
 #include <cstdint>
 #include <utility>
 namespace sdl3::rdp::audio::detail::bootstrap {
-using backend::Boundary;
-using backend::Operation;
-using backend::ScopedMutexLock;
-using settings::InvalidSetting;
-using settings::Text;
+using sdl3::rdp::backend::Boundary;
+using sdl3::rdp::backend::Operation;
+using sdl3::rdp::backend::ScopedMutexLock;
+using sdl3::rdp::settings::InvalidSetting;
+using sdl3::rdp::settings::Text;
 using sdl_rdp::settings::Settings;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::RAIIWrap;
 namespace {
 constexpr SDL_AudioSpec PlaybackSpec     { SDL_AUDIO_S16, 2, 44100 };
 constexpr int           PeriodsPerSecond = 100;
@@ -33,17 +36,23 @@ auto OpenAudio(Driver const& driver) -> std::reference_wrapper<Driver const> {
 auto CloseAudio(std::reference_wrapper<Driver const> driver) noexcept -> void {
   driver.get().Call<Operation::AUDIO_CLOSE>();
 }
-using AudioSession = utilities::RAIIWrap<std::reference_wrapper<Driver const>, OpenAudio, CloseAudio>;
+using AudioSession = RAIIWrap<std::reference_wrapper<Driver const>, OpenAudio, CloseAudio>;
 }
 }
+
+using sdl3::rdp::Driver;
+using sdl3::rdp::OwnedDriver;
+using sdl3::rdp::audio::detail::bootstrap::AudioLead;
+using sdl3::rdp::audio::detail::bootstrap::AudioSession;
+using sdl3::rdp::backend::Operation;
+
 // SDL declares this tag as a struct; the members stay private.
-struct SDL_PrivateAudioData : private sdl3::rdp::OwnedDriver<sdl3::rdp::Driver const> {
+struct SDL_PrivateAudioData : private OwnedDriver<Driver const> {
 public:
-  using sdl3::rdp::OwnedDriver<sdl3::rdp::Driver const>::Backend;
-  explicit SDL_PrivateAudioData(std::shared_ptr<sdl3::rdp::Driver const> driver)
-      : sdl3::rdp::OwnedDriver<sdl3::rdp::Driver const>{ std::move(driver) },
-        _lead{ sdl3::rdp::audio::detail::bootstrap::AudioLead(Backend()) },
-        _rate{ Backend().Call<sdl3::rdp::backend::Operation::AUDIO_RATE>() }, _session{ Backend() } { }
+  using OwnedDriver<Driver const>::Backend;
+  explicit SDL_PrivateAudioData(std::shared_ptr<Driver const> driver)
+      : OwnedDriver<Driver const>{ std::move(driver) }, _lead{ AudioLead(Backend()) },
+        _rate{ Backend().Call<Operation::AUDIO_RATE>() }, _session{ Backend() } { }
   auto     Buffer() -> std::vector<std::uint8_t>& {
     return _buffer;
   }
@@ -63,22 +72,22 @@ public:
     return delay;
   }
 private:
-  std::vector<std::uint8_t>                               _buffer;
-  std::uint64_t                                           _next   { SDL_GetTicksNS() };
-  std::uint64_t                                           _lead;
-  std::uint32_t                                           _rate;
-  sdl3::rdp::audio::detail::bootstrap::AudioSession const _session;
+  std::vector<std::uint8_t> _buffer;
+  std::uint64_t             _next   { SDL_GetTicksNS() };
+  std::uint64_t             _lead;
+  std::uint32_t             _rate;
+  AudioSession const        _session;
 };
 namespace sdl3::rdp::audio::detail::bootstrap {
 namespace {
 // SDL audio discovery returns borrowed device pointers through C out parameters.
 auto DetectDevices(SDL_AudioDevice** playback, [[maybe_unused]] SDL_AudioDevice** unused_recording) -> void {
-  utilities::Expects(playback != nullptr, "audio discovery has a playback output");
+  Expects(playback != nullptr, "audio discovery has a playback output");
   *playback = SDL_AddAudioDevice(false, "RDP client", &PlaybackSpec, reinterpret_cast<void*>(DetectDevices));
 }
 // SDL lends the audio device to the open callback and owns its hidden state until close.
 auto OpenDevice(SDL_AudioDevice* device) -> bool {
-  utilities::Expects(device != nullptr, "audio open has a device");
+  Expects(device != nullptr, "audio open has a device");
   return Boundary([&] {
     auto state = std::make_unique<SDL_PrivateAudioData>(Rendezvous::Acquire());
     device->spec = PlaybackSpec;
@@ -140,7 +149,7 @@ auto PlaybackDelay(SDL_AudioDevice& device) -> std::uint64_t {
 }
 // SDL borrows the device while its audio thread waits for playback.
 auto WaitDevice(SDL_AudioDevice* device) -> bool {
-  utilities::Expects(device != nullptr, "audio wait has a device");
+  Expects(device != nullptr, "audio wait has a device");
   return Boundary([&] {
     if (!AwaitBackend(*device)) return false;
     PollRateChanges(device->hidden->Backend());
@@ -150,27 +159,27 @@ auto WaitDevice(SDL_AudioDevice* device) -> bool {
 }
 // SDL audio playback provides a borrowed device and counted sample buffer.
 auto PlayDevice(SDL_AudioDevice* device, std::uint8_t const* buffer, int length) -> bool {
-  utilities::Expects(device != nullptr, "audio playback has a device");
-  utilities::Expects(buffer != nullptr, "audio playback has a buffer");
-  utilities::Expects(length >= 0, "audio buffer length is nonnegative");
-  auto const  frames = ::Backend::Narrowed<std::uint32_t>(length) / SDL_AUDIO_FRAMESIZE(device->spec);
+  Expects(device != nullptr, "audio playback has a device");
+  Expects(buffer != nullptr, "audio playback has a buffer");
+  Expects(length >= 0, "audio buffer length is nonnegative");
+  auto const  frames = Narrowed<std::uint32_t>(length) / SDL_AUDIO_FRAMESIZE(device->spec);
   auto const& driver = device->hidden->Backend();
   return std::cmp_equal(driver.Call<Operation::AUDIO_WRITE>(buffer, frames), frames) || driver.Fail();
 }
 // SDL borrows the returned mixing buffer until its next device callback.
 auto GetDeviceBuffer(SDL_AudioDevice* device, [[maybe_unused]] int* unused_size) -> std::uint8_t* {
-  utilities::Expects(device != nullptr, "audio buffer has a device");
+  Expects(device != nullptr, "audio buffer has a device");
   auto& buffer = device->hidden->Buffer();
   return std::cmp_greater_equal(buffer.size(), device->buffer_size) ? buffer.data() : nullptr;
 }
 // SDL returns ownership of hidden audio state to its close callback.
 auto CloseDevice(SDL_AudioDevice* device) -> void {
-  utilities::Expects(device != nullptr, "audio close has a device");
+  Expects(device != nullptr, "audio close has a device");
   std::unique_ptr<SDL_PrivateAudioData> const state{ std::exchange(device->hidden, nullptr) };
 }
 // SDL passes its writable audio callback table to bootstrap initialization.
 auto InitAudio(SDL_AudioDriverImpl* implementation) -> bool {
-  utilities::Expects(implementation != nullptr, "audio initialization has a callback table");
+  Expects(implementation != nullptr, "audio initialization has a callback table");
   implementation->DetectDevices = DetectDevices;
   implementation->OpenDevice    = OpenDevice;
   implementation->CloseDevice   = CloseDevice;
@@ -180,7 +189,6 @@ auto InitAudio(SDL_AudioDriverImpl* implementation) -> bool {
   return true;
 }
 }
+// SDL's C bootstrap table requires this named object with static storage; C linkage names the global symbol.
+extern "C" AudioBootStrap const RDPAUDIO_bootstrap = { "rdp", "SDL RDP audio driver", InitAudio, true, false };
 }
-// SDL's C bootstrap table requires this named object with static storage.
-extern "C" AudioBootStrap const RDPAUDIO_bootstrap = { "rdp", "SDL RDP audio driver",
-                                                       sdl3::rdp::audio::detail::bootstrap::InitAudio, true, false };

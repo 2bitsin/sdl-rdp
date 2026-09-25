@@ -8,11 +8,18 @@
 #include <functional>
 #include <span>
 namespace sdl3::rdp::detail::driver {
+using sdl3::rdp::backend::Backend;
+using sdl3::rdp::backend::BackendOperation;
+using sdl3::rdp::backend::Session;
+using sdl3::rdp::settings::AuthenticationCredential;
+using sdl3::rdp::settings::Configuration;
+using sdl_rdp::utilities::RAIIWrap;
+
 class Driver {
 public:
   Driver();
   template <backend::Operation OPERATION, typename... ArgsTy>
-    requires backend::BackendOperation<OPERATION, sdlrdp_handle*, ArgsTy...>
+    requires BackendOperation<OPERATION, sdlrdp_handle*, ArgsTy...>
   auto Call(ArgsTy&&... args) const -> decltype(auto) {
     return _backend.Call<OPERATION>(_session.Get().second, std::forward<ArgsTy>(args)...);
   }
@@ -24,7 +31,7 @@ public:
     for (auto count = PollBatch(events); count; count = PollBatch(events))
       std::ranges::for_each(std::span(events).first(count), std::cref(accept));
   }
-  auto Options() const                                   -> settings::Options const&;
+  auto Options() const                                   -> sdl3::rdp::settings::Options const&;
   auto Config() const                                    -> sdlrdp_config const&;
   auto AuthDisplay(SDL_PropertiesID properties) noexcept -> void;
   template <typename FailureTy = bool>
@@ -35,27 +42,28 @@ public:
   [[noreturn]] auto Throw() const -> void;
 private:
   // Backend authentication callbacks carry an opaque context and borrowed C strings.
-  template <backend::Operation OPERATION, settings::AuthenticationCredential CredentialTy>
+  template <backend::Operation OPERATION, AuthenticationCredential CredentialTy>
   static auto Authenticate(void* context, char const* domain, char const* user, CredentialTy credential) -> int;
   auto        PollBatch(std::span<sdlrdp_event> events) const                                            -> std::size_t;
   auto        ReportError() const                                                                        -> void;
-  static constexpr std::size_t  EventBatch       = 64;
-  settings::Options const       _options;
-  settings::Configuration const _config;
-  backend::Backend const        _backend;
-  std::atomic<SDL_PropertiesID> _auth_properties;
-  backend::Session const        _session;
+  static constexpr std::size_t       EventBatch       = 64;
+  sdl3::rdp::settings::Options const _options;
+  Configuration const                _config;
+  Backend const                      _backend;
+  std::atomic<SDL_PropertiesID>      _auth_properties;
+  Session const                      _session;
 };
 // The backend's authentication callback reports to this display's properties until it is withdrawn.
 using DisplayAuthentication = std::pair<std::reference_wrapper<Driver>, SDL_PropertiesID>;
 auto PublishAuthentication(Driver& driver, SDL_PropertiesID properties)           -> DisplayAuthentication;
 auto WithdrawAuthentication(DisplayAuthentication const& authentication) noexcept -> void;
-using AuthenticationDisplay = utilities::RAIIWrap<DisplayAuthentication, PublishAuthentication, WithdrawAuthentication>;
+using AuthenticationDisplay = RAIIWrap<DisplayAuthentication, PublishAuthentication, WithdrawAuthentication>;
 }
+
 namespace sdl3::rdp {
-using detail::driver::Driver;
+using detail::driver::AuthenticationDisplay;
 using detail::driver::DisplayAuthentication;
+using detail::driver::Driver;
 using detail::driver::PublishAuthentication;
 using detail::driver::WithdrawAuthentication;
-using detail::driver::AuthenticationDisplay;
 }

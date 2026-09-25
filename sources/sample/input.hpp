@@ -45,8 +45,9 @@ inline auto InputMode(SDL_Event const& event, SDL_Window* window) -> void {
   }
 }
 }
+
 namespace sample {
-using detail::input::TouchName;
-using detail::input::PrintInput;
 using detail::input::InputMode;
+using detail::input::PrintInput;
+using detail::input::TouchName;
 }
