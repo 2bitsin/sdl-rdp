@@ -159,6 +159,20 @@ def test_lambda_at_namespace_scope(tmp_path):
     assert labels(tmp_path, source) == ['lambda@1 nesting 3 > 2']
 
 
+def test_export_mark_is_part_of_the_declarator(tmp_path):
+    source = ('auto _Public_(ABI_VERSION)\n'
+              '    Exported(int a, int b, int c, int d, int e, int f) -> int {\n  return a;\n}\n')
+    assert labels(tmp_path, source) == ['Exported parameters 6 > 5']
+
+
+@pytest.mark.parametrize(('source', 'expected'), [
+    ('int _Public_;', ['int', '_Public_', ';']), ('auto _Public_ x = 1;', ['auto', '_Public_', 'x', '=', '1', ';']),
+    ('auto _Public_ /* n */ (7) f();', ['auto', '/* n */', 'f', '(', ')', ';']),
+    ('int _Public_ /* n */;', ['int', '_Public_', '/* n */', ';'])])
+def test_only_a_called_mark_is_dropped(source, expected):
+    assert [token.value for token in shape.live_lexemes(source)] == expected
+
+
 def test_constructor_initialisers_are_not_bodies(tmp_path):
     source = 'struct S { int a; int b; S(int x); };\nS::S(int x) : a{x}, b{x} {\n  if (x) ++a;\n}\n'
     assert values(tmp_path, source) == {'S::S': (1, 2, 1, 1)}

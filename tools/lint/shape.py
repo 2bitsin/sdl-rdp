@@ -68,6 +68,8 @@ RANKS                = {'public': 0, 'protected': 1, 'private': 2}
 FUNCTION_LIMITS      = {'complexity': COMPLEXITY, 'parameters': PARAMETERS, 'nesting': NESTING}
 HARD_ENTRY           = re.compile(rf' body lines \d+ > {BODY_LINES}$')
 CONDITIONALS         = frozenset(('if', 'ifdef', 'ifndef'))
+MARKS                = frozenset(('_Public_',))
+BRACKET_DEPTH        = {'(': 1, ')': -1}
 LITERALS             = ('"', 'R"')
 PYTHON_CONTROLS      = (ast.If, ast.For, ast.AsyncFor, ast.While, ast.Match)
 PYTHON_SCOPES        = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
@@ -234,7 +236,11 @@ def lexemes(text):
 
 
 def live_lexemes(text):
-    """Yield the lexemes outside #if 0 regions."""
+    """Yield the lexemes outside #if 0 regions, buildutil's export marks and their arguments dropped."""
+    return without_marks(enabled_lexemes(text))
+
+
+def enabled_lexemes(text):
     level = 0
     for token in lexemes(text):
         directive = DIRECTIVE.match(token.value) if token.value.lstrip().startswith('#') else None
@@ -245,6 +251,43 @@ def live_lexemes(text):
             level = disabled_level(words[0], level)
         else:
             yield token
+
+
+def without_marks(tokens):
+    """A mark is a mark only when called: `_Public_(n)` goes with its arguments, a bare `_Public_` is a name."""
+    tokens = iter(tokens)
+    for token in tokens:
+        if token.value not in MARKS:
+            yield token
+            continue
+        comments, following = held_comments(tokens)
+        called = following is not None and following.value == '('
+        if not called:
+            yield token
+        yield from comments
+        if called:
+            skip_arguments(tokens)
+        elif following is not None:
+            yield following
+
+
+def held_comments(tokens):
+    """The comments before the next code token, and that token (None at the end)."""
+    comments = []
+    for token in tokens:
+        if not token.value.startswith(('//', '/*')):
+            return comments, token
+        comments.append(token)
+    return comments, None
+
+
+def skip_arguments(tokens):
+    """Consume the rest of a parenthesised list whose `(` is already consumed."""
+    depth = 1
+    for token in tokens:
+        depth += BRACKET_DEPTH.get(token.value, 0)
+        if depth == 0:
+            return
 
 
 def disabled_level(keyword, level):

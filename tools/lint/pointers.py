@@ -23,7 +23,9 @@ BINDING         = re.compile(r'^(/[^:]+):(\d+):(\d+): note: "(\w+)" binds here')
 PRINTED         = re.compile(r'^Binding for "(\w+)":$')
 DECLARED        = re.compile(r'([A-Za-z_]\w*)\s*\(')
 NOT_NAMES       = re.compile(r'\[\[.*?\]\]|"[^"]*"')
-NOT_DECLARED    = frozenset(('decltype', 'alignas', '__attribute__', '__declspec'))
+NOT_DECLARED    = frozenset(('decltype', 'alignas', '__attribute__', '__declspec')) | shape.MARKS
+HEAD_END        = re.compile(r'[{;]')
+LINT_SOURCES    = (pathlib.Path(__file__), pathlib.Path(shape.__file__))
 GCC_ONLY        = ('-fconstexpr-ops-limit=',)
 # buildutil's reflect generator writes `reflect_scheme(T*)` and oxbox calls it with a null `T*` tag.
 REFLECT_ENTRY   = 'reflect_scheme'
@@ -321,8 +323,9 @@ def matches(output):
 
 def declared_name(location):
     """The name a function declaration at this location declares: the first word called, attributes aside."""
-    line = pathlib.Path(location[0]).read_text(errors='replace').splitlines()[location[1] - 1][location[2] - 1:]
-    return next(word for word in DECLARED.findall(NOT_NAMES.sub(' ', line)) if word not in NOT_DECLARED)
+    lines = pathlib.Path(location[0]).read_text(errors='replace').splitlines()[location[1] - 1:]
+    head  = HEAD_END.split(NOT_NAMES.sub(' ', '\n'.join(lines)[location[2] - 1:]), maxsplit=1)[0]
+    return next(word for word in DECLARED.findall(head) if word not in NOT_DECLARED)
 
 
 def query(tool, database, queries, unit):
@@ -348,6 +351,11 @@ def run_unit(tool, work, root, unit):
     return found
 
 
+def lint_text(queries):
+    """Everything a cached match depends on besides the unit: the queries and the lint's own sources."""
+    return queries + C_SIDE + ''.join(path.read_text() for path in LINT_SOURCES)
+
+
 def cached_keys(units, text, build):
     inputs = dependencies(build)
     with concurrent.futures.ThreadPoolExecutor(os.cpu_count() or 1) as pool:
@@ -364,7 +372,7 @@ def query_units(root, build):
     (work / 'queries.txt').write_text(text)
     cache_path = work / 'cache.json'
     cache      = json.loads(cache_path.read_text()) if cache_path.exists() else {}
-    keys, tool = cached_keys(units, text + C_SIDE, build), clang_query()
+    keys, tool = cached_keys(units, lint_text(text), build), clang_query()
     stale = [unit for unit in units
              if not keys[unit['file']] or cache.get(unit['file'], {}).get('key') != keys[unit['file']]]
     with concurrent.futures.ThreadPoolExecutor(os.cpu_count() or 1) as pool:

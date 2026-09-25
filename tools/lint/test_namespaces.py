@@ -71,6 +71,12 @@ def test_abi_names_stay_global(tree):
     assert findings(tree, text, SOURCE) == []
 
 
+def test_marked_abi_definitions_stay_global(tree):
+    text = f'{DETAIL}}}\nauto _Public_(ABI_VERSION)\n    sdlrdp_file_close(int handle) -> int {{ return handle; }}\n'
+    (tree / 'sources/sdl-rdp/abi/backend.h').write_text('int sdlrdp_file_close(int);\n')
+    assert findings(tree, text, SOURCE) == []
+
+
 def test_c_linkage_tables_live_in_the_detail_namespace(tree):
     table = 'extern "C" VideoBootStrap const RDP_bootstrap = { };\n'
     assert findings(tree, f'{DETAIL}{table}}}\n', SOURCE) == []

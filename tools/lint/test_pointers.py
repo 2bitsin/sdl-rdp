@@ -20,6 +20,7 @@ char const* sdl_export(struct Dev*);
 void sdl_close(struct Dev*);
 int sdl_chain(struct Dev*);
 int sdl_lambda(struct Dev*);
+int sdl_marked(struct Dev*);
 }
 '''
 PROBES = '''#include <array>
@@ -117,6 +118,9 @@ extern "C" auto sdl_lambda(Dev* captured) -> int {
   auto const run = [&] { return Stray(captured) + Inner(captured); };
   return run();
 }
+#define _Public_(version) __attribute__((visibility("default")))
+auto _Public_(7)
+    sdl_marked(Dev* marked) -> int { return Rooted(marked); }
 auto Unchecked(Dev* loose) -> Dev& { return *loose; }
 '''
 FACADE = '''#include "c.h"
@@ -212,6 +216,15 @@ def test_an_adapter_needs_a_c_pointee_and_only_abi_callers(found, needle):
 @pytest.mark.parametrize('needle', ['Checked(Dev* adapted', 'Rooted(Dev* rooted)'])
 def test_an_adapter_reached_from_an_export_passes(found, needle):
     assert not at(found, ADAPTER, needle, 'parameters')
+
+
+def test_an_export_mark_is_not_the_exports_name(found):
+    assert not at(found, ADAPTER, 'Dev* marked', 'parameters')
+
+
+def test_an_attribute_string_does_not_end_the_declaration_head(tmp_path):
+    (tmp_path / 'a.cpp').write_text('[[deprecated("a;b{")]] auto _Public_(7)\n    exported(int x) -> int;\n')
+    assert pointers.declared_name([str(tmp_path / 'a.cpp'), 1, 1]) == 'exported'
 
 
 def test_a_project_extern_c_declaration_is_no_c_side(found):
@@ -322,6 +335,21 @@ def test_a_recorded_input_that_is_gone_leaves_no_cache_key(tmp_path):
     unit = {'directory': str(tmp_path), 'file': 'unit.cpp', 'arguments': ['clang++']}
     assert pointers.unit_key(unit, 'q', ['kept.hpp'])
     assert pointers.unit_key(unit, 'q', ['kept.hpp', 'moved.hpp']) is None
+
+
+def test_a_lint_source_change_invalidates_every_key(tmp_path, monkeypatch):
+    assert pathlib.Path(pointers.shape.__file__) in pointers.LINT_SOURCES
+    sources = (tmp_path / 'pointers.py', tmp_path / 'shape.py')
+    for source in sources:
+        source.write_text('MARKS = ()\n')
+    (tmp_path / 'unit.cpp').write_text('')
+    monkeypatch.setattr(pointers, 'LINT_SOURCES', sources)
+    monkeypatch.setattr(pointers, 'dependencies', lambda build: {})
+    monkeypatch.setattr(pointers, 'preprocessed_inputs', lambda unit: [])
+    units = [{'directory': str(tmp_path), 'file': 'unit.cpp', 'arguments': ['clang++']}]
+    before = pointers.cached_keys(units, pointers.lint_text('q'), tmp_path)
+    sources[1].write_text("MARKS = ('_Public_',)\n")
+    assert pointers.cached_keys(units, pointers.lint_text('q'), tmp_path) != before
 
 
 def bench_build(root, database_age, bench_age):

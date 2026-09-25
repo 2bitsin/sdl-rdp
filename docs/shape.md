@@ -39,7 +39,9 @@ version keeps its archive, patched tree and configure cache under
 - `sources/sdl-rdp/backend/` builds `libbackend.so` from those
   modules: the FreeRDP 3 server behind a versioned C ABI (`abi`). It holds only
   `main.so.cpp`, every exported `sdlrdp_*` definition as a thunk into the module that
-  owns the operation, and `exports.map`. The library is
+  owns the operation, each marked `_Public_(SDLRDP_ABI_VERSION)`: buildutil exports
+  them at the version node `BACKEND_<n>`, `n` the ABI counter, and hides the rest.
+  `tools/exports/` checks the dynamic table against the ABI header. The library is
   exercised by the integration suites (a headless FreeRDP client connects, frames and input
   round-trip). The driver dlopens it by name only when the `rdp` driver is
   selected, so SDL stays free of FreeRDP and a program runs without the

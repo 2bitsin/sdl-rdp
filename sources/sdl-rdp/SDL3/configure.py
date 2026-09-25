@@ -107,8 +107,8 @@ def c_entries(config):
 
 
 def defines(entry):
-    split = (argument[2:].partition("=") for argument in arguments(entry) if argument.startswith("-D"))
-    return [(name, value) for name, _, value in split if name not in BUILD_TYPE_DEFINES]
+    return [argument[2:] for argument in arguments(entry)
+            if argument.startswith("-D") and argument[2:].partition("=")[0] not in BUILD_TYPE_DEFINES]
 
 
 def compile_options(entry):
@@ -116,26 +116,18 @@ def compile_options(entry):
             if argument.startswith(OPTION_PREFIXES) or argument in OPTION_FLAGS]
 
 
-def uniform_options(entries):
-    options = {tuple(compile_options(entry)) for entry in entries}
-    if len(options) != 1:
-        raise SystemExit(f"SDL compiles its C sources with {len(options)} option sets; this hook carries one")
-    return list(options.pop())
-
-
-def build_config(config, driver):
-    header  = next(config.rglob("SDL_build_config.h")).read_text()
-    lines   = ["", "#ifndef SDL_rdp_build_defines_h_", "#define SDL_rdp_build_defines_h_"]
+def build_config(config):
+    header = next(config.rglob("SDL_build_config.h")).read_text()
     # buildutil #136: the hook receives no build type, so DEBUG follows NDEBUG.
-    lines  += ["#ifndef NDEBUG", "#define DEBUG 1", "#endif"]
-    lines  += [f"#define {name} {value or 1}" for name, value in defines(driver)]
-    lines  += ["#endif", ""]
+    lines  = ["", "#ifndef NDEBUG", "#define DEBUG 1", "#endif", ""]
     bc.emit("SDL_build_config.h", header + "\n".join(lines))
 
 
-def option_files(options):
-    bc.emit("sdl-c.rsp", "\n".join(options) + "\n")
-    bc.emit("sdl-driver.rsp", "\n".join([*options, *DRIVER_OPTIONS]) + "\n")
+def declare_sources(entries, sdl_c):
+    for entry in entries:
+        bc.declare(entry["file"], options=compile_options(entry), defines=defines(entry))
+    for source in sorted(ROOT.rglob("*.cpp")):
+        bc.declare(source, options=[*compile_options(sdl_c), *DRIVER_OPTIONS], defines=defines(sdl_c))
 
 
 def public_headers(source, config):
@@ -185,10 +177,9 @@ def main():
     source      = patched_source(release, source_hash)
     config      = configure(release, source, source_hash + digest(Path(__file__)))
     entries     = c_entries(config)
-    for entry in entries:
-        bc.declare(entry["file"])
-    build_config(config, next(entry for entry in entries if Path(entry["file"]).name == "SDL.c"))
-    option_files(uniform_options(entries))
+    sdl_c       = next(entry for entry in entries if Path(entry["file"]).name == "SDL.c")
+    build_config(config)
+    declare_sources(entries, sdl_c)
     headers = public_headers(source, config)
     include_layer(source, headers)
     bc.emit("exports.map", (source / "src/dynapi/SDL_dynapi.sym").read_text())
