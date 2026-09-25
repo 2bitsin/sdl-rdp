@@ -1,2 +1,2 @@
 Init_submodule(PUBLISH_SYMBOLS)
-Link_dependencies(abi utilities freerdp-facade diagnostics picture auth drive session peer)
+Link_dependencies(abi utilities diagnostics configuration picture video auth drive session)

@@ -7,6 +7,7 @@
 #include <sdl-rdp/session/presenter.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/deadline.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 
 #include <algorithm>
 #include <cstddef>
@@ -47,7 +48,8 @@ auto AudioOutput::Wait(Deadline deadline) -> int {
   }
 }
 auto AudioOutput::Write(std::span<std::int16_t const> samples) -> int {
-  auto const count = int(samples.size() / 2);
+  Expects(samples.size() % StereoChannels == 0, "samples are whole stereo frames");
+  auto const count = Narrowed<int>(samples.size() / StereoChannels);
   while (!samples.empty()) {
     Wait(Deadline::max());
     auto const held = _session.Lock();
@@ -55,7 +57,7 @@ auto AudioOutput::Write(std::span<std::int16_t const> samples) -> int {
     if (!Rate()) return count;
     auto& audio = utilities::Required(Channel(held), "a channel with a rate exists").get();
     if (!audio.Ready(_configuration.AudioLatency())) continue;
-    auto size = std::min(samples.size(), std::size_t{ audio.Remaining() } * 2);
+    auto size = std::min(samples.size(), std::size_t{ audio.Remaining() } * StereoChannels);
     if (!audio.Send(samples.first(size))) return count;
     samples = samples.subspan(size);
   }

@@ -31,17 +31,15 @@ auto Delivered(bool sent) -> PointerDelivery {
   return sent ? PointerDelivery::Sent : PointerDelivery::Failed;
 }
 }
-PointerShape::PointerShape(Extent size, std::uint32_t x, std::uint32_t y, std::span<std::uint8_t const> argb)
-    : _size{ size }, _hot_x{ x }, _hot_y{ y }, _pixels(std::size_t{ size.width } * size.height * PixelBytes),
-      _mask(MaskStride(size.width) * size.height) {
-  Expects(size.width <= LargePointerLimit, "pointer width fits a large pointer");
-  Expects(size.height <= LargePointerLimit, "pointer height fits a large pointer");
+PointerShape::PointerShape(sdl_rdp::video::pointer::PointerLayout const& layout, std::span<std::uint8_t const> argb)
+    : _size{ layout.Size() }, _hot_x{ layout.X() }, _hot_y{ layout.Y() }, _pixels(layout.Bytes()),
+      _mask(MaskStride(_size.width) * _size.height) {
   Expects(argb.size() >= _pixels.size(), "source covers every pointer pixel");
-  auto const stride = MaskStride(size.width);
-  auto const row    = std::size_t{ size.width } * PixelBytes;
-  for (auto line : std::views::iota(0u, size.height)) {
+  auto const stride = MaskStride(_size.width);
+  auto const row    = std::size_t{ _size.width } * PixelBytes;
+  for (auto line : std::views::iota(0u, _size.height)) {
     auto const source = argb.subspan(std::size_t{ line } * row, row);
-    auto const target = std::size_t{ size.height - line - 1 };
+    auto const target = std::size_t{ _size.height - line - 1 };
     std::ranges::copy(source, _pixels.begin() + Narrowed<std::ptrdiff_t>(target * row));
     MarkTransparent(source, std::span(_mask).subspan(target * stride, stride));
   }

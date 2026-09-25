@@ -4,6 +4,7 @@
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/peer/peer.hpp>
 #include <sdl-rdp/picture/frame-store.hpp>
+#include <sdl-rdp/picture/geometry.hpp>
 #include <sdl-rdp/session/session.hpp>
 #include <sdl-rdp/video/avc/encoding.hpp>
 #include <sdl-rdp/video/pointer/store.hpp>
@@ -58,10 +59,12 @@ Presenter::Presenter(Diagnostics const& diagnostics, FrameStore& frames, Session
                      Configuration& configuration)
     : _diagnostics{ diagnostics }, _frames{ frames }, _session{ session }, _pointer{ pointer },
       _configuration{ configuration } { }
-auto Presenter::Present(std::span<std::uint8_t const> pixels, std::uint32_t pitch, Extent size,
+auto Presenter::Present(std::span<std::uint8_t const> pixels, sdl_rdp::picture::FrameLayout const& layout,
                         std::span<sdlrdp_rect const> damage) -> void {
-  Expects(pitch >= size.width * PixelBytes, "source pitch covers framebuffer rows");
-  Expects(pixels.size() >= std::size_t{ pitch } * size.height, "source framebuffer covers every row");
+  Expects(pixels.size() >= layout.Bytes(), "source framebuffer covers every row");
+  auto const size  = layout.Size();
+  auto const pitch = layout.Pitch();
+  ValidateDamage(damage, size);
   _diagnostics.Line("present", [&] { return std::format("dirty={}", damage.size()); });
   if (damage.empty()) return;
   std::scoped_lock const lock(_producer);
@@ -96,9 +99,8 @@ auto Presenter::EnsurePicture() -> void {
   if (!_frames.Ensure(frame)) return;
   if (auto const current = _session.Current(session)) current->get().Repaint(frame, _frames.Bounds(frame));
 }
-auto Presenter::Resize(Extent size) -> void {
-  Expects(size.width > 0, "picture width is positive");
-  Expects(size.height > 0, "picture height is positive");
+auto Presenter::Resize(Extent requested) -> void {
+  auto const             size    = Dimensions(requested.width, requested.height);
   std::scoped_lock const lock(_producer);
   auto const             session = _session.Lock();
   auto const             locked  = _session.LockPeersAndFrame();
@@ -111,7 +113,7 @@ auto Presenter::SetAspect(sdlrdp_aspect value) -> void {
   _frames.SetAspect(locked.Frame(), value);
   locked.ForEach([&](Peer& peer, FrameLock const& frame) { peer.Repaint(frame, _frames.Bounds(frame)); });
 }
-auto Presenter::SetRefresh(RefreshMode mode, std::uint32_t ceiling) -> void {
+auto Presenter::SetRefresh(std::uint32_t mode, std::uint32_t ceiling) -> void {
   auto const locked = _session.LockPeersAndFrame();
   _configuration.SetRefresh(mode, ceiling);
   locked.ForEach([](Peer& peer, FrameLock const& frame) { peer.RestartPacing(frame); });
@@ -119,8 +121,10 @@ auto Presenter::SetRefresh(RefreshMode mode, std::uint32_t ceiling) -> void {
 auto Presenter::SetCodec(sdlrdp_codec codec) -> void {
   _configuration.SetCodec(codec);
 }
-auto Presenter::SetPointer(PointerShape shape) -> void {
-  auto const session = _session.Lock();
+auto Presenter::SetPointer(sdl_rdp::video::pointer::PointerLayout const& layout, std::span<std::uint8_t const> argb)
+    -> void {
+  PointerShape shape   { layout, argb };
+  auto const   session = _session.Lock();
   _pointer.Replace(std::move(shape));
   _session.ForEachPeer([](Peer& peer) { peer.Signal(); });
 }

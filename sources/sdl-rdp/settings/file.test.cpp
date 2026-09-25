@@ -106,7 +106,7 @@ TEST(SettingsFile, RefusalsNameTheFileAndTheCause) {
   auto const                         unknown   = Written(directory.Path() / "unknown.yaml", "port: 1\ncolour: blue\n");
   EXPECT_TRUE(FailureOf(unknown).contains("unknown.yaml: unknown key 'colour'")) << FailureOf(unknown);
   auto const range = Written(directory.Path() / "range.yaml", "port: 70000\n");
-  EXPECT_TRUE(FailureOf(range).contains("70000 is outside 0 to 65535")) << FailureOf(range);
+  EXPECT_TRUE(FailureOf(range).contains("70000 is outside 0..65535")) << FailureOf(range);
   auto const codec = Written(directory.Path() / "codec.yaml", "codec: avc\n");
   EXPECT_TRUE(FailureOf(codec).contains("avc")) << FailureOf(codec);
   auto const aspect = Written(directory.Path() / "aspect.yaml", "aspect: 4:0\n");

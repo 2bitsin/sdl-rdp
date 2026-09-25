@@ -29,7 +29,7 @@ public:
     return std::cmp_greater_equal(value, MINIMUM) && std::cmp_less_equal(value, MAXIMUM);
   }
   static auto _Decode(std::int64_t wire) -> Bounded {
-    if (!Admits(wire)) throw ::Backend::OutOfBounds{ wire, Minimum(), Maximum() };
+    if (!Admits(wire)) throw ::Backend::OutOfRange{ "Value", wire, Minimum(), Maximum() };
     return Bounded{ static_cast<ValueTy>(wire) };
   }
   constexpr auto _Encode() const -> std::int64_t {

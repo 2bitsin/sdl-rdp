@@ -1,5 +1,6 @@
 #pragma once
 #include <sdl-rdp/drive/packet.hpp>
+#include <sdl-rdp/freerdp-facade/rdpdr.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -9,7 +10,8 @@ namespace sdl_rdp::drive::detail::file_request {
 enum class FileKind{ File, Directory, Any };
 class FileRequest {
 public:
-       FileRequest(std::uint32_t flags, FileKind kind, std::uint32_t extra_access = 0);
+       FileRequest(std::uint32_t flags, FileKind kind,
+                   freerdp_facade::AccessMask extra_access = freerdp_facade::AccessMask::None);
   auto Create(std::span<std::byte const> name) const -> DrivePacket;
 
 private:

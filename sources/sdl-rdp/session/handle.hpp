@@ -2,6 +2,7 @@
 #include <sdl-rdp/clipboard/store.hpp>
 #include <sdl-rdp/configuration/configuration.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
+#include <sdl-rdp/drive/files.hpp>
 #include <sdl-rdp/link/event-queue.hpp>
 #include <sdl-rdp/picture/frame-store.hpp>
 #include <sdl-rdp/session/audio-output.hpp>
@@ -13,18 +14,24 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 struct sdlrdp_handle : private Backend::Pinned {
 public:
        sdlrdp_handle(sdlrdp_config const& config, bool tracing);
-  auto Port() const noexcept   -> std::uint32_t;
-  auto Diagnostics() noexcept  -> Backend::Diagnostics&;
-  auto Events() noexcept       -> Backend::EventQueue&;
-  auto Presentation() noexcept -> Backend::Presenter&;
-  auto Audio() noexcept        -> Backend::AudioOutput&;
-  auto Session() noexcept      -> Backend::Session&;
-  auto Clipboard() noexcept    -> Backend::ClipboardStore&;
-  auto Frames() noexcept       -> Backend::FrameStore&;
+  auto Port() const noexcept                   -> std::uint32_t;
+  auto Diagnostics() noexcept                  -> Backend::Diagnostics&;
+  auto Events() noexcept                       -> Backend::EventQueue&;
+  auto Presentation() noexcept                 -> Backend::Presenter&;
+  auto Audio() noexcept                        -> Backend::AudioOutput&;
+  auto Session() noexcept                      -> Backend::Session&;
+  auto Clipboard() noexcept                    -> Backend::ClipboardStore&;
+  auto Frames() noexcept                       -> Backend::FrameStore&;
+  auto Drive()                                 -> sdl_rdp::drive::DriveFiles;
+  auto SetClipboardText(std::string_view utf8) -> void;
+  auto ClipboardText()                         -> std::string const&;
+  auto HasClipboardText()                      -> bool;
+  auto SetRelativeMouse(bool relative)         -> void;
 
 private:
   Backend::Diagnostics    _diagnostics;

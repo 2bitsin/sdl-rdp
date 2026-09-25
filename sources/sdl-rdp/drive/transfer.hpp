@@ -2,11 +2,10 @@
 #include <sdl-rdp/drive/channel.hpp>
 #include <sdl-rdp/drive/exceptions.hpp>
 #include <sdl-rdp/drive/file.hpp>
+#include <sdl-rdp/freerdp-facade/rdpdr.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 
-#include <freerdp/channels/rdpdr.h>
-#include <winpr/nt.h>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -25,7 +24,8 @@ template <class Byte> auto Submit(sdlrdp_file& file, std::uint64_t offset, std::
   packet.Write(offset);
   packet.Zero(padding_after_offset);
   if constexpr (write) packet.Append(bytes);
-  return file.Channel()->Send(file.Drive(), file.Id(), write ? IRP_MJ_WRITE : IRP_MJ_READ, packet);
+  return file.Channel()->Send(file.Drive(), file.Id(),
+                              write ? freerdp_facade::IrpMajor::Write : freerdp_facade::IrpMajor::Read, packet);
 }
 template <class Byte>
 auto Finish(sdlrdp_file& file, std::shared_ptr<DriveRequest> const& request, std::span<Byte> bytes) -> std::size_t {

@@ -5,6 +5,9 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
+#include <string_view>
+#include <tuple>
 #include <utility>
 
 namespace {
@@ -47,6 +50,27 @@ auto sdlrdp_handle::Clipboard() noexcept -> Backend::ClipboardStore& {
 }
 auto sdlrdp_handle::Frames() noexcept -> Backend::FrameStore& {
   return _frames;
+}
+auto sdlrdp_handle::Drive() -> sdl_rdp::drive::DriveFiles {
+  return sdl_rdp::drive::DriveFiles{ OnCurrent(_session,
+                                               [](Backend::Peer& peer) { return peer.Redirected().Drive(); }) };
+}
+auto sdlrdp_handle::SetClipboardText(std::string_view utf8) -> void {
+  auto const held = _session.Lock();
+  std::ignore = _clipboard.Replace(std::string{ utf8 });
+  Backend::OnCurrent(_session, [](Backend::Peer& current) { current.Signal(); });
+}
+auto sdlrdp_handle::ClipboardText() -> std::string const& {
+  auto const held = _session.Lock();
+  return _clipboard.Export();
+}
+auto sdlrdp_handle::HasClipboardText() -> bool {
+  auto const held = _session.Lock();
+  return !_clipboard.Text().empty();
+}
+auto sdlrdp_handle::SetRelativeMouse(bool relative) -> void {
+  auto const mode = relative ? Backend::MouseMode::Relative : Backend::MouseMode::Absolute;
+  Backend::OnCurrent(_session, [mode](Backend::Peer& current) { current.Point(mode); });
 }
 namespace Backend {
 auto SetError(sdlrdp_handle& handle, std::string text) -> void {

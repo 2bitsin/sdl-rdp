@@ -25,7 +25,7 @@ version keeps its archive, patched tree and configure cache under
 - `sources/sdl-rdp/abi/` is the header-only module holding the backend's C ABI,
   `<sdl-rdp/abi/backend.h>`; every module that includes it links it.
 - The rest of `sources/sdl-rdp/` holds the backend's static modules by functionality:
-  `utilities`, `freerdp-facade`, `diagnostics`, `configuration`, `picture`,
+  `utilities`, `freerdp-facade`, `diagnostics`, `picture`, `configuration`,
   `link`, then `auth`, `video`, `audio`,
   `input`, `clipboard`, `drive`, then `peer`, then `session`; each links only modules
   before it. Unit tests sit beside the code they test. The rigs are the test-lane modules
@@ -37,7 +37,9 @@ version keeps its archive, patched tree and configure cache under
   `video.test`, `session.test`, `drive.test`, `clipboard.test`, `sample.test`,
   `tls-race.test`, `allocations.test`) and `*.bench/` subtrees. Nothing of it ships.
 - `sources/sdl-rdp/backend/` builds `libbackend.so` from those
-  modules: the FreeRDP 3 server behind a versioned C ABI (`abi`),
+  modules: the FreeRDP 3 server behind a versioned C ABI (`abi`). It holds only
+  `main.so.cpp`, every exported `sdlrdp_*` definition as a thunk into the module that
+  owns the operation, and `exports.map`. The library is
   exercised by the integration suites (a headless FreeRDP client connects, frames and input
   round-trip). The driver dlopens it by name only when the `rdp` driver is
   selected, so SDL stays free of FreeRDP and a program runs without the

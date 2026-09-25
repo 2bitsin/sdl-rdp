@@ -18,7 +18,7 @@ TEST(Bounded, AdmitsExactlyItsRange) {
 TEST(Bounded, DecodesAWireValueInsideAndRefusesOneOutside) {
   EXPECT_EQ(Percent::_Decode(42).Get(), 42);
   EXPECT_EQ(Percent::_Decode(42)._Encode(), 42);
-  EXPECT_THROW(std::ignore = Percent::_Decode(356), ::Backend::OutOfBounds);
+  EXPECT_THROW(std::ignore = Percent::_Decode(356), ::Backend::OutOfRange);
 }
 TEST(BoundedDeathTest, ConstructionOutsideTheRangeBreaksTheContract) {
   EXPECT_DEATH(std::ignore = Percent{ 0 }, "within its range");

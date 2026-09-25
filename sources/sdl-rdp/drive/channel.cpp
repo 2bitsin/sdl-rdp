@@ -227,8 +227,8 @@ auto DriveChannel::Pump(std::span<WaitHandle const> signaled) -> bool {
     return true;
   }
 }
-auto DriveChannel::Send(std::uint32_t drive, std::uint32_t file, std::uint32_t major, DrivePacket const& body,
-                        std::uint32_t minor) -> std::shared_ptr<DriveRequest> {
+auto DriveChannel::Send(std::uint32_t drive, std::uint32_t file, freerdp_facade::IrpMajor major,
+                        DrivePacket const& body, freerdp_facade::IrpMinor minor) -> std::shared_ptr<DriveRequest> {
   std::scoped_lock const lock(mutex);
   if (!connected) throw PeerDisconnected{ "request" };
   auto wire = Device(drive);
@@ -237,7 +237,7 @@ auto DriveChannel::Send(std::uint32_t drive, std::uint32_t file, std::uint32_t m
   auto request = std::make_shared<DriveRequest>();
   request->drive = drive;
   pending.emplace(id, request);
-  auto packet = IoRequest(std::array{ wire, file, id, major, minor }, body);
+  auto packet = IoRequest(std::array{ wire, file, id, std::to_underlying(major), std::to_underlying(minor) }, body);
   try {
     Write(packet);
   } catch (std::exception const& error) {

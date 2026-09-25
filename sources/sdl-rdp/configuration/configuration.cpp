@@ -1,6 +1,7 @@
 #include <sdl-rdp/configuration/configuration.hpp>
 
 #include <sdl-rdp/configuration/exceptions.hpp>
+#include <sdl-rdp/configuration/validation.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 
 #include <array>
@@ -42,7 +43,8 @@ auto Configuration::Auth() const noexcept -> sdlrdp_auth {
 auto Configuration::Codec() const noexcept -> sdlrdp_codec {
   return _codec.load();
 }
-auto Configuration::SetCodec(sdlrdp_codec value) noexcept -> void {
+auto Configuration::SetCodec(sdlrdp_codec value) -> void {
+  sdl_rdp::configuration::ValidateCodec(value);
   _codec.store(value);
 }
 auto Configuration::AvcBitrate() const noexcept -> std::uint32_t {
@@ -54,9 +56,8 @@ auto Configuration::AudioLatency() const noexcept -> std::uint32_t {
 auto Configuration::RefreshPolicy() const noexcept -> Refresh const& {
   return _refresh;
 }
-auto Configuration::SetRefresh(RefreshMode mode, std::uint32_t ceiling) -> void {
-  Expects(ceiling > 0, "declared refresh is positive");
-  _refresh = Refresh(mode, ceiling);
+auto Configuration::SetRefresh(std::uint32_t mode, std::uint32_t ceiling) -> void {
+  _refresh = Refresh(sdl_rdp::configuration::ValidRefresh(mode, ceiling), ceiling);
   _refresh.Restart();
 }
 }

@@ -23,19 +23,22 @@ using MissingRequired  = ArgumentFailure<"MissingRequired"_hash, "Expected: {}",
 using NullArgument     = ArgumentFailure<"NullArgument"_hash, "{} is null.", std::string_view>;
 using InvalidEncoding  = RuntimeFailure<"InvalidEncoding"_hash, "Invalid text encoding.">;
 using Unencodable      = RuntimeFailure<"Unencodable"_hash, "Codepoint U+{:04X} is unrepresentable.", std::uint32_t>;
-using OutOfBounds = RuntimeFailure<"OutOfBounds"_hash, "{} is outside {} to {}", std::int64_t, std::int64_t,
-                                   std::int64_t>;
+using InvalidArguments = ArgumentFailure<"InvalidArguments"_hash, "Invalid {} arguments: {}.", std::string_view,
+                                         std::string_view>;
+using OutOfRange = ArgumentFailure<"OutOfRange"_hash, "{} {} is outside {}..{}.", std::string_view, std::int64_t,
+                                   std::int64_t, std::int64_t>;
 }
 namespace Backend {
 // Alias writers in every module name their ids with the literal.
 using oxbox::utilities::literals::operator""_hash;
 using detail::exceptions::AllocationFailed;
 using detail::exceptions::ArgumentFailure;
+using detail::exceptions::InvalidArguments;
 using detail::exceptions::InvalidEncoding;
 using detail::exceptions::LogicFailure;
 using detail::exceptions::MissingRequired;
 using detail::exceptions::NullArgument;
-using detail::exceptions::OutOfBounds;
+using detail::exceptions::OutOfRange;
 using detail::exceptions::RuntimeFailure;
 using detail::exceptions::Unencodable;
 }

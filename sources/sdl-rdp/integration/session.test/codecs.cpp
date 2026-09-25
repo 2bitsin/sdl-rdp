@@ -5,6 +5,7 @@
 #include <sdl-rdp/headless-client.test/codec/mode.hpp>
 #include <sdl-rdp/headless-client.test/frame/pattern.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
+#include <sdl-rdp/utilities/support.test/out-of-range-enum.hpp>
 #include <sdl-rdp/utilities/system-call.hpp>
 
 #include <algorithm>
@@ -151,8 +152,8 @@ TEST_P(Gate, LiveCodecChange) {
     ASSERT_NO_FATAL_FAILURE(ThenCodecChange(expected, previous));
     previous = expected;
   }
-  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange): Invalid codec ABI test.
-  EXPECT_EQ(sdlrdp_set_codec(backend.Handle(), sdlrdp_codec(99)), -1);
+  auto const unlisted = sdl_rdp::utilities::support_test::OutOfRangeEnum<sdlrdp_codec>(99);
+  EXPECT_EQ(sdlrdp_set_codec(backend.Handle(), unlisted), -1);
 }
 TEST_P(Gate, ExactFlatColour) {
   Client client(sdlrdp_port(backend.Handle()), GetParam().surface);

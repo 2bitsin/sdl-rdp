@@ -8,6 +8,7 @@
 #include <winpr/nt.h>
 #include <cstddef>
 #include <cstdint>
+#include <utility>
 
 namespace sdl_rdp::drive::detail::file_request {
 using Backend::Narrowed;
@@ -40,8 +41,9 @@ auto CreateOptions(FileKind kind) -> std::uint32_t {
   }
 }
 }
-FileRequest::FileRequest(std::uint32_t flags, FileKind file_kind, std::uint32_t extra_access)
-    : _access{ Access(Validated(flags), extra_access) }, _disposition{ Disposition(flags) }, _kind{ file_kind } { }
+FileRequest::FileRequest(std::uint32_t flags, FileKind file_kind, freerdp_facade::AccessMask extra_access)
+    : _access{ Access(Validated(flags), std::to_underlying(extra_access)) }, _disposition{ Disposition(flags) },
+      _kind{ file_kind } { }
 auto FileRequest::Create(std::span<std::byte const> name) const -> DrivePacket {
   DrivePacket packet;
   packet.Write(_access);

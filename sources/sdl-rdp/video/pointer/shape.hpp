@@ -1,5 +1,6 @@
 #pragma once
 #include <sdl-rdp/utilities/extent.hpp>
+#include <sdl-rdp/video/pointer/layout.hpp>
 
 #include <freerdp/pointer.h>
 #include <cstdint>
@@ -7,7 +8,6 @@
 #include <vector>
 
 namespace Backend {
-inline constexpr std::uint32_t LargePointerLimit = 384;
 enum class PointerDelivery{ Sent, Failed, Unsupported };
 class PointerShape {
   // FreeRDP's pointer update structs take the buffers as non-const pointers, so each send lends copies.
@@ -18,7 +18,7 @@ class PointerShape {
 
 public:
        PointerShape() noexcept = default;
-       PointerShape(Extent size, std::uint32_t x, std::uint32_t y, std::span<std::uint8_t const> argb);
+       PointerShape(sdl_rdp::video::pointer::PointerLayout const& layout, std::span<std::uint8_t const> argb);
   auto Send(rdpContext& context) const -> PointerDelivery;
 
 private:

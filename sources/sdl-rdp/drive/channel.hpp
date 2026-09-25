@@ -2,6 +2,7 @@
 #include <sdl-rdp/abi/backend.h>
 #include <sdl-rdp/drive/packet.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/freerdp-facade/rdpdr.hpp>
 
 #include <winpr/wtsapi.h>
 #include <winpr/wtypes.h>
@@ -50,8 +51,8 @@ public:
   auto Disconnect()                                        -> void;
   auto Abort(std::string const& cause)                     -> void;
   auto List(std::span<sdlrdp_drive> out)                   -> int;
-  auto Send(std::uint32_t drive, std::uint32_t file, std::uint32_t major, DrivePacket const& body,
-            std::uint32_t minor = 0) -> std::shared_ptr<DriveRequest>;
+  auto Send(std::uint32_t drive, std::uint32_t file, freerdp_facade::IrpMajor major, DrivePacket const& body,
+            freerdp_facade::IrpMinor minor = freerdp_facade::IrpMinor::None) -> std::shared_ptr<DriveRequest>;
   auto Wait(std::shared_ptr<DriveRequest> const& request, std::string const& path, bool end = false) -> DrivePacket;
   auto WaitAny(std::span<Slot const> slots)                -> std::size_t;
   auto Warn(std::string const& cause) const                -> void;

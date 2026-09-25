@@ -3,10 +3,13 @@
 #include <sdl-rdp/utilities/deadline.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <span>
 
 namespace Backend {
+// The ABI's audio frame is one interleaved left and right sample.
+inline constexpr std::size_t StereoChannels = 2;
 class AudioChannel;
 class Configuration;
 class Presenter;

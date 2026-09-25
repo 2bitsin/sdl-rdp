@@ -7,34 +7,17 @@
 #include <sdl-rdp/diagnostics/logging.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/utilities/terminated-copy.hpp>
+#include <sdl-rdp/utilities/transcode.hpp>
 
 #include <freerdp/settings.h>
 #include <openssl/crypto.h>
-#include <oxbox/utilities/span.hpp>
-#include <winpr/ntlm.h>
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <stdexcept>
 
 namespace Backend {
 namespace {
-struct NtHash {
-public:
-  NtHash(NtHash const&) = delete;
-  NtHash(NtHash&&)      = delete;
-  NtHash()              = default;
-  ~NtHash() {
-    OPENSSL_cleanse(bytes.data(), bytes.size());
-  }
-  auto operator=(NtHash const&) -> NtHash& = delete;
-  auto operator=(NtHash&&)      -> NtHash& = delete;
-  auto Key()                    -> NtKey {
-    return bytes;
-  }
-
-private:
-  std::array<std::uint8_t, 16> bytes{ };
-};
 struct SettingsPassword {
 public:
            SettingsPassword(SettingsPassword const&) = delete;
@@ -78,25 +61,10 @@ auto Password(rdpSettings const& settings) -> std::string_view {
   auto const* value = freerdp_settings_get_string(&settings, FreeRDP_Password);
   return value ? value : "";
 }
-auto Utf16(std::string const& text) -> std::vector<std::uint8_t> {
-  return TranscodeRange<std::vector<std::uint8_t>>(std::as_bytes(std::span(text)), { }, Utf16Little);
-}
-auto NtlmResponseKey(AuthenticationState const& identity, NtKey nt_hash_v1, NtKey response) -> bool {
-  // FreeRDP 3.32 ntlm_compute.c:513 takes the NTLMv2 response key, not the NT hash, and needs SEC_E_OK.
-  auto user          = Utf16(identity.User());
-  auto domain        = Utf16(identity.Domain());
-  auto user_length   = user.size();
-  auto domain_length = domain.size();
-  user.resize(user_length + sizeof(char16_t));
-  domain.resize(domain_length + sizeof(char16_t));
-  using oxbox::utilities::SpanCast;
-  return NTOWFv2FromHashW(nt_hash_v1.data(), SpanCast<std::uint16_t>(std::span(user)).data(), user_length,
-                          SpanCast<std::uint16_t>(std::span(domain)).data(), domain_length, response.data());
-}
 }
 Authenticator::Authenticator(PeerLink& link, Configuration const& configuration,
                              Diagnostics const& diagnostics) noexcept
-    : _link{ link }, _configuration{ configuration }, _diagnostics{ diagnostics },
+    : _link{ link }, _configuration{ configuration }, _diagnostics{ diagnostics }, _account{ configuration.Config() },
       _credentials{ configuration.CertificateDirectory() } { }
 auto Authenticator::InstallCredentials(rdpSettings& settings) const -> bool {
   try {
@@ -130,7 +98,7 @@ auto Authenticator::Verify(std::string const& domain, std::string const& user, s
   PlainPassword const plain    { password };
   bool const          accepted = config.verify
                             ? config.verify(config.auth_user, domain.c_str(), user.c_str(), plain.Text().c_str()) != 0
-                            : sdlrdp_verify_pair(&config, domain.c_str(), user.c_str(), plain.Text().c_str()) != 0;
+                            : _account.Verifies(domain, user, plain.Text());
   if (!accepted) Reject();
   client.authenticated = accepted;
   return accepted;
@@ -178,16 +146,23 @@ auto Authenticator::VerifySettings() -> bool {
     return Denied();
   }
 }
+auto Authenticator::NtHash(std::string const& domain, std::string const& user) const
+    -> std::optional<sdl_rdp::freerdp_facade::NtOwf> {
+  auto const& config = _configuration.Config();
+  if (!config.lookup) return _account.NtHash(domain, user);
+  sdl_rdp::freerdp_facade::NtOwf hash;
+  if (!config.lookup(config.auth_user, domain.c_str(), user.c_str(), hash.Bytes().data())) return std::nullopt;
+  return hash;
+}
 auto Authenticator::ResponseKey(SEC_WINNT_AUTH_IDENTITY const& identity, NtKey response) -> bool {
   auto const names = ClientNames(identity);
   _state.Identify(names.user, names.domain);
-  auto const& config = _configuration.Config();
-  auto const* domain = _state.Domain().c_str();
-  auto const* user   = _state.User().c_str();
-  NtHash      hash;
-  bool const  known  = config.lookup ? config.lookup(config.auth_user, domain, user, hash.Key().data()) != 0
-                                     : sdlrdp_lookup_pair(&config, domain, user, hash.Key().data()) != 0;
-  return known && NtlmResponseKey(_state, hash.Key(), response);
+  auto const hash = NtHash(_state.Domain(), _state.User());
+  if (!hash) return false;
+  // FreeRDP 3.32 ntlm_compute.c:513 takes the NTLMv2 response key, not the NT hash.
+  auto const key = sdl_rdp::freerdp_facade::NtOwfV2(*hash, Utf16(_state.User()), Utf16(_state.Domain()));
+  std::ranges::copy(key.Bytes(), response.begin());
+  return true;
 }
 auto Authenticator::Hash(SEC_WINNT_AUTH_IDENTITY const& identity, NtKey response) -> bool {
   _state.AttemptHash();

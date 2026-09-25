@@ -1,20 +1,25 @@
-#include "entry.hpp"
-
-#include <sdl-rdp/backend/exceptions.hpp>
-#include <sdl-rdp/peer/peer.hpp>
-#include <sdl-rdp/picture/geometry.hpp>
+#include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/auth/account.hpp>
+#include <sdl-rdp/configuration/validation.hpp>
+#include <sdl-rdp/diagnostics/error-store.hpp>
+#include <sdl-rdp/drive/files.hpp>
+#include <sdl-rdp/picture/frame-layout.hpp>
 #include <sdl-rdp/session/handle.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/deadline.hpp>
-#include <sdl-rdp/utilities/narrowed.hpp>
+#include <sdl-rdp/utilities/exceptions.hpp>
+#include <sdl-rdp/video/pointer/layout.hpp>
 
 #include <algorithm>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <format>
 #include <limits>
+#include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -22,54 +27,71 @@
 #include <utility>
 
 namespace {
-using Backend::Extent;
-using Backend::PixelBytes;
-using sdl_rdp::backend::DamageOutOfBounds;
-using sdl_rdp::backend::Guarded;
-using sdl_rdp::backend::InvalidArguments;
-using sdl_rdp::backend::InvalidChoice;
-using sdl_rdp::backend::OutOfRange;
-constexpr std::uint32_t MaximumRefreshMode  = 3;
-constexpr std::uint32_t MinimumPacedRefresh = 10;
-constexpr std::uint32_t MaximumPort         = 65535;
-constexpr std::uint32_t StereoChannels      = 2;
-constexpr std::uint32_t LargestMillihertz   = std::numeric_limits<std::int32_t>::max();
-// NVENC takes the rate in bits per second as a uint32_t.
-constexpr std::uint32_t LargestAvcKbps = std::numeric_limits<std::uint32_t>::max() / 1000;
-auto Dimensions(std::uint32_t width, std::uint32_t height) -> Extent {
-  if (!width || width > Backend::MaximumPictureWidth)
-    throw OutOfRange{ "Desktop width", width, 1, Backend::MaximumPictureWidth };
-  if (!height || height > Backend::MaximumPictureHeight)
-    throw OutOfRange{ "Desktop height", height, 1, Backend::MaximumPictureHeight };
-  return { .width = width, .height = height };
+using Backend::InvalidArguments;
+using Backend::NullArgument;
+using sdl_rdp::drive::DriveFiles;
+template <class BodyTy> using Result = std::invoke_result_t<BodyTy, sdlrdp_handle&>;
+template <class ResultTy> auto Refused(ResultTy failure, std::string_view subject) noexcept -> ResultTy {
+  auto const publish = [&] {
+    Backend::ErrorStore::PublishDetached(NullArgument{ subject }.what());
+    return failure;
+  };
+  return Backend::Contained(failure, publish, [](std::string_view) noexcept { });
 }
-auto ValidateConfiguration(sdlrdp_config const& config) -> void {
-  if (config.auth < SDLRDP_AUTH_NONE || config.auth > SDLRDP_AUTH_NLA) throw InvalidChoice{ "authentication mode" };
-  Dimensions(config.width, config.height);
-  if (config.avc_bitrate_kbps > LargestAvcKbps)
-    throw OutOfRange{ "Configured AVC bitrate (kbps)", config.avc_bitrate_kbps, 0, LargestAvcKbps };
-  if (config.codec < SDLRDP_CODEC_AUTO || config.codec > SDLRDP_CODEC_AVC420) throw InvalidChoice{ "codec preference" };
-  if (config.port > MaximumPort) throw OutOfRange{ "Configured port", config.port, 0, MaximumPort };
+template <std::invocable<sdlrdp_handle&> BodyTy>
+auto Serviced(sdlrdp_handle& handle, Result<BodyTy> failure, BodyTy const& body) noexcept -> Result<BodyTy> {
+  auto const failing = [&handle](std::string_view text) { Backend::SetError(handle, std::string{ text }); };
+  return Backend::Contained(failure, [&] { return body(handle); }, failing);
 }
-auto Inside(sdlrdp_rect area, Extent size) -> bool {
-  return area.x >= 0 && area.y >= 0 && area.w > 0 && area.h > 0
-         && std::cmp_less_equal(std::int64_t{ area.x } + area.w, size.width)
-         && std::cmp_less_equal(std::int64_t{ area.y } + area.h, size.height);
+// An sdlrdp_* caller may pass a null handle: refused here once, the body receives the open handle.
+template <std::invocable<sdlrdp_handle&> BodyTy>
+auto Guarded(sdlrdp_handle* handle, Result<BodyTy> failure, std::string_view subject, BodyTy const& body) noexcept
+    -> Result<BodyTy> {
+  if (!handle) return Refused(failure, subject);
+  return Serviced(*handle, failure, body);
 }
-auto ValidateDamage(std::span<sdlrdp_rect const> damage, Extent size) -> void {
-  if (!std::ranges::all_of(damage, [=](sdlrdp_rect area) { return Inside(area, size); })) throw DamageOutOfBounds{ };
+// A drive entry point: the handle refused once, the body receives the current peer's drive files.
+template <std::invocable<DriveFiles const&> OperationTy>
+auto OnDrive(sdlrdp_handle* handle, OperationTy const& operation) noexcept -> int {
+  return Guarded(handle, -1, "Drive handle", [&](sdlrdp_handle& open) { return operation(open.Drive()); });
+}
+// A drive entry point's path is a C string a caller may pass as null: refused here once, the body receives a view.
+template <std::invocable<DriveFiles const&, std::string_view> OperationTy>
+auto OnPath(sdlrdp_handle* handle, char const* path, OperationTy const& operation) noexcept -> int {
+  if (!handle) return Refused(-1, "Drive handle");
+  if (!path) return Refused(-1, "Drive path");
+  std::string_view const view{ path };
+  return Serviced(*handle, -1, [&](sdlrdp_handle& open) { return operation(open.Drive(), view); });
+}
+// A drive entry point over an open file: the body receives the file, checked against the current peer.
+template <std::invocable<sdlrdp_file&> OperationTy>
+auto OnFile(sdlrdp_handle* handle, sdlrdp_file* file, OperationTy const& operation) noexcept -> int {
+  return OnDrive(handle, [&](DriveFiles const& files) {
+    if (!file) throw NullArgument{ "Drive file" };
+    return operation(files.Attached(*file));
+  });
+}
+// abi: the caller's transfer buffer, null only when empty.
+auto Buffer(void* data, std::size_t size) -> std::optional<std::span<std::byte>> {
+  if (!data && size) return std::nullopt;
+  return std::span{ static_cast<std::byte*>(data), size };
+}
+auto Buffer(void const* data, std::size_t size) -> std::optional<std::span<std::byte const>> {
+  if (!data && size) return std::nullopt;
+  return std::span{ static_cast<std::byte const*>(data), size };
+}
+// A read fills the caller's bytes, a write sends them: one shape over the constness of the buffer.
+template <class ByteTy>
+auto Transferred(sdlrdp_handle* handle, sdlrdp_file* file, std::uint64_t offset,
+                 std::optional<std::span<ByteTy>> bytes) noexcept -> int {
+  return OnFile(handle, file, [&](sdlrdp_file& attached) {
+    if (!bytes) throw InvalidArguments{ "drive transfer", "buffer" };
+    return attached.Transfer(offset, *bytes);
+  });
 }
 auto Tracing() -> bool {
   auto const* trace = std::getenv("SDL_RDP_TRACE");
   return trace && std::string_view(trace) == "1";
-}
-auto ValidPointer(std::uint32_t w, std::uint32_t h, std::uint32_t x, std::uint32_t y, bool pixels) -> bool {
-  if (w > Backend::LargePointerLimit || h > Backend::LargePointerLimit) return false;
-  return !(w || h) || (w && h && pixels && x < w && y < h);
-}
-auto ValidRefresh(std::uint32_t mode, std::uint32_t ceiling) -> bool {
-  return mode <= MaximumRefreshMode && ceiling && ceiling <= LargestMillihertz / Backend::MillihertzPerHz
-         && (!mode || ceiling >= MinimumPacedRefresh);
 }
 }
 auto sdlrdp_last_error() -> char const* {
@@ -80,12 +102,31 @@ static_assert(std::is_same_v<decltype(sdlrdp_version()), std::uint32_t>,
 auto sdlrdp_version() -> std::uint32_t {
   return SDLRDP_ABI_VERSION;
 }
+auto sdlrdp_verify_pair(sdlrdp_config const* config, char const* domain, char const* user, char const* password)
+    -> int {
+  if (!config || !domain || !user || !password) return 0;
+  return int{ sdl_rdp::auth::Account{ *config }.Verifies(domain, user, password) };
+}
+static_assert(std::is_same_v<decltype(&sdlrdp_lookup_pair),
+                             auto (*)(sdlrdp_config const*, char const*, char const*, std::uint8_t*)->int>,
+              "the ABI's unsigned char hash[16] is the std::uint8_t* defined here");
+auto sdlrdp_lookup_pair(sdlrdp_config const* config, char const* domain, char const* user, std::uint8_t hash[16])
+    -> int {
+  if (!config || !domain || !user || !hash) return 0;
+  auto const looked_up = [&] {
+    auto const found = sdl_rdp::auth::Account{ *config }.NtHash(domain, user);
+    if (found) std::ranges::copy(found->Bytes(), hash);
+    return int{ found.has_value() };
+  };
+  return Backend::Contained(0, looked_up,
+                            [](std::string_view text) { Backend::ErrorStore::PublishDetached(std::string{ text }); });
+}
 auto sdlrdp_open(sdlrdp_config const* config, sdlrdp_handle** out) -> int {
   auto const opened = [&] {
-    if (!out) throw Backend::NullArgument{ "Open handle output" };
+    if (!out) throw NullArgument{ "Open handle output" };
     *out = nullptr;
-    if (!config) throw Backend::NullArgument{ "Open configuration" };
-    ValidateConfiguration(*config);
+    if (!config) throw NullArgument{ "Open configuration" };
+    sdl_rdp::configuration::Validate(*config);
     auto handle = std::make_unique<sdlrdp_handle>(*config, Tracing());
     if (config->wait_for_client) handle->Events().Wait(Backend::Deadline::max());
     *out = handle.release();
@@ -107,20 +148,15 @@ auto sdlrdp_port(sdlrdp_handle const* handle) -> std::uint32_t {
 auto sdlrdp_present(sdlrdp_handle* handle, void const* pixels, int pitch, std::uint32_t width, std::uint32_t height,
                     sdlrdp_rect const* rects, std::uint32_t count) -> int {
   return Guarded(handle, -1, "Backend handle", [&](sdlrdp_handle& open) {
-    auto const size = Dimensions(width, height);
-    if (!pixels || (!rects && count) || std::cmp_less(pitch, width * PixelBytes))
-      throw InvalidArguments{ "present", "pixels, rectangles or pitch" };
-    std::span const damage{ rects, count };
-    ValidateDamage(damage, size);
-    auto const bytes = (Backend::Narrowed<std::size_t>(pitch) * (height - 1)) + (std::size_t{ width } * PixelBytes);
-    open.Presentation().Present({ static_cast<std::uint8_t const*>(pixels), bytes },
-                                Backend::Narrowed<std::uint32_t>(pitch), size, damage);
+    sdl_rdp::picture::FrameLayout const layout{ width, height, pitch };
+    if (!pixels || (!rects && count)) throw InvalidArguments{ "present", "pixels or rectangles" };
+    open.Presentation().Present({ static_cast<std::uint8_t const*>(pixels), layout.Bytes() }, layout, { rects, count });
     return 0;
   });
 }
 auto sdlrdp_poll(sdlrdp_handle* handle, sdlrdp_event* out, std::uint32_t max) -> std::uint32_t {
   return Guarded(handle, 0U, "Backend handle", [&](sdlrdp_handle& open) {
-    if (!out && max) throw Backend::NullArgument{ "Poll event output" };
+    if (!out && max) throw NullArgument{ "Poll event output" };
     return open.Events().Poll({ out, max });
   });
 }
@@ -135,14 +171,13 @@ auto sdlrdp_wakeup(sdlrdp_handle* handle) -> void {
 }
 auto sdlrdp_set_codec(sdlrdp_handle* handle, sdlrdp_codec codec) -> int {
   return Guarded(handle, -1, "Backend handle", [&](sdlrdp_handle& open) {
-    if (codec < SDLRDP_CODEC_AUTO || codec > SDLRDP_CODEC_AVC420) throw InvalidChoice{ "codec preference" };
     open.Presentation().SetCodec(codec);
     return 0;
   });
 }
 auto sdlrdp_resize(sdlrdp_handle* handle, std::uint32_t width, std::uint32_t height) -> int {
   return Guarded(handle, -1, "Backend handle", [&](sdlrdp_handle& open) {
-    open.Presentation().Resize(Dimensions(width, height));
+    open.Presentation().Resize({ .width = width, .height = height });
     return 0;
   });
 }
@@ -159,33 +194,25 @@ auto sdlrdp_wait_frame(sdlrdp_handle* handle, int timeout) -> int {
 auto sdlrdp_set_pointer(sdlrdp_handle* handle, std::uint32_t w, std::uint32_t h, std::uint32_t x, std::uint32_t y,
                         void const* argb) -> int {
   return Guarded(handle, -1, "Pointer handle", [&](sdlrdp_handle& open) {
-    if (!ValidPointer(w, h, x, y, argb != nullptr))
-      throw InvalidArguments{ "pointer", "dimensions, hotspot or pixels" };
-    std::span const pixels{ static_cast<std::uint8_t const*>(argb), argb ? std::size_t{ w } * h * PixelBytes : 0 };
-    open.Presentation().SetPointer(Backend::PointerShape{ { .width = w, .height = h }, x, y, pixels });
+    sdl_rdp::video::pointer::PointerLayout const layout{ { .width = w, .height = h }, x, y };
+    if (!argb && layout.Bytes()) throw NullArgument{ "Pointer pixels" };
+    open.Presentation().SetPointer(layout, { static_cast<std::uint8_t const*>(argb), argb ? layout.Bytes() : 0 });
     return 0;
   });
 }
 auto sdlrdp_set_clipboard_text(sdlrdp_handle* handle, char const* utf8) -> int {
   return Guarded(handle, -1, "Clipboard handle", [&](sdlrdp_handle& open) {
-    if (!utf8) throw Backend::NullArgument{ "Clipboard text" };
-    auto const held = open.Session().Lock();
-    std::ignore = open.Clipboard().Replace(utf8);
-    OnCurrent(open.Session(), [](Backend::Peer& current) { current.Signal(); });
+    if (!utf8) throw NullArgument{ "Clipboard text" };
+    open.SetClipboardText(utf8);
     return 0;
   });
 }
 auto sdlrdp_get_clipboard_text(sdlrdp_handle* handle) -> char const* {
-  return Guarded(handle, static_cast<char const*>(nullptr), "Clipboard handle", [](sdlrdp_handle& open) {
-    auto const held = open.Session().Lock();
-    return open.Clipboard().Export().c_str();
-  });
+  return Guarded(handle, static_cast<char const*>(nullptr), "Clipboard handle",
+                 [](sdlrdp_handle& open) { return open.ClipboardText().c_str(); });
 }
 auto sdlrdp_has_clipboard_text(sdlrdp_handle* handle) -> int {
-  return Guarded(handle, -1, "Clipboard handle", [](sdlrdp_handle& open) {
-    auto const held = open.Session().Lock();
-    return int{ !open.Clipboard().Text().empty() };
-  });
+  return Guarded(handle, -1, "Clipboard handle", [](sdlrdp_handle& open) { return int{ open.HasClipboardText() }; });
 }
 auto sdlrdp_audio_open(sdlrdp_handle* handle) -> int {
   return Guarded(handle, -1, "Audio handle", [](sdlrdp_handle& open) {
@@ -200,7 +227,8 @@ auto sdlrdp_audio_write(sdlrdp_handle* handle, void const* frames, std::uint32_t
   return Guarded(handle, -1, "Audio handle", [&](sdlrdp_handle& open) {
     if ((!frames && count) || std::cmp_greater(count, std::numeric_limits<int>::max()))
       throw InvalidArguments{ "audio write", "frames or count" };
-    return open.Audio().Write({ static_cast<std::int16_t const*>(frames), std::size_t{ count } * StereoChannels });
+    return open.Audio().Write(
+        { static_cast<std::int16_t const*>(frames), std::size_t{ count } * Backend::StereoChannels });
   });
 }
 auto sdlrdp_audio_wait(sdlrdp_handle* handle, int timeout) -> int {
@@ -215,15 +243,89 @@ auto sdlrdp_audio_close(sdlrdp_handle* handle) -> void {
 }
 auto sdlrdp_set_refresh(sdlrdp_handle* handle, std::uint32_t mode, std::uint32_t ceiling) -> int {
   return Guarded(handle, -1, "Backend handle", [&](sdlrdp_handle& open) {
-    if (!ValidRefresh(mode, ceiling)) throw InvalidArguments{ "refresh", "mode or ceiling" };
-    open.Presentation().SetRefresh(Backend::RefreshMode(mode), ceiling);
+    open.Presentation().SetRefresh(mode, ceiling);
     return 0;
   });
 }
 auto sdlrdp_set_relative_mouse(sdlrdp_handle* handle, int enabled) -> int {
   return Guarded(handle, -1, "Backend handle", [&](sdlrdp_handle& open) {
-    auto const mode = enabled ? Backend::MouseMode::Relative : Backend::MouseMode::Absolute;
-    OnCurrent(open.Session(), [mode](Backend::Peer& current) { current.Point(mode); });
+    open.SetRelativeMouse(enabled != 0);
+    return 0;
+  });
+}
+auto sdlrdp_drive_list(sdlrdp_handle* handle, sdlrdp_drive* out, std::uint32_t max) -> int {
+  return OnDrive(handle, [&](DriveFiles const& files) {
+    if ((!out && max) || std::cmp_greater(max, std::numeric_limits<int>::max()))
+      throw InvalidArguments{ "drive list", "output or count" };
+    return files.List({ out, max });
+  });
+}
+auto sdlrdp_drive_open(sdlrdp_handle* handle, std::uint32_t drive, char const* path, std::uint32_t flags,
+                       sdlrdp_file** out) -> int {
+  if (!out) return Refused(-1, "Drive open output");
+  *out = nullptr;
+  return OnPath(handle, path, [&](DriveFiles const& files, std::string_view name) {
+    *out = files.Open(drive, name, flags).release();
+    return 0;
+  });
+}
+auto sdlrdp_drive_close(sdlrdp_handle* handle, sdlrdp_file* file) -> int {
+  std::unique_ptr<sdlrdp_file> const owned(file);
+  return OnFile(handle, file, [](sdlrdp_file& attached) {
+    attached.Close();
+    return 0;
+  });
+}
+auto sdlrdp_drive_read(sdlrdp_handle* h, sdlrdp_file* f, std::uint64_t offset, void* data, std::size_t size) -> int {
+  return Transferred(h, f, offset, Buffer(data, size));
+}
+auto sdlrdp_drive_write(sdlrdp_handle* h, sdlrdp_file* f, std::uint64_t offset, void const* data, std::size_t size)
+    -> int {
+  return Transferred(h, f, offset, Buffer(data, size));
+}
+auto sdlrdp_drive_stat(sdlrdp_handle* h, std::uint32_t drive, char const* path, sdlrdp_stat* out) -> int {
+  return OnPath(h, path, [&](DriveFiles const& files, std::string_view name) {
+    if (!out) throw NullArgument{ "Drive stat output" };
+    *out = files.Stat(drive, name);
+    return 0;
+  });
+}
+auto sdlrdp_drive_enumerate(sdlrdp_handle* h, std::uint32_t drive, char const* path, std::uint32_t offset,
+                            sdlrdp_dirent* out, std::uint32_t max) -> int {
+  return OnPath(h, path, [&](DriveFiles const& files, std::string_view name) {
+    if (!out && max) throw NullArgument{ "Drive directory output" };
+    return files.Enumerate(drive, name, offset, { out, max });
+  });
+}
+auto sdlrdp_drive_mkdir(sdlrdp_handle* h, std::uint32_t drive, char const* path) -> int {
+  return OnPath(h, path, [&](DriveFiles const& files, std::string_view name) {
+    files.MakeDirectory(drive, name);
+    return 0;
+  });
+}
+auto sdlrdp_drive_remove(sdlrdp_handle* h, std::uint32_t drive, char const* path) -> int {
+  return OnPath(h, path, [&](DriveFiles const& files, std::string_view name) {
+    files.Remove(drive, name);
+    return 0;
+  });
+}
+auto sdlrdp_drive_rename(sdlrdp_handle* h, std::uint32_t drive, char const* path, char const* destination) -> int {
+  return OnPath(h, path, [&](DriveFiles const& files, std::string_view name) {
+    if (!destination) throw NullArgument{ "Drive rename destination" };
+    files.Rename(drive, name, destination);
+    return 0;
+  });
+}
+auto sdlrdp_drive_fstat(sdlrdp_handle* h, sdlrdp_file* file, sdlrdp_stat* out) -> int {
+  return OnFile(h, file, [&](sdlrdp_file& attached) {
+    if (!out) throw NullArgument{ "Drive fstat output" };
+    *out = attached.Stat();
+    return 0;
+  });
+}
+auto sdlrdp_drive_flush(sdlrdp_handle* h, sdlrdp_file* file) -> int {
+  return OnFile(h, file, [](sdlrdp_file&) {
+    // FreeRDP 3.32 drive_main.c:754 has no FLUSH_BUFFERS case; synchronous writes are already acknowledged.
     return 0;
   });
 }

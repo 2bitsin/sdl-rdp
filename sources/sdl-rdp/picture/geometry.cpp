@@ -11,6 +11,22 @@
 #include <utility>
 
 namespace Backend {
+namespace {
+auto Inside(sdlrdp_rect area, Extent size) -> bool {
+  return area.x >= 0 && area.y >= 0 && area.w > 0 && area.h > 0
+         && std::cmp_less_equal(std::int64_t{ area.x } + area.w, size.width)
+         && std::cmp_less_equal(std::int64_t{ area.y } + area.h, size.height);
+}
+}
+auto Dimensions(std::uint32_t width, std::uint32_t height) -> Extent {
+  if (!width || width > MaximumPictureWidth) throw OutOfRange{ "Desktop width", width, 1, MaximumPictureWidth };
+  if (!height || height > MaximumPictureHeight) throw OutOfRange{ "Desktop height", height, 1, MaximumPictureHeight };
+  return { .width = width, .height = height };
+}
+auto ValidateDamage(std::span<sdlrdp_rect const> damage, Extent size) -> void {
+  if (!std::ranges::all_of(damage, [=](sdlrdp_rect area) { return Inside(area, size); }))
+    throw sdl_rdp::picture::DamageOutOfBounds{ };
+}
 PictureGeometry::PictureGeometry(Extent size, sdlrdp_aspect aspect) : _size{ size }, _aspect{ aspect } {
   std::ignore = Desktop();
 }

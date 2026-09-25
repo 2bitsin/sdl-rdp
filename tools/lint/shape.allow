@@ -1,9 +1,9 @@
 sample/main.cpp:73: DrawScheduled parameters 6 > 5 # size in #19
 sdl-rdp/audio/channel.hpp: AudioChannel data members 24 > 10 # collaborators replace Peer&; split in #6
 sdl-rdp/audio/channel.hpp: AudioChannel member functions 26 > 15 # AudioProtocol friend folded in, C.21 deleted copy and move; FailureSource, the accessor Handled reports through; split in #6
-sdl-rdp/backend/drive-files.cpp:264: sdlrdp_drive_enumerate parameters 6 > 5 # frozen C ABI
-sdl-rdp/backend/main.so.cpp:107: sdlrdp_present parameters 7 > 5 # frozen C ABI
-sdl-rdp/backend/main.so.cpp:159: sdlrdp_set_pointer parameters 6 > 5 # frozen C ABI
+sdl-rdp/backend/main.so.cpp:148: sdlrdp_present parameters 7 > 5 # frozen C ABI
+sdl-rdp/backend/main.so.cpp:194: sdlrdp_set_pointer parameters 6 > 5 # frozen C ABI
+sdl-rdp/backend/main.so.cpp:293: sdlrdp_drive_enumerate parameters 6 > 5 # frozen C ABI
 sdl-rdp/clipboard/channel.hpp: ClipboardChannel data members 15 > 10 # collaborators replace Peer&; split in #6
 sdl-rdp/clipboard/channel.hpp: ClipboardChannel member functions 19 > 15 # FailureSource, the accessor Handled reports through; split in #6
 sdl-rdp/drive/channel.hpp: DriveChannel data members 14 > 10 # collaborators replace Peer&; split in #6

@@ -7,6 +7,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace Backend {
@@ -30,4 +32,5 @@ auto TranscodeRange(std::span<std::byte const> input, oxbox::utilities::TextForm
   auto const text = SpanCast<typename Output::value_type const>(std::span(encoded));
   return Output(text.begin(), text.end());
 }
+auto Utf16(std::string_view utf8) -> std::u16string;
 }

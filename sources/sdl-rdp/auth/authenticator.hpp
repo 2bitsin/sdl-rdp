@@ -1,11 +1,14 @@
 #pragma once
 #include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/auth/account.hpp>
 #include <sdl-rdp/auth/credentials.hpp>
 #include <sdl-rdp/auth/state.hpp>
+#include <sdl-rdp/freerdp-facade/ntlm.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
 #include <freerdp/peer.h>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -32,11 +35,14 @@ private:
   auto Unauthenticated(std::string const& domain, std::string const& user)                   -> bool;
   auto Denied()                                                                              -> bool;
   auto ResponseKey(SEC_WINNT_AUTH_IDENTITY const& identity, NtKey response)                  -> bool;
-  PeerLink&            _link;
-  Configuration const& _configuration;
-  Diagnostics const&   _diagnostics;
-  Credentials          _credentials;
-  AuthenticationState  _state;
+  auto NtHash(std::string const& domain, std::string const& user) const
+      -> std::optional<sdl_rdp::freerdp_facade::NtOwf>;
+  PeerLink&              _link;
+  Configuration const&   _configuration;
+  Diagnostics const&     _diagnostics;
+  sdl_rdp::auth::Account _account;
+  Credentials            _credentials;
+  AuthenticationState    _state;
 };
 auto AuthenticationIdentity(freerdp_peer const& client, sdlrdp_event& event) -> void;
 }

@@ -102,6 +102,6 @@ auto Located(std::filesystem::path const& directory, std::string_view name) -> s
 auto Load(std::filesystem::path const& path) -> Settings {
   ::utilities::Expects(!path.empty(), "a settings file has a path");
   return Refusing<ParseError, TypeMismatch, MissingField, FileOpenError, UnknownSettingsFormat, UnknownSettingsKey,
-                  InvalidSettingValue, ::Backend::OutOfBounds>(path);
+                  InvalidSettingValue, ::Backend::OutOfRange>(path);
 }
 }

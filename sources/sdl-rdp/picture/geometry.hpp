@@ -4,11 +4,14 @@
 
 #include <cstdint>
 #include <limits>
+#include <span>
 
 namespace Backend {
 // A 32-bit row must fit BitmapUpdate bitmapLength (UINT16); height is UINT16.
 inline constexpr std::uint32_t MaximumPictureWidth  = std::numeric_limits<std::uint16_t>::max() / PixelBytes;
 inline constexpr std::uint32_t MaximumPictureHeight = std::numeric_limits<std::uint16_t>::max();
+auto Dimensions(std::uint32_t width, std::uint32_t height)            -> Extent;
+auto ValidateDamage(std::span<sdlrdp_rect const> damage, Extent size) -> void;
 class PictureGeometry {
 public:
        PictureGeometry(Extent size, sdlrdp_aspect aspect);
