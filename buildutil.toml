@@ -2,6 +2,7 @@
 name = "sdl-rdp"
 cmake_option_prefix = "BACKEND"
 module_define_prefix = "BACKEND"
+cxx_standard = 26
 
 [cmake]
 extensions = []
