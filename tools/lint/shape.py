@@ -1097,8 +1097,7 @@ def main(argv=None):
     findings = [finding for source in sources for finding in source_findings(source, fixtures)]
     findings += tree_findings(sources)
     findings += leading_return_findings(sources)
-    findings += [finding for path in sorted(pathlib.Path('tools/lint').glob('*.py'))
-                 for finding in python_findings(path)]
+    findings += [finding for path in sorted(pathlib.Path('tools').glob('*/*.py')) for finding in python_findings(path)]
     return check_allow(findings, args.allow)
 
 

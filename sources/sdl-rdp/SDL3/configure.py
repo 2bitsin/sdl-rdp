@@ -40,7 +40,7 @@ class Release:
 
 
 def pinned_release():
-    # buildutil #136: the hook receives no [options], so the release is pinned here.
+    # 2bitsin/buildutil#1: the hook receives no [options], so the release is pinned here.
     pins    = tomllib.loads(VERSIONS.read_text())
     version = pins["build"]
     if version not in pins["sha256"]:
@@ -118,7 +118,7 @@ def compile_options(entry):
 
 def build_config(config):
     header = next(config.rglob("SDL_build_config.h")).read_text()
-    # buildutil #136: the hook receives no build type, so DEBUG follows NDEBUG.
+    # 2bitsin/buildutil#1: the hook receives no build type, so DEBUG follows NDEBUG.
     lines  = ["", "#ifndef NDEBUG", "#define DEBUG 1", "#endif", ""]
     bc.emit("SDL_build_config.h", header + "\n".join(lines))
 

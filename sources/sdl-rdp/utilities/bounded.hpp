@@ -7,7 +7,7 @@
 #include <utility>
 
 namespace sdl_rdp::utilities::detail::bounded {
-// An integer with a real range; its decode also refuses what oxbox's reader would narrow unchecked (2bitsin/oxbox#2).
+// Decoding refuses a value outside the range, which oxbox's reader would narrow unchecked (2bitsin/oxbox#2).
 template <std::integral ValueTy, ValueTy MINIMUM, ValueTy MAXIMUM>
 class Bounded {
   static_assert(MINIMUM <= MAXIMUM, "a bounded range is ordered");

@@ -35,7 +35,7 @@ using sdl_rdp::utilities::OperationName;
 auto FreeSoundContext(RdpsndServerContext* sound) noexcept -> void {
   auto* const channels = sound->vcm;
   rdpsnd_server_context_free(sound);
-  // 2bitsin/FreeRDP#1: rdpsnd_main.c:1052 skips the close without an own thread; Open returns the channel.
+  // FreeRDP leaks the channel of a context without its own thread (2bitsin/FreeRDP#1); reopening returns it to close.
   auto                 name    = std::to_array(RDPSND_CHANNEL_NAME);
   VirtualChannel const channel { WTSVirtualChannelOpen(channels, WTS_CURRENT_SESSION, name.data()) };
 }

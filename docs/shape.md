@@ -14,8 +14,8 @@ version keeps its archive, patched tree and configure cache under
 `_build/generated/sdl-rdp-SDL3/<version>/`.
 
 - `sources/sdl-rdp/SDL3/` builds `libSDL3.so`, the library applications link.
-  `rdp/` is the driver, C++23 with `extern "C"` only at SDL's bootstrap
-  tables (since #22) and no FreeRDP dependency. `rdp-driver.patch` registers
+  `rdp/` is the driver, C++26 with `extern "C"` only at SDL's bootstrap
+  tables and no FreeRDP dependency. `rdp-driver.patch` registers
   it in SDL's build and bootstrap list. `configure.py` is buildutil's
   per-module hook: it downloads the selected SDL release into the generated
   folder once, applies the patch there, runs SDL's own CMake configure (never
