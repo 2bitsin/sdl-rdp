@@ -8,8 +8,18 @@
 #include <winpr/wlog.h>
 #include <array>
 #include <cstddef>
+#include <string>
+#include <string_view>
+
+namespace sdl_rdp::video::avc::detail::encoder {
+namespace {
+auto LoaderFailure(std::string& detail, std::string_view format, std::string_view name) -> void;
+}
+}
+// abi: the loader hands its log calls the void* context Loaded gave it, which is the detail string.
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage): Required by the ffnvcodec loader.
-#define FFNV_LOG_FUNC(ctx, msg, ...) WLog_ERR("sdlrdp.avc", msg, __VA_ARGS__)
+#define FFNV_LOG_FUNC(ctx, msg, ...) \
+  sdl_rdp::video::avc::detail::encoder::LoaderFailure(*static_cast<std::string*>(ctx), msg, __VA_ARGS__)
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage): Required by the ffnvcodec loader.
 #define FFNV_DEBUG_LOG_FUNC(ctx, msg, ...) static_cast<void>(0)
 #include <freerdp/primitives.h>
@@ -19,8 +29,6 @@
 #include <format>
 #include <memory>
 #include <span>
-#include <string>
-#include <string_view>
 #include <utility>
 
 namespace sdl_rdp::video::avc::detail::encoder {
@@ -54,17 +62,18 @@ private:
 using CudaLibrary   = std::unique_ptr<CudaFunctions, FreesLibrary<cuda_free_functions>>;
 using NvencLibrary  = std::unique_ptr<NvencFunctions, FreesLibrary<nvenc_free_functions>>;
 using EncodeSession = std::unique_ptr<void, DestroysSession>;
-template <auto LOAD, class LibraryTy> auto Loaded(LibraryTy& library) -> int {
-  typename LibraryTy::pointer loaded = nullptr;
-  auto const                  status = LOAD(&loaded, nullptr);
-  library.reset(loaded);
-  return status;
+enum class Report : std::uint8_t { Logged, Quiet };
+auto LoaderFailure(std::string& detail, std::string_view format, std::string_view name) -> void {
+  Expects(format == "Cannot load %s\n", "the loader reports one message shape");
+  detail = std::format("cannot load {}", name);
 }
 }
 struct Encoder::Impl {
 public:
+  auto Fail(std::string_view operation, std::string_view why, Report report)                -> void;
+  auto Check(int status, std::string_view operation, Report report)                         -> bool;
   auto Check(int status, std::string_view operation)                                        -> bool;
-  auto Load()                                                                               -> bool;
+  auto Load(Report report)                                                                  -> bool;
   auto Session()                                                                            -> bool;
   auto Initialize(std::uint32_t bitrate, std::uint32_t fps)                                 -> bool;
   auto Parameters(std::uint32_t fps, NV_ENC_CONFIG& config) const                           -> NV_ENC_INITIALIZE_PARAMS;
@@ -75,6 +84,8 @@ public:
   auto Fill(std::span<std::uint8_t const> bgrx, std::uint32_t stride, EncodingTimes& times) -> bool;
   auto Encoded(NV_ENC_PIC_PARAMS& pic, std::vector<std::byte>& encoded, EncodingTimes& times) -> bool;
   auto Close()                                                                              -> void;
+  template <auto LOAD, class LibraryTy>
+  auto Loaded(LibraryTy& library, std::string_view name, Report report) -> bool;
 
 private:
   friend class Encoder;
@@ -104,16 +115,30 @@ private:
   bool        first   = true;
   std::string error;
 };
-auto Encoder::Impl::Check(int status, std::string_view operation) -> bool {
-  if (!status) return true;
-  error = std::format("AVC420 {} failed: {}", operation, status);
-  WLog_ERR("sdlrdp.avc", "%s", error.c_str());
-  return false;
+auto Encoder::Impl::Fail(std::string_view operation, std::string_view why, Report report) -> void {
+  error = std::format("{} failed: {}", operation, why);
+  if (report == Report::Logged) WLog_ERR("sdlrdp.avc", "AVC420 %s", error.c_str());
 }
-auto Encoder::Impl::Load() -> bool {
-  return Check(Loaded<cuda_load_functions>(driver.cuda), "load libcuda.so.1")
-         && Check(Loaded<nvenc_load_functions>(driver.loader), "load libnvidia-encode.so.1")
-         && Check(driver.cuda->cuInit(0), "cuInit");
+auto Encoder::Impl::Check(int status, std::string_view operation, Report report) -> bool {
+  if (status != 0) Fail(operation, std::to_string(status), report);
+  return status == 0;
+}
+auto Encoder::Impl::Check(int status, std::string_view operation) -> bool {
+  return Check(status, operation, Report::Logged);
+}
+template <auto LOAD, class LibraryTy>
+auto Encoder::Impl::Loaded(LibraryTy& library, std::string_view name, Report report) -> bool {
+  typename LibraryTy::pointer loaded = nullptr;
+  std::string                 why;
+  auto const                  status = LOAD(&loaded, &why);
+  library.reset(loaded);
+  if (status != 0) Fail(std::format("load {}", name), why.empty() ? std::to_string(status) : why, report);
+  return status == 0;
+}
+auto Encoder::Impl::Load(Report report) -> bool {
+  return Loaded<cuda_load_functions>(driver.cuda, "libcuda.so.1", report)
+         && Loaded<nvenc_load_functions>(driver.loader, "libnvidia-encode.so.1", report)
+         && Check(driver.cuda->cuInit(0), "cuInit", report);
 }
 auto Encoder::Impl::Session() -> bool {
   Expects(driver.cuda != nullptr, "CUDA library is loaded");
@@ -303,11 +328,11 @@ auto Encoder::Error() const -> std::string const& {
 }
 auto Encoder::UnavailableReason() -> std::string {
   static std::string const reason = [] {
-    Impl probe;
-    auto available = probe.Load();
-    auto error     = probe.error;
+    Impl       probe;
+    auto const available = probe.Load(Report::Quiet);
     probe.Close();
-    return available ? std::string{ } : error;
+    if (!available) WLog_WARN("sdlrdp.avc", "AVC420 unavailable: %s", probe.error.c_str());
+    return available ? std::string{ } : probe.error;
   }();
   return reason;
 }
@@ -338,8 +363,8 @@ auto Encoder::Open(Extent size, std::uint32_t bitrate, std::uint32_t fps) -> boo
   impl->small   = false;
   impl->picture = size;
   impl->aligned = { .width = Aligned(width), .height = Aligned(height) };
-  if (!impl->Load() || !impl->Session() || !impl->MinimumSize() || impl->small || !impl->Initialize(bitrate, fps)
-      || !impl->Buffers()) {
+  if (!impl->Load(Report::Logged) || !impl->Session() || !impl->MinimumSize() || impl->small
+      || !impl->Initialize(bitrate, fps) || !impl->Buffers()) {
     Close();
     return false;
   }
