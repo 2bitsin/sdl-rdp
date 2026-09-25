@@ -10,11 +10,12 @@
 #include <cstdint>
 #include <format>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace sample::detail::events {
 namespace {
-constexpr std::array<std::pair<std::uint32_t, char const*>, 24> EventLabels{ {
+constexpr std::array<std::pair<std::uint32_t, std::string_view>, 24> EventLabels{ {
     { SDL_EVENT_KEYBOARD_ADDED              , "KEYBOARD_ADDED"               },
     { SDL_EVENT_MOUSE_ADDED                 , "MOUSE_ADDED"                  },
     { SDL_EVENT_WINDOW_MOVED                , "MOVED"                        },
@@ -40,18 +41,18 @@ constexpr std::array<std::pair<std::uint32_t, char const*>, 24> EventLabels{ {
     { SDL_EVENT_MOUSE_BUTTON_UP             , "MOUSE_BUTTON_UP"              },
     { SDL_EVENT_MOUSE_WHEEL                 , "MOUSE_WHEEL"                  },
 } };
-auto EventName(std::uint32_t type) -> char const* {
-  auto const* label = std::ranges::find(EventLabels, type, &std::pair<std::uint32_t, char const*>::first);
+auto EventName(std::uint32_t type) -> std::string_view {
+  auto const* label = std::ranges::find(EventLabels, type, &std::pair<std::uint32_t, std::string_view>::first);
   return label == EventLabels.end() ? "OTHER" : label->second;
 }
 
-auto PrintGeometry(SDL_Event const& event, SDL_Window* window) -> void {
+auto PrintGeometry(SDL_Event const& event, SDL_Window& window) -> void {
   if (event.type == SDL_EVENT_WINDOW_EXPOSED || event.type == SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED
       || event.type == SDL_EVENT_WINDOW_RESIZED) {
     auto const* mode = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
     int         w    = 0;
     int         h    = 0;
-    Check(SDL_GetWindowSize(window, &w, &h));
+    Check(SDL_GetWindowSize(&window, &w, &h));
     SDL_Log("event GEOMETRY window=%dx%d desktop=%dx%d", w, h, mode->w, mode->h);
   }
 }
@@ -71,8 +72,8 @@ auto DisplayTiming() -> std::string {
                      mode->refresh_rate_denominator);
 }
 
-auto ClientProperties(SDL_Window* window) -> std::string {
-  auto properties = SDL_GetWindowProperties(window);
+auto ClientProperties(SDL_Window& window) -> std::string {
+  auto properties = SDL_GetWindowProperties(&window);
   return std::format(" keyboard_layout={} client_name={} codec={}",
                      SDL_GetNumberProperty(properties, SDL_PROP_WINDOW_RDP_KEYBOARD_LAYOUT_NUMBER, 0),
                      SDL_GetStringProperty(properties, SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING, ""),
@@ -91,7 +92,7 @@ auto PointerDetails(SDL_Event const& event, std::uint32_t frame) -> std::string 
   default:                    return { };
   }
 }
-auto WindowDetails(SDL_Event const& event, SDL_Window* window) -> std::string {
+auto WindowDetails(SDL_Event const& event, SDL_Window& window) -> std::string {
   if (event.type == SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED)
     return std::format(" width={} height={}", event.display.data1, event.display.data2);
   if (event.type == SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED) {
@@ -103,7 +104,7 @@ auto WindowDetails(SDL_Event const& event, SDL_Window* window) -> std::string {
     return std::format(" data1={} data2={}", event.window.data1, event.window.data2);
   return { };
 }
-auto EventDetails(SDL_Event const& event, SDL_Window* window, std::uint32_t frame) -> std::string {
+auto EventDetails(SDL_Event const& event, SDL_Window& window, std::uint32_t frame) -> std::string {
   if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP)
     return std::format(" scancode={} key={} down={}", std::to_underlying(event.key.scancode), event.key.key,
                        int{ event.key.down });
@@ -111,7 +112,7 @@ auto EventDetails(SDL_Event const& event, SDL_Window* window, std::uint32_t fram
   return PointerDetails(event, frame) + WindowDetails(event, window);
 }
 }
-auto PrintEvent(SDL_Event const& event, SDL_Window* window, std::uint32_t frame) -> void {
+auto PrintEvent(SDL_Event const& event, SDL_Window& window, std::uint32_t frame) -> void {
   if (PrintClipboardEvent(event)) return;
   if (PrintInput(event, window)) return;
   auto line = std::format("event {} type={}", EventName(event.type), event.type);

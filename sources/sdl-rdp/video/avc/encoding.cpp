@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <ranges>
+#include <span>
 
 namespace sdl_rdp::video::avc::detail::encoding {
 using sdl_rdp::picture::Aligned;
@@ -46,7 +47,7 @@ auto ReplicateEdges(std::span<std::uint8_t> pixels, Extent size) -> void {
     auto line = pixels.subspan(std::size_t{ row } * stride, stride);
     auto edge = line.subspan(std::size_t{ width - 1 } * 4, 4);
     std::ranges::for_each(line.subspan(std::size_t{ width } * 4) | std::views::chunk(4),
-                          [&](auto pixel) { std::ranges::copy(edge, pixel.begin()); });
+                          [&](std::span<std::uint8_t> pixel) { std::ranges::copy(edge, pixel.begin()); });
   });
   auto last = pixels.subspan(std::size_t{ height - 1 } * stride, stride);
   std::ranges::for_each(std::views::iota(height, Aligned(height)), [&](std::uint32_t row) {

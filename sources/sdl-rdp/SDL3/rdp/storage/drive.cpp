@@ -4,6 +4,7 @@
 #include <sdl-rdp/SDL3/rdp/exceptions.hpp>
 #include <sdl-rdp/SDL3/rdp/owneddriver.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
+#include <sdl-rdp/utilities/void-buffer.hpp>
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -17,6 +18,7 @@ using sdl3::rdp::settings::Text;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::RAIIWrap;
+using sdl_rdp::utilities::VoidBuffer;
 namespace {
 constexpr std::size_t InitialDriveCapacity = 16;
 template <typename ElementTy, typename FillTy>
@@ -67,10 +69,11 @@ using DriveFile = RAIIWrap<std::pair<std::reference_wrapper<Driver const>, sdlrd
 class File : private OwnedDriver<Driver const> {
 public:
   using OwnedDriver<Driver const>::Backend;
-       File(std::shared_ptr<Driver const> driver, std::uint32_t drive, std::string const& path, FileMode mode)
+  File(std::shared_ptr<Driver const> driver, std::uint32_t drive, std::string const& path, FileMode mode)
       : OwnedDriver<Driver const>{ std::move(driver) }, _file{ Backend(), drive, path, mode.Flags() }, _mode{ mode } { }
-  auto Handle() const -> sdlrdp_file* {
-    return _file.Get().second;
+  template <Operation OPERATION, typename... ArgsTy>
+  auto Call(ArgsTy&&... args) const -> decltype(auto) {
+    return Backend().Call<OPERATION>(_file.Get().second, std::forward<ArgsTy>(args)...);
   }
   auto Mode() const -> FileMode {
     return _mode;
@@ -91,8 +94,7 @@ private:
 };
 auto Size(File const& file) -> std::int64_t {
   sdlrdp_stat info{ };
-  if (file.Backend().Call<Operation::DRIVE_FSTAT>(file.Handle(), &info) < 0)
-    return file.Backend().Fail<std::int64_t>(-1);
+  if (file.Call<Operation::DRIVE_FSTAT>(&info) < 0) return file.Backend().Fail<std::int64_t>(-1);
   if (std::in_range<std::int64_t>(info.size)) return static_cast<std::int64_t>(info.size);
   SDL_SetError("RDP file exceeds signed stream size");
   return -1;
@@ -133,10 +135,10 @@ auto Advance(File& file, int count, std::size_t size, SDL_IOStatus short_status)
   return { static_cast<std::size_t>(count), std::cmp_less(count, size) ? short_status : SDL_IO_STATUS_READY };
 }
 // SDL's stream transfer callbacks require raw counted buffers and a status output.
-template <Operation OPERATION, typename ByteTy>
-  requires IoBuffer<ByteTy>
-auto SDLCALL Transfer(void* context, ByteTy* buffer, std::size_t size, SDL_IOStatus* status) -> std::size_t {
+template <Operation OPERATION, VoidBuffer VoidTy>
+auto SDLCALL Transfer(void* context, VoidTy* buffer, std::size_t size, SDL_IOStatus* status) -> std::size_t {
   Expects(context != nullptr, "stream transfer has state");
+  Expects(buffer != nullptr, "stream transfer has a buffer");
   Expects(status != nullptr, "stream transfer has a status output");
   auto&          file         = *static_cast<File*>(context);
   constexpr auto short_status = OPERATION == Operation::DRIVE_READ ? SDL_IO_STATUS_EOF : SDL_IO_STATUS_ERROR;
@@ -144,8 +146,8 @@ auto SDLCALL Transfer(void* context, ByteTy* buffer, std::size_t size, SDL_IOSta
     *status = SDL_IO_STATUS_ERROR;
     return 0;
   }
-  auto const count = file.Backend().Call<OPERATION>(file.Handle(), static_cast<std::uint64_t>(file.Position()), buffer,
-                                                    std::min(size, static_cast<std::size_t>(SDL_MAX_SINT32)));
+  auto const count            = file.Call<OPERATION>(static_cast<std::uint64_t>(file.Position()), buffer,
+                                                     std::min(size, static_cast<std::size_t>(SDL_MAX_SINT32)));
   auto const [bytes, outcome] = Advance(file, count, size, short_status);
   if (outcome != SDL_IO_STATUS_READY) *status = outcome;
   return bytes;
@@ -155,7 +157,7 @@ auto SDLCALL FileFlush(void* context, SDL_IOStatus* status) -> bool {
   Expects(context != nullptr, "stream flush has state");
   Expects(status != nullptr, "stream flush has a status output");
   auto const& file = *static_cast<File*>(context);
-  if (file.Backend().Call<Operation::DRIVE_FLUSH>(file.Handle()) >= 0) return true;
+  if (file.Call<Operation::DRIVE_FLUSH>() >= 0) return true;
   *status = SDL_IO_STATUS_ERROR;
   return file.Backend().Fail();
 }
@@ -195,14 +197,15 @@ auto OpenDriveFile(std::shared_ptr<Driver const> driver, std::uint32_t drive, st
   return stream;
 }
 auto SDLCALL OpenFile(char const* drive, char const* path, char const* mode) -> SDL_IOStream* {
-  return Boundary([&] {
+  auto stream = Boundary([&] -> std::optional<Stream> {
     auto const file_path = Text(path);
     if (!file_path) throw InvalidFilePath{ };
     FileMode const file_mode { Text(mode).value_or("") };
     auto           driver    = Rendezvous::Acquire();
     auto const     id        = DriveId(*driver, DriveName(drive));
-    return OpenDriveFile(std::move(driver), id, *file_path, file_mode).Release();
+    return OpenDriveFile(std::move(driver), id, *file_path, file_mode);
   });
+  return stream ? stream->Release() : nullptr;
 }
 auto UpdateDrives(Driver const& driver, SDL_PropertiesID properties) -> void {
   Expects(properties != 0, "drive publication has display properties");

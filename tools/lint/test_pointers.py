@@ -17,20 +17,45 @@ typedef struct { int (*log)(void*, char const*); void* log_user; } config;
 int c_register(int (*cb)(void*), void* user);
 void c_free(int*);
 char const* sdl_export(struct Dev*);
+int sdl_bytes(void*);
+int sdl_forward(struct Dev*);
+void c_property(char const* name, void* value);
+void c_keep(void* value);
+int c_relay(void* (*cb)(void*), void* user);
+int c_read(void const* data);
+struct Pair { int (*on)(struct Dev*, int*); };
 void sdl_close(struct Dev*);
 int sdl_chain(struct Dev*);
 int sdl_lambda(struct Dev*);
 int sdl_marked(struct Dev*);
 }
 '''
+ABI_HEADER = '''extern "C" {
+struct Dev;
+int abi_open(struct Dev* dev, char const* name);
+}
+'''
+LIB_HEADER = '''#include <functional>
+namespace lib {
+struct Bench {
+  auto Apply(std::function<void(Bench*)> const& each) -> Bench*;
+  auto Each(void (*each)(Bench*)) -> Bench*;
+};
+}
+'''
 PROBES = '''#include <array>
+#include <cstring>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include <tuple>
 #include "c.h"
+#include "lib.h"
+#include <sdl-rdp/abi/abi.h>
 struct Loose { int value; };
 namespace probe {
 using P = int*;
@@ -81,7 +106,126 @@ constexpr auto reflect_scheme(Hue* used_tag) -> int { return used_tag == nullptr
 auto reflect_scheme([[maybe_unused]] Reflected* runtime_tag, [[maybe_unused]] Hue hue) -> int { return 0; }
 struct Method { constexpr auto reflect_scheme([[maybe_unused]] Method* method_tag) -> int { return 0; } };
 constexpr auto other_scheme([[maybe_unused]] Loose* other_tag) -> int { return 0; }
+template <class T> auto Carry(T carried) -> int { return *carried; }
+auto Abbrev(auto abbreviated) -> int { return *abbreviated; }
+template <class... ArgsTy> auto Pack(ArgsTy... packed) -> int { return (*packed + ...); }
+template <class T> auto Relay(T relayed) -> void { c_free(relayed); }
+auto Early(Dev* early) -> int;
+auto Once(lib::Bench* once) -> void;
+auto Each(lib::Bench* each) -> void;
+auto FreeThing(int* thing) -> void { c_free(thing); }
+template <auto... RELEASES> struct Releasing {
+  template <class ValueTy> auto operator()(ValueTy* released) const -> void { (..., RELEASES(released)); }
+};
+using Thing = std::unique_ptr<int, Releasing<FreeThing>>;
+auto Acquire(int size) -> int*;
+template <class ValueTy, auto ACQUIRE, auto RELEASE> class Wrap {
+public:
+  template <class... ArgsTy> explicit Wrap(ArgsTy... args) : _wrapped{ ACQUIRE(args...) } { }
+  Wrap(Wrap const&) = delete;
+  ~Wrap() { RELEASE(_wrapped); }
+private:
+  ValueTy _wrapped;
+};
+auto Register(int (*callback)(void*)) -> int* { c_register(callback, nullptr); return nullptr; }
+auto Keeps(int (*callback)(void*)) -> int*;
+auto Hooked(void* hooked) -> int { if (!hooked) return 0; return 1; }
+auto Kept(void* kept) -> int { if (!kept) return 0; return 1; }
+auto Laundered(Dev* laundered) -> int { if (!laundered) return 0; return 1; }
+template <class T> auto Quiet(T quiet) -> std::size_t { return std::strlen(quiet); }
+template <class T> auto ByRefQuiet(T& by_reference) -> std::size_t { return std::strlen(by_reference); }
+template <class T> auto Spanning(T spanned, std::size_t n) -> std::size_t { return std::span{ spanned, n }.size(); }
+auto Landing(int* landing) -> int { return *landing; }
+template <class T> auto Forward(T forwarded) -> int { return Landing(forwarded); }
+auto Expects(bool condition, char const* text) -> void;
+template <class ArgTy> auto Converted(ArgTy converted) -> decltype(auto) {
+  Expects(converted != nullptr, "the slot's argument is supplied");
+  return *converted;
+}
+template <class... ArgsTy> auto Passed(ArgsTy... passing) -> int { return (Converted(passing) + ...); }
+template <class ContextTy, class... ArgsTy> auto Trampoline(ContextTy* context, ArgsTy... args) -> int {
+  if (!context) return 0;
+  return [&] { return Passed(args...); }();
+}
+template <class ArgTy> auto Stranded(ArgTy stranded) -> decltype(auto) {
+  Expects(stranded != nullptr, "the argument is supplied");
+  return *stranded;
+}
+auto Direct(int& value) -> int { return Stranded(&value); }
+auto Lambdas() -> int {
+  auto const first  = [](int* first_lambda) { return *first_lambda; };
+  auto const second = [](int* second_lambda) { return *second_lambda; };
+  return first(nullptr) + second(nullptr);
+}
+template <class ValueTy,
+          class OtherTy>
+class Headed {
+  ValueTy* headed_member;
+};
+auto Stored(Dev* stored) -> int { if (!stored) return 0; return 1; }
+template <class... ArgsTy> auto PackQuiet(ArgsTy... pack_quiet) -> std::size_t { return std::strlen(pack_quiet...[0]); }
+template <class... ArgsTy> auto PackLanding(ArgsTy... pack_landing) -> int { return Landing(pack_landing...[0]); }
+template <class T> auto Made() -> T { return T{ }; }
+struct Pmf { auto F(int x) -> int { return x; } };
+struct HasPmf {
+  int (Pmf::*pointer_method)(int*);
+  int (Pmf::*plain_method)(int);
+  int Pmf::*data_offset;
+};
+auto TakesFunction(std::function<int(int*)> const& taken_function) -> int;
+auto MakesFunction() -> std::function<void(int*)>;
+struct Owner { Wrap<int*, Acquire, c_free> owned_handle; std::optional<Wrap<int*, Acquire, c_free>> maybe_handle; };
+auto Instantiate(int* value, Table& t, lib::Bench& bench) -> int {
+  Relay(value);
+  t.Init = Early;
+  bench.Apply(Once);
+  bench.Each(Each);
+  Thing const thing{ nullptr };
+  Wrap<int*, Register, c_free> const hook{ Hooked };
+  Wrap<int*, Keeps, c_free> const kept{ Kept };
+  c_property("stored", reinterpret_cast<void*>(Stored));
+  c_keep(reinterpret_cast<void*>(Laundered));
+  c_relay([](void* handed) -> void* { return handed; }, nullptr);
+  c_register([](void* copied) -> int { return c_read(copied); }, nullptr);
+  Pair pair{ Trampoline<Dev, int*> };
+  std::array<char, 4> text{ };
+  char*               letters = text.data();
+  return Carry(value) + Forward(value) + Direct(*value) + static_cast<int>(Quiet(text.data()) + ByRefQuiet(letters)
+         + Spanning(value, 1) + PackQuiet(text.data())) + Lambdas() + pair.on(nullptr, nullptr) + Abbrev(value)
+         + Pack(value, value) + PackLanding(value) + static_cast<int>(Made<int*>() == nullptr);
+}
+auto Early(Dev* early) -> int { if (!early) return 1; return 0; }
+auto Once(lib::Bench* once) -> void { if (!once) return; }
+auto Each(lib::Bench* each) -> void { if (!each) return; }
+template <class T> using O = std::optional<T>;
+class Calls {
+public:
+  template <class... ArgsTy> auto Call(ArgsTy&&... call_args) const -> int {
+    return std::get<0>(_symbols)(std::forward<ArgsTy>(call_args)...);
+  }
+  template <class... ArgsTy> auto Other(ArgsTy&&... other_args) const -> int {
+    return _other(std::forward<ArgsTy>(other_args)...);
+  }
+private:
+  std::tuple<decltype(&abi_open)> _symbols;
+  std::tuple<int (*)(int*)>       _other_table;
+  int (*_other)(int*);
+};
+template <auto ACQUIRE> struct Checking {
+  template <class... ArgsTy> auto operator()(ArgsTy&&... acquire_args) const -> int* {
+    return ACQUIRE(std::forward<ArgsTy>(acquire_args)...);
+  }
+};
+auto Borrow(int* from) -> int*;
+auto UseCalls(Calls const& calls, Dev& dev, int& value) -> int {
+  Wrap<int*, Checking<Borrow>{ }, c_free> const checked{ &value };
+  return calls.Call(&dev, "x") + calls.Other(&value);
+}
 struct Deep {
+  std::optional<std::vector<std::pair<int, std::span<int*>>>> deeper_member;
+  std::optional<std::optional<std::optional<std::optional<std::optional<std::vector<int*>>>>>> deepest_member;
+  O<O<O<O<O<O<O<O<O<O<O<std::vector<int*>>>>>>>>>>>> twelve_deep_member;
+  std::function<void(int*)>   function_member;
   std::optional<int*>         optional_member;
   std::vector<int*>           vector_member;
   std::pair<int*, int>        pair_member;
@@ -91,7 +235,10 @@ struct Deep {
 }
 auto main(int argc, char** argv) -> int { return argc; }
 '''
-ADAPTERS = '''#include <memory>
+ADAPTERS = '''#include <concepts>
+#include <memory>
+#include <optional>
+#include <string>
 #include "c.h"
 struct Loose { int value; };
 auto Checked(Dev* adapted, char const* named) -> int {
@@ -104,6 +251,9 @@ auto Stray(Dev* stray) -> int { if (!stray) return -1; return 0; }
 auto Inner(Dev* inner) -> int { if (!inner) return -1; return 0; }
 auto Caller(Dev& dev) -> int { return Stray(&dev); }
 template <class T> auto Generic(T* generic) -> int { if (!generic) return -1; return 0; }
+template <class T> concept Opaque = std::same_as<T, void> || std::same_as<T, void const>;
+template <Opaque ByteTy> auto Bytes(ByteTy* bytes) -> int { if (!bytes) return -1; return 0; }
+template <typename ByteTy> auto Loose(ByteTy* loosely) -> int { if (!loosely) return -1; return 0; }
 auto Project(Loose* project) -> int { if (!project) return -1; return 0; }
 extern "C" auto sdl_export(Dev* exported) -> char const* {
   auto text = [](Dev& dev) -> char const* { return "x"; };
@@ -112,6 +262,15 @@ extern "C" auto sdl_export(Dev* exported) -> char const* {
   Project(nullptr);
   return Checked(exported, "y") ? nullptr : text(*exported);
 }
+auto Checks(Dev* checks) -> int;
+extern "C" auto sdl_forward(Dev* forwarded) -> int { return Checks(forwarded); }
+auto Checks(Dev* checks) -> int { if (!checks) return -1; return 0; }
+auto Named(char const* named_text) -> std::optional<std::string> {
+  if (!named_text) return std::nullopt;
+  return std::string{ named_text };
+}
+auto Reader() -> bool { return Named("x").has_value(); }
+extern "C" auto sdl_bytes(void* data) -> int { return Bytes(data) + Loose(data); }
 extern "C" auto sdl_close(Dev* closed) -> void { std::unique_ptr<Dev> const owned{ closed }; }
 extern "C" auto sdl_chain(Dev* chained) -> int { return Rooted(chained); }
 extern "C" auto sdl_lambda(Dev* captured) -> int {
@@ -123,19 +282,65 @@ auto _Public_(7)
     sdl_marked(Dev* marked) -> int { return Rooted(marked); }
 auto Unchecked(Dev* loose) -> Dev& { return *loose; }
 '''
-FACADE = '''#include "c.h"
+FACADE = '''#include <optional>
+#include <string>
+#include "c.h"
 struct Loose { int value; };
 template <class T> auto Tpl(T* tpl) -> int { if (!tpl) return 0; return 1; }
 auto Text(char const* text) -> int { if (!text) return 0; return 1; }
 auto User(void* user) -> int { if (!user) return 0; return 1; }
+auto Optional(char const* optional_text) -> std::optional<std::string> {
+  if (!optional_text) return std::nullopt;
+  return std::string{ optional_text };
+}
 auto Record(Loose* record) -> int { if (!record) return 0; return 1; }
 extern "C" auto sdl_export(Dev* exported) -> char const*;
 auto Use(Dev* dev) -> char const* { return sdl_export(dev); }
 '''
+GETTERS = '''#include <sdl-rdp/abi/backend.h>
+#include <tuple>
+#include <vector>
+namespace probe {
+struct Getters {
+  char const* (*name)();
+  unsigned (*count)();
+  std::vector<char const* (*)()> names;
+  void (*closer)(sdlrdp_handle*);
+  int* control;
+};
+auto TakeName(char const* (*taken_name)()) -> int;
+struct Catalog {
+  using Symbols = std::tuple<decltype(&sdlrdp_last_error), decltype(&sdlrdp_version), decltype(&sdlrdp_close)>;
+};
+using CatalogSymbols = Catalog::Symbols;
+struct Table {
+  CatalogSymbols const catalog_symbols;
+};
+auto Loaded() -> CatalogSymbols;
+class Session {
+public:
+  template <class... ArgsTy> auto Call(ArgsTy... session_args) const -> decltype(auto) {
+    return std::get<0>(_symbols)(session_args...);
+  }
+  auto Error() const -> decltype(auto) { return Call(); }
+  auto Other() const -> decltype(auto) { return _other(); }
+private:
+  CatalogSymbols _symbols;
+  char const* (*_other)();
+};
+auto UseSession(Session const& session) -> bool { return session.Error() == session.Other(); }
+struct Symbols {
+  CatalogSymbols symbols;
+};
+auto SpelledError(Symbols const& table) -> char const* { return std::get<0>(table.symbols)(); }
+auto SpelledRelay(Symbols const& table) -> char const* { return SpelledError(table); }
+}
+'''
 PROBE   = 'sources/sdl-rdp/video/probe.cpp'
 ADAPTER = 'sources/sdl-rdp/backend/adapter.cpp'
 FACADES = 'sources/sdl-rdp/freerdp-facade/facade.cpp'
-FILES   = {PROBE: PROBES, ADAPTER: ADAPTERS, FACADES: FACADE}
+GETTER  = 'sources/sdl-rdp/video/getters.cpp'
+FILES   = {PROBE: PROBES, ADAPTER: ADAPTERS, FACADES: FACADE, GETTER: GETTERS}
 
 
 def locate(text, needle):
@@ -146,6 +351,10 @@ def tree(root, files, compiled):
     """A git tree holding the files, with a compile database of the compiled ones."""
     (root / 'include').mkdir()
     (root / 'include/c.h').write_text(C_HEADER)
+    (root / 'include/lib.h').write_text(LIB_HEADER)
+    (root / 'sources/sdl-rdp/abi').mkdir(parents=True)
+    (root / 'sources/sdl-rdp/abi/abi.h').write_text(ABI_HEADER)
+    (root / 'sources/sdl-rdp/abi/backend.h').write_text((pointers.ROOT / 'sources/sdl-rdp/abi/backend.h').read_text())
     for name, text in files.items():
         (root / name).parent.mkdir(parents=True, exist_ok=True)
         (root / name).write_text(text)
@@ -154,17 +363,32 @@ def tree(root, files, compiled):
     build = root / '_build/probe'
     build.mkdir(parents=True)
     database = [{'directory': str(root), 'file': str(root / name),
-                 'arguments': ['clang++', '-std=c++23', f'-I{root}/include', '-c', str(root / name)]}
+                 'arguments': ['clang++', '-std=c++26', f'-I{root}/include', f'-I{root}/sources', '-c',
+                               str(root / name)]}
                 for name in compiled]
     (build / 'compile_commands.json').write_text(json.dumps(database))
     return build
 
 
 @pytest.fixture(scope='module')
-def found(tmp_path_factory):
+def listed(tmp_path_factory):
     root  = tmp_path_factory.mktemp('tree')
     build = tree(root, FILES, FILES)
-    return {(str(item.path), item.line, item.kind) for item in pointers.findings(root, build)}
+    return pointers.findings(root, build)
+
+
+@pytest.fixture(scope='module')
+def found(listed):
+    return {(str(item.path), item.line, item.kind) for item in listed}
+
+
+@pytest.fixture(scope='module')
+def keyed(listed):
+    return {(str(item.path), item.line, item.owner): item for item in listed}
+
+
+def keyed_at(keyed, needle):
+    return next(owner for path, line, owner in keyed if path == PROBE and line == locate(PROBES, needle))
 
 
 def at(found, name, needle, kind):
@@ -202,6 +426,7 @@ def test_a_pointer_anywhere_in_the_canonical_type_counts(found, needle, kind):
 
 
 @pytest.mark.parametrize('needle', ['template <class T> auto Tpl', 'Text(char const* text)', 'User(void* user)',
+                                    'Optional(char const* optional_text)',
                                     'Record(Loose* record)', 'Use(Dev* dev)'])
 def test_a_module_holding_no_abi_has_no_adapters(found, needle):
     assert at(found, FACADES, needle, 'parameters')
@@ -274,6 +499,164 @@ def test_an_export_returns_through_its_lambda_and_adopts_into_ownership(found):
     assert not at(found, ADAPTER, 'sdl_close(Dev* closed)', 'unchecked')
 
 
+@pytest.mark.parametrize('needle', ['T carried', 'auto abbreviated', 'ArgsTy... packed'])
+def test_a_pointer_through_a_template_parameter_is_seen(found, needle):
+    assert at(found, PROBE, needle, 'parameters')
+
+
+@pytest.mark.parametrize('needle', ['T relayed', 'T quiet', 'T& by_reference', 'T spanned'])
+def test_a_template_pointer_reaching_foreign_code_is_judged_whether_or_not_it_is_dereferenced(found, needle):
+    assert at(found, PROBE, needle, 'parameters')
+
+
+def test_a_template_parameter_handed_to_a_project_function_is_judged_where_it_lands(found):
+    assert not at(found, PROBE, 'T forwarded', 'parameters')
+    assert at(found, PROBE, 'Landing(int* landing)', 'parameters')
+
+
+def test_a_pack_indexed_pointer_is_seen_through_its_index(found):
+    assert at(found, PROBE, 'ArgsTy... pack_quiet', 'parameters')
+    assert not at(found, PROBE, 'ArgsTy... pack_landing', 'parameters')
+
+
+def test_a_template_return_is_judged_per_instantiation(found):
+    assert at(found, PROBE, 'auto Made() -> T', 'returns')
+
+
+@pytest.mark.parametrize('needle, seen', [('pointer_method', True), ('plain_method', False), ('data_offset', False)])
+def test_a_member_function_pointer_with_a_pointer_parameter_is_seen(found, needle, seen):
+    assert at(found, PROBE, needle, 'members') == seen
+
+
+@pytest.mark.parametrize('needle, kind', [('taken_function', 'parameters'), ('MakesFunction()', 'returns')])
+def test_a_function_type_in_a_signature_is_one_finding(listed, needle, kind):
+    line = locate(PROBES, needle)
+    assert [item.kind for item in listed if str(item.path) == PROBE and item.line == line] == [kind]
+
+
+@pytest.mark.parametrize('needle, kind', [('(*name)()', 'members'), ('(*count)()', 'members'), ('names;', 'members'),
+                                          ('(*closer)', 'members'), ('control;', 'members'),
+                                          ('taken_name', 'parameters')])
+def test_a_pointer_of_an_abi_functions_type_outside_its_table_is_a_finding(found, needle, kind):
+    assert at(found, GETTER, needle, kind)
+
+
+def test_the_abis_table_through_its_aliases_is_the_abi(found):
+    assert not at(found, GETTER, 'catalog_symbols;', 'members')
+    assert not at(found, GETTER, 'auto Loaded()', 'returns')
+    assert not at(found, GETTER, 'CatalogSymbols _symbols;', 'members')
+
+
+def test_a_return_of_a_call_through_the_abis_table_is_the_abi(found):
+    assert not at(found, GETTER, 'auto Call(ArgsTy... session_args)', 'returns')
+    assert not at(found, GETTER, 'auto Error()', 'returns')
+    assert at(found, GETTER, 'auto Other()', 'returns')
+    assert at(found, GETTER, '(*_other)();', 'members')
+
+
+@pytest.mark.parametrize('needle', ['auto SpelledError(', 'auto SpelledRelay('])
+def test_a_spelled_pointer_return_is_judged_whatever_it_relays(found, needle):
+    assert at(found, GETTER, needle, 'returns')
+
+
+def test_a_concept_constrained_void_pointee_is_a_c_adapter(found):
+    assert not at(found, ADAPTER, 'ByteTy* bytes', 'parameters')
+    assert at(found, ADAPTER, 'ByteTy* loosely', 'parameters')
+
+
+@pytest.mark.parametrize('needle', ['deeper_member', 'deepest_member', 'twelve_deep_member'])
+def test_a_pointer_at_any_depth_is_seen(found, needle):
+    assert at(found, PROBE, needle, 'members')
+
+
+def test_a_pointer_in_a_function_type_held_as_a_member_is_seen(found, needle='function_member'):
+    assert at(found, PROBE, needle, 'members')
+
+
+@pytest.mark.parametrize('needle', ['auto Early(Dev* early) -> int;', 'auto Early(Dev* early) -> int {',
+                                    'auto Once(lib::Bench* once) -> void;', 'auto Once(lib::Bench* once) -> void {',
+                                    'auto Each(lib::Bench* each) -> void;'])
+def test_a_forward_declared_slot_is_one_slot_with_its_definition(found, needle):
+    assert not at(found, PROBE, needle, 'parameters')
+
+
+def test_a_function_a_deleter_releases_with_is_part_of_the_deleter(found):
+    assert not at(found, PROBE, 'FreeThing(int* thing)', 'parameters')
+    assert not at(found, PROBE, 'FreeThing(int* thing)', 'unchecked')
+    assert not at(found, PROBE, 'ValueTy* released', 'parameters')
+
+
+def test_an_raii_type_over_a_c_handle_is_not_a_pointer(found):
+    assert not at(found, PROBE, 'owned_handle', 'members')
+    assert not at(found, PROBE, 'ValueTy _wrapped', 'members')
+    assert not at(found, PROBE, 'auto Acquire(int size)', 'returns')
+
+
+def test_a_c_strings_conversion_to_an_optional_string_is_the_one_adapter_any_caller_may_use(found):
+    assert not at(found, ADAPTER, 'Named(char const* named_text)', 'parameters')
+
+
+def test_an_opaque_pointer_only_handed_back_is_never_read(found):
+    assert not at(found, PROBE, 'void* handed', 'unchecked')
+
+
+def test_an_opaque_pointer_handed_to_foreign_code_is_read(found):
+    assert at(found, PROBE, 'void* copied', 'unchecked')
+
+
+@pytest.mark.parametrize('needle', ['Hooked(void* hooked)', 'Stored(Dev* stored)'])
+def test_a_callback_registered_through_an_raii_type_or_as_an_opaque_value_is_a_slot(found, needle):
+    assert not at(found, PROBE, needle, 'parameters')
+
+
+@pytest.mark.parametrize('needle', ['Kept(void* kept)', 'Laundered(Dev* laundered)'])
+def test_a_callback_handed_to_a_receiver_that_registers_nothing_is_no_slot(found, needle):
+    assert at(found, PROBE, needle, 'parameters')
+
+
+def test_a_slots_pointer_checked_and_continued_as_a_reference_through_its_pass_throughs_is_the_slots(found):
+    assert not at(found, PROBE, 'ArgTy converted', 'parameters')
+    assert not at(found, PROBE, 'ArgTy converted', 'null checks')
+    assert not at(found, PROBE, 'ArgsTy... passing', 'parameters')
+
+
+def test_a_checked_conversion_reached_from_project_code_is_a_pointer(found):
+    assert at(found, PROBE, 'ArgTy stranded', 'parameters')
+    assert at(found, PROBE, 'ArgTy stranded', 'null checks')
+
+
+def test_every_finding_names_its_owner_and_a_lambda_is_counted_in_its_function(keyed):
+    owners = {owner for _, _, owner in keyed}
+    assert '' not in owners
+    assert not any(owner.startswith('?') or '::?' in owner for owner in owners)
+    assert keyed_at(keyed, 'int* first_lambda') == 'Lambdas::lambda#1'
+    assert keyed_at(keyed, 'int* second_lambda') == 'Lambdas::lambda#2'
+    assert keyed_at(keyed, 'ValueTy* headed_member') == 'Headed'
+
+
+def test_a_finding_moved_to_another_lambda_in_its_file_is_new(keyed):
+    first, second = (next(item for item in keyed.values() if item.owner == f'Lambdas::lambda#{n}') for n in (1, 2))
+    baseline = pointers.Baseline({}, collections.Counter([first.key()]))
+    assert pointers.regressions([second], baseline) == [
+        f'{second.path}: new parameters (int *) in Lambdas::lambda#2',
+        f'{first.path}: parameters (int *) in Lambdas::lambda#1 is gone; drop it from the baseline']
+
+
+def test_a_test_in_a_later_definition_guards_the_parameter_handed_to_its_declaration(found):
+    assert not at(found, ADAPTER, 'sdl_forward(Dev* forwarded)', 'unchecked')
+
+
+def test_the_abis_function_table_and_a_call_through_it_are_the_abi(found):
+    assert not at(found, PROBE, '_symbols;', 'members')
+    assert not at(found, PROBE, 'call_args', 'parameters')
+    assert at(found, PROBE, '_other_table;', 'members')
+    assert at(found, PROBE, 'other_args', 'parameters')
+
+
+def test_an_acquiring_functor_an_raii_type_holds_is_part_of_it(found):
+    assert not at(found, PROBE, 'acquire_args', 'parameters')
+
+
 def test_a_tracked_unit_outside_the_database_fails(tmp_path):
     files = {PROBE: PROBES, 'sources/sdl-rdp/video/missing.cpp': 'int x;\n', 'sources/sdl-rdp/link/wire.win32.cpp': ''}
     build = tree(tmp_path, files, [PROBE])
@@ -294,32 +677,50 @@ def test_the_database_comes_from_the_gate(monkeypatch):
         pointers.build_directory()
 
 
-def finding(path, kind, type_text):
-    return pointers.Finding(pathlib.Path(path), 1, 1, kind, type_text, '')
+def finding(path, kind, type_text, owner=''):
+    return pointers.Finding(pathlib.Path(path), 1, 1, kind, type_text, owner)
 
 
 def test_a_finished_module_is_held_by_finding_so_a_removal_admits_nothing():
-    baseline = pointers.Baseline({}, collections.Counter([('sources/sdl-rdp/link/a.hpp', 'returns', 'void *')] * 2))
-    found    = [finding('sources/sdl-rdp/link/a.hpp', 'returns', 'void *'),
-                finding('sources/sdl-rdp/link/b.hpp', 'parameters', 'int *')]
+    held     = ('sources/sdl-rdp/link/a.hpp', 'returns', 'A', 'void *')
+    baseline = pointers.Baseline({}, collections.Counter([held] * 2))
+    found    = [finding('sources/sdl-rdp/link/a.hpp', 'returns', 'void *', 'A'),
+                finding('sources/sdl-rdp/link/b.hpp', 'parameters', 'int *', 'B')]
     assert pointers.regressions(found, baseline) == [
-        'sources/sdl-rdp/link/b.hpp: new parameters (int *)',
-        'sources/sdl-rdp/link/a.hpp: returns (void *) is gone; drop it from the baseline']
+        'sources/sdl-rdp/link/b.hpp: new parameters (int *) in B',
+        'sources/sdl-rdp/link/a.hpp: returns (void *) in A is gone; drop it from the baseline']
+
+
+def test_a_finding_cannot_move_to_another_function_in_its_file():
+    held     = ('sources/sdl-rdp/link/a.cpp', 'parameters', 'Old', 'void *')
+    baseline = pointers.Baseline({}, collections.Counter([held]))
+    found    = [finding('sources/sdl-rdp/link/a.cpp', 'parameters', 'void *', 'New')]
+    assert pointers.regressions(found, baseline) == [
+        'sources/sdl-rdp/link/a.cpp: new parameters (void *) in New',
+        'sources/sdl-rdp/link/a.cpp: parameters (void *) in Old is gone; drop it from the baseline']
+
+
+def test_only_the_listed_unfinished_modules_are_held_by_count(tmp_path):
+    path = tmp_path / 'baseline'
+    path.write_text('count\tsdl-rdp/video\tparameters\t3\n')
+    with pytest.raises(SystemExit, match='sdl-rdp/video'):
+        pointers.read_baseline(path)
 
 
 def test_a_part_two_module_is_held_by_count():
-    baseline = pointers.Baseline({('sample', 'parameters'): 1}, collections.Counter())
-    found    = [finding('sources/sample/a.cpp', 'parameters', 'int *'),
-                finding('sources/sample/b.cpp', 'parameters', 'char *')]
-    assert pointers.regressions(found, baseline) == ['sample: parameters 2 != 1']
+    baseline = pointers.Baseline({('sdl-rdp/integration', 'parameters'): 1}, collections.Counter())
+    found    = [finding('sources/sdl-rdp/integration/a.cpp', 'parameters', 'int *'),
+                finding('sources/sdl-rdp/integration/b.cpp', 'parameters', 'char *')]
+    assert pointers.regressions(found, baseline) == ['sdl-rdp/integration: parameters 2 != 1']
 
 
 def test_the_baseline_reads_both_forms(tmp_path):
     path = tmp_path / 'baseline'
-    path.write_text('count\tsdl-rdp/SDL3\tparameters\t3\nfinding\tsources/sdl-rdp/link/a.hpp\treturns\tvoid *\n')
+    path.write_text('count\tsdl-rdp/integration\tparameters\t3\n'
+                    'finding\tsources/sdl-rdp/link/a.hpp\treturns\tA::B\tvoid *\n')
     baseline = pointers.read_baseline(path)
-    assert baseline.counts == {('sdl-rdp/SDL3', 'parameters'): 3}
-    assert baseline.findings == collections.Counter([('sources/sdl-rdp/link/a.hpp', 'returns', 'void *')])
+    assert baseline.counts == {('sdl-rdp/integration', 'parameters'): 3}
+    assert baseline.findings == collections.Counter([('sources/sdl-rdp/link/a.hpp', 'returns', 'A::B', 'void *')])
 
 
 def test_table_counts_by_module_with_tests_apart():
@@ -337,19 +738,16 @@ def test_a_recorded_input_that_is_gone_leaves_no_cache_key(tmp_path):
     assert pointers.unit_key(unit, 'q', ['kept.hpp', 'moved.hpp']) is None
 
 
-def test_a_lint_source_change_invalidates_every_key(tmp_path, monkeypatch):
-    assert pathlib.Path(pointers.shape.__file__) in pointers.LINT_SOURCES
-    sources = (tmp_path / 'pointers.py', tmp_path / 'shape.py')
-    for source in sources:
-        source.write_text('MARKS = ()\n')
+def test_a_cached_match_is_keyed_on_the_queries_and_the_tool_not_the_judgement(tmp_path, monkeypatch):
     (tmp_path / 'unit.cpp').write_text('')
-    monkeypatch.setattr(pointers, 'LINT_SOURCES', sources)
     monkeypatch.setattr(pointers, 'dependencies', lambda build: {})
     monkeypatch.setattr(pointers, 'preprocessed_inputs', lambda unit: [])
     units = [{'directory': str(tmp_path), 'file': 'unit.cpp', 'arguments': ['clang++']}]
-    before = pointers.cached_keys(units, pointers.lint_text('q'), tmp_path)
-    sources[1].write_text("MARKS = ('_Public_',)\n")
-    assert pointers.cached_keys(units, pointers.lint_text('q'), tmp_path) != before
+    tool  = pointers.clang_query()
+    keys  = pointers.cached_keys(units, pointers.lint_text('q', tool), tmp_path)
+    assert pointers.cached_keys(units, pointers.lint_text('q', tool), tmp_path) == keys
+    assert pointers.cached_keys(units, pointers.lint_text('r', tool), tmp_path) != keys
+    assert pathlib.Path(pointers.__file__).read_text() not in pointers.lint_text('q', tool)
 
 
 def bench_build(root, database_age, bench_age):

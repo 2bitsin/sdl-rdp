@@ -13,6 +13,8 @@ auto SDLCALL Authenticator::Deny(void* /*unused*/, char const* /*unused*/, char 
 }
 auto SDLCALL Authenticator::AuthenticationLog(void* user, int category, SDL_LogPriority priority, char const* message)
     -> void {
+  Check(user != nullptr);
+  Check(message != nullptr);
   auto&                      self   = *static_cast<Authenticator*>(user);
   std::string_view           text(message);
   constexpr std::string_view prefix = "Authentication rejected: user \"";
@@ -26,7 +28,8 @@ auto SDLCALL Authenticator::AuthenticationLog(void* user, int category, SDL_LogP
   auto line = std::string("event AUTH_REJECTED user=") + std::string(name);
   self.previous(self.previous_user, category, SDL_LOG_PRIORITY_INFO, line.c_str());
 }
-auto Authenticator::Option(std::string_view option, int& index, int argc, char** argv) -> bool {
+auto Authenticator::Option(std::span<std::string_view const> arguments, std::size_t& index) -> bool {
+  auto const option = arguments[index];
   if (option == "--verify-deny") {
     deny = true;
     return true;
@@ -37,8 +40,8 @@ auto Authenticator::Option(std::string_view option, int& index, int argc, char**
                                                                              { "--auth", SDL_HINT_RDP_AUTH } } };
   auto const* found = std::ranges::find(hints, option, &decltype(hints)::value_type::first);
   if (found == hints.end()) return false;
-  Check(index + 1 < argc);
-  Check(SDL_SetHint(found->second, argv[++index]));
+  Check(index + 1 < arguments.size());
+  Check(SDL_SetHint(found->second, std::string{ arguments[++index] }.c_str()));
   return true;
 }
 auto Authenticator::Defaults() const -> void {
@@ -56,8 +59,8 @@ auto Authenticator::Install() -> void {
 Authenticator::~Authenticator() {
   if (previous) SDL_SetLogOutputFunction(previous, previous_user);
 }
-auto PrintAuthentication(SDL_Window* window) -> void {
-  auto properties = SDL_GetWindowProperties(window);
+auto PrintAuthentication(SDL_Window& window) -> void {
+  auto properties = SDL_GetWindowProperties(&window);
   SDL_Log("event CONNECTED user=%s domain=%s authenticated=%d",
           SDL_GetStringProperty(properties, SDL_PROP_WINDOW_RDP_USER_STRING, ""),
           SDL_GetStringProperty(properties, SDL_PROP_WINDOW_RDP_DOMAIN_STRING, ""),

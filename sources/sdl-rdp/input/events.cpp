@@ -143,10 +143,12 @@ auto AbsoluteMotion(int x, int y, sdlrdp_rect bounds) -> sdlrdp_event {
            .mouse_move = { .x = std::clamp(x, 0, bounds.w - 1), .y = std::clamp(y, 0, bounds.h - 1) } };
 }
 }
-auto InputEvents::Scaled(int x, int y, std::invocable<int, int, sdlrdp_rect> auto build) -> void {
+template <auto BUILD>
+  requires std::invocable<decltype(BUILD), int, int, sdlrdp_rect>
+auto InputEvents::Scaled(int x, int y) -> void {
   auto const bounds  = _store.Read([](FrameStore const& store, FrameLock const& held) { return store.Bounds(held); });
   auto const desktop = _desktop.Rect();
-  _events.Push(build(Rescale(x, desktop.w, bounds.w), Rescale(y, desktop.h, bounds.h), bounds));
+  _events.Push(BUILD(Rescale(x, desktop.w, bounds.w), Rescale(y, desktop.h, bounds.h), bounds));
 }
 auto InputEvents::Point(MouseMode mode) noexcept -> void {
   _mouse.mode           = mode;
@@ -168,12 +170,12 @@ auto InputEvents::Motion(int x, int y) -> bool {
   int const dx = x - std::exchange(_mouse.last_x, x);
   int const dy = y - std::exchange(_mouse.last_y, y);
   if (_mouse.mode == MouseMode::Absolute) {
-    Scaled(x, y, AbsoluteMotion);
+    Scaled<AbsoluteMotion>(x, y);
     return true;
   }
   if (_mouse.have_relative) return true;
   bool const warped = std::exchange(_mouse.warp_requested, false) && AtCenter(desktop, x, y);
-  if (!warped && (dx || dy)) Scaled(dx, dy, RelativeMotion);
+  if (!warped && (dx || dy)) Scaled<RelativeMotion>(dx, dy);
   return NearEdge(desktop, x, y) ? Center() : true;
 }
 auto InputEvents::Pointer(std::uint64_t flags, std::int32_t x, std::int32_t y) -> std::uint32_t {
@@ -182,7 +184,7 @@ auto InputEvents::Pointer(std::uint64_t flags, std::int32_t x, std::int32_t y) -
     bool const shifted = moved && (flags & AINPUT_FLAGS_REL);
     if (moved) _mouse.have_relative = (flags & (AINPUT_FLAGS_REL | AINPUT_FLAGS_HAVE_REL)) != 0;
     if (_mouse.have_relative) _mouse.warp_requested = false;
-    if (shifted && _mouse.mode == MouseMode::Relative) Scaled(x, y, RelativeMotion);
+    if (shifted && _mouse.mode == MouseMode::Relative) Scaled<RelativeMotion>(x, y);
     if (moved && !shifted && !Motion(x, y)) return std::uint32_t{ ERROR_INTERNAL_ERROR };
     PushButtons<std::uint64_t>(_events, AinputButtons, flags, FirstButton, flags & AINPUT_FLAGS_DOWN);
     if (flags & AINPUT_FLAGS_WHEEL)

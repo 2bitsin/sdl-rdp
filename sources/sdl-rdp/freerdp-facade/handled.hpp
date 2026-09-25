@@ -63,11 +63,13 @@ template <class ParameterTy, class ArgTy> auto Referenced(ArgTy argument) -> dec
 template <auto HANDLER, class OwnerTy, class... ArgsTy>
 auto Invoked(OwnerTy& owner, ArgsTy... args) -> decltype(auto) {
   using ParametersTy = HandlerParameters<HANDLER>;
-  auto const arguments = std::tuple{ args... };
-  return [&]<std::size_t... INDEX>(std::index_sequence<INDEX...>) -> decltype(auto) {
-    return std::invoke(HANDLER, owner,
-                       Referenced<std::tuple_element_t<INDEX, ParametersTy>>(std::get<INDEX>(arguments))...);
-  }(std::make_index_sequence<std::tuple_size_v<ParametersTy>>{ });
+  // GCC 16 refuses to index an empty pack even inside an empty expansion.
+  if constexpr (sizeof...(ArgsTy) == 0)
+    return std::invoke(HANDLER, owner);
+  else
+    return [&]<std::size_t... INDEX>(std::index_sequence<INDEX...>) -> decltype(auto) {
+      return std::invoke(HANDLER, owner, Referenced<std::tuple_element_t<INDEX, ParametersTy>>(args...[INDEX])...);
+    }(std::make_index_sequence<std::tuple_size_v<ParametersTy>>{ });
 }
 
 // The registration hands back the owner it was given.

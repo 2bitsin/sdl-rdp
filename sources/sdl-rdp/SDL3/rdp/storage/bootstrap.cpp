@@ -2,6 +2,7 @@
 #include <sdl-rdp/SDL3/rdp/backend/boundary.hpp>
 #include <sdl-rdp/SDL3/rdp/owneddriver.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
+#include <sdl-rdp/utilities/void-buffer.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -9,10 +10,13 @@ namespace sdl3::rdp::storage::detail::bootstrap {
 using sdl3::rdp::backend::Boundary;
 using sdl3::rdp::backend::Operation;
 using sdl3::rdp::backend::StorageHandle;
+using sdl_rdp::utilities::ByteBuffer;
+using sdl_rdp::utilities::BytesOf;
 using sdl_rdp::utilities::Ensures;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::NotImplemented;
+using sdl_rdp::utilities::VoidBuffer;
 namespace {
 constexpr std::size_t DirectoryBatch = 32;
 constexpr std::size_t CopyChunkBytes = 65536;
@@ -43,8 +47,9 @@ auto StorageClose(void* context) -> bool {
   return true;
 }
 auto StorageReady(void* context) -> bool {
+  auto& data = Opened(context);
   return Boundary([&] {
-    Opened(context).Resolve();
+    data.Resolve();
     return true;
   });
 }
@@ -75,49 +80,58 @@ auto ReadDirectory(Storage const& data, std::string const& path, std::uint32_t o
   Ensures(std::cmp_less_equal(count, entries.size()), "backend fills at most the directory buffer");
   return entries.first(static_cast<std::size_t>(count));
 }
-// SDL enumeration passes a borrowed path and callback with an opaque application context.
-auto Deliver(std::span<sdlrdp_dirent const> entries, std::string const& directory,
-             SDL_EnumerateDirectoryCallback callback, void* user) -> SDL_EnumerationResult {
+template <typename ConsumerTy>
+concept EntryConsumer = std::is_invocable_r_v<SDL_EnumerationResult, ConsumerTy const&, sdlrdp_dirent const&>;
+template <EntryConsumer ConsumerTy>
+auto Deliver(std::span<sdlrdp_dirent const> entries, ConsumerTy const& consume) -> SDL_EnumerationResult {
   for (auto const& entry : entries)
-    if (auto const result = callback(user, directory.c_str(), entry.name); result != SDL_ENUM_CONTINUE) return result;
+    if (auto const result = consume(entry); result != SDL_ENUM_CONTINUE) return result;
   return SDL_ENUM_CONTINUE;
 }
-auto Enumerate(Storage const& data, std::string const& path, SDL_EnumerateDirectoryCallback callback, void* user)
-    -> bool {
-  auto const                                directory = DirectoryPrefix(path);
-  std::array<sdlrdp_dirent, DirectoryBatch> entries   { };
+template <EntryConsumer ConsumerTy>
+auto Enumerate(Storage const& data, std::string const& path, ConsumerTy const& consume) -> bool {
+  std::array<sdlrdp_dirent, DirectoryBatch> entries{ };
   for (std::uint32_t offset{ };; offset += Narrowed<std::uint32_t>(entries.size())) {
     auto const batch  = ReadDirectory(data, path, offset, entries);
-    auto const result = Deliver(batch, directory, callback, user);
+    auto const result = Deliver(batch, consume);
     if (result != SDL_ENUM_CONTINUE) return result == SDL_ENUM_SUCCESS;
     if (batch.size() < entries.size()) return true;
   }
 }
+// SDL enumeration passes a borrowed path and the application's callback with its opaque context.
 auto StorageEnumerate(void* context, char const* path, SDL_EnumerateDirectoryCallback callback, void* user) -> bool {
   Expects(path != nullptr, "enumeration has a path");
   Expects(callback != nullptr, "enumeration has a consumer");
   auto const& data = Opened(context);
-  return Boundary([&] { return Enumerate(data, std::string{ path }, callback, user); });
+  return Boundary([&] {
+    auto const directory = DirectoryPrefix(path);
+    return Enumerate(data, path,
+                     [&](sdlrdp_dirent const& entry) { return callback(user, directory.c_str(), entry.name); });
+  });
 }
-template <typename ByteTy>
-  requires IoBuffer<ByteTy>
-auto TransferAll(SDL_IOStream& stream, ByteTy* buffer, std::size_t length) -> std::size_t {
+template <ByteBuffer ByteTy> auto TransferAll(SDL_IOStream& stream, std::span<ByteTy> bytes) -> std::size_t {
   if constexpr (std::is_const_v<ByteTy>)
-    return SDL_WriteIO(&stream, buffer, length);
+    return SDL_WriteIO(&stream, bytes.data(), bytes.size());
   else
-    return SDL_ReadIO(&stream, buffer, length);
+    return SDL_ReadIO(&stream, bytes.data(), bytes.size());
+}
+// abi: SDL passes a null buffer with a zero length (SDL_storage.c), an empty transfer.
+template <VoidBuffer VoidTy> auto StorageBytes(VoidTy* buffer, std::size_t length) -> std::span<BytesOf<VoidTy>> {
+  if (length == 0) return { };
+  Expects(buffer != nullptr, "a non-empty storage transfer has a buffer");
+  return { static_cast<BytesOf<VoidTy>*>(buffer), length };
 }
 // SDL storage transfer callbacks provide counted raw buffers and borrowed paths.
-template <typename ByteTy>
-  requires IoBuffer<ByteTy>
-auto StorageTransfer(void* context, char const* path, ByteTy* buffer, std::uint64_t length) -> bool {
+template <VoidBuffer VoidTy>
+auto StorageTransfer(void* context, char const* path, VoidTy* buffer, std::uint64_t length) -> bool {
   Expects(path != nullptr, "storage transfer has a path");
-  auto const& data = Opened(context);
+  if (!std::in_range<std::size_t>(length)) return SDL_SetError("RDP storage transfer too large");
+  auto const& data  = Opened(context);
+  auto const  bytes = StorageBytes(buffer, static_cast<std::size_t>(length));
   return Boundary([&] {
-    if (!std::in_range<std::size_t>(length)) return SDL_SetError("RDP storage transfer too large");
-    FileMode const mode   { std::is_const_v<ByteTy> ? "wb" : "rb" };
+    FileMode const mode   { std::is_const_v<VoidTy> ? "wb" : "rb" };
     auto           file   = OpenDriveFile(data.Owner(), data.Drive(), path, mode);
-    auto const     count  = TransferAll(*file.Get(), buffer, static_cast<std::size_t>(length));
+    auto const     count  = TransferAll(*file.Get(), bytes);
     auto const     closed = file.Close();
     return count == length && closed;
   });
@@ -160,7 +174,7 @@ auto StorageSpace([[maybe_unused]] void* unused_context) -> std::uint64_t {
 }
 // SDL's storage bootstrap lends the name and takes ownership of the returned storage.
 auto StorageOpen(char const* name, [[maybe_unused]] SDL_PropertiesID unused_properties) -> SDL_Storage* {
-  return Boundary([&] {
+  auto storage = Boundary([&] -> std::optional<StorageHandle> {
     auto                       data      = std::make_unique<Storage>(Rendezvous::Acquire(), DriveName(name));
     SDL_StorageInterface const interface { sizeof(SDL_StorageInterface),
                                            StorageClose,
@@ -177,8 +191,9 @@ auto StorageOpen(char const* name, [[maybe_unused]] SDL_PropertiesID unused_prop
     StorageHandle              storage   { &interface, data.get() };
     // The storage owns its state from here on; StorageClose adopts it.
     std::ignore = data.release();
-    return storage.Release();
+    return storage;
   });
+  return storage ? storage->Release() : nullptr;
 }
 // SDL's user storage bootstrap lends organization and application names.
 auto UserStorageOpen([[maybe_unused]] char const* organization, char const* app, SDL_PropertiesID properties)

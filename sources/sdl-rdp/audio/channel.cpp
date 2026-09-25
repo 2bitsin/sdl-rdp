@@ -56,7 +56,7 @@ auto ApplyVolume(std::span<std::int16_t> stereo, std::uint32_t volume) -> void {
   Expects(stereo.size() % 2 == 0, "stereo frames are complete");
   auto left  = Narrowed<std::int32_t>(volume & 0xffff);
   auto right = Narrowed<std::int32_t>(volume >> 16);
-  std::ranges::for_each(stereo | std::views::chunk(2), [&](auto frame) {
+  std::ranges::for_each(stereo | std::views::chunk(2), [&](std::span<std::int16_t> frame) {
     frame[0] = Narrowed<std::int16_t>(std::int32_t{ frame[0] } * left / 65535);
     frame[1] = Narrowed<std::int16_t>(std::int32_t{ frame[1] } * right / 65535);
   });

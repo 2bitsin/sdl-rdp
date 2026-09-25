@@ -32,7 +32,8 @@ typedef struct {
   unsigned audio_latency_ms; /* 0 selects 500 ms ahead of confirmed playback. */
   sdlrdp_auth auth; /* Zero defaults to no authentication. */
   /* Peer worker callbacks; pointers and auth_user must live until close returns.
-     Missing callbacks fail closed unless a fixed password supplies the fallback. */
+     Missing callbacks fail closed unless a fixed password supplies the fallback.
+     Domain, user and the password or hash buffer are never NULL; an unnamed domain is "". */
   int (*verify)(void* auth_user, const char* domain, const char* user, const char* password);
   int (*lookup)(void* auth_user, const char* domain, const char* user, unsigned char nt_hash[16]);
   void* auth_user;
@@ -72,6 +73,7 @@ int sdlrdp_lookup_pair(const sdlrdp_config*, const char* domain, const char* use
 const char* sdlrdp_last_error(void);
 #define SDLRDP_ABI_VERSION 7
 unsigned sdlrdp_version(void);
+/* Reads the record only during the call; what the session keeps it copies. */
 int sdlrdp_open(const sdlrdp_config*, sdlrdp_handle**);
 /* Close joins workers; callers must finish concurrent ABI calls first. */
 void sdlrdp_close(sdlrdp_handle*);

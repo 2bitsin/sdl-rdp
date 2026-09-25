@@ -29,11 +29,11 @@ using sdl_rdp::diagnostics::SecurityTls;
 using sdl_rdp::diagnostics::TlsHandshakeFailed;
 
 namespace {
-constexpr std::array<std::pair<std::uint32_t, char const*>, 5> ProtocolFlags{ { { SecurityTls   , "TLS"     },
-                                                                                { SecurityNla   , "NLA"     },
-                                                                                { SecurityNlaExt, "NLA_EXT" },
-                                                                                { SecurityRdstls, "RDSTLS"  },
-                                                                                { SecurityRdsaad, "RDSAAD"  } } };
+constexpr std::array<std::pair<std::uint32_t, std::string_view>, 5> ProtocolFlags{ { { SecurityTls   , "TLS"     },
+                                                                                     { SecurityNla   , "NLA"     },
+                                                                                     { SecurityNlaExt, "NLA_EXT" },
+                                                                                     { SecurityRdstls, "RDSTLS"  },
+                                                                                     { SecurityRdsaad, "RDSAAD"  } } };
 auto ProtocolNames(std::uint32_t mask, bool rdp) -> std::string {
   std::vector<std::string_view> names;
   if (rdp) names.emplace_back("RDP");

@@ -1,0 +1,4 @@
+InheritParentConfig: true
+CheckOptions:
+  # printf-style: the sample prints a view as `%.*s`, its length the precision
+  bugprone-suspicious-stringview-data-usage.AllowedCallees: 'SDL_Log;SDL_SetError'

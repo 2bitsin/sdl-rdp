@@ -63,6 +63,7 @@ auto CreateWindow(SDL_VideoDevice* device, SDL_Window* window, [[maybe_unused]] 
 // SDL's video callback table supplies borrowed device and window pointers.
 auto DestroyWindow(SDL_VideoDevice* device, SDL_Window* window) -> void {
   Expects(device != nullptr, "window destruction has a device");
+  Expects(window != nullptr, "window destruction has a window");
   auto& data = *device->internal;
   if (data.Window() && &BoundWindow(data) == window) data.Unbind();
 }

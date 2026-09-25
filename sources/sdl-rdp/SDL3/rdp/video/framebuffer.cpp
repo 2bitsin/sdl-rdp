@@ -47,6 +47,7 @@ auto UpdateFramebuffer(SDL_VideoDevice* device, [[maybe_unused]] SDL_Window* unu
   auto const framebuffer = data.Framebuffer();
   if (!framebuffer) return SDL_SetError("Couldn't find RDP surface for window");
   if (count == 0) return true;
+  Expects(rects != nullptr, "a counted update has its rectangles");
   auto const damage = std::span(rects, static_cast<std::size_t>(count));
   return Boundary([&] { return framebuffer->get().Present(data.Backend(), damage); });
 }

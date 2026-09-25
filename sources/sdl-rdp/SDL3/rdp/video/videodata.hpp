@@ -7,20 +7,20 @@ struct SDL_VideoData : private sdl3::rdp::OwnedDriver<sdl3::rdp::Driver> {
 public:
   using FramebufferRef = std::optional<std::reference_wrapper<sdl3::rdp::video::Framebuffer>>;
   using sdl3::rdp::OwnedDriver<sdl3::rdp::Driver>::Backend;
-       SDL_VideoData(std::shared_ptr<sdl3::rdp::Driver> driver, SDL_HintCallback codec, SDL_HintCallback aspect);
-  auto Display() const                                      -> SDL_DisplayID;
-  auto Display(SDL_DisplayID display)                       -> void;
-  auto AttachTouch(SDL_TouchID touch)                       -> void;
-  auto DetachTouch()                                        -> void;
-  auto Window() const                                       -> std::optional<std::reference_wrapper<SDL_Window>>;
-  auto Bind(SDL_Window& window)                             -> void;
-  auto Unbind()                                             -> void;
-  auto Picture() const                                      -> std::pair<int, int>;
-  auto Picture(int width, int height)                       -> void;
-  auto RefreshMode(SDL_DisplayMode const& current)          -> SDL_DisplayMode&;
-  auto Framebuffer() noexcept                               -> FramebufferRef;
-  auto Attach(sdl3::rdp::backend::Surface surface) noexcept -> void;
-  auto Detach() noexcept                                    -> void;
+  explicit SDL_VideoData(std::shared_ptr<sdl3::rdp::Driver> driver);
+  auto     Display() const                                      -> SDL_DisplayID;
+  auto     Display(SDL_DisplayID display)                       -> void;
+  auto     AttachTouch(SDL_TouchID touch)                       -> void;
+  auto     DetachTouch()                                        -> void;
+  auto     Window() const                                       -> std::optional<std::reference_wrapper<SDL_Window>>;
+  auto     Bind(SDL_Window& window)                             -> void;
+  auto     Unbind()                                             -> void;
+  auto     Picture() const                                      -> std::pair<int, int>;
+  auto     Picture(int width, int height)                       -> void;
+  auto     RefreshMode(SDL_DisplayMode const& current)          -> SDL_DisplayMode&;
+  auto     Framebuffer() noexcept                               -> FramebufferRef;
+  auto     Attach(sdl3::rdp::backend::Surface surface) noexcept -> void;
+  auto     Detach() noexcept                                    -> void;
 private:
   SDL_DisplayID                                        _display       { };
   std::optional<sdl3::rdp::AuthenticationDisplay>      _authentication;

@@ -1,123 +1,102 @@
-count	sample	members	4
-count	sample	parameters	38
-count	sample	returns	5
-count	sample	unchecked	8
-count	sdl-rdp/SDL3	members	6
-count	sdl-rdp/SDL3	null checks	3
-count	sdl-rdp/SDL3	parameters	52
-count	sdl-rdp/SDL3	returns	16
-count	sdl-rdp/SDL3	unchecked	10
 count	sdl-rdp/headless-client.test tests	members	23
-count	sdl-rdp/headless-client.test tests	null checks	16
-count	sdl-rdp/headless-client.test tests	parameters	100
+count	sdl-rdp/headless-client.test tests	null checks	10
+count	sdl-rdp/headless-client.test tests	parameters	70
 count	sdl-rdp/headless-client.test tests	returns	10
-count	sdl-rdp/headless-client.test tests	unchecked	11
+count	sdl-rdp/headless-client.test tests	unchecked	24
 count	sdl-rdp/integration	parameters	2
+count	sdl-rdp/integration	unchecked	1
 count	sdl-rdp/integration tests	members	7
 count	sdl-rdp/integration tests	null checks	3
-count	sdl-rdp/integration tests	parameters	74
-count	sdl-rdp/integration tests	returns	16
-count	sdl-rdp/integration tests	unchecked	24
+count	sdl-rdp/integration tests	parameters	72
+count	sdl-rdp/integration tests	returns	17
+count	sdl-rdp/integration tests	unchecked	19
 count	sdl-rdp/sample-gate.test tests	members	5
-count	sdl-rdp/sample-gate.test tests	null checks	1
-count	sdl-rdp/sample-gate.test tests	parameters	39
+count	sdl-rdp/sample-gate.test tests	parameters	35
 count	sdl-rdp/sample-gate.test tests	returns	7
-count	sdl-rdp/sample-gate.test tests	unchecked	7
-finding	sources/sdl-rdp/audio/channel.cpp	parameters	s_rdpsnd_server_context *
-finding	sources/sdl-rdp/audio/channel.cpp	returns	void *
-finding	sources/sdl-rdp/audio/channel.hpp	parameters	s_rdpsnd_server_context *
-finding	sources/sdl-rdp/audio/channel.hpp	returns	void *
-finding	sources/sdl-rdp/clipboard/channel.cpp	parameters	std::span<void *const>
-finding	sources/sdl-rdp/clipboard/channel.cpp	returns	void *
-finding	sources/sdl-rdp/clipboard/channel.hpp	parameters	std::span<void *const>
-finding	sources/sdl-rdp/clipboard/channel.hpp	returns	void *
-finding	sources/sdl-rdp/configuration/authentication.hpp	members	sdlrdp_config
-finding	sources/sdl-rdp/drive/channel.cpp	parameters	std::span<void *const>
-finding	sources/sdl-rdp/drive/channel.cpp	parameters	void *
-finding	sources/sdl-rdp/drive/channel.cpp	returns	void *
-finding	sources/sdl-rdp/drive/channel.cpp	returns	void *
-finding	sources/sdl-rdp/drive/channel.hpp	members	void *
-finding	sources/sdl-rdp/drive/channel.hpp	parameters	std::span<void *const>
-finding	sources/sdl-rdp/drive/channel.hpp	returns	void *
-finding	sources/sdl-rdp/freerdp-facade/waitable.cpp	null checks	void *
-finding	sources/sdl-rdp/freerdp-facade/waitable.cpp	parameters	void *
-finding	sources/sdl-rdp/freerdp-facade/waitable.hpp	members	void *
-finding	sources/sdl-rdp/freerdp-facade/waitable.hpp	parameters	void *
-finding	sources/sdl-rdp/freerdp-facade/wake-event.cpp	returns	void *
-finding	sources/sdl-rdp/freerdp-facade/wake-event.hpp	returns	void *
-finding	sources/sdl-rdp/input/channel.hpp	parameters	std::span<void *const>
-finding	sources/sdl-rdp/input/channel.hpp	parameters	std::span<void *const>
-finding	sources/sdl-rdp/input/channel.hpp	returns	void *
-finding	sources/sdl-rdp/input/channel.hpp	returns	void *
-finding	sources/sdl-rdp/input/input.cpp	parameters	std::span<void *>
-finding	sources/sdl-rdp/input/input.cpp	parameters	std::span<void *const>
-finding	sources/sdl-rdp/input/input.cpp	parameters	void *
-finding	sources/sdl-rdp/input/input.cpp	returns	std::span<void *>
-finding	sources/sdl-rdp/input/input.hpp	parameters	std::span<void *>
-finding	sources/sdl-rdp/input/input.hpp	parameters	std::span<void *const>
-finding	sources/sdl-rdp/input/input.hpp	returns	std::span<void *>
-finding	sources/sdl-rdp/input/protocol.cpp	returns	void *
-finding	sources/sdl-rdp/input/protocol.cpp	returns	void *
-finding	sources/sdl-rdp/input/protocol.hpp	returns	void *
-finding	sources/sdl-rdp/input/protocol.hpp	returns	void *
-finding	sources/sdl-rdp/input/protocol.hpp	returns	void *
-finding	sources/sdl-rdp/link/peer-link.cpp	returns	void *
-finding	sources/sdl-rdp/link/peer-link.cpp	returns	void *
-finding	sources/sdl-rdp/link/peer-link.hpp	returns	void *
-finding	sources/sdl-rdp/link/peer-link.hpp	returns	void *
-finding	sources/sdl-rdp/peer/channel-set.cpp	parameters	std::span<void *>
-finding	sources/sdl-rdp/peer/channel-set.cpp	parameters	std::span<void *const>
-finding	sources/sdl-rdp/peer/channel-set.cpp	parameters	void *
-finding	sources/sdl-rdp/peer/channel-set.cpp	parameters	void *
-finding	sources/sdl-rdp/peer/channel-set.cpp	returns	std::span<void *>
-finding	sources/sdl-rdp/peer/channel-set.hpp	parameters	std::span<void *>
-finding	sources/sdl-rdp/peer/channel-set.hpp	parameters	std::span<void *const>
-finding	sources/sdl-rdp/peer/channel-set.hpp	parameters	void *
-finding	sources/sdl-rdp/peer/channel-set.hpp	returns	std::span<void *>
-finding	sources/sdl-rdp/peer/loop.cpp	parameters	std::span<void *>
-finding	sources/sdl-rdp/peer/loop.cpp	parameters	std::span<void *>
-finding	sources/sdl-rdp/peer/loop.cpp	parameters	void *
-finding	sources/sdl-rdp/peer/loop.hpp	parameters	std::span<void *>
-finding	sources/sdl-rdp/peer/loop.hpp	parameters	std::span<void *>
-finding	sources/sdl-rdp/peer/pump.cpp	parameters	std::span<void *const>
-finding	sources/sdl-rdp/peer/pump.cpp	parameters	std::span<void *const>
-finding	sources/sdl-rdp/peer/pump.hpp	parameters	std::span<void *const>
-finding	sources/sdl-rdp/peer/pump.hpp	parameters	std::span<void *const>
-finding	sources/sdl-rdp/peer/redirection.cpp	parameters	std::span<void *>
-finding	sources/sdl-rdp/peer/redirection.cpp	parameters	std::span<void *const>
-finding	sources/sdl-rdp/peer/redirection.cpp	parameters	std::span<void *const>
-finding	sources/sdl-rdp/peer/redirection.cpp	returns	std::span<void *>
-finding	sources/sdl-rdp/peer/redirection.hpp	parameters	std::span<void *>
-finding	sources/sdl-rdp/peer/redirection.hpp	parameters	std::span<void *const>
-finding	sources/sdl-rdp/peer/redirection.hpp	parameters	std::span<void *const>
-finding	sources/sdl-rdp/peer/redirection.hpp	returns	std::span<void *>
-finding	sources/sdl-rdp/peer/wait.cpp	parameters	std::span<void *>
-finding	sources/sdl-rdp/peer/wait.cpp	parameters	std::span<void *>
-finding	sources/sdl-rdp/peer/wait.hpp	parameters	std::span<void *>
-finding	sources/sdl-rdp/peer/wait.hpp	parameters	std::span<void *>
-finding	sources/sdl-rdp/session/listener.cpp	parameters	rdp_freerdp_listener *
-finding	sources/sdl-rdp/session/listener.hpp	parameters	rdp_freerdp_listener *
-finding	sources/sdl-rdp/session/session.cpp	returns	void *
-finding	sources/sdl-rdp/session/session.hpp	returns	void *
-finding	sources/sdl-rdp/utilities/releases.test.cpp	parameters	std::basic_string<char> *
-finding	sources/sdl-rdp/utilities/releases.test.cpp	parameters	std::basic_string<char> *
-finding	sources/sdl-rdp/utilities/releases.test.cpp	parameters	void *
-finding	sources/sdl-rdp/utilities/scoped.hpp	members	SDL_IOStream * | SDL_SharedObject * | SDL_Storage * | SDL_Surface * | char * | std::pair<std::reference_wrapper<const sdl3::rdp::backend::detail::backend::Backend>, sdlrdp_handle *> | std::pair<std::reference_wrapper<const sdl3::rdp::detail::driver::Driver>, sdlrdp_file *>
-finding	sources/sdl-rdp/video/avc/encoder.cpp	members	CUctx_st *
-finding	sources/sdl-rdp/video/avc/encoder.cpp	members	_NVENCSTATUS (*)(void *)
-finding	sources/sdl-rdp/video/avc/encoder.cpp	members	_NV_ENCODE_API_FUNCTION_LIST
-finding	sources/sdl-rdp/video/avc/encoder.cpp	members	_NV_ENC_LOCK_BITSTREAM | _NV_ENC_LOCK_INPUT_BUFFER
-finding	sources/sdl-rdp/video/avc/encoder.cpp	members	void *
-finding	sources/sdl-rdp/video/avc/encoder.cpp	members	void *
-finding	sources/sdl-rdp/video/avc/encoder.cpp	null checks	_NVENCSTATUS (*)(void *)
-finding	sources/sdl-rdp/video/avc/encoder.cpp	parameters	_NVENCSTATUS (*)(void *)
-finding	sources/sdl-rdp/video/encoder.cpp	parameters	wStream *
-finding	sources/sdl-rdp/video/encoder.hpp	parameters	wStream *
-finding	sources/sdl-rdp/video/gfx/channel.cpp	returns	void *
-finding	sources/sdl-rdp/video/gfx/channel.hpp	returns	void *
-finding	sources/sdl-rdp/video/graphics-link.cpp	parameters	std::span<void *>
-finding	sources/sdl-rdp/video/graphics-link.cpp	parameters	std::span<void *const>
-finding	sources/sdl-rdp/video/graphics-link.cpp	returns	std::span<void *>
-finding	sources/sdl-rdp/video/graphics-link.hpp	parameters	std::span<void *>
-finding	sources/sdl-rdp/video/graphics-link.hpp	parameters	std::span<void *const>
-finding	sources/sdl-rdp/video/graphics-link.hpp	returns	std::span<void *>
+count	sdl-rdp/sample-gate.test tests	unchecked	5
+finding	sources/sdl-rdp/audio/channel.cpp	returns	AudioChannel::Event	void *
+finding	sources/sdl-rdp/audio/channel.hpp	returns	AudioChannel::Event	void *
+finding	sources/sdl-rdp/clipboard/channel.cpp	parameters	ClipboardChannel::Pump	std::span<void *const>
+finding	sources/sdl-rdp/clipboard/channel.cpp	returns	ClipboardChannel::Event	void *
+finding	sources/sdl-rdp/clipboard/channel.hpp	parameters	ClipboardChannel::Pump	std::span<void *const>
+finding	sources/sdl-rdp/clipboard/channel.hpp	returns	ClipboardChannel::Event	void *
+finding	sources/sdl-rdp/configuration/authentication.hpp	members	Authentication	sdlrdp_config
+finding	sources/sdl-rdp/drive/channel.cpp	parameters	ChannelEvent	void *
+finding	sources/sdl-rdp/drive/channel.cpp	parameters	DriveChannel::Pump	std::span<void *const>
+finding	sources/sdl-rdp/drive/channel.cpp	returns	ChannelEvent	void *
+finding	sources/sdl-rdp/drive/channel.cpp	returns	DriveChannel::Event	void *
+finding	sources/sdl-rdp/drive/channel.hpp	members	DriveChannel	void *
+finding	sources/sdl-rdp/drive/channel.hpp	parameters	DriveChannel::Pump	std::span<void *const>
+finding	sources/sdl-rdp/drive/channel.hpp	returns	DriveChannel::Event	void *
+finding	sources/sdl-rdp/freerdp-facade/waitable.cpp	null checks	Waitable::Waitable	void *
+finding	sources/sdl-rdp/freerdp-facade/waitable.cpp	parameters	Waitable::Waitable	void *
+finding	sources/sdl-rdp/freerdp-facade/waitable.hpp	members	Waitable	void *
+finding	sources/sdl-rdp/freerdp-facade/waitable.hpp	parameters	Waitable::Waitable	void *
+finding	sources/sdl-rdp/freerdp-facade/wake-event.cpp	returns	WakeEvent::get	void *
+finding	sources/sdl-rdp/freerdp-facade/wake-event.hpp	returns	WakeEvent::get	void *
+finding	sources/sdl-rdp/input/channel.hpp	parameters	InputChannel::Pump	std::span<void *const>
+finding	sources/sdl-rdp/input/channel.hpp	parameters	InputChannel::Pump	std::span<void *const>
+finding	sources/sdl-rdp/input/channel.hpp	returns	InputChannel::Event	void *
+finding	sources/sdl-rdp/input/channel.hpp	returns	InputChannel::Event	void *
+finding	sources/sdl-rdp/input/input.cpp	parameters	Input::Channels	std::span<void *const>
+finding	sources/sdl-rdp/input/input.cpp	parameters	Input::Handles	std::span<void *>
+finding	sources/sdl-rdp/input/input.cpp	parameters	Input::Handles::lambda#1	void *
+finding	sources/sdl-rdp/input/input.cpp	returns	Input::Handles	std::span<void *>
+finding	sources/sdl-rdp/input/input.hpp	parameters	Input::Channels	std::span<void *const>
+finding	sources/sdl-rdp/input/input.hpp	parameters	Input::Handles	std::span<void *>
+finding	sources/sdl-rdp/input/input.hpp	returns	Input::Handles	std::span<void *>
+finding	sources/sdl-rdp/input/protocol.cpp	returns	InputProtocol::Handle	void *
+finding	sources/sdl-rdp/input/protocol.cpp	returns	InputProtocol::Handle	void *
+finding	sources/sdl-rdp/input/protocol.hpp	returns	InputProtocol::Handle	void *
+finding	sources/sdl-rdp/input/protocol.hpp	returns	InputProtocol::Handle	void *
+finding	sources/sdl-rdp/input/protocol.hpp	returns	InputProtocol::Handle	void *
+finding	sources/sdl-rdp/link/peer-link.cpp	returns	PeerLink::Channels	void *
+finding	sources/sdl-rdp/link/peer-link.cpp	returns	PeerLink::Wake	void *
+finding	sources/sdl-rdp/link/peer-link.hpp	returns	PeerLink::Channels	void *
+finding	sources/sdl-rdp/link/peer-link.hpp	returns	PeerLink::Wake	void *
+finding	sources/sdl-rdp/peer/channel-set.cpp	parameters	ChannelSet::Callbacks::Register	void *
+finding	sources/sdl-rdp/peer/channel-set.cpp	parameters	ChannelSet::Handles	std::span<void *>
+finding	sources/sdl-rdp/peer/channel-set.cpp	parameters	ChannelSet::Pump	std::span<void *const>
+finding	sources/sdl-rdp/peer/channel-set.cpp	returns	ChannelSet::Handles	std::span<void *>
+finding	sources/sdl-rdp/peer/channel-set.hpp	parameters	ChannelSet::Handles	std::span<void *>
+finding	sources/sdl-rdp/peer/channel-set.hpp	parameters	ChannelSet::Pump	std::span<void *const>
+finding	sources/sdl-rdp/peer/channel-set.hpp	returns	ChannelSet::Handles	std::span<void *>
+finding	sources/sdl-rdp/peer/loop.cpp	parameters	PeerLoop::Dispatch	std::span<void *>
+finding	sources/sdl-rdp/peer/loop.cpp	parameters	PeerLoop::Dispatch::lambda#1	void *
+finding	sources/sdl-rdp/peer/loop.cpp	parameters	PeerLoop::Step	std::span<void *>
+finding	sources/sdl-rdp/peer/loop.hpp	parameters	PeerLoop::Dispatch	std::span<void *>
+finding	sources/sdl-rdp/peer/loop.hpp	parameters	PeerLoop::Step	std::span<void *>
+finding	sources/sdl-rdp/peer/pump.cpp	parameters	PeerPump::Exchange	std::span<void *const>
+finding	sources/sdl-rdp/peer/pump.cpp	parameters	PeerPump::Service	std::span<void *const>
+finding	sources/sdl-rdp/peer/pump.hpp	parameters	PeerPump::Exchange	std::span<void *const>
+finding	sources/sdl-rdp/peer/pump.hpp	parameters	PeerPump::Service	std::span<void *const>
+finding	sources/sdl-rdp/peer/redirection.cpp	parameters	Redirection::Handles	std::span<void *>
+finding	sources/sdl-rdp/peer/redirection.cpp	parameters	Redirection::OpenStatic	std::span<void *const>
+finding	sources/sdl-rdp/peer/redirection.cpp	parameters	Redirection::Sound	std::span<void *const>
+finding	sources/sdl-rdp/peer/redirection.cpp	returns	Redirection::Handles	std::span<void *>
+finding	sources/sdl-rdp/peer/redirection.hpp	parameters	Redirection::Handles	std::span<void *>
+finding	sources/sdl-rdp/peer/redirection.hpp	parameters	Redirection::OpenStatic	std::span<void *const>
+finding	sources/sdl-rdp/peer/redirection.hpp	parameters	Redirection::Sound	std::span<void *const>
+finding	sources/sdl-rdp/peer/redirection.hpp	returns	Redirection::Handles	std::span<void *>
+finding	sources/sdl-rdp/peer/wait.cpp	parameters	PeerWait::Collect	std::span<void *>
+finding	sources/sdl-rdp/peer/wait.cpp	parameters	PeerWait::Plan	std::span<void *>
+finding	sources/sdl-rdp/peer/wait.hpp	parameters	PeerWait::Collect	std::span<void *>
+finding	sources/sdl-rdp/peer/wait.hpp	parameters	PeerWait::Plan	std::span<void *>
+finding	sources/sdl-rdp/session/session.cpp	returns	Session::ReapEvent	void *
+finding	sources/sdl-rdp/session/session.hpp	returns	Session::ReapEvent	void *
+finding	sources/sdl-rdp/video/avc/encoder.cpp	members	DestroysSession	_NVENCSTATUS (*)(void *)
+finding	sources/sdl-rdp/video/avc/encoder.cpp	members	Driver	CUctx_st *
+finding	sources/sdl-rdp/video/avc/encoder.cpp	members	Driver	_NV_ENCODE_API_FUNCTION_LIST
+finding	sources/sdl-rdp/video/avc/encoder.cpp	members	Handles	void *
+finding	sources/sdl-rdp/video/avc/encoder.cpp	members	Handles	void *
+finding	sources/sdl-rdp/video/avc/encoder.cpp	members	Locked	ParametersTy
+finding	sources/sdl-rdp/video/avc/encoder.cpp	null checks	DestroysSession::DestroysSession	_NVENCSTATUS (*)(void *)
+finding	sources/sdl-rdp/video/avc/encoder.cpp	parameters	DestroysSession::DestroysSession	_NVENCSTATUS (*)(void *)
+finding	sources/sdl-rdp/video/gfx/channel.cpp	returns	GfxChannel::Event	void *
+finding	sources/sdl-rdp/video/gfx/channel.hpp	returns	GfxChannel::Event	void *
+finding	sources/sdl-rdp/video/graphics-link.cpp	parameters	GraphicsLink::Handles	std::span<void *>
+finding	sources/sdl-rdp/video/graphics-link.cpp	parameters	GraphicsLink::Pump	std::span<void *const>
+finding	sources/sdl-rdp/video/graphics-link.cpp	returns	GraphicsLink::Handles	std::span<void *>
+finding	sources/sdl-rdp/video/graphics-link.hpp	parameters	GraphicsLink::Handles	std::span<void *>
+finding	sources/sdl-rdp/video/graphics-link.hpp	parameters	GraphicsLink::Pump	std::span<void *const>
+finding	sources/sdl-rdp/video/graphics-link.hpp	returns	GraphicsLink::Handles	std::span<void *>

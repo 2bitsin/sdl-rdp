@@ -47,10 +47,11 @@ auto FreeCursor(SDL_Cursor* cursor) -> void {
 auto CreateCursor(SDL_Surface* surface, int hot_x, int hot_y) -> SDL_Cursor* {
   Expects(surface != nullptr, "cursor creation has a surface");
   return Boundary([&] {
-    auto cursor = std::make_unique<SDL_Cursor>();
-    cursor->internal = std::make_unique<SDL_CursorData>(*surface, hot_x, hot_y).release();
-    return cursor.release();
-  });
+           auto cursor = std::make_unique<SDL_Cursor>();
+           cursor->internal = std::make_unique<SDL_CursorData>(*surface, hot_x, hot_y).release();
+           return cursor;
+         })
+      .release();
 }
 // SDL's context-free cursor callback borrows an optional cursor; its video accessor supplies the device.
 auto ShowPointer(Driver const& driver, SDL_Cursor const& cursor) -> int {

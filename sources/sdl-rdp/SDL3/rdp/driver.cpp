@@ -21,6 +21,9 @@ auto BackendPath(Options const& options) -> std::filesystem::path {
 template <Operation OPERATION, AuthenticationCredential CredentialTy>
 auto Driver::Authenticate(void* context, char const* domain, char const* user, CredentialTy credential) -> int {
   Expects(context != nullptr, "authentication has its driver context");
+  Expects(domain != nullptr, "the backend names a domain, empty when the client names none");
+  Expects(user != nullptr, "the backend names the user");
+  Expects(credential != nullptr, "the backend supplies the credential buffer");
   auto const&    self       = *static_cast<Driver const*>(context);
   constexpr auto name       = OPERATION == Operation::VERIFY_PAIR ? SDL_PROP_DISPLAY_RDP_VERIFY_POINTER
                                                                   : SDL_PROP_DISPLAY_RDP_LOOKUP_POINTER;
@@ -28,14 +31,22 @@ auto Driver::Authenticate(void* context, char const* domain, char const* user, C
   // SDL display properties hold the application's authentication callback as an opaque pointer.
   auto const callback = reinterpret_cast<AuthenticationCallback<CredentialTy>>(
       properties ? SDL_GetPointerProperty(properties, name, nullptr) : nullptr);
-  if (!callback) return self._backend.Call<OPERATION>(&self._config.Get(), domain, user, credential);
+  if (!callback) {
+    auto const config = self._config.Get();
+    return self._backend.Call<OPERATION>(&config, domain, user, credential);
+  }
   return callback(SDL_GetPointerProperty(properties, SDL_PROP_DISPLAY_RDP_AUTH_USERDATA_POINTER, nullptr), domain, user,
                   credential);
 }
-Driver::Driver()
-    : _config{ _options, Authenticate<Operation::VERIFY_PAIR, char const*>,
-               Authenticate<Operation::LOOKUP_PAIR, std::uint8_t*>, this },
-      _backend{ BackendPath(_options) }, _session{ _backend, _config.Get() } { }
+Driver::Driver() : _config{ _options }, _backend{ BackendPath(_options) }, _session{ _backend, Registered() } { }
+// sdlrdp_open reads the record only during the call; the callbacks and this context live until the session closes.
+auto Driver::Registered() -> sdlrdp_config {
+  auto config = _config.Get();
+  config.verify    = Authenticate<Operation::VERIFY_PAIR, char const*>;
+  config.lookup    = Authenticate<Operation::LOOKUP_PAIR, std::uint8_t*>;
+  config.auth_user = this;
+  return config;
+}
 auto Driver::PollBatch(std::span<sdlrdp_event> events) const -> std::size_t {
   auto const count = Call<Operation::POLL>(events.data(), Narrowed<std::uint32_t>(events.size()));
   Ensures(count <= events.size(), "backend fills at most the event buffer");
@@ -44,8 +55,8 @@ auto Driver::PollBatch(std::span<sdlrdp_event> events) const -> std::size_t {
 auto Driver::Options() const -> sdl3::rdp::settings::Options const& {
   return _options;
 }
-auto Driver::Config() const -> sdlrdp_config const& {
-  return _config.Get();
+auto Driver::Config() const -> Configuration const& {
+  return _config;
 }
 auto Driver::AuthDisplay(SDL_PropertiesID properties) noexcept -> void {
   _auth_properties.store(properties);

@@ -7,8 +7,6 @@
 namespace sdl3::rdp::storage::detail::drive {
 using sdl3::rdp::backend::Stream;
 
-template <typename ByteTy>
-concept IoBuffer = std::same_as<ByteTy, void> || std::same_as<ByteTy, void const>;
 // An absent name selects the first shared drive; SDL's interfaces spell that as a null or empty name.
 auto DriveName(char const* name)                                           -> std::optional<std::string>;
 auto DriveId(Driver const& driver, std::optional<std::string> const& name) -> std::uint32_t;
@@ -22,7 +20,6 @@ auto SDLCALL OpenFile(char const* drive, char const* path, char const* mode) -> 
 namespace sdl3::rdp::storage {
 using detail::drive::DriveId;
 using detail::drive::DriveName;
-using detail::drive::IoBuffer;
 using detail::drive::OpenDriveFile;
 using detail::drive::OpenFile;
 using detail::drive::UpdateDrives;

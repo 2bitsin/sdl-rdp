@@ -25,21 +25,6 @@ auto PublishAspect(SDL_Window& window, Aspect const& value) -> void {
   SDL_SetStringProperty(SDL_GetWindowProperties(&window), SDL_PROP_WINDOW_RDP_ASPECT_STRING, value.Text().c_str());
 }
 namespace {
-auto ApplyCodec(SDL_VideoData& data, sdlrdp_codec value) -> void {
-  if (data.Backend().Call<Operation::SET_CODEC>(value) != 0) data.Backend().Throw();
-}
-auto ApplyAspect(SDL_VideoData& data, Aspect const& value) -> void {
-  SetAspect(data.Backend(), value);
-  if (auto const window = data.Window()) PublishAspect(*window, value);
-}
-// SDL hint observers receive an opaque context and nullable C strings.
-template <auto FIELD, auto APPLY>
-auto SDLCALL HintChanged(void* context, [[maybe_unused]] char const* name, char const* old_value, char const* new_value)
-    -> void {
-  Expects(context != nullptr, "hint observer has video state");
-  auto& data = *static_cast<SDL_VideoData*>(context);
-  Boundary([&] { APPLY(data, data.Backend().Options().Changed<FIELD>(Text(old_value), Text(new_value))); });
-}
 auto StartRefresh(Driver const& driver) -> int {
   auto const refresh = driver.Options().Value<&Settings::refresh>();
   auto const hz      = Narrowed<int>(refresh.Hz());
@@ -49,8 +34,8 @@ auto StartRefresh(Driver const& driver) -> int {
 auto DesktopDisplayMode(Driver const& driver) -> SDL_DisplayMode {
   SDL_DisplayMode mode{ };
   mode.format                   = SDL_PIXELFORMAT_XRGB8888;
-  mode.w                        = static_cast<int>(driver.Config().width);
-  mode.h                        = static_cast<int>(driver.Config().height);
+  mode.w                        = static_cast<int>(driver.Config().Width());
+  mode.h                        = static_cast<int>(driver.Config().Height());
   mode.refresh_rate_numerator   = StartRefresh(driver);
   mode.refresh_rate_denominator = 1;
   mode.refresh_rate             = static_cast<float>(mode.refresh_rate_numerator);
@@ -137,24 +122,24 @@ auto RequestsRdp() -> bool {
 }
 // SDL's bootstrap takes ownership of the returned video device.
 auto CreateDevice() -> SDL_VideoDevice* {
-  return Boundary([&]() -> SDL_VideoDevice* {
-    if (!RequestsRdp()) return nullptr;
-    auto device = std::make_unique<SDL_VideoDevice>();
-    auto data   = std::make_unique<SDL_VideoData>(Rendezvous::Acquire(), HintChanged<&Settings::codec, ApplyCodec>,
-                                                  HintChanged<&Settings::aspect, ApplyAspect>);
-    device->is_dummy        = true;
-    device->VideoInit       = VideoInit;
-    device->VideoQuit       = VideoQuit;
-    device->GetDisplayModes = DisplayModes;
-    device->SetDisplayMode  = DisplayMode;
-    device->free            = DeleteDevice;
-    InitWindow(*device);
-    InitFramebuffer(*device);
-    InitEvents(*device);
-    InitClipboard(*device);
-    device->internal = data.release();
-    return device.release();
-  });
+  return Boundary([&]() -> std::unique_ptr<SDL_VideoDevice> {
+           if (!RequestsRdp()) return nullptr;
+           auto device = std::make_unique<SDL_VideoDevice>();
+           auto data   = std::make_unique<SDL_VideoData>(Rendezvous::Acquire());
+           device->is_dummy        = true;
+           device->VideoInit       = VideoInit;
+           device->VideoQuit       = VideoQuit;
+           device->GetDisplayModes = DisplayModes;
+           device->SetDisplayMode  = DisplayMode;
+           device->free            = DeleteDevice;
+           InitWindow(*device);
+           InitFramebuffer(*device);
+           InitEvents(*device);
+           InitClipboard(*device);
+           device->internal = data.release();
+           return device;
+         })
+      .release();
 }
 }
 // SDL's C bootstrap table requires this named object with static storage; C linkage names the global symbol.

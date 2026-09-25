@@ -9,6 +9,7 @@
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/deadline.hpp>
 #include <sdl-rdp/utilities/exceptions.hpp>
+#include <sdl-rdp/utilities/void-buffer.hpp>
 #include <sdl-rdp/video/pointer/layout.hpp>
 
 #include <algorithm>
@@ -17,6 +18,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <format>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -30,9 +32,11 @@ namespace sdl_rdp::backend::detail::main {
 using sdl_rdp::diagnostics::ErrorStore;
 using sdl_rdp::drive::DriveFiles;
 using sdl_rdp::session::SetError;
+using sdl_rdp::utilities::BytesOf;
 using sdl_rdp::utilities::Contained;
 using sdl_rdp::utilities::InvalidArguments;
 using sdl_rdp::utilities::NullArgument;
+using sdl_rdp::utilities::VoidBuffer;
 static_assert(std::is_same_v<decltype(sdlrdp_version()), std::uint32_t>,
               "the ABI's unsigned is the std::uint32_t these definitions spell");
 static_assert(std::is_same_v<decltype(&sdlrdp_lookup_pair),
@@ -81,13 +85,10 @@ auto OnFile(sdlrdp_handle* handle, sdlrdp_file* file, OperationTy const& operati
   });
 }
 // abi: the caller's transfer buffer, null only when empty.
-auto Buffer(void* data, std::size_t size) -> std::optional<std::span<std::byte>> {
+template <VoidBuffer VoidTy>
+auto Buffer(VoidTy* data, std::size_t size) -> std::optional<std::span<BytesOf<VoidTy>>> {
   if (!data && size) return std::nullopt;
-  return std::span{ static_cast<std::byte*>(data), size };
-}
-auto Buffer(void const* data, std::size_t size) -> std::optional<std::span<std::byte const>> {
-  if (!data && size) return std::nullopt;
-  return std::span{ static_cast<std::byte const*>(data), size };
+  return std::span{ static_cast<BytesOf<VoidTy>*>(data), size };
 }
 // A read fills the caller's bytes, a write sends them: one shape over the constness of the buffer.
 template <class ByteTy>
@@ -238,8 +239,10 @@ auto _Public_(SDLRDP_ABI_VERSION) sdlrdp_set_clipboard_text(sdlrdp_handle* handl
   });
 }
 auto _Public_(SDLRDP_ABI_VERSION) sdlrdp_get_clipboard_text(sdlrdp_handle* handle) -> char const* {
-  return Guarded(handle, static_cast<char const*>(nullptr), "Clipboard handle",
-                 [](sdlrdp_handle& open) { return open.ClipboardText().c_str(); });
+  using Text = std::optional<std::reference_wrapper<std::string const>>;
+  auto const text = Guarded(handle, Text{ }, "Clipboard handle",
+                            [](sdlrdp_handle& open) -> Text { return open.ClipboardText(); });
+  return text ? text->get().c_str() : nullptr;
 }
 auto _Public_(SDLRDP_ABI_VERSION) sdlrdp_has_clipboard_text(sdlrdp_handle* handle) -> int {
   return Guarded(handle, -1, "Clipboard handle", [](sdlrdp_handle& open) { return int{ open.HasClipboardText() }; });

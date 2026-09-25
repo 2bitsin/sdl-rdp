@@ -1,5 +1,6 @@
 #include "clipboard.hpp"
 #include <sdl-rdp/SDL3/rdp/backend/boundary.hpp>
+#include <optional>
 namespace sdl3::rdp::video::detail::clipboard {
 using sdl3::rdp::backend::Boundary;
 using sdl3::rdp::backend::Operation;
@@ -8,11 +9,7 @@ using sdl3::rdp::settings::Text;
 using sdl_rdp::utilities::Expects;
 namespace {
 constexpr auto TextMimeTypes = std::to_array({ "text/plain;charset=utf-8" });
-// SDL takes ownership of the SDL-allocated string this produces.
-auto CopyText(std::string const& text) -> char* {
-  return SDL_strdup(text.c_str());
-}
-using ClipboardText = Resource<char*, CopyText, SDL_free>;
+using ClipboardText = Resource<char*, SDL_strdup, SDL_free>;
 // SDL's clipboard callback borrows its device and a null-terminated string.
 auto SetText(SDL_VideoDevice* device, char const* text) -> bool {
   Expects(device != nullptr, "clipboard write has a device");
@@ -24,11 +21,12 @@ auto SetText(SDL_VideoDevice* device, char const* text) -> bool {
 auto GetText(SDL_VideoDevice* device) -> char* {
   Expects(device != nullptr, "clipboard read has a device");
   auto const& driver = device->internal->Backend();
-  return Boundary([&] {
+  auto        copy   = Boundary([&] -> std::optional<ClipboardText> {
     auto const text = Text(driver.Call<Operation::GET_CLIPBOARD_TEXT>());
     if (!text) driver.Throw();
-    return ClipboardText{ *text }.Release();
+    return ClipboardText{ text->c_str() };
   });
+  return copy ? copy->Release() : nullptr;
 }
 // SDL's clipboard predicate borrows its device.
 auto HasText(SDL_VideoDevice* device) -> bool {

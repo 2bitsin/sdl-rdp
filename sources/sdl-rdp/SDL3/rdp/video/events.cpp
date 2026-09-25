@@ -200,50 +200,50 @@ auto RefreshChanged(SDL_VideoData& data, sdlrdp_event const& event) -> void {
 auto ScreenChanged(SDL_VideoData& data, sdlrdp_event const& event) -> void {
   Resize(data, event.screen.width, event.screen.height);
 }
-auto PictureResized([[maybe_unused]] SDL_VideoData& data, [[maybe_unused]] sdlrdp_event const& event) -> void { }
-auto DrivesChanged(SDL_VideoData& data, [[maybe_unused]] sdlrdp_event const& event)                   -> void {
-  UpdateDrives(data.Backend(), SDL_GetDisplayProperties(data.Display()));
-}
-auto ClipboardChanged(SDL_VideoData& data, [[maybe_unused]] sdlrdp_event const& event) -> void {
-  ClipboardUpdate(data);
-}
-auto AudioChanged([[maybe_unused]] SDL_VideoData& data, sdlrdp_event const& event) -> void {
-  AudioRate(event.audio.freq);
-}
-using Handler = auto (*)(SDL_VideoData&, sdlrdp_event const&) -> void;
-template <Handler HANDLER>
+template <auto HANDLER>
+  requires std::invocable<decltype(HANDLER), SDL_VideoData&, sdlrdp_event const&>
 auto WhenBound(SDL_VideoData& data, sdlrdp_event const& event) -> void {
   if (data.Window()) HANDLER(data, event);
 }
-template <auto (*HANDLER)(SDL_Window&, sdlrdp_event const&)->void>
-auto ToWindow(SDL_VideoData& data, sdlrdp_event const& event) -> void {
-  if (auto const window = data.Window()) HANDLER(*window, event);
+auto ToWindow(SDL_Window& window, sdlrdp_event const& event) -> void {
+  switch (event.type) {
+  case SDLRDP_KEY:            Key(window, event); break;
+  case SDLRDP_MOUSE_MOVE:     MouseMove(window, event); break;
+  case SDLRDP_MOUSE_BUTTON:   MouseButton(window, event); break;
+  case SDLRDP_MOUSE_WHEEL:    MouseWheel(window, event); break;
+  case SDLRDP_CODEC_CHANGED:  CodecChanged(window, event); break;
+  case SDLRDP_TEXT:           Text(window, event); break;
+  case SDLRDP_MOUSE_RELATIVE: MouseRelative(window, event); break;
+  case SDLRDP_TOUCH:          Touch(window, event); break;
+  default:                    Unreachable(event.type);
+  }
 }
-constexpr auto Handlers = [] {
-  std::array<Handler, SDLRDP_DRIVE + 1> table{ };
-  table[SDLRDP_CONNECTED]      = WhenBound<Connected>;
-  table[SDLRDP_DISCONNECTED]   = WhenBound<ClientLeft>;
-  table[SDLRDP_RESIZE]         = PictureResized;
-  table[SDLRDP_KEY]            = ToWindow<Key>;
-  table[SDLRDP_MOUSE_MOVE]     = ToWindow<MouseMove>;
-  table[SDLRDP_MOUSE_BUTTON]   = ToWindow<MouseButton>;
-  table[SDLRDP_MOUSE_WHEEL]    = ToWindow<MouseWheel>;
-  table[SDLRDP_CODEC_CHANGED]  = ToWindow<CodecChanged>;
-  table[SDLRDP_SCREEN]         = WhenBound<ScreenChanged>;
-  table[SDLRDP_REFRESH]        = WhenBound<RefreshChanged>;
-  table[SDLRDP_CLIPBOARD]      = ClipboardChanged;
-  table[SDLRDP_TEXT]           = ToWindow<Text>;
-  table[SDLRDP_MOUSE_RELATIVE] = ToWindow<MouseRelative>;
-  table[SDLRDP_TOUCH]          = ToWindow<Touch>;
-  table[SDLRDP_AUDIO]          = AudioChanged;
-  table[SDLRDP_DRIVE]          = DrivesChanged;
-  return table;
-}();
-static_assert(std::ranges::none_of(Handlers, [](Handler handler) { return handler == nullptr; }),
-              "every backend event type has a handler");
+auto ToBoundWindow(SDL_VideoData& data, sdlrdp_event const& event) -> void {
+  if (auto const window = data.Window()) ToWindow(*window, event);
+}
+constexpr int DispatchedAbiVersion = 7;
+static_assert(SDLRDP_ABI_VERSION == DispatchedAbiVersion,
+              "the event types are frozen with the ABI: Dispatch grows with it");
 auto Dispatch(SDL_VideoData& data, sdlrdp_event const& event) -> void {
-  Expects(std::cmp_less(std::to_underlying(event.type), Handlers.size()), "backend event type is known");
-  Handlers.at(static_cast<std::size_t>(event.type))(data, event);
+  switch (event.type) {
+  case SDLRDP_RESIZE:       break;
+  case SDLRDP_CLIPBOARD:    ClipboardUpdate(data); break;
+  case SDLRDP_AUDIO:        AudioRate(event.audio.freq); break;
+  case SDLRDP_DRIVE:        UpdateDrives(data.Backend(), SDL_GetDisplayProperties(data.Display())); break;
+  case SDLRDP_CONNECTED:    WhenBound<Connected>(data, event); break;
+  case SDLRDP_DISCONNECTED: WhenBound<ClientLeft>(data, event); break;
+  case SDLRDP_SCREEN:       WhenBound<ScreenChanged>(data, event); break;
+  case SDLRDP_REFRESH:      WhenBound<RefreshChanged>(data, event); break;
+  case SDLRDP_KEY:
+  case SDLRDP_MOUSE_MOVE:
+  case SDLRDP_MOUSE_BUTTON:
+  case SDLRDP_MOUSE_WHEEL:
+  case SDLRDP_CODEC_CHANGED:
+  case SDLRDP_TEXT:
+  case SDLRDP_MOUSE_RELATIVE:
+  case SDLRDP_TOUCH: ToBoundWindow(data, event); break;
+  default:           Unreachable(event.type);
+  }
 }
 // SDL event callbacks borrow their device and optional wakeup window.
 auto PumpEvents(SDL_VideoDevice* device) -> void {

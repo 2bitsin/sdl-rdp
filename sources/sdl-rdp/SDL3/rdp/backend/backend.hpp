@@ -12,8 +12,7 @@ static_assert(BackendCatalog::Names.size() == std::tuple_size_v<BackendSymbols>)
 template <Operation OPERATION, typename... ArgsTy>
 concept BackendOperation = std::invocable<std::tuple_element_t<std::to_underlying(OPERATION), BackendSymbols>,
                                           ArgsTy...>;
-auto LoadLibrary(std::filesystem::path const& path) -> SDL_SharedObject*;
-using Library = Resource<SDL_SharedObject*, LoadLibrary, SDL_UnloadObject>;
+using Library = Resource<SDL_SharedObject*, SDL_LoadObject, SDL_UnloadObject>;
 class Backend {
 public:
   explicit Backend(std::filesystem::path const& path);
@@ -40,7 +39,6 @@ using detail::backend::BackendOperation;
 using detail::backend::BackendSymbols;
 using detail::backend::CloseSession;
 using detail::backend::Library;
-using detail::backend::LoadLibrary;
 using detail::backend::OpenSession;
 using detail::backend::Session;
 using detail::backend::SessionState;

@@ -54,9 +54,9 @@ private:
 using CudaLibrary   = std::unique_ptr<CudaFunctions, FreesLibrary<cuda_free_functions>>;
 using NvencLibrary  = std::unique_ptr<NvencFunctions, FreesLibrary<nvenc_free_functions>>;
 using EncodeSession = std::unique_ptr<void, DestroysSession>;
-template <class LibraryTy, class LoadTy> auto Loaded(LibraryTy& library, LoadTy load) -> int {
+template <auto LOAD, class LibraryTy> auto Loaded(LibraryTy& library) -> int {
   typename LibraryTy::pointer loaded = nullptr;
-  auto const                  status = load(&loaded, nullptr);
+  auto const                  status = LOAD(&loaded, nullptr);
   library.reset(loaded);
   return status;
 }
@@ -111,8 +111,8 @@ auto Encoder::Impl::Check(int status, std::string_view operation) -> bool {
   return false;
 }
 auto Encoder::Impl::Load() -> bool {
-  return Check(Loaded(driver.cuda, cuda_load_functions), "load libcuda.so.1")
-         && Check(Loaded(driver.loader, nvenc_load_functions), "load libnvidia-encode.so.1")
+  return Check(Loaded<cuda_load_functions>(driver.cuda), "load libcuda.so.1")
+         && Check(Loaded<nvenc_load_functions>(driver.loader), "load libnvidia-encode.so.1")
          && Check(driver.cuda->cuInit(0), "cuInit");
 }
 auto Encoder::Impl::Session() -> bool {

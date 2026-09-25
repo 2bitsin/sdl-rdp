@@ -48,10 +48,12 @@ public:
   auto Failures(OperationName operation) const noexcept             -> FailureLog;
 
 private:
-  template <class Result> auto WhenActive(Result idle, std::invocable auto action)                    -> Result;
-  auto                         Motion(int x, int y)                                                   -> bool;
-  auto                         Center()                                                               -> bool;
-  auto                         Scaled(int x, int y, std::invocable<int, int, sdlrdp_rect> auto build) -> void;
+  template <class Result> auto WhenActive(Result idle, std::invocable auto action) -> Result;
+  auto                         Motion(int x, int y)                                -> bool;
+  auto                         Center()                                            -> bool;
+  template <auto BUILD>
+    requires std::invocable<decltype(BUILD), int, int, sdlrdp_rect>
+  auto Scaled(int x, int y) -> void;
   PeerLink&                                       _link;
   Activation const&                               _activation;
   DesktopLayout const&                            _desktop;

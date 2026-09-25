@@ -1,13 +1,46 @@
 #include "videodata.hpp"
+#include "device.hpp"
+#include <sdl-rdp/SDL3/rdp/backend/boundary.hpp>
 #include <sdl-rdp/SDL3/rdp/exceptions.hpp>
+#include <sdl-rdp/SDL3/rdp/settings/options.hpp>
+
+namespace sdl3::rdp::video::detail::videodata {
+using sdl3::rdp::backend::Boundary;
+using sdl3::rdp::backend::Operation;
+using sdl3::rdp::settings::Text;
+using sdl_rdp::settings::Aspect;
+using sdl_rdp::utilities::Expects;
+namespace {
+auto ApplyCodec(SDL_VideoData& data, sdlrdp_codec value) -> void {
+  if (data.Backend().Call<Operation::SET_CODEC>(value) != 0) data.Backend().Throw();
+}
+auto ApplyAspect(SDL_VideoData& data, Aspect const& value) -> void {
+  SetAspect(data.Backend(), value);
+  if (auto const window = data.Window()) PublishAspect(*window, value);
+}
+// SDL hint observers receive an opaque context and nullable C strings.
+template <auto FIELD, auto APPLY>
+auto SDLCALL HintChanged(void* context, [[maybe_unused]] char const* name, char const* old_value, char const* new_value)
+    -> void {
+  Expects(context != nullptr, "hint observer has video state");
+  auto& data = *static_cast<SDL_VideoData*>(context);
+  Boundary([&] { APPLY(data, data.Backend().Options().Changed<FIELD>(Text(old_value), Text(new_value))); });
+}
+}
+}
 
 using sdl3::rdp::Driver;
 using sdl3::rdp::OwnedDriver;
 using sdl3::rdp::backend::Surface;
+using sdl3::rdp::video::detail::videodata::ApplyAspect;
+using sdl3::rdp::video::detail::videodata::ApplyCodec;
+using sdl3::rdp::video::detail::videodata::HintChanged;
+using sdl_rdp::settings::Settings;
 
-SDL_VideoData::SDL_VideoData(std::shared_ptr<Driver> driver, SDL_HintCallback codec, SDL_HintCallback aspect)
-    : OwnedDriver<Driver>{ std::move(driver) }, _codec{ SDL_HINT_RDP_CODEC, codec, this },
-      _aspect{ SDL_HINT_RDP_ASPECT, aspect, this } { }
+SDL_VideoData::SDL_VideoData(std::shared_ptr<Driver> driver)
+    : OwnedDriver<Driver>{ std::move(driver) },
+      _codec { SDL_HINT_RDP_CODEC, HintChanged<&Settings::codec, ApplyCodec>, this    },
+      _aspect{ SDL_HINT_RDP_ASPECT, HintChanged<&Settings::aspect, ApplyAspect>, this } { }
 auto SDL_VideoData::Display() const -> SDL_DisplayID {
   return _display;
 }

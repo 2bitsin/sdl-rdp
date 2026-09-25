@@ -71,13 +71,24 @@ auto ThenStorageContents(SDL_Storage* storage) -> void {
   ASSERT_TRUE(SDL_ReadStorageFile(storage, "whole", buffer.data(), sizeof(buffer)));
   EXPECT_EQ(std::string(buffer.data(), 8), "contents");
 }
+auto ThenEmptyFileRoundTrips(SDL_Storage& storage) -> void {
+  ASSERT_TRUE(SDL_WriteStorageFile(&storage, "empty", nullptr, 0)) << SDL_GetError();
+  std::uint64_t length = 1;
+  ASSERT_TRUE(SDL_GetStorageFileSize(&storage, "empty", &length)) << SDL_GetError();
+  EXPECT_EQ(length, 0u);
+  EXPECT_TRUE(SDL_ReadStorageFile(&storage, "empty", nullptr, 0)) << SDL_GetError();
+}
+auto ThenStorageFiles(SDL_Storage& storage) -> void {
+  ASSERT_NO_FATAL_FAILURE(ThenStorageContents(&storage));
+  ASSERT_NO_FATAL_FAILURE(ThenEmptyFileRoundTrips(storage));
+  ASSERT_NO_FATAL_FAILURE(ThenStorageEntries(&storage));
+}
 auto VerifyStorage() -> void {
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_STORAGE_TITLE_DRIVER, "rdp"));
   auto* storage = SDL_OpenTitleStorage("share", 0);
   ASSERT_NE(storage, nullptr) << SDL_GetError();
   ASSERT_TRUE(SDL_StorageReady(storage));
-  ASSERT_NO_FATAL_FAILURE(ThenStorageContents(storage));
-  ASSERT_NO_FATAL_FAILURE(ThenStorageEntries(storage));
+  ASSERT_NO_FATAL_FAILURE(ThenStorageFiles(*storage));
   EXPECT_TRUE(SDL_CloseStorage(storage));
 }
 auto ThenStreamRead(SDL_IOStream* stream) -> void {

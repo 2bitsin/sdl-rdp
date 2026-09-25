@@ -32,7 +32,7 @@ public:
       std::ranges::for_each(std::span(events).first(count), std::cref(accept));
   }
   auto Options() const                                   -> sdl3::rdp::settings::Options const&;
-  auto Config() const                                    -> sdlrdp_config const&;
+  auto Config() const                                    -> Configuration const&;
   auto AuthDisplay(SDL_PropertiesID properties) noexcept -> void;
   template <typename FailureTy = bool>
   auto Fail(FailureTy failure = { }) const -> FailureTy {
@@ -44,8 +44,9 @@ private:
   // Backend authentication callbacks carry an opaque context and borrowed C strings.
   template <backend::Operation OPERATION, AuthenticationCredential CredentialTy>
   static auto Authenticate(void* context, char const* domain, char const* user, CredentialTy credential) -> int;
-  auto        PollBatch(std::span<sdlrdp_event> events) const                                            -> std::size_t;
-  auto        ReportError() const                                                                        -> void;
+  auto Registered()                                    -> sdlrdp_config;
+  auto PollBatch(std::span<sdlrdp_event> events) const -> std::size_t;
+  auto ReportError() const                             -> void;
   static constexpr std::size_t       EventBatch       = 64;
   sdl3::rdp::settings::Options const _options;
   Configuration const                _config;
