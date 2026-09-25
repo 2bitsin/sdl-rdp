@@ -7,6 +7,7 @@
 #include <memory>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace sdl_rdp::drive::detail::channel {
@@ -18,7 +19,7 @@ template <typename ValueTy>
 concept WireField = std::unsigned_integral<ValueTy> && !std::same_as<ValueTy, bool>;
 class DrivePacket {
 public:
-  [[noreturn]] auto                 Invalid(std::string const& cause) const -> void;
+  [[noreturn]] auto                 Invalid(std::string_view cause) const   -> void;
   template <WireField ValueTy> auto Read()                                  -> ValueTy;
   template <WireField ValueTy> auto Write(ValueTy value)                    -> void;
   auto                              Zero(std::size_t count)                 -> void;
@@ -34,7 +35,7 @@ public:
 private:
   using Writer = oxbox::utilities::GrowingWriter<std::endian::little>;
   auto Remaining() const -> oxbox::utilities::BoundedReader;
-  auto Consumed(oxbox::utilities::BoundedReader const& reader, std::string const& cause) -> void;
+  auto Consumed(oxbox::utilities::BoundedReader const& reader, std::string_view cause) -> void;
   ChannelOrigin          origin;
   std::vector<std::byte> bytes;
   std::size_t            position{ };
@@ -43,7 +44,7 @@ auto DrivePath(char const* path) -> std::vector<std::byte>;
 template <WireField ValueTy> auto DrivePacket::Read() -> ValueTy {
   auto       reader = Remaining();
   auto const value  = reader.Fetch<ValueTy, std::endian::little>();
-  Consumed(reader, "Truncated drive response.");
+  Consumed(reader, "truncated");
   return value;
 }
 template <WireField ValueTy> auto DrivePacket::Write(ValueTy value) -> void {

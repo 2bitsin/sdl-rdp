@@ -1,6 +1,5 @@
 #pragma once
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
-#include <sdl-rdp/freerdp-facade/releases-peer.hpp>
 #include <sdl-rdp/freerdp-facade/wake-event.hpp>
 #include <sdl-rdp/link/dynamic-channels.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>

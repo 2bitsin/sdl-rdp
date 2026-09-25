@@ -6,17 +6,25 @@
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
+#include <sdl-rdp/utilities/exceptions.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 
 #include <freerdp/channels/wtsvc.h>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <ranges>
-#include <stdexcept>
 #include <tuple>
 
 namespace Backend {
+auto FreeSoundContext(RdpsndServerContext* sound) noexcept -> void {
+  auto* const channels = sound->vcm;
+  rdpsnd_server_context_free(sound);
+  // 2bitsin/FreeRDP#1: rdpsnd_main.c:1052 skips the close without an own thread; Open returns the channel.
+  auto                 name    = std::to_array(RDPSND_CHANNEL_NAME);
+  VirtualChannel const channel { WTSVirtualChannelOpen(channels, WTS_CURRENT_SESSION, name.data()) };
+}
 namespace {
 auto Owner(RdpsndServerContext* context) -> AudioChannel& {
   Expects(context != nullptr, "callback context exists");
@@ -88,9 +96,9 @@ AudioChannel::AudioChannel(PeerLink& link, Diagnostics const& diagnostics, Event
                            TraceQueue& traces)
     : _link{ link }, _diagnostics{ diagnostics }, _events{ events }, _session{ session }, _traces{ traces },
       _sound{ rdpsnd_server_context_new(link.Channels()) } {
-  if (!_sound) throw std::runtime_error("Audio channel allocation failed.");
+  if (!_sound) throw AllocationFailed{ "Audio channel" };
   _sound->server_formats = audio_formats_new(2);
-  if (!_sound->server_formats) throw std::runtime_error("Audio format allocation failed.");
+  if (!_sound->server_formats) throw AllocationFailed{ "Audio format" };
   _sound->num_server_formats = 2;
   _sound->server_formats[0] = StereoPcm(CompatibleRate);
   _sound->server_formats[1] = StereoPcm(NativeRate);

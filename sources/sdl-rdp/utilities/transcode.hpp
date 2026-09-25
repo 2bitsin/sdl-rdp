@@ -1,10 +1,12 @@
 #pragma once
+#include <sdl-rdp/utilities/exceptions.hpp>
+
 #include <oxbox/utilities/span.hpp>
 #include <oxbox/utilities/transcode.hpp>
 #include <bit>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
-#include <stdexcept>
 #include <vector>
 
 namespace Backend {
@@ -18,10 +20,11 @@ auto TranscodeRange(std::span<std::byte const> input, oxbox::utilities::TextForm
   std::vector<std::byte> encoded;
   while (!input.empty()) {
     auto point = DecodeFromBytes<char32_t>(input, source.encoding, source.order);
-    if (!point) throw std::runtime_error("Invalid text encoding.");
-    auto size = encoded.size();
-    EncodeAppend(map(*point), std::back_inserter(encoded), target);
-    if (encoded.size() == size) throw std::runtime_error("Unrepresentable codepoint.");
+    if (!point) throw InvalidEncoding{ };
+    auto const mapped = map(*point);
+    auto const size   = encoded.size();
+    EncodeAppend(mapped, std::back_inserter(encoded), target);
+    if (encoded.size() == size) throw Unencodable{ mapped };
   }
   if (encoded.empty()) return { };
   auto const text = SpanCast<typename Output::value_type const>(std::span(encoded));

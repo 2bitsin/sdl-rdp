@@ -1,12 +1,12 @@
 #pragma once
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
-#include <sdl-rdp/freerdp-facade/releases-sound.hpp>
 
 #include <freerdp/server/rdpsnd.h>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <memory>
 #include <span>
 #include <vector>
 
@@ -18,6 +18,9 @@ class EventQueue;
 class PeerLink;
 class SessionAccess;
 class TraceQueue;
+// abi: release steps no single FreeRDP free function performs as a plain call.
+auto FreeSoundContext(RdpsndServerContext* sound) noexcept -> void;
+using SoundContext = std::unique_ptr<RdpsndServerContext, Releases<FreeSoundContext>>;
 class AudioChannel {
 public:
        AudioChannel(AudioChannel const&)                            = delete;

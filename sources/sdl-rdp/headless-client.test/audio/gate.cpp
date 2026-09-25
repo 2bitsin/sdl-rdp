@@ -28,7 +28,7 @@ auto ThenCapturedPcm(SoundClient const& audio, std::vector<std::int16_t> const& 
 auto ThenMissingAudioHandle() -> void {
   sdlrdp_audio_close(nullptr);
   EXPECT_EQ(sdlrdp_audio_open(nullptr), -1);
-  EXPECT_STREQ(sdlrdp_last_error(), "Invalid audio handle.");
+  EXPECT_STREQ(sdlrdp_last_error(), "Audio handle is null.");
   EXPECT_EQ(sdlrdp_audio_rate(nullptr), 0u);
 }
 auto AudioGate::GivenConfirmingSession() -> void {

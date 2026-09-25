@@ -3,8 +3,8 @@
 #include <oxbox/utilities/number-text.hpp>
 #include <oxbox/utilities/text.hpp>
 #include <sdl-rdp/SDL3/rdp/backend/resources.hpp>
+#include <sdl-rdp/SDL3/rdp/exceptions.hpp>
 #include <cstdint>
-#include <stdexcept>
 #if defined(SDL_PLATFORM_WINDOWS)
 #include "src/core/windows/SDL_windows.h"
 #else
@@ -72,8 +72,7 @@ Settings::Settings() {
   auto explicit_path = Text(SDL_GetHintFromCode(SDL_HINT_RDP_INI));
   if (!explicit_path) explicit_path = Text(SDL_getenv(SDL_HINT_RDP_INI));
   if (explicit_path) {
-    if (explicit_path->empty() || !_Read(*explicit_path))
-      throw std::runtime_error("Could not read RDP settings file " + *explicit_path);
+    if (explicit_path->empty() || !_Read(*explicit_path)) throw UnreadableIni{ *explicit_path };
     return;
   }
   auto const beside_library = LibraryIni();
@@ -101,8 +100,7 @@ auto Settings::Integer(std::string const& name, int fallback, int minimum, int m
   if (!text) return fallback;
   auto const number = oxbox::utilities::ParseNumber<int>(oxbox::utilities::Trimmed(*text));
   if (!number || *number < minimum || *number > maximum)
-    InvalidSetting("Invalid " + name + " '" + *text + "': expected a whole number from " + std::to_string(minimum)
-                   + " to " + std::to_string(maximum));
+    InvalidSetting<IntegerOutOfRange>(name, *text, minimum, maximum);
   return *number;
 }
 auto Settings::Boolean(std::string const& name, bool fallback) const -> bool {

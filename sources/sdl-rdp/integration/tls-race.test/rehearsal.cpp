@@ -2,7 +2,7 @@
 #include "method-fill.hpp"
 #include <sdl-rdp/abi/backend.h>
 #include <sdl-rdp/auth/certificate.hpp>
-#include <sdl-rdp/auth/tls-accept-refused.hpp>
+#include <sdl-rdp/auth/exceptions.hpp>
 #include <sdl-rdp/auth/tls-rehearsal.hpp>
 #include <sdl-rdp/headless-client.test/backend/config.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>

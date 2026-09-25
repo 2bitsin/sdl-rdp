@@ -49,7 +49,6 @@ public:
   auto Disconnect()                                        -> void;
   auto Abort(std::string const& cause)                     -> void;
   auto List(sdlrdp_drive* out, std::size_t max)            -> int;
-  auto Device(std::uint32_t id)                            -> std::uint32_t;
   auto Send(std::uint32_t drive, std::uint32_t file, std::uint32_t major, DrivePacket const& body,
             std::uint32_t minor = 0) -> std::shared_ptr<DriveRequest>;
   auto Wait(std::shared_ptr<DriveRequest> const& request, std::string const& path, bool end = false) -> DrivePacket;
@@ -62,6 +61,7 @@ private:
     sdlrdp_drive  drive;
   };
   auto AnnounceDevice(std::uint32_t wire, std::string const& label)  -> void;
+  auto Device(std::uint32_t id)                                      -> std::uint32_t;
   auto GeneralClientCapability(DrivePacket& packet, std::size_t start, std::size_t length, std::uint32_t version) const
       -> void;
   auto PumpAvailable()                                               -> bool;

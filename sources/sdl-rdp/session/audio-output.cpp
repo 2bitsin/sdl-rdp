@@ -3,13 +3,13 @@
 #include <sdl-rdp/audio/channel.hpp>
 #include <sdl-rdp/configuration/configuration.hpp>
 #include <sdl-rdp/peer/peer.hpp>
+#include <sdl-rdp/session/exceptions.hpp>
 #include <sdl-rdp/session/presenter.hpp>
 #include <sdl-rdp/utilities/deadline.hpp>
 
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <stdexcept>
 
 namespace Backend {
 namespace {
@@ -24,7 +24,7 @@ auto AudioOutput::Channel(SessionLock const& held) const -> AudioChannel* {
 }
 auto AudioOutput::Open() -> void {
   auto const held = _session.Lock();
-  if (_open) throw std::runtime_error("Audio device is already open.");
+  if (_open) throw AudioDeviceState{ "already open" };
   _presenter.EnsurePicture();
   _open = true;
 }
@@ -50,7 +50,7 @@ auto AudioOutput::Write(std::span<std::int16_t const> samples) -> int {
   while (!samples.empty()) {
     Wait(Deadline::max());
     auto const held = _session.Lock();
-    if (!_open) throw std::runtime_error("Audio device is not open.");
+    if (!_open) throw AudioDeviceState{ "not open" };
     if (!Rate()) return count;
     auto& audio = *Channel(held);
     if (!audio.Ready(_configuration.AudioLatency())) continue;

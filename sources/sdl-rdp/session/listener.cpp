@@ -5,11 +5,14 @@
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
+#include <sdl-rdp/freerdp-facade/manual-reset-event.hpp>
 #include <sdl-rdp/peer/peer.hpp>
+#include <sdl-rdp/session/exceptions.hpp>
 #include <sdl-rdp/session/session.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/descriptor.hpp>
+#include <sdl-rdp/utilities/exceptions.hpp>
 #include <sdl-rdp/utilities/system-call.hpp>
 
 #include <freerdp/channels/channels.h>
@@ -22,11 +25,13 @@
 #include <cstdint>
 #include <format>
 #include <mutex>
-#include <stdexcept>
 #include <tuple>
 #include <utility>
 
 namespace Backend {
+auto CloseListener(freerdp_listener* listener) noexcept -> void {
+  listener->Close(listener);
+}
 namespace {
 constexpr int           ListenBacklog      = 8;
 constexpr std::size_t   WaitHandleCapacity = 32;
@@ -36,7 +41,7 @@ auto InitializeProcess(Credentials const& credentials) -> void {
   static std::once_flag once;
   std::call_once(once, [&credentials] {
     WTSRegisterWtsApiFunctionTable(FreeRDP_InitWtsApi());
-    if (!winpr_InitializeSSL(WINPR_SSL_INIT_DEFAULT)) throw std::runtime_error("OpenSSL initialisation failed.");
+    if (!winpr_InitializeSSL(WINPR_SSL_INIT_DEFAULT)) throw ListenerSetupFailed{ "OpenSSL initialisation" };
     // FreeRDP's lazily filled BIO tables are process-wide, so one rehearsal per process fills them for every listener.
     TlsRehearsal{ credentials }.Perform();
   });
@@ -45,8 +50,8 @@ auto Address(sdlrdp_config const& config) -> sockaddr_in {
   sockaddr_in address{ };
   address.sin_family = AF_INET;
   address.sin_port   = htons(config.port);
-  if (inet_pton(AF_INET, config.bind ? config.bind : "0.0.0.0", &address.sin_addr) != 1)
-    throw std::runtime_error("Listener address is not numeric IPv4.");
+  auto const* const bind = config.bind ? config.bind : "0.0.0.0";
+  if (inet_pton(AF_INET, bind, &address.sin_addr) != 1) throw AddressNotIpv4{ bind };
   return address;
 }
 auto Generic(sockaddr_in& address) -> sockaddr* {
@@ -62,8 +67,7 @@ auto StartListening(Descriptor const& socket, sockaddr_in& address) -> void {
   SystemCall(getsockname(socket.Get(), Generic(address), &size), "Listener socket name");
 }
 auto AdoptListenerSocket(freerdp_listener& listener, Descriptor socket) -> void {
-  if (!listener.OpenFromSocket(&listener, socket.Get()))
-    throw std::runtime_error("FreeRDP listener socket adoption failed.");
+  if (!listener.OpenFromSocket(&listener, socket.Get())) throw ListenerSetupFailed{ "socket adoption" };
   std::ignore = socket.Release();
 }
 auto Bind(freerdp_listener& listener, sdlrdp_config const& config) -> std::uint32_t {
@@ -76,13 +80,11 @@ auto Bind(freerdp_listener& listener, sdlrdp_config const& config) -> std::uint3
 auto NewListener(Credentials const& credentials) -> ListenerHandle {
   InitializeProcess(credentials);
   ListenerHandle listener{ freerdp_listener_new() };
-  if (!listener) throw std::runtime_error("listener allocation failed");
+  if (!listener) throw AllocationFailed{ "Listener" };
   return listener;
 }
 auto NewStopEvent() -> EventHandle {
-  EventHandle stop{ CreateEvent(nullptr, true, false, nullptr) };
-  if (!stop) throw std::runtime_error("listener stop event allocation failed");
-  return stop;
+  return sdl_rdp::freerdp_facade::ManualResetEvent("Listener stop event");
 }
 }
 Listener::Listener(Configuration const& configuration, Credentials const& credentials, Diagnostics const& diagnostics,

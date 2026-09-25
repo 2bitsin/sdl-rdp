@@ -1,5 +1,6 @@
 #include <sdl-rdp/diagnostics/logging.hpp>
 
+#include <sdl-rdp/diagnostics/exceptions.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 
@@ -13,7 +14,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <mutex>
-#include <stdexcept>
 #include <string_view>
 
 namespace Backend {
@@ -192,7 +192,7 @@ auto LogRoute::Install() -> void {
   wLogCallbacks  callbacks { forward, forward, forward, forward };
   if (!WLog_SetLogAppenderType(root, WLOG_APPENDER_CALLBACK)
       || !WLog_ConfigureAppender(WLog_GetLogAppender(root), "callbacks", &callbacks))
-    throw std::runtime_error("WLog callback installation failed.");
+    throw sdl_rdp::diagnostics::LogCallbackFailed{ };
   WLog_Layout_SetPrefixFormat(root, WLog_GetLogLayout(root), "%mn");
   if (auto* level = std::getenv("WLOG_LEVEL"))
     WLog_SetStringLogLevel(root, level);

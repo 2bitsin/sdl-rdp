@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 namespace {
@@ -33,4 +34,17 @@ TEST(Contained, KeepsTheFailureWhenTheSinkThrows) {
 }
 TEST(Contained, IsNoexcept) {
   EXPECT_TRUE(noexcept(Backend::Contained(0, [] { return 0; }, [](std::string_view) { })));
+}
+TEST(Reported, ReportsTheTextAndHandsBackTheSameFailure) {
+  std::vector<std::string> texts;
+  auto const               failure = Backend::Reported(std::out_of_range{ "past the end" }, Collecting(texts));
+  static_assert(std::is_same_v<decltype(failure), std::out_of_range const>);
+  EXPECT_EQ(texts, std::vector<std::string>{ "past the end" });
+  EXPECT_STREQ(failure.what(), "past the end");
+}
+TEST(Reported, KeepsTheFailureWhenTheReporterThrows) {
+  auto const              throwing = [](std::string_view) { throw std::runtime_error{ "reporter failed" }; };
+  std::out_of_range const failure  { "past the end" };
+  EXPECT_TRUE(noexcept(Backend::Reported(failure, throwing)));
+  EXPECT_STREQ(Backend::Reported(failure, throwing).what(), "past the end");
 }

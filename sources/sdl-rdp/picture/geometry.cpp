@@ -1,5 +1,6 @@
 #include <sdl-rdp/picture/geometry.hpp>
 
+#include <sdl-rdp/picture/exceptions.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 
@@ -7,7 +8,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <numeric>
-#include <stdexcept>
 #include <utility>
 
 namespace Backend {
@@ -26,7 +26,7 @@ auto PictureGeometry::Desktop(Extent size) const -> sdlrdp_rect {
   std::uint64_t const d       = _aspect.den / divisor;
   auto                units   = std::max((size.width + n - 1) / n, (size.height + d - 1) / d);
   if (units * n > MaximumPictureWidth || units * d > MaximumPictureHeight)
-    throw std::runtime_error("Aspect-corrected desktop exceeds RDP dimensions.");
+    throw sdl_rdp::picture::DesktopExceedsLimits{ units * n, units * d };
   return Whole({ .width = Narrowed<std::uint32_t>(units * n), .height = Narrowed<std::uint32_t>(units * d) });
 }
 auto PictureGeometry::Bounds() const noexcept -> sdlrdp_rect {

@@ -8,9 +8,8 @@ auto Signalled(HANDLE event) -> bool;
 class WakeEvent {
 public:
   enum class Phase{ Idle, Pending };
-  explicit WakeEvent(HANDLE value);
+  explicit WakeEvent(EventHandle value);
   auto     get() const            -> HANDLE;
-  explicit operator bool() const;
   auto     Transition(Phase next) -> void;
 
 private:

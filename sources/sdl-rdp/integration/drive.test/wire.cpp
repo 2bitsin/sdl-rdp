@@ -100,12 +100,12 @@ protected:
   auto ThenTruncatedInformation(auto& stat) -> void {
     auto [result, error] = stat.get();
     EXPECT_EQ(result, -1);
-    EXPECT_EQ(error, "Truncated drive response.");
+    EXPECT_EQ(error, "Malformed drive response: truncated.");
   }
   auto ThenAbortedRead(std::future<int>& read, sdlrdp_file* file) -> void {
     ASSERT_EQ(read.wait_for(2s), std::future_status::ready);
     EXPECT_EQ(read.get(), -1);
-    EXPECT_EQ(Logged(SDLRDP_LOG_WARN, "Drive channel ended: Truncated drive response."), 1u);
+    EXPECT_EQ(Logged(SDLRDP_LOG_WARN, "Drive channel ended: Malformed drive response: truncated."), 1u);
     EXPECT_EQ(sdlrdp_drive_close(handle.Handle(), file), -1);
   }
 };
@@ -140,8 +140,8 @@ TEST_F(DriveWire, MalformedInformationKeepsVideoSession) {
   ASSERT_NO_FATAL_FAILURE(ThenTruncatedInformation(stat));
   ThenDriveFailure(file, warnings);
   ASSERT_NO_FATAL_FAILURE(ThenVideoMatches());
-  RecordProperty("trace", "FileBasicInformation: Length=0; fstat=-1; Truncated drive response.; "
-                          "drives=0; WARN=1: Drive channel ended: Truncated drive response.; video matches");
+  RecordProperty("trace", "FileBasicInformation: Length=0; fstat=-1; Malformed drive response: truncated.; "
+                          "drives=0; WARN=1: Drive channel ended: Malformed drive response: truncated.; video matches");
 }
 
 TEST_F(DriveWire, SlidingWindowRefillsOnOutOfOrderCompletion) {

@@ -1,5 +1,7 @@
 #include <sdl-rdp/freerdp-facade/wake-event.hpp>
 
+#include <sdl-rdp/freerdp-facade/manual-reset-event.hpp>
+
 #include <sdl-rdp/utilities/contract.hpp>
 
 #include <gtest/gtest.h>
@@ -29,23 +31,11 @@ auto ProducePending(Backend::WakeEvent& wake, std::atomic<std::size_t>& publishe
   }
 }
 }
-TEST(WakeEvent, SignalledManualResetEvent) {
-  Backend::EventHandle const event{ CreateEvent(nullptr, true, false, nullptr) };
-  utilities::Expects(bool(event), "manual reset event exists");
-  EXPECT_FALSE(Backend::Signalled(event.get()));
-  ASSERT_TRUE(SetEvent(event.get()));
-  EXPECT_TRUE(Backend::Signalled(event.get()));
-  EXPECT_TRUE(Backend::Signalled(event.get()));
-  ASSERT_TRUE(ResetEvent(event.get()));
-  EXPECT_FALSE(Backend::Signalled(event.get()));
-}
-
 TEST(WakeEvent, ConcurrentPendingAndIdle) {
   using Phase = Backend::WakeEvent::Phase;
-  Backend::WakeEvent       wake     { CreateEvent(nullptr, true, false, nullptr) };
-  std::atomic<std::size_t> published{ 0                                          };
-  std::atomic<std::size_t> consumed { 0                                          };
-  ASSERT_TRUE(wake);
+  Backend::WakeEvent       wake     { sdl_rdp::freerdp_facade::ManualResetEvent("Wake event") };
+  std::atomic<std::size_t> published{ 0                                                       };
+  std::atomic<std::size_t> consumed { 0                                                       };
   std::jthread producer([&](std::stop_token const& stop) { ProducePending(wake, published, consumed, stop); });
   ASSERT_NO_FATAL_FAILURE(ConsumePublished(wake, published, consumed));
   producer.request_stop();

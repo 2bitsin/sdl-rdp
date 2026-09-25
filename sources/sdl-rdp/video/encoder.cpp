@@ -13,6 +13,9 @@
 #include <cstdint>
 
 namespace Backend {
+auto FreeStream(wStream* stream) noexcept -> void {
+  Stream_Free(stream, true);
+}
 namespace {
 constexpr std::size_t InitialStreamCapacity = 64uz * 1024;
 auto PrepareRemoteFx(RemoteFxContext& rfx) -> bool {

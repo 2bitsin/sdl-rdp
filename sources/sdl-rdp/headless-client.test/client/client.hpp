@@ -1,8 +1,8 @@
 #pragma once
-#include "release.hpp"
 #include <sdl-rdp/headless-client.test/utilities/observer-set.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/deadline.hpp>
+#include <sdl-rdp/utilities/releases.hpp>
 
 #include <freerdp/freerdp.h>
 #include <algorithm>
@@ -22,6 +22,10 @@ struct GraphicsOptions {
   bool h264                 = false;
   bool qoe_acknowledgements = false;
 };
+// gdi_free, called here so <freerdp/gdi/gdi.h> stays in client.cpp.
+auto FreeGraphics(freerdp* instance) noexcept -> void;
+using ClientInstance = std::unique_ptr<
+    freerdp, Backend::Releases<freerdp_disconnect, FreeGraphics, freerdp_context_free, freerdp_free>>;
 class Client {
 public:
   explicit Client(std::uint32_t port, bool surface, std::uint32_t width = 320, std::uint32_t height = 200);
@@ -43,14 +47,14 @@ public:
     return Backend::Until(Backend::DeadlineAfter(timeout), pumped, ready);
   }
   auto UntilDesktop(std::uint32_t width, std::uint32_t height) -> bool;
-  auto Instance() const                                        -> std::unique_ptr<freerdp, ReleaseClient> const&;
+  auto Instance() const                                        -> ClientInstance const&;
   auto Tolerance() const                                       -> std::uint32_t;
   auto Tolerance(std::uint32_t value)                          -> void;
 
 private:
-  std::unique_ptr<ObserverSet>            observers { std::make_unique<ObserverSet>() };
-  std::unique_ptr<freerdp, ReleaseClient> instance  { freerdp_new()                   };
-  std::uint32_t                           tolerance = 0;
+  std::unique_ptr<ObserverSet> observers { std::make_unique<ObserverSet>() };
+  ClientInstance               instance  { freerdp_new()                   };
+  std::uint32_t                tolerance = 0;
 };
 auto PumpInBackground(Client const& client)            -> std::jthread;
 auto Tap(Client const& client, std::uint16_t scancode) -> void;

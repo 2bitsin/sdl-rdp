@@ -1,8 +1,8 @@
 #include "driver.hpp"
+#include "exceptions.hpp"
 #include <sdl-rdp/utilities/narrowed.hpp>
 #include <cstddef>
 #include <cstdint>
-#include <stdexcept>
 namespace sdl3::rdp::detail::driver {
 using backend::Operation;
 using settings::AuthenticationCallback;
@@ -50,7 +50,7 @@ auto Driver::_ReportError() const -> void {
   SDL_SetError("%s", _backend.Call<Operation::LAST_ERROR>());
 }
 auto Driver::Throw() const -> void {
-  throw std::runtime_error(_backend.Call<Operation::LAST_ERROR>());
+  throw RelayedFailure{ _backend.Call<Operation::LAST_ERROR>() };
 }
 auto PublishAuthentication(Driver& driver, SDL_PropertiesID properties) -> DisplayAuthentication {
   utilities::Expects(properties != 0, "authentication reports to a display's properties");

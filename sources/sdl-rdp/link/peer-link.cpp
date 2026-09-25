@@ -1,11 +1,12 @@
 #include <sdl-rdp/link/peer-link.hpp>
 
+#include <sdl-rdp/freerdp-facade/manual-reset-event.hpp>
+#include <sdl-rdp/link/exceptions.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
+#include <sdl-rdp/utilities/exceptions.hpp>
 
 #include <freerdp/channels/wtsvc.h>
-#include <winpr/synch.h>
 #include <cstdint>
-#include <stdexcept>
 #include <utility>
 
 namespace Backend {
@@ -17,15 +18,14 @@ auto Accepted(PeerHandle accepted) -> PeerHandle {
 auto OpenChannelManager(rdpContext* context) -> ChannelManager {
   // FreeRDP 3.32 server.c:1134 WTSOpenServerA takes the peer's rdpContext through its server-name parameter.
   auto* opened = WTSOpenServerA(reinterpret_cast<char*>(context));
-  if (!opened || opened == INVALID_HANDLE_VALUE) throw std::runtime_error("Channel manager allocation failed.");
+  if (!opened || opened == INVALID_HANDLE_VALUE) throw AllocationFailed{ "Channel manager" };
   return ChannelManager{ opened };
 }
 }
 PeerLink::PeerLink(PeerHandle accepted)
     : _client{ Accepted(std::move(accepted)) }, _socket{ _client->sockfd },
-      _wake{ CreateEvent(nullptr, true, false, nullptr) } {
-  if (!_wake) throw std::runtime_error("peer event allocation failed");
-  if (!freerdp_peer_context_new(_client.get())) throw std::runtime_error("peer context failed");
+      _wake{ sdl_rdp::freerdp_facade::ManualResetEvent("Peer wake event") } {
+  if (!freerdp_peer_context_new(_client.get())) throw sdl_rdp::link::PeerContextFailed{ "Session" };
   _channels = OpenChannelManager(_client->context);
 }
 auto PeerLink::Client() const noexcept -> freerdp_peer& {

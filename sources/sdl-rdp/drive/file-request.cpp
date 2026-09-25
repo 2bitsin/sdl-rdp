@@ -1,4 +1,5 @@
 #include <sdl-rdp/drive/file-request.hpp>
+#include <sdl-rdp/drive/exceptions.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 
@@ -7,7 +8,6 @@
 #include <winpr/nt.h>
 #include <cstddef>
 #include <cstdint>
-#include <stdexcept>
 
 namespace sdl_rdp::drive::detail::file_request {
 using Backend::Narrowed;
@@ -16,8 +16,8 @@ constexpr std::uint32_t AllowedFlags = SDLRDP_FILE_READ | SDLRDP_FILE_WRITE | SD
                                        | SDLRDP_FILE_DIRECTORY;
 auto Validated(std::uint32_t flags) -> std::uint32_t {
   if ((flags & SDLRDP_FILE_TRUNCATE) && !(flags & SDLRDP_FILE_WRITE))
-    throw std::runtime_error("Truncate requires write access.");
-  if (flags & ~AllowedFlags) throw std::runtime_error("Invalid drive open flags.");
+    throw InvalidOpenFlags{ flags, "truncate without write access" };
+  if (flags & ~AllowedFlags) throw InvalidOpenFlags{ flags, "unknown bits" };
   return flags;
 }
 auto Access(std::uint32_t flags, std::uint32_t extra) -> std::uint32_t {

@@ -1,9 +1,11 @@
 #include <sdl-rdp/auth/tls-rehearsal.hpp>
 
 #include "_detail/unsignalled-socket-bio.hpp"
-#include <sdl-rdp/auth/tls-accept-refused.hpp>
+#include <sdl-rdp/auth/exceptions.hpp>
+#include <sdl-rdp/link/exceptions.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
+#include <sdl-rdp/utilities/exceptions.hpp>
 #include <sdl-rdp/utilities/system-call.hpp>
 
 #include <freerdp/freerdp.h>
@@ -14,7 +16,6 @@
 #include <chrono>
 #include <future>
 #include <initializer_list>
-#include <stdexcept>
 #include <string_view>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -30,14 +31,14 @@ using SslSession = std::unique_ptr<SSL, Releases<SSL_free>>;
 
 auto AdoptedPeer(Descriptor socket) -> PeerHandle {
   PeerHandle peer{ freerdp_peer_new(socket.Get()) };
-  if (!peer) throw std::runtime_error("TLS rehearsal peer allocation failed.");
+  if (!peer) throw AllocationFailed{ "TLS rehearsal peer" };
   std::ignore = socket.Release();
   return peer;
 }
 auto ServingPeer(Descriptor socket, Credentials const& credentials) -> PeerHandle {
   Expects(socket.Owns(), "the server end is open");
   auto peer = AdoptedPeer(std::move(socket));
-  if (!freerdp_peer_context_new(peer.get())) throw std::runtime_error("TLS rehearsal peer context failed.");
+  if (!freerdp_peer_context_new(peer.get())) throw sdl_rdp::link::PeerContextFailed{ "TLS rehearsal" };
   Ensures(peer->context != nullptr, "the peer has a context");
   InstallServerCredentials(*peer->context->settings, credentials);
   return peer;
@@ -100,7 +101,7 @@ auto TlsRehearsal::Perform() && -> void {
   // FreeRDP 3.32 transport.c:708 keeps the server socket open after a failed accept, so the client would wait for it.
   StopDirection(ends.Client(), SHUT_RD);
   auto const connected = handshake.get();
-  if (!accepted) throw TlsAcceptRefused("TLS rehearsal accept failed.");
-  if (!connected) throw std::runtime_error("TLS rehearsal client handshake failed.");
+  if (!accepted) throw TlsAcceptRefused{ };
+  if (!connected) throw TlsHandshakeFailed{ };
 }
 }

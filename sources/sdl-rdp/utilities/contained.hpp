@@ -31,4 +31,10 @@ auto Contained(std::invoke_result_t<BodyTy> failure, BodyTy const& body, SinkTy 
   }
   return failure;
 }
+// Reports the failure where it is raised and hands it back for the caller to throw.
+template <std::derived_from<std::exception> ExceptionTy, std::invocable<std::string_view> ReportTy>
+auto Reported(ExceptionTy failure, ReportTy const& report) noexcept -> ExceptionTy {
+  detail::contained::Report(report, failure.what());
+  return failure;
+}
 }

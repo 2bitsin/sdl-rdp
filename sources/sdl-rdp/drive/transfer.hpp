@@ -1,7 +1,7 @@
 #pragma once
 #include <sdl-rdp/drive/channel.hpp>
+#include <sdl-rdp/drive/exceptions.hpp>
 #include <sdl-rdp/drive/file.hpp>
-#include <sdl-rdp/drive/malformed-response.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 
@@ -32,9 +32,9 @@ auto Finish(sdlrdp_file& file, std::shared_ptr<DriveRequest> const& request, std
   constexpr bool write    = std::is_const_v<Byte>;
   auto           response = file.Channel()->Wait(request, file.Path(), !write);
   auto           received = response.Read<std::uint32_t>();
-  if (received > bytes.size()) response.Invalid("Drive returned oversized transfer.");
+  if (received > bytes.size()) response.Invalid("oversized transfer");
   if constexpr (!write) {
-    if (received > response.Bytes().size() - response.Position()) response.Invalid("Truncated drive read.");
+    if (received > response.Bytes().size() - response.Position()) response.Invalid("truncated read");
     std::memcpy(bytes.data(), response.Bytes().data() + response.Position(), received);
   }
   return received;

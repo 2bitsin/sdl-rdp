@@ -1,10 +1,9 @@
 #pragma once
 #include <sdl-rdp/abi/backend.h>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
-#include <sdl-rdp/freerdp-facade/releases-listener.hpp>
-#include <sdl-rdp/freerdp-facade/releases-peer.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
+#include <freerdp/listener.h>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -17,7 +16,10 @@ class Credentials;
 class Diagnostics;
 class Peer;
 class Session;
-using PeerFactory = std::move_only_function<std::unique_ptr<Peer>(PeerHandle)>;
+// abi: release steps no single FreeRDP free function performs as a plain call.
+auto CloseListener(freerdp_listener* listener) noexcept -> void;
+using ListenerHandle = std::unique_ptr<freerdp_listener, Releases<CloseListener, freerdp_listener_free>>;
+using PeerFactory    = std::move_only_function<std::unique_ptr<Peer>(PeerHandle)>;
 class Listener : private Pinned {
 public:
        Listener(Configuration const& configuration, Credentials const& credentials, Diagnostics const& diagnostics,

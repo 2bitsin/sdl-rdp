@@ -1,7 +1,8 @@
+#include <sdl-rdp/backend/exceptions.hpp>
 #include <sdl-rdp/drive/channel.hpp>
+#include <sdl-rdp/drive/exceptions.hpp>
 #include <sdl-rdp/drive/file-request.hpp>
 #include <sdl-rdp/drive/file.hpp>
-#include <sdl-rdp/drive/malformed-response.hpp>
 #include <sdl-rdp/drive/transfer.hpp>
 #include <sdl-rdp/peer/peer.hpp>
 #include <sdl-rdp/session/handle.hpp>
@@ -22,13 +23,16 @@
 #include <string>
 #include <string_view>
 
+using sdl_rdp::backend::EntryNameTooLong;
+using sdl_rdp::backend::InvalidArguments;
+using sdl_rdp::backend::NoDriveChannel;
 using sdl_rdp::drive::DriveChannel;
 using sdl_rdp::drive::DrivePacket;
 using sdl_rdp::drive::DrivePath;
 using sdl_rdp::drive::Exchange;
 using sdl_rdp::drive::FileKind;
 using sdl_rdp::drive::FileRequest;
-using sdl_rdp::drive::MalformedResponse;
+using sdl_rdp::drive::PeerDisconnected;
 using sdl_rdp::drive::Transfer;
 
 namespace {
@@ -37,24 +41,18 @@ auto CurrentDrive(sdlrdp_handle& handle) -> std::shared_ptr<DriveChannel> {
   return OnCurrent(handle.Session(), [](Peer& peer) { return peer.Redirected().Drive(); });
 }
 auto Channel(sdlrdp_handle* handle) -> std::shared_ptr<DriveChannel> {
-  if (!handle) throw std::runtime_error("Invalid drive handle.");
+  if (!handle) throw NullArgument{ "Drive handle" };
   auto drive = CurrentDrive(*handle);
-  if (!drive) throw std::runtime_error("Drive peer disconnected or no drives shared.");
+  if (!drive) throw NoDriveChannel{ };
   return drive;
 }
-// A malformed response leaves its channel out of step with the client, so the channel is aborted before the failure.
-template <std::invocable OperationTy> auto AbortingMalformed(OperationTy const& operation) -> int {
-  try {
-    return operation();
-  } catch (MalformedResponse const& error) {
-    if (auto origin = error.origin.lock()) origin->Abort(error.what());
-    throw;
-  }
+auto Attached(sdlrdp_handle* handle, sdlrdp_file* file) -> sdlrdp_file& {
+  if (!file) throw NullArgument{ "Drive file" };
+  if (Channel(handle) != file->Channel()) throw PeerDisconnected{ file->Path() };
+  return *file;
 }
 template <std::invocable OperationTy> auto Call(sdlrdp_handle* handle, OperationTy operation) noexcept -> int {
-  return Contained(
-      -1, [&] { return AbortingMalformed(operation); },
-      [handle](std::string_view text) { SetError(handle, std::string{ text }); });
+  return Contained(-1, operation, [handle](std::string_view text) { SetError(handle, std::string{ text }); });
 }
 auto Open(sdlrdp_handle* handle, std::uint32_t drive, char const* path, FileRequest const& request)
     -> std::unique_ptr<sdlrdp_file> {
@@ -77,7 +75,7 @@ auto InformationRequest(std::uint32_t type, DrivePacket const& body) -> DrivePac
 auto Information(sdlrdp_file& file, std::uint32_t type) -> DrivePacket {
   auto result = Exchange(file, IRP_MJ_QUERY_INFORMATION, InformationRequest(type, { }));
   auto length = result.Read<std::uint32_t>();
-  if (length > result.Bytes().size() - result.Position()) result.Invalid("Truncated drive information.");
+  if (length > result.Bytes().size() - result.Position()) result.Invalid("truncated information");
   return result;
 }
 auto UnixSeconds(std::uint64_t value) -> std::int64_t {
@@ -104,8 +102,8 @@ auto Stat(sdlrdp_file& file) -> sdlrdp_stat {
 auto ValidateTransfer(sdlrdp_handle* handle, sdlrdp_file* file, std::uint64_t offset, void const* buffer,
                       std::size_t size) -> void {
   if (!handle || !file || (!buffer && size) || size > INT_MAX || offset > UINT64_MAX - size)
-    throw std::runtime_error("Invalid drive transfer arguments.");
-  if (Channel(handle) != file->Channel()) throw std::runtime_error("File belongs to a disconnected peer.");
+    throw InvalidArguments{ "drive transfer", "handle, file, buffer, size or offset" };
+  Attached(handle, file);
 }
 
 auto SetInformation(sdlrdp_file& file, std::uint32_t type, DrivePacket const& body) -> void {
@@ -136,7 +134,7 @@ auto Entry(DrivePacket& packet) -> sdlrdp_dirent {
   entry.directory = bool(packet.Read<std::uint32_t>() & FILE_ATTRIBUTE_DIRECTORY);
   auto length = packet.Read<std::uint32_t>();
   auto name   = packet.Text(length);
-  if (name.size() >= sizeof(entry.name)) throw std::runtime_error("Drive entry name exceeds ABI capacity.");
+  if (name.size() >= sizeof(entry.name)) throw EntryNameTooLong{ name.size(), sizeof(entry.name) - 1 };
   CopyTerminated(entry.name, name);
   return entry;
 }
@@ -148,7 +146,7 @@ auto CollectEntries(DrivePacket& response, std::size_t& skipped, std::uint32_t o
                     std::size_t& count) -> void {
   Expects(count <= out.size(), "directory output cursor is bounded");
   auto length = response.Read<std::uint32_t>();
-  if (length > response.Bytes().size() - response.Position()) response.Invalid("Truncated directory response.");
+  if (length > response.Bytes().size() - response.Position()) response.Invalid("truncated directory listing");
   auto limit = response.Position() + length;
   while (response.Position() < limit && count < out.size()) {
     auto start = response.Position();
@@ -157,7 +155,7 @@ auto CollectEntries(DrivePacket& response, std::size_t& skipped, std::uint32_t o
     auto entry = Entry(response);
     if (Listed(entry) && skipped++ >= offset) out[count++] = entry;
     if (!next) break;
-    if (next < response.Position() - start || next > limit - start) response.Invalid("Invalid directory entry offset.");
+    if (next < response.Position() - start || next > limit - start) response.Invalid("invalid directory entry offset");
     response.Seek(start + next);
   }
 }
@@ -193,7 +191,7 @@ auto Enumerate(sdlrdp_handle* handle, std::uint32_t drive, char const* path, std
 }
 auto sdlrdp_drive_list(sdlrdp_handle* handle, sdlrdp_drive* out, std::uint32_t max) -> int {
   return Call(handle, [&] {
-    if (!handle || (!out && max) || max > INT_MAX) throw std::runtime_error("Invalid drive list arguments.");
+    if (!handle || (!out && max) || max > INT_MAX) throw InvalidArguments{ "drive list", "handle, output or count" };
     auto const drive = CurrentDrive(*handle);
     return drive ? drive->List(out, max) : 0;
   });
@@ -201,7 +199,7 @@ auto sdlrdp_drive_list(sdlrdp_handle* handle, sdlrdp_drive* out, std::uint32_t m
 auto sdlrdp_drive_open(sdlrdp_handle* handle, std::uint32_t drive, char const* path, std::uint32_t flags,
                        sdlrdp_file** out) -> int {
   return Call(handle, [&] {
-    if (!out) throw std::runtime_error("File output is null.");
+    if (!out) throw NullArgument{ "Drive open output" };
     *out = nullptr;
     auto kind = flags & SDLRDP_FILE_DIRECTORY ? FileKind::Directory : FileKind::File;
     *out = Open(handle, drive, path, { flags, kind }).release();
@@ -211,9 +209,7 @@ auto sdlrdp_drive_open(sdlrdp_handle* handle, std::uint32_t drive, char const* p
 auto sdlrdp_drive_close(sdlrdp_handle* handle, sdlrdp_file* file) -> int {
   return Call(handle, [&] {
     std::unique_ptr<sdlrdp_file> const owned(file);
-    if (!handle || !file) throw std::runtime_error("Invalid file handle.");
-    if (Channel(handle) != file->Channel()) throw std::runtime_error("File belongs to a disconnected peer.");
-    file->Close();
+    Attached(handle, file).Close();
     return 0;
   });
 }
@@ -226,7 +222,7 @@ auto sdlrdp_drive_write(sdlrdp_handle* h, sdlrdp_file* f, std::uint64_t offset, 
 }
 auto sdlrdp_drive_stat(sdlrdp_handle* h, std::uint32_t drive, char const* path, sdlrdp_stat* out) -> int {
   return Call(h, [&] {
-    if (!out) throw std::runtime_error("Stat output is null.");
+    if (!out) throw NullArgument{ "Drive stat output" };
     auto file = Open(h, drive, path, { 0, FileKind::Any });
     *out = Stat(*file);
     file->Close();
@@ -236,7 +232,7 @@ auto sdlrdp_drive_stat(sdlrdp_handle* h, std::uint32_t drive, char const* path, 
 auto sdlrdp_drive_enumerate(sdlrdp_handle* h, std::uint32_t drive, char const* path, std::uint32_t offset,
                             sdlrdp_dirent* out, std::uint32_t max) -> int {
   return Call(h, [&] {
-    if (!out && max) throw std::runtime_error("Directory output is null.");
+    if (!out && max) throw NullArgument{ "Drive directory output" };
     return Enumerate(h, drive, path, offset, { out, max });
   });
 }
@@ -270,14 +266,14 @@ auto sdlrdp_drive_rename(sdlrdp_handle* h, std::uint32_t drive, char const* path
 }
 auto sdlrdp_drive_fstat(sdlrdp_handle* h, sdlrdp_file* file, sdlrdp_stat* out) -> int {
   return Call(h, [&] {
-    if (!file || !out || Channel(h) != file->Channel()) throw std::runtime_error("Invalid or disconnected file.");
-    *out = Stat(*file);
+    if (!out) throw NullArgument{ "Drive fstat output" };
+    *out = Stat(Attached(h, file));
     return 0;
   });
 }
 auto sdlrdp_drive_flush(sdlrdp_handle* h, sdlrdp_file* file) -> int {
   return Call(h, [&] {
-    if (!file || Channel(h) != file->Channel()) throw std::runtime_error("Invalid or disconnected file.");
+    Attached(h, file);
     // FreeRDP 3.32 drive_main.c:754 has no FLUSH_BUFFERS case; synchronous writes are already acknowledged.
     return 0;
   });

@@ -1,20 +1,24 @@
 #pragma once
 #include <sdl-rdp/abi/backend.h>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
-#include <sdl-rdp/freerdp-facade/release-stream.hpp>
 #include <sdl-rdp/utilities/extent.hpp>
 
 #include <freerdp/codec/nsc.h>
 #include <freerdp/codec/planar.h>
 #include <freerdp/codec/rfx.h>
 #include <freerdp/settings.h>
+#include <winpr/stream.h>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <vector>
 
 namespace Backend {
+// abi: release steps no single FreeRDP free function performs as a plain call.
+auto FreeStream(wStream* stream) noexcept -> void;
+using StreamHandle    = std::unique_ptr<wStream, Releases<FreeStream>>;
 using RemoteFxContext = std::unique_ptr<RFX_CONTEXT, Releases<rfx_context_free>>;
 using NsCodecContext  = std::unique_ptr<NSC_CONTEXT, Releases<nsc_context_free>>;
 class Encoder {
@@ -48,12 +52,12 @@ private:
     RemoteFxContext context;
     Extent          size;
   };
-  sdlrdp_codec                            codec      { SDLRDP_CODEC_RAW };
-  std::chrono::nanoseconds                encode_time{ };
-  std::span<std::byte>                    payload;
-  PlanarState                             planar;
-  RemoteFxState                           remote_fx;
-  NsCodecContext                          nsc;
-  std::unique_ptr<wStream, ReleaseStream> stream;
+  sdlrdp_codec             codec      { SDLRDP_CODEC_RAW };
+  std::chrono::nanoseconds encode_time{ };
+  std::span<std::byte>     payload;
+  PlanarState              planar;
+  RemoteFxState            remote_fx;
+  NsCodecContext           nsc;
+  StreamHandle             stream;
 };
 }

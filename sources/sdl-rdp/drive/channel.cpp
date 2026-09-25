@@ -3,6 +3,7 @@
 #include <oxbox/utilities/span.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/drive/capabilities.hpp>
+#include <sdl-rdp/drive/exceptions.hpp>
 #include <sdl-rdp/drive/label.hpp>
 #include <sdl-rdp/link/event-queue.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
@@ -41,8 +42,7 @@ auto Header(std::uint32_t type) -> DrivePacket {
 auto ChannelEvent(WaitHandle channel) -> WaitHandle {
   void*         data = nullptr;
   std::uint32_t size = 0;
-  if (!WTSVirtualChannelQuery(channel, WTSVirtualEventHandle, &data, &size))
-    throw std::runtime_error("Drive channel event query failed.");
+  if (!WTSVirtualChannelQuery(channel, WTSVirtualEventHandle, &data, &size)) throw DriveChannelFailed{ "event query" };
   auto* event = *static_cast<WaitHandle*>(data);
   WTSFreeMemory(data);
   return event;
@@ -84,7 +84,7 @@ auto DriveChannel::Open() -> bool {
   try {
     auto name = std::to_array(RDPDR_CHANNEL_NAME);
     channel.reset(WTSVirtualChannelOpen(_link.Channels(), WTS_CURRENT_SESSION, name.data()));
-    if (!channel) throw std::runtime_error("Drive channel open failed.");
+    if (!channel) throw DriveChannelFailed{ "open" };
     event = ChannelEvent(channel.get());
     auto packet = Announcement(PAKID_CORE_SERVER_ANNOUNCE, client_id);
     Write(packet);
@@ -100,7 +100,7 @@ auto DriveChannel::Write(DrivePacket& packet) -> void {
   if (!WTSVirtualChannelWrite(channel.get(), oxbox::utilities::SpanCast<char>(std::span(packet.Bytes())).data(),
                               packet.Bytes().size(), &written)
       || written != packet.Bytes().size())
-    throw std::runtime_error("Drive transport disconnected.");
+    throw TransportDisconnected{ };
   _link.Signal();
 }
 auto DriveChannel::Capabilities() -> void {
@@ -144,7 +144,7 @@ auto DriveChannel::ClientCapabilities(DrivePacket& packet) -> void {
     auto type    = packet.Read<std::uint16_t>();
     auto length  = packet.Read<std::uint16_t>();
     auto version = packet.Read<std::uint32_t>();
-    if (length < capability_header_size) throw std::runtime_error("Invalid drive capability length.");
+    if (length < capability_header_size) throw ShortCapability{ type, length };
     packet.Skip(length - capability_header_size);
     auto end = packet.Position();
     if (type == CAP_DRIVE_TYPE) drive_version = version;
@@ -230,10 +230,10 @@ auto DriveChannel::Pump(std::span<WaitHandle const> signaled) -> bool {
 auto DriveChannel::Send(std::uint32_t drive, std::uint32_t file, std::uint32_t major, DrivePacket const& body,
                         std::uint32_t minor) -> std::shared_ptr<DriveRequest> {
   std::scoped_lock const lock(mutex);
-  if (!connected) throw std::runtime_error("Drive channel ended.");
+  if (!connected) throw PeerDisconnected{ "request" };
   auto wire = Device(drive);
   auto id   = next++;
-  if (!id || pending.contains(id)) throw std::runtime_error("Drive completion ids exhausted.");
+  if (!id || pending.contains(id)) throw CompletionIdsExhausted{ };
   auto request = std::make_shared<DriveRequest>();
   request->drive = drive;
   pending.emplace(id, request);
@@ -258,7 +258,7 @@ auto DriveChannel::GeneralClientCapability(DrivePacket& packet, std::size_t star
   constexpr std::size_t general_caps_v1_size          = 40;
   constexpr std::size_t protocol_major_version_offset = 16;
   constexpr std::size_t io_code_fields_size           = 8;
-  if (length < general_caps_v1_size) throw std::runtime_error("Truncated general drive capability.");
+  if (length < general_caps_v1_size) throw ShortCapability{ CAP_GENERAL_TYPE, length };
   packet.Seek(start + protocol_major_version_offset);
   auto major = packet.Read<std::uint16_t>();
   auto minor = packet.Read<std::uint16_t>();
@@ -273,14 +273,13 @@ auto DriveChannel::PumpAvailable() -> bool {
   for (;;) {
     if (!Signalled(event)) return true;
     std::uint32_t length = 0;
-    if (!WTSVirtualChannelRead(channel.get(), 0, nullptr, 0, &length))
-      throw std::runtime_error("Drive channel read failed.");
+    if (!WTSVirtualChannelRead(channel.get(), 0, nullptr, 0, &length)) throw DriveChannelFailed{ "read" };
     if (!length) return true;
     DrivePacket packet;
     packet.Bytes().resize(length);
     if (!WTSVirtualChannelRead(channel.get(), 0, oxbox::utilities::SpanCast<char>(std::span(packet.Bytes())).data(),
                                length, &length))
-      throw std::runtime_error("Drive channel read failed.");
+      throw DriveChannelFailed{ "read" };
     packet.Bytes().resize(length);
     Receive(packet);
   }
@@ -321,9 +320,9 @@ auto DriveChannel::CloseTransport() -> void {
   event = nullptr;
 }
 auto DriveChannel::Device(std::uint32_t id) -> std::uint32_t {
-  if (!connected) throw std::runtime_error("Drive peer disconnected.");
+  Expects(connected, "a request addresses a connected peer");
   auto found = devices.find(id);
-  if (found == devices.end()) throw std::runtime_error("Drive removed or peer disconnected.");
+  if (found == devices.end()) throw DriveRemoved{ "the requested drive" };
   return found->second.wire;
 }
 auto DriveChannel::List(sdlrdp_drive* out, std::size_t max) -> int {
@@ -353,17 +352,15 @@ auto DriveChannel::Wait(std::shared_ptr<DriveRequest> const& request, std::strin
     -> DrivePacket {
   std::unique_lock lock(mutex);
   changed.wait(lock, [&] { return request->done || request->removed || !connected; });
-  if (!connected) throw std::runtime_error("Drive peer disconnected: " + path);
-  if (request->removed) throw std::runtime_error("Drive removed: " + path);
+  if (!connected) throw PeerDisconnected{ path };
+  if (request->removed) throw DriveRemoved{ path };
   if (request->status
       && (!end
           || (request->status != std::bit_cast<std::uint32_t>(STATUS_NO_MORE_FILES)
               && request->status != std::bit_cast<std::uint32_t>(STATUS_END_OF_FILE)))) {
     // WinPR owns the NTSTATUS name table; unknown client values retain their code.
-    auto const* name   = NtStatus2Tag(static_cast<NTSTATUS>(request->status));
-    auto        status = name ? std::format("{} (0x{:08x})", name, request->status)
-                              : std::format("NTSTATUS 0x{:08x}", request->status);
-    throw std::runtime_error(std::format("Drive '{}' failed: {}", path, status));
+    auto const* name = NtStatus2Tag(static_cast<NTSTATUS>(request->status));
+    throw StatusFailure{ path, name ? name : "unknown NTSTATUS", request->status };
   }
   request->response.Origin(weak_from_this());
   return std::move(request->response);

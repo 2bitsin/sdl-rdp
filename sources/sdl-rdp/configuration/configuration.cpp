@@ -1,12 +1,12 @@
 #include <sdl-rdp/configuration/configuration.hpp>
 
+#include <sdl-rdp/configuration/exceptions.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 
 #include <array>
 #include <cstdint>
 #include <cstdlib>
 #include <pwd.h>
-#include <stdexcept>
 #include <unistd.h>
 
 namespace Backend {
@@ -19,7 +19,7 @@ auto DefaultCertificateDirectory() -> std::filesystem::path {
   passwd                  entry  { };
   passwd*                 found  = nullptr;
   if (getpwuid_r(getuid(), &entry, buffer.data(), buffer.size(), &found) || !found)
-    throw std::runtime_error("User home directory unavailable.");
+    throw sdl_rdp::configuration::HomeUnavailable{ };
   return std::filesystem::path(entry.pw_dir) / ".local/share/sdl-rdp";
 }
 auto ChosenDirectory(sdlrdp_config const& config) -> std::filesystem::path {

@@ -25,6 +25,9 @@
 #include <utility>
 
 namespace Headless {
+auto FreeGraphics(freerdp* instance) noexcept -> void {
+  gdi_free(instance);
+}
 namespace {
 // abi: pPostConnect, BOOL is int
 auto ClientPostConnect(freerdp* client) -> int {
@@ -186,7 +189,7 @@ auto Client::Received() const -> std::uint64_t {
           "transport statistics available");
   return bytes;
 }
-auto Client::Instance() const -> std::unique_ptr<freerdp, ReleaseClient> const& {
+auto Client::Instance() const -> ClientInstance const& {
   return instance;
 }
 auto Client::Tolerance() const -> std::uint32_t {

@@ -1,4 +1,5 @@
 #include "videodata.hpp"
+#include <sdl-rdp/SDL3/rdp/exceptions.hpp>
 SDL_VideoData::SDL_VideoData(std::shared_ptr<sdl3::rdp::Driver> driver, SDL_HintCallback codec, SDL_HintCallback aspect)
     : sdl3::rdp::OwnedDriver<sdl3::rdp::Driver>{ std::move(driver) }, _codec{ SDL_HINT_RDP_CODEC, codec, this },
       _aspect{ SDL_HINT_RDP_ASPECT, aspect, this } { }
@@ -50,7 +51,7 @@ auto SDL_VideoData::Detach() noexcept -> void {
 namespace sdl3::rdp::video::detail::videodata {
 auto BoundWindow(SDL_VideoData const& data) -> SDL_Window& {
   auto const window = data.Window();
-  if (!window) throw std::logic_error("RDP video has no window");
+  if (!window) throw NoWindow{ };
   return window->get();
 }
 auto CurrentVideo() -> SDL_VideoData& {

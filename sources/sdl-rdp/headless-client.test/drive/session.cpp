@@ -106,7 +106,7 @@ auto DriveSession::ThenDriveFailure(sdlrdp_file* file, std::size_t warnings) -> 
   EXPECT_EQ(sdlrdp_drive_list(handle.Handle(), &value, 1), 0);
   EXPECT_EQ(sdlrdp_drive_close(handle.Handle(), file), -1);
   EXPECT_EQ(Logged(SDLRDP_LOG_WARN, "") - warnings, 1u);
-  EXPECT_EQ(Logged(SDLRDP_LOG_WARN, "Drive channel ended: Truncated drive response."), 1u);
+  EXPECT_EQ(Logged(SDLRDP_LOG_WARN, "Drive channel ended: Malformed drive response: truncated."), 1u);
 }
 auto DriveSession::GivenDirectoryEntries() -> std::set<std::string> {
   std::set<std::string> expected;

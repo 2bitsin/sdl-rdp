@@ -1,6 +1,6 @@
 #include "backend.hpp"
+#include <sdl-rdp/SDL3/rdp/exceptions.hpp>
 #include <cstddef>
-#include <stdexcept>
 #include <string>
 
 namespace sdl3::rdp::backend::detail::backend {
@@ -12,14 +12,14 @@ auto LoadSymbols(Library const& library, [[maybe_unused]] std::index_sequence<IN
 }
 }
 Backend::Backend(std::filesystem::path const& path) : _library{ path }, _symbols{ _Load(_library) } {
-  if (Call<Operation::VERSION>() != SDLRDP_ABI_VERSION)
-    throw std::runtime_error("RDP backend ABI version mismatch (expected " + std::to_string(SDLRDP_ABI_VERSION) + ")");
+  if (auto const found = Call<Operation::VERSION>(); found != SDLRDP_ABI_VERSION)
+    throw AbiMismatch{ found, SDLRDP_ABI_VERSION };
   SDL_ClearError();
 }
 auto Backend::_Load(Library const& library) -> BackendSymbols {
   auto symbols = LoadSymbols(library, std::make_index_sequence<std::tuple_size_v<BackendSymbols>>{ });
   if (!std::apply([](auto... symbol) { return (... && (symbol != nullptr)); }, symbols))
-    throw std::runtime_error(SDL_GetError());
+    throw RelayedFailure{ SDL_GetError() };
   return symbols;
 }
 auto LoadLibrary(std::filesystem::path const& path) -> SDL_SharedObject* {
@@ -28,7 +28,7 @@ auto LoadLibrary(std::filesystem::path const& path) -> SDL_SharedObject* {
 auto OpenSession(Backend const& backend, sdlrdp_config const& config) -> SessionValue {
   sdlrdp_handle* handle{ };
   if (backend.Call<Operation::OPEN>(&config, &handle) != 0)
-    throw std::runtime_error(backend.Call<Operation::LAST_ERROR>());
+    throw RelayedFailure{ backend.Call<Operation::LAST_ERROR>() };
   return { backend, handle };
 }
 auto CloseSession(SessionValue const& session) noexcept -> void {

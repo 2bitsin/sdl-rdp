@@ -4,6 +4,7 @@
 #include "window.hpp"
 #include <oxbox/utilities/hash.hpp>
 #include <sdl-rdp/SDL3/rdp/backend/boundary.hpp>
+#include <sdl-rdp/SDL3/rdp/exceptions.hpp>
 #include <sdl-rdp/SDL3/rdp/input/mouse.hpp>
 #include <sdl-rdp/SDL3/rdp/settings/constants.hpp>
 #include <sdl-rdp/SDL3/rdp/settings/parsing.hpp>
@@ -75,11 +76,11 @@ auto DesktopDisplayMode(Driver const& driver) -> SDL_DisplayMode {
 auto InitDisplay(SDL_VideoData& data) -> void {
   auto const mode = DesktopDisplayMode(data.Backend());
   data.Display(SDL_AddBasicVideoDisplay(&mode));
-  if (!data.Display()) throw std::runtime_error(SDL_GetError());
+  if (!data.Display()) throw RelayedFailure{ SDL_GetError() };
   auto const properties = SDL_GetDisplayProperties(data.Display());
   UpdateDrives(data.Backend(), properties);
   if (!SDL_SetNumberProperty(properties, SDL_PROP_DISPLAY_RDP_PORT_NUMBER, data.Backend().Call<Operation::PORT>()))
-    throw std::runtime_error(SDL_GetError());
+    throw RelayedFailure{ SDL_GetError() };
 }
 constexpr auto StandardModes = std::to_array<std::pair<int, int>>({
     { 320 , 200  },

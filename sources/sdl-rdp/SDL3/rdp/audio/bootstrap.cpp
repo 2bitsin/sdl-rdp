@@ -23,8 +23,7 @@ auto PeriodFrames(int frequency) -> int {
 }
 auto AudioLead(Driver const& driver) -> std::uint64_t {
   auto const lead = driver.Options().Integer(SDL_HINT_RDP_AUDIO_LEAD, DefaultLeadMs, 0, SDL_MAX_SINT32);
-  if (std::cmp_greater_equal(lead, driver.Config().audio_latency_ms))
-    InvalidSetting("RDP audio lead must be below the audio latency window");
+  if (std::cmp_greater_equal(lead, driver.Config().audio_latency_ms)) InvalidSetting<LeadTooLong>();
   return static_cast<std::uint64_t>(lead) * SDL_NS_PER_MS;
 }
 auto OpenAudio(Driver const& driver) -> std::reference_wrapper<Driver const> {

@@ -1,8 +1,10 @@
 #include <sdl-rdp/auth/certificate.hpp>
 
+#include <sdl-rdp/auth/exceptions.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/descriptor.hpp>
+#include <sdl-rdp/utilities/exceptions.hpp>
 #include <sdl-rdp/utilities/system-call.hpp>
 
 #include <freerdp/crypto/certificate.h>
@@ -18,7 +20,6 @@
 #include <fcntl.h>
 #include <memory>
 #include <mutex>
-#include <stdexcept>
 #include <string>
 #include <sys/file.h>
 #include <sys/stat.h>
@@ -49,13 +50,12 @@ template <FreeRDP_Settings_Keys_Pointer KEY, typename VTy, auto RELEASE>
 auto Adopt(rdpSettings& settings, std::unique_ptr<VTy, Releases<RELEASE>> owned) -> void {
   Expects(owned != nullptr, "the server credential loaded");
   // These pointer setters transfer ownership despite the generic API's copy documentation.
-  if (!freerdp_settings_set_pointer_len(&settings, KEY, owned.get(), 1))
-    throw std::runtime_error("FreeRDP refused a server credential.");
+  if (!freerdp_settings_set_pointer_len(&settings, KEY, owned.get(), 1)) throw CredentialFailed{ "installation" };
   std::ignore = owned.release();
 }
 auto Hostname() -> std::string {
   std::array<char, 256> name{ };
-  if (gethostname(name.data(), name.size() - 1)) throw std::runtime_error("Hostname unavailable.");
+  SystemCall(gethostname(name.data(), name.size() - 1), "Hostname");
   return name.data();
 }
 auto Stamp(X509& cert) -> bool {
@@ -78,14 +78,14 @@ auto Identify(X509& cert, EVP_PKEY* key, std::string const& host) -> bool {
 auto SelfSigned(EVP_PKEY* key) -> Certificate {
   Expects(key != nullptr, "RSA key exists");
   Certificate cert(X509_new());
-  if (!cert) throw std::runtime_error("Certificate allocation failed.");
+  if (!cert) throw AllocationFailed{ "Certificate" };
   if (!Stamp(*cert) || !Identify(*cert, key, Hostname()) || !X509_sign(cert.get(), key, EVP_sha256()))
-    throw std::runtime_error("Certificate signing failed.");
+    throw CredentialFailed{ "certificate signing" };
   return cert;
 }
 auto Generate(Credentials const& paths) -> void {
   Key const key(EVP_RSA_gen(2048));
-  if (!key) throw std::runtime_error("RSA key generation failed.");
+  if (!key) throw CredentialFailed{ "RSA key generation" };
   auto      cert     = SelfSigned(key.get());
   auto      fd       = open(paths.Key().c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
   Bio const key_file(fd < 0 ? nullptr : BIO_new_fd(fd, BIO_CLOSE));
@@ -95,7 +95,7 @@ auto Generate(Credentials const& paths) -> void {
   if (!key_file || !cert_file
       || !PEM_write_bio_PrivateKey(key_file.get(), key.get(), nullptr, nullptr, 0, nullptr, nullptr)
       || !PEM_write_bio_X509(cert_file.get(), cert.get()))
-    throw std::runtime_error("Credential writing failed.");
+    throw CredentialFailed{ "writing" };
 }
 }
 auto EnsureCertificate(Credentials const& credentials) -> void {
@@ -103,8 +103,7 @@ auto EnsureCertificate(Credentials const& credentials) -> void {
   static std::mutex      generation_guard;
   std::scoped_lock const lock(generation_guard);
   if (!directory.parent_path().empty()) std::filesystem::create_directories(directory.parent_path());
-  if (mkdir(directory.c_str(), 0700) && errno != EEXIST)
-    throw std::runtime_error("Certificate directory creation failed.");
+  if (mkdir(directory.c_str(), 0700) && errno != EEXIST) throw CertificateDirectoryFailed{ directory.native() };
   DirectoryLock const process_lock(directory);
   std::filesystem::permissions(directory, std::filesystem::perms::owner_all);
   if (!credentials.Exist()) Generate(credentials);
@@ -116,8 +115,8 @@ auto EnsureCertificate(Credentials const& credentials) -> void {
 auto InstallServerCredentials(rdpSettings& settings, Credentials const& credentials) -> void {
   ServerKey  key        { freerdp_key_new_from_file(credentials.Key().c_str())                 };
   ServerCert certificate{ freerdp_certificate_new_from_file(credentials.Certificate().c_str()) };
-  if (!key) throw std::runtime_error("Server private key failed to load.");
-  if (!certificate) throw std::runtime_error("Server certificate failed to load.");
+  if (!key) throw CredentialFailed{ "private key loading" };
+  if (!certificate) throw CredentialFailed{ "certificate loading" };
   Adopt<FreeRDP_RdpServerRsaKey>(settings, std::move(key));
   Adopt<FreeRDP_RdpServerCertificate>(settings, std::move(certificate));
 }

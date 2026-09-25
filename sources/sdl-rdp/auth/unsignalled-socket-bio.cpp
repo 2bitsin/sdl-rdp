@@ -1,12 +1,13 @@
 #include "_detail/unsignalled-socket-bio.hpp"
 
+#include <sdl-rdp/auth/exceptions.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
+#include <sdl-rdp/utilities/exceptions.hpp>
 
 #include <cerrno>
 #include <cstddef>
 #include <memory>
-#include <stdexcept>
 #include <string_view>
 #include <sys/socket.h>
 #include <tuple>
@@ -93,11 +94,11 @@ auto Destroy(BIO* bio) noexcept -> int {
 }
 auto NewMethod() -> Method {
   Method method{ BIO_meth_new(BIO_get_new_index() | BIO_TYPE_SOURCE_SINK, "sdl-rdp unsignalled socket") };
-  if (!method) throw std::runtime_error("Socket BIO method allocation failed.");
+  if (!method) throw AllocationFailed{ "Socket BIO method" };
   auto* const filling = method.get();
   if (!BIO_meth_set_write(filling, Write) || !BIO_meth_set_read(filling, Read) || !BIO_meth_set_ctrl(filling, Control)
       || !BIO_meth_set_create(filling, Create) || !BIO_meth_set_destroy(filling, Destroy))
-    throw std::runtime_error("Socket BIO method setup failed.");
+    throw BioMethodSetupFailed{ };
   return method;
 }
 auto SharedMethod() -> BIO_METHOD const* {
@@ -110,7 +111,7 @@ auto SharedMethod() -> BIO_METHOD const* {
 auto UnsignalledSocketBio(int socket) -> Bio {
   Expects(socket >= 0, "the socket is open");
   Bio bio{ BIO_new(SharedMethod()) };
-  if (!bio) throw std::runtime_error("Socket BIO allocation failed.");
+  if (!bio) throw AllocationFailed{ "Socket BIO" };
   std::ignore = BIO_set_fd(bio.get(), socket, BIO_NOCLOSE);
   return bio;
 }

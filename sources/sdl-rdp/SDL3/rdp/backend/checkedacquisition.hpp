@@ -1,8 +1,8 @@
 #pragma once
 #include "sdl-internals.hpp"
+#include <sdl-rdp/SDL3/rdp/exceptions.hpp>
 #include <concepts>
 #include <functional>
-#include <stdexcept>
 #include <utility>
 namespace sdl3::rdp::backend::detail::checkedacquisition {
 template <auto ACQUIRE>
@@ -12,7 +12,7 @@ public:
     requires std::invocable<decltype(ACQUIRE), ArgsTy...>
   auto operator()(ArgsTy&&... args) const -> decltype(auto) {
     auto value = std::invoke(ACQUIRE, std::forward<ArgsTy>(args)...);
-    if (!value) throw std::runtime_error(SDL_GetError());
+    if (!value) throw RelayedFailure{ SDL_GetError() };
     return value;
   }
 };

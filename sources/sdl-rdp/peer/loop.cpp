@@ -3,6 +3,7 @@
 #include <sdl-rdp/auth/authenticator.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/logging.hpp>
+#include <sdl-rdp/freerdp-facade/exceptions.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/link/session-access.hpp>
 #include <sdl-rdp/peer/departure.hpp>
@@ -21,7 +22,6 @@
 #include <format>
 #include <memory>
 #include <ranges>
-#include <stdexcept>
 #include <utility>
 
 namespace Backend {
@@ -120,7 +120,7 @@ auto PeerLoop::Dispatch(std::stop_token const& quit, std::span<WaitHandle> handl
   WaitHandle*                                  end      { };
   try {
     end = std::ranges::copy_if(handles, signalled.begin(), Signalled).out;
-  } catch (std::runtime_error const&) {
+  } catch (EventWaitFailed const&) {
     return false;
   }
   if (result < handles.size()) std::ranges::rotate(handles, handles.begin() + result + 1);

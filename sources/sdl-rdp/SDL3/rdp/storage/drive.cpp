@@ -1,6 +1,7 @@
 #include "drive.hpp"
 #include <oxbox/utilities/text.hpp>
 #include <sdl-rdp/SDL3/rdp/backend/boundary.hpp>
+#include <sdl-rdp/SDL3/rdp/exceptions.hpp>
 #include <sdl-rdp/SDL3/rdp/owneddriver.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 #include <algorithm>
@@ -28,7 +29,7 @@ auto GrowUntilFits(std::size_t capacity, FillTy const& fill) -> std::vector<Elem
   return buffer;
 }
 auto ListDrives(Driver const& driver, std::span<sdlrdp_drive> drives) -> std::size_t {
-  if (!std::in_range<std::uint32_t>(drives.size())) throw std::length_error("Too many RDP drives");
+  if (!std::in_range<std::uint32_t>(drives.size())) throw TooManyDrives{ drives.size() };
   auto const count = driver.Call<Operation::DRIVE_LIST>(drives.data(),
                                                         ::Backend::Narrowed<std::uint32_t>(drives.size()));
   if (count < 0) driver.Throw();
@@ -39,12 +40,12 @@ auto Drives(Driver const& driver) -> std::vector<sdlrdp_drive> {
                                      [&](std::span<sdlrdp_drive> drives) { return ListDrives(driver, drives); });
 }
 auto FirstDrive(std::span<sdlrdp_drive const> drives) -> std::uint32_t {
-  if (drives.empty()) throw std::runtime_error("No RDP drive is available");
+  if (drives.empty()) throw DriveUnavailable{ "none is shared" };
   return drives.front().id;
 }
 auto NamedDrive(std::span<sdlrdp_drive const> drives, std::string const& name) -> std::uint32_t {
   auto const found = std::ranges::find_if(drives, [&](sdlrdp_drive const& drive) { return name == drive.name; });
-  if (found == drives.end()) throw std::runtime_error("RDP drive unavailable: " + name);
+  if (found == drives.end()) throw DriveUnavailable{ name };
   return found->id;
 }
 auto OpenHandle(Driver const& driver, std::uint32_t drive, std::string const& path, std::uint32_t flags)
@@ -194,7 +195,7 @@ auto OpenDriveFile(std::shared_ptr<Driver const> driver, std::uint32_t drive, st
 auto SDLCALL OpenFile(char const* drive, char const* path, char const* mode) -> SDL_IOStream* {
   return Boundary([&] {
     auto const file_path = Text(path);
-    if (!file_path) throw std::invalid_argument("Invalid RDP file path");
+    if (!file_path) throw InvalidFilePath{ };
     FileMode const file_mode { Text(mode).value_or("") };
     auto           driver    = Rendezvous::Acquire();
     auto const     id        = DriveId(*driver, DriveName(drive));

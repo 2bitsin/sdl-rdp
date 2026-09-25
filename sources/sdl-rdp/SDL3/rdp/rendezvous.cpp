@@ -1,4 +1,5 @@
 #include "rendezvous.hpp"
+#include "exceptions.hpp"
 #include <sdl-rdp/SDL3/rdp/backend/resources.hpp>
 #include <memory>
 #include <stdexcept>
@@ -13,13 +14,13 @@ auto SDLCALL Rendezvous::_Cleanup([[maybe_unused]] void* unused, void* value) ->
 }
 auto Rendezvous::_Published() -> Rendezvous& {
   auto const properties = SDL_GetGlobalProperties();
-  if (!properties) throw std::runtime_error(SDL_GetError());
+  if (!properties) throw RelayedFailure{ SDL_GetError() };
   ScopedPropertiesLock const lock{ properties };
   if (!SDL_GetPointerProperty(properties, RendezvousProperty, nullptr)) {
     auto owner = std::make_unique<Rendezvous>();
     // SDL owns the published value and hands it back to _Cleanup, also when publishing fails.
     if (!SDL_SetPointerPropertyWithCleanup(properties, RendezvousProperty, owner.release(), _Cleanup, nullptr))
-      throw std::runtime_error(SDL_GetError());
+      throw RelayedFailure{ SDL_GetError() };
   }
   return *static_cast<Rendezvous*>(SDL_GetPointerProperty(properties, RendezvousProperty, nullptr));
 }

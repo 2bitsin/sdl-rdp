@@ -1,21 +1,19 @@
 #include <sdl-rdp/session/session.hpp>
 
 #include <sdl-rdp/audio/channel.hpp>
+#include <sdl-rdp/freerdp-facade/manual-reset-event.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/event-queue.hpp>
 #include <sdl-rdp/peer/peer.hpp>
 
 #include <winpr/synch.h>
 #include <cstdint>
-#include <stdexcept>
 #include <utility>
 
 namespace Backend {
 namespace {
 auto ReapSignal() -> EventHandle {
-  EventHandle signal{ CreateEvent(nullptr, true, false, nullptr) };
-  if (!signal) throw std::runtime_error("peer reaping event allocation failed");
-  return signal;
+  return sdl_rdp::freerdp_facade::ManualResetEvent("Peer reaping event");
 }
 auto AnnounceDeparture(Session& session, EventQueue& events, Peer const& peer) -> void {
   auto const* sound = peer.Redirected().Audio();

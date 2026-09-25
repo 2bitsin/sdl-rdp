@@ -37,7 +37,7 @@ std::array<std::pair<std::uint32_t, char const*>, 13> constexpr FailureStatusNam
     { STATUS_SHARING_VIOLATION    , "STATUS_SHARING_VIOLATION (0xc0000043)"     },
     { STATUS_NOT_SUPPORTED        , "STATUS_NOT_SUPPORTED (0xc00000bb)"         },
     { STATUS_UNSUCCESSFUL         , "STATUS_UNSUCCESSFUL (0xc0000001)"          },
-    { 0xdeadbeef                  , "NTSTATUS 0xdeadbeef"                       },
+    { 0xdeadbeef                  , "unknown NTSTATUS (0xdeadbeef)"             },
 } };
 }
 

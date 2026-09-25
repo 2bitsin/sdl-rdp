@@ -1,12 +1,12 @@
 #pragma once
 
+#include <sdl-rdp/utilities/exceptions.hpp>
+
 #include <oxbox/platform/contract.hpp>
 #include <algorithm>
 #include <array>
 #include <optional>
 #include <source_location>
-#include <stdexcept>
-#include <string>
 #include <string_view>
 #include <utility>
 
@@ -41,7 +41,7 @@ template <typename VTy>
 auto Required(std::optional<VTy> value, std::string_view text,
               std::source_location where = std::source_location::current()) -> VTy {
   Checked::Expects(value.has_value(), text, where);
-  if (!value) throw std::invalid_argument(std::string(text));
+  if (!value) throw ::Backend::MissingRequired{ text };
   return *std::move(value);
 }
 

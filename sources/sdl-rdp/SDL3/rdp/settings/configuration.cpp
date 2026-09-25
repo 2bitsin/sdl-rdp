@@ -53,7 +53,7 @@ auto Authentication(std::optional<std::string> const& mode, bool has_password) -
   case "none"_hash: return SDLRDP_AUTH_NONE;
   case "tls"_hash:  return SDLRDP_AUTH_TLS;
   case "nla"_hash:  return SDLRDP_AUTH_NLA;
-  default:          InvalidSetting("Invalid SDL_RDP_AUTH '" + mode.value_or("") + "'; valid names: none, tls, nla");
+  default:          InvalidSetting<UnknownName>("SDL_RDP_AUTH", mode.value_or(""), "none, tls, nla");
   }
 }
 }

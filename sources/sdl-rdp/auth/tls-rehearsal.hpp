@@ -1,6 +1,6 @@
 #pragma once
 #include <sdl-rdp/auth/certificate.hpp>
-#include <sdl-rdp/freerdp-facade/releases-peer.hpp>
+#include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/utilities/socket-pair.hpp>
 
 #include <chrono>
