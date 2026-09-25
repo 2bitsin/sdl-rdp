@@ -10,11 +10,13 @@ InputClient::InputClient(Headless::Client& client) {
   advanced = nullptr;
   touch    = nullptr;
   freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
-  auto*                      context = client.Instance()->context;
-  std::array<char const*, 1> ainput  { AINPUT_CHANNEL_NAME };
-  std::array<char const*, 1> rdpei   { RDPEI_CHANNEL_NAME  };
-  Expects(freerdp_client_add_dynamic_channel(context->settings, 1, ainput.data()), "ainput enabled");
-  Expects(freerdp_client_add_dynamic_channel(context->settings, 1, rdpei.data()), "rdpei enabled");
+  auto*                      context        = client.Instance()->context;
+  std::array<char const*, 1> ainput         { AINPUT_CHANNEL_NAME };
+  std::array<char const*, 1> rdpei          { RDPEI_CHANNEL_NAME  };
+  auto const                 advanced_added = freerdp_client_add_dynamic_channel(context->settings, 1, ainput.data());
+  Expects(advanced_added, "ainput enabled");
+  auto const touch_added = freerdp_client_add_dynamic_channel(context->settings, 1, rdpei.data());
+  Expects(touch_added, "rdpei enabled");
   // abi: pChannelConnectedEventHandler
   PubSub_SubscribeChannelConnected(context->pubSub, [](void* /*unused*/, ChannelConnectedEventArgs const* event) {
     Expects(event, "event is supplied");

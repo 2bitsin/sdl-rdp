@@ -30,7 +30,7 @@ protected:
     SDL_Log("trace CLIPBOARD server request=1 bytes=3f3f3f7700 text=???w");
     ASSERT_TRUE(Read("event CLIPBOARD text=żółw"));
   }
-  auto GivenFocusedClient(Client const& first) -> void {
+  auto GivenFocusedClient(Client& first) -> void {
     ASSERT_NO_FATAL_FAILURE(Connect(first));
     ASSERT_TRUE(Read("event FOCUS_GAINED "));
     ASSERT_TRUE(Read("event MOUSE_ENTER "));
@@ -65,10 +65,10 @@ TEST_F(DesktopSample, RequestedSizeReturns) {
 
 TEST_F(DesktopSample, TakeoverFocus) {
   ASSERT_NO_FATAL_FAILURE(GivenProcess());
-  auto         port  = AnnouncedPort(line);
-  Client const first(port, true, 640, 480);
+  auto   port  = AnnouncedPort(line);
+  Client first(port, true, 640, 480);
   ASSERT_NO_FATAL_FAILURE(GivenFocusedClient(first));
-  Client const second(port, true, 640, 480);
+  Client second(port, true, 640, 480);
   ASSERT_NO_FATAL_FAILURE(Connect(second));
   for (auto const* expected : { "OCCLUDED", "FOCUS_LOST", "MOUSE_LEAVE", "EXPOSED", "FOCUS_GAINED", "MOUSE_ENTER" }) {
     ASSERT_NO_FATAL_FAILURE(ThenTakeoverEvent(expected));
@@ -89,7 +89,7 @@ TEST_F(DesktopSample, AutoAvcCodecProperty) {
 
 TEST_F(DesktopSample, LiveCodec) {
   ASSERT_NO_FATAL_FAILURE(GivenProcess({ "SDL_RDP_CODEC=remotefx" }));
-  auto const client = AnnouncedClient(640, 480);
+  auto client = AnnouncedClient(640, 480);
   ASSERT_NO_FATAL_FAILURE(GivenSwitchableCodec(client));
   ASSERT_TRUE(Read("event EXPOSED "));
   ASSERT_TRUE(line.ends_with("codec=remotefx")) << line;
@@ -104,7 +104,7 @@ TEST_F(DesktopSample, WaitForClient) {
   while (!(port = ListeningPort()) && Clock::now() < deadline) std::this_thread::sleep_for(1ms);
   ASSERT_GT(port, 0u) << "sample's ephemeral listener: " << process->Transcript();
   ASSERT_FALSE(Read("port ", 300ms)) << "no port line before client: " << process->Transcript();
-  Client const client(port, true, 640, 480);
+  Client client(port, true, 640, 480);
   ASSERT_NO_FATAL_FAILURE(Connect(client));
   ASSERT_NO_FATAL_FAILURE(ThenWaitingPort(port));
   ASSERT_NO_FATAL_FAILURE(Exposed());

@@ -61,7 +61,8 @@ Presenter::Presenter(Diagnostics const& diagnostics, FrameStore& frames, Session
       _configuration{ configuration } { }
 auto Presenter::Present(std::span<std::uint8_t const> pixels, sdl_rdp::picture::FrameLayout const& layout,
                         std::span<sdlrdp_rect const> damage) -> void {
-  Expects(pixels.size() >= layout.Bytes(), "source framebuffer covers every row");
+  auto const bytes = layout.Bytes();
+  Expects(pixels.size() >= bytes, "source framebuffer covers every row");
   auto const size  = layout.Size();
   auto const pitch = layout.Pitch();
   ValidateDamage(damage, size);

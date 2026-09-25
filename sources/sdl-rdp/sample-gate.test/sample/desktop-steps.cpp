@@ -53,14 +53,14 @@ auto SampleDesktopSteps::ThenWaitingPort(std::uint32_t port) -> void {
   ASSERT_TRUE(Read("port ")) << "port after connection: " << process->Transcript();
   ASSERT_EQ(AnnouncedPort(line), port) << line;
 }
-auto SampleDesktopSteps::WhenCodecKeyChanges(Client const& client) -> void {
+auto SampleDesktopSteps::WhenCodecKeyChanges(Client& client) -> void {
   auto* input = client.Instance()->context->input;
   ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x3b));
   ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x3b));
   ASSERT_TRUE(Read("event CODEC_CHANGED codec=nscodec")) << process->Transcript();
   SDL_Log("%s", process->Transcript().c_str());
 }
-auto SampleDesktopSteps::GivenSwitchableCodec(Client const& client) -> void {
+auto SampleDesktopSteps::GivenSwitchableCodec(Client& client) -> void {
   auto* settings = client.Instance()->context->settings;
   ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_RemoteFxCodec, true));
   ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_NSCodec, true));
@@ -79,11 +79,11 @@ auto SampleDesktopSteps::WhenSmallerDesktop(Client& first) -> void {
   ASSERT_TRUE(first.Disconnect());
   ASSERT_TRUE(Read("event FOCUS_LOST "));
 }
-auto SampleDesktopSteps::WhenWholeSampleReconnects(Client const& client, std::uint32_t port) -> void {
+auto SampleDesktopSteps::WhenWholeSampleReconnects(Client& client, std::uint32_t port) -> void {
   ASSERT_TRUE(client.Disconnect()) << "disconnect";
   ASSERT_TRUE(Read("event OCCLUDED ")) << "OCCLUDED: " << process->Transcript();
   ASSERT_TRUE(Read("event FOCUS_LOST ")) << "FOCUS_LOST: " << process->Transcript();
-  Client const second(port, true, 640, 480);
+  Client second(port, true, 640, 480);
   ASSERT_NO_FATAL_FAILURE(Connect(second));
   ASSERT_NO_FATAL_FAILURE(Exposed());
   Escape(second);

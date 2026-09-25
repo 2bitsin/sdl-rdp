@@ -108,8 +108,8 @@ auto EnsureCertificate(Credentials const& credentials) -> void {
   if (!credentials.Exist()) Generate(credentials);
   std::filesystem::permissions(credentials.Key(),
                                std::filesystem::perms::owner_read | std::filesystem::perms::owner_write);
-  Ensures(exists(credentials.Certificate()), "certificate exists");
-  Ensures(exists(credentials.Key()), "private key exists");
+  Ensures(std::filesystem::exists(credentials.Certificate()), "certificate exists");
+  Ensures(std::filesystem::exists(credentials.Key()), "private key exists");
 }
 auto InstallServerCredentials(rdpSettings& settings, Credentials const& credentials) -> void {
   ServerKey  key        { freerdp_key_new_from_file(credentials.Key().c_str())                 };

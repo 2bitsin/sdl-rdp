@@ -26,7 +26,7 @@ auto ResidentBytes() -> std::size_t {
   return pages[1] * Backend::Narrowed<std::size_t>(sysconf(_SC_PAGESIZE));
 }
 }
-auto Gate::ThenPictureDesktop(Client const& client) -> void {
+auto Gate::ThenPictureDesktop(Client& client) -> void {
   EXPECT_EQ(client.Instance()->context->gdi->width, 640);
   EXPECT_EQ(client.Instance()->context->gdi->height, 480);
   EXPECT_FALSE(logs.Contains("failed"));

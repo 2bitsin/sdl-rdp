@@ -108,7 +108,7 @@ protected:
     EXPECT_EQ(display.Observed().desktops, expected);
     EXPECT_EQ(display.Observed().echoes, display.Observed().echo_resize ? expected : 0u);
   }
-  static auto ThenFinalDesktop(Client const& client, Backend::Extent last) -> void {
+  static auto ThenFinalDesktop(Client& client, Backend::Extent last) -> void {
     EXPECT_EQ(client.Instance()->context->gdi->width, static_cast<std::int32_t>(last.width));
     EXPECT_EQ(client.Instance()->context->gdi->height, static_cast<std::int32_t>(last.height));
     EXPECT_FALSE(freerdp_shall_disconnect_context(client.Instance()->context));

@@ -87,9 +87,10 @@ auto AudioSession::ConnectAudio(Client& client, SoundClient& audio) -> void {
   ASSERT_TRUE(audio_connected(EventsUntil(audio_connected, true, [&client] { return client.Pump(); }))) << logs.Text();
 }
 auto AudioSession::RunRealtimeAudio(Client& client, SoundClient& audio) -> void {
-  Expects(backend.Handle() != nullptr, "backend exists");
+  auto* const handle = backend.Handle();
+  Expects(handle != nullptr, "backend exists");
   Expects(audio.CaptureState().opened, "client audio channel is open");
-  auto writing = std::async(std::launch::async, [&] { return WriteRealtimeAudio(backend.Handle()); });
+  auto writing = std::async(std::launch::async, [&] { return WriteRealtimeAudio(handle); });
   ConfirmDelayedAudio(client, audio,
                       { .frames = 96000, .delay = std::chrono::milliseconds(150), .timeout = std::chrono::seconds(4) });
   sdlrdp_audio_close(backend.Handle());

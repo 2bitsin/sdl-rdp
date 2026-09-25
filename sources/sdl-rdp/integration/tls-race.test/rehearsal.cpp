@@ -139,8 +139,8 @@ auto ConnectToOpenedBackend(std::string const& certificates) -> int {
   auto const backend = OpenedBackend(certificates);
   if (!backend) return FailedOtherwise;
   MethodFill::Shared().Arm(Race::TlsMethod, Setter::Write);
-  Headless::Client const client(sdlrdp_port(backend.Handle()), false);
-  auto const             connected = client.Connect();
+  Headless::Client client(sdlrdp_port(backend.Handle()), false);
+  auto const       connected = client.Connect();
   return (connected ? 0 : FailedOtherwise) | (MethodFill::Shared().Fills() != 0 ? MethodFilledLate : 0);
 }
 auto OpenFailsWithMessage(std::string const& certificates) -> int {

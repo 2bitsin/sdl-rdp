@@ -4,12 +4,15 @@
 #include <sdl-rdp/utilities/rect.hpp>
 
 #include <cstdint>
+#include <source_location>
 #include <utility>
 
 namespace Backend {
 namespace {
-auto Consistent(FrameSnapshot const& shadow, PictureGeometry const& geometry) -> bool {
-  return !shadow || SameSize(shadow.Bounds(), geometry.Bounds());
+auto EnsureConsistent(FrameSnapshot const& shadow, PictureGeometry const& geometry,
+                      std::source_location where = std::source_location::current()) -> void {
+  auto const consistent = !shadow || SameSize(shadow.Bounds(), geometry.Bounds());
+  Ensures(consistent, "the shadow has the picture's size", where);
 }
 auto Blank(sdlrdp_rect bounds) -> FrameSnapshot {
   Extent const size{ .width = Narrowed<std::uint32_t>(bounds.w), .height = Narrowed<std::uint32_t>(bounds.h) };
@@ -53,14 +56,14 @@ auto FrameStore::Publish(FrameLock const& held, std::shared_ptr<std::vector<std:
   std::ignore = _geometry.Resize(size);
   _shadow     = { std::move(next), size };
   ++_presented;
-  Ensures(Consistent(_shadow, _geometry), "the shadow has the picture's size");
+  EnsureConsistent(_shadow, _geometry);
   return resized;
 }
 auto FrameStore::Ensure(FrameLock const& held) -> bool {
   Expects(Holds(held), "creating a picture holds the frame lock");
   if (_shadow) return false;
   _shadow = Blank(_geometry.Bounds());
-  Ensures(Consistent(_shadow, _geometry), "the shadow has the picture's size");
+  EnsureConsistent(_shadow, _geometry);
   return true;
 }
 auto FrameStore::Resize(FrameLock const& held, Extent size) -> bool {
@@ -68,7 +71,7 @@ auto FrameStore::Resize(FrameLock const& held, Extent size) -> bool {
   if (!_geometry.Resize(size)) return false;
   _shadow = Blank(_geometry.Bounds());
   ++_presented;
-  Ensures(Consistent(_shadow, _geometry), "the shadow has the picture's size");
+  EnsureConsistent(_shadow, _geometry);
   return true;
 }
 auto FrameStore::SetAspect(FrameLock const& held, sdlrdp_aspect value) -> void {

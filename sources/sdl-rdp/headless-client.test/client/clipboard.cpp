@@ -83,8 +83,9 @@ ClipboardClient::ClipboardClient(Client& value, std::vector<std::uint8_t> initia
     : client(value), outgoing(std::move(initial)) {
   ObserverSet::Of(*client.Instance()->context).Add(*this);
   freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
-  auto* context = client.Instance()->context;
-  Expects(freerdp_settings_set_bool(context->settings, FreeRDP_RedirectClipboard, true), "clipboard enabled");
+  auto*      context    = client.Instance()->context;
+  auto const redirected = freerdp_settings_set_bool(context->settings, FreeRDP_RedirectClipboard, true);
+  Expects(redirected, "clipboard enabled");
   PubSub_SubscribeChannelConnected(context->pubSub, Callbacks::ChannelConnected);
   // abi: pLoadChannels, BOOL is int
   client.Instance()->LoadChannels = [](freerdp* instance) -> int {

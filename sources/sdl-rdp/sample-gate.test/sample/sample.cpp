@@ -21,7 +21,7 @@ auto Sample::ThenIgnoredWarpMotion(Client& client, rdpInput* input, std::uint16_
   EXPECT_TRUE(line.contains(delta)) << line;
   if (x == 630) ASSERT_TRUE(client.Until([&] { return Position().Count() > 0; }));
 }
-auto Sample::GivenRelativeOrigin(Client const& client) -> void {
+auto Sample::GivenRelativeOrigin(Client& client) -> void {
   ASSERT_TRUE(freerdp_input_send_mouse_event(client.Instance()->context->input, PTR_FLAGS_MOVE, 200, 150));
   ASSERT_TRUE(Read("event MOUSE_MOTION "));
   ASSERT_NO_FATAL_FAILURE(WhenRelative(client));
@@ -82,7 +82,7 @@ auto Sample::ThenStoppedUnicode(rdpInput* input) -> void {
   EXPECT_EQ(process->Transcript().find("event TEXT_INPUT", stopped), std::string::npos);
   SDL_Log("gate TEXT_STOPPED no_TEXT_INPUT=1 scancode_key=97 layout=0x040c");
 }
-auto Sample::GivenFrenchKeyboard(Client const& client) -> void {
+auto Sample::GivenFrenchKeyboard(Client& client) -> void {
   ASSERT_TRUE(freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_KeyboardLayout, 0x40c));
   ASSERT_TRUE(client.Connect());
   ASSERT_TRUE(Read("event EXPOSED "));

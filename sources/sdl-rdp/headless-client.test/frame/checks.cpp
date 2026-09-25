@@ -85,7 +85,7 @@ auto FrameChecks::SuppressAndCheckInput(Client& client) -> void {
   ASSERT_EQ(suppressed.size(), 1u);
   ASSERT_EQ(suppressed.front().type, SDLRDP_KEY);
 }
-auto FrameChecks::ThenDesktopGeometry(Client const& client, std::uint32_t w, std::uint32_t h) -> void {
+auto FrameChecks::ThenDesktopGeometry(Client& client, std::uint32_t w, std::uint32_t h) -> void {
   EXPECT_EQ(client.Instance()->context->gdi->width, int(w));
   EXPECT_EQ(client.Instance()->context->gdi->height, int(h));
 }
@@ -130,7 +130,7 @@ auto FrameChecks::ThenProducerFrame(Client& client, FrameObserver& observer, std
   testing::Test::RecordProperty("presents", std::to_string(presents.load()));
   testing::Test::RecordProperty("acknowledged_frames", std::to_string(observer.Frames().size()));
 }
-auto FrameChecks::ThenReadable(Client const& client) -> void {
+auto FrameChecks::ThenReadable(Client& client) -> void {
   std::array<Backend::WaitHandle, 64> handles{ };
   auto count = freerdp_get_event_handles(client.Instance()->context, handles.data(), handles.size());
   ASSERT_GT(count, 0u);

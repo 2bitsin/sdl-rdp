@@ -44,7 +44,7 @@ DriveObserver::~DriveObserver() {
   instance->ReceiveChannelData = original;
   active                       = nullptr;
 }
-auto DriveObserver::Send(sdl_rdp::drive::DrivePacket const& packet) const -> bool {
+auto DriveObserver::Send(sdl_rdp::drive::DrivePacket const& packet) -> bool {
   return SendStaticChannel(instance, RDPDR_CHANNEL_NAME,
                            oxbox::utilities::SpanCast<std::uint8_t const>(std::span(packet.Bytes())));
 }

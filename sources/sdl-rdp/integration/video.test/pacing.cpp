@@ -94,15 +94,17 @@ TEST_F(RoundFive, SparseRegions) {
 
 namespace {
 auto WaitForAcknowledgement(sdlrdp_handle& handle) -> bool {
-  auto& frames = handle.Frames();
-  auto  lock   = frames.Lock();
-  Expects(handle.Session().Current(lock).has_value(), "active peer owns the pending frame");
+  auto&      frames  = handle.Frames();
+  auto       lock    = frames.Lock();
+  auto const current = handle.Session().Current(lock);
+  Expects(current.has_value(), "active peer owns the pending frame");
   return frames.WaitFor(lock, Backend::DeadlineAfter(std::chrono::seconds(10)),
                         [&] { return AllAcknowledged(handle, lock); });
 }
 }
 TEST_F(RoundFive, WaitWithoutRefreshFeedback) {
-  Expects(backend.Handle() == nullptr, "backend has not opened");
+  auto const* const existing = backend.Handle();
+  Expects(existing == nullptr, "backend has not opened");
   ASSERT_NO_FATAL_FAILURE(Open(320, 200));
   Client client(sdlrdp_port(backend.Handle()), true);
   ASSERT_NO_FATAL_FAILURE(Connect(client));
@@ -160,7 +162,7 @@ TEST_F(RoundFive, ProducerDoesNotStarveOrTear) {
 
 TEST_F(RoundFive, AutoPrefersRemoteFX) {
   ASSERT_NO_FATAL_FAILURE(Open(320, 200, { }, SDLRDP_CODEC_AUTO));
-  Client const client(sdlrdp_port(backend.Handle()), true);
+  Client client(sdlrdp_port(backend.Handle()), true);
   ASSERT_TRUE(client.Connect()) << logs.Text(true);
   ThenConnectedCodec(client, SDLRDP_CODEC_REMOTEFX);
 }

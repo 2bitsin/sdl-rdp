@@ -6,6 +6,7 @@ import pytest
 import clones
 import cmake
 import columns
+import contracts
 import format as formatter
 import includes
 import pointers
@@ -59,3 +60,7 @@ def test_prefixes():
 
 def test_pointers():
     assert pointers.main(['--baseline', str(LINT / 'pointers.baseline')]) == 0
+
+
+def test_contracts():
+    assert contracts.main() == 0

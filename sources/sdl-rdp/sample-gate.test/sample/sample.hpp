@@ -9,7 +9,7 @@ protected:
   auto ThenTouchEvent(Client& client, std::string_view event, std::string_view detail) -> void;
   auto ThenIgnoredWarpMotion(Client& client, rdpInput* input, std::uint16_t x, std::uint16_t y, char const* delta)
       -> void;
-  auto GivenRelativeOrigin(Client const& client)                                       -> void;
+  auto GivenRelativeOrigin(Client& client)                                             -> void;
   auto WhenUnicodeControl(rdpInput* input, int code)                                   -> void;
   auto ThenStoppedScancodeText(std::size_t stopped)                                    -> void;
   auto WhenReverseWheel(Client& client, auto* advanced)                                -> void {
@@ -24,6 +24,6 @@ protected:
   auto WhenRelativeWarp(Client& client, rdpInput* input)                                               -> void;
   auto WhenPreciseWheel(rdpInput* input, std::uint16_t flags, char const* expected)                    -> void;
   auto ThenStoppedUnicode(rdpInput* input)                                                             -> void;
-  auto GivenFrenchKeyboard(Client const& client)                                                       -> void;
+  auto GivenFrenchKeyboard(Client& client)                                                             -> void;
 };
 }

@@ -16,14 +16,16 @@
 namespace Headless {
 namespace {
 auto ReadSoundFormats(wStream* stream, SoundCapture& capture) -> void {
-  Expects(Stream_GetRemainingLength(stream) >= 20, "server format header complete");
+  auto const remaining = Stream_GetRemainingLength(stream);
+  Expects(remaining >= 20, "server format header complete");
   Stream_Seek(stream, 14);
   std::uint16_t count = 0;
   Stream_Read_UINT16(stream, count);
   Stream_Seek(stream, 4);
   capture.server_formats.resize(count);
   std::ranges::for_each(capture.server_formats, [&](auto& format) {
-    Expects(audio_format_read(stream, &format), "server format readable");
+    auto const read = audio_format_read(stream, &format);
+    Expects(read, "server format readable");
     Expects(format.cbSize == 0, "server announces plain PCM");
   });
 }
@@ -38,7 +40,8 @@ auto SupportedSoundFormats(SoundCapture const& capture) -> std::vector<AUDIO_FOR
 }
 auto WriteSoundFormatHeader(wStream* out, SoundCapture const& capture, std::size_t count, std::size_t size) -> void {
   Expects(out != nullptr, "format reply stream exists");
-  Expects(Stream_GetRemainingCapacity(out) >= 24, "format reply header fits");
+  auto const capacity = Stream_GetRemainingCapacity(out);
+  Expects(capacity >= 24, "format reply header fits");
   oxbox::utilities::BoundedWriter writer(
       std::as_writable_bytes(std::span(static_cast<std::byte*>(Stream_Pointer(out)), 24)));
   writer.Store<std::uint8_t>(7);
@@ -52,7 +55,8 @@ auto WriteSoundFormatHeader(wStream* out, SoundCapture const& capture, std::size
   writer.Store<std::uint8_t>(0);
   writer.Store<std::uint16_t, std::endian::little>(capture.version);
   writer.Store<std::uint8_t>(0);
-  Expects(writer.Whole(), "sound format header fills its wire layout");
+  auto const filled = writer.Whole();
+  Expects(filled, "sound format header fills its wire layout");
   Stream_Seek(out, 24);
 }
 auto SoundFormatReply(SoundCapture const& capture) -> std::vector<std::uint8_t> {
@@ -62,7 +66,8 @@ auto SoundFormatReply(SoundCapture const& capture) -> std::vector<std::uint8_t> 
   auto*                     out       = Stream_StaticInit(&output, bytes.data(), bytes.size());
   WriteSoundFormatHeader(out, capture, supported.size(), bytes.size());
   std::ranges::for_each(supported, [&](auto const& format) {
-    Expects(audio_format_write(out, &format), "supported PCM format serialized");
+    auto const written = audio_format_write(out, &format);
+    Expects(written, "supported PCM format serialized");
   });
   return bytes;
 }
@@ -118,13 +123,17 @@ auto SoundProtocol::Received(SoundClient& self, std::span<std::uint8_t const> by
 }
 auto SoundProtocol::Formats(SoundClient& self, wStream* stream) -> void {
   ReadSoundFormats(stream, self.capture);
-  Expects(self.Send(SoundFormatReply(self.capture)), "client format intersection sent");
-  if (self.capture.version >= 6)
-    Expects(self.Send(std::array<std::uint8_t, 8>{ 12, 0, 4, 0, 2, 0, 0, 0 }), "quality mode sent");
+  auto const replied = self.Send(SoundFormatReply(self.capture));
+  Expects(replied, "client format intersection sent");
+  if (self.capture.version >= 6) {
+    auto const quality_sent = self.Send(std::array<std::uint8_t, 8>{ 12, 0, 4, 0, 2, 0, 0, 0 });
+    Expects(quality_sent, "quality mode sent");
+  }
   self.capture.ready = true;
 }
 auto SoundProtocol::Wave(SoundClient& self, wStream* stream, std::uint32_t size, bool second) -> void {
-  Expects(Stream_GetRemainingLength(stream) >= 12, "wave header complete");
+  auto const remaining = Stream_GetRemainingLength(stream);
+  Expects(remaining >= 12, "wave header complete");
   std::uint16_t format = 0;
   Stream_Read_UINT16(stream, self.timestamp);
   Stream_Read_UINT16(stream, format);
@@ -134,7 +143,8 @@ auto SoundProtocol::Wave(SoundClient& self, wStream* stream, std::uint32_t size,
   if (second) {
     Stream_Seek(stream, 4);
     Expects(size >= 12, "wave PDU includes its fixed header");
-    Expects(Stream_GetRemainingLength(stream) >= size - 12, "wave payload fits the remaining stream");
+    auto const remaining_after_header = Stream_GetRemainingLength(stream);
+    Expects(remaining_after_header >= size - 12, "wave payload fits the remaining stream");
     self.Capture({ static_cast<std::uint8_t const*>(Stream_Pointer(stream)), size - 12 });
   } else {
     Stream_Read(stream, self.first.data(), self.first.size());
@@ -164,15 +174,17 @@ auto SoundProtocol::CaptureWave(SoundClient& self) -> void {
   self.expecting_wave = false;
   self.Capture(std::span(self.incoming).first(self.wave_bytes));
 }
+auto SoundProtocol::Train(SoundClient& self) -> void {
+  Expects(self.incoming.size() >= 8, "training request has its header");
+  auto const answered = self.Send(std::span(self.incoming).first(8));
+  Expects(answered, "training response is sent");
+}
 auto SoundProtocol::Dispatch(SoundClient& self, wStream* stream, std::uint8_t type, std::uint16_t size) -> void {
   switch (type) {
   case 7: Formats(self, stream); break;
   case 2:
   case 13: Wave(self, stream, size, type == 13); break;
-  case 6:
-    Expects(self.incoming.size() >= 8, "training request has its header");
-    Expects(self.Send(std::span(self.incoming).first(8)), "training response is sent");
-    break;
+  case 6:  Train(self); break;
   case 1:
   case 3:  break;
   default: utilities::Unreachable(type);

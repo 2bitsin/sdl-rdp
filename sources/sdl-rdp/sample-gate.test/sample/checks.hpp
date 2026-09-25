@@ -10,8 +10,8 @@ protected:
   auto        WhenSurrogateText(rdpInput* input)                                         -> void;
   auto        WhenUnicodeText(rdpInput* input)                                           -> void;
   auto        ThenAbsoluteMouse(rdpInput* input)                                         -> void;
-  auto        WhenShiftedText(Client const& client)                                      -> void;
-  auto        WhenScancodeText(Client const& client)                                     -> void;
+  auto        WhenShiftedText(Client& client)                                            -> void;
+  auto        WhenScancodeText(Client& client)                                           -> void;
   auto        WhenNonAsciiKey(rdpInput* input)                                           -> void;
   auto        ThenUnicodeKeyEvents()                                                     -> void;
   auto        WhenUnicodeKeys(rdpInput* input)                                           -> void;

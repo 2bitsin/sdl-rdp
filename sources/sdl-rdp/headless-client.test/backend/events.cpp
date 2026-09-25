@@ -22,11 +22,11 @@ auto BackendEvents::Events(std::size_t wanted) -> std::vector<sdlrdp_event> {
 auto BackendEvents::UntilEvent(sdlrdp_event_type type, bool include_refresh) -> std::vector<sdlrdp_event> {
   return EventsUntil(Contains(type), include_refresh, [this] { return AwaitBackend(); });
 }
-auto BackendEvents::UntilEvent(Client const& client, sdlrdp_event_type type, bool include_refresh)
+auto BackendEvents::UntilEvent(Client& client, sdlrdp_event_type type, bool include_refresh)
     -> std::vector<sdlrdp_event> {
   return EventsUntil(Contains(type), include_refresh, [&client] { return client.Pump(); });
 }
-auto BackendEvents::ThenConnectedCodec(Client const& client, sdlrdp_codec expected) -> void {
+auto BackendEvents::ThenConnectedCodec(Client& client, sdlrdp_codec expected) -> void {
   auto const events    = UntilEvent(client, SDLRDP_CONNECTED);
   auto const connected = std::ranges::find(events, SDLRDP_CONNECTED, &sdlrdp_event::type);
   ASSERT_NE(connected, events.end()) << logs.Text();

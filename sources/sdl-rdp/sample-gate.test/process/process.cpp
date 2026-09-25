@@ -23,8 +23,9 @@ using namespace std::chrono_literals;
 namespace {
 auto Spawn(std::vector<std::string> arguments, int& output) -> pid_t {
   Expects(!arguments.empty(), "child arguments supplied");
-  std::array<int, 2> descriptors{ };
-  Expects(pipe2(descriptors.data(), O_CLOEXEC) == 0, "stdout pipe created");
+  std::array<int, 2> descriptors { };
+  auto const         piped       = pipe2(descriptors.data(), O_CLOEXEC);
+  Expects(piped == 0, "stdout pipe created");
   output = descriptors[0];
   Backend::Descriptor const write_end{ descriptors[1] };
   SpawnActions              actions;

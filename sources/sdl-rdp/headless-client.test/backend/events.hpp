@@ -38,13 +38,12 @@ protected:
     } while (Clock::now() < deadline);
     return result;
   }
-  auto Events(std::size_t wanted)                                                -> std::vector<sdlrdp_event>;
-  auto UntilEvent(sdlrdp_event_type type, bool include_refresh = true)           -> std::vector<sdlrdp_event>;
-  auto UntilEvent(Client const& client, sdlrdp_event_type type, bool include_refresh = true)
-      -> std::vector<sdlrdp_event>;
-  auto ThenConnectedCodec(Client const& client, sdlrdp_codec expected)           -> void;
-  auto Accumulate(std::vector<sdlrdp_event>& result, bool include_refresh) const -> void;
-  auto AwaitBackend() const                                                      -> bool;
+  auto Events(std::size_t wanted)                                                      -> std::vector<sdlrdp_event>;
+  auto UntilEvent(sdlrdp_event_type type, bool include_refresh = true)                 -> std::vector<sdlrdp_event>;
+  auto UntilEvent(Client& client, sdlrdp_event_type type, bool include_refresh = true) -> std::vector<sdlrdp_event>;
+  auto ThenConnectedCodec(Client& client, sdlrdp_codec expected)                       -> void;
+  auto Accumulate(std::vector<sdlrdp_event>& result, bool include_refresh) const       -> void;
+  auto AwaitBackend() const                                                            -> bool;
   CertificateDirectory      certificates;
   Logs                      logs;
   Headless::BackendInstance backend;

@@ -28,13 +28,13 @@ protected:
   auto GivenProcess(Words const& environment = { }, Words const& options = { }) -> void;
   auto Launch(Words const& arguments)                                           -> void;
   auto AnnouncedClient(std::uint32_t width, std::uint32_t height)               -> Client;
-  auto Connect(Client const& client)                                            -> void;
-  auto ConnectAcknowledging(Client const& client)                               -> void;
+  auto Connect(Client& client)                                                  -> void;
+  auto ConnectAcknowledging(Client& client)                                     -> void;
   auto SetUp()                                                                  -> void override;
   auto Read(std::string_view expected, std::chrono::milliseconds timeout = 10s) -> bool;
   auto Exposed()                                                                -> void;
   auto TearDown()                                                               -> void override;
-  auto Escape(Client const& client)                                             -> void;
+  auto Escape(Client& client)                                                   -> void;
   Headless::Logs               logs;
   oxbox::platform::ScratchArea certificates{ "certificates", "sdl-rdp" };
   std::unique_ptr<Process>     process;

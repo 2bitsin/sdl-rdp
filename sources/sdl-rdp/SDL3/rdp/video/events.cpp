@@ -122,7 +122,8 @@ auto Disconnected(SDL_VideoData& data) -> void {
   data.DetachTouch();
 }
 auto SendText(SDL_Window& window, std::uint32_t codepoint) -> void {
-  utilities::Expects(IsCodePoint(codepoint), "text is a Unicode code point");
+  auto const code_point = IsCodePoint(codepoint);
+  utilities::Expects(code_point, "text is a Unicode code point");
   if (!SDL_TextInputActive(&window)) return;
   auto const [length, bytes] = oxbox::utilities::UtfEncode<char>(codepoint);
   SDL_SendKeyboardText(std::string(bytes.data(), length).c_str());

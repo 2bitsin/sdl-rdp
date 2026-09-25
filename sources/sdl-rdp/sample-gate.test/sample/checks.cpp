@@ -44,14 +44,14 @@ auto SampleChecks::ThenAbsoluteMouse(rdpInput* input) -> void {
   ASSERT_TRUE(Read("event MOUSE_MOTION "));
   EXPECT_TRUE(line.contains(" x=100 y=120 ")) << line;
 }
-auto SampleChecks::WhenShiftedText(Client const& client) -> void {
+auto SampleChecks::WhenShiftedText(Client& client) -> void {
   auto* input = client.Instance()->context->input;
   ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x2a));
   ASSERT_NO_FATAL_FAILURE(Headless::Tap(client, 0x1e));
   ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x2a));
   ASSERT_TRUE(Read("event TEXT_INPUT text=A"));
 }
-auto SampleChecks::WhenScancodeText(Client const& client) -> void {
+auto SampleChecks::WhenScancodeText(Client& client) -> void {
   ASSERT_NO_FATAL_FAILURE(Headless::Tap(client, 0x1e));
   ASSERT_TRUE(Read("event TEXT_INPUT text=a"));
   WhenShiftedText(client);

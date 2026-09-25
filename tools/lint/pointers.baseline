@@ -9,7 +9,7 @@ count	sdl-rdp/SDL3	returns	16
 count	sdl-rdp/SDL3	unchecked	10
 count	sdl-rdp/headless-client.test tests	members	23
 count	sdl-rdp/headless-client.test tests	null checks	16
-count	sdl-rdp/headless-client.test tests	parameters	108
+count	sdl-rdp/headless-client.test tests	parameters	100
 count	sdl-rdp/headless-client.test tests	returns	10
 count	sdl-rdp/headless-client.test tests	unchecked	11
 count	sdl-rdp/integration	parameters	2

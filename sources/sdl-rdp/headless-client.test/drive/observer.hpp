@@ -17,15 +17,15 @@ struct DriveCapture {
 };
 struct DriveObserver {
 public:
-           DriveObserver(DriveObserver const&)                                     = delete;
-           DriveObserver(DriveObserver&&)                                          = delete;
+           DriveObserver(DriveObserver const&)                               = delete;
+           DriveObserver(DriveObserver&&)                                    = delete;
   explicit DriveObserver(Client& client);
            ~DriveObserver();
-  auto     operator=(DriveObserver const&)                       -> DriveObserver& = delete;
-  auto     operator=(DriveObserver&&)                            -> DriveObserver& = delete;
-  auto     Send(sdl_rdp::drive::DrivePacket const& packet) const -> bool;
-  auto     Observed()                                            -> DriveCapture&;
-  auto     Observed() const                                      -> DriveCapture const&;
+  auto     operator=(DriveObserver const&)                 -> DriveObserver& = delete;
+  auto     operator=(DriveObserver&&)                      -> DriveObserver& = delete;
+  auto     Send(sdl_rdp::drive::DrivePacket const& packet) -> bool;
+  auto     Observed()                                      -> DriveCapture&;
+  auto     Observed() const                                -> DriveCapture const&;
 
 private:
   auto Receive(std::uint16_t id, std::span<std::byte const> data, std::uint32_t flags, std::size_t total) -> bool;

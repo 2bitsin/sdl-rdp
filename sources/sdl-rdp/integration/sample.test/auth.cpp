@@ -13,8 +13,8 @@ namespace {
 class AuthenticationSample : public SampleGate::Sample {
 protected:
   auto ThenWrongPassword(std::uint32_t port) -> void {
-    Client const wrong(port, true);
-    wrong.Credentials("alice", "wrong-secret", "LAB", true);
+    Client wrong(port, true);
+    wrong.Credentials({ .user = "alice", .password = "wrong-secret", .domain = "LAB" }, true);
     ASSERT_FALSE(wrong.Connect());
     ASSERT_TRUE(Read("event AUTH_REJECTED user=alice"));
   }
@@ -23,8 +23,8 @@ TEST_F(AuthenticationSample, AuthenticationPair) {
   ASSERT_NO_FATAL_FAILURE(GivenProcess({ }, { "--user", "alice", "--password", "sample-secret", "--domain", "LAB" }));
   auto port = AnnouncedPort(line);
   ASSERT_NO_FATAL_FAILURE(ThenWrongPassword(port));
-  Client const right(port, true);
-  right.Credentials("alice", "sample-secret", "LAB", true);
+  Client right(port, true);
+  right.Credentials({ .user = "alice", .password = "sample-secret", .domain = "LAB" }, true);
   ASSERT_TRUE(right.Connect());
   ASSERT_TRUE(Read("event CONNECTED user=alice domain=LAB authenticated=1"));
   EXPECT_FALSE(process->Transcript().contains("sample-secret"));
@@ -34,8 +34,8 @@ TEST_F(AuthenticationSample, AuthenticationPair) {
 TEST_F(AuthenticationSample, AuthenticationPropertyDenies) {
   ASSERT_NO_FATAL_FAILURE(
       GivenProcess({ }, { "--user", "alice", "--password", "sample-secret", "--auth", "tls", "--verify-deny" }));
-  auto const client = AnnouncedClient(320, 200);
-  client.Credentials("alice", "sample-secret", "", false);
+  auto client = AnnouncedClient(320, 200);
+  client.Credentials({ .user = "alice", .password = "sample-secret", .domain = "" }, false);
   ASSERT_FALSE(client.Connect());
   ASSERT_TRUE(Read("event AUTH_REJECTED user=alice"));
   EXPECT_FALSE(process->Transcript().contains("event CONNECTED"));
@@ -102,13 +102,13 @@ auto GivenPropertyCredentials(SDL_PropertiesID properties, PropertyCredentials& 
 }
 auto ConnectPropertyCredentials(std::uint32_t port) -> void {
   {
-    Client const client(port, true);
-    client.Credentials("alice", "property-secret", "LAB", false);
+    Client client(port, true);
+    client.Credentials({ .user = "alice", .password = "property-secret", .domain = "LAB" }, false);
     ASSERT_TRUE(client.Connect());
   }
   {
-    Client const client(port, true);
-    client.Credentials("alice", "property-secret", "LAB", true);
+    Client client(port, true);
+    client.Credentials({ .user = "alice", .password = "property-secret", .domain = "LAB" }, true);
     ASSERT_TRUE(client.Connect());
   }
 }

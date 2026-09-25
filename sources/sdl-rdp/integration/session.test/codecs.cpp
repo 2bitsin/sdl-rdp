@@ -18,7 +18,7 @@ namespace BackendGate {
 namespace {
 // A flat colour survives every lossy codec within three levels per channel.
 constexpr std::uint32_t FlatColourError = 3;
-auto ThenUnblockedPresent(std::future<int>& presenting, Client const& client) -> void {
+auto ThenUnblockedPresent(std::future<int>& presenting, Client& client) -> void {
   auto ready = presenting.wait_for(std::chrono::seconds(10));
   EXPECT_EQ(ready, std::future_status::ready);
   if (ready != std::future_status::ready) client.Disconnect();
@@ -36,7 +36,7 @@ auto ThenTakeoverEvents(std::span<sdlrdp_event const> events) -> void {
   ThenTakeoverGeometry(events[1]);
   EXPECT_EQ(events[2].type, SDLRDP_SCREEN);
 }
-auto ThenDisplaced(Client const& first) -> void {
+auto ThenDisplaced(Client& first) -> void {
   ASSERT_TRUE(freerdp_input_send_keyboard_event(first.Instance()->context->input, KBD_FLAGS_DOWN, 0x30));
   auto deadline  = Clock::now() + std::chrono::seconds(10);
   bool connected = true;
@@ -123,7 +123,7 @@ TEST_P(Gate, BlockedSinglePresent) {
   RecordProperty("max_channel_error", std::to_string(client.MaxError(pixels)));
 }
 TEST_P(Gate, NewestClientTakesOver) {
-  Client const first(sdlrdp_port(backend.Handle()), GetParam().surface);
+  Client first(sdlrdp_port(backend.Handle()), GetParam().surface);
   ASSERT_TRUE(first.Connect()) << logs.Text(true);
   ASSERT_EQ(Events(2).size(), 2u);
   Client second(sdlrdp_port(backend.Handle()), GetParam().surface, 400, 240);

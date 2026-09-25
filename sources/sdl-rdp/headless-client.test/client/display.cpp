@@ -1,15 +1,20 @@
 #include <sdl-rdp/headless-client.test/client/display.hpp>
 
+#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/headless-client.test/client/channels.hpp>
 
 #include <freerdp/addin.h>
 #include <freerdp/channels/channels.h>
 #include <freerdp/client/channels.h>
 #include <freerdp/gdi/gdi.h>
+#include <array>
 #include <cstdint>
 #include <string_view>
+#include <utility>
 
 namespace Headless {
+using sdl_rdp::freerdp_facade::FirstRefused;
+using sdl_rdp::freerdp_facade::Refusal;
 namespace {
 // abi: pLoadChannels, BOOL is int
 auto LoadDisplayChannel(freerdp* instance) -> int {
@@ -46,10 +51,14 @@ DisplayClient::DisplayClient(Client& client)
   ObserverSet::Of(*client.Instance()->context).Add(*this);
   Callbacks::Install(*client.Instance()->context->update);
   freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
-  auto* context = client.Instance()->context;
-  Expects(freerdp_settings_set_bool(context->settings, FreeRDP_SupportDisplayControl, true), "display control enabled");
-  Expects(freerdp_settings_set_bool(context->settings, FreeRDP_SynchronousDynamicChannels, true),
-          "display control enabled");
+  std::array<std::pair<FreeRDP_Settings_Keys_Bool, bool>, 2> const display_control{ {
+      { FreeRDP_SupportDisplayControl     , true },
+      { FreeRDP_SynchronousDynamicChannels, true },
+  } };
+
+  auto*      context                 = client.Instance()->context;
+  auto const refused_display_control = FirstRefused(*context->settings, display_control);
+  Expects(!refused_display_control.has_value(), Refusal("display control", refused_display_control));
   PubSub_SubscribeChannelConnected(context->pubSub, Callbacks::ChannelConnected);
   client.Instance()->LoadChannels = LoadDisplayChannel;
 }

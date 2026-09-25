@@ -1,4 +1,5 @@
 #include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/headless-client.test/backend/certificate-directory.hpp>
 #include <sdl-rdp/headless-client.test/backend/events.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
@@ -240,7 +241,7 @@ TEST(Certificate, StableDefaultAndPermissions) {
 }
 
 TEST(Planar, Noisy640Rows) {
-  std::unique_ptr<rdpSettings, Backend::Releases<freerdp_settings_free>> const settings(freerdp_settings_new(0));
+  sdl_rdp::freerdp_facade::Settings const settings(freerdp_settings_new(0));
   ASSERT_TRUE(freerdp_settings_set_uint32(settings.get(), FreeRDP_ColorDepth, 32));
   PlanarContext const encoder(
       freerdp_bitmap_planar_context_new(PLANAR_FORMAT_HEADER_RLE | PLANAR_FORMAT_HEADER_NA, 1, 1));

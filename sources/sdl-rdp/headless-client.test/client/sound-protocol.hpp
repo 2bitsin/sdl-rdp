@@ -21,6 +21,7 @@ private:
   static auto Wave(SoundClient& self, wStream* stream, std::uint32_t size, bool second)           -> void;
   static auto Receive(SoundClient& self)                                                          -> void;
   static auto CaptureWave(SoundClient& self)                                                      -> void;
+  static auto Train(SoundClient& self)                                                            -> void;
   static auto Dispatch(SoundClient& self, wStream* stream, std::uint8_t type, std::uint16_t size) -> void;
 };
 }

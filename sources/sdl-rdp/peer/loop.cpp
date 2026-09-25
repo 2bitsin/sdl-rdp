@@ -4,6 +4,7 @@
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/logging.hpp>
 #include <sdl-rdp/freerdp-facade/exceptions.hpp>
+#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/freerdp-facade/waitable.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/link/session-access.hpp>
@@ -33,10 +34,9 @@
 
 namespace Backend {
 namespace {
+using sdl_rdp::freerdp_facade::FirstRefused;
+using sdl_rdp::freerdp_facade::Set;
 using SecurityFlags = std::array<std::pair<FreeRDP_Settings_Keys_Bool, bool>, 12>;
-auto Apply(rdpSettings& settings, std::ranges::input_range auto const& entries, auto set) -> bool {
-  return std::ranges::all_of(entries, [&](auto const& entry) { return set(&settings, entry.first, entry.second); });
-}
 auto Flags(sdlrdp_auth auth) -> SecurityFlags {
   return { {
       { FreeRDP_NlaSecurity, auth == SDLRDP_AUTH_NLA },
@@ -60,9 +60,8 @@ auto ApplySettings(rdpSettings& settings, sdlrdp_auth auth, sdlrdp_rect picture)
       { FreeRDP_FrameAcknowledge, AcknowledgedFrameWindow                               },
       { FreeRDP_LargePointerFlag, LARGE_POINTER_FLAG_96x96 | LARGE_POINTER_FLAG_384x384 },
   } };
-  return freerdp_settings_set_string(&settings, FreeRDP_AuthenticationPackageList, "!kerberos")
-         && Apply(settings, Flags(auth), freerdp_settings_set_bool)
-         && Apply(settings, numbers, freerdp_settings_set_uint32) && ApplyDesktopSize(settings, picture);
+  return Set(settings, FreeRDP_AuthenticationPackageList, "!kerberos") && !FirstRefused(settings, Flags(auth))
+         && !FirstRefused(settings, numbers) && ApplyDesktopSize(settings, picture);
 }
 auto BeginNegotiationLogging(rdpSettings& settings) -> rdpSettings& {
   ResetAuthenticationLogging();

@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <memory>
 #include <ranges>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -18,6 +19,12 @@ namespace Headless {
 using Clock = std::chrono::steady_clock;
 using utilities::Expects;
 enum class KeyState{ Down, Up };
+struct Login {
+  std::string_view user;
+  std::string_view password;
+  std::string_view domain;
+};
+using Pixels = std::vector<std::uint32_t>;
 struct GraphicsOptions {
   bool h264                 = false;
   bool qoe_acknowledgements = false;
@@ -29,17 +36,16 @@ using ClientInstance = std::unique_ptr<
 class Client {
 public:
   explicit Client(std::uint32_t port, bool surface, std::uint32_t width = 320, std::uint32_t height = 200);
-  auto EnableGraphics(GraphicsOptions options = { }) const                                             -> void;
-  auto Credentials(char const* user, char const* password, char const* domain, bool nla = false) const -> void;
-  auto Connect() const                                                                                 -> bool;
-  auto Key(std::uint16_t scancode, KeyState state) const                                               -> bool;
-  auto Disconnect() const                                                                              -> bool;
-  auto Pump(std::uint32_t timeout = 10) const                                                          -> bool;
-  auto Matches(std::vector<std::uint32_t> const& pixels)                                               -> bool;
-  auto MaxError(std::vector<std::uint32_t> const& pixels, std::vector<std::uint32_t> const* reference = nullptr) const
-      -> std::uint32_t;
-  auto Received() const                                                                                -> std::uint64_t;
-  auto Until(auto ready, std::chrono::milliseconds timeout = std::chrono::seconds(10))                 -> bool {
+  auto     EnableGraphics(GraphicsOptions options = { })                                   -> void;
+  auto     Credentials(Login const& login, bool nla = false)                               -> void;
+  auto     Connect()                                                                       -> bool;
+  auto     Key(std::uint16_t scancode, KeyState state)                                     -> bool;
+  auto     Disconnect()                                                                    -> bool;
+  auto     Pump(std::uint32_t timeout = 10)                                                -> bool;
+  auto     Matches(Pixels const& pixels)                                                   -> bool;
+  auto     MaxError(Pixels const& pixels, Pixels const* reference = nullptr) const         -> std::uint32_t;
+  auto     Received() const                                                                -> std::uint64_t;
+  auto     Until(auto ready, std::chrono::milliseconds timeout = std::chrono::seconds(10)) -> bool {
     Expects(timeout.count() > 0, "event deadline is positive");
     auto const pumped = [this] {
       return std::ranges::all_of(std::views::iota(0u, 16u), [this](std::size_t batch) { return Pump(batch ? 0 : 10); });
@@ -56,6 +62,6 @@ private:
   ClientInstance               instance  { freerdp_new()                   };
   std::uint32_t                tolerance = 0;
 };
-auto PumpInBackground(Client const& client)            -> std::jthread;
-auto Tap(Client const& client, std::uint16_t scancode) -> void;
+auto PumpInBackground(Client& client)            -> std::jthread;
+auto Tap(Client& client, std::uint16_t scancode) -> void;
 }

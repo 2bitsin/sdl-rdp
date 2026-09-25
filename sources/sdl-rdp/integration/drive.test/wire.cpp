@@ -171,8 +171,8 @@ TEST_F(DriveWire, UnicodeWireNameAndRecoverableAnnouncements) {
 TEST_F(DriveWire, UnknownCompletionIsIgnored) {
   pump.request_stop();
   pump.join();
-  Headless::DriveObserver const observer(*client);
-  sdl_rdp::drive::DrivePacket   packet;
+  Headless::DriveObserver     observer(*client);
+  sdl_rdp::drive::DrivePacket packet;
   packet.Write(std::uint16_t{ RDPDR_CTYP_CORE });
   packet.Write(std::uint16_t{ PAKID_CORE_DEVICE_IOCOMPLETION });
   packet.Write(std::uint32_t{ 0 });

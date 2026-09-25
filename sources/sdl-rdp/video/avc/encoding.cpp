@@ -38,7 +38,8 @@ auto operator+=(EncodingTimes& total, EncodingTimes const& frame) noexcept -> En
 auto ReplicateEdges(std::span<std::uint8_t> pixels, Extent size) -> void {
   auto const [width, height] = size;
   auto       stride          = Aligned(width) * 4;
-  Expects(pixels.size() >= std::size_t{ stride } * Aligned(height), "picture includes aligned storage");
+  auto const rows            = Aligned(height);
+  Expects(pixels.size() >= std::size_t{ stride } * rows, "picture includes aligned storage");
   std::ranges::for_each(std::views::iota(0u, height), [&](std::uint32_t row) {
     auto line = pixels.subspan(std::size_t{ row } * stride, stride);
     auto edge = line.subspan(std::size_t{ width - 1 } * 4, 4);

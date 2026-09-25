@@ -55,8 +55,8 @@ auto BoundWindow(SDL_VideoData const& data) -> SDL_Window& {
   return window->get();
 }
 auto CurrentVideo() -> SDL_VideoData& {
-  utilities::Expects(SDL_GetVideoDevice() != nullptr, "context-free video callbacks run while video is initialised");
   auto* const device = SDL_GetVideoDevice();
+  utilities::Expects(device != nullptr, "context-free video callbacks run while video is initialised");
   utilities::Expects(device->internal != nullptr, "the RDP video device has its state");
   return *device->internal;
 }

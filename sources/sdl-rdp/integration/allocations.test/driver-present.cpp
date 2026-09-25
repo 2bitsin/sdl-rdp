@@ -30,8 +30,10 @@ auto StartVideo(std::filesystem::path const& certificates) -> bool {
                               { SDL_HINT_RDP_PORT    , "0"                  },
                               { SDL_HINT_RDP_BIND    , "127.0.0.1"          },
                               { SDL_HINT_RDP_CERT_DIR, certificates.c_str() },
-                              { SDL_HINT_RDP_BACKEND , backend.c_str()      } })
-    utilities::Expects(SDL_SetHint(name, value), "the rdp hints are accepted");
+                              { SDL_HINT_RDP_BACKEND , backend.c_str()      } }) {
+    auto const accepted = SDL_SetHint(name, value);
+    utilities::Expects(accepted, "the rdp hints are accepted");
+  }
   return SDL_Init(SDL_INIT_VIDEO);
 }
 

@@ -17,7 +17,8 @@ public:
   using value_type = ValueTy;
   constexpr          Bounded() = default;
   constexpr explicit Bounded(ValueTy value) : _value{ value } {
-    ::utilities::Expects(Admits(value), "a bounded value is within its range");
+    auto const admitted = Admits(value);
+    ::utilities::Expects(admitted, "a bounded value is within its range");
   }
   static constexpr auto Minimum() -> std::int64_t {
     return MINIMUM;

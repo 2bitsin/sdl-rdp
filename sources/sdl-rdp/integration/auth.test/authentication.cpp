@@ -9,8 +9,8 @@ namespace {
 auto RejectCertificate(std::uint32_t port, bool& rejected) -> void {
   static thread_local bool verified;
   verified = false;
-  Headless::Client const client(port, false);
-  client.Credentials("alice", "correct-secret", "LAB", true);
+  Headless::Client client(port, false);
+  client.Credentials({ .user = "alice", .password = "correct-secret", .domain = "LAB" }, true);
   auto* settings = client.Instance()->context->settings;
   ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_TlsSecurity, true));
   ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_IgnoreCertificate, false));
@@ -163,8 +163,8 @@ TEST_F(Authentication, RefusedSecurityLogs) {
   for (bool const nla : { true, false }) {
     ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_TLS));
     {
-      Headless::Client const client(sdlrdp_port(handle.Handle()), false);
-      client.Credentials("alice", "correct-secret", "LAB", nla);
+      Headless::Client client(sdlrdp_port(handle.Handle()), false);
+      client.Credentials({ .user = "alice", .password = "correct-secret", .domain = "LAB" }, nla);
       auto* settings = client.Instance()->context->settings;
       ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_TlsSecurity, false));
       ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_RdpSecurity, !nla));
@@ -198,7 +198,7 @@ TEST_F(Authentication, PendingDisconnectLogLevels) {
        { FREERDP_ERROR_CONNECT_TRANSPORT_FAILED, FREERDP_ERROR_LOGOFF_BY_USER, FREERDP_ERROR_CONNECT_FAILED }) {
     ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_TLS));
     Headless::Client client(sdlrdp_port(handle.Handle()), false);
-    client.Credentials("alice", "correct-secret", "LAB");
+    client.Credentials({ .user = "alice", .password = "correct-secret", .domain = "LAB" });
     ASSERT_TRUE(client.Connect());
     ASSERT_TRUE(client.Until([&] { return CurrentStatus(*handle).has_value(); }));
     DisconnectWithPending(*handle, code);

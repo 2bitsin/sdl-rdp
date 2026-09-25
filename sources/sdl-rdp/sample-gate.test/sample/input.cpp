@@ -23,11 +23,11 @@ auto SampleInput::GivenFocus(Client& client) -> void {
   ASSERT_TRUE(client.Connect());
   ASSERT_TRUE(Read("event FOCUS_GAINED "));
 }
-auto SampleInput::WhenTextStops(Client const& client) -> void {
+auto SampleInput::WhenTextStops(Client& client) -> void {
   ASSERT_NO_FATAL_FAILURE(Headless::Tap(client, 0x3c));
   ASSERT_TRUE(Read("event TEXT_MODE active=0"));
 }
-auto SampleInput::WhenRelative(Client const& client) -> void {
+auto SampleInput::WhenRelative(Client& client) -> void {
   ASSERT_NO_FATAL_FAILURE(Headless::Tap(client, 0x3d));
   ASSERT_TRUE(Read("event RELATIVE_MODE active=1"));
 }

@@ -6,14 +6,14 @@
 #include <cstddef>
 #include <cstdint>
 namespace Headless {
-inline auto SendMouse(Client const& client, std::uint16_t x, std::uint16_t y) -> void {
+inline auto SendMouse(Client& client, std::uint16_t x, std::uint16_t y) -> void {
   auto* input = client.Instance()->context->input;
   ASSERT_TRUE(freerdp_input_send_mouse_event(input, PTR_FLAGS_MOVE, x, y)) << "send motion";
   ASSERT_TRUE(freerdp_input_send_mouse_event(input, PTR_FLAGS_BUTTON1 | PTR_FLAGS_DOWN, x, y)) << "send left down";
   ASSERT_TRUE(freerdp_input_send_mouse_event(input, PTR_FLAGS_BUTTON1, x, y)) << "send left up";
   ASSERT_TRUE(freerdp_input_send_mouse_event(input, PTR_FLAGS_WHEEL | 120, 0, 0)) << "send wheel";
 }
-inline auto SendKeyboardAndMouse(Client const& client, std::uint16_t x, std::uint16_t y) -> void {
+inline auto SendKeyboardAndMouse(Client& client, std::uint16_t x, std::uint16_t y) -> void {
   ASSERT_NO_FATAL_FAILURE(Tap(client, 0x1e));
   SendMouse(client, x, y);
 }

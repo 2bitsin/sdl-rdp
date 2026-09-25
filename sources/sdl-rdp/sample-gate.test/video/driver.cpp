@@ -5,7 +5,7 @@
 #include <utility>
 
 namespace SampleGate {
-auto VideoDriver::ThenDesktopPicture(Client const& client, Headless::DisplayClient& display) -> void {
+auto VideoDriver::ThenDesktopPicture(Client& client, Headless::DisplayClient& display) -> void {
   EXPECT_EQ(client.Instance()->context->gdi->width, 1280);
   EXPECT_EQ(client.Instance()->context->gdi->height, 800);
   EXPECT_FALSE(logs.Contains("Unexpected client message")) << logs.Text(true);

@@ -43,9 +43,9 @@ public:
   auto     operator=(SoundClient const&) -> SoundClient& = delete;
   auto     operator=(SoundClient&&)      -> SoundClient& = delete;
 
-  auto Send(std::span<std::uint8_t const> bytes) const -> bool;
-  auto Capture(std::span<std::uint8_t const> bytes)    -> void;
-  auto Confirm(std::size_t index = 0)                  -> bool;
+  auto Send(std::span<std::uint8_t const> bytes)    -> bool;
+  auto Capture(std::span<std::uint8_t const> bytes) -> void;
+  auto Confirm(std::size_t index = 0)               -> bool;
 
   auto CaptureState()       -> SoundCapture&;
   auto CaptureState() const -> SoundCapture const&;

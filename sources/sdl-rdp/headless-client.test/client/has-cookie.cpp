@@ -5,7 +5,7 @@
 #include <freerdp/settings.h>
 
 namespace BackendGate {
-auto HasCookie(Headless::Client const& client) -> bool {
+auto HasCookie(Headless::Client& client) -> bool {
   utilities::Expects(client.Instance() != nullptr, "client instance exists");
   utilities::Expects(client.Instance()->context, "client instance has a context");
   auto const* cookie = static_cast<ARC_SC_PRIVATE_PACKET const*>(

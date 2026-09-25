@@ -13,7 +13,7 @@
 namespace SampleGate {
 
 namespace {
-auto InputOf(Client const& client) -> rdpInput* {
+auto InputOf(Client& client) -> rdpInput* {
   return client.Instance()->context->input;
 }
 auto WhenPressureContact(auto* touch, std::int32_t& id) -> void {
@@ -36,7 +36,7 @@ auto TouchChannel(Client& client) -> auto* {
 
 TEST_F(Sample, UnicodeTextAndStopped) {
   ASSERT_NO_FATAL_FAILURE(GivenProcess());
-  auto const client = AnnouncedClient(640, 480);
+  auto client = AnnouncedClient(640, 480);
   ASSERT_NO_FATAL_FAILURE(GivenFrenchKeyboard(client));
   auto* input = InputOf(client);
   ASSERT_NO_FATAL_FAILURE(WhenUnicodeText(input));
@@ -127,7 +127,7 @@ TEST_F(Sample, AdvancedWheelBothAxesPrecise) {
 }
 TEST_F(Sample, ScancodeTextAndStopped) {
   ASSERT_NO_FATAL_FAILURE(GivenInputSession());
-  auto const& client = SessionClient();
+  auto& client = SessionClient();
   ASSERT_NO_FATAL_FAILURE(WhenScancodeText(client));
   ASSERT_NO_FATAL_FAILURE(WhenTextStops(client));
   auto stopped = process->Transcript().size();

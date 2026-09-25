@@ -27,7 +27,8 @@ public:
     auto* password = freerdp_settings_get_string_writable(&settings, FreeRDP_Password);
     if (password) OPENSSL_cleanse(password, std::strlen(password));
     // FreeRDP 3.32 include/freerdp/settings.h:553: set_string copies input; nullptr removes the old entry.
-    Ensures(freerdp_settings_set_string(&settings, FreeRDP_Password, nullptr), "password cleared");
+    auto const cleared = freerdp_settings_set_string(&settings, FreeRDP_Password, nullptr);
+    Ensures(cleared, "password cleared");
   }
   auto operator=(SettingsPassword const&) -> SettingsPassword& = delete;
   auto operator=(SettingsPassword&&)      -> SettingsPassword& = delete;

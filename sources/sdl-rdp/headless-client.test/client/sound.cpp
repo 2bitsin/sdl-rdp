@@ -12,8 +12,8 @@
 
 namespace Headless {
 SoundClient::SoundClient(Client& target) : client(target), previous_load(client.Instance()->LoadChannels) {
-  Expects(freerdp_settings_set_bool(client.Instance()->context->settings, FreeRDP_AudioPlayback, true),
-          "sound playback enabled");
+  auto const playback = freerdp_settings_set_bool(client.Instance()->context->settings, FreeRDP_AudioPlayback, true);
+  Expects(playback, "sound playback enabled");
   Expects(!active, "one sound capture per client thread");
   active = this;
 
@@ -30,7 +30,7 @@ SoundClient::~SoundClient() {
   client.Instance()->LoadChannels = previous_load;
   active                          = nullptr;
 }
-auto SoundClient::Send(std::span<std::uint8_t const> bytes) const -> bool {
+auto SoundClient::Send(std::span<std::uint8_t const> bytes) -> bool {
   Expects(!bytes.empty(), "sound PDU is nonempty");
   return SendStaticChannel(client.Instance().get(), "rdpsnd", bytes);
 }
@@ -44,7 +44,9 @@ auto SoundClient::Capture(std::span<std::uint8_t const> bytes) -> void {
       { timestamp, block, Backend::Narrowed<std::uint32_t>(bytes.size() / 4), capture.received.back() });
   capture.maximum_pending_frames = std::max(capture.maximum_pending_frames,
                                             (capture.samples.size() / 2) - capture.confirmed_frames);
-  if (capture.auto_confirm) Expects(Confirm(), "wave confirmation sent");
+  if (!capture.auto_confirm) return;
+  auto const confirmed = Confirm();
+  Expects(confirmed, "wave confirmation sent");
 }
 auto SoundClient::Confirm(std::size_t index) -> bool {
   if (capture.pending.empty()) return true;

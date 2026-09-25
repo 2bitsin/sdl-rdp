@@ -45,9 +45,11 @@ auto AvailablePort() -> std::uint32_t {
   sockaddr_in address{ };
   address.sin_family      = AF_INET;
   address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-  Expects(bind(socket_fd, reinterpret_cast<sockaddr*>(&address), sizeof(address)) == 0, "ephemeral port bound");
-  socklen_t size = sizeof(address);
-  Expects(getsockname(socket_fd, reinterpret_cast<sockaddr*>(&address), &size) == 0, "port obtained");
+  auto const bound = bind(socket_fd, reinterpret_cast<sockaddr*>(&address), sizeof(address));
+  Expects(bound == 0, "ephemeral port bound");
+  socklen_t  size  = sizeof(address);
+  auto const named = getsockname(socket_fd, reinterpret_cast<sockaddr*>(&address), &size);
+  Expects(named == 0, "port obtained");
   close(socket_fd);
   return ntohs(address.sin_port);
 }

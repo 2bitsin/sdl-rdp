@@ -54,7 +54,8 @@ auto DestroyFramebuffer(SDL_VideoDevice* device, [[maybe_unused]] SDL_Window* un
 }
 }
 Framebuffer::Framebuffer(Surface surface) noexcept : _surface{ std::move(surface) } {
-  utilities::Expects(_surface.Get() != nullptr, "framebuffer owns its surface");
+  auto const* const owned = _surface.Get();
+  utilities::Expects(owned != nullptr, "framebuffer owns its surface");
 }
 auto Framebuffer::Present(Driver const& driver, std::span<SDL_Rect const> rects) -> bool {
   auto const& surface = *_surface.Get();

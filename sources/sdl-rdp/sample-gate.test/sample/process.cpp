@@ -18,10 +18,10 @@ auto SampleProcess::Launch(Words const& arguments) -> void {
 auto SampleProcess::AnnouncedClient(std::uint32_t width, std::uint32_t height) -> Client {
   return Client(AnnouncedPort(line), true, width, height);
 }
-auto SampleProcess::Connect(Client const& client) -> void {
+auto SampleProcess::Connect(Client& client) -> void {
   ASSERT_TRUE(client.Connect()) << ConnectLogs();
 }
-auto SampleProcess::ConnectAcknowledging(Client const& client) -> void {
+auto SampleProcess::ConnectAcknowledging(Client& client) -> void {
   ASSERT_TRUE(freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_FrameAcknowledge, 2));
   Connect(client);
 }
@@ -71,7 +71,7 @@ auto SampleProcess::TearDown() -> void {
   }
   if (process) SDL_Log("%s", process->Transcript().c_str());
 }
-auto SampleProcess::Escape(Client const& client) -> void {
+auto SampleProcess::Escape(Client& client) -> void {
   ASSERT_TRUE(freerdp_input_send_keyboard_event(client.Instance()->context->input, KBD_FLAGS_DOWN, 1)) << "send Escape";
   ASSERT_TRUE(process->Exit()) << "sample exit 0 within ten seconds: " << process->Transcript();
 }

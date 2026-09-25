@@ -4,7 +4,7 @@
 namespace BackendGate {
 class Gate : public CodecSession {
 protected:
-  auto        ThenPictureDesktop(Client const& client)            -> void;
+  auto        ThenPictureDesktop(Client& client)                  -> void;
   auto        WhenBurstPictures(Client& client, sdlrdp_rect area) -> void;
   static auto ThenInitialScreen(sdlrdp_event const& event)        -> void;
   auto        ThenResizedConnection()                             -> void;

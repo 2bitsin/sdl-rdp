@@ -62,13 +62,13 @@ public:
   auto TestBody() -> void override;
 
 private:
-  auto        Exercised()                                                                                   -> bool;
+  auto        Exercised()                                                                             -> bool;
   static auto MediaReady(Headless::Client& client, Headless::FrameObserver& frames, Headless::SoundClient const& audio,
                          Headless::ClipboardClient const& clipboard) -> bool;
   auto Sampled(Headless::Client& client, Headless::FrameObserver& frames, Headless::ClipboardClient& clipboard) -> bool;
   static auto PumpedUntil(Headless::Client& client, Headless::FrameObserver& frames,
                           Headless::Clock::time_point deadline) -> bool;
-  auto        Sent(Headless::Client const& client, Headless::ClipboardClient& clipboard, std::size_t index) -> bool;
+  auto        Sent(Headless::Client& client, Headless::ClipboardClient& clipboard, std::size_t index) -> bool;
   auto        ThenLatency(std::string_view event, std::predicate<std::string_view> auto measured,
                           std::span<std::int64_t const> sent) -> void;
 
@@ -125,7 +125,7 @@ auto InputAndClipboardUnderTightVideo::PumpedUntil(Headless::Client& client, Hea
   };
   return Backend::Throughout(deadline, pumped);
 }
-auto InputAndClipboardUnderTightVideo::Sent(Headless::Client const& client, Headless::ClipboardClient& clipboard,
+auto InputAndClipboardUnderTightVideo::Sent(Headless::Client& client, Headless::ClipboardClient& clipboard,
                                             std::size_t index) -> bool {
   _keys.push_back(Headless::WallMilliseconds());
   if (!Check(client.Key(0x1e, index % 2 == 0 ? Headless::KeyState::Down : Headless::KeyState::Up), "the key is sent"))

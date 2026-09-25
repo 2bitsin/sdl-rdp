@@ -13,10 +13,10 @@ protected:
   auto        ThenSizeEvents(std::string const& dimensions)                                       -> void;
   auto        ThenDesktopMode(Client& client, std::uint32_t w, std::uint32_t h)                   -> void;
   auto        ThenWaitingPort(std::uint32_t port)                                                 -> void;
-  auto        WhenCodecKeyChanges(Client const& client)                                           -> void;
-  auto        GivenSwitchableCodec(Client const& client)                                          -> void;
+  auto        WhenCodecKeyChanges(Client& client)                                                 -> void;
+  auto        GivenSwitchableCodec(Client& client)                                                -> void;
   auto        ThenTakeoverEvent(char const* expected)                                             -> void;
   auto        WhenSmallerDesktop(Client& first)                                                   -> void;
-  auto        WhenWholeSampleReconnects(Client const& client, std::uint32_t port)                 -> void;
+  auto        WhenWholeSampleReconnects(Client& client, std::uint32_t port)                       -> void;
 };
 }

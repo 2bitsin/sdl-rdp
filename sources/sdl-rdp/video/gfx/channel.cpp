@@ -184,7 +184,8 @@ auto GfxChannel::Surface() -> bool {
   _progressive.reset();
   ResetAvc();
   _sources.frames.get().Resend();
-  Ensures(SameSize(Whole(_surface), desktop), "surface matches the desktop");
+  auto const matches = SameSize(Whole(_surface), desktop);
+  Ensures(matches, "surface matches the desktop");
   return true;
 }
 auto GfxChannel::FailureSource() const noexcept -> Diagnostics const& {
