@@ -65,7 +65,8 @@ auto SettingsArguments(fs::path const& directory, fs::path const& certificates, 
 auto WrittenText(fs::path const& file, std::string_view text) -> fs::path {
   std::ofstream out(file);
   out << text;
-  Expects(bool(out), "settings text written");
+  bool const written = !out.fail();
+  Expects(written, "settings text written");
   return file;
 }
 auto WriteInvalidSettings(fs::path const& directory) -> void {

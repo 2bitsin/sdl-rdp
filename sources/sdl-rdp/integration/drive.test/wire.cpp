@@ -2,6 +2,7 @@
 #include <sdl-rdp/headless-client.test/client/channels.hpp>
 #include <sdl-rdp/headless-client.test/drive/checks.hpp>
 #include <sdl-rdp/headless-client.test/drive/rdpdr-packets.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/utilities/transcode.hpp>
 
 #include <freerdp/channels/rdpdr.h>
@@ -15,7 +16,8 @@ namespace DriveGate {
 namespace {
 auto SendMalformedDrivePacket(Headless::Client& client) -> void {
   std::array<std::uint8_t, 4> const malformed{ 0x72, 0x44, 0x41, 0x44 };
-  ASSERT_TRUE(Headless::SendStaticChannel(client.Instance().get(), RDPDR_CHANNEL_NAME, malformed));
+  ASSERT_TRUE(
+      Headless::SendStaticChannel(client.Instance().get(), RDPDR_CHANNEL_NAME, std::as_bytes(std::span(malformed))));
 }
 auto EmptyBasicInformation(Headless::DriveObserver& observer) -> sdl_rdp::drive::DrivePacket {
   auto request = observer.Observed().io.front();
@@ -153,7 +155,7 @@ TEST_F(DriveWire, SlidingWindowRefillsOnOutOfOrderCompletion) {
                          [&] { return sdlrdp_drive_read(handle.Handle(), file, 0, bytes.data(), bytes.size()); });
   ASSERT_NO_FATAL_FAILURE(WhenReadWindowRefilled(observer));
   ASSERT_TRUE(client->Until([&] { return read.wait_for(0s) == std::future_status::ready; }));
-  EXPECT_EQ(read.get(), int(bytes.size()));
+  EXPECT_EQ(read.get(), Backend::Narrowed<int>(bytes.size()));
   EXPECT_EQ(bytes, std::string(bytes.size(), 'x'));
   ThenHeldFileClosed(observer, file);
 }

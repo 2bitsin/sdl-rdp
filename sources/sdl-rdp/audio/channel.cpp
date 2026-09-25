@@ -32,10 +32,11 @@ auto Owner(RdpsndServerContext const& context) -> AudioChannel& {
 auto Levels(std::span<std::int16_t const> samples) -> std::string {
   Expects(!samples.empty(), "audio block has samples");
   auto squares = std::ranges::fold_left(
-      samples, 0.0, [](double sum, std::int16_t sample) { return sum + (double(sample) * sample); });
+      samples, 0.0, [](double sum, std::int16_t sample) { return sum + (static_cast<double>(sample) * sample); });
   auto peak    = std::ranges::max(samples
-                                  | std::views::transform([](std::int16_t sample) { return std::abs(int(sample)); }));
-  return std::format("rms={} peak={}", int(std::sqrt(squares / double(samples.size()))), peak);
+                                  | std::views::transform([](std::int16_t sample) { return std::abs(int{ sample }); }));
+  return std::format("rms={} peak={}", static_cast<int>(std::sqrt(squares / static_cast<double>(samples.size()))),
+                     peak);
 }
 auto ApplyVolume(std::span<std::int16_t> stereo, std::uint32_t volume) -> void {
   Expects(stereo.size() % 2 == 0, "stereo frames are complete");
@@ -172,11 +173,11 @@ auto AudioChannel::SendBlock() -> bool {
 auto AudioChannel::LogAudio() const -> void {
   Expects(_sound != nullptr, "audio statistics have a channel");
   using Milliseconds = std::chrono::duration<double, std::milli>;
-  _diagnostics.Log(SDLRDP_LOG_INFO,
-                   std::format("Audio: {} blocks sent; gap {:.1f} ms mean, {:.1f} ms max; {} gaps over 40 ms.",
-                               _blocks_sent,
-                               _blocks_sent > 1 ? Milliseconds(_gap_total).count() / double(_blocks_sent - 1) : 0,
-                               Milliseconds(_gap_max).count(), _gaps_over_40ms));
+  _diagnostics.Log(
+      SDLRDP_LOG_INFO,
+      std::format("Audio: {} blocks sent; gap {:.1f} ms mean, {:.1f} ms max; {} gaps over 40 ms.", _blocks_sent,
+                  _blocks_sent > 1 ? Milliseconds{ _gap_total }.count() / static_cast<double>(_blocks_sent - 1) : 0,
+                  Milliseconds{ _gap_max }.count(), _gaps_over_40ms));
 }
 auto AudioChannel::FailureSource() const noexcept -> Diagnostics const& {
   return _diagnostics;

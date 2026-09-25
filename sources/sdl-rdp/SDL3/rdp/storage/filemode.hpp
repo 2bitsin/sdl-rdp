@@ -11,7 +11,7 @@ public:
   auto     Writes() const  -> bool;
   auto     Appends() const -> bool;
 private:
-  static auto _Flags(std::string_view mode) -> std::uint32_t;
+  static auto FlagsOf(std::string_view mode) -> std::uint32_t;
   std::uint32_t _flags;
   bool          _append;
 };

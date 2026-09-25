@@ -125,7 +125,8 @@ auto PeerLoop::Run(std::stop_token const& quit) -> void {
 auto PeerLoop::Configure() -> bool {
   auto const picture  = _store.Read([](FrameStore const& store, FrameLock const& held) { return store.Picture(held); });
   auto&      settings = _link.Settings();
-  return _authenticator.InstallCredentials(settings) && ApplySettings(settings, _authenticator.Auth(), picture);
+  _authenticator.InstallCredentials(settings);
+  return ApplySettings(settings, _authenticator.Auth(), picture);
 }
 auto PeerLoop::Step(std::stop_token const& quit, std::span<WaitHandle> handles) -> bool {
   auto const plan = [&] {

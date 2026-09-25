@@ -67,7 +67,7 @@ auto FramePacing::Accept(std::uint32_t id) -> void {
   if (settled.empty()) return;
   auto const now = Clock::now();
   _traces.Defer("ack",
-                [&] { return std::format("id={} age={:.1f}", id, Milliseconds(settled.back().Age(now)).count()); });
+                [&] { return std::format("id={} age={:.1f}", id, Milliseconds{ settled.back().Age(now) }.count()); });
   for (auto const& sent : settled) {
     _statistics.Acknowledged(sent.Age(now));
     if (_refresh.Mode() == RefreshMode::Average && &sent != &settled.back()) continue;

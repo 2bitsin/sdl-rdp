@@ -1,8 +1,12 @@
 #include <sdl-rdp/headless-client.test/backend/authentication.hpp>
 #include <sdl-rdp/abi/backend.h>
 #include <sdl-rdp/headless-client.test/client/client.hpp>
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <fstream>
+#include <ios>
+#include <ranges>
 
 namespace AuthenticationGate {
 namespace {
@@ -212,5 +216,15 @@ TEST_F(Authentication, TenRejectionsThenSuccess) {
   for (std::size_t i = 0; i < 10; ++i) Attempt("alice", "wrong-secret", "LAB", false, false);
   ASSERT_NO_FATAL_FAILURE(Attempt("alice", "correct-secret", "LAB", false, true));
   RejectionLogs("wrong-secret", 10);
+}
+TEST_F(Authentication, UnreadableKeyEndsThePeerWithItsReason) {
+  ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_NONE, false));
+  std::ofstream{ certificates.Path() / "server.key", std::ios::trunc } << "not a private key\n";
+  Headless::Client client(sdlrdp_port(handle.Handle()), false);
+  EXPECT_FALSE(client.Connect());
+  auto const reported = [&] {
+    return std::ranges::any_of(logs, [](auto const& entry) { return entry.second.contains("private key loading"); });
+  };
+  EXPECT_TRUE(Until(reported));
 }
 }

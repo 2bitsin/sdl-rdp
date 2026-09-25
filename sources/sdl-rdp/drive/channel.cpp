@@ -9,6 +9,7 @@
 #include <sdl-rdp/link/event-queue.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/link/session-access.hpp>
+#include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/utilities/terminated-copy.hpp>
@@ -19,11 +20,16 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <functional>
+#include <optional>
 #include <ranges>
 #include <span>
+#include <string>
+#include <string_view>
 #include <utility>
 
 namespace sdl_rdp::drive::detail::channel {
+using Backend::Contained;
 using Backend::CopyTerminated;
 using Backend::Diagnostics;
 using Backend::EventQueue;
@@ -65,6 +71,10 @@ auto DriveEvent(bool added, sdlrdp_drive const& drive) -> sdlrdp_event {
   CopyTerminated(event.drive.name, drive.name);
   return event;
 }
+// Logs why the channel ends while its peer is connected; the caller shuts the channel down after it.
+auto Ending(DriveChannel const& channel) -> auto {
+  return [&channel](std::string_view cause) { channel.Warn(std::format("Drive channel ended: {}", cause)); };
+}
 } // namespace
 auto DriveChannel::Abort(std::string const& cause) -> void {
   std::scoped_lock const lock(mutex);
@@ -81,7 +91,7 @@ auto DriveChannel::Event() const -> WaitHandle {
 }
 auto DriveChannel::Open() -> bool {
   Expects(!channel, "drive channel opens once");
-  try {
+  auto const opened = [this] {
     auto name = std::to_array(RDPDR_CHANNEL_NAME);
     channel.reset(WTSVirtualChannelOpen(_link.Channels(), WTS_CURRENT_SESSION, name.data()));
     if (!channel) throw DriveChannelFailed{ "open" };
@@ -89,10 +99,10 @@ auto DriveChannel::Open() -> bool {
     auto packet = Announcement(PAKID_CORE_SERVER_ANNOUNCE, client_id);
     Write(packet);
     return true;
-  } catch (std::exception const& error) {
-    Fail(error.what());
-    return false;
-  }
+  };
+  if (Contained(false, opened, Ending(*this))) return true;
+  Shutdown();
+  return false;
 }
 auto DriveChannel::Write(DrivePacket& packet) -> void {
   Expects(channel != nullptr, "drive transport exists");
@@ -122,7 +132,7 @@ auto DriveChannel::Announce(DrivePacket& packet) -> void {
     auto                type = packet.Read<std::uint32_t>();
     auto                wire = packet.Read<std::uint32_t>();
     std::array<char, 9> name { };
-    for (std::size_t i = 0; i < 8; ++i) name[i] = char(packet.Read<std::uint8_t>());
+    for (std::size_t i = 0; i < 8; ++i) name[i] = static_cast<char>(packet.Read<std::uint8_t>());
     auto length = packet.Read<std::uint32_t>();
     auto begin  = packet.Position();
     packet.Skip(length);
@@ -154,12 +164,12 @@ auto DriveChannel::ClientCapabilities(DrivePacket& packet) -> void {
     packet.Seek(end);
   }
 }
-auto DriveChannel::Warn(std::string const& cause) const -> void {
-  if (connected) _diagnostics.Log(SDLRDP_LOG_WARN, cause);
+auto DriveChannel::Warn(std::string_view cause) const -> void {
+  if (connected) _diagnostics.Log(SDLRDP_LOG_WARN, std::string{ cause });
 }
-auto DriveChannel::Fail(std::string const& cause) -> void {
+auto DriveChannel::Fail(std::string_view cause) -> void {
   if (!connected) return;
-  Warn("Drive channel ended: " + cause);
+  std::invoke(Ending(*this), cause);
   Shutdown();
 }
 auto DriveChannel::Remove(std::uint32_t wire) -> void {
@@ -220,12 +230,11 @@ auto DriveChannel::Pump(std::span<WaitHandle const> signaled) -> bool {
     return true;
   }
   if (!std::ranges::contains(signaled, event)) return true;
-  try {
-    return PumpAvailable();
-  } catch (std::exception const& error) {
-    Fail(error.what());
-    return true;
-  }
+  auto const pumped = Contained(
+      std::optional<bool>{ }, [this] -> std::optional<bool> { return PumpAvailable(); }, Ending(*this));
+  if (pumped) return *pumped;
+  Shutdown();
+  return true;
 }
 auto DriveChannel::Send(std::uint32_t drive, std::uint32_t file, freerdp_facade::IrpMajor major,
                         DrivePacket const& body, freerdp_facade::IrpMinor minor) -> std::shared_ptr<DriveRequest> {
@@ -267,7 +276,7 @@ auto DriveChannel::GeneralClientCapability(DrivePacket& packet, std::size_t star
   _diagnostics.Log(
       SDLRDP_LOG_INFO,
       std::format("Drive client version {}.{}, general capability {}, extended PDU 0x{:08x}, device removal {}.", major,
-                  minor, version, flags, bool(flags & RDPDR_DEVICE_REMOVE_PDUS)));
+                  minor, version, flags, (flags & RDPDR_DEVICE_REMOVE_PDUS) != 0));
 }
 auto DriveChannel::PumpAvailable() -> bool {
   sdl_rdp::freerdp_facade::Waitable const ready{ event };
@@ -286,13 +295,9 @@ auto DriveChannel::PumpAvailable() -> bool {
   }
 }
 auto DriveChannel::Name(std::span<std::byte const> bytes, std::string_view dos) const -> std::string {
-  std::string label(dos);
-  try {
-    label = DecodeLabel(bytes, drive_version, dos);
-  } catch (std::exception const& error) {
-    label = dos;
-    Warn(std::format("{} Using DOS name '{}'.", error.what(), dos));
-  }
+  auto                  label    = Contained(
+      std::string{ dos }, [&] { return DecodeLabel(bytes, drive_version, dos); },
+      [&](std::string_view cause) { Warn(std::format("{} Using DOS name '{}'.", cause, dos)); });
   constexpr std::size_t capacity = sizeof(sdlrdp_drive::name) - 1;
   if (label.size() > capacity) {
     Warn(std::format("Drive name exceeds {} bytes; truncating.", capacity));
@@ -333,7 +338,7 @@ auto DriveChannel::List(std::span<sdlrdp_drive> out) -> int {
   return Narrowed<int>(std::ranges::copy(listed, out.begin()).out - out.begin());
 }
 auto DriveChannel::WaitAny(std::span<Slot const> slots) -> std::size_t {
-  Expects(std::ranges::any_of(slots, [](auto const& slot) { return bool(slot.request); }),
+  Expects(std::ranges::any_of(slots, [](auto const& slot) { return slot.request != nullptr; }),
           "transfer has outstanding requests");
   std::unique_lock lock(mutex);
   std::size_t      ready = slots.size();

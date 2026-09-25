@@ -11,6 +11,7 @@
 #include <sdl-rdp/headless-client.test/input/steps.hpp>
 #include <algorithm>
 #include <cstddef>
+#include <format>
 #include <fstream>
 #include <memory>
 #include <ranges>
@@ -209,9 +210,10 @@ protected:
     ASSERT_TRUE(frames.Ack());
     ASSERT_TRUE(client.Until([&] { return frames.Frames().size() >= before + 2; }));
     ASSERT_NO_FATAL_FAILURE(ThenIncrementalPicture(client, desktop, baseline, deliveries));
-    SDL_Log("trace exclusive %.*s gdi=%dx%d new_full_desktop=%zu frames=%zu", int(change.size()), change.data(),
-            client.Instance()->context->gdi->width, client.Instance()->context->gdi->height, desktop.Full() - baseline,
-            frames.Frames().size() - before);
+    auto const& gdi = *client.Instance()->context->gdi;
+    SDL_Log("%s", std::format("trace exclusive {} gdi={}x{} new_full_desktop={} frames={}", change, gdi.width,
+                              gdi.height, desktop.Full() - baseline, frames.Frames().size() - before)
+                      .c_str());
   }
   auto Start() -> void {
     Expects(process == nullptr, "sample has not started");

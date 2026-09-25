@@ -23,7 +23,7 @@ public:
       std::invoke(step);
       return true;
     };
-    return Backend::Contained(false, ran, [phase](std::string_view text) { _FailFatally(phase, text); });
+    return Backend::Contained(false, ran, [phase](std::string_view text) { FailFatally(phase, text); });
   }
   auto Holds(std::invocable auto&&... steps) -> bool {
     return ((Contained("a rig step", steps) && Healthy()) && ...);
@@ -37,8 +37,8 @@ public:
   auto Report(benchmark::State& state) const         -> void;
 
 private:
-  static auto _FailFatally(std::string_view phase, std::string_view text) -> void;
-  auto        _Skipped() const                                            -> std::optional<std::string>;
+  static auto FailFatally(std::string_view phase, std::string_view text) -> void;
+  auto        Skipped() const                                            -> std::optional<std::string>;
 
   LockedReporter          _reporter;
   benchmark::UserCounters _counters;

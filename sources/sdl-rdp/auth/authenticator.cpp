@@ -4,8 +4,10 @@
 #include <sdl-rdp/auth/identity.hpp>
 #include <sdl-rdp/configuration/configuration.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
+#include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/diagnostics/logging.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
+#include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/terminated-copy.hpp>
 #include <sdl-rdp/utilities/transcode.hpp>
 
@@ -14,7 +16,8 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
-#include <stdexcept>
+#include <optional>
+#include <tuple>
 
 namespace Backend {
 namespace {
@@ -67,13 +70,8 @@ Authenticator::Authenticator(PeerLink& link, Configuration const& configuration,
                              Diagnostics const& diagnostics) noexcept
     : _link{ link }, _configuration{ configuration }, _diagnostics{ diagnostics }, _account{ configuration.Config() },
       _credentials{ configuration.CertificateDirectory() } { }
-auto Authenticator::InstallCredentials(rdpSettings& settings) const -> bool {
-  try {
-    InstallServerCredentials(settings, _credentials);
-    return true;
-  } catch (std::runtime_error const&) {
-    return false;
-  }
+auto Authenticator::InstallCredentials(rdpSettings& settings) const -> void {
+  InstallServerCredentials(settings, _credentials);
 }
 auto Authenticator::Auth() const noexcept -> sdlrdp_auth {
   return _configuration.Auth();
@@ -115,11 +113,10 @@ auto Authenticator::Logon(bool automatic) -> bool {
   // FreeRDP 3.32 nla.c:1494 stores delegated credentials in settings, not nla_get_identity().
   std::ignore = _state.TestAndSetChecked();
   auto const& settings = _link.Settings();
-  try {
-    std::ignore = Verify(Setting(settings, FreeRDP_Domain), Setting(settings, FreeRDP_Username), Password(settings));
-  } catch (...) {
-    Reject();
-  }
+  auto const  verified = [&] {
+    return Verify(Setting(settings, FreeRDP_Domain), Setting(settings, FreeRDP_Username), Password(settings));
+  };
+  if (!Contained(false, verified, Failures("Logon verification"))) Reject();
   return true;
 }
 auto Authenticator::Unauthenticated(std::string const& domain, std::string const& user) -> bool {
@@ -137,15 +134,16 @@ auto Authenticator::VerifySettings() -> bool {
     Ensures(!client.authenticated, "a rejected peer is not authenticated at activation");
     return false;
   }
-  try {
+  auto const verified = [&] -> std::optional<bool> {
     auto const domain = Setting(settings, FreeRDP_Domain);
     auto const user   = Setting(settings, FreeRDP_Username);
     if (_configuration.Config().auth == SDLRDP_AUTH_NONE) return Unauthenticated(domain, user);
     return Verify(domain, user, Password(settings)) || Denied();
-  } catch (...) {
-    Reject();
-    return Denied();
-  }
+  };
+  if (auto const outcome = Contained(std::optional<bool>{ }, verified, Failures("Settings verification")))
+    return *outcome;
+  Reject();
+  return Denied();
 }
 auto Authenticator::NtHash(std::string const& domain, std::string const& user) const
     -> std::optional<sdl_rdp::freerdp_facade::NtOwf> {
@@ -167,14 +165,12 @@ auto Authenticator::ResponseKey(SEC_WINNT_AUTH_IDENTITY const& identity, NtKey r
 }
 auto Authenticator::Hash(SEC_WINNT_AUTH_IDENTITY const& identity, NtKey response) -> bool {
   _state.AttemptHash();
-  try {
-    bool const result = ResponseKey(identity, response);
-    if (!result) Reject();
-    return result;
-  } catch (...) {
-    Reject();
-    return false;
-  }
+  bool const keyed = Contained(false, [&] { return ResponseKey(identity, response); }, Failures("NTLM response key"));
+  if (!keyed) Reject();
+  return keyed;
+}
+auto Authenticator::Failures(OperationName operation) const noexcept -> FailureLog {
+  return FailureLog{ _diagnostics, operation, SDLRDP_LOG_WARN };
 }
 auto Authenticator::End() -> void {
   if (_state.Abandoned()) Reject();

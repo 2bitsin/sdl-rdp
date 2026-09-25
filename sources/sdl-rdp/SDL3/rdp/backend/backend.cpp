@@ -11,12 +11,12 @@ auto LoadSymbols(Library const& library, [[maybe_unused]] std::index_sequence<IN
       SDL_LoadFunction(library.Get(), BackendCatalog::Names.at(INDICES)))... };
 }
 }
-Backend::Backend(std::filesystem::path const& path) : _library{ path }, _symbols{ _Load(_library) } {
+Backend::Backend(std::filesystem::path const& path) : _library{ path }, _symbols{ Loaded(_library) } {
   if (auto const found = Call<Operation::VERSION>(); found != SDLRDP_ABI_VERSION)
     throw AbiMismatch{ found, SDLRDP_ABI_VERSION };
   SDL_ClearError();
 }
-auto Backend::_Load(Library const& library) -> BackendSymbols {
+auto Backend::Loaded(Library const& library) -> BackendSymbols {
   auto symbols = LoadSymbols(library, std::make_index_sequence<std::tuple_size_v<BackendSymbols>>{ });
   if (!std::apply([](auto... symbol) { return (... && (symbol != nullptr)); }, symbols))
     throw RelayedFailure{ SDL_GetError() };

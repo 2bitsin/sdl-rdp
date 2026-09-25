@@ -121,7 +121,8 @@ auto CompressSignedDelta(BITMAP_PLANAR_CONTEXT* encoder, std::vector<std::uint32
   ASSERT_NE(compressed.front() & PLANAR_FORMAT_HEADER_RLE, 0);
 }
 auto ThenCertificate(std::string const& first, std::filesystem::path const& data) -> void {
-  std::unique_ptr<BIO, Backend::Releases<BIO_free>> const   bio(BIO_new_mem_buf(first.data(), int(first.size())));
+  std::unique_ptr<BIO, Backend::Releases<BIO_free>> const   bio(
+      BIO_new_mem_buf(first.data(), Backend::Narrowed<int>(first.size())));
   std::unique_ptr<X509, Backend::Releases<X509_free>> const cert(
       PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
   ASSERT_TRUE(cert);

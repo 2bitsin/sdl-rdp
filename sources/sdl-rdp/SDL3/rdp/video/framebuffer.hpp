@@ -8,7 +8,7 @@ public:
   explicit Framebuffer(backend::Surface surface) noexcept;
   auto     Present(Driver const& driver, std::span<SDL_Rect const> rects) -> bool;
 private:
-  auto _Damage(std::span<SDL_Rect const> rects) -> std::span<sdlrdp_rect const>;
+  auto Damage(std::span<SDL_Rect const> rects) -> std::span<sdlrdp_rect const>;
   backend::Surface         _surface;
   std::vector<sdlrdp_rect> _damage;
 };

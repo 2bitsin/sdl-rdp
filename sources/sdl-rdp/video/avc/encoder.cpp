@@ -11,7 +11,7 @@
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage): Required by the ffnvcodec loader.
 #define FFNV_LOG_FUNC(ctx, msg, ...) WLog_ERR("sdlrdp.avc", msg, __VA_ARGS__)
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage): Required by the ffnvcodec loader.
-#define FFNV_DEBUG_LOG_FUNC(ctx, msg, ...) ((void)0)
+#define FFNV_DEBUG_LOG_FUNC(ctx, msg, ...) static_cast<void>(0)
 // WinPR already supplies the ABI-compatible GUID type.
 #define GUID_DEFINED
 #include <freerdp/primitives.h>

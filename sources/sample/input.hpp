@@ -25,7 +25,7 @@ inline auto PrintInput(SDL_Event const& event, SDL_Window* window) -> bool {
   Check(SDL_GetWindowSize(window, &width, &height));
   SDL_Log("event %s id=%" SDL_PRIu64 " x=%.3f y=%.3f pressure=%.3f window_x=%.0f window_y=%.0f", name,
           event.tfinger.fingerID, event.tfinger.x, event.tfinger.y, event.tfinger.pressure,
-          event.tfinger.x * float(width), event.tfinger.y * float(height));
+          event.tfinger.x * static_cast<float>(width), event.tfinger.y * static_cast<float>(height));
   return true;
 }
 

@@ -21,7 +21,7 @@ constexpr std::size_t InitialStreamCapacity = 64uz * 1024;
 auto PrepareRemoteFx(RemoteFxContext& rfx) -> bool {
   if (!rfx) rfx.reset(rfx_context_new_ex(true, THREADING_FLAGS_DISABLE_THREADS));
   if (rfx) rfx_context_set_pixel_format(rfx.get(), PIXEL_FORMAT_BGRX32);
-  return bool(rfx);
+  return rfx != nullptr;
 }
 auto PrepareNsCodec(NsCodecContext& nsc) -> bool {
   if (!nsc) nsc.reset(nsc_context_new());

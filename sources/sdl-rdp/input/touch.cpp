@@ -17,10 +17,10 @@ auto Phase(std::uint32_t flags) -> sdlrdp_touch_phase {
 }
 auto Pressure(RDPINPUT_CONTACT_DATA const& contact) -> float {
   if (!(contact.fieldsPresent & CONTACT_DATA_PRESSURE_PRESENT)) return 1.0F;
-  return float(std::min(contact.pressure, PressureScale)) / float(PressureScale);
+  return static_cast<float>(std::min(contact.pressure, PressureScale)) / static_cast<float>(PressureScale);
 }
 auto Unit(std::int32_t value, int extent) -> float {
-  return std::clamp(float(value) / float(extent), 0.0F, 1.0F);
+  return std::clamp(static_cast<float>(value) / static_cast<float>(extent), 0.0F, 1.0F);
 }
 auto Contact(sdlrdp_rect desktop, RDPINPUT_CONTACT_DATA const& contact) -> sdlrdp_event {
   Expects(desktop.w > 0, "desktop width is positive");

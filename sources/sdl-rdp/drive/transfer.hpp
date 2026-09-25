@@ -79,7 +79,7 @@ template <class Byte> auto Transfer(sdlrdp_file& file, std::uint64_t offset, std
     SubmitSlot(file, offset, bytes, progress, slot);
   }
   if (progress.failure) std::rethrow_exception(progress.failure);
-  return int(progress.limit);
+  return Backend::Narrowed<int>(progress.limit);
 }
 }
 namespace sdl_rdp::drive {

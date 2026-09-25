@@ -16,7 +16,7 @@ auto AccessFlags(std::string_view mode) -> std::uint32_t {
   }
 }
 }
-FileMode::FileMode(std::string_view mode) : _flags{ _Flags(mode) }, _append{ mode.front() == 'a' } { }
+FileMode::FileMode(std::string_view mode) : _flags{ FlagsOf(mode) }, _append{ mode.front() == 'a' } { }
 auto FileMode::Flags() const -> std::uint32_t {
   return _flags;
 }
@@ -29,7 +29,7 @@ auto FileMode::Writes() const -> bool {
 auto FileMode::Appends() const -> bool {
   return _append;
 }
-auto FileMode::_Flags(std::string_view mode) -> std::uint32_t {
+auto FileMode::FlagsOf(std::string_view mode) -> std::uint32_t {
   auto const modifiers = mode.empty() ? mode : mode.substr(1);
   if (mode.empty() || !std::ranges::all_of(modifiers, [](char value) { return value == '+' || value == 'b'; }))
     throw InvalidFileMode{ mode };

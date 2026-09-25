@@ -1,6 +1,8 @@
 #include <sdl-rdp/utilities/contained.hpp>
 
 #include <gtest/gtest.h>
+#include <oxbox/utilities/visitor.hpp>
+#include <new>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -26,7 +28,7 @@ TEST(Contained, TurnsAStandardExceptionIntoTheFailureAndReportsItsText) {
 TEST(Contained, TurnsANonStandardExceptionIntoTheFailureAndReportsItUnknown) {
   std::vector<std::string> texts;
   EXPECT_EQ(Backend::Contained(-2, []() -> int { throw 42; }, Collecting(texts)), -2);
-  EXPECT_EQ(texts, std::vector<std::string>{ std::string{ Backend::UnknownException } });
+  EXPECT_EQ(texts, std::vector<std::string>{ std::string{ Backend::UnknownException.View() } });
 }
 TEST(Contained, KeepsTheFailureWhenTheSinkThrows) {
   auto const throwing = [](std::string_view) { throw std::runtime_error("sink failed"); };
@@ -47,4 +49,24 @@ TEST(Reported, KeepsTheFailureWhenTheReporterThrows) {
   std::out_of_range const failure  { "past the end" };
   EXPECT_TRUE(noexcept(Backend::Reported(failure, throwing)));
   EXPECT_STREQ(Backend::Reported(failure, throwing).what(), "past the end");
+}
+TEST(Contained, RoutesExhaustionAndUnknownFailuresApartFromText) {
+  std::vector<std::string>     texts;
+  Backend::FailureRoutes const routes{ Collecting(texts), [&](std::bad_alloc const&) { texts.emplace_back("memory"); },
+                                       Backend::OperationName{ "unknown in the test" } };
+  EXPECT_FALSE(Backend::Contained(false, []() -> bool { throw std::bad_alloc{ }; }, routes));
+  EXPECT_FALSE(Backend::Contained(false, []() -> bool { throw std::runtime_error("other"); }, routes));
+  EXPECT_FALSE(Backend::Contained(false, []() -> bool { throw 42; }, routes));
+  EXPECT_EQ(texts, (std::vector<std::string>{ "memory", "other", "unknown in the test" }));
+}
+TEST(Contained, RefusesAnOverloadSetSink) {
+  auto const typed = oxbox::utilities::Visitor{ [](std::out_of_range const&) { }, [](std::string_view) { } };
+  static_assert(!Backend::ContainedSink<std::remove_const_t<decltype(typed)>>);
+  static_assert(Backend::ContainedSink<decltype([](std::string_view) { })>);
+}
+TEST(Contained, AnswersWhetherABodyWithoutAResultCompleted) {
+  std::vector<std::string> texts;
+  EXPECT_TRUE(Backend::Contained([] { }, Collecting(texts)));
+  EXPECT_FALSE(Backend::Contained([] { throw std::runtime_error("void failed"); }, Collecting(texts)));
+  EXPECT_EQ(texts, std::vector<std::string>{ "void failed" });
 }

@@ -3,6 +3,7 @@
 #include <sdl-rdp/drive/information.hpp>
 #include <sdl-rdp/drive/transfer.hpp>
 #include <sdl-rdp/freerdp-facade/rdpdr.hpp>
+#include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/exceptions.hpp>
 
@@ -11,6 +12,8 @@
 #include <cstdint>
 #include <format>
 #include <limits>
+#include <string_view>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 
@@ -27,11 +30,9 @@ sdlrdp_file::sdlrdp_file(std::shared_ptr<sdl_rdp::drive::DriveChannel> source, s
                          std::string name)
     : channel{ std::move(source) }, drive{ device }, wire{ file }, path{ std::move(name) } { }
 sdlrdp_file::~sdlrdp_file() {
-  try {
-    Close();
-  } catch (std::exception const& error) {
-    channel->Warn(std::format("Drive close '{}': {}", path, error.what()));
-  }
+  std::ignore = Backend::Contained(
+      [this] { Close(); },
+      [this](std::string_view cause) { channel->Warn(std::format("Drive close '{}': {}", path, cause)); });
 }
 auto sdlrdp_file::Close() -> void {
   if (std::exchange(closed, true)) return;

@@ -92,19 +92,21 @@ auto Run(SDL_Window* window, bool tight, bool partial, DriveOptions drives) -> v
 }
 
 auto SDLCALL FeedTone(void* userdata, SDL_AudioStream* stream, int additional, int /*unused*/) -> void {
-  auto&                         frame   = *static_cast<std::uint64_t*>(userdata);
-  std::array<std::int16_t, 960> samples { };
+  auto&                         frame       = *static_cast<std::uint64_t*>(userdata);
+  constexpr int                 frame_bytes { 2 * sizeof(std::int16_t) };
+  std::array<std::int16_t, 960> samples     { };
   while (additional > 0) {
-    auto count = std::min(additional / int(2 * sizeof(std::int16_t)), 480);
+    auto count = std::min(additional / frame_bytes, 480);
     if (!count) return;
     for (int i = 0; i < count; ++i, ++frame) {
       // A -12 dBFS sine stays inside std::int16_t.
-      auto value = static_cast<std::int16_t>(std::lround(
-          32767 * std::pow(10.0, -12.0 / 20.0) * std::sin(2 * std::numbers::pi * 440 * double(frame) / 48000)));
+      auto value = static_cast<std::int16_t>(
+          std::lround(32767 * std::pow(10.0, -12.0 / 20.0)
+                      * std::sin(2 * std::numbers::pi * 440 * static_cast<double>(frame) / 48000)));
       samples[2uz * i] = samples[(2uz * i) + 1] = value;
     }
-    Check(SDL_PutAudioStreamData(stream, samples.data(), count * 2 * int(sizeof(std::int16_t))));
-    additional -= count * 2 * int(sizeof(std::int16_t));
+    Check(SDL_PutAudioStreamData(stream, samples.data(), count * frame_bytes));
+    additional -= count * frame_bytes;
   }
 }
 
@@ -137,7 +139,7 @@ struct Options {
 auto ParseSize(std::string_view size) -> Extent {
   auto const sides = oxbox::utilities::ParseNumbers<int, 2>(size, 'x').value_or(std::array{ 0, 0 });
   if (std::ranges::any_of(sides, [](int side) { return side <= 0; })) {
-    SDL_SetError("Invalid size '%.*s': expected WxH with positive sides", int(size.size()), size.data());
+    SDL_SetError("%s", std::format("Invalid size '{}': expected WxH with positive sides", size).c_str());
     Check(false);
   }
   return { .width = sides[0], .height = sides[1] };

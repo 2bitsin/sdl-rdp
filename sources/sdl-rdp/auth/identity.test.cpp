@@ -7,13 +7,12 @@
 #include <condition_variable>
 #include <format>
 #include <mutex>
+#include <string_view>
 #include <thread>
 
 namespace {
 TEST(AuthenticationIdentity, UnicodeAndAnsi) {
-  std::array<std::uint16_t, 5> unicode{ 0x017e, 0x0105, 's', 'i', 's' };
-  EXPECT_EQ(Backend::IdentityText(std::span<std::uint16_t const>(unicode)), "žąsis");
-  auto ansi = std::to_array("Aé");
-  EXPECT_EQ(Backend::IdentityText(std::span<char const>(ansi).first(ansi.size() - 1)), "Aé");
+  EXPECT_EQ(Backend::IdentityText(std::u16string_view{ u"žąsis" }), "žąsis");
+  EXPECT_EQ(Backend::IdentityText(std::string_view{ "Aé" }), "Aé");
 }
 }

@@ -153,7 +153,7 @@ auto ReachFloor(Client& client, Headless::FrameObserver& frames, Headless::Logs&
 }
 auto PresentsPerSecond(Pace const& pace) -> double {
   Expects(pace.milliseconds > 0, "the published rate held for a measurable interval");
-  return double(pace.presents) * 1000.0 / double(pace.milliseconds);
+  return static_cast<double>(pace.presents) * 1000.0 / static_cast<double>(pace.milliseconds);
 }
 auto ThenPresentRecovery(RateTrace const& trace) -> void {
   ASSERT_GT(trace.floors, 0u);

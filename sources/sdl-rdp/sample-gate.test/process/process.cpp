@@ -3,6 +3,7 @@
 #include <sdl-rdp/sample-gate.test/process/spawn-actions.hpp>
 
 #include <sdl-rdp/utilities/descriptor.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 #include <algorithm>
 #include <array>
 #include <cerrno>
@@ -62,7 +63,7 @@ auto Process::Line(std::string& line, Clock::time_point deadline) -> bool {
     auto left = std::chrono::ceil<std::chrono::milliseconds>(deadline - Clock::now()).count();
     if (left <= 0) return false;
     pollfd descriptor{ .fd = output, .events = POLLIN, .revents = 0 };
-    if (poll(&descriptor, 1, int(left)) <= 0) return false;
+    if (poll(&descriptor, 1, Backend::Narrowed<int>(left)) <= 0) return false;
     std::array<char, 4096> buffer { };
     auto                   count  = read(output, buffer.data(), buffer.size());
     if (count <= 0) return false;

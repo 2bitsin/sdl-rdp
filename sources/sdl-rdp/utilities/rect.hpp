@@ -57,6 +57,6 @@ inline auto Intersect(sdlrdp_rect left, sdlrdp_rect right) -> std::optional<sdlr
   auto end_x = std::min(std::int64_t{ left.x } + left.w, std::int64_t{ right.x } + right.w);
   auto end_y = std::min(std::int64_t{ left.y } + left.h, std::int64_t{ right.y } + right.h);
   if (end_x <= x || end_y <= y) return std::nullopt;
-  return sdlrdp_rect{ x, y, int(end_x - x), int(end_y - y) };
+  return sdlrdp_rect{ x, y, Narrowed<int>(end_x - x), Narrowed<int>(end_y - y) };
 }
 }

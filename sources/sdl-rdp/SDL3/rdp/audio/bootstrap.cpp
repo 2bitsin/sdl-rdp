@@ -97,12 +97,10 @@ auto ChangeRate(SDL_AudioDevice& device, std::uint32_t rate) -> bool {
   auto spec = device.spec;
   spec.freq = static_cast<int>(rate);
   if (!SDL_AudioDeviceFormatChangedAlreadyLocked(&device, &spec, PeriodFrames(spec.freq))) return false;
-  try {
+  return Boundary([&] {
     data.Buffer().resize(static_cast<std::size_t>(device.buffer_size));
-  } catch (std::bad_alloc const&) {
-    return SDL_OutOfMemory();
-  }
-  return true;
+    return true;
+  });
 }
 // SDL's audio registry identifies this driver's device by its discovery callback address.
 auto PlaybackDevice() -> std::optional<std::reference_wrapper<SDL_AudioDevice>> {

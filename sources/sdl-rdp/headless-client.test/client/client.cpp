@@ -108,7 +108,9 @@ auto KeyboardFlags(KeyState state) -> std::uint16_t {
   }
 }
 auto ChannelError(std::uint32_t a, std::uint32_t b) -> std::uint32_t {
-  auto channel = [&](std::uint32_t shift) { return std::abs(int((a >> shift) & 255) - int((b >> shift) & 255)); };
+  auto channel = [&](std::uint32_t shift) {
+    return std::abs(Backend::Narrowed<int>((a >> shift) & 255) - Backend::Narrowed<int>((b >> shift) & 255));
+  };
   return Backend::Narrowed<std::uint32_t>(std::max({ channel(0), channel(8), channel(16) }));
 }
 }

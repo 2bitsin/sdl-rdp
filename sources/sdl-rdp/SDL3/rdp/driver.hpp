@@ -20,8 +20,8 @@ public:
     requires std::invocable<AcceptTy const&, sdlrdp_event const&>
   auto Poll(AcceptTy const& accept) const -> void {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init): ES.20 input buffer, the poll writes what it reports
-    std::array<sdlrdp_event, _EventBatch> events;
-    for (auto count = _Poll(events); count; count = _Poll(events))
+    std::array<sdlrdp_event, EventBatch> events;
+    for (auto count = PollBatch(events); count; count = PollBatch(events))
       std::ranges::for_each(std::span(events).first(count), std::cref(accept));
   }
   auto Options() const                                   -> settings::Options const&;
@@ -29,17 +29,17 @@ public:
   auto AuthDisplay(SDL_PropertiesID properties) noexcept -> void;
   template <typename FailureTy = bool>
   auto Fail(FailureTy failure = { }) const -> FailureTy {
-    _ReportError();
+    ReportError();
     return failure;
   }
   [[noreturn]] auto Throw() const -> void;
 private:
   // Backend authentication callbacks carry an opaque context and borrowed C strings.
   template <backend::Operation OPERATION, settings::AuthenticationCredential CredentialTy>
-  static auto _Authenticate(void* context, char const* domain, char const* user, CredentialTy credential) -> int;
-  auto _Poll(std::span<sdlrdp_event> events) const -> std::size_t;
-  auto _ReportError() const                        -> void;
-  static constexpr std::size_t  _EventBatch      = 64;
+  static auto Authenticate(void* context, char const* domain, char const* user, CredentialTy credential) -> int;
+  auto        PollBatch(std::span<sdlrdp_event> events) const                                            -> std::size_t;
+  auto        ReportError() const                                                                        -> void;
+  static constexpr std::size_t  EventBatch       = 64;
   settings::Options const       _options;
   settings::Configuration const _config;
   backend::Backend const        _backend;

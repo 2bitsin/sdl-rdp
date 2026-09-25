@@ -3,6 +3,7 @@ import pathlib
 
 import pytest
 
+import casts
 import clones
 import cmake
 import columns
@@ -11,6 +12,7 @@ import format as formatter
 import includes
 import pointers
 import prefixes
+import reserved
 import shape
 import spellings
 
@@ -64,3 +66,11 @@ def test_pointers():
 
 def test_contracts():
     assert contracts.main() == 0
+
+
+def test_casts():
+    assert casts.main() == 0
+
+
+def test_reserved():
+    assert reserved.main() == 0

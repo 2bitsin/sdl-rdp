@@ -23,7 +23,7 @@ auto PushMouseWheel(EventQueue& events, std::uint16_t flags) -> void {
   if (!(flags & (PTR_FLAGS_WHEEL | PTR_FLAGS_HWHEEL))) return;
   int rotation = flags & WheelRotationMask;
   if (flags & PTR_FLAGS_WHEEL_NEGATIVE) rotation -= WheelSignExtension;
-  float const notches = float(rotation) / WheelNotch;
+  float const notches = static_cast<float>(rotation) / WheelNotch;
   events.Push({ .type        = SDLRDP_MOUSE_WHEEL,
                 .mouse_wheel = { .dx = (flags & PTR_FLAGS_HWHEEL) ? notches : 0,
                                  .dy = (flags & PTR_FLAGS_WHEEL) ? notches : 0 } });
@@ -58,7 +58,7 @@ auto InputEvents::Key(std::uint16_t flags, std::uint8_t code) -> bool {
     bool const extended = flags & KBD_FLAGS_EXTENDED;
     bool const down     = !(flags & KBD_FLAGS_RELEASE);
     _diagnostics.Line("key",
-                      [&] { return std::format("code={} extended={} down={}", code, int(extended), int(down)); });
+                      [&] { return std::format("code={} extended={} down={}", code, int{ extended }, int{ down }); });
     _events.Push({ .type = SDLRDP_KEY, .key = { .scancode = code, .extended = extended, .down = down } });
     return true;
   });
@@ -68,7 +68,7 @@ auto InputEvents::Text(std::uint16_t flags, std::uint16_t code) -> bool {
     bool const down  = !(flags & KBD_FLAGS_RELEASE);
     auto const point = oxbox::utilities::UtfDecode(_unicode[down], code);
     if (!point || *point == oxbox::utilities::INVALID_CODEPOINT<>) return true;
-    _diagnostics.Line("key", [&] { return std::format("codepoint={} down={}", std::uint32_t{ *point }, int(down)); });
+    _diagnostics.Line("key", [&] { return std::format("codepoint={} down={}", std::uint32_t{ *point }, int{ down }); });
     _events.Push({ .type = SDLRDP_TEXT, .text = { .codepoint = *point, .down = down } });
     return true;
   });

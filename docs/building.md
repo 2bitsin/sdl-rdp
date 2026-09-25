@@ -55,6 +55,10 @@ and the backend's C ABI header is the header-only module `sources/sdl-rdp/abi/`.
 A lint whose tool is missing (`npx`, clang-format 20) fails with the reason
 printed; the gate has no skips. `python3 tools/lint/includes.py` refuses an
 include of another module's header unless the module links it.
+`tools/lint/casts.py` refuses a functional or C-style cast to a scalar type
+(ES.48, ES.49): `Narrowed<T>(x)`, `T{ x }` or `static_cast<T>(x)` instead, and
+`tools/lint/reserved.py` refuses an `_Upper` identifier ([lex.name]) but for the
+names oxbox, NVENC and POSIX chose.
 
 The driver sources in `rdp/` are compiled directly, not copied into the SDL patch.
 For bootstrap changes, extract two pristine copies of the pinned SDL archive,

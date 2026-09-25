@@ -95,15 +95,9 @@ auto Handled(ContextTy* context, ArgsTy... args) noexcept -> ResultTy {
   auto const reported = [&](std::string_view failure) { std::invoke(FAILURES, owner, OPERATION)(failure); };
   auto const handled  = [&] -> decltype(auto) { return Invoked<HANDLER>(owner, args...); };
   if constexpr (std::is_void_v<ResultTy>)
-    std::ignore = Backend::Contained(
-        false,
-        [&] {
-          handled();
-          return true;
-        },
-        reported);
+    std::ignore = Backend::Contained([&] { handled(); }, reported);
   else
-    return Backend::Contained(ResultTy(FAILURE), [&] -> ResultTy { return handled(); }, reported);
+    return Backend::Contained(ResultTy{ FAILURE }, [&] -> ResultTy { return handled(); }, reported);
 }
 }
 

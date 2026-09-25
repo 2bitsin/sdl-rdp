@@ -4,6 +4,7 @@
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
 
 #include <sdl-rdp/headless-client.test/backend/status.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 
 #include <freerdp/gdi/gdi.h>
 #include <freerdp/input.h>
@@ -56,7 +57,7 @@ auto ThenGraphicsReset(Headless::GraphicsObserver const& observer, GraphicsCount
 }
 }
 auto FrameChecks::Present(std::vector<std::uint32_t> const& pixels, std::uint32_t w, std::uint32_t h) -> void {
-  sdlrdp_rect const full{ 0, 0, int(w), int(h) };
+  sdlrdp_rect const full{ 0, 0, Backend::Narrowed<int>(w), Backend::Narrowed<int>(h) };
   ASSERT_EQ(backend.Present(pixels, w, h, full), 0);
 }
 auto FrameChecks::FillLegacyWindow(Client& client, FrameObserver& observer, std::vector<std::uint32_t>& pixels)
@@ -86,8 +87,8 @@ auto FrameChecks::SuppressAndCheckInput(Client& client) -> void {
   ASSERT_EQ(suppressed.front().type, SDLRDP_KEY);
 }
 auto FrameChecks::ThenDesktopGeometry(Client& client, std::uint32_t w, std::uint32_t h) -> void {
-  EXPECT_EQ(client.Instance()->context->gdi->width, int(w));
-  EXPECT_EQ(client.Instance()->context->gdi->height, int(h));
+  EXPECT_EQ(client.Instance()->context->gdi->width, Backend::Narrowed<int>(w));
+  EXPECT_EQ(client.Instance()->context->gdi->height, Backend::Narrowed<int>(h));
 }
 auto FrameChecks::ThenAspectGeometry(Client& client) -> void {
   auto events = Events(2);

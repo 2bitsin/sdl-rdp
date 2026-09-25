@@ -1,3 +1,4 @@
+#include <sdl-rdp/headless-client.test/utilities/octets.hpp>
 #include <sdl-rdp/sample-gate.test/client/pointer-observer.hpp>
 #include <sdl-rdp/sample-gate.test/client/steps.hpp>
 #include <sdl-rdp/sample-gate.test/frame/first-size.hpp>
@@ -26,7 +27,8 @@ class DesktopSample : public SampleGate::Sample {
 protected:
   auto ThenLegacyClipboard(Client& client) -> void {
     ASSERT_EQ(ClipboardSession().RequestFormat(CF_TEXT), CHANNEL_RC_OK);
-    ASSERT_TRUE(client.Until([&] { return ClipboardSession().Received({ '?', '?', '?', 'w', 0 }); }));
+    ASSERT_TRUE(client.Until(
+        [&] { return ClipboardSession().Received(sdl_rdp::headless_client_test::utilities::AnsiText("???w")); }));
     SDL_Log("trace CLIPBOARD server request=1 bytes=3f3f3f7700 text=???w");
     ASSERT_TRUE(Read("event CLIPBOARD text=żółw"));
   }
@@ -195,11 +197,12 @@ TEST_F(DesktopSample, Soname) {
 TEST_F(DesktopSample, ClipboardAscii) {
   ASSERT_NO_FATAL_FAILURE(GivenClipboard("hello"));
   auto& client = SessionClient();
-  ASSERT_TRUE(
-      client.Until([&] { return ClipboardSession().Received({ 'h', 0, 'e', 0, 'l', 0, 'l', 0, 'o', 0, 0, 0 }); }));
+  ASSERT_TRUE(client.Until(
+      [&] { return ClipboardSession().Received(sdl_rdp::headless_client_test::utilities::UnicodeText("hello")); }));
   SDL_Log("trace CLIPBOARD server formats=13,1 request=13 utf16le=680065006c006c006f000000 text=hello");
   ASSERT_EQ(ClipboardSession().RequestFormat(CF_TEXT), CHANNEL_RC_OK);
-  ASSERT_TRUE(client.Until([&] { return ClipboardSession().Received({ 'h', 'e', 'l', 'l', 'o', 0 }); }));
+  ASSERT_TRUE(client.Until(
+      [&] { return ClipboardSession().Received(sdl_rdp::headless_client_test::utilities::AnsiText("hello")); }));
   SDL_Log("trace CLIPBOARD server request=1 bytes=68656c6c6f00 text=hello");
   ASSERT_NO_FATAL_FAILURE(WhenAsciiClipboardOffered(client));
   Escape(client);
@@ -207,8 +210,8 @@ TEST_F(DesktopSample, ClipboardAscii) {
 
 TEST_F(DesktopSample, ClipboardUnicode) {
   ASSERT_NO_FATAL_FAILURE(GivenClipboard("żółw"));
-  auto&                     client = SessionClient();
-  std::vector<std::uint8_t> bytes  { 0x7c, 1, 0xf3, 0, 0x42, 1, 0x77, 0, 0, 0 };
+  auto&      client = SessionClient();
+  auto const bytes  = sdl_rdp::headless_client_test::utilities::UnicodeText("żółw");
   ASSERT_TRUE(client.Until([&] { return ClipboardSession().Received(bytes); }));
   SDL_Log("trace CLIPBOARD server formats=13,1 request=13 utf16le=7c01f300420177000000 text=żółw");
   ASSERT_NO_FATAL_FAILURE(ThenLegacyClipboard(client));

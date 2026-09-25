@@ -93,6 +93,6 @@ auto CodecSession::RecordFrameCost(Client& client, std::uint64_t bytes) -> void 
   RecordProperty("max_channel_error", std::to_string(client.MaxError(pixels)));
   RecordProperty("wire_bytes", std::to_string(client.Received() - bytes));
   RecordProperty("codec", std::to_string(GetParam().codec));
-  RecordProperty("surface", bool(GetParam().surface) ? "true" : "false");
+  RecordProperty("surface", GetParam().surface ? "true" : "false");
 }
 }

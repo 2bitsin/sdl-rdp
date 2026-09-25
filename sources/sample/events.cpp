@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <format>
 #include <string>
+#include <utility>
 
 namespace sample::detail::events {
 namespace {
@@ -84,9 +85,10 @@ auto PointerDetails(SDL_Event const& event, std::uint32_t frame) -> std::string 
     return std::format(" xrel={:g} yrel={:g} x={:.0f} y={:.0f} frame={}", event.motion.xrel, event.motion.yrel,
                        event.motion.x, event.motion.y, frame);
   case SDL_EVENT_MOUSE_BUTTON_DOWN:
-  case SDL_EVENT_MOUSE_BUTTON_UP: return std::format(" button={} down={}", event.button.button, int(event.button.down));
-  case SDL_EVENT_MOUSE_WHEEL:     return std::format(" x={} y={}", event.wheel.x, event.wheel.y);
-  default:                        return { };
+  case SDL_EVENT_MOUSE_BUTTON_UP:
+    return std::format(" button={} down={}", event.button.button, int{ event.button.down });
+  case SDL_EVENT_MOUSE_WHEEL: return std::format(" x={} y={}", event.wheel.x, event.wheel.y);
+  default:                    return { };
   }
 }
 auto WindowDetails(SDL_Event const& event, SDL_Window* window) -> std::string {
@@ -103,7 +105,8 @@ auto WindowDetails(SDL_Event const& event, SDL_Window* window) -> std::string {
 }
 auto EventDetails(SDL_Event const& event, SDL_Window* window, std::uint32_t frame) -> std::string {
   if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP)
-    return std::format(" scancode={} key={} down={}", int(event.key.scancode), event.key.key, int(event.key.down));
+    return std::format(" scancode={} key={} down={}", std::to_underlying(event.key.scancode), event.key.key,
+                       int{ event.key.down });
   if (event.type == SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED) PrintAudioFormat(event.adevice.which);
   return PointerDetails(event, frame) + WindowDetails(event, window);
 }

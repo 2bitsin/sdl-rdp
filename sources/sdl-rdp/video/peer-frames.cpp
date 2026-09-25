@@ -65,6 +65,6 @@ auto PeerFrames::Sequence() const noexcept -> std::uint64_t {
   return _sequence;
 }
 auto ExpectCaptured(PeerFrames const& frames) -> void {
-  Expects(bool(frames.Snapshot()), "a captured frame exists");
+  Expects(static_cast<bool>(frames.Snapshot()), "a captured frame exists");
 }
 }

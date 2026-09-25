@@ -1,5 +1,6 @@
 #pragma once
 #include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/utilities/narrowed.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -11,6 +12,6 @@ struct Extent {
   std::uint32_t height{ };
 };
 constexpr auto Whole(Extent size) noexcept -> sdlrdp_rect {
-  return { 0, 0, int(size.width), int(size.height) };
+  return { 0, 0, Narrowed<int>(size.width), Narrowed<int>(size.height) };
 }
 }

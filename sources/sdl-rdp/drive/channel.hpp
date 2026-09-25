@@ -55,7 +55,7 @@ public:
             freerdp_facade::IrpMinor minor = freerdp_facade::IrpMinor::None) -> std::shared_ptr<DriveRequest>;
   auto Wait(std::shared_ptr<DriveRequest> const& request, std::string const& path, bool end = false) -> DrivePacket;
   auto WaitAny(std::span<Slot const> slots)                -> std::size_t;
-  auto Warn(std::string const& cause) const                -> void;
+  auto Warn(std::string_view cause) const                  -> void;
 
 private:
   struct DeviceEntry {
@@ -74,7 +74,7 @@ private:
   auto Name(std::span<std::byte const> bytes, std::string_view dos) const -> std::string;
   auto Shutdown()                                                         -> void;
   auto CloseTransport()                                                   -> void;
-  auto Fail(std::string const& cause)                                     -> void;
+  auto Fail(std::string_view cause)                                       -> void;
   auto Announce(DrivePacket& packet)                                      -> void;
   auto Remove(std::uint32_t wire)                                         -> void;
   auto Complete(DrivePacket& packet)                                      -> void;

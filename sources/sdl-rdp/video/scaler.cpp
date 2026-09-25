@@ -24,8 +24,8 @@ auto Blend(float left, float right, float weight) -> float {
   return left + ((right - left) * weight);
 }
 auto Sample(std::span<std::uint8_t const> row, Tap column, std::size_t channel) -> float {
-  auto const first  = float(row[(column.First() * PixelBytes) + channel]);
-  auto const second = float(row[(column.Second() * PixelBytes) + channel]);
+  auto const first  = static_cast<float>(row[(column.First() * PixelBytes) + channel]);
+  auto const second = static_cast<float>(row[(column.Second() * PixelBytes) + channel]);
   return Blend(first, second, column.Weight());
 }
 auto BlendRow(std::span<Tap const> columns, std::span<std::uint8_t const> top, std::span<std::uint8_t const> bottom,
@@ -66,12 +66,12 @@ auto Scaler::Area(sdlrdp_rect damage) const -> sdlrdp_rect {
   Expects(snapshot.Width() > 0, "snapshot width is positive");
   Expects(snapshot.Height() > 0, "snapshot height is positive");
   if (!Scaled()) return damage;
-  auto const sx     = double(target.w) / snapshot.Width();
-  auto const sy     = double(target.h) / snapshot.Height();
-  int const  x      = std::max(0, int(std::floor((damage.x - 1) * sx)));
-  int const  y      = std::max(0, int(std::floor((damage.y - 1) * sy)));
-  int const  right  = std::min(target.w, int(std::ceil((damage.x + damage.w + 1) * sx)));
-  int const  bottom = std::min(target.h, int(std::ceil((damage.y + damage.h + 1) * sy)));
+  auto const sx     = static_cast<double>(target.w) / snapshot.Width();
+  auto const sy     = static_cast<double>(target.h) / snapshot.Height();
+  int const  x      = std::max(0, static_cast<int>(std::floor((damage.x - 1) * sx)));
+  int const  y      = std::max(0, static_cast<int>(std::floor((damage.y - 1) * sy)));
+  int const  right  = std::min(target.w, static_cast<int>(std::ceil((damage.x + damage.w + 1) * sx)));
+  int const  bottom = std::min(target.h, static_cast<int>(std::ceil((damage.y + damage.h + 1) * sy)));
   return { x, y, right - x, bottom - y };
 }
 auto Scaler::Scaled() const -> bool {
@@ -84,7 +84,7 @@ auto Scaler::Fill(sdlrdp_rect area, std::span<std::uint8_t> buffer, std::size_t 
   auto const  stride   = RowBytes(area.w);
   auto const  size     = (Narrowed<std::size_t>(area.h - 1) * pitch) + stride;
   CheckArea(area, _desktop.Rect());
-  Expects(bool(snapshot), "snapshot storage exists");
+  Expects(static_cast<bool>(snapshot), "snapshot storage exists");
   Expects(pitch >= stride, "wire pitch covers the row stride");
   Expects(size <= buffer.size(), "scratch buffer covers the wire band");
   if (Scaled())
@@ -99,7 +99,7 @@ auto Scaler::Fill(sdlrdp_rect area, std::span<std::uint8_t> buffer, std::size_t 
 }
 auto Scaler::Resample(sdlrdp_rect area, std::span<std::uint8_t> buffer, std::size_t pitch, RowOrder order) -> void {
   auto const& snapshot = _frames.Snapshot();
-  auto const  ratio    = double(snapshot.Height()) / _desktop.Rect().h;
+  auto const  ratio    = static_cast<double>(snapshot.Height()) / _desktop.Rect().h;
   Columns(area);
   for (auto row : std::views::iota(0, area.h)) {
     Tap const line{ area.y + row, ratio, snapshot.Height() };
@@ -113,7 +113,7 @@ auto Scaler::Columns(sdlrdp_rect area) -> void {
   if (_column_x == area.x && _column_width == width && _column_source == source
       && std::cmp_equal(_columns.size(), area.w))
     return;
-  auto const ratio = double(source) / width;
+  auto const ratio = static_cast<double>(source) / width;
   _column_x      = area.x;
   _column_width  = width;
   _column_source = source;

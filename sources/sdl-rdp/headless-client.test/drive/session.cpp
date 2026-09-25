@@ -80,7 +80,7 @@ auto DriveSession::Logged(sdlrdp_log_level level, std::string_view text) -> std:
 auto Pattern(std::size_t size, std::uint32_t seed) -> std::string {
   std::string bytes(size, '\0');
   std::ranges::transform(std::views::iota(0uz, size), bytes.begin(),
-                         [=](std::size_t i) { return char((i * 31 + i / 251 + seed) & 255); });
+                         [=](std::size_t i) { return static_cast<char>((i * 31 + i / 251 + seed) & 255); });
   return bytes;
 }
 auto DriveSession::Write(std::string const& name, std::string const& bytes) -> void {

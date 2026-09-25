@@ -11,10 +11,10 @@ namespace {
 using Milliseconds = std::chrono::duration<double, std::milli>;
 constexpr auto SlowAcknowledgement = std::chrono::milliseconds(100);
 auto Mean(std::convertible_to<double> auto total, std::uint64_t count) -> double {
-  return count ? double(total) / double(count) : 0;
+  return count ? static_cast<double>(total) / static_cast<double>(count) : 0;
 }
 auto MeanMilliseconds(std::chrono::nanoseconds total, std::uint64_t count) -> double {
-  return Mean(Milliseconds(total).count(), count);
+  return Mean(Milliseconds{ total }.count(), count);
 }
 }
 auto FrameStatistics::Begin(std::chrono::nanoseconds encoded, std::uint64_t presents) noexcept -> void {
@@ -45,9 +45,9 @@ auto FrameStatistics::Summary() const -> std::string {
   return std::format("Frames: {} sent, {} coalesced; encode {:.1f} ms mean, {:.1f} ms max{}; acknowledgement {:.1f} ms "
                      "mean, {:.1f} ms max, {} over 100 ms, {} timed out. Send buffer: {:.1f} bytes mean, {} bytes max.",
                      _encode.Count(), _coalesced, MeanMilliseconds(_encode.Total(), _encode.Count()),
-                     Milliseconds(_encode.Maximum()).count(), AvcPhases(),
+                     Milliseconds{ _encode.Maximum() }.count(), AvcPhases(),
                      MeanMilliseconds(_acknowledgement.Total(), _acknowledgement.Count()),
-                     Milliseconds(_acknowledgement.Maximum()).count(), _slow, _timed_out,
+                     Milliseconds{ _acknowledgement.Maximum() }.count(), _slow, _timed_out,
                      Mean(_outq.Total(), _encode.Count()), _outq.Maximum());
 }
 auto FrameStatistics::Acknowledgements() const noexcept -> std::uint64_t {

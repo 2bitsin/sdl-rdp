@@ -3,6 +3,7 @@
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
 #include <sdl-rdp/headless-client.test/backend/logs.hpp>
 #include <sdl-rdp/headless-client.test/client/clipboard.hpp>
+#include <sdl-rdp/headless-client.test/utilities/octets.hpp>
 #include <sdl-rdp/utilities/transcode.hpp>
 
 #include <gtest/gtest.h>
@@ -15,6 +16,8 @@
 #include <span>
 
 namespace {
+using sdl_rdp::headless_client_test::utilities::Octets;
+using sdl_rdp::headless_client_test::utilities::UnicodeText;
 auto HasClipboardEvent(std::span<sdlrdp_event const> events) -> bool {
   return std::ranges::contains(events, SDLRDP_CLIPBOARD, &sdlrdp_event::type);
 }
@@ -69,7 +72,7 @@ protected:
   std::unique_ptr<Headless::ClipboardClient> clipboard;
 };
 auto OfferMalformedText(Headless::Client& client, Headless::ClipboardClient& clipboard) -> void {
-  for (auto const& bytes : { std::vector<std::uint8_t>{ 0x7c }, { 0, 0xdc, 0, 0 }, { 'x', 0 } }) {
+  for (auto const& bytes : { Octets(0x7c), Octets(0, 0xdc, 0, 0), Octets('x', 0) }) {
     auto count = clipboard.Observed().requests.load();
     ASSERT_TRUE(clipboard.Offer(bytes));
     ASSERT_TRUE(client.Until([&] { return clipboard.Observed().requests.load() > count; }));
@@ -101,20 +104,20 @@ TEST_F(Clipboard, LocalTextAndErrors) {
 TEST_F(Clipboard, LiveSetAndMalformedResponse) {
   ASSERT_NO_FATAL_FAILURE(GivenClipboard());
   ASSERT_EQ(sdlrdp_set_clipboard_text(handle.Handle(), "hello"), 0);
-  ASSERT_TRUE(client->Until([&] { return clipboard->Received({ 'h', 0, 'e', 0, 'l', 0, 'l', 0, 'o', 0, 0, 0 }); }));
+  ASSERT_TRUE(client->Until([&] { return clipboard->Received(UnicodeText("hello")); }));
   Drain();
   auto const* retained = sdlrdp_get_clipboard_text(handle.Handle());
   ASSERT_NO_FATAL_FAILURE(OfferMalformedText(*client, *clipboard));
-  ASSERT_TRUE(clipboard->Offer({ 'w', 0, 'o', 0, 'r', 0, 'l', 0, 'd', 0, 0, 0 }));
+  ASSERT_TRUE(clipboard->Offer(UnicodeText("world")));
   ASSERT_TRUE(UntilClipboardEvent());
   ThenReplacedText(retained);
 }
 TEST_F(Clipboard, FirstOfferRetainsAppText) {
   ASSERT_EQ(sdlrdp_set_clipboard_text(handle.Handle(), "app"), 0);
   Headless::Client          client(sdlrdp_port(handle.Handle()), false);
-  Headless::ClipboardClient clipboard(client, { 'c', 0, 'l', 0, 'i', 0, 'e', 0, 'n', 0, 't', 0, 0, 0 });
+  Headless::ClipboardClient clipboard(client, UnicodeText("client"));
   ASSERT_TRUE(client.Connect()) << logs.Text(true);
-  ASSERT_TRUE(client.Until([&] { return clipboard.Received({ 'a', 0, 'p', 0, 'p', 0, 0, 0 }); }));
+  ASSERT_TRUE(client.Until([&] { return clipboard.Received(UnicodeText("app")); }));
   EXPECT_EQ(clipboard.Observed().accepted.load(), 1u);
   EXPECT_EQ(clipboard.Observed().requests.load(), 0u);
   EXPECT_STREQ(sdlrdp_get_clipboard_text(handle.Handle()), "app");
@@ -122,7 +125,7 @@ TEST_F(Clipboard, FirstOfferRetainsAppText) {
 TEST_F(Clipboard, NonTextOfferClearsText) {
   ASSERT_NO_FATAL_FAILURE(GivenClipboard());
   ASSERT_EQ(sdlrdp_set_clipboard_text(handle.Handle(), "app"), 0);
-  ASSERT_TRUE(client->Until([&] { return clipboard->Received({ 'a', 0, 'p', 0, 'p', 0, 0, 0 }); }));
+  ASSERT_TRUE(client->Until([&] { return clipboard->Received(UnicodeText("app")); }));
   Drain();
   ThenNonTextOffer();
 }

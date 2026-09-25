@@ -59,7 +59,7 @@ Framebuffer::Framebuffer(Surface surface) noexcept : _surface{ std::move(surface
 }
 auto Framebuffer::Present(Driver const& driver, std::span<SDL_Rect const> rects) -> bool {
   auto const& surface = *_surface.Get();
-  auto const  damage  = _Damage(rects);
+  auto const  damage  = Damage(rects);
   if (driver.Call<Operation::PRESENT>(surface.pixels, surface.pitch, surface.w, surface.h, damage.data(),
                                       ::Backend::Narrowed<std::uint32_t>(damage.size()))
       != 0)
@@ -68,7 +68,7 @@ auto Framebuffer::Present(Driver const& driver, std::span<SDL_Rect const> rects)
   return driver.Call<Operation::WAIT_FRAME>(FrameAcknowledgementWaitMs) >= 0 || driver.Fail();
 }
 // The buffer keeps its capacity across presents, so a steady rectangle count allocates only on its first present.
-auto Framebuffer::_Damage(std::span<SDL_Rect const> rects) -> std::span<sdlrdp_rect const> {
+auto Framebuffer::Damage(std::span<SDL_Rect const> rects) -> std::span<sdlrdp_rect const> {
   _damage.clear();
   std::ranges::transform(rects, std::back_inserter(_damage), BackendRect);
   return _damage;

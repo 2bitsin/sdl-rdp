@@ -43,9 +43,9 @@ public:
   auto     operator=(SoundClient const&) -> SoundClient& = delete;
   auto     operator=(SoundClient&&)      -> SoundClient& = delete;
 
-  auto Send(std::span<std::uint8_t const> bytes)    -> bool;
-  auto Capture(std::span<std::uint8_t const> bytes) -> void;
-  auto Confirm(std::size_t index = 0)               -> bool;
+  auto Send(std::span<std::byte const> bytes)    -> bool;
+  auto Capture(std::span<std::byte const> bytes) -> void;
+  auto Confirm(std::size_t index = 0)            -> bool;
 
   auto CaptureState()       -> SoundCapture&;
   auto CaptureState() const -> SoundCapture const&;
@@ -59,8 +59,8 @@ private:
   CHANNEL_ENTRY_POINTS_EX                 entry          { };
   void*                                   init           = nullptr;
   std::uint32_t                           channel        = 0;
-  std::vector<std::uint8_t>               incoming;
-  std::array<std::uint8_t, 4>             first          { };
+  std::vector<std::byte>                  incoming;
+  std::array<std::byte, 4>                first          { };
   std::uint32_t                           wave_bytes     = 0;
   std::uint16_t                           timestamp      = 0;
   std::uint8_t                            block          = 0;

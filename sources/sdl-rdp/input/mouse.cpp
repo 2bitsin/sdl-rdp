@@ -78,7 +78,8 @@ auto InputEvents::Pointer(std::uint64_t flags, std::int32_t x, std::int32_t y) -
     PushButtons<std::uint64_t>(_events, Buttons, flags, FirstButton, flags & AINPUT_FLAGS_DOWN);
     if (flags & AINPUT_FLAGS_WHEEL)
       _events.Push(
-          { .type = SDLRDP_MOUSE_WHEEL, .mouse_wheel = { .dx = float(x) / WheelUnit, .dy = float(y) / WheelUnit } });
+          { .type        = SDLRDP_MOUSE_WHEEL,
+            .mouse_wheel = { .dx = static_cast<float>(x) / WheelUnit, .dy = static_cast<float>(y) / WheelUnit } });
     return std::uint32_t{ CHANNEL_RC_OK };
   });
 }

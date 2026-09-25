@@ -1,6 +1,7 @@
 #include <sdl-rdp/headless-client.test/client/clipboard.hpp>
 #include <sdl-rdp/headless-client.test/client/sound.hpp>
 #include <sdl-rdp/headless-client.test/frame/observer.hpp>
+#include <sdl-rdp/headless-client.test/utilities/octets.hpp>
 #include <sdl-rdp/headless-client.test/utilities/wall-milliseconds.hpp>
 #include <sdl-rdp/integration/support.bench/session.hpp>
 #include <sdl-rdp/sample-gate.test/process/process.hpp>
@@ -131,7 +132,8 @@ auto InputAndClipboardUnderTightVideo::Sent(Headless::Client& client, Headless::
   if (!Check(client.Key(0x1e, index % 2 == 0 ? Headless::KeyState::Down : Headless::KeyState::Up), "the key is sent"))
     return false;
   _clips.push_back(Headless::WallMilliseconds());
-  return Check(clipboard.Offer({ Backend::Narrowed<std::uint8_t>('A' + index), 0, 0, 0 }),
+  return Check(clipboard.Offer(sdl_rdp::headless_client_test::utilities::UnicodeText(
+                   std::string{ Backend::Narrowed<char>('A' + index) })),
                "the clipboard offer is sent");
 }
 auto InputAndClipboardUnderTightVideo::ThenLatency(std::string_view event,

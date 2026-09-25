@@ -7,8 +7,10 @@
 #include <freerdp/addin.h>
 #include <freerdp/channels/channels.h>
 #include <freerdp/client/channels.h>
+#include <oxbox/utilities/span.hpp>
 #include <winpr/clipboard.h>
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <ranges>
 #include <span>
@@ -79,7 +81,7 @@ auto ClipboardClient::Callbacks::InstallData(CliprdrClientContext& context) -> v
   };
 }
 
-ClipboardClient::ClipboardClient(Client& value, std::vector<std::uint8_t> initial)
+ClipboardClient::ClipboardClient(Client& value, std::vector<std::byte> initial)
     : client(value), outgoing(std::move(initial)) {
   ObserverSet::Of(*client.Instance()->context).Add(*this);
   freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
@@ -97,9 +99,10 @@ ClipboardClient::~ClipboardClient() {
   PubSub_UnsubscribeChannelConnected(client.Instance()->context->pubSub, Callbacks::ChannelConnected);
   ObserverSet::Of(*client.Instance()->context).Remove<ClipboardClient>();
 }
-auto ClipboardClient::Received(std::vector<std::uint8_t> const& bytes) -> bool {
+auto ClipboardClient::Received(std::span<std::byte const> bytes) -> bool {
   std::scoped_lock const lock(guard);
-  return incoming == bytes && std::ranges::contains(formats, CF_UNICODETEXT) && std::ranges::contains(formats, CF_TEXT);
+  return std::ranges::equal(incoming, bytes) && std::ranges::contains(formats, CF_UNICODETEXT)
+         && std::ranges::contains(formats, CF_TEXT);
 }
 auto ClipboardClient::RequestFormat(std::uint32_t format) -> std::uint32_t {
   Expects(channel.load(), "clipboard channel connected");
@@ -107,11 +110,11 @@ auto ClipboardClient::RequestFormat(std::uint32_t format) -> std::uint32_t {
   request.requestedFormatId = format;
   return channel.load()->ClientFormatDataRequest(channel.load(), &request);
 }
-auto ClipboardClient::Offer(std::vector<std::uint8_t> bytes, bool unicode) -> bool {
+auto ClipboardClient::Offer(std::span<std::byte const> bytes, bool unicode) -> bool {
   Expects(channel.load(), "clipboard channel connected");
   {
     std::scoped_lock const lock(guard);
-    outgoing = std::move(bytes);
+    outgoing.assign(bytes.begin(), bytes.end());
   }
   return AnnounceFormat(*channel.load(), unicode) == CHANNEL_RC_OK;
 }
@@ -150,14 +153,16 @@ auto ClipboardClient::Request(CliprdrClientContext& context, CLIPRDR_FORMAT_DATA
   CLIPRDR_FORMAT_DATA_RESPONSE response{ .common = { .msgType = CB_FORMAT_DATA_RESPONSE } };
   response.common.msgFlags     = request.requestedFormatId == CF_UNICODETEXT ? CB_RESPONSE_OK : CB_RESPONSE_FAIL;
   response.common.dataLen      = outgoing.size();
-  response.requestedFormatData = outgoing.data();
+  response.requestedFormatData = oxbox::utilities::SpanCast<std::uint8_t const>(std::span(outgoing)).data();
   ++observed.requests;
   return context.ClientFormatDataResponse(&context, &response);
 }
 auto ClipboardClient::Response(CLIPRDR_FORMAT_DATA_RESPONSE const& response) -> std::uint32_t {
   std::scoped_lock const lock(guard);
-  if (response.common.msgFlags & CB_RESPONSE_OK)
-    incoming.assign(response.requestedFormatData, response.requestedFormatData + response.common.dataLen);
+  if (response.common.msgFlags & CB_RESPONSE_OK) {
+    auto const data = std::as_bytes(std::span(response.requestedFormatData, response.common.dataLen));
+    incoming.assign(data.begin(), data.end());
+  }
   ++observed.responses;
   return CHANNEL_RC_OK;
 }

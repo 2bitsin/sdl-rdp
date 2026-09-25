@@ -20,26 +20,28 @@ struct IdentityNames {
 inline auto QualifiedName(std::string_view domain, std::string_view user) -> std::string {
   return domain.empty() ? std::string(user) : std::string(domain) + "\\" + std::string(user);
 }
-inline auto IdentityText(std::span<std::uint16_t const> utf16) -> std::string {
+inline auto IdentityText(std::u16string_view utf16) -> std::string {
   using oxbox::utilities::Encoding;
-  return TranscodeRange<std::string>(oxbox::utilities::SpanCast<std::byte const>(utf16),
+  return TranscodeRange<std::string>(oxbox::utilities::AsBytes(utf16),
                                      { .encoding = Encoding::UTF16, .order = std::endian::native }, { });
 }
-inline auto IdentityText(std::span<char const> utf8) -> std::string {
+inline auto IdentityText(std::string_view utf8) -> std::string {
   using oxbox::utilities::Encoding;
   return TranscodeRange<std::string>(oxbox::utilities::AsBytes(utf8),
                                      { .encoding = Encoding::UTF8, .order = std::endian::native }, { });
 }
-inline auto IdentityText(std::span<std::uint8_t const> utf8) -> std::string {
-  return IdentityText(oxbox::utilities::SpanCast<char const>(utf8));
+// WinPR types identity text as BYTE for UTF-8 and UINT16 for UTF-16; the code units are the text.
+inline auto IdentityView(std::span<std::uint8_t const> utf8) -> std::string_view {
+  return std::string_view{ oxbox::utilities::SpanCast<char const>(utf8) };
 }
-template <auto TEXT, auto LENGTH, class Identity>
-auto IdentityField(Identity const& identity)
-    -> std::span<std::remove_pointer_t<std::remove_cvref_t<decltype(identity.*TEXT)>> const> {
+inline auto IdentityView(std::span<std::uint16_t const> utf16) -> std::u16string_view {
+  return std::u16string_view{ oxbox::utilities::SpanCast<char16_t const>(utf16) };
+}
+template <auto TEXT, auto LENGTH, class Identity> auto IdentityField(Identity const& identity) -> decltype(auto) {
   auto const* const text   = identity.*TEXT;
   auto const        length = std::size_t{ identity.*LENGTH };
   if (length) utilities::Expects(text != nullptr, "identity buffer covers length");
-  return std::span{ text, length };
+  return IdentityView(std::span{ text, length });
 }
 template <class Identity> auto NamesOf(Identity const& identity) -> IdentityNames {
   return { .user   = IdentityText(IdentityField<&Identity::User, &Identity::UserLength>(identity)),

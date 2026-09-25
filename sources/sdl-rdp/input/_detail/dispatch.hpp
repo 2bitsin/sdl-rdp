@@ -13,7 +13,7 @@
 namespace Backend {
 template <class Result> auto InputEvents::WhenActive(Result idle, std::invocable auto action) -> Result {
   auto const session = _session.Lock();
-  return _activation.Active() ? Result(action()) : idle;
+  return _activation.Active() ? Result{ action() } : idle;
 }
 template <std::unsigned_integral Flags>
 auto PushButtons(EventQueue& events, std::span<Flags const> buttons, Flags flags, std::uint32_t first, bool down)

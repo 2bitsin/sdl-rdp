@@ -26,7 +26,7 @@ public:
   auto Get() const -> std::optional<FieldValue<FIELD>> {
     if (auto const hint = Text(SDL_GetHintFromCode(HintText<FIELD>.data())))
       return FromText(std::type_identity<FieldValue<FIELD>>{ }, HintName<FIELD>(), *hint);
-    return _Fallback<FIELD>();
+    return Fallback<FIELD>();
   }
   template <auto FIELD>
   auto Value() const -> FieldValue<FIELD> {
@@ -37,7 +37,7 @@ public:
       -> FieldValue<FIELD> {
     auto const code = Text(SDL_GetHintFromCode(HintText<FIELD>.data()));
     // SDL_ResetHint calls observers before removing the old code value.
-    return old_value != new_value && code && code != new_value ? _Fallback<FIELD>().value_or(Default<FIELD>())
+    return old_value != new_value && code && code != new_value ? Fallback<FIELD>().value_or(Default<FIELD>())
                                                                : Value<FIELD>();
   }
   // Complain mode continues a field without a default at its type's own default.
@@ -49,7 +49,7 @@ public:
   }
 private:
   template <auto FIELD>
-  auto _Fallback() const -> std::optional<FieldValue<FIELD>> {
+  auto Fallback() const -> std::optional<FieldValue<FIELD>> {
     if (auto const& value = _file.*FIELD) return value;
     return Text(SDL_getenv(HintText<FIELD>.data())).transform([](std::string const& text) {
       return FromText(std::type_identity<FieldValue<FIELD>>{ }, HintName<FIELD>(), text);

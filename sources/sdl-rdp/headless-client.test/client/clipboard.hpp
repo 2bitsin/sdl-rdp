@@ -4,8 +4,10 @@
 #include <freerdp/client/cliprdr.h>
 #include <freerdp/event.h>
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <mutex>
+#include <span>
 #include <vector>
 
 namespace Headless {
@@ -16,16 +18,16 @@ struct ClipboardCapture {
 };
 class ClipboardClient {
 public:
-           ClipboardClient(ClipboardClient const&)                                         = delete;
-           ClipboardClient(ClipboardClient&&)                                              = delete;
-  explicit ClipboardClient(Client& value, std::vector<std::uint8_t> initial = { });
+           ClipboardClient(ClipboardClient const&)                                          = delete;
+           ClipboardClient(ClipboardClient&&)                                               = delete;
+  explicit ClipboardClient(Client& value, std::vector<std::byte> initial = { });
            ~ClipboardClient();
-  auto     operator=(ClipboardClient const&)                           -> ClipboardClient& = delete;
-  auto     operator=(ClipboardClient&&)                                -> ClipboardClient& = delete;
-  auto     Received(std::vector<std::uint8_t> const& bytes)            -> bool;
-  auto     RequestFormat(std::uint32_t format)                         -> std::uint32_t;
-  auto     Offer(std::vector<std::uint8_t> bytes, bool unicode = true) -> bool;
-  auto     Observed() const                                            -> ClipboardCapture const&;
+  auto     operator=(ClipboardClient const&)                            -> ClipboardClient& = delete;
+  auto     operator=(ClipboardClient&&)                                 -> ClipboardClient& = delete;
+  auto     Received(std::span<std::byte const> bytes)                   -> bool;
+  auto     RequestFormat(std::uint32_t format)                          -> std::uint32_t;
+  auto     Offer(std::span<std::byte const> bytes, bool unicode = true) -> bool;
+  auto     Observed() const                                             -> ClipboardCapture const&;
 
 private:
   class Callbacks;
@@ -37,8 +39,8 @@ private:
   ClipboardCapture                   observed;
   Client&                            client;
   std::mutex                         guard;
-  std::vector<std::uint8_t>          outgoing;
-  std::vector<std::uint8_t>          incoming;
+  std::vector<std::byte>             outgoing;
+  std::vector<std::byte>             incoming;
   std::vector<std::uint32_t>         formats;
   std::atomic<CliprdrClientContext*> channel  = nullptr;
 };

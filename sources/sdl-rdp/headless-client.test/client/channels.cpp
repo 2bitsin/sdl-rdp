@@ -3,7 +3,9 @@
 #include <freerdp/addin.h>
 #include <freerdp/channels/channels.h>
 #include <freerdp/client/cmdline.h>
+#include <oxbox/utilities/span.hpp>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 
 namespace Headless {
@@ -24,8 +26,10 @@ auto LoadDynamicChannel(freerdp* instance, char const* name) -> bool {
   std::array const channel{ name };
   return LoadAddin(instance, "drdynvc", channel);
 }
-auto SendStaticChannel(freerdp* instance, char const* name, std::span<std::uint8_t const> bytes) -> bool {
+auto SendStaticChannel(freerdp* instance, char const* name, std::span<std::byte const> bytes) -> bool {
   auto id = freerdp_channels_get_id_by_name(instance, name);
-  return id && instance->SendChannelData(instance, id, bytes.data(), bytes.size());
+  return id
+         && instance->SendChannelData(instance, id, oxbox::utilities::SpanCast<std::uint8_t const>(bytes).data(),
+                                      bytes.size());
 }
 }

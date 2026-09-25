@@ -24,10 +24,10 @@ auto ToneMeasurements(std::vector<std::int16_t> const& samples, std::uint32_t ra
   for (std::size_t frame = 1; frame < frames; ++frame) {
     auto sample = samples[start + (frame * 2)];
     crossings += samples[start + ((frame - 1) * 2)] <= 0 && sample > 0;
-    square    += double(sample) * sample;
+    square    += static_cast<double>(sample) * sample;
   }
   auto frequency = static_cast<double>(crossings) * rate / static_cast<double>(frames);
-  auto db        = 20 * std::log10(std::sqrt(square / double(frames - 1)) * std::numbers::sqrt2 / 32767);
+  auto db        = 20 * std::log10(std::sqrt(square / static_cast<double>(frames - 1)) * std::numbers::sqrt2 / 32767);
   return { frequency, db };
 }
 auto MaximumGapMs(std::span<std::chrono::steady_clock::time_point const> received) -> double {

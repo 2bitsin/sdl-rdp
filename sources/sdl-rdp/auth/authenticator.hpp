@@ -4,6 +4,7 @@
 #include <sdl-rdp/auth/credentials.hpp>
 #include <sdl-rdp/auth/state.hpp>
 #include <sdl-rdp/freerdp-facade/ntlm.hpp>
+#include <sdl-rdp/utilities/operation-name.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
 #include <freerdp/peer.h>
@@ -16,6 +17,7 @@
 namespace Backend {
 class Configuration;
 class Diagnostics;
+class FailureLog;
 class PeerLink;
 // NTLM keys are an MD5 digest wide (MS-NLMP 3.3.2).
 using NtKey = std::span<std::uint8_t, 16>;
@@ -26,7 +28,7 @@ public:
   auto VerifySettings()                                              -> bool;
   auto Hash(SEC_WINNT_AUTH_IDENTITY const& identity, NtKey response) -> bool;
   auto End()                                                         -> void;
-  auto InstallCredentials(rdpSettings& settings) const               -> bool;
+  auto InstallCredentials(rdpSettings& settings) const               -> void;
   auto Auth() const noexcept                                         -> sdlrdp_auth;
 
 private:
@@ -37,6 +39,7 @@ private:
   auto ResponseKey(SEC_WINNT_AUTH_IDENTITY const& identity, NtKey response)                  -> bool;
   auto NtHash(std::string const& domain, std::string const& user) const
       -> std::optional<sdl_rdp::freerdp_facade::NtOwf>;
+  auto Failures(OperationName operation) const noexcept                                      -> FailureLog;
   PeerLink&              _link;
   Configuration const&   _configuration;
   Diagnostics const&     _diagnostics;

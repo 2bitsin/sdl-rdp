@@ -6,6 +6,7 @@
 #include <sdl-rdp/picture/frame-store.hpp>
 #include <sdl-rdp/picture/geometry.hpp>
 #include <sdl-rdp/session/session.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/video/avc/encoding.hpp>
 #include <sdl-rdp/video/pointer/store.hpp>
 
@@ -23,7 +24,7 @@ auto Spans(int start, int length, int value) -> bool {
 }
 auto ComposeRow(std::span<std::uint8_t const> source, std::span<std::uint8_t const> former,
                 std::span<std::uint8_t> target, auto damage) -> void {
-  auto const width = int(target.size() / PixelBytes);
+  auto const width = Narrowed<int>(target.size() / PixelBytes);
   for (int x = 0; x < width;) {
     auto covered{ std::ranges::find_if(damage, [x](auto rect) { return Spans(rect.x, rect.w, x); })               };
     auto ahead  { damage | std::views::filter([x](auto rect) { return rect.x > x; })                              };
@@ -49,7 +50,7 @@ auto ComposePicture(std::span<std::uint8_t const> source, std::uint32_t pitch, F
   auto const prior_stride = prior.empty() ? std::size_t{ 0 } : stride;
   auto const prior_row    = prior.empty() ? std::size_t{ 0 } : row;
   std::ranges::for_each(std::views::iota(0u, former.Height()), [&](std::uint32_t y) {
-    auto active = damage | std::views::filter([y](auto rect) { return Spans(rect.y, rect.h, int(y)); });
+    auto active = damage | std::views::filter([y](auto rect) { return Spans(rect.y, rect.h, Narrowed<int>(y)); });
     ComposeRow(source.subspan(std::size_t{ y } * pitch, row), prior.subspan(std::size_t{ y } * prior_stride, prior_row),
                target.subspan(std::size_t{ y } * stride, row), active);
   });

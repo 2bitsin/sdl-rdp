@@ -26,7 +26,8 @@ auto ProcId() -> pid_t {
   // procfs can belong to an outer PID namespace; its children file uses that namespace.
   std::ifstream children("/proc/thread-self/children");
   pid_t         child    = 0;
-  utilities::Expects(bool(children >> child), "spawned child visible in procfs");
+  bool const    read     = !(children >> child).fail();
+  utilities::Expects(read, "spawned child visible in procfs");
   return child;
 }
 }

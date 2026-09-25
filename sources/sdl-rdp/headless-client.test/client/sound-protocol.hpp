@@ -15,7 +15,7 @@ private:
   static auto EntryPoint() -> PVIRTUALCHANNELENTRYEX;
   static auto Register(SoundClient& self, CHANNEL_ENTRY_POINTS_EX const& points, void* handle)    -> bool;
   static auto Initialized(SoundClient& self, std::uint32_t event)                                 -> void;
-  static auto Received(SoundClient& self, std::span<std::uint8_t const> bytes, std::size_t total, std::uint32_t flags)
+  static auto Received(SoundClient& self, std::span<std::byte const> bytes, std::size_t total, std::uint32_t flags)
       -> void;
   static auto Formats(SoundClient& self, wStream* stream)                                         -> void;
   static auto Wave(SoundClient& self, wStream* stream, std::uint32_t size, bool second)           -> void;

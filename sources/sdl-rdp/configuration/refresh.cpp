@@ -70,8 +70,8 @@ auto Refresh::Average(Clock::time_point now) -> void {
 }
 auto Refresh::Estimate(Clock::duration interval) -> void {
   average = 0.8 * average + 0.2 * std::chrono::duration<double>(interval).count();
-  auto estimate = Narrowed<std::uint32_t>(std::lround(std::clamp(1.0 / average, 10.0, double(ceiling))));
-  if (std::abs(double(estimate) - rate) > rate * 0.05) rate = estimate;
+  auto estimate = Narrowed<std::uint32_t>(std::lround(std::clamp(1.0 / average, 10.0, static_cast<double>(ceiling))));
+  if (std::abs(static_cast<double>(estimate) - rate) > rate * 0.05) rate = estimate;
 }
 auto Refresh::Written(WireSample const& wire, std::size_t bytes) -> void {
   utilities::Expects(bytes > 0, "a frame was written");

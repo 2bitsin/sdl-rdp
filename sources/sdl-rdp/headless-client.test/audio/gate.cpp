@@ -91,7 +91,7 @@ auto AudioGate::ThenSlowAudioConfirms(std::future<int>& writing) -> void {
   RecordProperty("audio_diagnostics", logs.Text(true));
   EXPECT_EQ(writing.get(), 480000);
   RecordProperty("maximum_unconfirmed_ms",
-                 std::to_string(double(AudioSession().CaptureState().maximum_pending_frames) / 48.0));
+                 std::to_string(static_cast<double>(AudioSession().CaptureState().maximum_pending_frames) / 48.0));
 }
 auto AudioGate::GivenUnconfirmedSession() -> void {
   ASSERT_NO_FATAL_FAILURE(GivenAudioServer());

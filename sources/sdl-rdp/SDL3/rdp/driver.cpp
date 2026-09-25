@@ -15,7 +15,7 @@ auto BackendPath(Options const& options) -> std::filesystem::path {
 }
 }
 template <Operation OPERATION, AuthenticationCredential CredentialTy>
-auto Driver::_Authenticate(void* context, char const* domain, char const* user, CredentialTy credential) -> int {
+auto Driver::Authenticate(void* context, char const* domain, char const* user, CredentialTy credential) -> int {
   utilities::Expects(context != nullptr, "authentication has its driver context");
   auto const&    self       = *static_cast<Driver const*>(context);
   constexpr auto name       = OPERATION == Operation::VERIFY_PAIR ? SDL_PROP_DISPLAY_RDP_VERIFY_POINTER
@@ -29,10 +29,10 @@ auto Driver::_Authenticate(void* context, char const* domain, char const* user, 
                   credential);
 }
 Driver::Driver()
-    : _config{ _options, _Authenticate<Operation::VERIFY_PAIR, char const*>,
-               _Authenticate<Operation::LOOKUP_PAIR, std::uint8_t*>, this },
+    : _config{ _options, Authenticate<Operation::VERIFY_PAIR, char const*>,
+               Authenticate<Operation::LOOKUP_PAIR, std::uint8_t*>, this },
       _backend{ BackendPath(_options) }, _session{ _backend, _config.Get() } { }
-auto Driver::_Poll(std::span<sdlrdp_event> events) const -> std::size_t {
+auto Driver::PollBatch(std::span<sdlrdp_event> events) const -> std::size_t {
   auto const count = Call<Operation::POLL>(events.data(), ::Backend::Narrowed<std::uint32_t>(events.size()));
   utilities::Ensures(count <= events.size(), "backend fills at most the event buffer");
   return count;
@@ -46,7 +46,7 @@ auto Driver::Config() const -> sdlrdp_config const& {
 auto Driver::AuthDisplay(SDL_PropertiesID properties) noexcept -> void {
   _auth_properties.store(properties);
 }
-auto Driver::_ReportError() const -> void {
+auto Driver::ReportError() const -> void {
   SDL_SetError("%s", _backend.Call<Operation::LAST_ERROR>());
 }
 auto Driver::Throw() const -> void {

@@ -6,6 +6,7 @@
 #include <sdl-rdp/headless-client.test/graphics/cost.hpp>
 #include <sdl-rdp/headless-client.test/graphics/observer.hpp>
 #include <sdl-rdp/utilities/extent.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/video/gfx/protocol.hpp>
 
 #include <gtest/gtest.h>
@@ -118,7 +119,7 @@ TEST_F(GraphicsResize, ProgressiveContextAndFullDamage) {
   for (auto [w, h] : ResizeSequence) {
     std::vector<std::uint32_t> pixels(static_cast<std::size_t>(w) * h, 0x335577 + (generations * 0x221100));
     SCOPED_TRACE(std::to_string(w) + "x" + std::to_string(h));
-    sdlrdp_rect const damage{ 0, 0, int(w), int(h) };
+    sdlrdp_rect const damage{ 0, 0, Backend::Narrowed<int>(w), Backend::Narrowed<int>(h) };
     ASSERT_EQ(backend.Present(pixels, w, h, damage), 0);
     ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text(true);
     ++generations;

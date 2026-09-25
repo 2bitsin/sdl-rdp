@@ -1,9 +1,11 @@
 #include <sdl-rdp/headless-client.test/utilities/child-process.hpp>
 
+#include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/system-call.hpp>
 
 #include <csignal>
+#include <string_view>
 #include <sys/wait.h>
 #include <tuple>
 #include <unistd.h>
@@ -14,11 +16,7 @@ namespace {
 constexpr int BodyThrew = 124;
 
 auto Run(std::function<int()> const& body) noexcept -> int {
-  try {
-    return body();
-  } catch (...) {
-    return BodyThrew;
-  }
+  return Backend::Contained(BodyThrew, body, [](std::string_view) noexcept { });
 }
 auto Spawned(std::function<int()> const& body) -> pid_t {
   utilities::Expects(static_cast<bool>(body), "the child has a body");

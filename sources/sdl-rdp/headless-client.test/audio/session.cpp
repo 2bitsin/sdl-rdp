@@ -40,8 +40,8 @@ auto ConfirmDue(SoundClient& audio, std::chrono::milliseconds delay) -> void {
 auto ThenAudioCadence(SoundClient const& audio) -> void {
   ASSERT_GT(audio.CaptureState().received.size(), 1u);
   auto const maximum_gap = Headless::MaximumGapMs(audio.CaptureState().received);
-  auto       block_ms    = 1000.0 * double(audio.CaptureState().samples.size()) / 2
-                           / double(audio.CaptureState().received.size()) / audio.CaptureState().rate;
+  auto       block_ms    = 1000.0 * static_cast<double>(audio.CaptureState().samples.size()) / 2
+                           / static_cast<double>(audio.CaptureState().received.size()) / audio.CaptureState().rate;
   EXPECT_LE(maximum_gap, (2 * block_ms) + 10);
 }
 }

@@ -21,7 +21,7 @@ public:
     return std::get<std::to_underlying(OPERATION)>(_symbols)(std::forward<ArgsTy>(args)...);
   }
 private:
-  static auto _Load(Library const& library) -> BackendSymbols;
+  static auto Loaded(Library const& library) -> BackendSymbols;
   Library const        _library;
   BackendSymbols const _symbols;
 };

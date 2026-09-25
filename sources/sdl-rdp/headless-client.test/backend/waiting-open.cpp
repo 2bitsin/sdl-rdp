@@ -2,6 +2,7 @@
 #include <oxbox/utilities/number-text.hpp>
 #include <sdl-rdp/abi/backend.h>
 #include <sdl-rdp/headless-client.test/backend/events.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 #include <poll.h>
 #include <sys/socket.h>
 
@@ -49,7 +50,7 @@ WaitingOpen::~WaitingOpen() {
 }
 auto WaitingOpen::Receive(std::chrono::milliseconds timeout) const -> std::optional<int> {
   pollfd ready  { .fd = sockets[0].Get(), .events = POLLIN, .revents = 0 };
-  auto   polled = poll(&ready, 1, int(timeout.count()));
+  auto   polled = poll(&ready, 1, Backend::Narrowed<int>(timeout.count()));
   if (polled != 1) return std::nullopt;
   int  value    = -1;
   auto received = recv(ready.fd, &value, sizeof(value), MSG_DONTWAIT);

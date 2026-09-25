@@ -52,15 +52,15 @@ protected:
   }
 
 private:
-  static auto _SetUp(Session& session) -> Session& {
+  static auto MeasuredSetUp(Session& session) -> Session& {
     session._set_up = session._measurement.get().Contained("SetUp()", [&session] { session.SetUp(); })
                       && session._measurement.get().Healthy();
     return session;
   }
-  static auto _TearDown(Session& session) -> void {
+  static auto MeasuredTearDown(Session& session) -> void {
     session._measurement.get().Contained("TearDown()", [&session] { session.TearDown(); });
   }
-  using Torn = ::utilities::RAIIWrap<Session&, &Session::_SetUp, &Session::_TearDown>;
+  using Torn = ::utilities::RAIIWrap<Session&, &Session::MeasuredSetUp, &Session::MeasuredTearDown>;
 
   std::reference_wrapper<Measurement> _measurement;
   bool                                _set_up      = false;

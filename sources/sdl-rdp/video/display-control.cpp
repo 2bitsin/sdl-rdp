@@ -41,7 +41,7 @@ auto Covering(std::span<Monitor const> monitors) -> sdlrdp_rect {
   auto const top    = Edge(monitors, [](auto const& m) { return std::int64_t{ m.Top }; }, lower);
   auto const right  = Edge(monitors, [](auto const& m) { return std::int64_t{ m.Left } + m.Width; }, upper);
   auto const bottom = Edge(monitors, [](auto const& m) { return std::int64_t{ m.Top } + m.Height; }, upper);
-  return { int(left), int(top), int(right - left), int(bottom - top) };
+  return { Narrowed<int>(left), Narrowed<int>(top), Narrowed<int>(right - left), Narrowed<int>(bottom - top) };
 }
 }
 class DisplayControl::Callbacks {

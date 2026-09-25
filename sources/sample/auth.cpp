@@ -61,6 +61,6 @@ auto PrintAuthentication(SDL_Window* window) -> void {
   SDL_Log("event CONNECTED user=%s domain=%s authenticated=%d",
           SDL_GetStringProperty(properties, SDL_PROP_WINDOW_RDP_USER_STRING, ""),
           SDL_GetStringProperty(properties, SDL_PROP_WINDOW_RDP_DOMAIN_STRING, ""),
-          int(SDL_GetBooleanProperty(properties, SDL_PROP_WINDOW_RDP_AUTHENTICATED_BOOLEAN, false)));
+          int{ SDL_GetBooleanProperty(properties, SDL_PROP_WINDOW_RDP_AUTHENTICATED_BOOLEAN, false) });
 }
 }

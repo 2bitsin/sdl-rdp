@@ -30,11 +30,11 @@ SoundClient::~SoundClient() {
   client.Instance()->LoadChannels = previous_load;
   active                          = nullptr;
 }
-auto SoundClient::Send(std::span<std::uint8_t const> bytes) -> bool {
+auto SoundClient::Send(std::span<std::byte const> bytes) -> bool {
   Expects(!bytes.empty(), "sound PDU is nonempty");
   return SendStaticChannel(client.Instance().get(), "rdpsnd", bytes);
 }
-auto SoundClient::Capture(std::span<std::uint8_t const> bytes) -> void {
+auto SoundClient::Capture(std::span<std::byte const> bytes) -> void {
   Expects(bytes.size() % 4 == 0, "PCM stereo frames complete");
   auto start = capture.samples.size();
   capture.samples.resize(start + (bytes.size() / 2));
@@ -61,7 +61,7 @@ auto SoundClient::Confirm(std::size_t index) -> bool {
                                      static_cast<std::uint8_t>(confirmation.timestamp >> 8),
                                      confirmation.block,
                                      0 };
-  if (!Send(bytes)) return false;
+  if (!Send(std::as_bytes(std::span(bytes)))) return false;
   capture.confirmed_frames += confirmation.frames;
   capture.pending.erase(capture.pending.begin() + Backend::Narrowed<std::ptrdiff_t>(index));
   return true;

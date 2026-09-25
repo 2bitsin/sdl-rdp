@@ -29,7 +29,7 @@ auto Formats(RdpsndServerContext const& context) -> std::string {
   return formats.empty() ? "none" : formats;
 }
 auto Behind(std::uint64_t sent, std::uint64_t credit, std::uint32_t rate) -> double {
-  return double(sent > credit ? sent - credit : 0) * 1000.0 / rate;
+  return static_cast<double>(sent > credit ? sent - credit : 0) * 1000.0 / rate;
 }
 }
 auto AudioChannel::Select(std::size_t index) -> void {
