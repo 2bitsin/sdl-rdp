@@ -6,8 +6,13 @@
 #include <SDL3/SDL.h>
 #include <sdl-rdp/headless-client.test/input/steps.hpp>
 #include <array>
+#include <concepts>
 #include <cstdint>
+#include <functional>
+#include <optional>
 #include <string>
+#include <string_view>
+#include <tuple>
 #include <utility>
 
 namespace sdl_rdp::integration::sample_test::detail::input {
@@ -19,23 +24,27 @@ using sdl_rdp::sample_gate_test::sample::AspectOptions;
 using sdl_rdp::sample_gate_test::sample::Sample;
 
 namespace {
-auto InputOf(Client& client) -> rdpInput* {
-  return client.Instance()->context->input;
+auto InputOf(Client& client) -> rdpInput& {
+  return *client.Instance()->context->input;
 }
-auto WhenPressureContact(auto* touch, std::int32_t& id) -> void {
+auto WhenPressureContact(RdpeiClientContext& touch, std::int32_t& id) -> void {
   ASSERT_EQ(
-      touch->TouchRawEvent(touch, 3, 160, 120, &id,
-                           RDPINPUT_CONTACT_FLAG_DOWN | RDPINPUT_CONTACT_FLAG_INRANGE | RDPINPUT_CONTACT_FLAG_INCONTACT,
-                           CONTACT_DATA_PRESSURE_PRESENT, 512u),
+      touch.TouchRawEvent(&touch, 3, 160, 120, &id,
+                          RDPINPUT_CONTACT_FLAG_DOWN | RDPINPUT_CONTACT_FLAG_INRANGE | RDPINPUT_CONTACT_FLAG_INCONTACT,
+                          CONTACT_DATA_PRESSURE_PRESENT, 512u),
       CHANNEL_RC_OK);
 }
-auto TouchChannel(Client& client) -> auto* {
-  bool const ready = client.Until([&] {
-    return InputClient::Touch().load()
-           && InputClient::Touch().load()->GetVersion(InputClient::Touch().load()) == RDPINPUT_PROTOCOL_V10;
-  });
+auto TouchChannel(Client& client) -> std::optional<std::reference_wrapper<RdpeiClientContext>> {
+  bool const ready = client.Until([&] { return InputClient::Of(client, &InputClient::TouchV10); });
   EXPECT_TRUE(ready);
-  return ready ? InputClient::Touch().load() : nullptr;
+  if (!ready) return std::nullopt;
+  return InputClient::Of(client, [](InputClient const& input) { return input.Touch().Peek(); });
+}
+auto Touching(Client& client, std::invocable<RdpeiClientContext&, std::int32_t&> auto const& touch) -> void {
+  auto const found = TouchChannel(client);
+  if (!found) FAIL() << "the touch channel is loaded";
+  std::int32_t id = 0;
+  touch(found->get(), id);
 }
 
 }
@@ -44,7 +53,7 @@ TEST_F(Sample, UnicodeTextAndStopped) {
   ASSERT_NO_FATAL_FAILURE(GivenProcess());
   auto client = AnnouncedClient(640, 480);
   ASSERT_NO_FATAL_FAILURE(GivenFrenchKeyboard(client));
-  auto* input = InputOf(client);
+  auto& input = InputOf(client);
   ASSERT_NO_FATAL_FAILURE(WhenUnicodeText(input));
   ASSERT_NO_FATAL_FAILURE(WhenTextStops(client));
   ASSERT_NO_FATAL_FAILURE(ThenStoppedUnicode(input));
@@ -53,8 +62,8 @@ TEST_F(Sample, UnicodeTextAndStopped) {
 
 TEST_F(Sample, WheelBothAxesPrecise) {
   ASSERT_NO_FATAL_FAILURE(GivenInputSession());
-  auto* input = InputOf(SessionClient());
-  for (auto [flags, expected] : std::array<std::pair<std::uint16_t, char const*>, 4>{
+  auto& input = InputOf(SessionClient());
+  for (auto [flags, expected] : std::array<std::pair<std::uint16_t, std::string_view>, 4>{
            { { PTR_FLAGS_WHEEL | 30                                      , " x=0 y=0.25"  },
              { PTR_FLAGS_WHEEL | PTR_FLAGS_WHEEL_NEGATIVE | (0x200 - 60) , " x=0 y=-0.5"  },
              { PTR_FLAGS_HWHEEL | 120                                    , " x=1 y=0"     },
@@ -67,7 +76,7 @@ TEST_F(Sample, WheelBothAxesPrecise) {
 TEST_F(Sample, RelativeWarpFallback) {
   ASSERT_NO_FATAL_FAILURE(GivenPositionSession());
   auto& client = SessionClient();
-  auto* input  = InputOf(client);
+  auto& input  = InputOf(client);
   ASSERT_NO_FATAL_FAILURE(WhenRelative(client));
   ASSERT_NO_FATAL_FAILURE(WhenRelativeWarp(client, input));
   ASSERT_NO_FATAL_FAILURE(ThenWarpEchoIgnored(input));
@@ -85,15 +94,14 @@ TEST_F(Sample, AdvancedRelative) {
 TEST_F(Sample, TouchContacts) {
   ASSERT_NO_FATAL_FAILURE(GivenInputSession(true));
   auto& client = SessionClient();
-  auto* touch  = TouchChannel(client);
-  ASSERT_NE(touch, nullptr);
-  std::int32_t id = 0;
-  ASSERT_EQ(touch->TouchBegin(touch, 7, 160, 120, &id), CHANNEL_RC_OK);
-  ASSERT_NO_FATAL_FAILURE(ThenTouchEvent(client, "event FINGER_DOWN ", " x=0.250 y=0.250 "));
-  ASSERT_EQ(touch->TouchUpdate(touch, 7, 320, 240, &id), CHANNEL_RC_OK);
-  ASSERT_NO_FATAL_FAILURE(ThenTouchEvent(client, "event FINGER_MOTION ", " x=0.500 y=0.500 "));
-  ASSERT_EQ(touch->TouchEnd(touch, 7, 320, 240, &id), CHANNEL_RC_OK);
-  ASSERT_NO_FATAL_FAILURE(ThenTouchEvent(client, "event FINGER_UP ", "window_x=320 window_y=240"));
+  ASSERT_NO_FATAL_FAILURE(Touching(client, [&](RdpeiClientContext& touch, std::int32_t& id) {
+    ASSERT_EQ(touch.TouchBegin(&touch, 7, 160, 120, &id), CHANNEL_RC_OK);
+    ASSERT_NO_FATAL_FAILURE(ThenTouchEvent(client, "event FINGER_DOWN ", " x=0.250 y=0.250 "));
+    ASSERT_EQ(touch.TouchUpdate(&touch, 7, 320, 240, &id), CHANNEL_RC_OK);
+    ASSERT_NO_FATAL_FAILURE(ThenTouchEvent(client, "event FINGER_MOTION ", " x=0.500 y=0.500 "));
+    ASSERT_EQ(touch.TouchEnd(&touch, 7, 320, 240, &id), CHANNEL_RC_OK);
+    ASSERT_NO_FATAL_FAILURE(ThenTouchEvent(client, "event FINGER_UP ", "window_x=320 window_y=240"));
+  }));
   Escape(client);
 }
 
@@ -102,13 +110,12 @@ TEST_F(Sample, TouchPressureCancel) {
   auto              client   = AnnouncedClient(640, 480);
   InputClient const channels(client);
   ASSERT_TRUE(client.Connect());
-  auto* touch = TouchChannel(client);
-  ASSERT_NE(touch, nullptr);
-  std::int32_t id = 0;
-  ASSERT_NO_FATAL_FAILURE(WhenPressureContact(touch, id));
-  ASSERT_NO_FATAL_FAILURE(ThenTouchEvent(client, "event FINGER_DOWN ", "pressure=0.500"));
-  ASSERT_EQ(touch->TouchCancel(touch, 3, 160, 120, &id), CHANNEL_RC_OK);
-  ASSERT_TRUE(ReadInput(client, "event FINGER_CANCELED "));
+  ASSERT_NO_FATAL_FAILURE(Touching(client, [&](RdpeiClientContext& touch, std::int32_t& id) {
+    ASSERT_NO_FATAL_FAILURE(WhenPressureContact(touch, id));
+    ASSERT_NO_FATAL_FAILURE(ThenTouchEvent(client, "event FINGER_DOWN ", "pressure=0.500"));
+    ASSERT_EQ(touch.TouchCancel(&touch, 3, 160, 120, &id), CHANNEL_RC_OK);
+    ASSERT_TRUE(ReadInput(client, "event FINGER_CANCELED "));
+  }));
   Escape(client);
 }
 TEST_F(Sample, AdvancedAspectRelative) {
@@ -124,11 +131,11 @@ TEST_F(Sample, AdvancedAspectRelative) {
 TEST_F(Sample, AdvancedWheelBothAxesPrecise) {
   ASSERT_NO_FATAL_FAILURE(GivenAdvancedSession());
   auto& client   = SessionClient();
-  auto* advanced = InputClient::Advanced().load();
-  ASSERT_EQ(advanced->AInputSendInputEvent(advanced, AINPUT_FLAGS_WHEEL, 30 * 65536, -60 * 65536), CHANNEL_RC_OK);
+  auto& advanced = InputClient::AdvancedChannel(client);
+  ASSERT_EQ(advanced.AInputSendInputEvent(&advanced, AINPUT_FLAGS_WHEEL, 30 * 65536, -60 * 65536), CHANNEL_RC_OK);
   ASSERT_TRUE(ReadInput(client, "event MOUSE_WHEEL "));
   EXPECT_TRUE(line.ends_with(" x=0.25 y=-0.5")) << line;
-  ASSERT_NO_FATAL_FAILURE(WhenReverseWheel(client, advanced));
+  ASSERT_NO_FATAL_FAILURE(WhenReverseWheel(client));
   Escape(client);
 }
 TEST_F(Sample, ScancodeTextAndStopped) {
@@ -145,7 +152,7 @@ TEST_F(Sample, ScancodeTextAndStopped) {
 
 TEST_F(Sample, UnicodeKeysAndEscape) {
   ASSERT_NO_FATAL_FAILURE(GivenInputSession());
-  auto* input = InputOf(SessionClient());
+  auto& input = InputOf(SessionClient());
   ASSERT_NO_FATAL_FAILURE(WhenUnicodeKeys(input));
   auto controls = process->Transcript().size();
   for (auto code : { 8, 9, 13, 127, 27 }) {
@@ -159,9 +166,9 @@ TEST_F(Sample, UnicodeKeysAndEscape) {
 TEST_F(Sample, RelativeIgnoredWarp) {
   ASSERT_NO_FATAL_FAILURE(GivenPositionSession());
   auto& client = SessionClient();
-  auto* input  = InputOf(client);
+  auto& input  = InputOf(client);
   ASSERT_NO_FATAL_FAILURE(GivenRelativeOrigin(client));
-  for (auto [x, y, delta] : std::array<std::tuple<std::uint16_t, std::uint16_t, char const*>, 4>{
+  for (auto [x, y, delta] : std::array<std::tuple<std::uint16_t, std::uint16_t, std::string_view>, 4>{
            { { 250, 200, " xrel=50 yrel=50 "   },
              { 300, 260, " xrel=50 yrel=60 "   },
              { 630, 260, " xrel=330 yrel=0 "   },

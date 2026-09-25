@@ -33,10 +33,10 @@ auto DefaultPresentDoesNotWaitForAcknowledgements::TestBody() -> void {
   if (!Check(client.Connect(), "the client connects")) return;
   FrameObserver const observer(client);
   SDL_PumpEvents();
-  if (!Check(SDL_GetWindowSurface(window) != nullptr, "the window has a surface")) return;
+  if (!Check(SDL_GetWindowSurface(window.get()) != nullptr, "the window has a surface")) return;
   bool       updated = false;
   auto const elapsed = Timed(
-      [&] { updated = std::ranges::all_of(std::views::repeat(window, 10), SDL_UpdateWindowSurface); });
+      [&] { updated = std::ranges::all_of(std::views::repeat(window.get(), 10), SDL_UpdateWindowSurface); });
   Measure(elapsed);
   if (!Check(updated, "every update presents")) return;
   // Ten old 100 ms waits exceed this half-second regression budget.

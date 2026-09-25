@@ -1,7 +1,9 @@
 #include <sdl-rdp/headless-client.test/client/sound.hpp>
 
 #include <sdl-rdp/headless-client.test/client/channels.hpp>
+#include <sdl-rdp/headless-client.test/client/handles.hpp>
 #include <sdl-rdp/headless-client.test/client/sound-protocol.hpp>
+#include <sdl-rdp/headless-client.test/utilities/observer-set.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 
 #include <freerdp/channels/channels.h>
@@ -11,31 +13,33 @@
 #include <cstring>
 
 namespace sdl_rdp::headless_client_test::client::detail::sound {
+using sdl_rdp::headless_client_test::utilities::ObserverSet;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
 
-SoundClient::SoundClient(Client& target) : client(target), previous_load(client.Instance()->LoadChannels) {
+SoundClient::SoundClient(Client& target) : client(target), previous_load(ClientHandle(client).LoadChannels) {
   auto const playback = freerdp_settings_set_bool(client.Instance()->context->settings, FreeRDP_AudioPlayback, true);
   Expects(playback, "sound playback enabled");
-  Expects(!active, "one sound capture per client thread");
-  active = this;
-
+  ObserverSet::Of(*client.Instance()->context).Add(*this);
   // abi: pLoadChannels, BOOL is int
   client.Instance()->LoadChannels = [](freerdp* instance) -> int {
-    if (active->previous_load && !active->previous_load(instance)) return false;
+    Expects(instance != nullptr, "channel loading names its client");
+    Expects(instance->context != nullptr, "the loading client has its context");
+    auto const sound = ObserverSet::Of(*instance->context).Held<SoundClient>();
+    if (sound->previous_load && !sound->previous_load(instance)) return false;
     return freerdp_channels_client_load_ex(instance->context->channels, instance->context->settings,
-                                           SoundProtocol::EntryPoint(), active)
+                                           SoundProtocol::Entry, &*sound)
            == 0;
   };
 }
 SoundClient::~SoundClient() {
   client.Disconnect();
   client.Instance()->LoadChannels = previous_load;
-  active                          = nullptr;
+  ObserverSet::Of(*client.Instance()->context).Remove<SoundClient>();
 }
 auto SoundClient::Send(std::span<std::byte const> bytes) -> bool {
   Expects(!bytes.empty(), "sound PDU is nonempty");
-  return SendStaticChannel(client.Instance().get(), "rdpsnd", bytes);
+  return SendStaticChannel(*client.Instance(), "rdpsnd", bytes);
 }
 auto SoundClient::Capture(std::span<std::byte const> bytes) -> void {
   Expects(bytes.size() % 4 == 0, "PCM stereo frames complete");

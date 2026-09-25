@@ -2,6 +2,7 @@
 #include <sdl-rdp/headless-client.test/client/sound.hpp>
 #include <sdl-rdp/headless-client.test/frame/observer.hpp>
 #include <sdl-rdp/sample-gate.test/frame/full-desktop.hpp>
+#include <sdl-rdp/sample-gate.test/process/initialized-sdl.hpp>
 #include <sdl-rdp/sample-gate.test/sample/launch.hpp>
 #include <sdl-rdp/sample-gate.test/sample/sample.hpp>
 #include <sdl-rdp/sample-gate.test/video/driver.hpp>
@@ -17,8 +18,10 @@ namespace sdl_rdp::integration::sample_test::detail::video {
 using sdl_rdp::headless_client_test::backend::Logs;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::DisplayClient;
+using sdl_rdp::headless_client_test::client::Pixels;
 using sdl_rdp::headless_client_test::client::SoundClient;
 using sdl_rdp::sample_gate_test::frame::FullDesktopFrames;
+using sdl_rdp::sample_gate_test::process::AudioStream;
 using sdl_rdp::sample_gate_test::sample::PrimaryDisplayPort;
 using sdl_rdp::sample_gate_test::video::VideoDriver;
 using sdl_rdp::utilities::Expects;
@@ -43,30 +46,30 @@ auto ThenEqualLayout(Client& client, DisplayClient& display) -> void {
   ASSERT_NO_FATAL_FAILURE(PumpDesktop(client));
   ThenUnchangedPicture(display, frames);
 }
-auto ThenAudioDeviceChanges(Client& client, SDL_AudioStream* stream) -> void {
+auto ThenAudioDeviceChanges(Client& client, SDL_AudioStream& stream) -> void {
   SDL_AudioSpec before{ };
-  ASSERT_TRUE(SDL_GetAudioDeviceFormat(SDL_GetAudioStreamDevice(stream), &before, nullptr));
+  ASSERT_TRUE(SDL_GetAudioDeviceFormat(SDL_GetAudioStreamDevice(&stream), &before, nullptr));
   EXPECT_EQ(before.freq, 44100);
   ASSERT_TRUE(client.Until([&] {
     SDL_PumpEvents();
     SDL_AudioSpec actual{ };
-    return SDL_GetAudioDeviceFormat(SDL_GetAudioStreamDevice(stream), &actual, nullptr) && actual.freq == 48000;
+    return SDL_GetAudioDeviceFormat(SDL_GetAudioStreamDevice(&stream), &actual, nullptr) && actual.freq == 48000;
   }));
 }
 auto AwaitResizedPicture(Client& client, DisplayClient& display) -> void {
   Expects(client.Instance() != nullptr, "resized client exists");
-  std::vector<std::uint32_t> pixels(1280uz * 800, 0);
+  Pixels pixels(1280uz * 800, 0);
   ASSERT_TRUE(client.Until([&] {
     SDL_PumpEvents();
     return display.Observed().desktops && client.Matches(pixels);
   }));
 }
-auto PresentDesktop(Client& client, SDL_Window* window) -> void {
-  auto* surface = SDL_GetWindowSurface(window);
+auto PresentDesktop(Client& client, SDL_Window& window) -> void {
+  auto* surface = SDL_GetWindowSurface(&window);
   ASSERT_NE(surface, nullptr);
   ASSERT_TRUE(SDL_FillSurfaceRect(surface, nullptr, SDL_MapSurfaceRGB(surface, 0x12, 0x34, 0x56)));
-  ASSERT_TRUE(SDL_UpdateWindowSurface(window));
-  std::vector<std::uint32_t> pixels(1280uz * 800, 0x00123456);
+  ASSERT_TRUE(SDL_UpdateWindowSurface(&window));
+  Pixels pixels(1280uz * 800, 0x00123456);
   ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); }));
 }
 auto ConnectDesktop(Client& client, Logs& logs) -> void {
@@ -80,7 +83,7 @@ auto ConnectDesktop(Client& client, Logs& logs) -> void {
 }
 }
 TEST_F(VideoDriver, ResizeStormWithLayoutEcho) {
-  ASSERT_TRUE(SDL_SetWindowSize(window, 640, 480));
+  ASSERT_TRUE(SDL_SetWindowSize(window.get(), 640, 480));
   Client        client(PrimaryDisplayPort(), true, 640, 480);
   DisplayClient display(client);
   display.Observed().echo_resize = true;
@@ -90,7 +93,7 @@ TEST_F(VideoDriver, ResizeStormWithLayoutEcho) {
       ASSERT_NO_FATAL_FAILURE(StormSizes());
     }
   };
-  ASSERT_TRUE(SDL_SetWindowSize(window, 1280, 800));
+  ASSERT_TRUE(SDL_SetWindowSize(window.get(), 1280, 800));
   ASSERT_NO_FATAL_FAILURE(AwaitResizedPicture(client, display));
   ASSERT_NO_FATAL_FAILURE(PumpDesktop(client));
   ThenResizeStorm(client, display);
@@ -103,7 +106,7 @@ TEST_F(VideoDriver, ExclusiveScreenChangeDoesNotResizePicture) {
   Client        client(PrimaryDisplayPort(), true, 1280, 800);
   DisplayClient display(client);
   ASSERT_NO_FATAL_FAILURE(ConnectDesktop(client, logs));
-  ASSERT_NO_FATAL_FAILURE(PresentDesktop(client, window));
+  ASSERT_NO_FATAL_FAILURE(PresentDesktop(client, *window));
   FullDesktopFrames const frames(client);
   SDL_FlushEvents(SDL_EVENT_FIRST, SDL_EVENT_LAST);
   ASSERT_TRUE(display.Layout(1600, 900));
@@ -116,7 +119,7 @@ TEST_F(VideoDriver, ExclusiveScreenChangeDoesNotResizePicture) {
 }
 
 TEST_F(VideoDriver, WindowResizeMovesDesktopMode) {
-  ASSERT_TRUE(SDL_SetWindowSize(window, 1920, 1080));
+  ASSERT_TRUE(SDL_SetWindowSize(window.get(), 1920, 1080));
   Desktop(1920, 1080);
 }
 
@@ -124,47 +127,45 @@ TEST_F(VideoDriver, FullscreenModeMovesDesktopMode) {
   auto mode = *SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
   mode.w = 1920;
   mode.h = 1080;
-  ASSERT_TRUE(SDL_SetWindowFullscreenMode(window, &mode));
-  ASSERT_TRUE(SDL_SetWindowFullscreen(window, true));
+  ASSERT_TRUE(SDL_SetWindowFullscreenMode(window.get(), &mode));
+  ASSERT_TRUE(SDL_SetWindowFullscreen(window.get(), true));
   ASSERT_NO_FATAL_FAILURE(Desktop(1920, 1080));
-  EXPECT_TRUE(SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN);
-  ASSERT_TRUE(SDL_SetWindowFullscreen(window, false));
+  EXPECT_TRUE(SDL_GetWindowFlags(window.get()) & SDL_WINDOW_FULLSCREEN);
+  ASSERT_TRUE(SDL_SetWindowFullscreen(window.get(), false));
   ASSERT_NO_FATAL_FAILURE(Desktop(1280, 800));
-  ASSERT_TRUE(SDL_SetWindowFullscreen(window, true));
+  ASSERT_TRUE(SDL_SetWindowFullscreen(window.get(), true));
   Desktop(1920, 1080);
 }
 
 TEST_F(VideoDriver, InitialWindowMovesDesktopMode) {
-  SDL_DestroyWindow(window);
-  window = SDL_CreateWindow("different size", 1920, 1080, 0);
+  window.reset();
+  window.reset(SDL_CreateWindow("different size", 1920, 1080, 0));
   ASSERT_NE(window, nullptr);
   Desktop(1920, 1080);
 }
 
 TEST_F(VideoDriver, DesktopFullscreenKeepsDesktopMode) {
-  ASSERT_TRUE(SDL_SetWindowFullscreen(window, true));
+  ASSERT_TRUE(SDL_SetWindowFullscreen(window.get(), true));
   auto const* mode = SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
   ASSERT_NE(mode, nullptr);
   EXPECT_EQ(mode->w, 1280);
   EXPECT_EQ(mode->h, 800);
-  ASSERT_TRUE(SDL_SetWindowFullscreen(window, false));
+  ASSERT_TRUE(SDL_SetWindowFullscreen(window.get(), false));
   EXPECT_FALSE(SDL_HasEvent(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED));
 }
 
 TEST_F(VideoDriver, AudioEventChangesOpenDeviceFormat) {
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "rdp"));
   ASSERT_TRUE(SDL_Init(SDL_INIT_AUDIO));
-  SDL_AudioSpec const                                                       spec  { SDL_AUDIO_S16, 2, 44100 };
-  std::unique_ptr<SDL_AudioStream, decltype(&SDL_DestroyAudioStream)> const stream{
-    SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr), SDL_DestroyAudioStream
-  };
+  SDL_AudioSpec const spec  { SDL_AUDIO_S16, 2, 44100                                                               };
+  AudioStream const   stream{ SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr) };
   ASSERT_TRUE(stream) << SDL_GetError();
   Client      client(PrimaryDisplayPort(), true, 1280, 800);
   SoundClient audio(client);
   audio.CaptureState().rate = 48000;
   ASSERT_TRUE(client.Connect());
   ASSERT_TRUE(client.Until([&] { return audio.CaptureState().ready; }));
-  ASSERT_NO_FATAL_FAILURE(ThenAudioDeviceChanges(client, stream.get()));
+  ASSERT_NO_FATAL_FAILURE(ThenAudioDeviceChanges(client, *stream));
   SDL_ResetHint(SDL_HINT_AUDIO_DRIVER);
 }
 }

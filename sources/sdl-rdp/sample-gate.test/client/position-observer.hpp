@@ -6,7 +6,7 @@
 namespace sdl_rdp::sample_gate_test::client::detail::position_observer {
 using sdl_rdp::headless_client_test::client::Client;
 
-struct PositionObserver {
+class PositionObserver {
 public:
            PositionObserver(PositionObserver const&)               = delete;
            PositionObserver(PositionObserver&&)                    = delete;
@@ -20,10 +20,12 @@ public:
 
 private:
   auto Receive(POINTER_POSITION_UPDATE const& position) -> void;
-  inline static thread_local PositionObserver* active = nullptr;
-  std::size_t                                  count  = 0;
-  std::uint32_t                                x      = 0;
-  std::uint32_t                                y      = 0;
+  rdpContext&       context;
+  rdpPointerUpdate& pointer;
+  pPointerPosition  original;
+  std::size_t       count    = 0;
+  std::uint32_t     x        = 0;
+  std::uint32_t     y        = 0;
 };
 }
 

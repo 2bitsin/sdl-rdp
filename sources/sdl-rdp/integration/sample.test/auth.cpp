@@ -14,6 +14,7 @@ using sdl_rdp::sample_gate_test::sample::AnnouncedPort;
 using sdl_rdp::sample_gate_test::sample::BackendLibrary;
 using sdl_rdp::sample_gate_test::sample::PrimaryDisplayPort;
 using sdl_rdp::sample_gate_test::sample::Sample;
+using sdl_rdp::utilities::Expects;
 
 namespace {
 class AuthenticationSample : public Sample {
@@ -49,14 +50,24 @@ TEST_F(AuthenticationSample, AuthenticationPropertyDenies) {
 namespace {
 struct PropertyCredentials {
 public:
+  // abi: SDL_PROP_DISPLAY_RDP_VERIFY_POINTER, the driver calls it with the userdata property
   static auto SDLCALL Verify(void* raw, char const* domain, char const* user, char const* password) -> bool {
+    Expects(raw != nullptr, "the verifier names its credentials");
+    Expects(domain != nullptr, "the verifier is handed a domain");
+    Expects(user != nullptr, "the verifier is handed a user");
+    Expects(password != nullptr, "the verifier is handed a password");
     auto& self = *static_cast<PropertyCredentials*>(raw);
     self.arguments = self.arguments && std::string_view(domain) == "LAB" && std::string_view(user) == "alice"
                      && std::string_view(password) == "property-secret";
     ++self.verified;
     return true;
   }
+  // abi: SDL_PROP_DISPLAY_RDP_LOOKUP_POINTER, the driver calls it with the userdata property
   static auto SDLCALL Lookup(void* raw, char const* domain, char const* user, std::uint8_t* hash) -> bool {
+    Expects(raw != nullptr, "the lookup names its credentials");
+    Expects(domain != nullptr, "the lookup is handed a domain");
+    Expects(user != nullptr, "the lookup is handed a user");
+    Expects(hash != nullptr, "the lookup is handed a hash buffer");
     auto& self = *static_cast<PropertyCredentials*>(raw);
     self.arguments = self.arguments && std::string_view(domain) == "LAB" && std::string_view(user) == "alice";
     ++self.looked_up;

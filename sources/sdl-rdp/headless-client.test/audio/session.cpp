@@ -17,17 +17,18 @@
 
 namespace sdl_rdp::headless_client_test::audio::detail::session {
 using sdl_rdp::headless_client_test::backend::Clock;
+using sdl_rdp::headless_client_test::client::Pixels;
 using sdl_rdp::headless_client_test::frame::FrameObserver;
 using sdl_rdp::utilities::Expects;
 
 namespace {
-auto WriteRealtimeAudio(sdlrdp_handle* backend) -> int {
+auto WriteRealtimeAudio(sdlrdp_handle& backend) -> int {
   std::array<std::int16_t, 480uz * 2> pcm     { };
   auto                                start   = Clock::now();
   int                                 written = 0;
   for (std::size_t tick = 1; tick <= 200; ++tick) {
     std::this_thread::sleep_until(start + std::chrono::milliseconds(tick * 10));
-    auto count = sdlrdp_audio_write(backend, pcm.data(), 480);
+    auto count = sdlrdp_audio_write(&backend, pcm.data(), 480);
     if (count != 480) return written;
     written += count;
   }
@@ -69,7 +70,7 @@ auto AudioSession::ThenRealtimeCounts(SoundClient const& audio) -> void {
 }
 auto AudioSession::GivenAudioServer() -> void {
   ASSERT_NO_FATAL_FAILURE(Open(320, 200));
-  ASSERT_EQ(sdlrdp_audio_open(backend.Handle()), 0);
+  ASSERT_EQ(sdlrdp_audio_open(&*backend), 0);
 }
 auto AudioSession::ThenAudioFormats(SoundClient const& audio) -> void {
   ASSERT_EQ(audio.CaptureState().server_formats.size(), 2u);
@@ -91,13 +92,12 @@ auto AudioSession::ConnectAudio(Client& client, SoundClient& audio) -> void {
   ASSERT_TRUE(audio_connected(EventsUntil(audio_connected, true, [&client] { return client.Pump(); }))) << logs.Text();
 }
 auto AudioSession::RunRealtimeAudio(Client& client, SoundClient& audio) -> void {
-  auto* const handle = backend.Handle();
-  Expects(handle != nullptr, "backend exists");
+  auto& handle = *backend;
   Expects(audio.CaptureState().opened, "client audio channel is open");
   auto writing = std::async(std::launch::async, [&] { return WriteRealtimeAudio(handle); });
   ConfirmDelayedAudio(client, audio,
                       { .frames = 96000, .delay = std::chrono::milliseconds(150), .timeout = std::chrono::seconds(4) });
-  sdlrdp_audio_close(backend.Handle());
+  sdlrdp_audio_close(&*backend);
   EXPECT_EQ(writing.get(), 96000);
   EXPECT_EQ(audio.CaptureState().samples.size() / 2, 96000u);
   ASSERT_NO_FATAL_FAILURE(ThenAudioCadence(audio));
@@ -121,9 +121,9 @@ auto AudioSession::EstablishConfirmations(Client& client, SoundClient& audio) ->
   std::vector<std::int16_t> pcm(24000uz * 2);
   auto                      automatic = audio.CaptureState().auto_confirm;
   audio.CaptureState().auto_confirm = true;
-  ASSERT_EQ(sdlrdp_audio_write(backend.Handle(), pcm.data(), 24000), 24000);
+  ASSERT_EQ(sdlrdp_audio_write(&*backend, pcm.data(), 24000), 24000);
   ASSERT_TRUE(client.Until([&] { return audio.CaptureState().confirmed_frames == 24000; }));
-  ASSERT_EQ(sdlrdp_audio_wait(backend.Handle(), 10000), 1);
+  ASSERT_EQ(sdlrdp_audio_wait(&*backend, 10000), 1);
   audio.CaptureState().auto_confirm = automatic;
   audio.CaptureState().samples.clear();
   audio.CaptureState().confirmed_frames = audio.CaptureState().maximum_pending_frames = 0;
@@ -133,16 +133,16 @@ auto AudioSession::ThenUnavailableAudio(Client& client, bool unmatched) -> void 
   auto event  = std::ranges::find(events, SDLRDP_AUDIO, &sdlrdp_event::type);
   ASSERT_NE(event, events.end()) << logs.Text();
   EXPECT_EQ(event->audio.connected, 0u);
-  EXPECT_EQ(sdlrdp_audio_rate(backend.Handle()), 0u);
+  EXPECT_EQ(sdlrdp_audio_rate(&*backend), 0u);
   EXPECT_EQ(logs.Count(SDLRDP_LOG_WARN, unmatched ? "rate=22050" : "client formats: none"), 1u);
   EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, "client doesn't support any format"));
 }
 auto AudioSession::ThenLiveVideoAndInput(Client& client) -> void {
   FrameObserver observer(client);
-  ASSERT_NO_FATAL_FAILURE(Present(std::vector<std::uint32_t>(320uz * 200, 0x123456), 320, 200));
+  ASSERT_NO_FATAL_FAILURE(Present(Pixels(320uz * 200, 0x123456), 320, 200));
   ASSERT_TRUE(client.Until([&] { return !observer.Frames().empty(); }));
   ASSERT_TRUE(observer.Ack());
-  ASSERT_EQ(sdlrdp_wait_frame(backend.Handle(), 10000), 1);
+  ASSERT_EQ(sdlrdp_wait_frame(&*backend, 10000), 1);
   ThenLiveInput(client);
 }
 }

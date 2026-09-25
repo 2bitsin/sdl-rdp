@@ -21,6 +21,7 @@ namespace sdl_rdp::integration::sample_test::detail::audio {
 using sdl_rdp::headless_client_test::audio::ToneMeasurements;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::Clock;
+using sdl_rdp::headless_client_test::client::Pixels;
 using sdl_rdp::headless_client_test::client::SoundClient;
 using sdl_rdp::headless_client_test::frame::FrameObserver;
 using sdl_rdp::sample_gate_test::audio::AudioDriver;
@@ -93,8 +94,8 @@ TEST_F(AudioDriver, AudioOnlyPlaysBlackDesktop) {
   Client      client(port, true);
   SoundClient audio(client);
   ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
-  auto*                      gdi   = client.Instance()->context->gdi;
-  std::vector<std::uint32_t> black(Narrowed<std::size_t>(gdi->width) * gdi->height);
+  auto*  gdi   = client.Instance()->context->gdi;
+  Pixels black(Narrowed<std::size_t>(gdi->width) * gdi->height);
   ASSERT_TRUE(client.Until([&] { return client.Matches(black); }));
   ASSERT_NO_FATAL_FAILURE(ThenPcm(client, audio));
   EXPECT_EQ(SDL_WasInit(SDL_INIT_VIDEO), 0u);

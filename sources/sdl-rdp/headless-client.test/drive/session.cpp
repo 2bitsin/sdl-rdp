@@ -16,11 +16,12 @@
 
 namespace sdl_rdp::headless_client_test::drive::detail::session {
 using sdl_rdp::headless_client_test::backend::LoopbackConfig;
+using sdl_rdp::headless_client_test::client::Pixels;
 
-auto DriveSession::ThenPartialReads(sdlrdp_file* file, std::string const& source, std::string& result) -> void {
+auto DriveSession::ThenPartialReads(sdlrdp_file& file, std::string const& source, std::string& result) -> void {
   for (std::size_t const offset : { 13u, 1048577u, 3145697u }) {
     result.resize(65536);
-    auto count = sdlrdp_drive_read(handle.Handle(), file, offset, result.data(), result.size());
+    auto count = sdlrdp_drive_read(&*handle, &file, offset, result.data(), result.size());
     ASSERT_GE(count, 0) << sdlrdp_last_error();
     EXPECT_EQ(result.substr(0, count), source.substr(offset, result.size()));
   }
@@ -33,16 +34,16 @@ auto DriveSession::SetUp() -> void {
   ASSERT_NO_FATAL_FAILURE(handle.Open(config));
   Connect();
 }
-auto DriveSession::Connect(char const* name, bool second) -> void {
-  client = std::make_unique<Client>(sdlrdp_port(handle.Handle()), false);
+auto DriveSession::Connect(std::string const& name, bool second) -> void {
+  client = std::make_unique<Client>(sdlrdp_port(&*handle), false);
   auto path = scratch.Path().string();
-  ShareDrive(*client, path.c_str(), name);
-  if (second) ShareDrive(*client, path.c_str(), "second");
+  ShareDrive(*client, path, name);
+  if (second) ShareDrive(*client, path, "second");
   ASSERT_TRUE(client->Connect()) << logs.Text(true);
   ASSERT_TRUE(client->Until([&] {
     sdlrdp_drive value{ };
-    if (sdlrdp_drive_list(handle.Handle(), &value, 1) != 1) return false;
-    EXPECT_STREQ(value.name, name);
+    if (sdlrdp_drive_list(&*handle, &value, 1) != 1) return false;
+    EXPECT_EQ(std::string_view(value.name), name);
     drive = value.id;
     return true;
   }));
@@ -51,7 +52,7 @@ auto DriveSession::Connect(char const* name, bool second) -> void {
 auto DriveSession::GivenHeldFile() -> void {
   Write("file", "data");
   held_file = Open("file");
-  ASSERT_NE(held_file, nullptr);
+  ASSERT_TRUE(held_file.has_value());
   HoldRequests();
 }
 auto DriveSession::HoldRequests() -> void {
@@ -61,8 +62,8 @@ auto DriveSession::HoldRequests() -> void {
   observer->Observed().hold = true;
 }
 auto DriveSession::ThenVideoMatches() -> void {
-  std::vector<std::uint32_t> pixels(320uz * 200uz, 0x00446688);
-  sdlrdp_rect const          damage{ 0, 0, 320, 200 };
+  Pixels            pixels(320uz * 200uz, 0x00446688);
+  sdlrdp_rect const damage{ 0, 0, 320, 200 };
   ASSERT_EQ(handle.Present(pixels, 320, 200, damage), 0);
   ASSERT_TRUE(client->Until([&] { return client->Matches(pixels); }));
 }
@@ -88,10 +89,10 @@ auto Pattern(std::size_t size, std::uint32_t seed) -> std::string {
 auto DriveSession::Write(std::string const& name, std::string const& bytes) -> void {
   oxbox::platform::WriteBinaryFile(scratch.Path() / name, std::as_bytes(std::span(bytes)));
 }
-auto DriveSession::Open(char const* name, std::uint32_t flags) -> sdlrdp_file* {
+auto DriveSession::Open(std::string const& name, std::uint32_t flags) -> OpenedFile {
   sdlrdp_file* file = nullptr;
-  EXPECT_EQ(sdlrdp_drive_open(handle.Handle(), drive, name, flags, &file), 0) << sdlrdp_last_error();
-  return file;
+  EXPECT_EQ(sdlrdp_drive_open(&*handle, drive, name.c_str(), flags, &file), 0) << sdlrdp_last_error();
+  return file == nullptr ? OpenedFile{ } : OpenedFile{ *file };
 }
 auto DriveSession::ThenRemovedDrive() -> void {
   EXPECT_TRUE(PolledDriveName(false, drive).has_value());
@@ -103,10 +104,10 @@ auto DriveSession::PolledDriveName(bool added, std::uint32_t id) -> std::optiona
   });
   return found == events.end() ? std::nullopt : std::optional<std::string>(found->drive.name);
 }
-auto DriveSession::ThenDriveFailure(sdlrdp_file* file, std::size_t warnings) -> void {
+auto DriveSession::ThenDriveFailure(sdlrdp_file& file, std::size_t warnings) -> void {
   sdlrdp_drive value{ };
-  EXPECT_EQ(sdlrdp_drive_list(handle.Handle(), &value, 1), 0);
-  EXPECT_EQ(sdlrdp_drive_close(handle.Handle(), file), -1);
+  EXPECT_EQ(sdlrdp_drive_list(&*handle, &value, 1), 0);
+  EXPECT_EQ(sdlrdp_drive_close(&*handle, &file), -1);
   EXPECT_EQ(Logged(SDLRDP_LOG_WARN, "") - warnings, 1u);
   EXPECT_EQ(Logged(SDLRDP_LOG_WARN, "Drive channel ended: Malformed drive response: truncated."), 1u);
 }

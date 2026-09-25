@@ -7,6 +7,8 @@
 #include <sdl-rdp/headless-client.test/frame/observer.hpp>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -61,10 +63,10 @@ auto ObserveRefresh(RateTrace& trace, std::string const& line) -> void {
   ++trace.ceilings;
   trace.recovered |= trace.floors != 0;
 }
-auto CurrentPace(RateTrace& trace) -> Pace* {
-  if (trace.recovered) return &trace.recovered_pace;
-  if (trace.floors && trace.rate == 10) return &trace.floor_pace;
-  return nullptr;
+auto CurrentPace(RateTrace& trace) -> std::optional<std::reference_wrapper<Pace>> {
+  if (trace.recovered) return trace.recovered_pace;
+  if (trace.floors && trace.rate == 10) return trace.floor_pace;
+  return std::nullopt;
 }
 auto ObserveFrame(RateTrace& trace, std::string const& line) -> void {
   ++trace.frames;
@@ -77,9 +79,9 @@ auto ObserveRate(RateTrace& trace, std::string const& line) -> void {
   if (!line.contains("trace ")) return;
   auto       time    = TraceNumber(line, " t=");
   bool const present = line.contains("trace present ");
-  auto*      pace    = CurrentPace(trace);
-  if (pace && trace.time) pace->milliseconds += time - trace.time;
-  if (pace) pace->presents += present;
+  auto const pace    = CurrentPace(trace);
+  if (pace && trace.time) pace->get().milliseconds += time - trace.time;
+  if (pace) pace->get().presents += present;
   trace.time             =  time;
   trace.presents         += present;
   trace.acknowledgements += line.contains("trace ack ");

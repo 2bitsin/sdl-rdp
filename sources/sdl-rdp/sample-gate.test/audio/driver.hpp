@@ -1,17 +1,23 @@
 #pragma once
 #include <sdl-rdp/sample-gate.test/audio/sample.hpp>
+#include <sdl-rdp/sample-gate.test/process/captured-logs.hpp>
+#include <sdl-rdp/sample-gate.test/process/initialized-sdl.hpp>
 
 #include <SDL3/SDL.h>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 
 namespace sdl_rdp::sample_gate_test::audio::detail::driver {
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::Clock;
 using sdl_rdp::headless_client_test::client::SoundClient;
+using sdl_rdp::sample_gate_test::process::AudioStream;
+using sdl_rdp::sample_gate_test::process::CapturedLogs;
+using sdl_rdp::sample_gate_test::process::LockedStream;
 using std::chrono_literals::operator""ms;
 
 auto ThenLead(Client& client, SoundClient& audio, std::size_t after, std::size_t milliseconds) -> void;
@@ -25,9 +31,8 @@ protected:
     auto& client = *sound_client;
     auto& audio  = *sound;
     {
-      ASSERT_TRUE(SDL_LockAudioStream(stream.get()));
-      std::unique_ptr<SDL_AudioStream, decltype(&SDL_UnlockAudioStream)> const locked(stream.get(),
-                                                                                      SDL_UnlockAudioStream);
+      LockedStream const locked{ *stream };
+      ASSERT_TRUE(locked.Get().locked) << SDL_GetError();
       auto deadline = Clock::now() + 300ms;
       while (Clock::now() < deadline) ASSERT_TRUE(client.Pump(1));
     }
@@ -45,14 +50,12 @@ protected:
   auto OpenStream()                                                             -> void;
   auto ConnectAudio(Client& client, SoundClient& audio)                         -> void;
   auto ThenPcm(Client& client, SoundClient& audio)                              -> void;
-  auto CaptureLogs()                                                            -> void;
   auto SetUp()                                                                  -> void override;
   auto TearDown()                                                               -> void override;
   std::unique_ptr<Client>      sound_client;
   std::unique_ptr<SoundClient> sound;
-  SDL_LogOutputFunction        previous_log      = nullptr;
-  void*                        previous_log_user = nullptr;
-  std::unique_ptr<SDL_AudioStream, decltype(&SDL_DestroyAudioStream)> stream{ nullptr, SDL_DestroyAudioStream };
+  std::optional<CapturedLogs>  captured;
+  AudioStream                  stream;
 };
 }
 

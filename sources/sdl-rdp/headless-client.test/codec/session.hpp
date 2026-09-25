@@ -10,6 +10,7 @@
 namespace sdl_rdp::headless_client_test::codec::detail::session {
 using sdl_rdp::headless_client_test::backend::BackendEvents;
 using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::Pixels;
 
 class CodecSession : public testing::TestWithParam<Mode>, protected BackendEvents {
 protected:
@@ -26,7 +27,7 @@ protected:
   static auto ThenConnectionDetails(sdlrdp_event const& event)              -> void;
   auto        ThenDisconnected()                                            -> void;
   auto        RecordFrameCost(Client& client, std::uint64_t bytes)          -> void;
-  std::vector<std::uint32_t> pixels = std::vector<std::uint32_t>(320uz * 200);
+  Pixels pixels = Pixels(320uz * 200);
 };
 }
 

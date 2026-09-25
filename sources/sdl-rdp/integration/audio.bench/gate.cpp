@@ -14,10 +14,12 @@
 #include <vector>
 
 namespace sdl_rdp::integration::audio_bench::detail::gate {
+using namespace std::chrono_literals;
 using sdl_rdp::headless_client_test::audio::AudioGate;
 using sdl_rdp::headless_client_test::audio::MaximumGapMs;
 using sdl_rdp::headless_client_test::backend::BackendInstance;
 using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::Pixels;
 using sdl_rdp::headless_client_test::client::SoundClient;
 using sdl_rdp::headless_client_test::frame::MovingTilePattern;
 using sdl_rdp::headless_client_test::graphics::GraphicsObserver;
@@ -28,14 +30,13 @@ using sdl_rdp::integration::support_bench::Session;
 using sdl_rdp::utilities::DeadlineAfter;
 using sdl_rdp::utilities::Throughout;
 using sdl_rdp::utilities::Timed;
-using namespace std::chrono_literals;
 namespace {
 auto ProduceProgressiveFrames(BackendInstance const& backend) -> std::size_t {
-  std::vector<std::uint32_t> pixels(1280uz * 800);
-  sdlrdp_rect const          full      { 0, 0, 1280, 800 };
-  std::size_t                presented = 0;
+  Pixels            pixels(1280uz * 800);
+  sdlrdp_rect const full      { 0, 0, 1280, 800 };
+  std::size_t       presented = 0;
   Throughout(DeadlineAfter(2s), [&] {
-    if (!sdlrdp_wait_frame(backend.Handle(), 10)) return true;
+    if (!sdlrdp_wait_frame(&*backend, 10)) return true;
     MovingTilePattern(pixels, 1280, 800, presented);
     if (backend.Present(pixels, 1280, 800, full) != 0) return false;
     ++presented;
@@ -81,7 +82,7 @@ auto AudioPlaybackConfirmsKeepRealtimeStreamContinuous::TestBody() -> void {
 
 auto AudioContinuousUnderProgressiveLoad::TestBody() -> void {
   if (!Holds([this] { Open(1280, 800, { }, SDLRDP_CODEC_PROGRESSIVE); })) return;
-  if (!Check(sdlrdp_audio_open(backend.Handle()) == 0, "the backend opens audio")) return;
+  if (!Check(sdlrdp_audio_open(&*backend) == 0, "the backend opens audio")) return;
   auto [client, audio] = NewSession(1280, 800);
   client.EnableGraphics();
   GraphicsObserver observer(client);
@@ -116,8 +117,7 @@ auto AudioNeverConfirmsUsesServerClock::TestBody() -> void {
   Record("never_confirms_one_second_elapsed", std::chrono::duration<double>(span).count());
 }
 auto AudioNeverConfirmsUsesServerClock::WriteCaptured(std::vector<std::int16_t> const& pcm) -> int {
-  auto writing = std::async(std::launch::async,
-                            [&] { return sdlrdp_audio_write(backend.Handle(), pcm.data(), 48000); });
+  auto writing = std::async(std::launch::async, [&] { return sdlrdp_audio_write(&*backend, pcm.data(), 48000); });
   Check(UntilCaptured(pcm.size()), "the client captures the second");
   return writing.get();
 }

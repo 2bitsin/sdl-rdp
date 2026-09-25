@@ -23,11 +23,11 @@ auto NextFrame::Observe(PictureUpdate const& update) -> void {
 }
 auto NextFrame::Inspect() -> void {
   auto const* context = client.Instance()->context;
-  Expects(context, "callback context exists");
-  Expects(context->gdi, "decoded framebuffer exists");
-  auto const index  = (40 * 640) + static_cast<int>(column);
-  bool const origin = PatternPixel(context->gdi, index) == 0x00ff00
-                      && (!column || PatternPixel(context->gdi, index - 1) != 0x00ff00);
+  Expects(context != nullptr, "callback context exists");
+  Expects(context->gdi != nullptr, "decoded framebuffer exists");
+  auto const& gdi    = *context->gdi;
+  auto const  index  = (40 * 640) + static_cast<int>(column);
+  bool const  origin = PatternPixel(gdi, index) == 0x00ff00 && (!column || PatternPixel(gdi, index - 1) != 0x00ff00);
   if (!received && origin) {
     matches  = Pattern(client, true);
     received = true;

@@ -21,7 +21,7 @@ auto CodecSession::SetUp() -> void {
   config.codec = GetParam().codec;
   std::filesystem::remove_all(certificates.Path());
   ASSERT_NO_FATAL_FAILURE(backend.Open(config));
-  ASSERT_NE(sdlrdp_port(backend.Handle()), 0u);
+  ASSERT_NE(sdlrdp_port(&*backend), 0u);
   std::array<std::uint32_t, 8> bars{ 0x00ffffff, 0x00ffff00, 0x0000ffff, 0x0000ff00,
                                      0x00ff00ff, 0x00ff0000, 0x000000ff, 0 };
   std::ranges::generate(pixels, [&, index = 0u]() mutable {
@@ -42,8 +42,7 @@ auto CodecSession::Reopen(std::uint32_t width, std::uint32_t height) -> void {
 }
 auto CodecSession::Frame(Client& client, sdlrdp_rect area) -> void {
   ASSERT_EQ(backend.Present(pixels, 320, 200, area), 0);
-  ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(backend.Handle(), 0) && client.Matches(pixels); }))
-      << logs.Text();
+  ASSERT_TRUE(client.Until([&] { return sdlrdp_wait_frame(&*backend, 0) && client.Matches(pixels); })) << logs.Text();
 }
 auto CodecSession::ThenMotion(sdlrdp_event const& event) -> void {
   EXPECT_EQ(event.type, SDLRDP_MOUSE_MOVE);

@@ -2,6 +2,7 @@
 
 #include <sdl-rdp/clipboard/capabilities.hpp>
 #include <sdl-rdp/headless-client.test/client/channels.hpp>
+#include <sdl-rdp/headless-client.test/client/handles.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 
 #include <freerdp/addin.h>
@@ -24,10 +25,9 @@ using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
 
 namespace {
-auto HeldClipboard(CliprdrClientContext* context) -> ClipboardClient& {
-  Expects(context, "callback context exists");
-  Expects(context->custom, "callback context carries its observer");
-  return *static_cast<ClipboardClient*>(context->custom);
+auto HeldClipboard(CliprdrClientContext& context) -> ClipboardClient& {
+  Expects(context.custom != nullptr, "callback context carries its observer");
+  return *static_cast<ClipboardClient*>(context.custom);
 }
 auto AnnounceFormat(CliprdrClientContext& context, bool unicode) -> std::uint32_t {
   CLIPRDR_FORMAT      format{ Narrowed<std::uint32_t>(unicode ? CF_UNICODETEXT : CF_DIB), nullptr };
@@ -46,57 +46,64 @@ public:
   static auto InstallData(CliprdrClientContext& context)                              -> void;
 };
 auto ClipboardClient::Callbacks::ChannelConnected(void* context, ChannelConnectedEventArgs const* event) -> void {
+  Expects(context != nullptr, "the channel event names its client context");
   Expects(event != nullptr, "channel event is supplied");
   if (std::string_view(event->name) != CLIPRDR_SVC_CHANNEL_NAME) return;
   auto* channel = static_cast<CliprdrClientContext*>(event->pInterface);
   Expects(channel != nullptr, "the clipboard channel interface exists");
-  Attach(*ObserverSet::Of(context).Held<ClipboardClient>(), *channel);
+  Attach(*ObserverSet::Of(*static_cast<rdpContext*>(context)).Held<ClipboardClient>(), *channel);
 }
 auto ClipboardClient::Callbacks::Attach(ClipboardClient& self, CliprdrClientContext& context) -> void {
   context.custom = &self;
   InstallFormats(context);
   InstallData(context);
-  self.channel = &context;
+  self.channel.Publish(context);
 }
 // abi: the pcCliprdr server message callbacks, UINT is uint32_t
 auto ClipboardClient::Callbacks::InstallFormats(CliprdrClientContext& context) -> void {
   context.MonitorReady             = [](CliprdrClientContext* ctx, CLIPRDR_MONITOR_READY const*) -> std::uint32_t {
-    return HeldClipboard(ctx).Ready(*ctx);
+    Expects(ctx != nullptr, "the clipboard callback names its channel");
+    return HeldClipboard(*ctx).Ready(*ctx);
   };
   context.ServerFormatList         = [](CliprdrClientContext* ctx, CLIPRDR_FORMAT_LIST const* list) -> std::uint32_t {
+    Expects(ctx != nullptr, "the clipboard callback names its channel");
     Expects(list != nullptr, "format list is supplied");
-    return HeldClipboard(ctx).Formats(*ctx, *list);
+    return HeldClipboard(*ctx).Formats(*ctx, *list);
   };
   context.ServerFormatListResponse = [](CliprdrClientContext* ctx,
                                         CLIPRDR_FORMAT_LIST_RESPONSE const*) -> std::uint32_t {
-    return HeldClipboard(ctx).Accepted();
+    Expects(ctx != nullptr, "the clipboard callback names its channel");
+    return HeldClipboard(*ctx).Accepted();
   };
 }
 // abi: the pcCliprdr server message callbacks, UINT is uint32_t
 auto ClipboardClient::Callbacks::InstallData(CliprdrClientContext& context) -> void {
   context.ServerFormatDataRequest  = [](CliprdrClientContext* ctx,
                                         CLIPRDR_FORMAT_DATA_REQUEST const* request) -> std::uint32_t {
+    Expects(ctx != nullptr, "the clipboard callback names its channel");
     Expects(request != nullptr, "data request is supplied");
-    return HeldClipboard(ctx).Request(*ctx, *request);
+    return HeldClipboard(*ctx).Request(*ctx, *request);
   };
   context.ServerFormatDataResponse = [](CliprdrClientContext* ctx,
                                         CLIPRDR_FORMAT_DATA_RESPONSE const* response) -> std::uint32_t {
+    Expects(ctx != nullptr, "the clipboard callback names its channel");
     Expects(response != nullptr, "data response is supplied");
-    return HeldClipboard(ctx).Response(*response);
+    return HeldClipboard(*ctx).Response(*response);
   };
 }
 
 ClipboardClient::ClipboardClient(Client& value, std::vector<std::byte> initial)
     : client(value), outgoing(std::move(initial)) {
-  ObserverSet::Of(*client.Instance()->context).Add(*this);
+  auto& context = ClientContext(client);
+  ObserverSet::Of(context).Add(*this);
   freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
-  auto*      context    = client.Instance()->context;
-  auto const redirected = freerdp_settings_set_bool(context->settings, FreeRDP_RedirectClipboard, true);
+  auto const redirected = freerdp_settings_set_bool(context.settings, FreeRDP_RedirectClipboard, true);
   Expects(redirected, "clipboard enabled");
-  PubSub_SubscribeChannelConnected(context->pubSub, Callbacks::ChannelConnected);
+  PubSub_SubscribeChannelConnected(context.pubSub, Callbacks::ChannelConnected);
   // abi: pLoadChannels, BOOL is int
-  client.Instance()->LoadChannels = [](freerdp* instance) -> int {
-    return LoadStaticChannel(instance, CLIPRDR_SVC_CHANNEL_NAME);
+  ClientHandle(client).LoadChannels = [](freerdp* instance) -> int {
+    Expects(instance != nullptr, "channel loading names its client");
+    return LoadStaticChannel(*instance, CLIPRDR_SVC_CHANNEL_NAME);
   };
 }
 ClipboardClient::~ClipboardClient() {
@@ -110,18 +117,18 @@ auto ClipboardClient::Received(std::span<std::byte const> bytes) -> bool {
          && std::ranges::contains(formats, CF_TEXT);
 }
 auto ClipboardClient::RequestFormat(std::uint32_t format) -> std::uint32_t {
-  Expects(channel.load(), "clipboard channel connected");
-  CLIPRDR_FORMAT_DATA_REQUEST request{ .common = { .msgType = CB_FORMAT_DATA_REQUEST } };
+  auto&                       connected = channel.Get();
+  CLIPRDR_FORMAT_DATA_REQUEST request   { .common = { .msgType = CB_FORMAT_DATA_REQUEST } };
   request.requestedFormatId = format;
-  return channel.load()->ClientFormatDataRequest(channel.load(), &request);
+  return connected.ClientFormatDataRequest(&connected, &request);
 }
 auto ClipboardClient::Offer(std::span<std::byte const> bytes, bool unicode) -> bool {
-  Expects(channel.load(), "clipboard channel connected");
+  auto& connected = channel.Get();
   {
     std::scoped_lock const lock(guard);
     outgoing.assign(bytes.begin(), bytes.end());
   }
-  return AnnounceFormat(*channel.load(), unicode) == CHANNEL_RC_OK;
+  return AnnounceFormat(connected, unicode) == CHANNEL_RC_OK;
 }
 auto ClipboardClient::Observed() const -> ClipboardCapture const& {
   return observed;

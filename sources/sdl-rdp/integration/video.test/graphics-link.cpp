@@ -53,10 +53,9 @@ class PeerParts : public testing::Test {
 protected:
   CertificateDirectory const _certificates;
   Logs                       _logs;
-  sdlrdp_config const        _config       { Config(_certificates, _logs)         };
-  Diagnostics const          _diagnostics  { _config, false                       };
+  Diagnostics const          _diagnostics  { Config(_certificates, _logs), false  };
   EventQueue                 _events;
-  Configuration const        _configuration{ _config                              };
+  Configuration const        _configuration{ Config(_certificates, _logs)         };
   FrameStore                 _store        { { .width = 320, .height = 200 }, { } };
   SocketPair                 _sockets;
   PeerLink                   _link         { AcceptedPeer(_sockets)               };

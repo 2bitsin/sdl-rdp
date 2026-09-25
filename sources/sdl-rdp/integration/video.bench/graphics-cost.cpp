@@ -20,6 +20,7 @@
 namespace sdl_rdp::integration::video_bench::detail::graphics_cost {
 using sdl_rdp::headless_client_test::backend::AwaitAllAcknowledged;
 using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::Pixels;
 using sdl_rdp::headless_client_test::graphics::GraphicsCost;
 using sdl_rdp::headless_client_test::graphics::GraphicsObserver;
 using sdl_rdp::integration::support_bench::Check;
@@ -81,7 +82,7 @@ auto GraphicsCostSession::EncodeCost(std::string_view pattern) -> std::optional<
 
 auto FullRandomFrame::TestBody() -> void {
   if (!Holds([this] { Open(); })) return;
-  Client client(sdlrdp_port(backend.Handle()), true, 1280, 800);
+  Client client(sdlrdp_port(&*backend), true, 1280, 800);
   client.EnableGraphics();
   GraphicsObserver const observer(client);
   if (Connected(client) && PresentedRandomFrame(client)) ThenProgressiveCost(client, observer);
@@ -91,8 +92,8 @@ auto FullRandomFrame::Connected(Client& client) -> bool {
   return Check(client.Until([this] { return logs.Contains("GFX confirmed"); }), "the client confirms GFX");
 }
 auto FullRandomFrame::PresentedRandomFrame(Client& client) -> bool {
-  std::vector<std::uint32_t> pixels(1280uz * 800);
-  std::mt19937               random(17);            // NOLINT(cert-msc32-c, cert-msc51-cpp): Reproducible codec input.
+  Pixels       pixels(1280uz * 800);
+  std::mt19937 random(17);            // NOLINT(cert-msc32-c, cert-msc51-cpp): Reproducible codec input.
   std::ranges::generate(pixels, [&] { return random() & 0x00ffffff; });
   sdlrdp_rect const full{ 0, 0, 1280, 800 };
   return Check(backend.Present(pixels, 1280, 800, full) == 0, "the backend presents")
@@ -118,7 +119,7 @@ auto AvcFullFrame::TestBody() -> void {
     return;
   }
   if (!Holds([this] { Open(1920, 1080, SDLRDP_CODEC_AVC420); })) return;
-  Client client(sdlrdp_port(backend.Handle()), true, 1920, 1080);
+  Client client(sdlrdp_port(&*backend), true, 1920, 1080);
   client.EnableGraphics({ .h264 = true });
   GraphicsObserver const observer(client);
   if (!PresentedTiles(client, observer)) return;

@@ -17,6 +17,7 @@ namespace sdl_rdp::headless_client_test::graphics::detail::session {
 using sdl_rdp::headless_client_test::backend::AwaitAllAcknowledged;
 using sdl_rdp::headless_client_test::backend::Logs;
 using sdl_rdp::headless_client_test::client::HasCookie;
+using sdl_rdp::headless_client_test::client::Pixels;
 
 namespace {
 auto ConnectConfirmed(Client& client, Logs& logs, std::invocable<Client&> auto connect) -> void {
@@ -26,7 +27,7 @@ auto ConnectConfirmed(Client& client, Logs& logs, std::invocable<Client&> auto c
 }
 }
 auto GraphicsSession::ThenWriteDisconnect(Client& client) -> void {
-  EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 0), 1);
+  EXPECT_EQ(sdlrdp_wait_frame(&*backend, 0), 1);
   ASSERT_TRUE(client.Disconnect());
   EXPECT_TRUE(std::ranges::contains(UntilEvent(SDLRDP_DISCONNECTED), SDLRDP_DISCONNECTED, &sdlrdp_event::type));
   backend.Close();
@@ -47,8 +48,7 @@ auto GraphicsSession::GraphicsClient() -> Client& {
 auto GraphicsSession::Observer() -> GraphicsObserver& {
   return *graphics_observer;
 }
-auto GraphicsSession::PresentProgressiveDamage(Client& client, std::vector<std::uint32_t> const& pixels,
-                                               sdlrdp_rect damage) -> void {
+auto GraphicsSession::PresentProgressiveDamage(Client& client, Pixels const& pixels, sdlrdp_rect damage) -> void {
   ASSERT_EQ(backend.Present(pixels, 640, 480, damage), 0);
   ASSERT_NO_FATAL_FAILURE(AwaitAllAcknowledged(client, backend, logs));
   EXPECT_LE(client.MaxError(pixels), 24u);
@@ -59,12 +59,12 @@ auto GraphicsSession::ConnectPipeline(Client& client) -> void {
 }
 auto GraphicsSession::GivenGraphicsClient(sdlrdp_codec codec) -> void {
   ASSERT_NO_FATAL_FAILURE(Open(640, 480, { }, codec));
-  graphics_client = std::make_unique<Client>(sdlrdp_port(backend.Handle()), true, 640, 480);
+  graphics_client = std::make_unique<Client>(sdlrdp_port(&*backend), true, 640, 480);
   graphics_client->EnableGraphics();
 }
 auto GraphicsSession::GivenPipelinedGraphics() -> void {
   ASSERT_NO_FATAL_FAILURE(Open(320, 200, { }, SDLRDP_CODEC_PROGRESSIVE));
-  graphics_client = std::make_unique<Client>(sdlrdp_port(backend.Handle()), true);
+  graphics_client = std::make_unique<Client>(sdlrdp_port(&*backend), true);
   graphics_client->EnableGraphics();
   graphics_observer = std::make_unique<GraphicsObserver>(*graphics_client);
   ConnectGraphics(*graphics_client, *graphics_observer);
@@ -74,13 +74,12 @@ auto GraphicsSession::ThenLegacyFallback(Client& client) -> void {
   ASSERT_NO_FATAL_FAILURE(ThenConnectedCodec(client, SDLRDP_CODEC_RAW));
   EXPECT_TRUE(logs.Contains(SDLRDP_LOG_WARN, "GFX confirmation timed out"));
 }
-auto GraphicsSession::PresentMatching(Client& client, std::vector<std::uint32_t> const& pixels) -> void {
+auto GraphicsSession::PresentMatching(Client& client, Pixels const& pixels) -> void {
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
   ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text(true);
 }
-auto GraphicsSession::PresentGraphicsFrames(Client& client, GraphicsObserver& observer,
-                                            std::vector<std::uint32_t> const& pixels, std::uint32_t first,
-                                            std::uint32_t last) -> void {
+auto GraphicsSession::PresentGraphicsFrames(Client& client, GraphicsObserver& observer, Pixels const& pixels,
+                                            std::uint32_t first, std::uint32_t last) -> void {
   std::ranges::for_each(std::views::iota(first, last + 1), [&](std::size_t count) {
     ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
     ASSERT_NO_FATAL_FAILURE(AwaitFrames(client, observer.Observed().frames, count));
@@ -95,7 +94,7 @@ auto GraphicsSession::Connect(Client& client, bool ack) -> void {
   ASSERT_TRUE(client.Connect()) << logs.Text(true);
   ASSERT_TRUE(client.Until([&] { return HasCookie(client); }));
 }
-auto GraphicsSession::ShowFirstPicture(Client& client, std::vector<std::uint32_t> const& pixels) -> void {
+auto GraphicsSession::ShowFirstPicture(Client& client, Pixels const& pixels) -> void {
   ASSERT_NO_FATAL_FAILURE(Connect(client, false));
   ASSERT_NO_FATAL_FAILURE(PresentMatching(client, pixels));
 }

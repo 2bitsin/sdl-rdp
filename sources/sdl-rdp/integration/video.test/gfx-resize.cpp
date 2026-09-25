@@ -23,6 +23,7 @@ namespace sdl_rdp::integration::video_test::detail::gfx_resize {
 using sdl_rdp::headless_client_test::backend::BackendInstance;
 using sdl_rdp::headless_client_test::backend::Logs;
 using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::Pixels;
 using sdl_rdp::headless_client_test::frame::MovingTilePattern;
 using sdl_rdp::headless_client_test::graphics::GraphicsObserver;
 using sdl_rdp::utilities::Extent;
@@ -43,8 +44,8 @@ protected:
     backend.Close();
     if (!certificates.empty()) std::filesystem::remove_all(certificates);
   }
-  auto PresentProgressivePixel(Client& client, GraphicsObserver& observer, std::vector<std::uint32_t>& pixels,
-                               Extent size, std::size_t generations) -> void {
+  auto PresentProgressivePixel(Client& client, GraphicsObserver& observer, Pixels& pixels, Extent size,
+                               std::size_t generations) -> void {
     auto              frames = observer.Observed().frames.size();
     sdlrdp_rect const damage = { .x = 0, .y = 0, .w = 1, .h = 1 };
     pixels.front() ^= 0x222222;
@@ -67,7 +68,7 @@ auto Blend(std::uint32_t top, std::uint32_t bottom, float weight) -> std::uint32
   }
   return blended;
 }
-auto BilinearRow(std::vector<std::uint32_t> const& pixels, std::size_t y) -> std::vector<std::uint32_t> {
+auto BilinearRow(Pixels const& pixels, std::size_t y) -> Pixels {
   auto const position = std::clamp(((static_cast<double>(y) + 0.5) * (200.0 / 240)) - 0.5, 0.0, 199.0);
   auto const first    = static_cast<std::size_t>(position);
   auto const second   = std::min(first + 1, 199uz);
@@ -77,14 +78,14 @@ auto BilinearRow(std::vector<std::uint32_t> const& pixels, std::size_t y) -> std
   return std::views::zip_transform([=](std::uint32_t a, std::uint32_t b) { return Blend(a, b, weight); }, top, bottom)
          | std::ranges::to<std::vector>();
 }
-auto ThenBilinearRow(rdpGdi const& gdi, std::vector<std::uint32_t> const& pixels, std::size_t y) -> void {
+auto ThenBilinearRow(rdpGdi const& gdi, Pixels const& pixels, std::size_t y) -> void {
   auto const frame    = std::span(gdi.primary_buffer, std::size_t{ gdi.stride } * static_cast<std::size_t>(gdi.height));
   auto const row      = frame.subspan(y * gdi.stride, 320 * PixelBytes);
   auto const actual   = oxbox::utilities::SpanCast<std::uint32_t const>(row);
   auto const expected = BilinearRow(pixels, y);
   for (std::size_t x = 0; x < 320; ++x) ASSERT_EQ(actual[x] & 0xffffff, expected[x]) << x << ',' << y;
 }
-auto ThenBilinearPixels(rdpGdi const& gdi, std::vector<std::uint32_t> const& pixels) -> void {
+auto ThenBilinearPixels(rdpGdi const& gdi, Pixels const& pixels) -> void {
   for (std::size_t y = 0; y < 240; ++y) {
     ASSERT_NO_FATAL_FAILURE(ThenBilinearRow(gdi, pixels, y));
   }
@@ -99,14 +100,14 @@ auto ThenProgressiveGeneration(GraphicsObserver const& observer, std::size_t gen
 }
 constexpr std::array ResizeSequence{ std::pair{ 640u, 480u }, std::pair{ 320u, 200u }, std::pair{ 640u, 480u } };
 TEST_F(GraphicsResize, RawAspectMatchesBilinear) {
-  ASSERT_EQ(sdlrdp_set_codec(backend.Handle(), SDLRDP_CODEC_RAW), 0);
-  ASSERT_EQ(sdlrdp_set_aspect(backend.Handle(), { 4, 3 }), 0);
-  Client client(sdlrdp_port(backend.Handle()), true, 320, 240);
+  ASSERT_EQ(sdlrdp_set_codec(&*backend, SDLRDP_CODEC_RAW), 0);
+  ASSERT_EQ(sdlrdp_set_aspect(&*backend, { 4, 3 }), 0);
+  Client client(sdlrdp_port(&*backend), true, 320, 240);
   client.EnableGraphics();
   GraphicsObserver observer(client);
   ASSERT_TRUE(client.Connect());
-  std::vector<std::uint32_t> pixels(320uz * 200);
-  std::mt19937               random(17);           // NOLINT(cert-msc32-c, cert-msc51-cpp): Reproducible codec input.
+  Pixels       pixels(320uz * 200);
+  std::mt19937 random(17);           // NOLINT(cert-msc32-c, cert-msc51-cpp): Reproducible codec input.
   std::ranges::generate(pixels, [&] { return random() & 0x00ffffff; });
   sdlrdp_rect const full{ 0, 0, 320, 200 };
   ASSERT_EQ(backend.Present(pixels, 320, 200, full), 0);
@@ -118,14 +119,14 @@ TEST_F(GraphicsResize, RawAspectMatchesBilinear) {
   ThenBilinearPixels(*gdi, pixels);
 }
 TEST_F(GraphicsResize, ProgressiveContextAndFullDamage) {
-  Client client(sdlrdp_port(backend.Handle()), true, 640, 480);
+  Client client(sdlrdp_port(&*backend), true, 640, 480);
   client.EnableGraphics();
   client.Tolerance(24);
   GraphicsObserver observer(client);
   ASSERT_TRUE(client.Connect());
   std::size_t generations = 0;
   for (auto [w, h] : ResizeSequence) {
-    std::vector<std::uint32_t> pixels(static_cast<std::size_t>(w) * h, 0x335577 + (generations * 0x221100));
+    Pixels pixels(static_cast<std::size_t>(w) * h, 0x335577 + (generations * 0x221100));
     SCOPED_TRACE(std::to_string(w) + "x" + std::to_string(h));
     sdlrdp_rect const damage{ 0, 0, Narrowed<int>(w), Narrowed<int>(h) };
     ASSERT_EQ(backend.Present(pixels, w, h, damage), 0);
@@ -138,8 +139,7 @@ TEST_F(GraphicsResize, ProgressiveContextAndFullDamage) {
 }
 using sdl_rdp::headless_client_test::graphics::GraphicsCost;
 
-auto ApplyPlanarDamage(std::vector<std::uint32_t>& pixels, std::vector<std::uint32_t>& expected, sdlrdp_rect part)
-    -> void {
+auto ApplyPlanarDamage(Pixels& pixels, Pixels& expected, sdlrdp_rect part) -> void {
   std::ranges::for_each(std::views::iota(part.y, part.y + part.h), [&](int row) {
     std::ranges::fill(std::span(pixels).subspan((row * 354) + part.x, part.w), 0x55aaffu);
   });
@@ -149,11 +149,11 @@ auto ApplyPlanarDamage(std::vector<std::uint32_t>& pixels, std::vector<std::uint
 }
 TEST_F(GraphicsCost, PlanarPartialMatchesFull) {
   ASSERT_NO_FATAL_FAILURE(Open(354, 226, SDLRDP_CODEC_PLANAR));
-  Client client(sdlrdp_port(backend.Handle()), true, 354, 226);
+  Client client(sdlrdp_port(&*backend), true, 354, 226);
   client.EnableGraphics();
   GraphicsObserver observer(client);
   ASSERT_NO_FATAL_FAILURE(ConnectGraphics(client));
-  std::vector<std::uint32_t> pixels(354uz * 226);
+  Pixels pixels(354uz * 226);
   MovingTilePattern(pixels, 354, 226, 0);
   sdlrdp_rect const full     { 0, 0, 354, 226   };
   sdlrdp_rect const part     { 17, 19, 177, 113 };

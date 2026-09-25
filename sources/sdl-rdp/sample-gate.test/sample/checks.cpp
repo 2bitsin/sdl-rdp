@@ -32,29 +32,29 @@ auto ThenWrittenBytes(std::string const& output) -> void {
 }
 }
 
-auto SampleChecks::WhenSurrogateText(rdpInput* input) -> void {
-  ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(input, KBD_FLAGS_DOWN, 0xd83d));
-  ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(input, KBD_FLAGS_DOWN, 0xde00));
+auto SampleChecks::WhenSurrogateText(rdpInput& input) -> void {
+  ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(&input, KBD_FLAGS_DOWN, 0xd83d));
+  ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(&input, KBD_FLAGS_DOWN, 0xde00));
   ASSERT_TRUE(Read("event TEXT_INPUT text=😀"));
 }
-auto SampleChecks::WhenUnicodeText(rdpInput* input) -> void {
-  ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(input, KBD_FLAGS_DOWN, 0xe9));
-  ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(input, KBD_FLAGS_RELEASE, 0xe9));
+auto SampleChecks::WhenUnicodeText(rdpInput& input) -> void {
+  ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(&input, KBD_FLAGS_DOWN, 0xe9));
+  ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(&input, KBD_FLAGS_RELEASE, 0xe9));
   ASSERT_TRUE(Read("event TEXT_INPUT text=é"));
   WhenSurrogateText(input);
 }
-auto SampleChecks::ThenAbsoluteMouse(rdpInput* input) -> void {
-  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x3d));
+auto SampleChecks::ThenAbsoluteMouse(rdpInput& input) -> void {
+  ASSERT_TRUE(freerdp_input_send_keyboard_event(&input, KBD_FLAGS_DOWN, 0x3d));
   ASSERT_TRUE(Read("event RELATIVE_MODE active=0"));
-  ASSERT_TRUE(freerdp_input_send_mouse_event(input, PTR_FLAGS_MOVE, 100, 120));
+  ASSERT_TRUE(freerdp_input_send_mouse_event(&input, PTR_FLAGS_MOVE, 100, 120));
   ASSERT_TRUE(Read("event MOUSE_MOTION "));
   EXPECT_TRUE(line.contains(" x=100 y=120 ")) << line;
 }
 auto SampleChecks::WhenShiftedText(Client& client) -> void {
-  auto* input = client.Instance()->context->input;
-  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_DOWN, 0x2a));
+  auto& input = *client.Instance()->context->input;
+  ASSERT_TRUE(freerdp_input_send_keyboard_event(&input, KBD_FLAGS_DOWN, 0x2a));
   ASSERT_NO_FATAL_FAILURE(Tap(client, 0x1e));
-  ASSERT_TRUE(freerdp_input_send_keyboard_event(input, KBD_FLAGS_RELEASE, 0x2a));
+  ASSERT_TRUE(freerdp_input_send_keyboard_event(&input, KBD_FLAGS_RELEASE, 0x2a));
   ASSERT_TRUE(Read("event TEXT_INPUT text=A"));
 }
 auto SampleChecks::WhenScancodeText(Client& client) -> void {
@@ -62,9 +62,9 @@ auto SampleChecks::WhenScancodeText(Client& client) -> void {
   ASSERT_TRUE(Read("event TEXT_INPUT text=a"));
   WhenShiftedText(client);
 }
-auto SampleChecks::WhenNonAsciiKey(rdpInput* input) -> void {
-  ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(input, KBD_FLAGS_DOWN, 0xe4));
-  ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(input, KBD_FLAGS_RELEASE, 0xe4));
+auto SampleChecks::WhenNonAsciiKey(rdpInput& input) -> void {
+  ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(&input, KBD_FLAGS_DOWN, 0xe4));
+  ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(&input, KBD_FLAGS_RELEASE, 0xe4));
   ASSERT_TRUE(Read("event KEY_DOWN type=768 scancode=400 key=0 down=1"));
   ASSERT_TRUE(Read("event KEY_UP type=769 scancode=400 key=0 down=0"));
   ASSERT_TRUE(Read("event TEXT_INPUT text=ä"));
@@ -75,9 +75,9 @@ auto SampleChecks::ThenUnicodeKeyEvents() -> void {
   ASSERT_TRUE(Read("event KEY_UP type=769 scancode=4 key=97 down=0"));
   ASSERT_TRUE(Read("event TEXT_INPUT text=a"));
 }
-auto SampleChecks::WhenUnicodeKeys(rdpInput* input) -> void {
-  ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(input, KBD_FLAGS_DOWN, 'a'));
-  ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(input, KBD_FLAGS_RELEASE, 'a'));
+auto SampleChecks::WhenUnicodeKeys(rdpInput& input) -> void {
+  ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(&input, KBD_FLAGS_DOWN, 'a'));
+  ASSERT_TRUE(freerdp_input_send_unicode_keyboard_event(&input, KBD_FLAGS_RELEASE, 'a'));
   ASSERT_NO_FATAL_FAILURE(ThenUnicodeKeyEvents());
   WhenNonAsciiKey(input);
 }

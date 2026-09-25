@@ -1,5 +1,6 @@
 #pragma once
 #include "client.hpp"
+#include <sdl-rdp/headless-client.test/utilities/published.hpp>
 
 #include <freerdp/client/disp.h>
 #include <freerdp/event.h>
@@ -12,6 +13,7 @@
 
 namespace sdl_rdp::headless_client_test::client::detail::display {
 using sdl_rdp::headless_client_test::utilities::ObserverSet;
+using sdl_rdp::headless_client_test::utilities::Published;
 
 struct DisplayCapture {
   bool                  echo_resize = false;
@@ -39,11 +41,11 @@ private:
   class Callbacks;
   auto Resize(rdpContext& context)             -> bool;
   auto Connected(DispClientContext& connected) -> void;
-  DisplayCapture                  observed;
-  Client&                         client;
-  pDesktopResize                  desktop_resize;
-  std::atomic<DispClientContext*> channel       { nullptr };
-  std::atomic_bool                ready         { false   };
+  DisplayCapture               observed;
+  Client&                      client;
+  pDesktopResize               desktop_resize;
+  Published<DispClientContext> channel;
+  std::atomic_bool             ready         { false };
 };
 // The lease keeps the observer registered for the whole call, so Remove waits for it.
 template <std::invocable<DisplayClient&> UseTy>

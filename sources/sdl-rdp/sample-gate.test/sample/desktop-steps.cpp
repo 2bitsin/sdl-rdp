@@ -73,11 +73,11 @@ auto SampleDesktopSteps::GivenSwitchableCodec(Client& client) -> void {
   ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_NSCodec, true));
   ASSERT_NO_FATAL_FAILURE(Connect(client));
 }
-auto SampleDesktopSteps::ThenTakeoverEvent(char const* expected) -> void {
+auto SampleDesktopSteps::ThenTakeoverEvent(std::string_view expected) -> void {
   do {
     ASSERT_TRUE(process->Line(line, Clock::now() + 10s)) << process->Transcript();
   } while (!line.starts_with("event ") || line.starts_with("event GEOMETRY ") || line.starts_with("event CONNECTED "));
-  EXPECT_TRUE(line.starts_with("event " + std::string(expected) + " ")) << line;
+  EXPECT_TRUE(line.starts_with(std::format("event {} ", expected))) << line;
 }
 auto SampleDesktopSteps::WhenSmallerDesktop(Client& first) -> void {
   ASSERT_NO_FATAL_FAILURE(Connect(first));

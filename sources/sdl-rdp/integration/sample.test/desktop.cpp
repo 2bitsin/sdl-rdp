@@ -39,6 +39,14 @@ using sdl_rdp::sample_gate_test::sample::Words;
 using sdl_rdp::video::avc::Encoder;
 
 namespace {
+// abi: pEndPaint, BOOL is int
+auto PaintNothing(rdpContext* /*context*/) -> int {
+  return true;
+}
+// abi: pConnectCallback, BOOL is int
+auto RefuseConnect(freerdp* /*instance*/) -> int {
+  return false;
+}
 auto DesktopSize() -> Words {
   return { "SDL_RDP_WIDTH=1280", "SDL_RDP_HEIGHT=800" };
 }
@@ -90,7 +98,8 @@ TEST_F(DesktopSample, TakeoverFocus) {
   ASSERT_NO_FATAL_FAILURE(GivenFocusedClient(first));
   Client second(port, true, 640, 480);
   ASSERT_NO_FATAL_FAILURE(Connect(second));
-  for (auto const* expected : { "OCCLUDED", "FOCUS_LOST", "MOUSE_LEAVE", "EXPOSED", "FOCUS_GAINED", "MOUSE_ENTER" }) {
+  for (std::string_view const expected :
+       { "OCCLUDED", "FOCUS_LOST", "MOUSE_LEAVE", "EXPOSED", "FOCUS_GAINED", "MOUSE_ENTER" }) {
     ASSERT_NO_FATAL_FAILURE(ThenTakeoverEvent(expected));
   }
   SDL_Log("%s", process->Transcript().c_str());
@@ -153,18 +162,15 @@ TEST_F(DesktopSample, FullscreenFollowsScreen) {
 
 TEST_F(DesktopSample, FirstFrameObserverWithoutSuccessfulConnect) {
   Client client(0, true);
-  // abi: pEndPaint and pConnectCallback, BOOL is int
-  auto paint   = +[](rdpContext*) -> int { return true; };
-  auto connect = +[](freerdp*) -> int { return false; };
-  client.Instance()->context->update->EndPaint = paint;
-  client.Instance()->PostConnect               = connect;
+  client.Instance()->context->update->EndPaint = PaintNothing;
+  client.Instance()->PostConnect               = RefuseConnect;
   for (bool const attempt : { false, true }) {
     {
       FirstFrameSize const frame(client);
       if (attempt) EXPECT_FALSE(client.Instance()->PostConnect(client.Instance().get()));
     }
-    EXPECT_EQ(client.Instance()->context->update->EndPaint, paint);
-    EXPECT_EQ(client.Instance()->PostConnect, connect);
+    EXPECT_EQ(client.Instance()->context->update->EndPaint, &PaintNothing);
+    EXPECT_EQ(client.Instance()->PostConnect, &RefuseConnect);
   }
 }
 

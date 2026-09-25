@@ -6,6 +6,8 @@
 #include <cstdint>
 
 namespace sdl_rdp::headless_client_test::frame::detail::pattern {
+using sdl_rdp::headless_client_test::client::Pixels;
+
 auto MovingTilePattern(std::span<std::uint32_t> pixels, std::size_t width, std::size_t height, std::size_t frame)
     -> void {
   constexpr std::array<std::uint32_t, 4> colors { 0x335577, 0x55aaff, 0x779933, 0xaa5533 };
@@ -26,10 +28,10 @@ auto NoisePattern(std::span<std::uint32_t> pixels, std::uint32_t value) -> void 
 auto HashPattern(std::span<std::uint32_t> pixels, std::uint32_t first) -> void {
   std::ranges::generate(pixels, [index = first]() mutable { return (index++ * 2654435761u) & 0xffffff; });
 }
-auto GraphicsScene(std::uint32_t frame, bool noise) -> std::vector<std::uint32_t> {
-  std::vector<std::uint32_t> pixels(640uz * 480, 0x00010101);
-  auto const                 left   = std::size_t{ frame % 640 };
-  auto const                 width  = std::min(left + 32, 640uz) - left;
+auto GraphicsScene(std::uint32_t frame, bool noise) -> Pixels {
+  Pixels     pixels(640uz * 480, 0x00010101);
+  auto const left   = std::size_t{ frame % 640 };
+  auto const width  = std::min(left + 32, 640uz) - left;
   if (noise)
     NoisePattern(pixels, frame + 1);
   else

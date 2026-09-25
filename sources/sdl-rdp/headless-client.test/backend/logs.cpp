@@ -34,7 +34,9 @@ auto Logs::Statistics(std::string_view pattern) -> std::optional<std::vector<std
   auto const  text  = Text(true);
   std::smatch match;
   if (!std::regex_search(text, match, std::regex(pattern.begin(), pattern.end()))) return std::nullopt;
-  return match | std::views::transform([](auto const& group) { return group.str(); }) | std::ranges::to<std::vector>();
+  return std::views::iota(std::size_t{ 0 }, match.size())
+         | std::views::transform([&match](std::size_t group) { return match.str(group); })
+         | std::ranges::to<std::vector>();
 }
 auto Logs::Entries() -> std::vector<std::pair<sdlrdp_log_level, std::string>> {
   std::scoped_lock const lock(guard);

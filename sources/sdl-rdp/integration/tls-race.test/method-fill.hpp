@@ -18,25 +18,26 @@ inline constexpr std::string_view TlsMethod    = "RdpTls";
 class MethodFill {
 public:
   // The interposers are C functions without a user pointer, so their state is one object per process.
-  static auto        Shared()                                               -> MethodFill&;
-  auto               Created(BIO_METHOD const* method, char const* name)    -> void;
-  auto               Filling(BIO_METHOD const* method, Setter setter)       -> void;
-  auto               Arm(std::string_view method, Setter setter)            -> void;
-  auto               RacerDone()                                            -> void;
-  [[nodiscard]] auto Fills()                                                -> std::size_t;
-  [[nodiscard]] auto Seen(std::string_view method)                          -> bool;
-  [[nodiscard]] auto Named(BIO_METHOD const* method, std::string_view name) -> bool;
+  static auto        Shared()                                                 -> MethodFill&;
+  auto               Created(BIO_METHOD const& method, std::string_view name) -> void;
+  auto               Filling(BIO_METHOD const& method, Setter setter)         -> void;
+  auto               Arm(std::string_view method, Setter setter)              -> void;
+  auto               RacerDone()                                              -> void;
+  [[nodiscard]] auto Fills()                                                  -> std::size_t;
+  [[nodiscard]] auto Seen(std::string_view method)                            -> bool;
+  [[nodiscard]] auto Named(BIO_METHOD const& method, std::string_view name)   -> bool;
 
 private:
-  [[nodiscard]] auto Holds(BIO_METHOD const* method, Setter setter) const      -> bool;
-  [[nodiscard]] auto Is(BIO_METHOD const* method, std::string_view name) const -> bool;
-  std::mutex                                            guard;
-  std::condition_variable                               racer_done;
-  std::map<std::string, BIO_METHOD const*, std::less<>> created;
-  std::string                                           held_method;
-  Setter                                                held_setter = Setter::Write;
-  std::size_t                                           fills       = 0;
-  std::size_t                                           racers_done = 0;
+  using Method = std::reference_wrapper<BIO_METHOD const>;
+  [[nodiscard]] auto Holds(BIO_METHOD const& method, Setter setter) const      -> bool;
+  [[nodiscard]] auto Is(BIO_METHOD const& method, std::string_view name) const -> bool;
+  std::mutex                                 guard;
+  std::condition_variable                    racer_done;
+  std::map<std::string, Method, std::less<>> created;
+  std::string                                held_method;
+  Setter                                     held_setter = Setter::Write;
+  std::size_t                                fills       = 0;
+  std::size_t                                racers_done = 0;
 };
 }
 

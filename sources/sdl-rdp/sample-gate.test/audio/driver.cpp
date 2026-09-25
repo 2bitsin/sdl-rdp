@@ -11,7 +11,7 @@
 #include <vector>
 
 namespace sdl_rdp::sample_gate_test::audio::detail::driver {
-using sdl_rdp::headless_client_test::backend::Logs;
+using sdl_rdp::sample_gate_test::process::Capture;
 using sdl_rdp::sample_gate_test::process::ListeningPort;
 using sdl_rdp::sample_gate_test::process::ProcfsSelf;
 using sdl_rdp::sample_gate_test::sample::SetBackendHints;
@@ -76,21 +76,8 @@ auto AudioDriver::ThenPcm(Client& client, SoundClient& audio) -> void {
   ASSERT_NO_FATAL_FAILURE(PlayPcm(4800uz * 2));
   ASSERT_TRUE(client.Until([&] { return std::ranges::count(audio.CaptureState().samples, 1234) >= 960; }));
 }
-auto AudioDriver::CaptureLogs() -> void {
-  SDL_GetLogOutputFunction(&previous_log, &previous_log_user);
-  SDL_SetLogOutputFunction(
-      [](void* user, int category, SDL_LogPriority priority, char const* text) {
-        auto& self  = *static_cast<AudioDriver*>(user);
-        auto  level = priority >= SDL_LOG_PRIORITY_ERROR ? SDLRDP_LOG_ERROR
-                      : priority == SDL_LOG_PRIORITY_WARN ? SDLRDP_LOG_WARN
-                                                          : SDLRDP_LOG_INFO;
-        Logs::Collect(&self.logs, level, text);
-        if (self.previous_log) self.previous_log(self.previous_log_user, category, priority, text);
-      },
-      this);
-}
 auto AudioDriver::SetUp() -> void {
-  CaptureLogs();
+  captured.emplace(logs, Capture{ .forwarded = true });
   ASSERT_NO_FATAL_FAILURE(GivenAudioHints());
   ASSERT_TRUE(SDL_Init(SDL_INIT_AUDIO)) << SDL_GetError();
   ASSERT_NO_FATAL_FAILURE(OpenStream());
@@ -102,7 +89,7 @@ auto AudioDriver::TearDown() -> void {
   sound_client.reset();
   stream.reset();
   SDL_Quit();
-  SDL_SetLogOutputFunction(previous_log, previous_log_user);
+  captured.reset();
   for (auto const* hint : { SDL_HINT_AUDIO_DRIVER, SDL_HINT_VIDEO_DRIVER, "SDL_RDP_PORT", "SDL_RDP_BIND",
                             "SDL_RDP_CERT_DIR", "SDL_RDP_BACKEND", "SDL_RDP_CODEC", SDL_HINT_RDP_AUDIO_LEAD })
     SDL_ResetHint(hint);

@@ -1,14 +1,14 @@
 #include "method-fill.hpp"
 
-#include <sdl-rdp/utilities/contract.hpp>
-
 #include <chrono>
 #include <cstddef>
+#include <functional>
+#include <memory>
+#include <string>
+#include <string_view>
 #include <tuple>
 
 namespace sdl_rdp::integration::tls_race_test::detail::method_fill {
-using sdl_rdp::utilities::Expects;
-
 namespace {
 constexpr auto StallLimit = std::chrono::seconds(2);
 }
@@ -16,14 +16,11 @@ auto MethodFill::Shared() -> MethodFill& {
   static MethodFill fill;
   return fill;
 }
-auto MethodFill::Created(BIO_METHOD const* method, char const* name) -> void {
-  Expects(method != nullptr, "OpenSSL allocated the method");
-  Expects(name != nullptr, "the method is named");
+auto MethodFill::Created(BIO_METHOD const& method, std::string_view name) -> void {
   std::scoped_lock const lock(guard);
-  created.insert_or_assign(name, method);
+  created.insert_or_assign(std::string{ name }, std::cref(method));
 }
-auto MethodFill::Filling(BIO_METHOD const* method, Setter setter) -> void {
-  Expects(method != nullptr, "a method is being filled");
+auto MethodFill::Filling(BIO_METHOD const& method, Setter setter) -> void {
   std::unique_lock lock(guard);
   if (!Holds(method, setter)) return;
   ++fills;
@@ -51,15 +48,15 @@ auto MethodFill::Seen(std::string_view method) -> bool {
   std::scoped_lock const lock(guard);
   return created.contains(method);
 }
-auto MethodFill::Named(BIO_METHOD const* method, std::string_view name) -> bool {
+auto MethodFill::Named(BIO_METHOD const& method, std::string_view name) -> bool {
   std::scoped_lock const lock(guard);
   return Is(method, name);
 }
-auto MethodFill::Holds(BIO_METHOD const* method, Setter setter) const -> bool {
+auto MethodFill::Holds(BIO_METHOD const& method, Setter setter) const -> bool {
   return setter == held_setter && Is(method, held_method);
 }
-auto MethodFill::Is(BIO_METHOD const* method, std::string_view name) const -> bool {
+auto MethodFill::Is(BIO_METHOD const& method, std::string_view name) const -> bool {
   auto const found = created.find(name);
-  return found != created.end() && found->second == method;
+  return found != created.end() && std::addressof(found->second.get()) == std::addressof(method);
 }
 }

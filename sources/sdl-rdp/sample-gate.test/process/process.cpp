@@ -4,13 +4,11 @@
 
 #include <sdl-rdp/utilities/descriptor.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
-#include <algorithm>
 #include <array>
 #include <cerrno>
 #include <chrono>
 #include <csignal>
 #include <fcntl.h>
-#include <iterator>
 #include <poll.h>
 #include <sys/wait.h>
 #include <thread>
@@ -24,7 +22,6 @@ using namespace std::chrono_literals;
 
 namespace {
 auto Spawn(std::vector<std::string> arguments, int& output) -> pid_t {
-  Expects(!arguments.empty(), "child arguments supplied");
   std::array<int, 2> descriptors { };
   auto const         piped       = pipe2(descriptors.data(), O_CLOEXEC);
   Expects(piped == 0, "stdout pipe created");
@@ -33,13 +30,7 @@ auto Spawn(std::vector<std::string> arguments, int& output) -> pid_t {
   SpawnActions     actions;
   actions.Redirect(write_end.Get(), STDERR_FILENO);
   actions.Redirect(write_end.Get(), STDOUT_FILENO);
-  std::vector<char*> argv;
-  std::ranges::transform(arguments, std::back_inserter(argv), [](auto& s) { return s.data(); });
-  argv.push_back(nullptr);
-  pid_t pid    = -1;
-  auto  result = posix_spawn(&pid, "/usr/bin/env", actions.Get(), nullptr, argv.data(), environ);
-  Expects(result == 0, "sample spawned");
-  return pid;
+  return actions.Spawn("/usr/bin/env", arguments);
 }
 }
 

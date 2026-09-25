@@ -4,15 +4,22 @@
 namespace sdl_rdp::sample_gate_test::client::detail::pointer_observer {
 using sdl_rdp::headless_client_test::client::Client;
 
-struct PointerObserver {
+class PointerObserver {
 public:
+           PointerObserver(PointerObserver const&)               = delete;
+           PointerObserver(PointerObserver&&)                    = delete;
   explicit PointerObserver(Client& client);
-  auto     Red() const -> bool;
+           ~PointerObserver();
+  auto     operator=(PointerObserver const&) -> PointerObserver& = delete;
+  auto     operator=(PointerObserver&&)      -> PointerObserver& = delete;
+  auto     Red() const                       -> bool;
 
 private:
   auto Receive(POINTER_NEW_UPDATE const& update) -> void;
-  inline static thread_local PointerObserver* active = nullptr;
-  bool                                        red    = false;
+  rdpContext&       context;
+  rdpPointerUpdate& pointer;
+  pPointerNew       original;
+  bool              red      = false;
 };
 }
 

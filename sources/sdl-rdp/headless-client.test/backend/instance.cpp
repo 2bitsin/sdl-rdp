@@ -21,9 +21,6 @@ auto BackendInstance::TryOpen(sdlrdp_config const& config) -> int {
 auto BackendInstance::Close() noexcept -> void {
   _handle.reset();
 }
-auto BackendInstance::Handle() const noexcept -> sdlrdp_handle* {
-  return _handle.get();
-}
 auto BackendInstance::operator*() const -> sdlrdp_handle& {
   Expects(_handle != nullptr, "the backend is open");
   return *_handle;

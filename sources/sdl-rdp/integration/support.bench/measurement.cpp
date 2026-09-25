@@ -1,5 +1,6 @@
 #include <sdl-rdp/integration/support.bench/measurement.hpp>
 
+#include <sdl-rdp/headless-client.test/utilities/split.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 
 #include <algorithm>
@@ -10,12 +11,13 @@
 #include <vector>
 
 namespace sdl_rdp::integration::support_bench::detail::measurement {
+using sdl_rdp::headless_client_test::utilities::Split;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Required;
 
 namespace {
 auto OneLine(std::string_view text) -> std::string {
-  return text | std::views::split('\n') | std::views::filter([](auto line) { return !line.empty(); })
+  return Split(text, '\n') | std::views::filter([](std::string_view line) { return !line.empty(); })
          | std::views::join_with(' ') | std::ranges::to<std::string>();
 }
 auto Located(testing::TestPartResult const& part) -> std::string {

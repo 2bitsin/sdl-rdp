@@ -3,6 +3,7 @@
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/headless-client.test/client/channels.hpp>
+#include <sdl-rdp/headless-client.test/client/framebuffer.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 
 #include <freerdp/addin.h>
@@ -39,17 +40,20 @@ auto FreeGraphics(freerdp* instance) noexcept -> void {
 namespace {
 // abi: pPostConnect, BOOL is int
 auto ClientPostConnect(freerdp* client) -> int {
-  auto* context = client->context;
-  return freerdp_client_codecs_reset(context->codecs, FREERDP_CODEC_ALL,
-                                     freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopWidth),
-                                     freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopHeight))
+  Expects(client != nullptr, "post-connect names its client");
+  auto& context = *client->context;
+  return freerdp_client_codecs_reset(context.codecs, FREERDP_CODEC_ALL,
+                                     freerdp_settings_get_uint32(context.settings, FreeRDP_DesktopWidth),
+                                     freerdp_settings_get_uint32(context.settings, FreeRDP_DesktopHeight))
          && gdi_init(client, PIXEL_FORMAT_BGRX32);
 }
 // abi: pDesktopResize, BOOL is int
 auto ClientDesktopResize(rdpContext* context) -> int {
-  auto w = freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopWidth);
-  auto h = freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopHeight);
-  return freerdp_client_codecs_reset(context->codecs, FREERDP_CODEC_ALL, w, h) && gdi_resize(context->gdi, w, h);
+  Expects(context != nullptr, "resize names its client context");
+  auto& resized = *context;
+  auto  w       = freerdp_settings_get_uint32(resized.settings, FreeRDP_DesktopWidth);
+  auto  h       = freerdp_settings_get_uint32(resized.settings, FreeRDP_DesktopHeight);
+  return freerdp_client_codecs_reset(resized.codecs, FREERDP_CODEC_ALL, w, h) && gdi_resize(resized.gdi, w, h);
 }
 auto ConfigureClientCodecs(rdpSettings& settings, bool surface) -> void {
   std::array<std::pair<FreeRDP_Settings_Keys_Bool, bool>, 5> const codecs_and_security{ {
@@ -88,21 +92,25 @@ auto ConfigureClient(rdpSettings& settings, std::uint32_t port, bool surface, st
           Refusal("client port, desktop and threading", refused_port_desktop_or_threading));
   ConfigureClientCodecs(settings, surface);
 }
-auto ConnectGraphicsDecoder(void* raw, ChannelConnectedEventArgs const* event) -> void {
-  if (std::string_view(event->name) != RDPGFX_DVC_CHANNEL_NAME) return;
-  auto*      context     = static_cast<rdpContext*>(raw);
-  auto const initialized = gdi_graphics_pipeline_init(context->gdi,
-                                                      static_cast<RdpgfxClientContext*>(event->pInterface));
+auto StartGraphicsDecoder(rdpContext& context, RdpgfxClientContext& channel) -> void {
+  auto const initialized = gdi_graphics_pipeline_init(context.gdi, &channel);
   Expects(initialized, "graphics decoder initialized");
 }
-auto DisconnectGraphicsDecoder(void* raw, ChannelDisconnectedEventArgs const* event) -> void {
+auto StopGraphicsDecoder(rdpContext& context, RdpgfxClientContext& channel) -> void {
+  gdi_graphics_pipeline_uninit(context.gdi, &channel);
+}
+// abi: pChannelConnectedEventHandler and pChannelDisconnectedEventHandler
+template <auto apply, class EventTy> auto GraphicsDecoderEvent(void* raw, EventTy const* event) -> void {
+  Expects(raw != nullptr, "the channel event names its client context");
+  Expects(event != nullptr, "channel event is supplied");
   if (std::string_view(event->name) != RDPGFX_DVC_CHANNEL_NAME) return;
-  auto* context = static_cast<rdpContext*>(raw);
-  gdi_graphics_pipeline_uninit(context->gdi, static_cast<RdpgfxClientContext*>(event->pInterface));
+  Expects(event->pInterface != nullptr, "the graphics channel interface exists");
+  apply(*static_cast<rdpContext*>(raw), *static_cast<RdpgfxClientContext*>(event->pInterface));
 }
 // abi: pLoadChannels, BOOL is int
 auto LoadGraphicsChannel(freerdp* instance) -> int {
-  return LoadDynamicChannel(instance, "rdpgfx");
+  Expects(instance != nullptr, "channel loading names its client");
+  return LoadDynamicChannel(*instance, "rdpgfx");
 }
 auto KeyboardFlags(KeyState state) -> std::uint16_t {
   switch (state) {
@@ -142,8 +150,10 @@ auto Client::EnableGraphics(GraphicsOptions options) -> void {
   auto const refused_graphics = FirstRefused(*context->settings, graphics);
   Expects(!refused_graphics.has_value(), Refusal("the client's graphics pipeline preferences", refused_graphics));
   freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
-  PubSub_SubscribeChannelConnected(context->pubSub, ConnectGraphicsDecoder);
-  PubSub_SubscribeChannelDisconnected(context->pubSub, DisconnectGraphicsDecoder);
+  PubSub_SubscribeChannelConnected(context->pubSub,
+                                   GraphicsDecoderEvent<StartGraphicsDecoder, ChannelConnectedEventArgs>);
+  PubSub_SubscribeChannelDisconnected(context->pubSub,
+                                      GraphicsDecoderEvent<StopGraphicsDecoder, ChannelDisconnectedEventArgs>);
   instance->LoadChannels = LoadGraphicsChannel;
 }
 auto Client::Credentials(Login const& login, bool nla) -> void {
@@ -196,22 +206,22 @@ auto PumpInBackground(Client& client) -> std::jthread {
   });
 }
 auto Client::Matches(Pixels const& pixels) -> bool {
-  auto* gdi = instance->context->gdi;
+  auto const* gdi = instance->context->gdi;
+  Expects(gdi != nullptr, "decoded framebuffer exists");
   Expects(std::cmp_equal(gdi->stride, gdi->width * 4), "decoded rows are packed");
   if (pixels.size() != Narrowed<std::size_t>(gdi->width) * gdi->height) return false;
-  auto const* actual = reinterpret_cast<std::uint32_t const*>(gdi->primary_buffer);
-  if (!tolerance)
-    return std::equal(pixels.begin(), pixels.end(), actual, [](auto a, auto b) { return ((a ^ b) & 0x00ffffff) == 0; });
-  return std::equal(pixels.begin(), pixels.end(), actual,
-                    [&](auto a, auto b) { return ChannelError(a, b) <= tolerance; });
+  auto const actual = Framebuffer(*gdi);
+  if (!tolerance) return std::ranges::equal(pixels, actual, [](auto a, auto b) { return ((a ^ b) & 0x00ffffff) == 0; });
+  return std::ranges::equal(pixels, actual, [&](auto a, auto b) { return ChannelError(a, b) <= tolerance; });
 }
-auto Client::MaxError(Pixels const& pixels, Pixels const* reference) const -> std::uint32_t {
-  Expects(instance->context->gdi != nullptr, "decoded framebuffer exists");
-  auto const* actual   = reinterpret_cast<std::uint32_t const*>(instance->context->gdi->primary_buffer);
-  auto const& expected = reference ? *reference : pixels;
-  Expects(expected.size() == pixels.size(), "reference matches source dimensions");
+auto Client::MaxError(Pixels const& pixels) const -> std::uint32_t {
+  auto const* gdi = instance->context->gdi;
+  Expects(gdi != nullptr, "decoded framebuffer exists");
+  Expects(std::cmp_equal(gdi->stride, gdi->width * 4), "decoded rows are packed");
+  auto const actual = Framebuffer(*gdi);
+  Expects(pixels.size() == actual.size(), "the source matches the decoded frame");
   return std::transform_reduce(
-      expected.begin(), expected.end(), actual, 0u, [](auto a, auto b) { return std::max(a, b); }, ChannelError);
+      pixels.begin(), pixels.end(), actual.begin(), 0u, [](auto a, auto b) { return std::max(a, b); }, ChannelError);
 }
 auto Client::Received() const -> std::uint64_t {
   std::uint64_t bytes   = 0;

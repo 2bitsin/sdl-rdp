@@ -5,6 +5,7 @@
 #include <array>
 #include <cerrno>
 #include <fcntl.h>
+#include <filesystem>
 #include <string>
 #include <unistd.h>
 
@@ -23,9 +24,8 @@ inline auto ReadText(int descriptor) -> std::string {
     result.append(buffer.data(), count);
   }
 }
-inline auto ReadText(char const* path) -> std::string {
-  Expects(path != nullptr, "input path exists");
-  Descriptor const file{ open(path, O_RDONLY) };
+inline auto ReadText(std::filesystem::path const& path) -> std::string {
+  Descriptor const file{ open(path.c_str(), O_RDONLY) };
   return ReadText(file.Get());
 }
 }

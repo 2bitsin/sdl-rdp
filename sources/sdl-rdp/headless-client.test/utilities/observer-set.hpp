@@ -17,7 +17,6 @@ class ObserverSet {
 public:
   static auto                      ContextSize()             -> std::size_t;
   static auto                      Of(rdpContext& context)   -> ObserverSet&;
-  static auto                      Of(void* context)         -> ObserverSet&;
   auto                             Bind(rdpContext& context) -> void;
   template <class ObserverTy> auto Add(ObserverTy& observer) -> void;
   template <class ObserverTy> auto Remove()                  -> void;

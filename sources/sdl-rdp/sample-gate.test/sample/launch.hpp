@@ -4,12 +4,14 @@
 #include <initializer_list>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 namespace sdl_rdp::sample_gate_test::sample::detail::launch {
 using Words = std::vector<std::string>;
-using Hint  = std::pair<char const*, char const*>;
+struct Hint {
+  std::string name;
+  std::string value;
+};
 
 auto BuildRoot()                                                -> std::filesystem::path;
 auto BackendLibrary()                                           -> std::filesystem::path;
@@ -31,5 +33,6 @@ using detail::launch::BuildRoot;
 using detail::launch::PrimaryDisplayPort;
 using detail::launch::SetBackendHints;
 using detail::launch::SetLoopbackHints;
+using detail::launch::Hint;
 using detail::launch::Words;
 }

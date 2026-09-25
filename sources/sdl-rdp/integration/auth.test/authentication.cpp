@@ -11,6 +11,7 @@
 namespace sdl_rdp::integration::auth_test::detail::authentication {
 using sdl_rdp::headless_client_test::backend::Authentication;
 using sdl_rdp::headless_client_test::backend::CurrentStatus;
+using sdl_rdp::headless_client_test::backend::FixedPair;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::utilities::Required;
 
@@ -44,11 +45,9 @@ TEST_F(Authentication, TlsFixedPair) {
 }
 TEST_F(Authentication, DnsDomain) {
   std::string const domain = std::string(63, 'a') + "." + std::string(63, 'b') + ".example.org";
-  config.domain   = domain.c_str();
-  config.user     = "alice";
-  config.password = "correct-secret";
+  setup.pair = FixedPair{ .user = "alice", .password = "correct-secret", .domain = domain };
   ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_TLS, false));
-  Attempt("alice", "correct-secret", domain.c_str(), false, true);
+  Attempt("alice", "correct-secret", domain, false, true);
 }
 TEST_F(Authentication, WrongPassword) {
   ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_TLS));
@@ -66,14 +65,13 @@ TEST_F(Authentication, WrongDomain) {
   RejectionLogs("correct-secret");
 }
 TEST_F(Authentication, UnsetDomain) {
-  config.user     = "alice";
-  config.password = "correct-secret";
+  setup.pair = FixedPair{ .user = "alice", .password = "correct-secret", .domain = std::nullopt };
   ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_TLS, false));
   ASSERT_NO_FATAL_FAILURE(Attempt("alice", "correct-secret", "OTHER", false, true));
   RecordProperty("trace", "tls fixed pair: unset domain admits OTHER; authenticated=1");
 }
 TEST_F(Authentication, VerifyDecides) {
-  config.verify = Verify;
+  setup.verifies = true;
   ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_TLS, false));
   ASSERT_NO_FATAL_FAILURE(Attempt("žąsis", "callback-secret", "ŽEMĖ", false, true));
   EXPECT_EQ(seen.user, "žąsis");
@@ -95,17 +93,15 @@ TEST_F(Authentication, NlaFixedPair) {
   RecordProperty("trace", "nla fixed pair: user=alice domain=LAB authenticated=1");
 }
 TEST_F(Authentication, NlaUnicode) {
-  config.user     = "žąsis";
-  config.password = "unicode-secret";
-  config.domain   = "ŽEMĖ";
+  setup.pair = FixedPair{ .user = "žąsis", .password = "unicode-secret", .domain = "ŽEMĖ" };
   ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_NLA, false));
   ASSERT_NO_FATAL_FAILURE(Attempt("žąsis", "unicode-secret", "ŽEMĖ", true, true));
   RecordProperty("trace", "nla UTF-8 user=žąsis domain=ŽEMĖ authenticated=1");
 }
 TEST_F(Authentication, NlaVerifyDenies) {
-  config.verify = Verify;
-  config.lookup = Lookup;
-  permit        = false;
+  setup.verifies = true;
+  setup.looks_up = true;
+  permit         = false;
   ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_NLA));
   ASSERT_NO_FATAL_FAILURE(Attempt("alice", "correct-secret", "LAB", true, false));
   handle.Close();
@@ -118,8 +114,8 @@ TEST_F(Authentication, NlaWrongPassword) {
   RejectionLogs("wrong-secret");
 }
 TEST_F(Authentication, NlaHashBeforePassword) {
-  config.verify = Verify;
-  config.lookup = Lookup;
+  setup.verifies = true;
+  setup.looks_up = true;
   ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_NLA));
   ASSERT_NO_FATAL_FAILURE(Attempt("alice", "wrong-secret", "LAB", true, false));
   handle.Close();
@@ -128,8 +124,8 @@ TEST_F(Authentication, NlaHashBeforePassword) {
   RejectionLogs("wrong-secret");
 }
 TEST_F(Authentication, NlaCallbackOrder) {
-  config.verify = Verify;
-  config.lookup = Lookup;
+  setup.verifies = true;
+  setup.looks_up = true;
   ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_NLA));
   ASSERT_NO_FATAL_FAILURE(Attempt("alice", "correct-secret", "LAB", true, true));
   handle.Close();
@@ -138,7 +134,7 @@ TEST_F(Authentication, NlaCallbackOrder) {
   RecordProperty("trace", "nla: lookup -> hash check -> verify; authenticated=1");
 }
 TEST_F(Authentication, NlaAcceptsTls) {
-  config.verify = Verify;
+  setup.verifies = true;
   ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_NLA));
   ASSERT_NO_FATAL_FAILURE(Attempt("alice", "correct-secret", "LAB", false, true));
   handle.Close();
@@ -146,7 +142,7 @@ TEST_F(Authentication, NlaAcceptsTls) {
   RecordProperty("trace", "nla server + tls client: verify only; authenticated=1");
 }
 TEST_F(Authentication, NlaMissingLookup) {
-  config.verify = Verify;
+  setup.verifies = true;
   ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_NLA, false));
   ASSERT_NO_FATAL_FAILURE(Attempt("alice", "missing-secret", "LAB", true, false));
   EXPECT_TRUE(seen.order.empty());
@@ -172,7 +168,7 @@ TEST_F(Authentication, RefusedSecurityLogs) {
   for (bool const nla : { true, false }) {
     ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_TLS));
     {
-      Client client(sdlrdp_port(handle.Handle()), false);
+      Client client(sdlrdp_port(&*handle), false);
       client.Credentials({ .user = "alice", .password = "correct-secret", .domain = "LAB" }, nla);
       auto* settings = client.Instance()->context->settings;
       ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_TlsSecurity, false));
@@ -187,7 +183,7 @@ TEST_F(Authentication, RefusedSecurityLogs) {
 TEST_F(Authentication, RejectedCertificateLogs) {
   ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_TLS));
   bool verified = false;
-  ASSERT_NO_FATAL_FAILURE(RejectCertificate(sdlrdp_port(handle.Handle()), verified));
+  ASSERT_NO_FATAL_FAILURE(RejectCertificate(sdlrdp_port(&*handle), verified));
   constexpr auto closed = "Connection closed before activation: ERRCONNECT_CONNECT_TRANSPORT_FAILED.";
   EXPECT_TRUE(
       Until([&] { return std::ranges::any_of(logs, [&](auto const& entry) { return entry.second == closed; }); }));
@@ -206,7 +202,7 @@ TEST_F(Authentication, PendingDisconnectLogLevels) {
   for (auto code :
        { FREERDP_ERROR_CONNECT_TRANSPORT_FAILED, FREERDP_ERROR_LOGOFF_BY_USER, FREERDP_ERROR_CONNECT_FAILED }) {
     ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_TLS));
-    Client client(sdlrdp_port(handle.Handle()), false);
+    Client client(sdlrdp_port(&*handle), false);
     client.Credentials({ .user = "alice", .password = "correct-secret", .domain = "LAB" });
     ASSERT_TRUE(client.Connect());
     ASSERT_TRUE(client.Until([&] { return CurrentStatus(*handle).has_value(); }));
@@ -225,7 +221,7 @@ TEST_F(Authentication, TenRejectionsThenSuccess) {
 TEST_F(Authentication, UnreadableKeyEndsThePeerWithItsReason) {
   ASSERT_NO_FATAL_FAILURE(Open(SDLRDP_AUTH_NONE, false));
   std::ofstream{ certificates.Path() / "server.key", std::ios::trunc } << "not a private key\n";
-  Client client(sdlrdp_port(handle.Handle()), false);
+  Client client(sdlrdp_port(&*handle), false);
   EXPECT_FALSE(client.Connect());
   auto const reported = [&] {
     return std::ranges::any_of(logs, [](auto const& entry) { return entry.second.contains("private key loading"); });

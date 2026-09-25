@@ -29,6 +29,7 @@
 
 namespace sdl_rdp::auth::detail::certificate {
 using sdl_rdp::freerdp_facade::Bio;
+using sdl_rdp::freerdp_facade::Certificate;
 using sdl_rdp::utilities::AllocationFailed;
 using sdl_rdp::utilities::Descriptor;
 using sdl_rdp::utilities::Ensures;
@@ -36,11 +37,10 @@ using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Releases;
 using sdl_rdp::utilities::SystemCall;
 namespace {
-using Key         = std::unique_ptr<EVP_PKEY, Releases<EVP_PKEY_free>>;
-using Certificate = std::unique_ptr<X509, Releases<X509_free>>;
-using ServerKey   = std::unique_ptr<rdpPrivateKey, Releases<freerdp_key_free>>;
-using ServerCert  = std::unique_ptr<rdpCertificate, Releases<freerdp_certificate_free>>;
-using Extension   = std::unique_ptr<X509_EXTENSION, Releases<X509_EXTENSION_free>>;
+using Key        = std::unique_ptr<EVP_PKEY, Releases<EVP_PKEY_free>>;
+using ServerKey  = std::unique_ptr<rdpPrivateKey, Releases<freerdp_key_free>>;
+using ServerCert = std::unique_ptr<rdpCertificate, Releases<freerdp_certificate_free>>;
+using Extension  = std::unique_ptr<X509_EXTENSION, Releases<X509_EXTENSION_free>>;
 class DirectoryLock {
 public:
   explicit DirectoryLock(std::filesystem::path const& directory)

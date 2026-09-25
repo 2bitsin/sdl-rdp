@@ -1,3 +1,5 @@
+#include <sdl-rdp/sample-gate.test/process/captured-logs.hpp>
+#include <sdl-rdp/sample-gate.test/process/initialized-sdl.hpp>
 #include <sdl-rdp/sample-gate.test/sample/launch.hpp>
 #include <sdl-rdp/sample-gate.test/sample/sample.hpp>
 
@@ -6,14 +8,19 @@
 #include <SDL3/SDL.h>
 #include <cstdint>
 #include <future>
+#include <optional>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace sdl_rdp::integration::sample_test::detail::vsync {
 using namespace std::chrono_literals;
 using sdl_rdp::configuration::RefreshMode;
-using sdl_rdp::headless_client_test::backend::Logs;
+using sdl_rdp::sample_gate_test::process::Capture;
+using sdl_rdp::sample_gate_test::process::CapturedLogs;
+using sdl_rdp::sample_gate_test::process::Renderer;
+using sdl_rdp::sample_gate_test::process::Window;
 using sdl_rdp::sample_gate_test::sample::PrimaryDisplayPort;
 using sdl_rdp::sample_gate_test::sample::Sample;
 using sdl_rdp::sample_gate_test::sample::SetLoopbackHints;
@@ -23,20 +30,20 @@ using sdl_rdp::utilities::Expects;
 
 namespace {
 struct RefreshCase {
-  char const* hint;
-  RefreshMode mode;
+  std::string_view hint;
+  RefreshMode      mode;
 };
-auto PrintTo(RefreshCase const& value, std::ostream* output) -> void {
-  *output << '"' << value.hint << '"';
+auto operator<<(std::ostream& output, RefreshCase const& value) -> std::ostream& {
+  return output << '"' << value.hint << '"';
 }
 }
 class VsyncRecovery : public Sample, public testing::WithParamInterface<RefreshCase> {
 protected:
   auto WhenFrameRendered(std::uint32_t& frame) -> void {
     SDL_PumpEvents();
-    ASSERT_TRUE(SDL_SetRenderDrawColor(renderer, ++frame % 256, 0, 0, 255));
-    ASSERT_TRUE(SDL_RenderClear(renderer));
-    ASSERT_TRUE(SDL_RenderPresent(renderer));
+    ASSERT_TRUE(SDL_SetRenderDrawColor(renderer.get(), ++frame % 256, 0, 0, 255));
+    ASSERT_TRUE(SDL_RenderClear(renderer.get()));
+    ASSERT_TRUE(SDL_RenderPresent(renderer.get()));
   }
   auto GivenRendererHints() -> void {
     ASSERT_TRUE(SetLoopbackHints(certificates.Path(), { { "SDL_RDP_CODEC" , "raw" },
@@ -49,23 +56,19 @@ protected:
     ASSERT_NO_FATAL_FAILURE(Sample::SetUp());
     if (auto* value = std::getenv("SDL_RDP_TRACE")) previous_trace = value;
     ASSERT_EQ(setenv("SDL_RDP_TRACE", "1", 1), 0);
-    priority = SDL_GetLogPriority(SDL_LOG_CATEGORY_VIDEO);
-    SDL_SetLogPriority(SDL_LOG_CATEGORY_VIDEO, SDL_LOG_PRIORITY_INFO);
-    SDL_GetLogOutputFunction(&output, &userdata);
-    SDL_SetLogOutputFunction(
-        [](void* user, int, SDL_LogPriority, char const* text) { Logs::Collect(user, SDLRDP_LOG_INFO, text); }, &logs);
-    ASSERT_TRUE(SDL_SetHint("SDL_RDP_REFRESH", GetParam().hint));
+    captured.emplace(logs, Capture{ .video = SDL_LOG_PRIORITY_INFO });
+    ASSERT_TRUE(SDL_SetHint("SDL_RDP_REFRESH", std::string(GetParam().hint).c_str()));
     CreateRenderer();
   }
   auto CreateRenderer() -> void {
     Expects(window == nullptr, "window has not been created");
     ASSERT_NO_FATAL_FAILURE(GivenRendererHints());
     ASSERT_TRUE(SDL_Init(SDL_INIT_VIDEO));
-    window = SDL_CreateWindow("vsync recovery", 640, 480, SDL_WINDOW_FULLSCREEN);
+    window.reset(SDL_CreateWindow("vsync recovery", 640, 480, SDL_WINDOW_FULLSCREEN));
     ASSERT_NE(window, nullptr);
-    renderer = SDL_CreateRenderer(window, "software");
+    renderer.reset(SDL_CreateRenderer(window.get(), "software"));
     ASSERT_NE(renderer, nullptr);
-    ASSERT_TRUE(SDL_SetRenderVSync(renderer, 1));
+    ASSERT_TRUE(SDL_SetRenderVSync(renderer.get(), 1));
   }
   auto RenderWhile(std::future<void>& client) -> void {
     Expects(renderer != nullptr, "vsync renderer exists");
@@ -82,12 +85,10 @@ protected:
     client.get();
   }
   auto TearDown() -> void override {
-    Expects(output != nullptr, "previous log callback was saved");
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
+    renderer.reset();
+    window.reset();
     SDL_Quit();
-    SDL_SetLogOutputFunction(output, userdata);
-    SDL_SetLogPriority(SDL_LOG_CATEGORY_VIDEO, priority);
+    captured.reset();
     for (auto const* hint :
          { SDL_HINT_VIDEO_DRIVER, "SDL_RDP_PORT", "SDL_RDP_BIND", "SDL_RDP_CODEC", "SDL_RDP_WIDTH", "SDL_RDP_HEIGHT",
            "SDL_RDP_VSYNC", "SDL_RDP_REFRESH", "SDL_RDP_CERT_DIR", "SDL_RDP_BACKEND" })
@@ -98,12 +99,10 @@ protected:
       setenv("SDL_RDP_TRACE", previous_trace.c_str(), 1);
     Sample::TearDown();
   }
-  SDL_Window*           window         = nullptr;
-  SDL_Renderer*         renderer       = nullptr;
-  SDL_LogOutputFunction output         = nullptr;
-  void*                 userdata       = nullptr;
-  std::string           previous_trace;
-  SDL_LogPriority       priority       = SDL_LOG_PRIORITY_INVALID;
+  Window                      window;
+  Renderer                    renderer;
+  std::optional<CapturedLogs> captured;
+  std::string                 previous_trace;
 };
 
 TEST_P(VsyncRecovery, HeldAcknowledgementAndDisplayChannelResize) {

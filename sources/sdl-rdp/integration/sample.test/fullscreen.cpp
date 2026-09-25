@@ -16,6 +16,7 @@
 #include <memory>
 #include <ranges>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <utility>
 
@@ -40,14 +41,14 @@ protected:
   static auto ThenWindowedPicture(Client& client) -> void {
     ASSERT_TRUE(client.UntilDesktop(640, 480));
   }
-  auto ThenRelativeMotion(Client& client, rdpInput* input) -> void {
-    ASSERT_TRUE(freerdp_input_send_mouse_event(input, PTR_FLAGS_MOVE, 330, 192));
+  auto ThenRelativeMotion(Client& client, rdpInput& input) -> void {
+    ASSERT_TRUE(freerdp_input_send_mouse_event(&input, PTR_FLAGS_MOVE, 330, 192));
     ASSERT_TRUE(ReadInput(client, "event MOUSE_MOTION "));
     EXPECT_TRUE(line.contains(" xrel=10 yrel=-35 ")) << line;
   }
   auto ThenRelativeAspectMouse(Client& client) -> void {
-    auto* input = client.Instance()->context->input;
-    ASSERT_TRUE(freerdp_input_send_mouse_event(input, PTR_FLAGS_MOVE, 320, 240));
+    auto& input = *client.Instance()->context->input;
+    ASSERT_TRUE(freerdp_input_send_mouse_event(&input, PTR_FLAGS_MOVE, 320, 240));
     ASSERT_TRUE(Read("event MOUSE_MOTION "));
     ASSERT_NO_FATAL_FAILURE(WhenRelative(client));
     ThenRelativeMotion(client, input);
@@ -113,7 +114,7 @@ TEST_F(FullscreenSample, ExplicitFullscreenSurvivesScreenChange) {
   Escape(client);
 }
 
-class RefreshMode : public FullscreenSample, public testing::WithParamInterface<char const*> {
+class RefreshMode : public FullscreenSample, public testing::WithParamInterface<std::string_view> {
 protected:
   auto ThenDeclaredRate() -> void {
     std::string_view const kind = GetParam();
@@ -184,7 +185,7 @@ TEST_P(RefreshMode, AcknowledgementsPreserveDeclaredRate) {
 
 INSTANTIATE_TEST_SUITE_P(Window, RefreshMode, testing::Values("windowed", "borderless", "exclusive"));
 
-class ExclusiveFullscreen : public FullscreenSample, public testing::WithParamInterface<char const*> {
+class ExclusiveFullscreen : public FullscreenSample, public testing::WithParamInterface<std::string_view> {
 protected:
   auto WhenDesktopModeChanges(Client& client, DisplayClient& display, FullDesktopFrames const& desktop) -> void {
     ASSERT_GT(desktop.Full(), 0u);
@@ -285,7 +286,6 @@ auto ThenRefilledWindow(Client& client, FrameObserver& observer, std::size_t& ac
   ASSERT_TRUE(client.Until([&] { return observer.Frames().size() >= acknowledged + window; }));
 }
 auto FillSendWindow(Client& client, FrameObserver& observer) -> void {
-  Expects(observer.Installed(), "frame observer is installed");
   auto window = freerdp_settings_get_uint32(client.Instance()->context->settings, FreeRDP_FrameAcknowledge);
   ASSERT_EQ(window, 2u);
   std::size_t acknowledged = 0;

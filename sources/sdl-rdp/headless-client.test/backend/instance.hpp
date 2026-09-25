@@ -17,7 +17,6 @@ public:
   auto     Open(sdlrdp_config const& config)    -> void;
   auto     TryOpen(sdlrdp_config const& config) -> int;
   auto     Close() noexcept                     -> void;
-  auto     Handle() const noexcept              -> sdlrdp_handle*;
   auto     operator*() const                    -> sdlrdp_handle&;
   explicit operator bool() const noexcept;
   auto     Poll() const                         -> std::vector<sdlrdp_event>;

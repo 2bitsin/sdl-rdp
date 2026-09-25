@@ -9,4 +9,10 @@ auto InitializeSdl(std::function<bool()> const& initialize) -> bool {
 auto QuitSdl([[maybe_unused]] bool initialized) noexcept -> void {
   SDL_Quit();
 }
+auto LockStream(SDL_AudioStream& stream) -> StreamLock {
+  return { .stream = stream, .locked = SDL_LockAudioStream(&stream) };
+}
+auto UnlockStream(StreamLock const& lock) noexcept -> void {
+  if (lock.locked) SDL_UnlockAudioStream(&lock.stream.get());
+}
 }

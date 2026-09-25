@@ -3,6 +3,7 @@
 
 #include <freerdp/peer.h>
 #include <openssl/bio.h>
+#include <openssl/x509.h>
 #include <winpr/handle.h>
 #include <winpr/wtsapi.h>
 #include <memory>
@@ -14,12 +15,14 @@ using sdl_rdp::utilities::Releases;
 using WaitHandle     = HANDLE;
 using EventHandle    = std::unique_ptr<void, Releases<CloseHandle>>;
 using Bio            = std::unique_ptr<BIO, Releases<BIO_free>>;
+using Certificate    = std::unique_ptr<X509, Releases<X509_free>>;
 using VirtualChannel = std::unique_ptr<void, Releases<WTSVirtualChannelClose>>;
 using PeerHandle     = std::unique_ptr<freerdp_peer, Releases<freerdp_peer_context_free, freerdp_peer_free>>;
 }
 
 namespace sdl_rdp::freerdp_facade {
 using detail::rdp_handles::Bio;
+using detail::rdp_handles::Certificate;
 using detail::rdp_handles::EventHandle;
 using detail::rdp_handles::PeerHandle;
 using detail::rdp_handles::VirtualChannel;

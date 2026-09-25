@@ -6,7 +6,7 @@
 namespace sdl_rdp::headless_client_test::drive::detail::checks {
 class DriveChecks : public DriveSession {
 protected:
-  auto ThenReadRanges(sdlrdp_file* file, std::string const& source) -> void;
+  auto ThenReadRanges(sdlrdp_file& file, std::string const& source) -> void;
 };
 }
 

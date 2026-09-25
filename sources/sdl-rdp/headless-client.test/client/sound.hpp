@@ -53,20 +53,18 @@ public:
   auto CaptureState() const -> SoundCapture const&;
 
 private:
-  friend                                  SoundProtocol;
-  SoundCapture                            capture;
-  inline static thread_local SoundClient* active         = nullptr;
-  Client&                                 client;
-  decltype(freerdp::LoadChannels)         previous_load  = nullptr;
-  CHANNEL_ENTRY_POINTS_EX                 entry          { };
-  void*                                   init           = nullptr;
-  std::uint32_t                           channel        = 0;
-  std::vector<std::byte>                  incoming;
-  std::array<std::byte, 4>                first          { };
-  std::uint32_t                           wave_bytes     = 0;
-  std::uint16_t                           timestamp      = 0;
-  std::uint8_t                            block          = 0;
-  bool                                    expecting_wave = false;
+  friend                          SoundProtocol;
+  SoundCapture                    capture;
+  Client&                         client;
+  decltype(freerdp::LoadChannels) previous_load  = nullptr;
+  PVIRTUALCHANNELOPENEX           open           = nullptr;
+  std::uint32_t                   channel        = 0;
+  std::vector<std::byte>          incoming;
+  std::array<std::byte, 4>        first          { };
+  std::uint32_t                   wave_bytes     = 0;
+  std::uint16_t                   timestamp      = 0;
+  std::uint8_t                    block          = 0;
+  bool                            expecting_wave = false;
 };
 }
 

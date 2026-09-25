@@ -6,7 +6,7 @@
 namespace sdl_rdp::sample_gate_test::frame::detail::pattern {
 using sdl_rdp::headless_client_test::client::Client;
 
-auto PatternPixel(rdpGdi const* gdi, int index) -> std::uint32_t;
+auto PatternPixel(rdpGdi const& gdi, int index) -> std::uint32_t;
 auto Pattern(Client& client, bool /*pointer*/)  -> testing::AssertionResult;
 }
 

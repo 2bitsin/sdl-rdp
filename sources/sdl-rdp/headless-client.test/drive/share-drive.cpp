@@ -12,16 +12,18 @@ namespace sdl_rdp::headless_client_test::drive::detail::share_drive {
 using sdl_rdp::headless_client_test::client::LoadStaticChannel;
 using sdl_rdp::utilities::Expects;
 
-auto ShareDrive(Client& client, char const* path, char const* name) -> void {
-  Expects(path != nullptr, "shared directory supplied");
+auto ShareDrive(Client& client, std::filesystem::path const& path, std::string const& name) -> void {
   freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
   auto* const settings = client.Instance()->context->settings;
   auto const  silent   = freerdp_settings_set_bool(settings, FreeRDP_AudioPlayback, false);
   Expects(silent, "drive-only client has no audio device");
-  std::array<char const*, 3> arguments { "drive", name, path };
+  std::array<char const*, 3> arguments { "drive", name.c_str(), path.c_str() };
   auto const                 added     = freerdp_client_add_device_channel(settings, 3, arguments.data());
   Expects(added, "drive device configured");
   // abi: pLoadChannels, BOOL is int
-  client.Instance()->LoadChannels = [](freerdp* instance) -> int { return LoadStaticChannel(instance, "rdpdr"); };
+  client.Instance()->LoadChannels = [](freerdp* instance) -> int {
+    Expects(instance != nullptr, "channel loading names its client");
+    return LoadStaticChannel(*instance, "rdpdr");
+  };
 }
 }

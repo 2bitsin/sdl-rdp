@@ -28,12 +28,12 @@ auto SampleProcess::ConnectAcknowledging(Client& client) -> void {
   Connect(client);
 }
 auto SampleProcess::SetUp() -> void {
-  std::scoped_lock const lock(log_guard);
-  client_logs = &logs;
+  client_logs.Publish(logs);
   auto* root = WLog_GetRoot();
   ASSERT_NE(root, nullptr);
   // abi: wLogCallbackMessage_t and its siblings, BOOL is int
   constexpr auto collect   = [](wLogMessage const* message) -> int {
+    Expects(message != nullptr, "the appender is handed its message");
     CollectClientLog(*message);
     return true;
   };
@@ -67,10 +67,7 @@ auto SampleProcess::Exposed() -> void {
   ASSERT_LT(name + 13, line.size()) << "non-empty client_name required: " << line;
 }
 auto SampleProcess::TearDown() -> void {
-  {
-    std::scoped_lock const lock(log_guard);
-    client_logs = nullptr;
-  }
+  client_logs.Withdraw();
   if (process) SDL_Log("%s", process->Transcript().c_str());
 }
 auto SampleProcess::Escape(Client& client) -> void {
@@ -78,12 +75,11 @@ auto SampleProcess::Escape(Client& client) -> void {
   ASSERT_TRUE(process->Exit()) << "sample exit 0 within ten seconds: " << process->Transcript();
 }
 auto SampleProcess::CollectClientLog(wLogMessage const& message) -> void {
-  std::scoped_lock const lock(log_guard);
-  if (client_logs && message.TextString) {
-    auto level = message.Level == WLOG_ERROR ? SDLRDP_LOG_ERROR
-                 : message.Level == WLOG_WARN ? SDLRDP_LOG_WARN
-                                              : SDLRDP_LOG_INFO;
-    Logs::Collect(client_logs, level, message.TextString);
-  }
+  auto const collecting = client_logs.Peek();
+  if (!collecting || message.TextString == nullptr) return;
+  auto const level = message.Level == WLOG_ERROR ? SDLRDP_LOG_ERROR
+                     : message.Level == WLOG_WARN ? SDLRDP_LOG_WARN
+                                                  : SDLRDP_LOG_INFO;
+  Logs::Collect(&collecting->get(), level, message.TextString);
 }
 }

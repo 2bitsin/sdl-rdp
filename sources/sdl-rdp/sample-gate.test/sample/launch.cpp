@@ -38,9 +38,10 @@ auto SetBackendHints(std::filesystem::path const& certificates) -> bool {
 
 // env applies its assignments in order, so an environment entry overrides the defaults before it.
 auto SetLoopbackHints(std::filesystem::path const& certificates, std::initializer_list<Hint> hints) -> bool {
-  constexpr std::array loopback { Hint{ SDL_HINT_VIDEO_DRIVER, "rdp" }, Hint{ "SDL_RDP_PORT", "0" },
-                                  Hint{ "SDL_RDP_BIND", "127.0.0.1" } };
-  auto const           set      = [](Hint const& hint) { return SDL_SetHint(hint.first, hint.second); };
+  std::array const loopback { Hint{ .name = SDL_HINT_VIDEO_DRIVER, .value = "rdp" },
+                              Hint{ .name = "SDL_RDP_PORT", .value = "0"          },
+                              Hint{ .name = "SDL_RDP_BIND", .value = "127.0.0.1" } };
+  auto const       set      = [](Hint const& hint) { return SDL_SetHint(hint.name.c_str(), hint.value.c_str()); };
   return std::ranges::all_of(loopback, set) && std::ranges::all_of(hints, set) && SetBackendHints(certificates);
 }
 

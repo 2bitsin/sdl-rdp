@@ -3,11 +3,14 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
+#include <format>
+#include <string_view>
 
 namespace sdl_rdp::headless_client_test::graphics::detail::backend {
-auto GraphicsBackend::OpenGraphics(char* pattern, std::uint32_t width, std::uint32_t height, sdlrdp_codec codec)
-    -> void {
-  auto* path = mkdtemp(pattern);
+auto GraphicsBackend::OpenGraphics(std::string_view purpose, std::uint32_t width, std::uint32_t height,
+                                   sdlrdp_codec codec) -> void {
+  auto  pattern = std::format("/tmp/sdlrdp-{}-XXXXXX", purpose);
+  auto* path    = mkdtemp(pattern.data());
   ASSERT_NE(path, nullptr);
   directory = path;
   sdlrdp_config config{ "127.0.0.1", 0, directory.c_str(), width, height, 0, Logs::Collect, &logs };

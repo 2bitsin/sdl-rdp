@@ -2,6 +2,7 @@
 #include <sdl-rdp/headless-client.test/client/sound.hpp>
 #include <sdl-rdp/headless-client.test/frame/observer.hpp>
 #include <sdl-rdp/headless-client.test/utilities/octets.hpp>
+#include <sdl-rdp/headless-client.test/utilities/split.hpp>
 #include <sdl-rdp/headless-client.test/utilities/wall-milliseconds.hpp>
 #include <sdl-rdp/integration/support.bench/session.hpp>
 #include <sdl-rdp/sample-gate.test/process/process.hpp>
@@ -27,6 +28,7 @@
 #include <vector>
 
 namespace sdl_rdp::integration::sample_bench::detail::latency {
+using sdl_rdp::headless_client_test::utilities::Split;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::ClipboardClient;
 using sdl_rdp::headless_client_test::client::Clock;
@@ -54,8 +56,7 @@ auto DrainTrace(Process& process, std::stop_token const& stop) -> void {
 auto TraceTimes(std::string_view trace, std::string_view prefix, std::predicate<std::string_view> auto measured)
     -> std::vector<std::int64_t> {
   auto const traced = [&](std::string_view line) { return line.contains(prefix) && measured(line); };
-  return trace | std::views::split('\n') | std::views::transform([](auto line) { return std::string_view(line); })
-         | std::views::filter(traced)
+  return Split(trace, '\n') | std::views::filter(traced)
          | std::views::transform([&](std::string_view line) { return TraceNumber(line, prefix); })
          | std::ranges::to<std::vector>();
 }

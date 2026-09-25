@@ -29,10 +29,12 @@ using namespace std::chrono_literals;
 using sdl_rdp::headless_client_test::client::Clock;
 using sdl_rdp::sample_gate_test::process::InitializedSdl;
 using sdl_rdp::sample_gate_test::process::Process;
+using sdl_rdp::sample_gate_test::process::Storage;
 using sdl_rdp::sample_gate_test::process::Window;
 using sdl_rdp::sample_gate_test::sample::Arguments;
 using sdl_rdp::sample_gate_test::sample::BackendLibrary;
 using sdl_rdp::sample_gate_test::sample::BuildRoot;
+using sdl_rdp::sample_gate_test::sample::Hint;
 using sdl_rdp::sample_gate_test::sample::PrimaryDisplayPort;
 using sdl_rdp::sample_gate_test::sample::Sample;
 using sdl_rdp::sample_gate_test::sample::Words;
@@ -119,8 +121,8 @@ TEST(SettingsHints, EveryFieldsHintIsThePatchesMacro) {
 }
 class SettingsSample : public Sample, public testing::WithParamInterface<bool> { };
 namespace {
-auto ThenLiveAspect(SDL_Window* window) -> void {
-  auto properties = SDL_GetWindowProperties(window);
+auto ThenLiveAspect(SDL_Window& window) -> void {
+  auto properties = SDL_GetWindowProperties(&window);
   EXPECT_STREQ(SDL_GetStringProperty(properties, SDL_PROP_WINDOW_RDP_ASPECT_STRING, ""), "4:3");
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_ASPECT, "2:1"));
   EXPECT_STREQ(SDL_GetStringProperty(properties, SDL_PROP_WINDOW_RDP_ASPECT_STRING, ""), "2:1");
@@ -236,10 +238,11 @@ TEST_F(Sample, SettingsCodeHintsCacheAndLiveReset) {
   WriteSettings(file, Served(1));
   ASSERT_NO_FATAL_FAILURE(GivenSettingsHints(file));
   EXPECT_GT(PrimaryDisplayPort(), 2u);
-  auto* window = SDL_CreateWindow("settings", 640, 480, 0);
-  ASSERT_NE(window, nullptr) << SDL_GetError();
-  ASSERT_NO_FATAL_FAILURE(ThenLiveAspect(window));
-  SDL_DestroyWindow(window);
+  {
+    Window const window{ SDL_CreateWindow("settings", 640, 480, 0) };
+    ASSERT_NE(window, nullptr) << SDL_GetError();
+    ASSERT_NO_FATAL_FAILURE(ThenLiveAspect(*window));
+  }
   SDL_Quit();
   auto reloaded = Served(1);
   reloaded.aspect.emplace(2, 1);
@@ -247,10 +250,10 @@ TEST_F(Sample, SettingsCodeHintsCacheAndLiveReset) {
   ThenReloadedSettings(file);
 }
 namespace {
-using Storage = std::unique_ptr<SDL_Storage, decltype(&SDL_CloseStorage)>;
 class SettingsFile {
 public:
-  explicit SettingsFile(char const* name) : _directory{ name, "sdl-rdp" }, _path{ _directory.Path() / "libSDL3.yaml" } {
+  explicit SettingsFile(std::string_view name)
+      : _directory{ name, "sdl-rdp" }, _path{ _directory.Path() / "libSDL3.yaml" } {
     WriteSettings(_path, Served(1));
   }
   auto Path() const -> std::filesystem::path const& {
@@ -262,7 +265,7 @@ private:
 };
 auto RdpTitleStorage() -> Storage {
   EXPECT_TRUE(SDL_SetHint(SDL_HINT_STORAGE_TITLE_DRIVER, "rdp"));
-  return { SDL_OpenTitleStorage("", 0), SDL_CloseStorage };
+  return Storage{ SDL_OpenTitleStorage("", 0) };
 }
 auto WindowAspect(Window const& window) -> std::string {
   return SDL_GetStringProperty(SDL_GetWindowProperties(window.get()), SDL_PROP_WINDOW_RDP_ASPECT_STRING, "");
@@ -276,14 +279,14 @@ auto ThenVideoRejoinsDriver(std::filesystem::path const& file) -> void {
   ASSERT_TRUE(SDL_InitSubSystem(SDL_INIT_VIDEO)) << SDL_GetError();
   EXPECT_EQ(PrimaryDisplayPort(), port);
 }
-auto ThenWindowAspect(char const* expected) -> void {
-  Window const window{ SDL_CreateWindow("aspect", 640, 480, 0), SDL_DestroyWindow };
+auto ThenWindowAspect(std::string_view expected) -> void {
+  Window const window{ SDL_CreateWindow("aspect", 640, 480, 0) };
   ASSERT_TRUE(window) << SDL_GetError();
   EXPECT_EQ(WindowAspect(window), expected);
 }
-auto ThenInvalidAspectFailsWindow(char const* aspect) -> void {
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_ASPECT, aspect));
-  EXPECT_EQ(Window(SDL_CreateWindow("invalid aspect", 640, 480, 0), SDL_DestroyWindow), nullptr);
+auto ThenInvalidAspectFailsWindow(std::string const& aspect) -> void {
+  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_ASPECT, aspect.c_str()));
+  EXPECT_EQ(Window{ SDL_CreateWindow("invalid aspect", 640, 480, 0) }, nullptr);
   EXPECT_TRUE(std::string_view(SDL_GetError()).contains("aspect")) << SDL_GetError();
 }
 constexpr auto StorageSpaceChild = "SDL_RDP_TEST_STORAGE_SPACE_CHILD";
@@ -316,10 +319,10 @@ auto ThenStorageSpaceIsNotImplemented(Storage const& storage) -> void {
   else
     EXPECT_EQ(SDL_GetStorageSpaceRemaining(storage.get()), 0);
 }
-auto WhenInitializedWith(std::pair<char const*, char const*> const& setting) -> void {
+auto WhenInitializedWith(Hint const& setting) -> void {
   EXPECT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));
   EXPECT_TRUE(SDL_SetHint(SDL_HINT_RDP_BACKEND, "/missing/backend"));
-  EXPECT_TRUE(SDL_SetHint(setting.first, setting.second));
+  EXPECT_TRUE(SDL_SetHint(setting.name.c_str(), setting.value.c_str()));
   EXPECT_FALSE(SDL_Init(SDL_INIT_VIDEO));
 }
 }
@@ -346,7 +349,7 @@ TEST_F(SettingsSession, PartialVideoQuitKeepsDriverAndSettingsSnapshot) {
   ThenWindowAspect("4:3");
 }
 TEST_F(SettingsSession, InvalidAspectHintFailsWindowCreationAndCanRecover) {
-  for (auto const* aspect : { "1:0", "4:3:2", "4:x", "4 : 3" }) ThenInvalidAspectFailsWindow(aspect);
+  for (std::string const aspect : { "1:0", "4:3:2", "4:x", "4 : 3" }) ThenInvalidAspectFailsWindow(aspect);
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_ASPECT, "4:3"));
   ThenWindowAspect("4:3");
 }
@@ -355,25 +358,25 @@ TEST_F(SettingsSession, StorageSpaceDiagnosesUnsupportedBackendOperation) {
   ASSERT_TRUE(storage) << SDL_GetError();
   ThenStorageSpaceIsNotImplemented(storage);
 }
-class InvalidInteger : public Sample, public testing::WithParamInterface<std::pair<char const*, char const*>> { };
+class InvalidInteger : public Sample, public testing::WithParamInterface<Hint> { };
 TEST_P(InvalidInteger, FailsBeforeBackendLoadingAndNamesTheSetting) {
   InitializedSdl const sdl{ [&] {
     WhenInitializedWith(GetParam());
     return true;
   } };
-  EXPECT_TRUE(std::string_view(SDL_GetError()).contains(GetParam().first)) << SDL_GetError();
+  EXPECT_TRUE(std::string_view(SDL_GetError()).contains(GetParam().name)) << SDL_GetError();
 }
 INSTANTIATE_TEST_SUITE_P(Settings, InvalidInteger,
-                         testing::Values(std::pair{ SDL_HINT_RDP_PORT, "-5" }, std::pair{ SDL_HINT_RDP_WIDTH, "+640" },
-                                         std::pair{ SDL_HINT_RDP_WIDTH, "-1" }, std::pair{ SDL_HINT_RDP_PORT, "3389x" },
-                                         std::pair{ SDL_HINT_RDP_WIDTH, "640 480" }));
+                         testing::Values(Hint{ SDL_HINT_RDP_PORT, "-5" }, Hint{ SDL_HINT_RDP_WIDTH, "+640" },
+                                         Hint{ SDL_HINT_RDP_WIDTH, "-1" }, Hint{ SDL_HINT_RDP_PORT, "3389x" },
+                                         Hint{ SDL_HINT_RDP_WIDTH, "640 480" }));
 using FileAndCause = std::pair<std::string_view, std::string_view>;
 class InvalidFile : public Sample, public testing::WithParamInterface<FileAndCause> { };
 TEST_P(InvalidFile, FailsInitOnceNamingTheFileAndTheCause) {
   oxbox::platform::ScratchArea const directory { "settings-invalid", "sdl-rdp" };
   auto const                         file      = WrittenText(directory.Path() / "libSDL3.yaml", GetParam().first);
   InitializedSdl const               sdl       { [&] {
-    WhenInitializedWith({ SDL_HINT_RDP_SETTINGS, file.c_str() });
+    WhenInitializedWith({ .name = SDL_HINT_RDP_SETTINGS, .value = file.string() });
     return true;
   } };
   std::string_view const             error     { SDL_GetError()                };

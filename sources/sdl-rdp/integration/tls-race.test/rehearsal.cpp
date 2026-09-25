@@ -47,7 +47,7 @@ using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
 namespace {
 using namespace std::chrono_literals;
-using Outcome = auto (*)(int status) -> bool;
+using Outcome = auto (&)(int status) -> bool;
 constexpr std::size_t   Children          = 200;
 constexpr std::size_t   FaultChildren     = 10;
 constexpr std::size_t   ChildrenPerWave   = 10;
@@ -146,7 +146,7 @@ auto ConnectToOpenedBackend(std::string const& certificates) -> int {
   auto const backend = OpenedBackend(certificates);
   if (!backend) return FailedOtherwise;
   MethodFill::Shared().Arm(TlsMethod, Setter::Write);
-  Client     client(sdlrdp_port(backend.Handle()), false);
+  Client     client(sdlrdp_port(&*backend), false);
   auto const connected = client.Connect();
   return (connected ? 0 : FailedOtherwise) | (MethodFill::Shared().Fills() != 0 ? MethodFilledLate : 0);
 }

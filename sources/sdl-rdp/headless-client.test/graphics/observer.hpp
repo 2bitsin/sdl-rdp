@@ -5,6 +5,8 @@
 #include <freerdp/event.h>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -44,7 +46,7 @@ public:
   auto     operator=(GraphicsObserver&&)                    -> GraphicsObserver& = delete;
   auto     Ack(std::uint32_t depth = 0)                     -> bool;
   auto     AckFrame(std::size_t index, std::uint32_t depth) -> bool;
-  auto     Channel() const                                  -> RdpgfxClientContext*;
+  auto     Channel() const                                  -> RdpgfxClientContext&;
   auto     Observed()                                       -> GraphicsCapture&;
   auto     Observed() const                                 -> GraphicsCapture const&;
 
@@ -55,16 +57,16 @@ private:
   auto ObserveResets()                                   -> void;
   auto ObserveFrames()                                   -> void;
 
-  RdpgfxClientContext*     channel        = nullptr;
-  GraphicsCapture          observed;
-  Client&                  client;
-  pcRdpgfxFrameAcknowledge original       = nullptr;
-  pcRdpgfxEndFrame         end            = nullptr;
-  pcRdpgfxSurfaceCommand   surface        = nullptr;
-  pcRdpgfxCreateSurface    create         = nullptr;
-  pcRdpgfxDeleteSurface    remove         = nullptr;
-  pcRdpgfxResetGraphics    reset          = nullptr;
-  pDesktopResize           desktop_resize = nullptr;
+  std::optional<std::reference_wrapper<RdpgfxClientContext>> channel;
+  GraphicsCapture                                            observed;
+  Client&                                                    client;
+  pcRdpgfxFrameAcknowledge                                   original       = nullptr;
+  pcRdpgfxEndFrame                                           end            = nullptr;
+  pcRdpgfxSurfaceCommand                                     surface        = nullptr;
+  pcRdpgfxCreateSurface                                      create         = nullptr;
+  pcRdpgfxDeleteSurface                                      remove         = nullptr;
+  pcRdpgfxResetGraphics                                      reset          = nullptr;
+  pDesktopResize                                             desktop_resize = nullptr;
 };
 }
 

@@ -6,12 +6,12 @@
 #include <oxbox/platform/scratch-area.hpp>
 #include <sdl-rdp/headless-client.test/backend/logs.hpp>
 #include <sdl-rdp/headless-client.test/client/client.hpp>
+#include <sdl-rdp/headless-client.test/utilities/published.hpp>
 #include <winpr/wlog.h>
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -20,6 +20,7 @@ namespace sdl_rdp::sample_gate_test::sample::detail::process {
 using sdl_rdp::headless_client_test::backend::Logs;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::Clock;
+using sdl_rdp::headless_client_test::utilities::Published;
 using sdl_rdp::sample_gate_test::process::Process;
 using sdl_rdp::utilities::Expects;
 using std::chrono_literals::operator""s;
@@ -44,8 +45,8 @@ protected:
 private:
   auto        ConnectLogs()                                -> std::string;
   static auto CollectClientLog(wLogMessage const& message) -> void;
-  inline static std::mutex log_guard;
-  inline static Logs*      client_logs = nullptr;
+  // abi: wLogCallbackMessage_t carries only the message, no user data.
+  inline static Published<Logs> client_logs;
 };
 
 }

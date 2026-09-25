@@ -10,14 +10,14 @@ using sdl_rdp::headless_client_test::client::ClipboardClient;
 
 class SampleChecks : public SampleInput {
 protected:
-  auto        WhenSurrogateText(rdpInput* input)                                               -> void;
-  auto        WhenUnicodeText(rdpInput* input)                                                 -> void;
-  auto        ThenAbsoluteMouse(rdpInput* input)                                               -> void;
+  auto        WhenSurrogateText(rdpInput& input)                                               -> void;
+  auto        WhenUnicodeText(rdpInput& input)                                                 -> void;
+  auto        ThenAbsoluteMouse(rdpInput& input)                                               -> void;
   auto        WhenShiftedText(Client& client)                                                  -> void;
   auto        WhenScancodeText(Client& client)                                                 -> void;
-  auto        WhenNonAsciiKey(rdpInput* input)                                                 -> void;
+  auto        WhenNonAsciiKey(rdpInput& input)                                                 -> void;
   auto        ThenUnicodeKeyEvents()                                                           -> void;
-  auto        WhenUnicodeKeys(rdpInput* input)                                                 -> void;
+  auto        WhenUnicodeKeys(rdpInput& input)                                                 -> void;
   auto        ThenDriveOutput(std::filesystem::path const& share, std::string const& original) -> void;
   static auto WhenSettingsEnvironmentConflicts()                                               -> void;
   auto        GivenSettingsHints(std::filesystem::path const& file)                            -> void;

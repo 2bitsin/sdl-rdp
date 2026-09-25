@@ -16,10 +16,8 @@ auto ChangeMonitor(Client& client) -> void {
 }
 
 auto ThenAdvanced(Client& client) -> void {
-  ASSERT_TRUE(client.Until([&] {
-    return InputClient::Advanced().load() && InputClient::Touch().load()
-           && InputClient::Touch().load()->GetVersion(InputClient::Touch().load()) == RDPINPUT_PROTOCOL_V10;
-  }));
+  auto const ready = [](InputClient const& input) { return input.Advanced().Peek().has_value() && input.TouchV10(); };
+  ASSERT_TRUE(client.Until([&] { return InputClient::Of(client, ready); }));
 }
 
 auto ConnectDrive(Client& client, std::filesystem::path const& share) -> void {

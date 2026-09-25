@@ -1,14 +1,19 @@
 #pragma once
 #include <sdl-rdp/headless-client.test/client/display.hpp>
 #include <sdl-rdp/sample-gate.test/frame/full-desktop.hpp>
+#include <sdl-rdp/sample-gate.test/process/captured-logs.hpp>
+#include <sdl-rdp/sample-gate.test/process/initialized-sdl.hpp>
 #include <sdl-rdp/sample-gate.test/sample/sample.hpp>
 
 #include <SDL3/SDL.h>
+#include <optional>
 
 namespace sdl_rdp::sample_gate_test::video::detail::driver {
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::DisplayClient;
 using sdl_rdp::sample_gate_test::frame::FullDesktopFrames;
+using sdl_rdp::sample_gate_test::process::CapturedLogs;
+using sdl_rdp::sample_gate_test::process::Window;
 using sdl_rdp::sample_gate_test::sample::Sample;
 
 class VideoDriver : public Sample {
@@ -23,9 +28,8 @@ protected:
   auto        TearDown()                                                 -> void override;
   auto        ThenResizeStorm(Client& client, DisplayClient& display)    -> void;
   auto ThenExclusivePicture(Client& client, DisplayClient& display, FullDesktopFrames const& frames) -> void;
-  SDL_Window*           window       = nullptr;
-  SDL_LogOutputFunction log_output   = nullptr;
-  void*                 log_userdata = nullptr;
+  Window                      window;
+  std::optional<CapturedLogs> captured;
 };
 }
 

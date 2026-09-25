@@ -46,7 +46,7 @@ auto ReceiveIdentity(sdlrdp_handle& handle, Identity expected) -> bool {
     connected = AnyConnectedIdentity(std::span(events.data(), count), expected) || connected;
   return connected;
 }
-auto ThenSafeAuthenticationLog(sdlrdp_log_level level, std::string const& text, char const* password) -> void {
+auto ThenSafeAuthenticationLog(sdlrdp_log_level level, std::string const& text, std::string_view password) -> void {
   EXPECT_FALSE(text.contains(password));
   EXPECT_FALSE(text.contains("ERRBASE_SUCCESS")) << text;
   EXPECT_NE(level, SDLRDP_LOG_ERROR) << text;
@@ -55,24 +55,33 @@ auto ThenSafeAuthenticationLog(sdlrdp_log_level level, std::string const& text, 
 auto Authentication::TearDown() -> void {
   handle.Close();
 }
-auto Authentication::Open(sdlrdp_auth mode, bool fixed) -> void {
-  auto directory = certificates.Path().string();
+auto Authentication::Open(sdlrdp_auth chosen, bool fixed) -> void {
+  setup.mode = chosen;
+  if (fixed) setup.pair = FixedPair{ .user = "alice", .password = "correct-secret", .domain = "LAB" };
+  ASSERT_NO_FATAL_FAILURE(handle.Open(Config()));
+}
+auto Authentication::Config() -> sdlrdp_config {
+  sdlrdp_config config{ };
   config.bind      = "127.0.0.1";
-  config.cert_dir  = directory.c_str();
+  config.cert_dir  = certificates.Path().c_str();
   config.width     = 320;
   config.height    = 200;
-  config.auth      = mode;
+  config.auth      = setup.mode;
   config.log       = Log;
   config.log_user  = this;
   config.auth_user = this;
-  if (fixed) {
-    config.user     = "alice";
-    config.password = "correct-secret";
-    config.domain   = "LAB";
-  }
-  ASSERT_NO_FATAL_FAILURE(handle.Open(config));
+  config.verify    = setup.verifies ? Verify : nullptr;
+  config.lookup    = setup.looks_up ? Lookup : nullptr;
+  if (!setup.pair) return config;
+  auto const& pair = *setup.pair;
+  config.user     = pair.user.c_str();
+  config.password = pair.password.c_str();
+  config.domain   = pair.domain ? pair.domain->c_str() : nullptr;
+  return config;
 }
 auto Authentication::Log(void* raw, sdlrdp_log_level level, char const* text) -> void {
+  Expects(raw != nullptr, "the log names its fixture");
+  Expects(text != nullptr, "log line exists");
   auto& self = *static_cast<Authentication*>(raw);
   // WLog routing is process-wide; the headless client runs on the test thread.
   if (std::this_thread::get_id() == self.client_thread) return;
@@ -81,6 +90,10 @@ auto Authentication::Log(void* raw, sdlrdp_log_level level, char const* text) ->
   self.logged.notify_all();
 }
 auto Authentication::Verify(void* raw, char const* domain, char const* user, char const* password) -> int {
+  Expects(raw != nullptr, "verification names its fixture");
+  Expects(domain != nullptr, "verification names a domain");
+  Expects(user != nullptr, "verification names a user");
+  Expects(password != nullptr, "verification carries a password");
   auto& self = *static_cast<Authentication*>(raw);
   self.seen.order    += 'V';
   self.seen.domain   =  domain;
@@ -90,20 +103,25 @@ auto Authentication::Verify(void* raw, char const* domain, char const* user, cha
   return self.permit;
 }
 auto Authentication::Lookup(void* raw, char const* domain, char const* user, std::uint8_t* hash) -> int {
+  Expects(raw != nullptr, "lookup names its fixture");
+  Expects(domain != nullptr, "lookup names a domain");
+  Expects(user != nullptr, "lookup names a user");
+  Expects(hash != nullptr, "lookup has room for the hash");
   auto& self = *static_cast<Authentication*>(raw);
   self.seen.order += 'L';
   EXPECT_TRUE(self.seen.password.empty());
-  return sdlrdp_lookup_pair(&self.config, domain, user, hash);
+  auto const config = self.Config();
+  return sdlrdp_lookup_pair(&config, domain, user, hash);
 }
-auto Authentication::Attempt(char const* user, char const* password, char const* domain, bool nla, bool accepted)
-    -> void {
-  Client client(sdlrdp_port(handle.Handle()), false);
+auto Authentication::Attempt(std::string_view user, std::string_view password, std::string_view domain, bool nla,
+                             bool accepted) -> void {
+  Client client(sdlrdp_port(&*handle), false);
   client.Credentials({ .user = user, .password = password, .domain = domain }, nla);
   ASSERT_EQ(client.Connect(), accepted);
   if (!accepted)
     rejections.push_back(
         std::format("Authentication rejected: user \"{}\" from 127.0.0.1", QualifiedName(domain, user)));
-  Identity const expected  { .user = user, .domain = domain, .authenticated = config.auth != SDLRDP_AUTH_NONE };
+  Identity const expected  { .user = user, .domain = domain, .authenticated = setup.mode != SDLRDP_AUTH_NONE };
   bool           connected = false;
   auto           receive   = [&] {
     connected = ReceiveIdentity(*handle, expected) || connected;
@@ -125,7 +143,7 @@ auto Authentication::ThenRejection(sdlrdp_log_level level, std::string const& te
   EXPECT_EQ(level, SDLRDP_LOG_WARN);
   if (rejected < rejections.size()) EXPECT_EQ(text, rejections[rejected]);
 }
-auto Authentication::RejectionLogs(char const* password, std::size_t expected) -> void {
+auto Authentication::RejectionLogs(std::string_view password, std::size_t expected) -> void {
   handle.Close();
   std::scoped_lock const lock(guard);
   std::size_t            rejected = 0;

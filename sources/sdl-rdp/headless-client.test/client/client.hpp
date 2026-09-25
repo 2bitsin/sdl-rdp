@@ -9,7 +9,9 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
+#include <optional>
 #include <ranges>
 #include <string_view>
 #include <thread>
@@ -47,7 +49,7 @@ public:
   auto     Disconnect()                                                                    -> bool;
   auto     Pump(std::uint32_t timeout = 10)                                                -> bool;
   auto     Matches(Pixels const& pixels)                                                   -> bool;
-  auto     MaxError(Pixels const& pixels, Pixels const* reference = nullptr) const         -> std::uint32_t;
+  auto     MaxError(Pixels const& pixels) const                                            -> std::uint32_t;
   auto     Received() const                                                                -> std::uint64_t;
   auto     Until(auto ready, std::chrono::milliseconds timeout = std::chrono::seconds(10)) -> bool {
     Expects(timeout.count() > 0, "event deadline is positive");
@@ -74,5 +76,6 @@ namespace sdl_rdp::headless_client_test::client {
 using detail::client::Client;
 using detail::client::Clock;
 using detail::client::KeyState;
+using detail::client::Pixels;
 using detail::client::Tap;
 }

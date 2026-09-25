@@ -34,7 +34,7 @@ auto PublishListeningPort(void* user, sdlrdp_log_level level, char const* text) 
 auto OpenedWithClient(sdlrdp_config const& config) -> bool {
   BackendInstance backend;
   if (backend.TryOpen(config) != 0) return false;
-  if (sdlrdp_wait(backend.Handle(), 0) != 1) return false;
+  if (sdlrdp_wait(&*backend, 0) != 1) return false;
   auto const events = backend.Poll();
   return !events.empty() && events.front().type == SDLRDP_CONNECTED;
 }

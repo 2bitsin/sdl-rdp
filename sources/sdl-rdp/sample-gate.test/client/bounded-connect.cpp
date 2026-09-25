@@ -11,8 +11,10 @@ namespace sdl_rdp::sample_gate_test::client::detail::bounded_connect {
 using sdl_rdp::utilities::Descriptor;
 using sdl_rdp::utilities::Expects;
 
+// abi: pTCPConnect, the transport IO table's connect slot
 auto BoundedConnect([[maybe_unused]] rdpContext* context, [[maybe_unused]] rdpSettings* settings, char const* hostname,
                     int port, [[maybe_unused]] std::uint32_t timeout) -> int {
+  Expects(hostname != nullptr, "the client names its host");
   Expects(std::string_view(hostname) == "127.0.0.1", "local test listener");
   Expects(port > 0, "listener has a port");
   Descriptor socket{ ::socket(AF_INET, SOCK_STREAM, 0) };

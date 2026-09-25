@@ -24,6 +24,7 @@ using sdl_rdp::headless_client_test::backend::RequiredGraphics;
 using sdl_rdp::headless_client_test::backend::RequiredStatus;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::Clock;
+using sdl_rdp::headless_client_test::client::Pixels;
 using sdl_rdp::headless_client_test::frame::GraphicsScene;
 using sdl_rdp::headless_client_test::graphics::RoundFive;
 using sdl_rdp::integration::support_bench::Check;
@@ -41,7 +42,7 @@ struct FrameCost {
 enum class Scene{ MovingBlock, Noise };
 
 namespace {
-auto Pixels(Scene scene, std::uint32_t frame) -> std::vector<std::uint32_t> {
+auto ScenePixels(Scene scene, std::uint32_t frame) -> Pixels {
   return GraphicsScene(frame, scene == Scene::Noise);
 }
 auto Damage(Scene scene, std::uint32_t frame) -> sdlrdp_rect {
@@ -92,7 +93,7 @@ BENCHMARK(Measured<RemoteFxNoise>)->Apply(OneSession);
 
 auto GraphicsMeasurement::MeasureCodec(sdlrdp_codec codec, Scene scene) -> void {
   if (!Holds([&] { Open(640, 480, { }, codec); })) return;
-  Client client(sdlrdp_port(backend.Handle()), true, 640, 480);
+  Client client(sdlrdp_port(&*backend), true, 640, 480);
   if (Prepared(client, codec, scene)) RecordFrames(client, codec, scene);
 }
 auto GraphicsMeasurement::Prepared(Client& client, sdlrdp_codec codec, Scene scene) -> bool {
@@ -101,12 +102,12 @@ auto GraphicsMeasurement::Prepared(Client& client, sdlrdp_codec codec, Scene sce
   if (!Holds([&] { Connect(client); })) return false;
   if (progressive && !Check(client.Until([this] { return logs.Contains("GFX confirmed"); }), "the client confirms GFX"))
     return false;
-  return Holds([&] { Present(Pixels(scene, 0), 640, 480); }, [&] { AwaitAllAcknowledged(client, backend, logs); });
+  return Holds([&] { Present(ScenePixels(scene, 0), 640, 480); }, [&] { AwaitAllAcknowledged(client, backend, logs); });
 }
 auto GraphicsMeasurement::MeasuredFrames(Client& client, Scene scene) -> std::optional<FrameCost> {
   FrameCost cost;
   for (std::uint32_t frame = 1; frame <= 20; ++frame) {
-    auto const pixels    = Pixels(scene, frame);
+    auto const pixels    = ScenePixels(scene, frame);
     auto const presented = Clock::now();
     if (!Check(backend.Present(pixels, 640, 480, Damage(scene, frame)) == 0, "the backend presents"))
       return std::nullopt;

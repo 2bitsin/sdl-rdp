@@ -23,11 +23,10 @@ private:
   int  width    = 0;
   int  height   = 0;
 
-  inline static thread_local FirstFrameSize* active           = nullptr;
-  Client&                                    client;
-  decltype(freerdp::PostConnect)             original_connect;
-  pEndPaint                                  original_paint   = nullptr;
-  bool                                       paint_installed  = false;
+  Client&                        client;
+  decltype(freerdp::PostConnect) original_connect;
+  pEndPaint                      original_paint   = nullptr;
+  bool                           paint_installed  = false;
 };
 }
 

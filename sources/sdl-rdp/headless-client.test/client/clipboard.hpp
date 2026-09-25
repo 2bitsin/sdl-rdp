@@ -1,5 +1,6 @@
 #pragma once
 #include "client.hpp"
+#include <sdl-rdp/headless-client.test/utilities/published.hpp>
 
 #include <freerdp/client/cliprdr.h>
 #include <freerdp/event.h>
@@ -11,6 +12,7 @@
 #include <vector>
 
 namespace sdl_rdp::headless_client_test::client::detail::clipboard {
+using sdl_rdp::headless_client_test::utilities::Published;
 struct ClipboardCapture {
   std::atomic<std::size_t> requests  = 0;
   std::atomic<std::size_t> responses = 0;
@@ -36,13 +38,13 @@ private:
   auto Formats(CliprdrClientContext& context, CLIPRDR_FORMAT_LIST const& list)            -> std::uint32_t;
   auto Request(CliprdrClientContext& context, CLIPRDR_FORMAT_DATA_REQUEST const& request) -> std::uint32_t;
   auto Response(CLIPRDR_FORMAT_DATA_RESPONSE const& response)                             -> std::uint32_t;
-  ClipboardCapture                   observed;
-  Client&                            client;
-  std::mutex                         guard;
-  std::vector<std::byte>             outgoing;
-  std::vector<std::byte>             incoming;
-  std::vector<std::uint32_t>         formats;
-  std::atomic<CliprdrClientContext*> channel  = nullptr;
+  ClipboardCapture                observed;
+  Client&                         client;
+  std::mutex                      guard;
+  std::vector<std::byte>          outgoing;
+  std::vector<std::byte>          incoming;
+  std::vector<std::uint32_t>      formats;
+  Published<CliprdrClientContext> channel;
 };
 }
 

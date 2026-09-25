@@ -6,20 +6,20 @@
 #include <ranges>
 
 namespace sdl_rdp::sample_gate_test::frame::detail::pattern {
-auto PatternPixel(rdpGdi const* gdi, int index) -> std::uint32_t {
+auto PatternPixel(rdpGdi const& gdi, int index) -> std::uint32_t {
   std::uint32_t value = 0;
   std::memcpy(&value,
-              gdi->primary_buffer + (static_cast<std::size_t>((index / 640)) * gdi->stride)
+              gdi.primary_buffer + (static_cast<std::size_t>((index / 640)) * gdi.stride)
                   + ((static_cast<std::ptrdiff_t>(index % 640)) * 4),
               4);
   return value & 0xffffff;
 }
 
 auto Pattern(Client& client, bool /*pointer*/) -> testing::AssertionResult {
-  auto* gdi = client.Instance()->context->gdi;
+  auto const* gdi = client.Instance()->context->gdi;
   if (!gdi || gdi->width != 640 || gdi->height != 480)
     return testing::AssertionFailure() << "framebuffer is not 640x480";
-  auto pixel   = [&](int index) { return PatternPixel(gdi, index); };
+  auto pixel   = [&](int index) { return PatternPixel(*gdi, index); };
   auto columns = std::views::iota(0, 640);
   auto first   = std::ranges::find_if(columns, [&](int x) { return pixel((40 * 640) + x) == 0x00ff00; });
   if (first == columns.end() || *first > 608) return testing::AssertionFailure() << "no complete green block on row 40";

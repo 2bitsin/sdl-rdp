@@ -21,6 +21,7 @@ using sdl_rdp::headless_client_test::backend::CertificateDirectory;
 using sdl_rdp::headless_client_test::backend::Logs;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::HasCookie;
+using sdl_rdp::headless_client_test::client::Pixels;
 using sdl_rdp::headless_client_test::frame::FrameCounter;
 using sdl_rdp::headless_client_test::frame::HashPattern;
 
@@ -31,8 +32,8 @@ constexpr std::size_t   PaddingPixels = 16;
 constexpr std::size_t   Stride        = Width + PaddingPixels;
 constexpr std::uint32_t Padding       = 0xdeadbeef;
 // The caller's buffer ends at the last row's last pixel, as an SDL surface's does.
-auto Padded(std::span<std::uint32_t const> rows) -> std::vector<std::uint32_t> {
-  std::vector<std::uint32_t> source((Stride * (Height - 1)) + Width, Padding);
+auto Padded(std::span<std::uint32_t const> rows) -> Pixels {
+  Pixels source((Stride * (Height - 1)) + Width, Padding);
   for (auto const y : std::views::iota(0uz, std::size_t{ Height }))
     std::ranges::copy(rows.subspan(y * Width, Width), source.begin() + static_cast<std::ptrdiff_t>(y * Stride));
   return source;
@@ -45,17 +46,15 @@ TEST(PaddedPitch, ClientFrameEqualsTheSource) {
   config.codec = SDLRDP_CODEC_RAW;
   BackendInstance backend;
   ASSERT_NO_FATAL_FAILURE(backend.Open(config));
-  Client client(sdlrdp_port(backend.Handle()), true, Width, Height);
+  Client client(sdlrdp_port(&*backend), true, Width, Height);
   ASSERT_TRUE(client.Connect()) << logs.Text(true);
   ASSERT_TRUE(client.Until([&] { return HasCookie(client); }));
-  std::vector<std::uint32_t> expected(std::size_t{ Width } * Height);
+  Pixels expected(std::size_t{ Width } * Height);
   HashPattern(expected);
   auto const        source  = Padded(expected);
   FrameCounter      counter(client);
   sdlrdp_rect const area    { 0, 0, int{ Width }, int{ Height } };
-  ASSERT_EQ(
-      sdlrdp_present(backend.Handle(), source.data(), int{ Stride * sizeof(std::uint32_t) }, Width, Height, &area, 1),
-      0)
+  ASSERT_EQ(sdlrdp_present(&*backend, source.data(), int{ Stride * sizeof(std::uint32_t) }, Width, Height, &area, 1), 0)
       << sdlrdp_last_error();
   ASSERT_TRUE(client.Until([&] { return counter.Frames() == 1; }));
   EXPECT_TRUE(client.Matches(expected)) << client.MaxError(expected);

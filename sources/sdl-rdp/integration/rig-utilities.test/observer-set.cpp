@@ -14,6 +14,7 @@ namespace sdl_rdp::integration::rig_utilities_test::detail::observer_set {
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::utilities::ObserverLease;
 using sdl_rdp::headless_client_test::utilities::ObserverSet;
+using sdl_rdp::utilities::Expects;
 namespace {
 struct Probe {
   bool freed = false;
@@ -64,6 +65,7 @@ TEST(ObserverSet, OutlivesTheClientsFreeRdpTeardown) {
     ObserverSet::Of(*client.Instance()->context).Add(probe);
     // abi: pContextFree
     client.Instance()->ContextFree = [](freerdp*, rdpContext* context) {
+      Expects(context != nullptr, "the teardown names its client context");
       ObserverSet::Of(*context).Held<Probe>()->freed = true;
     };
   }

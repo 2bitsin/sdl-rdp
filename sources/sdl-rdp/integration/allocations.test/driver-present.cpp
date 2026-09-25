@@ -56,7 +56,7 @@ TEST(DriverAllocations, NonePerPresentOnceWarm) {
 
   InitializedSdl const video{ [&] { return StartVideo(certificates.Path()); } };
   ASSERT_TRUE(video.Get()) << SDL_GetError();
-  Window const window{ SDL_CreateWindow("driver allocations", Width, Height, 0), SDL_DestroyWindow };
+  Window const window{ SDL_CreateWindow("driver allocations", Width, Height, 0) };
   ASSERT_TRUE(window) << SDL_GetError();
   ASSERT_NE(SDL_GetWindowSurface(window.get()), nullptr) << SDL_GetError();
   ASSERT_NO_FATAL_FAILURE(PresentRepeatedly(*window, WarmPresents));

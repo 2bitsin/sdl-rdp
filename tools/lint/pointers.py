@@ -20,8 +20,6 @@ import shape
 ROOT            = pathlib.Path(__file__).resolve().parents[2]
 KINDS           = ('parameters', 'members', 'returns', 'null checks', 'unchecked')
 ABI_HOLDERS     = ('sdl-rdp/backend', 'sdl-rdp/SDL3')
-COUNTED         = frozenset(('sdl-rdp/headless-client.test tests', 'sdl-rdp/integration', 'sdl-rdp/integration tests',
-                             'sdl-rdp/sample-gate.test tests'))
 UNCONSTRAINED   = re.compile(r'^\s*(typename|class)\b')
 BINDING         = re.compile(r'^(/[^:]+):(\d+):(\d+): note: "(\w+)" binds here')
 PRINTED         = re.compile(r'^Binding for "(\w+)":$')
@@ -85,14 +83,15 @@ let site allOf(optionally(hasAncestor(functionDecl(unless(isImplicit())).bind("s
                optionally(hasAncestor(outer.bind("siteouter"))))
 let pfield allOf(own, unless(isImplicit()), unless(hasParent(raii)),
                  anyOf(hasType(anyptr), fieldDecl(hasType(holder)).bind("fholder")))
-let pret allOf(own, unless(isImplicit()), unless(cxxMethodDecl(ofClass(raii))), returns(anyptr))
+let pret allOf(own, unless(isImplicit()), unless(cxxMethodDecl(ofClass(raii))), unless(hasOverloadedOperatorName("->")),
+               returns(anyptr))
 let recpointee hasType(hasCanonicalType(pointerType(pointee(hasDeclaration(
     recordDecl(unless(hasAncestor(namespaceDecl()))).bind("precord"))))))
 let dependent hasType(pointerType(pointee(templateTypeParmType(hasDeclaration(templateTypeParmDecl().bind("tparm"))))))
 let signature hasParent(typeLoc(anyOf(hasParent(functionDecl()), hasParent(typeLoc(hasParent(functionDecl()))))))
 match parmVarDecl(own, signature, hasType(anyptr), owner, closure, optionally(parmVarDecl(cpointee).bind("pc")),
                   optionally(recpointee), optionally(parmVarDecl(dependent).bind("pdep")),
-                  optionally(parmVarDecl(hasType(voidptr)).bind("pvoid"))).bind("param")
+                  optionally(parmVarDecl(anyOf(hasType(voidptr), hasType(fnptr))).bind("pvoid"))).bind("param")
 let deref anyOf(unaryOperator(hasOperatorName("*")), memberExpr(isArrow()), arraySubscriptExpr())
 let indexed allOf(hasType(anyptr), unless(isTypeDependent()), unless(declRefExpr()), unless(explicitCastExpr()))
 match declRefExpr(own, to(parmVarDecl(own, hasType(anyptr)).bind("dereferenced")),
@@ -109,6 +108,9 @@ let handed anyOf(passed, hasParent(forwarder), hasParent(implicitCastExpr(hasPar
 match declRefExpr(own, to(parmVarDecl(own, hasType(anyptr)).bind("escaped")), unless(handed))
 match expr(own, indexed, has(declRefExpr(isTypeDependent(), to(parmVarDecl(own).bind("escaped")))), unless(handed))
 match fieldDecl(pfield, hasParent(recordDecl().bind("fclass"))).bind("field")
+let pstatic varDecl(own, unless(parmVarDecl()), unless(isImplicit()), hasGlobalStorage(),
+                   hasType(qualType(unless(isConstQualified()), hasCanonicalType(pointerType()))))
+match varDecl(pstatic, optionally(hasParent(recordDecl().bind("fclass")))).bind("field")
 match functionDecl(own, anyOf(hasAnyParameter(hasType(anyptr)), returns(anyptr)),
                    hasAnyBody(stmt().bind("body"))).bind("bodied")
 match functionDecl(pret, closure, optionally(hasReturnTypeLoc(typeLoc().bind("rloc"))),
@@ -116,6 +118,9 @@ match functionDecl(pret, closure, optionally(hasReturnTypeLoc(typeLoc().bind("rl
                    optionally(hasAncestor(functionDecl(isExternC()).bind("rexport"))),
                    optionally(decl(isInstantiated()).bind("rinst"))).bind("ret")
 match functionDecl(own, isMain()).bind("entry")
+let allocation hasAnyOverloadedOperatorName("new", "delete", "new[]", "delete[]")
+match functionDecl(own, unless(cxxMethodDecl()), allocation).bind("entry")
+match functionDecl(own, isExternC(), unless(hasAnyBody(stmt()))).bind("cdecl")
 let part refersToDeclaration(functionDecl().bind("part"))
 match classTemplateSpecializationDecl(raii, forEachTemplateArgument(part))
 let invoker cxxMethodDecl(hasOverloadedOperatorName("()")).bind("part")
@@ -156,6 +161,26 @@ match callExpr(own, callee(functionDecl(foreign, unless(isTemplateInstantiation(
                forEachArgumentWithParam(anyOf(flow, ignoringImplicit(cxxConstructExpr(hasArgument(0, flow)))),
                                         parmVarDecl(callback)))
 match initListExpr(own, hasType(hasCanonicalType(recordType(hasDeclaration(crecord)))), forEach(expr(flow)))
+let cfield ignoringParenImpCasts(memberExpr(member(fieldDecl(hasParent(crecord)))))
+let savedfield fieldDecl(own, hasType(fnptr)).bind("saved")
+match binaryOperator(own, hasOperatorName("="), hasLHS(cfield),
+                     hasRHS(ignoringParenImpCasts(memberExpr(member(savedfield)))))
+match binaryOperator(own, hasOperatorName("="), hasLHS(memberExpr(member(savedfield))), hasRHS(cfield))
+match cxxCtorInitializer(forField(savedfield), withInitializer(cfield))
+let foreigncall ignoringParenImpCasts(callExpr(callee(functionDecl(foreign))))
+let cabi functionDecl(anyOf(foreign, isExternC()))
+let foreigntyped varDecl(anyOf(hasTypeLoc(typeLoc(hasDescendant(declRefExpr(to(cabi))))), hasInitializer(foreigncall)))
+let savedcall ignoringParenImpCasts(memberExpr(member(savedfield)))
+let throughvar ignoringParenImpCasts(declRefExpr(to(foreigntyped)))
+match callExpr(own, unless(callee(functionDecl())), callee(expr(anyOf(throughvar, cfield, savedcall))),
+               hasAnyArgument(flow))
+let prefix hasCanonicalType(recordType(hasDeclaration(recordDecl(equalsBoundNode("prefix")))))
+match cxxReinterpretCastExpr(own, hasSourceExpression(hasType(hasCanonicalType(pointerType(pointee(
+                                 hasDeclaration(crecord.bind("prefix"))))))),
+                             hasDestinationType(hasCanonicalType(pointerType(pointee(hasDeclaration(recordDecl(own,
+                                 has(fieldDecl(hasType(prefix)).bind("extended"))).bind("extrecord")))))))
+match cxxReinterpretCastExpr(own, hasDestinationType(hasCanonicalType(pointerType(pointee(hasDeclaration(
+                                 recordDecl(own, forEach(fieldDecl().bind("extfield"))).bind("fieldrecord")))))))
 match cxxOperatorCallExpr(isExpansionInFileMatching("/unique_ptr[.]h$"), callee(cxxMethodDecl(own, ofClass(anyOf(
     classTemplateSpecializationDecl(hasSpecializedTemplate(classTemplateDecl(has(cxxRecordDecl().bind("deleter"))))),
     cxxRecordDecl().bind("deleter"))))))
@@ -175,6 +200,12 @@ match declRefExpr(own, to(pparam.bind("unwrapped")), anyOf(hasParent(explicitCas
 match callExpr(own, callee(functionDecl(foreign)), hasAnyArgument(ignoringParenImpCasts(anyOf(
     declRefExpr(to(pparam.bind("unwrapped"))),
     expr(indexed, has(declRefExpr(isTypeDependent(), to(parmVarDecl(own).bind("unwrapped")))))))))
+match callExpr(own, callee(expr(ignoringParenImpCasts(declRefExpr(to(pparam.bind("unwrapped")))))))
+let stored ignoringParenImpCasts(declRefExpr(to(parmVarDecl(own, hasType(fnptr)).bind("unwrapped"))))
+match binaryOperator(own, hasOperatorName("="), unless(hasLHS(cfield)), hasRHS(stored))
+match cxxCtorInitializer(withInitializer(stored))
+match varDecl(own, hasInitializer(stored))
+match initListExpr(own, unless(hasType(hasCanonicalType(recordType(hasDeclaration(crecord))))), has(expr(stored)))
 let ctype hasType(pointerType(pointee(isAnyCharacter())))
 let string classTemplateSpecializationDecl(hasName("::std::basic_string"))
 let maybe classTemplateSpecializationDecl(hasName("::std::optional"),
@@ -208,6 +239,7 @@ let typed allOf(hasType(hasCanonicalType(qualType().bind("type"))), optionally(d
                 optionally(hasType(spelled)))
 match parmVarDecl(own, hasType(anyptr), typed).bind("typed")
 match fieldDecl(pfield, typed).bind("typed")
+match varDecl(pstatic, typed).bind("typed")
 let abifn functionDecl(isExternC(), isExpansionInFileMatching("^{abi}"),
                        hasType(hasCanonicalType(qualType().bind("type"))))
 match declRefExpr(to(abifn), hasAncestor(typeLoc(loc(decltypeType()))),
@@ -490,7 +522,8 @@ class Facts:
     SETS = {'entry': 'entries', 'deleter': 'deleters', 'checked': 'checked', 'tested': 'tested', 'adopted': 'tested',
             'used': 'used', 'abirecord': 'abirecords', 'reflected': 'reflected', 'dereferenced': 'dereferenced',
             'unwrapped': 'unwrapped', 'ctext': 'ctexts', 'escaped': 'escaped', 'cdef': 'cdefs', 'cside': 'csides',
-            'registrar': 'registrars', 'fholder': 'holders', 'raiitype': 'raiitypes',
+            'registrar': 'registrars', 'fholder': 'holders', 'raiitype': 'raiitypes', 'saved': 'saved',
+            'cdecl': 'cdecls',
             'part': 'parts', 'released': 'parts'}
 
     def __init__(self, blocks):
@@ -501,6 +534,8 @@ class Facts:
         self.bodies, self.raii, self.unwrapped, self.ctexts, self.opaque = {}, set(), set(), set(), set()
         self.cdefs, self.csides, self.registrars, self.holders, self.raiitypes = set(), set(), set(), set(), set()
         self.instances, self.lambdas = collections.defaultdict(list), {}
+        self.saved, self.cdecls = set(), set()
+        self.extended, self.record_fields = {}, collections.defaultdict(set)
         self.types, self.references = collections.defaultdict(set), collections.defaultdict(set)
         self.instance_types, self.acquired = collections.defaultdict(set), collections.defaultdict(set)
         self.tables, self.fnargs           = collections.defaultdict(set), collections.defaultdict(set)
@@ -532,7 +567,7 @@ class Facts:
         elif 'forwarded' in block:
             self.forwarded[block['forwarded']].add(block['into'])
         elif 'field' in block:
-            self.members[block['field']] = block['fclass']
+            self.members[block['field']] = block.get('fclass')
         elif 'bodied' in block:
             self.bodies[block['bodied']] = block['body']
         elif 'rslot' in block:
@@ -565,6 +600,13 @@ class Facts:
             self.lambdas[block['plambda']] = enclosing
         if 'referee' in block:
             self.references[block['referee']].add(tuple(block.get(name) for name in SITE))
+        self.add_records(block)
+
+    def add_records(self, block):
+        if 'extended' in block:
+            self.extended[block['extended']] = block['extrecord']
+        if 'extfield' in block:
+            self.record_fields[block['fieldrecord']].add(block['extfield'])
         for name in ('regfn', 'regvoid'):
             if name in block:
                 self.registrations[block['regrecord']][name].add(block[name])
@@ -645,6 +687,11 @@ class Facts:
     def returned_types(self):
         return {returned for _, returned, _, _ in self.returns.values()}
 
+    @functools.cached_property
+    def prefixes(self):
+        """A C record an own record holds as its first field and is reinterpreted from: the layout the ABI allocates."""
+        return {field for field, record in self.extended.items() if field == min(self.record_fields[record])}
+
     def registered(self):
         """A registration is one callback and the one `void*` it hands back: exactly one of each in its record."""
         return {field for fields in self.registrations.values()
@@ -678,8 +725,8 @@ class Facts:
         return False
 
     def unwrapped_use(self, parameter):
-        """A use that reads the pointee: any use of a typed pointer; a cast of an opaque one, or its handing to foreign
-        code; an opaque `void*` only handed back to project code is never read."""
+        """A use that reads the pointee: any use of a typed pointer; a cast or a call of an opaque one, its handing to
+        foreign code, or a function pointer stored anywhere but a C record field; one only handed on is never read."""
         return parameter in self.used and (parameter not in self.opaque or parameter in self.unwrapped)
 
     def transparent(self, parameter):
@@ -757,13 +804,20 @@ class Facts:
         found |= {function for function in candidates if self.one_of(function, self.ctexts)}
         return found | self.conversions()
 
+    @functools.cached_property
+    def transcribed(self):
+        """`extern "C"` declarations of a name no project code defines: a foreign library's signature, written out
+        where its header does not declare it."""
+        defined = {declared_name(found) for found in self.cdefs}
+        return {found for found in self.cdecls if declared_name(found) not in defined}
+
     def allowed(self, function, closure):
         """A signature an ABI writes: a C export or main, a slot a C table or C call takes, a reflect tag, a function
-        an RAII type or a deleter is made of."""
+        an RAII type or a deleter is made of, a foreign declaration transcribed."""
         if closure is not None:
             return closure in self.slots
         return (self.one_of(function, self.entries | self.slots | self.parts | self.raii)
-                or self.reflect_tag(function))
+                or function in self.transcribed or self.reflect_tag(function))
 
     def released(self, function):
         """Part of an RAII type or a deleter, which is only ever handed the live handle it owns."""
@@ -915,10 +969,10 @@ def parameter_findings(root, facts):
 
 
 def findings_from(root, facts):
-    registered = facts.registered()
+    abi_shaped = facts.registered() | facts.saved | facts.prefixes
     found      = parameter_findings(root, facts)
-    found     += [finding(root, 'members', member, facts.type_of(member), class_name(record))
-                  for member, record in facts.members.items() if member not in registered and facts.pointer(member)]
+    found     += [finding(root, 'members', member, facts.type_of(member), owner_name(record).removesuffix('::'))
+                  for member, record in facts.members.items() if member not in abi_shaped and facts.pointer(member)]
     found     += [finding(root, 'returns', function, facts.type_of(returned), facts.owner(function, closure, record))
                   for function, (record, returned, export, closure) in facts.judged_returns().items()
                   if export not in facts.entries and not facts.allowed(function, closure) and facts.pointer(returned)
@@ -958,48 +1012,27 @@ def table(found):
     return lines
 
 
-class Baseline(NamedTuple):
-    """The modules the lint lists as unfinished by count; every other module by finding, so a removed pointer frees no
-    room and a finding cannot move to another function."""
-    counts:   dict
-    findings: collections.Counter
-
-
 def read_baseline(path):
-    """`count<TAB>module<TAB>kind<TAB>n` and `finding<TAB>path<TAB>kind<TAB>owner<TAB>canonical type` lines; a count
-    for a module the lint does not list as unfinished fails."""
-    rows   = [line.split('\t') for line in path.read_text().splitlines() if line.strip()]
-    counts = {(name, kind): int(count) for form, name, kind, count in (row for row in rows if row[0] == 'count')}
-    held   = collections.Counter(tuple(row[1:]) for row in rows if row[0] == 'finding')
-    if stray := sorted({name for name, _ in counts} - COUNTED):
-        raise SystemExit('pointers: held by count but finished: ' + ', '.join(stray))
-    return Baseline(counts, held)
-
-
-def module_counts(found, counted):
-    """Findings per (module, kind) for the modules the baseline holds by count."""
-    return collections.Counter((module(item.path), item.kind) for item in found if module(item.path) in counted)
+    """`finding<TAB>path<TAB>kind<TAB>owner<TAB>canonical type` lines, so a removed pointer frees no room and a finding
+    cannot move to another function; any other line fails."""
+    rows = [line.split('\t') for line in path.read_text().splitlines() if line.strip()]
+    if stray := [row for row in rows if row[0] != 'finding' or len(row) != 5]:
+        raise SystemExit('pointers: not a finding line: ' + ', '.join('\t'.join(row) for row in stray))
+    return collections.Counter(tuple(row[1:]) for row in rows)
 
 
 def regressions(found, baseline):
     """Any difference from the baseline, either way: a new pointer fails, and so does a stale entry."""
-    counts  = module_counts(found, COUNTED)
-    held    = collections.Counter(item.key() for item in found if module(item.path) not in COUNTED)
-    lines   = [f'{name}: {kind} {counts[(name, kind)]} != {baseline.counts.get((name, kind), 0)}'
-               for name, kind in sorted(counts.keys() | baseline.counts.keys())
-               if counts[(name, kind)] != baseline.counts.get((name, kind), 0)]
-    lines  += [f'{path}: new {kind} ({type_text}) in {owner}'
-               for path, kind, owner, type_text in sorted(held - baseline.findings)]
-    lines  += [f'{path}: {kind} ({type_text}) in {owner} is gone; drop it from the baseline'
-               for path, kind, owner, type_text in sorted(baseline.findings - held)]
+    held   = collections.Counter(item.key() for item in found)
+    lines  = [f'{path}: new {kind} ({type_text}) in {owner}'
+              for path, kind, owner, type_text in sorted(held - baseline)]
+    lines += [f'{path}: {kind} ({type_text}) in {owner} is gone; drop it from the baseline'
+              for path, kind, owner, type_text in sorted(baseline - held)]
     return lines
 
 
 def baseline_lines(found):
-    """The current findings in the baseline's form, the unfinished modules as counts."""
-    counts  = module_counts(found, COUNTED)
-    lines   = [f'count\t{name}\t{kind}\t{count}' for (name, kind), count in sorted(counts.items())]
-    return lines + sorted('\t'.join(('finding', *item.key())) for item in found if module(item.path) not in COUNTED)
+    return sorted('\t'.join(('finding', *item.key())) for item in found)
 
 
 def main(argv=None):

@@ -1,5 +1,7 @@
 #include <sdl-rdp/headless-client.test/frame/update-hook.hpp>
 
+#include <sdl-rdp/headless-client.test/client/handles.hpp>
+#include <sdl-rdp/headless-client.test/utilities/observer-set.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 
 #include <freerdp/gdi/gdi.h>
@@ -10,6 +12,8 @@
 #include <vector>
 
 namespace sdl_rdp::headless_client_test::frame::detail::update_hook {
+using sdl_rdp::headless_client_test::client::ClientUpdates;
+using sdl_rdp::headless_client_test::utilities::ObserverSet;
 using sdl_rdp::utilities::Expects;
 
 namespace {
@@ -27,11 +31,10 @@ auto Regions(BITMAP_UPDATE const& command) -> std::vector<sdlrdp_rect> {
          })
          | std::ranges::to<std::vector>();
 }
-auto Desktop(rdpContext const* context) -> Extent {
-  Expects(context, "callback context exists");
-  Expects(context->gdi, "decoded framebuffer exists");
-  return { .width  = static_cast<std::uint32_t>(context->gdi->width),
-           .height = static_cast<std::uint32_t>(context->gdi->height) };
+auto Desktop(rdpContext const& context) -> Extent {
+  Expects(context.gdi != nullptr, "decoded framebuffer exists");
+  return { .width  = static_cast<std::uint32_t>(context.gdi->width),
+           .height = static_cast<std::uint32_t>(context.gdi->height) };
 }
 }
 
@@ -48,35 +51,34 @@ private:
   // abi: pSurfaceBits and pBitmapUpdate, BOOL is int
   template <auto original, PictureCommand command, class Wire>
   static auto Receive(rdpContext* context, Wire const* wire) -> int;
-  inline static thread_local Installation* active   = nullptr;
-  rdpUpdate*                               update;
-  pSurfaceBits                             surface;
-  pBitmapUpdate                            bitmap;
-  Observer                                 observer;
+  rdpUpdate&    update;
+  pSurfaceBits  surface;
+  pBitmapUpdate bitmap;
+  Observer      observer;
 };
 
 PictureUpdateHook::Installation::Installation(Client& client, Observer observer)
-    : update(client.Instance()->context->update), surface(update->SurfaceBits), bitmap(update->BitmapUpdate),
+    : update(ClientUpdates(client)), surface(update.SurfaceBits), bitmap(update.BitmapUpdate),
       observer(std::move(observer)) {
-  Expects(!active, "no observer is already installed");
   Expects(surface, "surface callback is installed");
   Expects(bitmap, "bitmap callback is installed");
-  active               = this;
-  update->SurfaceBits  = Receive<&Installation::surface, PictureCommand::Surface>;
-  update->BitmapUpdate = Receive<&Installation::bitmap, PictureCommand::Bitmap>;
+  ObserverSet::Of(*update.context).Add(*this);
+  update.SurfaceBits  = Receive<&Installation::surface, PictureCommand::Surface>;
+  update.BitmapUpdate = Receive<&Installation::bitmap, PictureCommand::Bitmap>;
 }
 PictureUpdateHook::Installation::~Installation() {
-  update->SurfaceBits  = surface;
-  update->BitmapUpdate = bitmap;
-  active               = nullptr;
+  update.SurfaceBits  = surface;
+  update.BitmapUpdate = bitmap;
+  ObserverSet::Of(*update.context).Remove<Installation>();
 }
 template <auto original, PictureCommand command, class Wire>
 auto PictureUpdateHook::Installation::Receive(rdpContext* context, Wire const* wire) -> int {
-  Expects(active, "observer is installed");
-  Expects(wire, "wire command is supplied");
-  auto       result  = (active->*original)(context, wire);
+  Expects(context != nullptr, "callback context exists");
+  Expects(wire != nullptr, "wire command is supplied");
+  auto const active  = ObserverSet::Of(*context).Held<Installation>();
+  auto       result  = ((*active).*original)(context, wire);
   auto const regions = Regions(*wire);
-  auto const desktop = Desktop(context);
+  auto const desktop = Desktop(*context);
   active->observer({ .command = command, .regions = regions, .desktop = desktop, .delivered = result != 0 });
   return result;
 }

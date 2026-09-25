@@ -28,6 +28,14 @@ void sdl_close(struct Dev*);
 int sdl_chain(struct Dev*);
 int sdl_lambda(struct Dev*);
 int sdl_marked(struct Dev*);
+typedef int (*Setter)(int (*)(struct Dev*));
+Setter c_lookup(void);
+struct Entry { int (*Open)(int (*cb)(struct Dev*)); };
+int sdl_passes(int (*cb)(struct Dev*));
+int sdl_calls(int (*cb)(struct Dev*));
+int sdl_stores(int (*cb)(struct Dev*));
+int sdl_assigns(int (*cb)(struct Dev*));
+int sdl_fills(int (*cb)(struct Dev*));
 }
 '''
 ABI_HEADER = '''extern "C" {
@@ -336,6 +344,94 @@ auto SpelledError(Symbols const& table) -> char const* { return std::get<0>(tabl
 auto SpelledRelay(Symbols const& table) -> char const* { return SpelledError(table); }
 }
 '''
+SHAPES = '''#include <cstddef>
+#include <new>
+#include "c.h"
+extern "C" auto transcribed_alloc(std::size_t size) noexcept -> void*;
+extern "C" auto transcribed_free(void* block) noexcept -> void;
+extern "C" auto project_defined(int* defined_param) -> int*;
+namespace shapes {
+struct Restores {
+  Table& table;
+  int (*restored)(Dev*);
+  ~Restores() { table.Init = restored; }
+};
+struct Reads {
+  explicit Reads(Table& t) : initialized(t.Init) { assigned = t.Init; }
+  int (*initialized)(Dev*);
+  int (*assigned)(Dev*) = nullptr;
+};
+struct Untouched { int (*untouched)(Dev*); };
+struct Extended {
+  Table prefix_table;
+  int   extra;
+};
+auto Of(Table& table) -> Extended& { return *reinterpret_cast<Extended*>(&table); }
+struct Composed { Table composed_table; };
+struct Trailing {
+  int   extra;
+  Table trailing_table;
+};
+auto Of(Table& table) -> Trailing& { return *reinterpret_cast<Trailing*>(&table); }
+struct Routed { inline static thread_local Routed* routed_static = nullptr; };
+Dev* namespace_global = nullptr;
+char const* const constant_text = "text";
+#define WRITES_STATIC(name) Dev* name##_written = nullptr
+WRITES_STATIC(macro);
+template <class T> struct Lease {
+  T& held;
+  auto operator->() const -> T* { return &held; }
+  auto Get() const -> T* { return &held; }
+};
+auto Hand(Dev* handed_through) -> int { return handed_through == nullptr; }
+auto Direct(Dev* handed_directly) -> int { return handed_directly == nullptr; }
+auto ThroughReference() -> int {
+  static decltype(c_register)& registered = c_register;
+  return registered([](void* by_reference_lambda) -> int { return by_reference_lambda == nullptr; }, nullptr);
+}
+auto Taking(int (*taken)(Dev*)) -> int { return taken(nullptr); }
+auto Local(Dev* handed_locally) -> int { return handed_locally == nullptr; }
+auto ThroughProject() -> int {
+  auto* const project = &Taking;
+  return project(Local);
+}
+auto Indirect() -> void {
+  auto* const next = c_lookup();
+  next(Hand);
+}
+auto ViaField(Entry& entry) -> int {
+  return entry.Open([](Dev* field_lambda) -> int { return field_lambda == nullptr; });
+}
+struct SavedOpen {
+  explicit SavedOpen(Entry& e) : open(e.Open) { }
+  auto Call() const -> int { return open([](Dev* saved_lambda) -> int { return saved_lambda == nullptr; }); }
+  int (*open)(int (*)(Dev*));
+};
+}
+extern "C" auto sdl_passes(int (*passed_cb)(Dev*)) -> int { return c_lookup()(passed_cb); }
+extern "C" auto sdl_calls(int (*called_cb)(Dev*)) -> int { return called_cb(nullptr); }
+struct Stored {
+  int (*callback)(Dev*);
+  void* user;
+};
+extern "C" auto sdl_stores(int (*stored_cb)(Dev*)) -> int {
+  Stored const record{ stored_cb, nullptr };
+  return record.callback(nullptr);
+}
+extern "C" auto sdl_assigns(int (*assigned_cb)(Dev*)) -> int {
+  Stored record{ };
+  record.callback = assigned_cb;
+  return record.callback(nullptr);
+}
+extern "C" auto sdl_fills(int (*filled_cb)(Dev*)) -> int {
+  Table table{ };
+  table.Init = filled_cb;
+  return c_register(nullptr, &table);
+}
+auto operator new(std::size_t size) -> void* { return transcribed_alloc(size); }
+auto operator delete(void* released_block) noexcept -> void { transcribed_free(released_block); }
+'''
+DEFINED = 'extern "C" auto project_defined(int* defined_param) -> int* { return defined_param; }\n'
 PROBE   = 'sources/sdl-rdp/video/probe.cpp'
 ADAPTER = 'sources/sdl-rdp/backend/adapter.cpp'
 FACADES = 'sources/sdl-rdp/freerdp-facade/facade.cpp'
@@ -636,7 +732,7 @@ def test_every_finding_names_its_owner_and_a_lambda_is_counted_in_its_function(k
 
 def test_a_finding_moved_to_another_lambda_in_its_file_is_new(keyed):
     first, second = (next(item for item in keyed.values() if item.owner == f'Lambdas::lambda#{n}') for n in (1, 2))
-    baseline = pointers.Baseline({}, collections.Counter([first.key()]))
+    baseline = collections.Counter([first.key()])
     assert pointers.regressions([second], baseline) == [
         f'{second.path}: new parameters (int *) in Lambdas::lambda#2',
         f'{first.path}: parameters (int *) in Lambdas::lambda#1 is gone; drop it from the baseline']
@@ -655,6 +751,89 @@ def test_the_abis_function_table_and_a_call_through_it_are_the_abi(found):
 
 def test_an_acquiring_functor_an_raii_type_holds_is_part_of_it(found):
     assert not at(found, PROBE, 'acquire_args', 'parameters')
+
+
+@pytest.fixture(scope='module')
+def shaped(tmp_path_factory):
+    root  = tmp_path_factory.mktemp('shapes')
+    files = {'sources/sdl-rdp/video/shapes.cpp': SHAPES, 'sources/sdl-rdp/video/defined.cpp': DEFINED}
+    build = tree(root, files, files)
+    return {(str(item.path), item.line, item.kind) for item in pointers.findings(root, build)}
+
+
+def shape_at(shaped, needle, kind):
+    return ('sources/sdl-rdp/video/shapes.cpp', locate(SHAPES, needle), kind) in shaped
+
+
+@pytest.mark.parametrize('needle', ['int (*restored)(Dev*)', 'int (*initialized)(Dev*)', 'int (*assigned)(Dev*)'])
+def test_a_function_pointer_member_a_c_table_slot_fills_or_is_restored_from_is_its_saved_original(shaped, needle):
+    assert not shape_at(shaped, needle, 'members')
+
+
+def test_a_function_pointer_member_that_touches_no_c_table_stays_a_pointer(shaped):
+    assert shape_at(shaped, 'int (*untouched)(Dev*)', 'members')
+
+
+def test_a_c_record_a_project_record_extends_by_prefix_is_the_layout_the_abi_allocates(shaped):
+    assert not shape_at(shaped, 'Table prefix_table', 'members')
+    assert shape_at(shaped, 'Table composed_table', 'members')
+    assert shape_at(shaped, 'Table trailing_table', 'members')
+
+
+@pytest.mark.parametrize('needle', ['Routed* routed_static', 'Dev* namespace_global', 'WRITES_STATIC(macro)'])
+def test_a_mutable_pointer_with_static_storage_is_a_member(shaped, needle):
+    assert shape_at(shaped, needle, 'members')
+
+
+def test_a_constant_pointer_is_no_state(shaped):
+    assert not shape_at(shaped, 'char const* const constant_text', 'members')
+
+
+def test_a_boundary_function_pointer_is_read_only_when_called(shaped):
+    assert not shape_at(shaped, 'int (*passed_cb)(Dev*)', 'unchecked')
+    assert shape_at(shaped, 'int (*called_cb)(Dev*)', 'unchecked')
+
+
+@pytest.mark.parametrize('needle', ['int (*stored_cb)(Dev*)', 'int (*assigned_cb)(Dev*)'])
+def test_a_boundary_function_pointer_stored_in_a_project_record_is_read(shaped, needle):
+    assert shape_at(shaped, needle, 'unchecked')
+
+
+def test_a_boundary_function_pointer_filled_into_a_c_record_is_handed_on(shaped):
+    assert not shape_at(shaped, 'int (*filled_cb)(Dev*)', 'unchecked')
+
+
+def test_operator_arrow_is_the_signature_the_language_writes(shaped):
+    assert not shape_at(shaped, 'auto operator->()', 'returns')
+    assert shape_at(shaped, 'auto Get() const -> T*', 'returns')
+
+
+@pytest.mark.parametrize('needle, kind', [('auto operator new', 'returns'), ('void* released_block', 'parameters'),
+                                          ('void* released_block', 'unchecked')])
+def test_a_replaced_allocation_function_is_the_signature_the_standard_writes(shaped, needle, kind):
+    assert not shape_at(shaped, needle, kind)
+
+
+def test_a_foreign_declaration_transcribed_is_its_librarys_signature(shaped):
+    assert not shape_at(shaped, 'transcribed_alloc(std::size_t size)', 'returns')
+    assert not shape_at(shaped, 'transcribed_free(void* block)', 'parameters')
+
+
+def test_an_extern_c_declaration_project_code_defines_is_no_foreign_signature(shaped):
+    assert shape_at(shaped, 'project_defined(int* defined_param) -> int*;', 'parameters')
+
+
+@pytest.mark.parametrize('needle', ['Dev* field_lambda', 'Dev* saved_lambda'])
+def test_a_lambda_handed_through_a_c_table_field_or_its_saved_original_is_a_slot(shaped, needle):
+    assert not shape_at(shaped, needle, 'parameters')
+    assert not shape_at(shaped, 'int (*open)(int (*)(Dev*))', 'members')
+
+
+def test_a_function_handed_through_an_indirect_c_call_is_a_slot(shaped):
+    assert not shape_at(shaped, 'Hand(Dev* handed_through)', 'parameters')
+    assert shape_at(shaped, 'Direct(Dev* handed_directly)', 'parameters')
+    assert shape_at(shaped, 'Local(Dev* handed_locally)', 'parameters')
+    assert not shape_at(shaped, 'void* by_reference_lambda', 'parameters')
 
 
 def test_a_tracked_unit_outside_the_database_fails(tmp_path):
@@ -683,7 +862,7 @@ def finding(path, kind, type_text, owner=''):
 
 def test_a_finished_module_is_held_by_finding_so_a_removal_admits_nothing():
     held     = ('sources/sdl-rdp/link/a.hpp', 'returns', 'A', 'void *')
-    baseline = pointers.Baseline({}, collections.Counter([held] * 2))
+    baseline = collections.Counter([held] * 2)
     found    = [finding('sources/sdl-rdp/link/a.hpp', 'returns', 'void *', 'A'),
                 finding('sources/sdl-rdp/link/b.hpp', 'parameters', 'int *', 'B')]
     assert pointers.regressions(found, baseline) == [
@@ -693,34 +872,34 @@ def test_a_finished_module_is_held_by_finding_so_a_removal_admits_nothing():
 
 def test_a_finding_cannot_move_to_another_function_in_its_file():
     held     = ('sources/sdl-rdp/link/a.cpp', 'parameters', 'Old', 'void *')
-    baseline = pointers.Baseline({}, collections.Counter([held]))
+    baseline = collections.Counter([held])
     found    = [finding('sources/sdl-rdp/link/a.cpp', 'parameters', 'void *', 'New')]
     assert pointers.regressions(found, baseline) == [
         'sources/sdl-rdp/link/a.cpp: new parameters (void *) in New',
         'sources/sdl-rdp/link/a.cpp: parameters (void *) in Old is gone; drop it from the baseline']
 
 
-def test_only_the_listed_unfinished_modules_are_held_by_count(tmp_path):
+@pytest.mark.parametrize('line', ['count\tsdl-rdp/integration tests\tparameters\t3',
+                                  'count\tsdl-rdp/video\tparameters\t0',
+                                  'finding\tsources/sdl-rdp/link/a.hpp\treturns\tvoid *'])
+def test_the_baseline_refuses_any_line_but_a_finding(tmp_path, line):
     path = tmp_path / 'baseline'
-    path.write_text('count\tsdl-rdp/video\tparameters\t3\n')
-    with pytest.raises(SystemExit, match='sdl-rdp/video'):
+    path.write_text(f'{line}\n')
+    with pytest.raises(SystemExit, match='not a finding line'):
         pointers.read_baseline(path)
 
 
-def test_a_part_two_module_is_held_by_count():
-    baseline = pointers.Baseline({('sdl-rdp/integration', 'parameters'): 1}, collections.Counter())
-    found    = [finding('sources/sdl-rdp/integration/a.cpp', 'parameters', 'int *'),
-                finding('sources/sdl-rdp/integration/b.cpp', 'parameters', 'char *')]
-    assert pointers.regressions(found, baseline) == ['sdl-rdp/integration: parameters 2 != 1']
-
-
-def test_the_baseline_reads_both_forms(tmp_path):
+def test_the_baseline_reads_findings_by_owner(tmp_path):
     path = tmp_path / 'baseline'
-    path.write_text('count\tsdl-rdp/integration\tparameters\t3\n'
-                    'finding\tsources/sdl-rdp/link/a.hpp\treturns\tA::B\tvoid *\n')
-    baseline = pointers.read_baseline(path)
-    assert baseline.counts == {('sdl-rdp/integration', 'parameters'): 3}
-    assert baseline.findings == collections.Counter([('sources/sdl-rdp/link/a.hpp', 'returns', 'A::B', 'void *')])
+    path.write_text('finding\tsources/sdl-rdp/link/a.hpp\treturns\tA::B\tvoid *\n')
+    assert pointers.read_baseline(path) == collections.Counter([('sources/sdl-rdp/link/a.hpp', 'returns', 'A::B',
+                                                                 'void *')])
+
+
+def test_a_test_module_is_held_by_finding_like_any_other():
+    found = [finding('sources/sdl-rdp/integration/a.cpp', 'parameters', 'int *', 'A')]
+    assert pointers.regressions(found, collections.Counter()) == [
+        'sources/sdl-rdp/integration/a.cpp: new parameters (int *) in A']
 
 
 def test_table_counts_by_module_with_tests_apart():

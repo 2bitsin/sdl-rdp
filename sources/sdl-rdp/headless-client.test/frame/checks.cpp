@@ -23,6 +23,7 @@
 namespace sdl_rdp::headless_client_test::frame::detail::checks {
 using sdl_rdp::freerdp_facade::WaitHandle;
 using sdl_rdp::headless_client_test::backend::RequiredGraphics;
+using sdl_rdp::headless_client_test::client::Pixels;
 using sdl_rdp::utilities::Narrowed;
 
 namespace {
@@ -58,12 +59,11 @@ auto ThenGraphicsReset(GraphicsObserver const& observer, GraphicsCounts before, 
   EXPECT_EQ(observer.Observed().frames.size(), before.frames + 1);
 }
 }
-auto FrameChecks::Present(std::vector<std::uint32_t> const& pixels, std::uint32_t w, std::uint32_t h) -> void {
+auto FrameChecks::Present(Pixels const& pixels, std::uint32_t w, std::uint32_t h) -> void {
   sdlrdp_rect const full{ 0, 0, Narrowed<int>(w), Narrowed<int>(h) };
   ASSERT_EQ(backend.Present(pixels, w, h, full), 0);
 }
-auto FrameChecks::FillLegacyWindow(Client& client, FrameObserver& observer, std::vector<std::uint32_t>& pixels)
-    -> void {
+auto FrameChecks::FillLegacyWindow(Client& client, FrameObserver& observer, Pixels& pixels) -> void {
   ASSERT_NO_FATAL_FAILURE(PresentObserved(client, observer, pixels, 1));
   std::ranges::fill(pixels, 0x223344);
   ASSERT_NO_FATAL_FAILURE(PresentObserved(client, observer, pixels, 2));
@@ -72,10 +72,10 @@ auto FrameChecks::FillLegacyWindow(Client& client, FrameObserver& observer, std:
     ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
   }
   EXPECT_EQ(observer.Frames().size(), 2u);
-  EXPECT_EQ(sdlrdp_wait_frame(backend.Handle(), 0), 0);
+  EXPECT_EQ(sdlrdp_wait_frame(&*backend, 0), 0);
 }
-auto FrameChecks::PresentObserved(Client& client, FrameObserver const& observer,
-                                  std::vector<std::uint32_t> const& pixels, std::size_t frames) -> void {
+auto FrameChecks::PresentObserved(Client& client, FrameObserver const& observer, Pixels const& pixels,
+                                  std::size_t frames) -> void {
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
   ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == frames; }));
 }
@@ -108,11 +108,11 @@ auto FrameChecks::ThenScaledHighlight(Client& client) -> void {
                                             [&](int y) { return actual[static_cast<std::size_t>(y) * 640] & 255; });
   EXPECT_LE(std::abs(*brightest - 240), 1);
 }
-auto FrameChecks::ThenSparseDamage(Client& client, FrameObserver& observer, std::vector<std::uint32_t> const& pixels,
-                                   std::size_t bounding, sdlrdp_codec codec) -> void {
+auto FrameChecks::ThenSparseDamage(Client& client, FrameObserver& observer, Pixels const& pixels, std::size_t bounding,
+                                   sdlrdp_codec codec) -> void {
   auto                       bytes  = client.Received();
   std::array<sdlrdp_rect, 2> damage { { { .x = 0, .y = 0, .w = 8, .h = 8 }, { .x = 1016, .y = 760, .w = 8, .h = 8 } } };
-  ASSERT_EQ(sdlrdp_present(backend.Handle(), pixels.data(), 4096, 1024, 768, damage.data(), 2), 0);
+  ASSERT_EQ(sdlrdp_present(&*backend, pixels.data(), 4096, 1024, 768, damage.data(), 2), 0);
   ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == 3; }));
   auto used = client.Received() - bytes;
   testing::Test::RecordProperty("region_bytes_" + std::to_string(codec), std::to_string(used));
@@ -120,7 +120,7 @@ auto FrameChecks::ThenSparseDamage(Client& client, FrameObserver& observer, std:
 }
 auto FrameChecks::ThenProducerFrame(Client& client, FrameObserver& observer, std::atomic<std::size_t> const& presents)
     -> void {
-  std::vector<std::uint32_t> final(1024uz * 768);
+  Pixels final(1024uz * 768);
   std::fill_n(final.begin(), 1024, presents.load());
   std::fill_n(final.end() - 1024, 1024, presents.load());
   ASSERT_TRUE(client.Until([&] {
@@ -140,16 +140,17 @@ auto FrameChecks::ThenReadable(Client& client) -> void {
   ASSERT_LT(WaitForMultipleObjects(count, handles.data(), false, 10000), WAIT_OBJECT_0 + count);
 }
 auto FrameChecks::ThenQoe(Client& client, GraphicsObserver& observer) -> void {
-  RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU qoe{ observer.Observed().frames.back().frameId, 1234, 7, 9 };
-  ASSERT_EQ(observer.Channel()->QoeFrameAcknowledge(observer.Channel(), &qoe), CHANNEL_RC_OK);
+  RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU qoe     { observer.Observed().frames.back().frameId, 1234, 7, 9 };
+  auto&                            channel = observer.Channel();
+  ASSERT_EQ(channel.QoeFrameAcknowledge(&channel, &qoe), CHANNEL_RC_OK);
   ASSERT_TRUE(client.Until([&] {
     auto const received = RequiredGraphics(*backend).Qoe();
     return received.timestamp == qoe.timestamp && received.timeDiffSE == 7 && received.timeDiffEDR == 9;
   }));
   EXPECT_FALSE(logs.Contains("GFX QoE"));
 }
-auto FrameChecks::ResizePicture(Client& client, GraphicsObserver& observer, std::vector<std::uint32_t>& pixels,
-                                Extent size, bool graphics) -> void {
+auto FrameChecks::ResizePicture(Client& client, GraphicsObserver& observer, Pixels& pixels, Extent size, bool graphics)
+    -> void {
   auto const before = CountsOf(observer);
   pixels.assign(static_cast<std::size_t>(size.width) * size.height, 0x654321);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, size.width, size.height));

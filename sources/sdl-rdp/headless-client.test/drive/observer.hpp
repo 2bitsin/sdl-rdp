@@ -18,7 +18,7 @@ struct DriveCapture {
   std::vector<std::pair<std::uint32_t, std::uint32_t>> replies;
   bool                                                 hold     = false;
 };
-struct DriveObserver {
+class DriveObserver {
 public:
            DriveObserver(DriveObserver const&)               = delete;
            DriveObserver(DriveObserver&&)                    = delete;
@@ -32,10 +32,9 @@ public:
 
 private:
   auto Receive(std::uint16_t id, std::span<std::byte const> data, std::uint32_t flags, std::size_t total) -> bool;
-  DriveCapture                              observed;
-  inline static thread_local DriveObserver* active   = nullptr;
-  freerdp*                                  instance;
-  pReceiveChannelData                       original;
+  DriveCapture        observed;
+  freerdp&            instance;
+  pReceiveChannelData original;
 };
 }
 

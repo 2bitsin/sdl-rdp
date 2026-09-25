@@ -38,7 +38,7 @@ auto BackendEvents::Accumulate(std::vector<sdlrdp_event>& result, bool include_r
                        [=](auto const& event) { return include_refresh || event.type != SDLRDP_REFRESH; });
 }
 auto BackendEvents::AwaitBackend() const -> bool {
-  sdlrdp_wait(backend.Handle(), 50);
+  sdlrdp_wait(&*backend, 50);
   return true;
 }
 }

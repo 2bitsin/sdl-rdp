@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <cstring>
 #include <span>
+#include <string_view>
 
 namespace sdl_rdp::integration::clipboard_test::detail::channel {
 using sdl_rdp::headless_client_test::backend::BackendInstance;
@@ -31,7 +32,7 @@ auto HasClipboardEvent(std::span<sdlrdp_event const> events) -> bool {
 class Clipboard : public testing::Test {
 protected:
   auto Poll(std::span<sdlrdp_event> events) -> std::span<sdlrdp_event const> {
-    return events.first(sdlrdp_poll(handle.Handle(), events.data(), Narrowed<std::uint32_t>(events.size())));
+    return events.first(sdlrdp_poll(&*handle, events.data(), Narrowed<std::uint32_t>(events.size())));
   }
   auto Drain() -> void {
     std::array<sdlrdp_event, 32> events{ };
@@ -49,15 +50,15 @@ protected:
   auto ThenNonTextOffer() -> void {
     ASSERT_TRUE(clipboard->Offer({ }, false));
     ASSERT_TRUE(UntilClipboardEvent());
-    EXPECT_EQ(sdlrdp_has_clipboard_text(handle.Handle()), 0);
-    EXPECT_STREQ(sdlrdp_get_clipboard_text(handle.Handle()), "");
+    EXPECT_EQ(sdlrdp_has_clipboard_text(&*handle), 0);
+    EXPECT_STREQ(sdlrdp_get_clipboard_text(&*handle), "");
   }
-  auto ThenReplacedText(char const* retained) -> void {
-    EXPECT_STREQ(retained, "hello");
-    EXPECT_STREQ(sdlrdp_get_clipboard_text(handle.Handle()), "world");
+  auto ThenReplacedText(std::string_view retained) -> void {
+    EXPECT_EQ(retained, "hello");
+    EXPECT_STREQ(sdlrdp_get_clipboard_text(&*handle), "world");
   }
   auto GivenClipboard() -> void {
-    client    = std::make_unique<Client>(sdlrdp_port(handle.Handle()), false);
+    client    = std::make_unique<Client>(sdlrdp_port(&*handle), false);
     clipboard = std::make_unique<ClipboardClient>(*client);
     ConnectClipboard(*client, *clipboard);
   }
@@ -89,49 +90,50 @@ TEST_F(Clipboard, EmptyConnectUnchanged) {
   ASSERT_NO_FATAL_FAILURE(GivenClipboard());
   std::array<sdlrdp_event, 32> events{ };
   for (auto polled = Poll(events); !polled.empty(); polled = Poll(events)) EXPECT_FALSE(HasClipboardEvent(polled));
-  EXPECT_STREQ(sdlrdp_get_clipboard_text(handle.Handle()), "");
+  EXPECT_STREQ(sdlrdp_get_clipboard_text(&*handle), "");
   RecordProperty("trace", "empty connect: format list accepted; CLIPBOARD events=0");
 }
 TEST_F(Clipboard, LocalTextAndErrors) {
-  EXPECT_EQ(sdlrdp_has_clipboard_text(handle.Handle()), 0);
-  EXPECT_STREQ(sdlrdp_get_clipboard_text(handle.Handle()), "");
-  ASSERT_EQ(sdlrdp_set_clipboard_text(handle.Handle(), "żółw"), 0);
-  EXPECT_EQ(sdlrdp_has_clipboard_text(handle.Handle()), 1);
-  EXPECT_STREQ(sdlrdp_get_clipboard_text(handle.Handle()), "żółw");
-  EXPECT_EQ(sdlrdp_set_clipboard_text(handle.Handle(), "\xc0\xaf"), -1);
+  EXPECT_EQ(sdlrdp_has_clipboard_text(&*handle), 0);
+  EXPECT_STREQ(sdlrdp_get_clipboard_text(&*handle), "");
+  ASSERT_EQ(sdlrdp_set_clipboard_text(&*handle, "żółw"), 0);
+  EXPECT_EQ(sdlrdp_has_clipboard_text(&*handle), 1);
+  EXPECT_STREQ(sdlrdp_get_clipboard_text(&*handle), "żółw");
+  EXPECT_EQ(sdlrdp_set_clipboard_text(&*handle, "\xc0\xaf"), -1);
   EXPECT_STRNE(sdlrdp_last_error(), "");
-  EXPECT_STREQ(sdlrdp_get_clipboard_text(handle.Handle()), "żółw");
-  EXPECT_EQ(sdlrdp_set_clipboard_text(handle.Handle(), nullptr), -1);
+  EXPECT_STREQ(sdlrdp_get_clipboard_text(&*handle), "żółw");
+  EXPECT_EQ(sdlrdp_set_clipboard_text(&*handle, nullptr), -1);
   EXPECT_EQ(sdlrdp_set_clipboard_text(nullptr, "hello"), -1);
   EXPECT_EQ(sdlrdp_get_clipboard_text(nullptr), nullptr);
   EXPECT_EQ(sdlrdp_has_clipboard_text(nullptr), -1);
-  ASSERT_EQ(sdlrdp_set_clipboard_text(handle.Handle(), ""), 0);
-  EXPECT_EQ(sdlrdp_has_clipboard_text(handle.Handle()), 0);
+  ASSERT_EQ(sdlrdp_set_clipboard_text(&*handle, ""), 0);
+  EXPECT_EQ(sdlrdp_has_clipboard_text(&*handle), 0);
 }
 TEST_F(Clipboard, LiveSetAndMalformedResponse) {
   ASSERT_NO_FATAL_FAILURE(GivenClipboard());
-  ASSERT_EQ(sdlrdp_set_clipboard_text(handle.Handle(), "hello"), 0);
+  ASSERT_EQ(sdlrdp_set_clipboard_text(&*handle, "hello"), 0);
   ASSERT_TRUE(client->Until([&] { return clipboard->Received(UnicodeText("hello")); }));
   Drain();
-  auto const* retained = sdlrdp_get_clipboard_text(handle.Handle());
+  auto const* retained = sdlrdp_get_clipboard_text(&*handle);
+  ASSERT_NE(retained, nullptr);
   ASSERT_NO_FATAL_FAILURE(OfferMalformedText(*client, *clipboard));
   ASSERT_TRUE(clipboard->Offer(UnicodeText("world")));
   ASSERT_TRUE(UntilClipboardEvent());
   ThenReplacedText(retained);
 }
 TEST_F(Clipboard, FirstOfferRetainsAppText) {
-  ASSERT_EQ(sdlrdp_set_clipboard_text(handle.Handle(), "app"), 0);
-  Client          client(sdlrdp_port(handle.Handle()), false);
+  ASSERT_EQ(sdlrdp_set_clipboard_text(&*handle, "app"), 0);
+  Client          client(sdlrdp_port(&*handle), false);
   ClipboardClient clipboard(client, UnicodeText("client"));
   ASSERT_TRUE(client.Connect()) << logs.Text(true);
   ASSERT_TRUE(client.Until([&] { return clipboard.Received(UnicodeText("app")); }));
   EXPECT_EQ(clipboard.Observed().accepted.load(), 1u);
   EXPECT_EQ(clipboard.Observed().requests.load(), 0u);
-  EXPECT_STREQ(sdlrdp_get_clipboard_text(handle.Handle()), "app");
+  EXPECT_STREQ(sdlrdp_get_clipboard_text(&*handle), "app");
 }
 TEST_F(Clipboard, NonTextOfferClearsText) {
   ASSERT_NO_FATAL_FAILURE(GivenClipboard());
-  ASSERT_EQ(sdlrdp_set_clipboard_text(handle.Handle(), "app"), 0);
+  ASSERT_EQ(sdlrdp_set_clipboard_text(&*handle, "app"), 0);
   ASSERT_TRUE(client->Until([&] { return clipboard->Received(UnicodeText("app")); }));
   Drain();
   ThenNonTextOffer();

@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <string_view>
 
 namespace sdl_rdp::sample_gate_test::sample::detail::desktop_steps {
 using sdl_rdp::headless_client_test::client::Client;
@@ -19,7 +20,7 @@ protected:
   auto        ThenWaitingPort(std::uint32_t port)                                           -> void;
   auto        WhenCodecKeyChanges(Client& client)                                           -> void;
   auto        GivenSwitchableCodec(Client& client)                                          -> void;
-  auto        ThenTakeoverEvent(char const* expected)                                       -> void;
+  auto        ThenTakeoverEvent(std::string_view expected)                                  -> void;
   auto        WhenSmallerDesktop(Client& first)                                             -> void;
   auto        WhenWholeSampleReconnects(Client& client, std::uint32_t port)                 -> void;
 };
