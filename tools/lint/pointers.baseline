@@ -3,9 +3,9 @@ count	sample	parameters	38
 count	sample	returns	5
 count	sample	unchecked	8
 count	sdl-rdp/SDL3	members	6
-count	sdl-rdp/SDL3	null checks	4
+count	sdl-rdp/SDL3	null checks	3
 count	sdl-rdp/SDL3	parameters	52
-count	sdl-rdp/SDL3	returns	18
+count	sdl-rdp/SDL3	returns	16
 count	sdl-rdp/SDL3	unchecked	10
 count	sdl-rdp/headless-client.test tests	members	23
 count	sdl-rdp/headless-client.test tests	null checks	16

@@ -49,8 +49,8 @@ auto SampleSession::GivenAudioProcess(Words const& environment, Words const& opt
   audio_port = AnnouncedPort(line);
   ASSERT_TRUE(Read("audio device=RDP client freq=44100"));
 }
-auto SampleSession::ThenIniConnects(std::vector<std::string> const& args, std::uint32_t port) -> void {
-  ASSERT_NO_FATAL_FAILURE(GivenIniProcess(args, port));
+auto SampleSession::ThenSettingsConnect(std::vector<std::string> const& args, std::uint32_t port) -> void {
+  ASSERT_NO_FATAL_FAILURE(GivenSettingsProcess(args, port));
   Client client(port, true, 640, 480);
   ASSERT_NO_FATAL_FAILURE(Connect(client));
   ASSERT_TRUE(client.Until([&] { return Pattern(client, false); }));
@@ -69,7 +69,7 @@ auto SampleSession::GivenSession(Words const& environment, Words const& options,
   ASSERT_NO_FATAL_FAILURE(GivenProcess(environment, options));
   session = std::make_unique<Client>(AnnouncedPort(line), true, width, height);
 }
-auto SampleSession::GivenIniProcess(std::vector<std::string> const& args, std::uint32_t port) -> void {
+auto SampleSession::GivenSettingsProcess(std::vector<std::string> const& args, std::uint32_t port) -> void {
   ASSERT_NO_FATAL_FAILURE(Launch(args));
   EXPECT_EQ(AnnouncedPort(line), port);
 }

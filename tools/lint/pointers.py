@@ -25,6 +25,8 @@ DECLARED        = re.compile(r'([A-Za-z_]\w*)\s*\(')
 NOT_NAMES       = re.compile(r'\[\[.*?\]\]|"[^"]*"')
 NOT_DECLARED    = frozenset(('decltype', 'alignas', '__attribute__', '__declspec'))
 GCC_ONLY        = ('-fconstexpr-ops-limit=',)
+# buildutil's reflect generator writes `reflect_scheme(T*)` and oxbox calls it with a null `T*` tag.
+REFLECT_ENTRY   = 'reflect_scheme'
 PLATFORM_TAGS   = frozenset(('win32', 'linux', 'macos', 'emscripten', 'posix', 'apple', 'native'))
 LIVE_PLATFORMS  = frozenset(('native', 'posix', 'linux'))
 CARRIED_ENTRIES = re.compile(r'^(BUILD_TESTING|CMAKE_BUILD_TYPE|CMAKE_TOOLCHAIN_FILE|BUILDUTIL_\w+|\w+_OPTION_\w+)$')
@@ -75,6 +77,10 @@ match functionDecl(pret, optionally(hasReturnTypeLoc(typeLoc().bind("rloc"))),
                    optionally(cxxMethodDecl(ofClass(cxxRecordDecl().bind("rclass")))),
                    optionally(hasAncestor(functionDecl(isExternC()).bind("rexport")))).bind("ret")
 match functionDecl(own, isMain()).bind("entry")
+let reflected hasDeclaration(anyOf(enumDecl(), cxxRecordDecl(has(friendDecl(has(functionDecl(hasName("{reflect}"))))))))
+let tagged parmVarDecl(hasType(pointerType(pointee(hasCanonicalType(reflected)))))
+match functionDecl(own, hasName("{reflect}"), isConstexpr(), parameterCountIs(1), unless(cxxMethodDecl()),
+                   hasParameter(0, tagged)).bind("reflected")
 match functionDecl(own, isDefinition(), isExternC()).bind("cdef")
 match binaryOperator(own, hasOperatorName("="), hasLHS(memberExpr(member(fieldDecl(hasParent(crecord))))),
                      hasRHS(flow))
@@ -151,6 +157,7 @@ def query_text(root):
     abi     = re.escape(f'{root}/sources/sdl-rdp/abi/')
     deep    = {'deep1': DEEP.format(inner='t0'), 'deep2': DEEP.format(inner='t1'), 'deep3': DEEP.format(inner='t2')}
     text    = QUERIES.replace('{sources}', sources).replace('{abi}', abi)
+    text    = text.replace('{reflect}', REFLECT_ENTRY)
     for name, value in deep.items():
         text = text.replace('{' + name + '}', value)
     return text
@@ -215,8 +222,10 @@ def bench_database(root, build):
     target  = build / 'pointers' / 'benches'
     if entries.get('BUILD_BENCHMARKING', ('', 'ON'))[1] == 'ON':
         return None
-    database = target / 'compile_commands.json'
-    if database.exists() and database.stat().st_mtime >= (build / 'CMakeCache.txt').stat().st_mtime:
+    database  = target / 'compile_commands.json'
+    generated = max(path.stat().st_mtime for name in ('CMakeCache.txt', 'compile_commands.json')
+                    if (path := build / name).exists())
+    if database.exists() and database.stat().st_mtime >= generated:
         return database
     carried = [f'-D{name}={value}' for name, (kind, value) in entries.items()
                if kind == 'UNINITIALIZED' or CARRIED_ENTRIES.match(name)]
@@ -273,12 +282,13 @@ def object_of(unit):
 
 
 def unit_key(unit, queries, inputs):
-    """A digest of the command, the queries and every input's size and time; no recorded inputs, no key."""
-    if inputs is None:
+    """A digest of the command, the queries and every input's size and time; no key for an input unrecorded or gone."""
+    paths = [pathlib.Path(unit['directory']) / path for path in [unit['file'], *(inputs or [])]]
+    if inputs is None or not all(path.exists() for path in paths):
         return None
     digest = hashlib.sha256(json.dumps(unit['arguments']).encode() + queries.encode())
-    for path in [unit['file'], *inputs]:
-        status = (pathlib.Path(unit['directory']) / path).stat()
+    for path in paths:
+        status = path.stat()
         digest.update(f'{path}:{status.st_size}:{status.st_mtime_ns}'.encode())
     return digest.hexdigest()
 
@@ -370,12 +380,14 @@ class Facts:
     """What the matches say, deduplicated across translation units by declaration location."""
 
     SETS = {'field': 'members', 'entry': 'entries', 'deleter': 'deleters', 'checked': 'checked', 'tested': 'tested',
-            'adopted': 'tested', 'used': 'used', 'cparam': 'cparams', 'abirecord': 'abirecords'}
+            'adopted': 'tested', 'used': 'used', 'cparam': 'cparams', 'abirecord': 'abirecords',
+            'reflected': 'reflected'}
 
     def __init__(self, blocks):
         self.parameters, self.returns, self.forwarded = {}, {}, collections.defaultdict(set)
         self.members, self.entries, self.slots, self.deleters, self.exported = set(), set(), set(), set(), set()
         self.checked, self.tested, self.used, self.cparams, self.abirecords = set(), set(), set(), set(), set()
+        self.reflected = set()
         self.types, self.records, self.references = collections.defaultdict(set), {}, collections.defaultdict(set)
         self.registrations = collections.defaultdict(lambda: collections.defaultdict(set))
         for block in blocks:
@@ -450,10 +462,15 @@ class Facts:
         return found
 
     def allowed(self, function, closure):
-        """A signature an ABI writes: a C export or main, a slot a C table or C call takes."""
+        """A signature an ABI writes: a C export or main, a slot a C table or C call takes, a reflect tag."""
         if closure is not None:
             return closure in self.slots
-        return function in self.entries or function in self.slots
+        return function in self.entries or function in self.slots or self.reflect_tag(function)
+
+    def reflect_tag(self, function):
+        """The reflect protocol's shape, which the query matched, and a tag that is only a type: never read."""
+        return function in self.reflected and not any(
+            parameter in self.used for parameter, (owner, _, _) in self.parameters.items() if owner == function)
 
     def deleter(self, call_class):
         """A unique_ptr deleter's call operator, a class template's keyed by its pattern, where its parameters live."""

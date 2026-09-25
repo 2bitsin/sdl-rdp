@@ -16,10 +16,10 @@ protected:
   auto        ThenUnicodeKeyEvents()                                                     -> void;
   auto        WhenUnicodeKeys(rdpInput* input)                                           -> void;
   auto        ThenDriveOutput(fs::path const& share, std::string const& original)        -> void;
-  static auto WhenIniEnvironmentConflicts()                                              -> void;
-  auto        GivenIniHints(fs::path const& file)                                        -> void;
+  static auto WhenSettingsEnvironmentConflicts()                                         -> void;
+  auto        GivenSettingsHints(fs::path const& file)                                   -> void;
   static auto ThenReloadedAspect()                                                       -> void;
-  auto        ThenReloadedIni(fs::path const& file)                                      -> void;
+  auto        ThenReloadedSettings(fs::path const& file)                                 -> void;
   auto        DisconnectReading(std::uint32_t port, fs::path const& share)               -> void;
   auto        ThenClipboardCleared(Client& client, Headless::ClipboardClient& clipboard) -> void;
 };

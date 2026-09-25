@@ -19,7 +19,9 @@ using TooManyDrives    = LogicFailure<"TooManyDrives"_hash, "Too many RDP drives
 using DriveUnavailable = RuntimeFailure<"DriveUnavailable"_hash, "RDP drive unavailable: {}", string_view>;
 using InvalidFilePath  = ArgumentFailure<"InvalidFilePath"_hash, "Invalid RDP file path">;
 using InvalidFileMode  = ArgumentFailure<"InvalidFileMode"_hash, "Invalid RDP file mode '{}'", string_view>;
-using UnreadableIni    = RuntimeFailure<"UnreadableIni"_hash, "Could not read RDP settings file {}", string_view>;
+using UnreadableSettings = RuntimeFailure<"UnreadableSettings"_hash, "Could not read RDP settings file {}",
+                                          string_view>;
+using UnlocatedLibrary = RuntimeFailure<"UnlocatedLibrary"_hash, "The RDP driver could not locate its own library">;
 using LeadTooLong      = RuntimeFailure<"LeadTooLong"_hash, "RDP audio lead must be below the audio latency window">;
 
 using AbiMismatch = RuntimeFailure<"AbiMismatch"_hash, "RDP backend ABI version mismatch (found {}, expected {})",
@@ -28,24 +30,25 @@ using AbiMismatch = RuntimeFailure<"AbiMismatch"_hash, "RDP backend ABI version 
 using UnknownName = RuntimeFailure<"UnknownName"_hash, "Invalid {} '{}'; valid names: {}", string_view, string_view,
                                    string_view>;
 
-using InvalidAspect = RuntimeFailure<
-    "InvalidAspect"_hash, "Invalid RDP aspect '{}': expected two positive whole numbers as N:D", string_view>;
+using InvalidText = RuntimeFailure<"InvalidText"_hash, "Invalid {} '{}': expected {}", string_view, string_view,
+                                   string_view>;
 
 using IntegerOutOfRange = RuntimeFailure<"IntegerOutOfRange"_hash,
                                          "Invalid {} '{}': expected a whole number from {} to {}", string_view,
-                                         string_view, int, int>;
+                                         string_view, std::int64_t, std::int64_t>;
 }
 namespace sdl3::rdp {
 using detail::exceptions::AbiMismatch;
 using detail::exceptions::DriveUnavailable;
 using detail::exceptions::IntegerOutOfRange;
-using detail::exceptions::InvalidAspect;
 using detail::exceptions::InvalidFileMode;
 using detail::exceptions::InvalidFilePath;
+using detail::exceptions::InvalidText;
 using detail::exceptions::LeadTooLong;
 using detail::exceptions::NoWindow;
 using detail::exceptions::RelayedFailure;
 using detail::exceptions::TooManyDrives;
 using detail::exceptions::UnknownName;
-using detail::exceptions::UnreadableIni;
+using detail::exceptions::UnlocatedLibrary;
+using detail::exceptions::UnreadableSettings;
 }

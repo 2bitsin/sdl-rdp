@@ -127,15 +127,15 @@ protected:
     Words                  environment { "SDL_RDP_WIDTH=640", "SDL_RDP_HEIGHT=480" };
     Words                  options     { "--tight"                                 };
     if (kind == "borderless") environment.emplace_back("SDL_RDP_REFRESH=75");
-    if (kind == "exclusive") environment.emplace_back("SDL_RDP_INI=" + RefreshIni().string());
+    if (kind == "exclusive") environment.emplace_back("SDL_RDP_SETTINGS=" + RefreshSettings().string());
     if (kind != "windowed") options.emplace_back("--fullscreen");
     if (kind == "exclusive") options.append_range(Words{ "--mode", "320x200" });
     GivenProcess(environment, options);
   }
-  auto RefreshIni() -> fs::path {
-    auto ini = certificates.Path() / "refresh.ini";
-    std::ofstream(ini) << "SDL_RDP_REFRESH=90\n";
-    return ini;
+  auto RefreshSettings() -> fs::path {
+    auto settings = certificates.Path() / "refresh.yaml";
+    std::ofstream(settings) << "refresh: 90\n";
+    return settings;
   }
   static auto AcknowledgeCadence(Client& client, Headless::FrameObserver& frames) -> void {
     for (std::size_t i = 0; i < 6; ++i) {

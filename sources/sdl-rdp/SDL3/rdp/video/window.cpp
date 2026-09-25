@@ -47,7 +47,7 @@ auto CreateWindow(SDL_VideoDevice* device, SDL_Window* window, [[maybe_unused]] 
   return Boundary([&] {
     auto& data = *device->internal;
     if (data.Window()) return SDL_SetError("RDP supports one window");
-    auto const aspect = data.Backend().Options().Get(SDL_HINT_RDP_ASPECT);
+    auto const aspect = data.Backend().Options().Value<&sdl_rdp::settings::Settings::aspect>();
     SetAspect(data.Backend(), aspect);
     PlaceAtOrigin(*window);
     if (!ResizePicture(data, window->w, window->h)) return false;

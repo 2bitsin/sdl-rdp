@@ -63,7 +63,7 @@ auto Framebuffer::Present(Driver const& driver, std::span<SDL_Rect const> rects)
                                       ::Backend::Narrowed<std::uint32_t>(damage.size()))
       != 0)
     return driver.Fail();
-  if (!driver.Options().Boolean(SDL_HINT_RDP_VSYNC, false)) return true;
+  if (!driver.Options().Value<&sdl_rdp::settings::Settings::vsync>()) return true;
   return driver.Call<Operation::WAIT_FRAME>(FrameAcknowledgementWaitMs) >= 0 || driver.Fail();
 }
 // The buffer keeps its capacity across presents, so a steady rectangle count allocates only on its first present.

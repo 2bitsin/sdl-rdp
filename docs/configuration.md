@@ -6,25 +6,54 @@ Opt in only: probing never picks the driver and no listener opens unasked.
     SDL_HINT_VIDEO_DRIVER       # from code, before SDL_Init: an app's --rdp flag
 
 Driver settings use these sources in order: an application hint set through SDL,
-`libSDL3.ini`, then the environment variable with the same name. SDL can reject
+the settings file, then the environment variable named like the hint. SDL can reject
 `SDL_SetHint` when an environment variable already exists; use
 `SDL_SetHintWithPriority(..., SDL_HINT_OVERRIDE)` in that case.
-The ini is read once on the first driver setting lookup and cached for the process.
-The first file found wins as a whole: `SDL_RDP_INI` (application hint, else
-environment), `libSDL3.ini` beside the loaded SDL3 shared library, then
-`libSDL3.ini` in the current working directory. An unreadable explicit path fails
-driver startup; missing default files are fine. `SDL_HINT_RDP_INI` names the path
-hint; setting it inside the file does not select another file.
+The file is read when the driver starts; `SDL_Quit` forgets it and the next `SDL_Init` reads it again.
 
-Each line is `NAME = value`, using environment names, e.g. `SDL_RDP_PORT = 33892`.
-Leading/trailing blanks are trimmed; double quotes preserve inner blanks and allow `""`.
-Blank lines and lines beginning with `#` or `;` (after trimming) are ignored.
-`[section]` lines are ignored; duplicate keys use the last value.
-Unknown keys and lines without `=` are skipped with a file/line warning; values are never logged.
+The settings file is named after the loaded SDL library with its extension replaced:
+`libSDL3.yaml` beside `libSDL3.so` or `libSDL3.dylib`, `SDL3.yaml` beside `SDL3.dll`.
+Any format oxbox serialization reads by extension works (`.yaml`, `.yml`, `.json`, `.xml`,
+`.bsx`, `.bsp` today); the extension picks the format. The first file found wins as a whole:
+`SDL_RDP_SETTINGS` (application hint, else environment) names one file of any supported
+extension, then the file beside the library, then the file in the current working directory.
+Two files with the same name and different extensions at one location fail driver startup,
+naming both; so does an unreadable explicit path. Missing default files are fine.
 
-File permissions can restrict access to `SDL_RDP_PASSWORD` in the ini, unlike
+YAML is the human format. Keys are the setting names in lower case without the `SDL_RDP_`
+prefix; a key left out, or given no value, is absent and the environment answers it:
+
+```yaml
+port: 33892                 # 0 for ephemeral
+bind: 127.0.0.1
+cert_dir: /home/me/.local/share/sdl-rdp
+width: 1280
+height: 800
+refresh: auto-client        # or a rate in Hz
+aspect: 4:3
+codec: planar
+avc_bitrate: 8000           # kbit/s
+vsync: false
+wait_for_client: false
+audio_latency: 500          # ms
+audio_lead: 150             # ms
+backend: /opt/sdl-rdp/libbackend.so
+user: me
+password: secret
+domain: example
+auth: nla
+```
+
+Every value has its real type: numbers are whole numbers within the setting's range,
+`vsync` and `wait_for_client` are `true` or `false`, `codec` and `auth` are one of their
+names, `refresh` is a mode name or a whole number of hertz, and `aspect` is `N:D` with two
+positive whole numbers. An unknown key, a value of the wrong type or outside its range, and a
+file the format cannot parse fail `SDL_Init` once, with the file and the cause in `SDL_GetError()`; values are
+never logged. Hints and environment variables keep SDL's text forms (`SDL_RDP_VSYNC=1`).
+
+File permissions can restrict access to `password` in the file, unlike
 exposing it in the environment; keep the file readable only by the intended user.
-The ini cannot select `SDL_VIDEO_DRIVER` or `SDL_AUDIO_DRIVER`: SDL core reads
+The file cannot select `SDL_VIDEO_DRIVER` or `SDL_AUDIO_DRIVER`: SDL core reads
 those before the RDP driver runs. Set them through hints or the environment.
 
 Settings include:
@@ -79,9 +108,9 @@ Measured legacy title-screen traffic at 1280x800 explains the auto preference:
 
 Session facts arrive as native SDL events: a client attaching is
 EXPOSED + FOCUS_GAINED, leaving is OCCLUDED + FOCUS_LOST, the display mode
-reports the client's screen. `SDL_RDP_REFRESH` accepts an application hint, environment variable or ini
-setting with the precedence above; unknown values fail initialization and log
-one SDL error. The desktop mode declares the ceiling (60 Hz for adaptive modes),
+reports the client's screen. `SDL_RDP_REFRESH` accepts an application hint, environment variable or settings
+file `refresh` with the precedence above; an unknown value in the file fails `SDL_Init`, and
+one in a hint or the environment fails video initialization and logs one SDL error. The desktop mode declares the ceiling (60 Hz for adaptive modes),
 and the current mode exposes the effective rate used by simulated vsync and AVC.
 
 - Integer Hz keeps a fixed declared rate, independent of transport or client timing.

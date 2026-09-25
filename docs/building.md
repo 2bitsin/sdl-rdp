@@ -47,9 +47,9 @@ inspect shape failures, `python3 tools/lint/clones.py` for the clone gate (jscpd
 4.0.5, 40 tokens, 5 lines), `python3 tools/lint/format.py` to format the tree
 (`--check` to verify) and `python3 tools/lint/cmake.py` for the CMake vocabulary.
 Test fixtures retain protected data members so derived test bodies can use them.
-The driver (`sources/sdl-rdp/SDL3/rdp`) is C++23 under clang-tidy like the backend;
-its INI parser sits beside `settings.cpp`, its one user, and the backend's C ABI header is
-the header-only module `sources/sdl-rdp/abi/`.
+The driver (`sources/sdl-rdp/SDL3/rdp`) is C++26 under clang-tidy like the backend;
+its settings file is the reflected record in `sources/sdl-rdp/settings/`, read through oxbox serialization,
+and the backend's C ABI header is the header-only module `sources/sdl-rdp/abi/`.
 `tools/lint/` is a pytest suite that `buildutil test` runs after CTest:
 `test_gate.py` runs every lint over the tree, the other files test the lints.
 A lint whose tool is missing (`npx`, clang-format 20) fails with the reason

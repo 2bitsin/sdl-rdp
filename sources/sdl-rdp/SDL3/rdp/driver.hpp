@@ -24,7 +24,7 @@ public:
     for (auto count = _Poll(events); count; count = _Poll(events))
       std::ranges::for_each(std::span(events).first(count), std::cref(accept));
   }
-  auto Options() const                                   -> settings::Settings const&;
+  auto Options() const                                   -> settings::Options const&;
   auto Config() const                                    -> sdlrdp_config const&;
   auto AuthDisplay(SDL_PropertiesID properties) noexcept -> void;
   template <typename FailureTy = bool>
@@ -40,7 +40,7 @@ private:
   auto _Poll(std::span<sdlrdp_event> events) const -> std::size_t;
   auto _ReportError() const                        -> void;
   static constexpr std::size_t  _EventBatch      = 64;
-  settings::Settings const      _settings;
+  settings::Options const       _options;
   settings::Configuration const _config;
   backend::Backend const        _backend;
   std::atomic<SDL_PropertiesID> _auth_properties;

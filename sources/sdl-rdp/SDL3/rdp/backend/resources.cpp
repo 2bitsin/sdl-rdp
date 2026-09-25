@@ -29,9 +29,4 @@ auto AttachTouch(SDL_TouchID touch) -> SDL_TouchID {
 auto DetachTouch(SDL_TouchID touch) noexcept -> void {
   SDL_DelTouch(touch);
 }
-auto LoadFile(std::filesystem::path const& path) -> char* {
-  auto* const text = static_cast<char*>(SDL_LoadFile(path.string().c_str(), nullptr));
-  if (!text) throw UnreadableIni{ path.string() };
-  return text;
-}
 }

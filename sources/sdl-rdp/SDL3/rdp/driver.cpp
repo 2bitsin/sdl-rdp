@@ -7,11 +7,11 @@ namespace sdl3::rdp::detail::driver {
 using backend::Operation;
 using settings::AuthenticationCallback;
 using settings::AuthenticationCredential;
-using settings::Settings;
+using settings::Options;
 namespace {
-auto BackendPath(Settings const& settings) -> std::filesystem::path {
-  auto const path = settings.Get(SDL_HINT_RDP_BACKEND).value_or("");
-  return path.empty() ? SDL_RDP_DYNAMIC : path;
+auto BackendPath(Options const& options) -> std::filesystem::path {
+  auto const path = options.Value<&sdl_rdp::settings::Settings::backend>();
+  return path.empty() ? Options::Default<&sdl_rdp::settings::Settings::backend>() : path;
 }
 }
 template <Operation OPERATION, AuthenticationCredential CredentialTy>
@@ -29,16 +29,16 @@ auto Driver::_Authenticate(void* context, char const* domain, char const* user, 
                   credential);
 }
 Driver::Driver()
-    : _config{ _settings, _Authenticate<Operation::VERIFY_PAIR, char const*>,
+    : _config{ _options, _Authenticate<Operation::VERIFY_PAIR, char const*>,
                _Authenticate<Operation::LOOKUP_PAIR, std::uint8_t*>, this },
-      _backend{ BackendPath(_settings) }, _session{ _backend, _config.Get() } { }
+      _backend{ BackendPath(_options) }, _session{ _backend, _config.Get() } { }
 auto Driver::_Poll(std::span<sdlrdp_event> events) const -> std::size_t {
   auto const count = Call<Operation::POLL>(events.data(), ::Backend::Narrowed<std::uint32_t>(events.size()));
   utilities::Ensures(count <= events.size(), "backend fills at most the event buffer");
   return count;
 }
-auto Driver::Options() const -> Settings const& {
-  return _settings;
+auto Driver::Options() const -> settings::Options const& {
+  return _options;
 }
 auto Driver::Config() const -> sdlrdp_config const& {
   return _config.Get();

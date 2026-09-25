@@ -5,7 +5,7 @@ module_define_prefix = "BACKEND"
 cxx_standard = 26
 
 [cmake]
-extensions = []
+extensions = ["reflect"]
 
 [options]
 contracts = "stop"

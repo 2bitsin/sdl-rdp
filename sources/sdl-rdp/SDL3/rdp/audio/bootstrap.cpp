@@ -1,7 +1,7 @@
 #include "bootstrap.hpp"
 #include <sdl-rdp/SDL3/rdp/backend/boundary.hpp>
 #include <sdl-rdp/SDL3/rdp/owneddriver.hpp>
-#include <sdl-rdp/SDL3/rdp/settings/parsing.hpp>
+#include <sdl-rdp/SDL3/rdp/settings/options.hpp>
 #include <sdl-rdp/SDL3/rdp/storage/drive.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 #include <cstddef>
@@ -13,16 +13,16 @@ using backend::Operation;
 using backend::ScopedMutexLock;
 using settings::InvalidSetting;
 using settings::Text;
+using sdl_rdp::settings::Settings;
 namespace {
 constexpr SDL_AudioSpec PlaybackSpec     { SDL_AUDIO_S16, 2, 44100 };
 constexpr int           PeriodsPerSecond = 100;
 constexpr int           BackendWaitMs    = 100;
-constexpr int           DefaultLeadMs    = 150;
 auto PeriodFrames(int frequency) -> int {
   return frequency / PeriodsPerSecond;
 }
 auto AudioLead(Driver const& driver) -> std::uint64_t {
-  auto const lead = driver.Options().Integer(SDL_HINT_RDP_AUDIO_LEAD, DefaultLeadMs, 0, SDL_MAX_SINT32);
+  auto const lead = driver.Options().Value<&Settings::audio_lead>().Get();
   if (std::cmp_greater_equal(lead, driver.Config().audio_latency_ms)) InvalidSetting<LeadTooLong>();
   return static_cast<std::uint64_t>(lead) * SDL_NS_PER_MS;
 }

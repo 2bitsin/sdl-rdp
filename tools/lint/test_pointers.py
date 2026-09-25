@@ -1,6 +1,7 @@
 """The pointer lint on canonical types: the reviews' evasions fail, the ABI's own signatures pass."""
 import collections
 import json
+import os
 import pathlib
 import subprocess
 
@@ -69,6 +70,16 @@ auto Optional(std::optional<int*> optional_param) -> void;
 auto Spanned(std::span<int*> span_param) -> void;
 auto Arrayed() -> std::array<int*, 3>;
 auto Referred(int*& reference_param) -> void;
+struct Reflected { friend constexpr auto reflect_scheme(Reflected* reflect_tag); };
+enum class Colour { RED };
+enum class Hue { WARM };
+constexpr auto reflect_scheme([[maybe_unused]] Colour* enum_tag) -> int { return 0; }
+constexpr auto reflect_scheme([[maybe_unused]] Loose* loose_tag) -> int { return 0; }
+constexpr auto reflect_scheme([[maybe_unused]] Colour* paired_tag, int second) -> int { return second; }
+constexpr auto reflect_scheme(Hue* used_tag) -> int { return used_tag == nullptr ? 0 : 1; }
+auto reflect_scheme([[maybe_unused]] Reflected* runtime_tag, [[maybe_unused]] Hue hue) -> int { return 0; }
+struct Method { constexpr auto reflect_scheme([[maybe_unused]] Method* method_tag) -> int { return 0; } };
+constexpr auto other_scheme([[maybe_unused]] Loose* other_tag) -> int { return 0; }
 struct Deep {
   std::optional<int*>         optional_member;
   std::vector<int*>           vector_member;
@@ -222,6 +233,16 @@ def test_slots_and_main_are_the_abis_signatures(found, needle):
     assert not at(found, PROBE, needle, 'parameters')
 
 
+def test_the_reflect_entry_is_the_signature_the_reflect_vocabulary_writes(found):
+    assert not at(found, PROBE, 'reflect_tag', 'parameters')
+    assert not at(found, PROBE, 'enum_tag', 'parameters')
+
+
+@pytest.mark.parametrize('needle', ['loose_tag', 'paired_tag', 'used_tag', 'runtime_tag', 'method_tag', 'other_tag'])
+def test_a_reflect_name_off_the_protocols_shape_is_a_pointer(found, needle):
+    assert at(found, PROBE, needle, 'parameters')
+
+
 def test_a_slot_pointer_is_tested_in_the_slot_or_in_the_function_it_goes_to(found):
     assert not at(found, PROBE, 'void* forwarding', 'unchecked')
     assert at(found, PROBE, 'void* raw', 'unchecked')
@@ -293,3 +314,36 @@ def test_table_counts_by_module_with_tests_apart():
              finding('sources/sdl-rdp/video/a.test.cpp', 'members', 'int *')]
     assert [line.split()[:2] for line in pointers.table(found)[1:3]] == [['sdl-rdp/video', '0'],
                                                                       ['sdl-rdp/video', 'tests']]
+
+
+def test_a_recorded_input_that_is_gone_leaves_no_cache_key(tmp_path):
+    (tmp_path / 'unit.cpp').write_text('')
+    (tmp_path / 'kept.hpp').write_text('')
+    unit = {'directory': str(tmp_path), 'file': 'unit.cpp', 'arguments': ['clang++']}
+    assert pointers.unit_key(unit, 'q', ['kept.hpp'])
+    assert pointers.unit_key(unit, 'q', ['kept.hpp', 'moved.hpp']) is None
+
+
+def bench_build(root, database_age, bench_age):
+    """A build tree with benches off whose own database and bench database have the given ages in seconds."""
+    build = root / 'build'
+    (build / 'pointers' / 'benches').mkdir(parents=True)
+    (build / 'CMakeCache.txt').write_text('CMAKE_COMMAND:INTERNAL=cmake\nCMAKE_GENERATOR:INTERNAL=Ninja\n'
+                                          'BUILD_BENCHMARKING:BOOL=OFF\n')
+    for path, age in ((build / 'compile_commands.json', database_age),
+                      (build / 'pointers' / 'benches' / 'compile_commands.json', bench_age)):
+        if age is not None:
+            path.write_text('[]')
+            os.utime(path, (path.stat().st_mtime - age, path.stat().st_mtime - age))
+    os.utime(build / 'CMakeCache.txt', (0, 0))
+    return build
+
+
+@pytest.mark.parametrize('database_age, bench_age, reconfigured',
+                         [(10, 100, True), (100, 10, False), (None, 10, False)])
+def test_the_bench_database_follows_the_builds_own(tmp_path, monkeypatch, database_age, bench_age, reconfigured):
+    commands = []
+    monkeypatch.setattr(pointers.subprocess, 'run',
+                        lambda command, **_: commands.append(command) or subprocess.CompletedProcess(command, 0))
+    pointers.bench_database(tmp_path, bench_build(tmp_path, database_age, bench_age))
+    assert bool(commands) == reconfigured

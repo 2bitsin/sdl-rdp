@@ -86,27 +86,27 @@ auto SampleChecks::ThenDriveOutput(fs::path const& share, std::string const& ori
   ASSERT_EQ(output.size(), 3 * 1024uz * 1024u);
   ThenWrittenBytes(output);
 }
-auto SampleChecks::WhenIniEnvironmentConflicts() -> void {
+auto SampleChecks::WhenSettingsEnvironmentConflicts() -> void {
   ASSERT_TRUE(SDL_SetEnvironmentVariable(SDL_GetEnvironment(), SDL_HINT_RDP_PORT, "2", true));
-  ASSERT_TRUE(SDL_SetEnvironmentVariable(SDL_GetEnvironment(), SDL_HINT_RDP_INI, "/missing/ini", true));
+  ASSERT_TRUE(SDL_SetEnvironmentVariable(SDL_GetEnvironment(), SDL_HINT_RDP_SETTINGS, "/missing/settings.yaml", true));
   ASSERT_TRUE(SDL_Init(SDL_INIT_VIDEO)) << SDL_GetError();
 }
-auto SampleChecks::GivenIniHints(fs::path const& file) -> void {
+auto SampleChecks::GivenSettingsHints(fs::path const& file) -> void {
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_INI, file.c_str()));
+  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_SETTINGS, file.c_str()));
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_CERT_DIR, certificates.Path().c_str()));
   ASSERT_TRUE(SDL_SetHintWithPriority(SDL_HINT_RDP_PORT, "0", SDL_HINT_OVERRIDE));
-  WhenIniEnvironmentConflicts();
+  WhenSettingsEnvironmentConflicts();
 }
 auto SampleChecks::ThenReloadedAspect() -> void {
-  auto* window = SDL_CreateWindow("reloaded ini", 640, 480, 0);
+  auto* window = SDL_CreateWindow("reloaded settings", 640, 480, 0);
   ASSERT_NE(window, nullptr);
   EXPECT_STREQ(SDL_GetStringProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_RDP_ASPECT_STRING, ""), "2:1");
   SDL_DestroyWindow(window);
   SDL_Quit();
 }
-auto SampleChecks::ThenReloadedIni(fs::path const& file) -> void {
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_INI, file.c_str()));
+auto SampleChecks::ThenReloadedSettings(fs::path const& file) -> void {
+  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_SETTINGS, file.c_str()));
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));
   ASSERT_TRUE(SDL_SetHintWithPriority(SDL_HINT_RDP_PORT, "0", SDL_HINT_OVERRIDE));
   ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_CERT_DIR, certificates.Path().c_str()));

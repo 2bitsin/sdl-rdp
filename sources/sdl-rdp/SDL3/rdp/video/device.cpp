@@ -2,65 +2,45 @@
 #include "clipboard.hpp"
 #include "events.hpp"
 #include "window.hpp"
-#include <oxbox/utilities/hash.hpp>
 #include <sdl-rdp/SDL3/rdp/backend/boundary.hpp>
 #include <sdl-rdp/SDL3/rdp/exceptions.hpp>
 #include <sdl-rdp/SDL3/rdp/input/mouse.hpp>
-#include <sdl-rdp/SDL3/rdp/settings/constants.hpp>
-#include <sdl-rdp/SDL3/rdp/settings/parsing.hpp>
-#include <cstdint>
+#include <sdl-rdp/SDL3/rdp/settings/options.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 namespace sdl3::rdp::video::detail::device {
 using backend::Boundary;
 using backend::Operation;
 using input::InitMouse;
-using settings::Aspect;
-using settings::Codec;
-using settings::MillihertzPerHertz;
-using settings::Settings;
+using sdl_rdp::settings::Aspect;
+using sdl_rdp::settings::Settings;
 using settings::Text;
 using storage::UpdateDrives;
-using namespace oxbox::utilities::literals;
-auto SetAspect(Driver const& driver, std::optional<std::string> const& value) -> void {
-  if (driver.Call<Operation::SET_ASPECT>(Aspect(value)) != 0) driver.Throw();
+auto SetAspect(Driver const& driver, Aspect const& value) -> void {
+  if (driver.Call<Operation::SET_ASPECT>(settings::BackendAspect(value)) != 0) driver.Throw();
 }
-auto PublishAspect(SDL_Window& window, std::optional<std::string> const& value) -> void {
-  auto const aspect = value.value_or("");
-  SDL_SetStringProperty(SDL_GetWindowProperties(&window), SDL_PROP_WINDOW_RDP_ASPECT_STRING, aspect.c_str());
+auto PublishAspect(SDL_Window& window, Aspect const& value) -> void {
+  SDL_SetStringProperty(SDL_GetWindowProperties(&window), SDL_PROP_WINDOW_RDP_ASPECT_STRING, value.Text().c_str());
 }
 namespace {
-constexpr int DefaultRefreshHz = 60;
-constexpr int MaximumRefreshHz = SDL_MAX_SINT32 / MillihertzPerHertz;
-// Values are the frozen backend set_refresh mode argument.
-enum class RefreshMode : std::uint32_t { FIXED = 0, CLIENT = 1, CLIENT_AVERAGE = 2, SENDER = 3 };
-auto ApplyCodec(SDL_VideoData& data, std::optional<std::string> const& value) -> void {
-  if (data.Backend().Call<Operation::SET_CODEC>(Codec(value)) != 0) data.Backend().Throw();
+auto ApplyCodec(SDL_VideoData& data, sdlrdp_codec value) -> void {
+  if (data.Backend().Call<Operation::SET_CODEC>(value) != 0) data.Backend().Throw();
 }
-auto ApplyAspect(SDL_VideoData& data, std::optional<std::string> const& value) -> void {
+auto ApplyAspect(SDL_VideoData& data, Aspect const& value) -> void {
   SetAspect(data.Backend(), value);
   if (auto const window = data.Window()) PublishAspect(*window, value);
 }
 // SDL hint observers receive an opaque context and nullable C strings.
-template <auto APPLY>
-auto SDLCALL HintChanged(void* context, char const* name, char const* old_value, char const* new_value) -> void {
+template <auto FIELD, auto APPLY>
+auto SDLCALL HintChanged(void* context, [[maybe_unused]] char const* name, char const* old_value, char const* new_value)
+    -> void {
   utilities::Expects(context != nullptr, "hint observer has video state");
-  utilities::Expects(name != nullptr, "hint observer has a name");
   auto& data = *static_cast<SDL_VideoData*>(context);
-  Boundary([&] { APPLY(data, data.Backend().Options().Changed(name, Text(old_value), Text(new_value))); });
-}
-auto ConfiguredRefresh(Settings const& settings) -> RefreshMode {
-  switch (oxbox::utilities::HashString(settings.Get(SDL_HINT_RDP_REFRESH).value_or(""))) {
-  case "auto-client"_hash:         return RefreshMode::CLIENT;
-  case "auto-client-average"_hash: return RefreshMode::CLIENT_AVERAGE;
-  case "auto-sender"_hash:         return RefreshMode::SENDER;
-  default:                         return RefreshMode::FIXED;
-  }
+  Boundary([&] { APPLY(data, data.Backend().Options().Changed<FIELD>(Text(old_value), Text(new_value))); });
 }
 auto StartRefresh(Driver const& driver) -> int {
-  auto const mode = ConfiguredRefresh(driver.Options());
-  auto const hz   = mode == RefreshMode::FIXED
-                      ? driver.Options().Integer(SDL_HINT_RDP_REFRESH, DefaultRefreshHz, 1, MaximumRefreshHz)
-                      : DefaultRefreshHz;
-  if (driver.Call<Operation::SET_REFRESH>(std::to_underlying(mode), hz) != 0) driver.Throw();
+  auto const refresh = driver.Options().Value<&Settings::refresh>();
+  auto const hz      = ::Backend::Narrowed<int>(refresh.Hz());
+  if (driver.Call<Operation::SET_REFRESH>(std::to_underlying(refresh.Mode()), hz) != 0) driver.Throw();
   return hz;
 }
 auto DesktopDisplayMode(Driver const& driver) -> SDL_DisplayMode {
@@ -157,8 +137,8 @@ auto CreateDevice() -> SDL_VideoDevice* {
   return Boundary([&]() -> SDL_VideoDevice* {
     if (!RequestsRdp()) return nullptr;
     auto device = std::make_unique<SDL_VideoDevice>();
-    auto data   = std::make_unique<SDL_VideoData>(Rendezvous::Acquire(), HintChanged<ApplyCodec>,
-                                                  HintChanged<ApplyAspect>);
+    auto data   = std::make_unique<SDL_VideoData>(Rendezvous::Acquire(), HintChanged<&Settings::codec, ApplyCodec>,
+                                                  HintChanged<&Settings::aspect, ApplyAspect>);
     device->is_dummy        = true;
     device->VideoInit       = VideoInit;
     device->VideoQuit       = VideoQuit;

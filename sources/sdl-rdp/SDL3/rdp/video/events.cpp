@@ -4,7 +4,7 @@
 #include <sdl-rdp/SDL3/rdp/audio/bootstrap.hpp>
 #include <sdl-rdp/SDL3/rdp/backend/boundary.hpp>
 #include <sdl-rdp/SDL3/rdp/settings/constants.hpp>
-#include <sdl-rdp/SDL3/rdp/settings/parsing.hpp>
+#include <sdl-rdp/settings/settings.hpp>
 // The RDP protocol sends Windows scan codes; SDL's Windows table maps them.
 #include "src/events/scancodes_windows.h"
 #include <oxbox/utilities/codepoint.hpp>
@@ -13,11 +13,12 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <string>
 namespace sdl3::rdp::video::detail::events {
 using audio::AudioRate;
 using backend::Boundary;
 using backend::Operation;
-using settings::CodecName;
+using sdl_rdp::settings::NameOf;
 using settings::MillihertzPerHertz;
 using storage::UpdateDrives;
 namespace {
@@ -89,9 +90,9 @@ auto RestoreRefresh(SDL_VideoData& data) -> void {
                          / ::Backend::Narrowed<std::uint64_t>(desktop.refresh_rate_denominator)));
 }
 auto PublishClient(SDL_Window& window, decltype(sdlrdp_event::connected) const& client) -> void {
-  auto const properties = SDL_GetWindowProperties(&window);
-  auto const codec      = CodecName(client.codec);
-  auto const strings    = std::to_array<std::pair<char const*, char const*>>(
+  auto const        properties = SDL_GetWindowProperties(&window);
+  std::string const codec      { NameOf(client.codec) };
+  auto const        strings    = std::to_array<std::pair<char const*, char const*>>(
       { { SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING, client.client_name },
         { SDL_PROP_WINDOW_RDP_CODEC_STRING      , codec.c_str()      },
         { SDL_PROP_WINDOW_RDP_USER_STRING       , client.user        },
@@ -183,7 +184,7 @@ auto MouseWheel(SDL_Window& window, sdlrdp_event const& event) -> void {
 }
 auto CodecChanged(SDL_Window& window, sdlrdp_event const& event) -> void {
   SDL_SetStringProperty(SDL_GetWindowProperties(&window), SDL_PROP_WINDOW_RDP_CODEC_STRING,
-                        CodecName(event.codec_changed.codec).c_str());
+                        std::string{ NameOf(event.codec_changed.codec) }.c_str());
 }
 auto ClientLeft(SDL_VideoData& data, [[maybe_unused]] sdlrdp_event const& event) -> void {
   Disconnected(data);

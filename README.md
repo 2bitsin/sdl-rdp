@@ -35,7 +35,17 @@ mstsc /v:host:3389
 ```
 
 The default port is 3389; set `SDL_RDP_PORT` to change it.
-Driver settings can use [`libSDL3.ini`](docs/configuration.md) instead of environment variables, except `SDL_VIDEO_DRIVER` and `SDL_AUDIO_DRIVER`, which must be set through hints or the environment.
+Driver settings can live in a settings file named after the library, `libSDL3.yaml` beside `libSDL3.so`
+(`SDL3.yaml` beside `SDL3.dll`), in YAML or any other format oxbox serialization reads; see
+[Configuration](docs/configuration.md). `SDL_VIDEO_DRIVER` and `SDL_AUDIO_DRIVER` are read by SDL core and must be set
+through hints or the environment:
+
+```yaml
+port: 33892
+cert_dir: /home/me/.local/share/sdl-rdp
+codec: planar
+aspect: 4:3
+```
 The backend library must sit next to `libSDL3.so` or be named by `SDL_RDP_BACKEND`.
 
 ## Documentation

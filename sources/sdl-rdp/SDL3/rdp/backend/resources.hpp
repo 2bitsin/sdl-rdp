@@ -3,7 +3,6 @@
 #include "pointerstate.hpp"
 #include "sdl-internals.hpp"
 #include <sdl-rdp/utilities/scoped.hpp>
-#include <filesystem>
 #include <tuple>
 namespace sdl3::rdp::backend::detail::resources {
 auto LockMutex(SDL_Mutex& mutex)                            -> SDL_Mutex&;
@@ -27,10 +26,6 @@ using HintObserver      = utilities::RAIIWrap<HintRegistration, ObserveHint, For
 auto AttachTouch(SDL_TouchID touch)                                          -> SDL_TouchID;
 auto DetachTouch(SDL_TouchID touch) noexcept                                 -> void;
 using TouchRegistration = utilities::RAIIWrap<SDL_TouchID, AttachTouch, DetachTouch>;
-// SDL_LoadFile returns an SDL-allocated C buffer that SDL_free releases.
-auto LoadFile(std::filesystem::path const& path) -> char*;
-using LoadedFile = utilities::RAIIWrap<char*, LoadFile, SDL_free, PointerState<char*>::IsNull,
-                                       PointerState<char*>::MakeNull>;
 }
 namespace sdl3::rdp::backend {
 using detail::resources::LockMutex;
@@ -51,6 +46,4 @@ using detail::resources::HintObserver;
 using detail::resources::AttachTouch;
 using detail::resources::DetachTouch;
 using detail::resources::TouchRegistration;
-using detail::resources::LoadFile;
-using detail::resources::LoadedFile;
 }
