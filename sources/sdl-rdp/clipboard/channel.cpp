@@ -3,9 +3,9 @@
 #include <sdl-rdp/clipboard/capabilities.hpp>
 #include <sdl-rdp/clipboard/store.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
-#include <sdl-rdp/diagnostics/dispatched.hpp>
 #include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
+#include <sdl-rdp/freerdp-facade/handled.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/event-queue.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
@@ -21,42 +21,26 @@
 
 namespace Backend {
 namespace {
-auto Owner(CliprdrServerContext* context) -> ClipboardChannel& {
-  Expects(context != nullptr, "callback context exists");
-  return CallbackOwner<ClipboardChannel>(context->custom);
+auto Owner(CliprdrServerContext const& context) -> ClipboardChannel& {
+  return CallbackOwner<ClipboardChannel, &CliprdrServerContext::custom>(context);
 }
+constexpr OperationName ClipboardFormats { "Clipboard format list"   };
+constexpr OperationName ClipboardRequest { "Clipboard data request"  };
+constexpr OperationName ClipboardResponse{ "Clipboard data response" };
+using sdl_rdp::freerdp_facade::Handled;
 }
 class ClipboardChannel::Callbacks {
 public:
   static auto Install(CliprdrServerContext& server) -> void;
-
-private:
-  template <auto HANDLER, class PduTy>
-  static auto Handled(CliprdrServerContext* context, PduTy const* pdu, OperationName operation) noexcept
-      -> std::uint32_t;
 };
-template <auto HANDLER, class PduTy>
-auto ClipboardChannel::Callbacks::Handled(CliprdrServerContext* context, PduTy const* pdu,
-                                          OperationName operation) noexcept -> std::uint32_t {
-  auto& owner = Owner(context);
-  return Dispatched<HANDLER>(ERROR_INTERNAL_ERROR, owner, pdu, FailureLog{ owner._diagnostics, operation });
-}
 auto ClipboardChannel::Callbacks::Install(CliprdrServerContext& server) -> void {
-  // abi: psCliprdrClientFormatList, UINT is uint32_t
-  server.ClientFormatList = [](CliprdrServerContext* context,
-                               CLIPRDR_FORMAT_LIST const* list) noexcept -> std::uint32_t {
-    return Handled<&ClipboardChannel::Formats>(context, list, "Clipboard format list");
-  };
-  // abi: psCliprdrClientFormatDataRequest, UINT is uint32_t
-  server.ClientFormatDataRequest = [](CliprdrServerContext* context,
-                                      CLIPRDR_FORMAT_DATA_REQUEST const* request) noexcept -> std::uint32_t {
-    return Handled<&ClipboardChannel::DataRequest>(context, request, "Clipboard data request");
-  };
-  // abi: psCliprdrClientFormatDataResponse, UINT is uint32_t
-  server.ClientFormatDataResponse = [](CliprdrServerContext* context,
-                                       CLIPRDR_FORMAT_DATA_RESPONSE const* response) noexcept -> std::uint32_t {
-    return Handled<&ClipboardChannel::DataResponse>(context, response, "Clipboard data response");
-  };
+  constexpr auto failures = FailuresThrough<&ClipboardChannel::FailureSource>;
+  constexpr auto failed   = ERROR_INTERNAL_ERROR;
+  // abi: psCliprdrClientFormatList, FormatDataRequest, FormatDataResponse; UINT is uint32_t
+  server.ClientFormatList        = Handled<Owner, &ClipboardChannel::Formats, ClipboardFormats, failures, failed>;
+  server.ClientFormatDataRequest = Handled<Owner, &ClipboardChannel::DataRequest, ClipboardRequest, failures, failed>;
+  server
+      .ClientFormatDataResponse = Handled<Owner, &ClipboardChannel::DataResponse, ClipboardResponse, failures, failed>;
 }
 ClipboardChannel::ClipboardChannel(PeerLink& link, Activation const& activation, ClipboardStore& store,
                                    EventQueue& events, Diagnostics const& diagnostics) noexcept
@@ -70,14 +54,15 @@ auto ClipboardChannel::Event() const -> WaitHandle {
 auto ClipboardChannel::Open() -> bool {
   Expects(!_context, "clipboard opens once");
   _context.reset(cliprdr_server_context_new(_link.Channels()));
-  if (!BindContext(_context.get(), this, _link.Context())) return false;
+  if (!_context) return false;
+  BindContext(*_context, *this, _link.Context());
   _context->autoInitializationSequence = false;
   _context->useLongFormatNames         = true;
   Callbacks::Install(*_context);
   if (_context->Open(_context.get()) != CHANNEL_RC_OK) return false;
   _opened = true;
   CLIPRDR_MONITOR_READY const monitor{ .common = { .msgType = CB_MONITOR_READY } };
-  return SendGeneralCapabilities([&](auto const* caps) { return _context->ServerCapabilities(_context.get(), caps); })
+  return SendGeneralCapabilities([&](auto const& caps) { return _context->ServerCapabilities(_context.get(), &caps); })
              == CHANNEL_RC_OK
          && _context->MonitorReady(_context.get(), &monitor) == CHANNEL_RC_OK;
 }
@@ -146,7 +131,7 @@ auto ClipboardChannel::RequestOfferedText(CLIPRDR_FORMAT_LIST const& list) -> st
   return _has_unicode && !_pending ? Request() : CHANNEL_RC_OK;
 }
 namespace {
-auto SendClipboardText(CliprdrServerContext* context, ClipboardStore const& clipboard, std::uint32_t format)
+auto SendClipboardText(CliprdrServerContext& context, ClipboardStore const& clipboard, std::uint32_t format)
     -> std::uint32_t {
   std::string                  ansi;
   CLIPRDR_FORMAT_DATA_RESPONSE response{ .common = { .msgType = CB_FORMAT_DATA_RESPONSE } };
@@ -160,11 +145,11 @@ auto SendClipboardText(CliprdrServerContext* context, ClipboardStore const& clip
     response.common.dataLen      = ansi.size() + 1;
   } else
     response.common.msgFlags = CB_RESPONSE_FAIL;
-  return context->ServerFormatDataResponse(context, &response);
+  return context.ServerFormatDataResponse(&context, &response);
 }
 }
 auto ClipboardChannel::DataRequest(CLIPRDR_FORMAT_DATA_REQUEST const& request) -> std::uint32_t {
-  return SendClipboardText(_context.get(), _store, request.requestedFormatId);
+  return SendClipboardText(*_context, _store, request.requestedFormatId);
 }
 auto ClipboardChannel::DataResponse(CLIPRDR_FORMAT_DATA_RESPONSE const& response) -> std::uint32_t {
   if (!_pending) return CHANNEL_RC_OK;
@@ -178,5 +163,8 @@ auto ClipboardChannel::DataResponse(CLIPRDR_FORMAT_DATA_RESPONSE const& response
   };
   return Contained(std::uint32_t{ CHANNEL_RC_OK }, received,
                    FailureLog{ _diagnostics, "Clipboard text decoding", SDLRDP_LOG_WARN });
+}
+auto ClipboardChannel::FailureSource() const noexcept -> Diagnostics const& {
+  return _diagnostics;
 }
 } // namespace Backend

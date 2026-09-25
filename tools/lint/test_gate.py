@@ -8,6 +8,7 @@ import cmake
 import columns
 import format as formatter
 import includes
+import pointers
 import prefixes
 import shape
 import spellings
@@ -54,3 +55,7 @@ def test_spellings():
 
 def test_prefixes():
     assert prefixes.main() == 0
+
+
+def test_pointers():
+    assert pointers.main(['--baseline', str(LINT / 'pointers.baseline')]) == 0

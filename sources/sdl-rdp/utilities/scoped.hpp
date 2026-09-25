@@ -17,15 +17,15 @@ public:
   explicit RAIIWrap(ArgsTy&&... args) : _value{ std::invoke(CTOR, std::forward<ArgsTy>(args)...) } {
     if constexpr (_Checked) Ensures(_Live(), "acquisition produced a live resource");
   }
-  RAIIWrap(RAIIWrap const&) = delete;
+  RAIIWrap(RAIIWrap const&)  = delete;
   RAIIWrap(RAIIWrap&& other) noexcept
     requires NullableResource<VTy, IS_NULL, MAKE_NULL>
       : _value{ other.Release() } { }
-  ~RAIIWrap() noexcept {
+  ~RAIIWrap()                noexcept {
     _Free();
   }
-  auto operator=(RAIIWrap const&) -> RAIIWrap& = delete;
-  auto operator=(RAIIWrap&& other) noexcept -> RAIIWrap&
+  auto     operator=(RAIIWrap const&)           -> RAIIWrap& = delete;
+  auto     operator=(RAIIWrap&& other) noexcept -> RAIIWrap&
     requires NullableResource<VTy, IS_NULL, MAKE_NULL>
   {
     if (this != &other) {
@@ -34,7 +34,7 @@ public:
     }
     return *this;
   }
-  explicit operator bool() const noexcept {
+  explicit operator bool() const                             noexcept {
     return _Live();
   }
   auto Get() const noexcept -> decltype(auto) {
@@ -50,7 +50,7 @@ public:
     std::invoke(MAKE_NULL, _value);
     return value;
   }
-  auto Close() noexcept -> std::invoke_result_t<decltype(DTOR), VTy>
+  auto Close() noexcept   -> std::invoke_result_t<decltype(DTOR), VTy>
     requires NullableResource<VTy, IS_NULL, MAKE_NULL>
   {
     Expects(_Live(), "close requires a live resource");
@@ -69,6 +69,6 @@ private:
     if (_Live()) std::invoke(DTOR, _value);
   }
   static constexpr bool _Checked = NullableResource<VTy, IS_NULL, MAKE_NULL>;
-  _Stored _value;
+  _Stored               _value;
 };
 }

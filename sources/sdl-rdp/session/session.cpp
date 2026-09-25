@@ -16,9 +16,9 @@ auto ReapSignal() -> EventHandle {
   return sdl_rdp::freerdp_facade::ManualResetEvent("Peer reaping event");
 }
 auto AnnounceDeparture(Session& session, EventQueue& events, Peer const& peer) -> void {
-  auto const* sound = peer.Redirected().Audio();
+  auto const sound = peer.Redirected().Audio();
   events.Push({ .type = SDLRDP_DISCONNECTED });
-  if (sound && sound->Rate()) session.AudioGone();
+  if (sound && sound->get().Rate()) session.AudioGone();
 }
 }
 Session::Session(FrameStore& frames, EventQueue& events)
@@ -44,11 +44,11 @@ auto Session::Takeover(PeerLink const& self) -> FrameLock {
   auto                   peers   = LockPeersAndFrame();
   peers.ForEach([&](Peer& peer, FrameLock const& /*held*/) {
     if (peer.Owns(self))
-      _current = &peer;
+      _current = std::ref(peer);
     else if (peer.Evict())
       AnnounceDeparture(*this, _events, peer);
   });
-  Ensures(_current != nullptr, "the arriving peer is current");
+  Ensures(_current.has_value(), "the arriving peer is current");
   return std::move(peers).ReleaseFrame();
 }
 auto Session::Depart(PeerLink const& self, Activation& activation) -> void {
@@ -56,7 +56,7 @@ auto Session::Depart(PeerLink const& self, Activation& activation) -> void {
     std::scoped_lock const session(_guard);
     LockPeersAndFrame().ForEach([&](Peer& peer, FrameLock const& /*held*/) {
       if (!peer.Owns(self)) return;
-      if (_current == &peer) _current = nullptr;
+      if (_current && &_current->get() == &peer) _current.reset();
       if (activation.Deactivate()) AnnounceDeparture(*this, _events, peer);
     });
   }
@@ -65,11 +65,11 @@ auto Session::Depart(PeerLink const& self, Activation& activation) -> void {
   activation.Finish();
   SetEvent(_reap.get());
 }
-auto Session::Current(SessionLock const& held) const -> Peer* {
+auto Session::Current(SessionLock const& held) const -> CurrentPeer {
   Expects(held.mutex() == &_guard, "reading the current peer holds the session lock");
   return _current;
 }
-auto Session::Current(FrameLock const& held) const -> Peer* {
+auto Session::Current(FrameLock const& held) const -> CurrentPeer {
   Expects(_frames.Holds(held), "reading the current peer holds the frame lock");
   return _current;
 }

@@ -96,7 +96,7 @@ namespace {
 auto WaitForAcknowledgement(sdlrdp_handle& handle) -> bool {
   auto& frames = handle.Frames();
   auto  lock   = frames.Lock();
-  Expects(handle.Session().Current(lock) != nullptr, "active peer owns the pending frame");
+  Expects(handle.Session().Current(lock).has_value(), "active peer owns the pending frame");
   return frames.WaitFor(lock, Backend::DeadlineAfter(std::chrono::seconds(10)),
                         [&] { return AllAcknowledged(handle, lock); });
 }

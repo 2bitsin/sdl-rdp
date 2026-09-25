@@ -123,7 +123,7 @@ auto ClipboardClient::Accepted() -> std::uint32_t {
 }
 auto ClipboardClient::Ready(CliprdrClientContext& context) -> std::uint32_t {
   auto result = Backend::SendGeneralCapabilities(
-      [&](auto const* caps) { return context.ClientCapabilities(&context, caps); });
+      [&](auto const& caps) { return context.ClientCapabilities(&context, &caps); });
   if (result != CHANNEL_RC_OK) return result;
   if (!outgoing.empty()) return AnnounceFormat(context, true);
   CLIPRDR_FORMAT_LIST const list{ .common = { .msgType = CB_FORMAT_LIST } };

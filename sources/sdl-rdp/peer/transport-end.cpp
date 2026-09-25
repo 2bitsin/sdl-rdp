@@ -44,7 +44,7 @@ auto HandshakeFailure(rdpSettings const& settings, std::string const& protocols)
                      ProtocolNames(selected, !selected));
 }
 auto ReportDisconnect(Diagnostics const& diagnostics, Activation const& activation, std::uint32_t code, bool pending,
-                      char const* error) -> void {
+                      std::string_view error) -> void {
   auto const activated = activation.Activated();
   if (ExpectedDisconnect(code))
     diagnostics.Log(SDLRDP_LOG_INFO, activated ? std::format("Peer disconnected: {}.", error)

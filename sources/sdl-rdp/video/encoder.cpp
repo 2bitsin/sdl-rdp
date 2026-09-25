@@ -30,17 +30,17 @@ auto PrepareNsCodec(NsCodecContext& nsc) -> bool {
          && nsc_context_set_parameters(nsc.get(), NSC_ALLOW_SUBSAMPLING, 0);
 }
 auto CompressRow(BITMAP_PLANAR_CONTEXT& context, std::span<std::uint8_t const> pixels, std::uint32_t width,
-                 std::span<std::byte> out, std::uint32_t& size) -> std::uint8_t* {
-  return freerdp_bitmap_compress_planar(&context, pixels.data(), PIXEL_FORMAT_BGRA32, width, 1, width * PixelBytes,
-                                        oxbox::utilities::SpanCast<std::uint8_t>(out).data(), &size);
+                 std::span<std::byte> out, std::uint32_t& size) -> bool {
+  return nullptr
+         != freerdp_bitmap_compress_planar(&context, pixels.data(), PIXEL_FORMAT_BGRA32, width, 1, width * PixelBytes,
+                                           oxbox::utilities::SpanCast<std::uint8_t>(out).data(), &size);
 }
-auto Available(rdpSettings const* settings, sdlrdp_codec codec) -> bool {
-  utilities::Expects(settings != nullptr, "negotiated settings exist");
-  auto surface = freerdp_settings_get_bool(settings, FreeRDP_SurfaceCommandsEnabled);
+auto Available(rdpSettings const& settings, sdlrdp_codec codec) -> bool {
+  auto surface = freerdp_settings_get_bool(&settings, FreeRDP_SurfaceCommandsEnabled);
   switch (codec) {
-  case SDLRDP_CODEC_PLANAR:   return freerdp_settings_get_uint32(settings, FreeRDP_ColorDepth) == 32;
-  case SDLRDP_CODEC_REMOTEFX: return surface && freerdp_settings_get_bool(settings, FreeRDP_RemoteFxCodec);
-  case SDLRDP_CODEC_NSCODEC:  return surface && freerdp_settings_get_bool(settings, FreeRDP_NSCodec);
+  case SDLRDP_CODEC_PLANAR:   return freerdp_settings_get_uint32(&settings, FreeRDP_ColorDepth) == 32;
+  case SDLRDP_CODEC_REMOTEFX: return surface && freerdp_settings_get_bool(&settings, FreeRDP_RemoteFxCodec);
+  case SDLRDP_CODEC_NSCODEC:  return surface && freerdp_settings_get_bool(&settings, FreeRDP_NSCodec);
   case SDLRDP_CODEC_RAW:      return true;
   case SDLRDP_CODEC_AVC420:
   case SDLRDP_CODEC_PROGRESSIVE:
@@ -49,22 +49,21 @@ auto Available(rdpSettings const* settings, sdlrdp_codec codec) -> bool {
   }
 }
 }
-auto Encoder::SetupPlanar(rdpSettings const* settings, bool xrgb) -> bool {
-  utilities::Expects(settings != nullptr, "negotiated settings exist");
-  auto alpha = xrgb || freerdp_settings_get_bool(settings, FreeRDP_DrawAllowSkipAlpha);
+auto Encoder::SetupPlanar(rdpSettings const& settings, bool xrgb) -> bool {
+  auto alpha = xrgb || freerdp_settings_get_bool(&settings, FreeRDP_DrawAllowSkipAlpha);
   if (planar.skip_alpha != alpha) {
     planar.context.reset();
     planar.width = 0;
   }
   planar.skip_alpha    = alpha;
-  planar.dynamic_color = freerdp_settings_get_bool(settings, FreeRDP_DrawAllowDynamicColorFidelity);
+  planar.dynamic_color = freerdp_settings_get_bool(&settings, FreeRDP_DrawAllowDynamicColorFidelity);
   if (!stream) stream.reset(Stream_New(nullptr, InitialStreamCapacity));
   if (!planar.context)
     planar.context.reset(freerdp_bitmap_planar_context_new(
         PLANAR_FORMAT_HEADER_RLE | (planar.skip_alpha ? PLANAR_FORMAT_HEADER_NA : 0), 1, 1));
   return stream && planar.context;
 }
-auto Encoder::InitializeCodec(rdpSettings const* settings) -> bool {
+auto Encoder::InitializeCodec(rdpSettings const& settings) -> bool {
   switch (codec) {
   case SDLRDP_CODEC_PLANAR:   return SetupPlanar(settings);
   case SDLRDP_CODEC_REMOTEFX: return PrepareRemoteFx(remote_fx.context);
@@ -73,13 +72,12 @@ auto Encoder::InitializeCodec(rdpSettings const* settings) -> bool {
   default:                    utilities::Unreachable(codec);
   }
 }
-auto Encoder::Select(rdpSettings const* settings, sdlrdp_codec preference) -> bool {
-  utilities::Expects(settings != nullptr, "negotiated settings exist");
-  if (freerdp_settings_get_uint32(settings, FreeRDP_ColorDepth) != 32) preference = SDLRDP_CODEC_RAW;
+auto Encoder::Select(rdpSettings const& settings, sdlrdp_codec preference) -> bool {
+  if (freerdp_settings_get_uint32(&settings, FreeRDP_ColorDepth) != 32) preference = SDLRDP_CODEC_RAW;
   constexpr std::array choices{ SDLRDP_CODEC_REMOTEFX, SDLRDP_CODEC_NSCODEC, SDLRDP_CODEC_PLANAR, SDLRDP_CODEC_RAW };
   codec = Available(settings, preference)
               ? preference
-              : *std::ranges::find_if(choices, [=](auto choice) { return Available(settings, choice); });
+              : *std::ranges::find_if(choices, [&](auto choice) { return Available(settings, choice); });
   if (!stream) stream.reset(Stream_New(nullptr, InitialStreamCapacity));
   if (!stream) return false;
   return InitializeCodec(settings);
@@ -130,8 +128,8 @@ auto Encoder::EncodePlanar(std::span<std::uint8_t const> pixels, std::uint32_t w
   }
   auto& compressed = planar.compressed;
   compressed.resize(pixels.size() + 1024);
-  auto  size   = Narrowed<std::uint32_t>(compressed.size());
-  auto* result = width < 4 ? nullptr : CompressRow(*planar.context, pixels, width, compressed, size);
+  auto size   = Narrowed<std::uint32_t>(compressed.size());
+  auto result = width >= 4 && CompressRow(*planar.context, pixels, width, compressed, size);
   if (!result) {
     planar.fallback.reset(freerdp_bitmap_planar_context_new(planar.skip_alpha ? PLANAR_FORMAT_HEADER_NA : 0, width, 1));
     if (!planar.fallback) return false;
@@ -140,13 +138,12 @@ auto Encoder::EncodePlanar(std::span<std::uint8_t const> pixels, std::uint32_t w
   }
   payload = std::span{ compressed }.first(size);
   if (result) utilities::Ensures(payload.size() <= pixels.size() + 2, "planar row fits bitmap length");
-  return result != nullptr;
+  return result;
 }
-auto Encoder::Id(rdpSettings const* settings) const -> std::uint32_t {
-  utilities::Expects(settings != nullptr, "codec IDs were negotiated");
+auto Encoder::Id(rdpSettings const& settings) const -> std::uint32_t {
   switch (codec) {
-  case SDLRDP_CODEC_REMOTEFX: return freerdp_settings_get_uint32(settings, FreeRDP_RemoteFxCodecId);
-  case SDLRDP_CODEC_NSCODEC:  return freerdp_settings_get_uint32(settings, FreeRDP_NSCodecId);
+  case SDLRDP_CODEC_REMOTEFX: return freerdp_settings_get_uint32(&settings, FreeRDP_RemoteFxCodecId);
+  case SDLRDP_CODEC_NSCODEC:  return freerdp_settings_get_uint32(&settings, FreeRDP_NSCodecId);
   case SDLRDP_CODEC_RAW:      return RDP_CODEC_ID_NONE;
   default:                    utilities::Unreachable(codec);
   }

@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <memory>
 #include <span>
+#include <string_view>
 
 namespace Backend {
 inline constexpr auto        GraphicsConnectionWait = std::chrono::seconds(3);
@@ -32,11 +33,11 @@ public:
   auto Handles(std::span<WaitHandle> out) const         -> std::span<WaitHandle>;
   auto Activate()                                       -> bool override;
   auto Reject()                                         -> void override;
-  auto Timing() const noexcept                          -> GraphicsTiming const*;
+  auto Timing() const noexcept                          -> std::optional<std::reference_wrapper<GraphicsTiming const>>;
   auto Failures(OperationName operation) const noexcept -> FailureLog;
 
 private:
-  auto Abandon(char const* reason) -> void;
+  auto Abandon(std::string_view reason) -> void;
   PeerLink&                                             _link;
   Diagnostics const&                                    _diagnostics;
   Activation&                                           _activation;

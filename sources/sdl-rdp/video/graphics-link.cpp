@@ -60,15 +60,16 @@ auto GraphicsLink::Reject() -> void {
   Expects(_channel != nullptr, "a rejected graphics channel is open");
   Abandon("GFX channel rejected; using legacy surface bits.");
 }
-auto GraphicsLink::Timing() const noexcept -> GraphicsTiming const* {
-  return _channel ? &_channel->Timing() : nullptr;
+auto GraphicsLink::Timing() const noexcept -> std::optional<std::reference_wrapper<GraphicsTiming const>> {
+  if (!_channel) return std::nullopt;
+  return std::cref(_channel->Timing());
 }
 auto GraphicsLink::Failures(OperationName operation) const noexcept -> FailureLog {
   return { _diagnostics, operation };
 }
-auto GraphicsLink::Abandon(char const* reason) -> void {
+auto GraphicsLink::Abandon(std::string_view reason) -> void {
   _channel.reset();
-  _diagnostics.Log(SDLRDP_LOG_WARN, reason);
+  _diagnostics.Log(SDLRDP_LOG_WARN, std::string{ reason });
   _activation.Announce(_encoder.Codec(), _pacing.Effective());
 }
 }

@@ -27,7 +27,7 @@ public:
   auto Port() const noexcept -> std::uint32_t;
 
 private:
-  auto Accept(freerdp_peer* client)        -> void;
+  auto Accept(PeerHandle accepted)         -> void;
   auto Listen(std::stop_token const& quit) -> void;
   Diagnostics const& _diagnostics;
   Session&           _session;

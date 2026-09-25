@@ -4,8 +4,12 @@
 #include <sdl-rdp/link/exceptions.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/exceptions.hpp>
+#include <sdl-rdp/utilities/terminated-copy.hpp>
 
 #include <freerdp/channels/wtsvc.h>
+#include <freerdp/svc.h>
+#include <winpr/synch.h>
+#include <array>
 #include <cstdint>
 #include <utility>
 
@@ -15,9 +19,9 @@ auto Accepted(PeerHandle accepted) -> PeerHandle {
   Expects(accepted != nullptr, "accepted peer exists");
   return accepted;
 }
-auto OpenChannelManager(rdpContext* context) -> ChannelManager {
+auto OpenChannelManager(rdpContext& context) -> ChannelManager {
   // FreeRDP 3.32 server.c:1134 WTSOpenServerA takes the peer's rdpContext through its server-name parameter.
-  auto* opened = WTSOpenServerA(reinterpret_cast<char*>(context));
+  auto* opened = WTSOpenServerA(reinterpret_cast<char*>(&context));
   if (!opened || opened == INVALID_HANDLE_VALUE) throw AllocationFailed{ "Channel manager" };
   return ChannelManager{ opened };
 }
@@ -26,7 +30,9 @@ PeerLink::PeerLink(PeerHandle accepted)
     : _client{ Accepted(std::move(accepted)) }, _socket{ _client->sockfd },
       _wake{ sdl_rdp::freerdp_facade::ManualResetEvent("Peer wake event") } {
   if (!freerdp_peer_context_new(_client.get())) throw sdl_rdp::link::PeerContextFailed{ "Session" };
-  _channels = OpenChannelManager(_client->context);
+  Expects(_client->context != nullptr, "the peer context exists once created");
+  Expects(_client->context->update != nullptr, "the peer context carries its update table");
+  _channels = OpenChannelManager(*_client->context);
 }
 auto PeerLink::Client() const noexcept -> freerdp_peer& {
   return *_client;
@@ -71,7 +77,10 @@ auto PeerLink::Close() -> void {
 auto DynamicChannelsReady(PeerLink const& link) -> bool {
   return WTSVirtualChannelManagerGetDrdynvcState(link.Channels()) == DRDYNVC_STATE_READY;
 }
-auto Joined(PeerLink const& link, char const* name) -> bool {
-  return WTSVirtualChannelManagerIsChannelJoined(link.Channels(), name);
+auto Joined(PeerLink const& link, std::string_view name) -> bool {
+  Expects(name.size() <= CHANNEL_NAME_LEN, "a static channel name fits its protocol field");
+  std::array<char, CHANNEL_NAME_LEN + 1> terminated{ };
+  CopyTerminated(terminated, name);
+  return WTSVirtualChannelManagerIsChannelJoined(link.Channels(), terminated.data());
 }
 }

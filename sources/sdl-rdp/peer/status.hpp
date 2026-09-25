@@ -6,20 +6,21 @@
 #include <freerdp/server/disp.h>
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 namespace Backend {
 struct PeerStatus {
-  freerdp_peer*                         client          { };
-  DispServerContext*                    display         { };
-  sdlrdp_rect                           desktop         { };
-  bool                                  resizing        { };
-  bool                                  holding         { };
-  std::chrono::steady_clock::time_point activated_at;
-  std::optional<GraphicsTiming>         graphics;
-  std::uint32_t                         frame           { };
-  std::uint64_t                         acknowledged    { };
-  std::uint64_t                         acknowledgements{ };
-  std::chrono::nanoseconds              encode_time     { };
+  std::reference_wrapper<freerdp_peer>                     client;
+  std::optional<std::reference_wrapper<DispServerContext>> display;
+  sdlrdp_rect                                              desktop         { };
+  bool                                                     resizing        { };
+  bool                                                     holding         { };
+  std::chrono::steady_clock::time_point                    activated_at;
+  std::optional<GraphicsTiming>                            graphics;
+  std::uint32_t                                            frame           { };
+  std::uint64_t                                            acknowledged    { };
+  std::uint64_t                                            acknowledgements{ };
+  std::chrono::nanoseconds                                 encode_time     { };
 };
 }

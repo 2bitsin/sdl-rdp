@@ -8,8 +8,9 @@
 namespace Backend {
 class ErrorStore {
 public:
-  static auto Last()                                       -> char const*;
-  static auto Publish(ErrorStore* owner, std::string text) -> void;
+  static auto Last()                            -> std::string const&;
+  static auto PublishDetached(std::string text) -> void;
+  auto        Publish(std::string text)         -> void;
 
 private:
   struct Cursor {

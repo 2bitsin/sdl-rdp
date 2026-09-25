@@ -42,7 +42,7 @@ auto Activator::Activate() -> bool {
     return true;
   }
   if (!_authenticator.VerifySettings() || !SendCookie(_link.Context())) return false;
-  if (!_encoder.Select(&_link.Settings(), _configuration.Codec())) return false;
+  if (!_encoder.Select(_link.Settings(), _configuration.Codec())) return false;
   _arrival.Admit(_encoder.Codec());
   return true;
 }

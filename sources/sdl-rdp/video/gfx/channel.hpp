@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <string_view>
 #include <vector>
 
 namespace Backend {
@@ -54,6 +55,7 @@ private:
     std::uint32_t codec { };
   };
   auto Caps(RDPGFX_CAPS_ADVERTISE_PDU const& caps)                      -> std::uint32_t;
+  auto FailureSource() const noexcept                                   -> Diagnostics const&;
   auto Ack(RDPGFX_FRAME_ACKNOWLEDGE_PDU const& ack)                     -> std::uint32_t;
   auto Qoe(RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU const& ack)                 -> std::uint32_t;
   auto CompressProgressive(REGION16& damage, Stopwatch const& watch)    -> bool;
@@ -79,7 +81,7 @@ private:
   auto BeginPayload()                                                   -> void;
   auto WriteCommand(Packet const& packet)                               -> bool;
   auto Command(sdlrdp_rect area, std::span<std::byte const> data, std::uint32_t codec) -> bool;
-  auto Check(std::uint32_t result, char const* operation) const         -> bool;
+  auto Check(std::uint32_t result, std::string_view operation) const    -> bool;
   using GraphicsContext    = std::unique_ptr<RdpgfxServerContext, Releases<rdpgfx_server_context_free>>;
   using ProgressiveContext = std::unique_ptr<PROGRESSIVE_CONTEXT, Releases<progressive_context_free>>;
   PeerLink&                 _link;

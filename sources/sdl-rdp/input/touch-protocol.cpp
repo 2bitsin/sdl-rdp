@@ -1,6 +1,8 @@
 #include <sdl-rdp/input/touch-protocol.hpp>
 
+#include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
+#include <sdl-rdp/freerdp-facade/handled.hpp>
 #include <sdl-rdp/input/events.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
 
@@ -20,10 +22,19 @@ auto TouchHandled(std::uint32_t result) -> bool {
 }
 }
 using TouchChannel = TouchProtocol::Channel;
+namespace {
+auto Touched(RdpeiServerContext const& context) -> TouchChannel& {
+  return CallbackOwner<TouchChannel, &RdpeiServerContext::user_data>(context);
+}
+constexpr OperationName TouchEvent     { "Touch event"              };
+constexpr OperationName TouchAssignment{ "Touch channel assignment" };
+using sdl_rdp::freerdp_facade::AssignThrough;
+using sdl_rdp::freerdp_facade::Handled;
+}
 template <> auto TouchProtocol::Open(PeerLink& link, Channel& channel) -> Context {
   auto context = Context{ rdpei_server_context_new(link.Channels()) };
   if (!context) return context;
-  Install(context, channel);
+  Install(*context, channel);
   return rdpei_server_init(context.get()) == CHANNEL_RC_OK ? std::move(context) : Context{ };
 }
 template <> auto TouchProtocol::Service(Context const& context) -> bool {
@@ -35,21 +46,15 @@ template <> auto TouchProtocol::Handle(Context const& context) -> WaitHandle {
 template <> auto TouchProtocol::Activate(Context const& context) -> bool {
   return rdpei_server_send_sc_ready(context.get(), RDPINPUT_PROTOCOL_V10, 0) == CHANNEL_RC_OK;
 }
-template <> auto TouchProtocol::Install(Context const& context, Channel& channel) -> void {
-  Expects(context != nullptr, "an installed input channel has its context");
-  context->user_data = &channel;
-  // abi: rdpei onTouchEvent
-  context->onTouchEvent = [](RdpeiServerContext* owner, RDPINPUT_TOUCH_EVENT const* event) noexcept -> std::uint32_t {
-    Expects(owner != nullptr, "callback context exists");
-    Expects(event != nullptr, "event is supplied");
-    auto& events = CallbackOwner<TouchChannel>(owner->user_data)._events;
-    return Contained(ERROR_INTERNAL_ERROR, [&] { return events.Touch(*event); }, events.Failures("Touch event"));
+template <> auto TouchProtocol::Install(RdpeiServerContext& server, Channel& channel) -> void {
+  server.user_data = &channel;
+  constexpr auto failures = FailuresThrough<&TouchChannel::FailureSource>;
+  constexpr auto touch    = [](TouchChannel& channel, RDPINPUT_TOUCH_EVENT const& event) {
+    return channel._events.Touch(event);
   };
-  // abi: rdpei onChannelIdAssigned, BOOL is int
-  context->onChannelIdAssigned = [](RdpeiServerContext* owner, std::uint32_t id) noexcept -> int {
-    Expects(owner != nullptr, "callback context exists");
-    auto& channel = CallbackOwner<TouchChannel>(owner->user_data);
-    return channel._slot.Assigned(id, channel._events.Failures("Touch channel assignment"));
-  };
+  constexpr auto assign   = AssignThrough<&TouchChannel::_slot>;
+  // abi: rdpei onTouchEvent; onChannelIdAssigned, BOOL is int
+  server.onTouchEvent        = Handled<Touched, touch, TouchEvent, failures, ERROR_INTERNAL_ERROR>;
+  server.onChannelIdAssigned = Handled<Touched, assign, TouchAssignment, failures, false>;
 }
 }

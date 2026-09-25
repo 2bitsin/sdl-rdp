@@ -4,6 +4,8 @@
 
 #include <freerdp/server/disp.h>
 #include <cstdint>
+#include <functional>
+#include <optional>
 
 namespace Backend {
 class Activation;
@@ -16,13 +18,14 @@ public:
        DisplayControl(PeerLink& link, Activation const& activation, DesktopLayout const& desktop, EventQueue& events,
                       Diagnostics const& diagnostics) noexcept;
   auto Open()                  -> bool;
-  auto Opened() const noexcept -> DispServerContext*;
+  auto Opened() const noexcept -> std::optional<std::reference_wrapper<DispServerContext>>;
   auto Activate()              -> bool override;
   auto Reject()                -> void override;
 
 private:
   class Callbacks;
   auto Layout(DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const& pdu) -> std::uint32_t;
+  auto FailureSource() const noexcept                        -> Diagnostics const&;
   using DisplayContext = std::unique_ptr<DispServerContext, Releases<disp_server_context_free>>;
   PeerLink&            _link;
   Activation const&    _activation;

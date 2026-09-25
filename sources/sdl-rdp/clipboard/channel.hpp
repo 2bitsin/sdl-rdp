@@ -31,6 +31,7 @@ public:
 private:
   class Callbacks;
   auto Formats(CLIPRDR_FORMAT_LIST const& list)                   -> std::uint32_t;
+  auto FailureSource() const noexcept                             -> Diagnostics const&;
   auto DataRequest(CLIPRDR_FORMAT_DATA_REQUEST const& request)    -> std::uint32_t;
   auto DataResponse(CLIPRDR_FORMAT_DATA_RESPONSE const& response) -> std::uint32_t;
   auto Announce()                                                 -> std::uint32_t;

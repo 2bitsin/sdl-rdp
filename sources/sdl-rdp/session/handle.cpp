@@ -49,10 +49,7 @@ auto sdlrdp_handle::Frames() noexcept -> Backend::FrameStore& {
   return _frames;
 }
 namespace Backend {
-auto SetError(sdlrdp_handle* handle, std::string text) -> void {
-  if (handle)
-    handle->Diagnostics().Fail(std::move(text));
-  else
-    ErrorStore::Publish(nullptr, std::move(text));
+auto SetError(sdlrdp_handle& handle, std::string text) -> void {
+  handle.Diagnostics().Fail(std::move(text));
 }
 }

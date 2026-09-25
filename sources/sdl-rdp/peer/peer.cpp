@@ -102,14 +102,14 @@ auto Peer::Point(MouseMode mode) -> void {
   _link.Signal();
 }
 auto Peer::Status(FrameLock const& held) const -> PeerStatus {
-  auto const* timing = _graphics.Timing();
-  return { .client           = &_link.Client(),
+  auto const timing = _graphics.Timing();
+  return { .client           = std::ref(_link.Client()),
            .display          = _display.Opened(),
            .desktop          = _desktop.Rect(),
            .resizing         = _desktop.Resizing(),
            .holding          = _activation.Holding(),
            .activated_at     = _activation.ActivatedAt(),
-           .graphics         = timing ? std::optional{ *timing } : std::nullopt,
+           .graphics         = timing ? std::optional{ timing->get() } : std::nullopt,
            .frame            = _pacing.Frame(),
            .acknowledged     = _pacing.Acknowledged(held),
            .acknowledgements = _statistics.Acknowledgements(),

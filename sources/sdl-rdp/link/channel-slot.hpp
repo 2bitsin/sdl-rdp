@@ -1,5 +1,4 @@
 #pragma once
-#include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/link/dynamic-channels.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
@@ -10,8 +9,7 @@ namespace Backend {
 class ChannelSlot : private Pinned {
 public:
        ChannelSlot(DynamicChannels& registry, DynamicChannel& owner) noexcept;
-  auto Assign(std::uint32_t id)                                        -> void;
-  auto Assigned(std::uint32_t id, FailureLog const& failures) noexcept -> bool;
+  auto Assign(std::uint32_t id) -> bool;
 
 private:
   DynamicChannels&                           _registry;

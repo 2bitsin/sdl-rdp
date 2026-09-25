@@ -8,6 +8,7 @@
 #include <winpr/wtsapi.h>
 #include <concepts>
 #include <cstdint>
+#include <string_view>
 
 namespace Backend {
 using ChannelManager = std::unique_ptr<void, Releases<WTSCloseServer>>;
@@ -40,6 +41,6 @@ private:
   DynamicChannels _dynamic;
   std::uint32_t   _handle_count{ };
 };
-auto DynamicChannelsReady(PeerLink const& link)     -> bool;
-auto Joined(PeerLink const& link, char const* name) -> bool;
+auto DynamicChannelsReady(PeerLink const& link)          -> bool;
+auto Joined(PeerLink const& link, std::string_view name) -> bool;
 }

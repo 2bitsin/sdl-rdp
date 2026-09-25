@@ -150,14 +150,13 @@ namespace {
 auto DisconnectWithPending(sdlrdp_handle& handle, std::uint32_t code) -> void {
   auto const session = handle.Session().Lock();
   auto const frame   = handle.Frames().Lock();
-  auto*      current = handle.Session().Current(frame);
-  Expects(current != nullptr, "a client is current");
-  current->Repaint(frame, { 0, 0, 1, 1 });
-  auto* const client = current->Status(frame).client;
-  freerdp_set_last_error(client->context, code);
+  auto&      current = utilities::Required(handle.Session().Current(frame), "a client is current").get();
+  current.Repaint(frame, { 0, 0, 1, 1 });
+  auto& client = current.Status(frame).client.get();
+  freerdp_set_last_error(client.context, code);
   // abi: psPeerCheckFileDescriptor, BOOL is int
-  client->CheckFileDescriptor = [](freerdp_peer*) -> int { return false; };
-  current->Signal();
+  client.CheckFileDescriptor = [](freerdp_peer*) -> int { return false; };
+  current.Signal();
 }
 }
 TEST_F(Authentication, RefusedSecurityLogs) {

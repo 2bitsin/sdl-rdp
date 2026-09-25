@@ -13,6 +13,7 @@
 #include <memory>
 #include <mutex>
 #include <span>
+#include <string_view>
 
 namespace Backend {
 class Diagnostics;
@@ -48,7 +49,7 @@ public:
   auto Event() const                                       -> Backend::WaitHandle;
   auto Disconnect()                                        -> void;
   auto Abort(std::string const& cause)                     -> void;
-  auto List(sdlrdp_drive* out, std::size_t max)            -> int;
+  auto List(std::span<sdlrdp_drive> out)                   -> int;
   auto Send(std::uint32_t drive, std::uint32_t file, std::uint32_t major, DrivePacket const& body,
             std::uint32_t minor = 0) -> std::shared_ptr<DriveRequest>;
   auto Wait(std::shared_ptr<DriveRequest> const& request, std::string const& path, bool end = false) -> DrivePacket;
@@ -60,22 +61,22 @@ private:
     std::uint32_t wire;
     sdlrdp_drive  drive;
   };
-  auto AnnounceDevice(std::uint32_t wire, std::string const& label)  -> void;
-  auto Device(std::uint32_t id)                                      -> std::uint32_t;
+  auto AnnounceDevice(std::uint32_t wire, std::string const& label)       -> void;
+  auto Device(std::uint32_t id)                                           -> std::uint32_t;
   auto GeneralClientCapability(DrivePacket& packet, std::size_t start, std::size_t length, std::uint32_t version) const
       -> void;
-  auto PumpAvailable()                                               -> bool;
-  auto Write(DrivePacket& packet)                                    -> void;
-  auto Receive(DrivePacket& packet)                                  -> void;
-  auto Capabilities()                                                -> void;
-  auto ClientCapabilities(DrivePacket& packet)                       -> void;
-  auto Name(std::span<std::byte const> bytes, char const* dos) const -> std::string;
-  auto Shutdown()                                                    -> void;
-  auto CloseTransport()                                              -> void;
-  auto Fail(std::string const& cause)                                -> void;
-  auto Announce(DrivePacket& packet)                                 -> void;
-  auto Remove(std::uint32_t wire)                                    -> void;
-  auto Complete(DrivePacket& packet)                                 -> void;
+  auto PumpAvailable()                                                    -> bool;
+  auto Write(DrivePacket& packet)                                         -> void;
+  auto Receive(DrivePacket& packet)                                       -> void;
+  auto Capabilities()                                                     -> void;
+  auto ClientCapabilities(DrivePacket& packet)                            -> void;
+  auto Name(std::span<std::byte const> bytes, std::string_view dos) const -> std::string;
+  auto Shutdown()                                                         -> void;
+  auto CloseTransport()                                                   -> void;
+  auto Fail(std::string const& cause)                                     -> void;
+  auto Announce(DrivePacket& packet)                                      -> void;
+  auto Remove(std::uint32_t wire)                                         -> void;
+  auto Complete(DrivePacket& packet)                                      -> void;
   std::mutex                                             mutex;
   Backend::PeerLink&                                     _link;
   Backend::EventQueue&                                   _events;

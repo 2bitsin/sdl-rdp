@@ -35,9 +35,9 @@ auto AbsoluteMotion(int x, int y, sdlrdp_rect bounds) -> sdlrdp_event {
 }
 }
 auto InputEvents::Scaled(int x, int y, std::invocable<int, int, sdlrdp_rect> auto build) -> void {
-  auto const bounds = _store.Read([](FrameStore const& store, FrameLock const& held) { return store.Bounds(held); });
-  _events.Push(
-      build(_desktop.Scale(x, bounds.w, &sdlrdp_rect::w), _desktop.Scale(y, bounds.h, &sdlrdp_rect::h), bounds));
+  auto const bounds  = _store.Read([](FrameStore const& store, FrameLock const& held) { return store.Bounds(held); });
+  auto const desktop = _desktop.Rect();
+  _events.Push(build(Rescale(x, desktop.w, bounds.w), Rescale(y, desktop.h, bounds.h), bounds));
 }
 auto InputEvents::Point(MouseMode mode) noexcept -> void {
   _mouse.mode           = mode;

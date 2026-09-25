@@ -20,7 +20,7 @@ public:
   auto Close()                                      -> void;
 
 private:
-  auto Channel(SessionLock const& held) const -> AudioChannel*;
+  auto Channel(SessionLock const& held) const -> std::optional<std::reference_wrapper<AudioChannel>>;
   Session&             _session;
   Presenter&           _presenter;
   Configuration const& _configuration;

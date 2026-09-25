@@ -10,12 +10,15 @@
 #include <concepts>
 #include <condition_variable>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <type_traits>
 
 namespace Backend {
 class EventQueue;
+using CurrentPeer = std::optional<std::reference_wrapper<Peer>>;
 class Session final : public SessionAccess {
 public:
                      Session(FrameStore& frames, EventQueue& events);
@@ -27,8 +30,8 @@ public:
   auto               ReapEvent() const noexcept                           -> WaitHandle;
   [[nodiscard]] auto Takeover(PeerLink const& self)                       -> FrameLock     override;
   auto               Depart(PeerLink const& self, Activation& activation) -> void          override;
-  auto               Current(SessionLock const& held) const               -> Peer*;
-  auto               Current(FrameLock const& held) const                 -> Peer*;
+  auto               Current(SessionLock const& held) const               -> CurrentPeer;
+  auto               Current(FrameLock const& held) const                 -> CurrentPeer;
   auto               NextDrive() noexcept                                 -> std::uint32_t override;
   auto               AudioChanged()                                       -> void          override;
   auto               AudioGone()                                          -> void          override;
@@ -38,7 +41,7 @@ private:
   std::recursive_mutex        _guard;
   std::condition_variable_any _audio_changed;
   EventHandle                 _reap;
-  Peer*                       _current      { };
+  CurrentPeer                 _current;
   std::atomic<std::uint32_t>  _next_drive   { 1 };
   FrameStore&                 _frames;
   EventQueue&                 _events;
@@ -52,11 +55,11 @@ auto Session::ForEachPeer(std::invocable<Peer&> auto visit) -> void {
 template <std::invocable<Peer&> Act> auto OnCurrent(Session& session, Act act) -> decltype(auto) {
   using Result = std::invoke_result_t<Act, Peer&>;
   auto const held    = session.Lock();
-  auto*      current = session.Current(held);
+  auto const current = session.Current(held);
   if constexpr (std::is_void_v<Result>) {
-    if (current) act(*current);
+    if (current) act(current->get());
   } else {
-    return current ? act(*current) : Result{ };
+    return current ? act(current->get()) : Result{ };
   }
 }
 }

@@ -26,7 +26,7 @@ public:
 
 private:
   auto Serve(std::stop_token const& quit)                                                          -> void;
-  auto Run(std::stop_token const& quit)                                                            -> bool;
+  auto Run(std::stop_token const& quit)                                                            -> void;
   auto Configure()                                                                                 -> bool;
   auto Step(std::stop_token const& quit, std::span<WaitHandle> handles)                            -> bool;
   auto Dispatch(std::stop_token const& quit, std::span<WaitHandle> handles, std::uint32_t timeout) -> bool;

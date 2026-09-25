@@ -933,7 +933,7 @@ def open_statement(physical, logical, constructors):
     if not item:
         unfinished = code_end(logical.code).strip()
         boundary = not unfinished or unfinished.endswith((';', '{', '}', ':')) or unfinished.startswith('@')
-        if not boundary and unfinished.split()[0] not in SCOPE_WORDS:
+        if not boundary and unfinished.split()[0] not in SCOPE_WORDS | {'template'}:
             return None, statement_extent(physical, index, 'expression')
         return None, {}
     skipped = statement_extent(physical, index, item.kind)

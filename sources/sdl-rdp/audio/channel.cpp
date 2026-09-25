@@ -3,8 +3,8 @@
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
+#include <sdl-rdp/freerdp-facade/handled.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
-#include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/exceptions.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
@@ -26,9 +26,8 @@ auto FreeSoundContext(RdpsndServerContext* sound) noexcept -> void {
   VirtualChannel const channel { WTSVirtualChannelOpen(channels, WTS_CURRENT_SESSION, name.data()) };
 }
 namespace {
-auto Owner(RdpsndServerContext* context) -> AudioChannel& {
-  Expects(context != nullptr, "callback context exists");
-  return CallbackOwner<AudioChannel>(context->data);
+auto Owner(RdpsndServerContext const& context) -> AudioChannel& {
+  return CallbackOwner<AudioChannel, &RdpsndServerContext::data>(context);
 }
 auto Levels(std::span<std::int16_t const> samples) -> std::string {
   Expects(!samples.empty(), "audio block has samples");
@@ -65,31 +64,19 @@ auto SoundHandled(std::uint32_t result) -> bool {
   default:            return false;
   }
 }
+constexpr OperationName AudioActivation  { "Audio activation"         };
+constexpr OperationName AudioConfirmation{ "Audio block confirmation" };
+using sdl_rdp::freerdp_facade::Handled;
 } // namespace
 class AudioChannel::Callbacks {
 public:
   static auto Install(RdpsndServerContext& sound) -> void;
 };
 auto AudioChannel::Callbacks::Install(RdpsndServerContext& sound) -> void {
-  // abi: psRdpsndServerActivated
-  sound.Activated = [](RdpsndServerContext* context) noexcept {
-    auto&      owner    = Owner(context);
-    auto const activate = [&] {
-      owner.Activate();
-      return true;
-    };
-    std::ignore = Contained(false, activate, FailureLog{ owner._diagnostics, "Audio activation" });
-  };
-  // abi: psRdpsndServerConfirmBlock, BYTE is uint8_t, UINT16 is uint16_t, UINT is uint32_t
-  sound.ConfirmBlock = [](RdpsndServerContext* context, std::uint8_t id,
-                          std::uint16_t timestamp) noexcept -> std::uint32_t {
-    auto&      owner   = Owner(context);
-    auto const confirm = [&]() -> std::uint32_t {
-      owner.Confirm(id, timestamp);
-      return CHANNEL_RC_OK;
-    };
-    return Contained(ERROR_INTERNAL_ERROR, confirm, FailureLog{ owner._diagnostics, "Audio block confirmation" });
-  };
+  constexpr auto failures = FailuresThrough<&AudioChannel::FailureSource>;
+  // abi: psRdpsndServerActivated; psRdpsndServerConfirmBlock, BYTE is uint8_t, UINT16 is uint16_t, UINT is uint32_t
+  sound.Activated    = Handled<Owner, &AudioChannel::Activate, AudioActivation, failures>;
+  sound.ConfirmBlock = Handled<Owner, &AudioChannel::Confirm, AudioConfirmation, failures, ERROR_INTERNAL_ERROR>;
 }
 // mstsc plays 48 kHz at its 44.1 kHz device rate (measured 2026-09-23), so 44.1 kHz is offered first.
 AudioChannel::AudioChannel(PeerLink& link, Diagnostics const& diagnostics, EventQueue& events, SessionAccess& session,
@@ -125,11 +112,11 @@ auto AudioChannel::Event() const -> WaitHandle {
   return rdpsnd_server_get_event_handle(_sound.get());
 }
 auto AudioChannel::Rate() const -> std::uint32_t {
-  return _ready ? _selected.nSamplesPerSec : 0;
+  return _ready ? _rate : 0;
 }
 auto AudioChannel::Remaining() const -> std::uint32_t {
   Expects(_ready, "audio has a selected format");
-  return (_selected.nSamplesPerSec / 50) - Narrowed<std::uint32_t>(_buffer.size() / 2);
+  return (_rate / 50) - Narrowed<std::uint32_t>(_buffer.size() / 2);
 }
 auto AudioChannel::Reset() -> void {
   _sent         = _confirmed = _clock_frames = 0;
@@ -190,5 +177,8 @@ auto AudioChannel::LogAudio() const -> void {
                                _blocks_sent,
                                _blocks_sent > 1 ? Milliseconds(_gap_total).count() / double(_blocks_sent - 1) : 0,
                                Milliseconds(_gap_max).count(), _gaps_over_40ms));
+}
+auto AudioChannel::FailureSource() const noexcept -> Diagnostics const& {
+  return _diagnostics;
 }
 } // namespace Backend

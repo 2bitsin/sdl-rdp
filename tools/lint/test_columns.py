@@ -29,6 +29,11 @@ def align(text):
         id='decltype_template_is_not_a_function_declaration',
     ),
     pytest.param(
+        'template <class ValueTy>\nclass Held {\n  Owner& _owner;\n  ValueTy _value;\n};\n',
+        'template <class ValueTy>\nclass Held {\n  Owner&  _owner;\n  ValueTy _value;\n};\n',
+        id='template_head_line_opens_its_class',
+    ),
+    pytest.param(
         'if (count < 0 && errno == EINTR) continue;\n'
         'if (value == other) return value;\n'
         'while (count == 0) wait();\n'

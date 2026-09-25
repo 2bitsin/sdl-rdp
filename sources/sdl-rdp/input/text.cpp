@@ -1,13 +1,14 @@
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
+#include <sdl-rdp/freerdp-facade/handled.hpp>
 #include <sdl-rdp/input/_detail/dispatch.hpp>
-#include <sdl-rdp/utilities/contained.hpp>
 
 #include <freerdp/input.h>
 #include <array>
 #include <cstdint>
 #include <format>
+#include <functional>
 #include <string_view>
 
 namespace Backend {
@@ -27,10 +28,14 @@ auto PushMouseWheel(EventQueue& events, std::uint16_t flags) -> void {
                 .mouse_wheel = { .dx = (flags & PTR_FLAGS_HWHEEL) ? notches : 0,
                                  .dy = (flags & PTR_FLAGS_WHEEL) ? notches : 0 } });
 }
-auto Owner(rdpInput* input) -> InputEvents& {
-  Expects(input != nullptr, "input object exists");
-  return CallbackOwner<InputEvents>(input->param1);
+auto Owner(rdpInput const& input) -> InputEvents& {
+  return CallbackOwner<InputEvents, &rdpInput::param1>(input);
 }
+constexpr OperationName KeyboardEvent       { "Keyboard event"         };
+constexpr OperationName UnicodeKeyboardEvent{ "Unicode keyboard event" };
+constexpr OperationName MouseEvent          { "Mouse event"            };
+constexpr OperationName ExtendedMouseEvent  { "Extended mouse event"   };
+using sdl_rdp::freerdp_facade::Handled;
 }
 InputEvents::InputEvents(PeerLink& link, Activation const& activation, DesktopLayout const& desktop, EventQueue& events,
                          FrameStore& store, Diagnostics const& diagnostics, SessionAccess& session) noexcept
@@ -42,22 +47,11 @@ auto InputEvents::Failures(OperationName operation) const noexcept -> FailureLog
 auto InputEvents::Install(rdpInput& input) -> void {
   input.param1 = this;
   // abi: pKeyboardEvent, pUnicodeKeyboardEvent, pMouseEvent, pExtendedMouseEvent; BOOL is int
-  input.KeyboardEvent        = [](rdpInput* in, std::uint16_t flags, std::uint8_t code) noexcept -> int {
-    auto& owner = Owner(in);
-    return Contained(false, [&] { return owner.Key(flags, code); }, owner.Failures("Keyboard event"));
-  };
-  input.UnicodeKeyboardEvent = [](rdpInput* in, std::uint16_t flags, std::uint16_t code) noexcept -> int {
-    auto& owner = Owner(in);
-    return Contained(false, [&] { return owner.Text(flags, code); }, owner.Failures("Unicode keyboard event"));
-  };
-  input.MouseEvent           = [](rdpInput* in, std::uint16_t flags, std::uint16_t x, std::uint16_t y) noexcept -> int {
-    auto& owner = Owner(in);
-    return Contained(false, [&] { return owner.Mouse(flags, x, y); }, owner.Failures("Mouse event"));
-  };
-  input.ExtendedMouseEvent   = [](rdpInput* in, std::uint16_t flags, std::uint16_t, std::uint16_t) noexcept -> int {
-    auto& owner = Owner(in);
-    return Contained(false, [&] { return owner.ExtendedMouse(flags); }, owner.Failures("Extended mouse event"));
-  };
+  constexpr auto failures = &InputEvents::Failures;
+  input.KeyboardEvent        = Handled<Owner, &InputEvents::Key, KeyboardEvent, failures, false>;
+  input.UnicodeKeyboardEvent = Handled<Owner, &InputEvents::Text, UnicodeKeyboardEvent, failures, false>;
+  input.MouseEvent           = Handled<Owner, &InputEvents::Mouse, MouseEvent, failures, false>;
+  input.ExtendedMouseEvent   = Handled<Owner, &InputEvents::ExtendedMouse, ExtendedMouseEvent, failures, false>;
 }
 auto InputEvents::Key(std::uint16_t flags, std::uint8_t code) -> bool {
   return WhenActive(true, [&] {

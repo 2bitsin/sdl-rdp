@@ -54,17 +54,17 @@ auto Address(sdlrdp_config const& config) -> sockaddr_in {
   if (inet_pton(AF_INET, bind, &address.sin_addr) != 1) throw AddressNotIpv4{ bind };
   return address;
 }
-auto Generic(sockaddr_in& address) -> sockaddr* {
+auto Generic(sockaddr_in& address) -> sockaddr& {
   // POSIX socket calls take an IPv4 address through the generic sockaddr it begins with.
-  return reinterpret_cast<sockaddr*>(&address);
+  return reinterpret_cast<sockaddr&>(address);
 }
 auto StartListening(Descriptor const& socket, sockaddr_in& address) -> void {
   int reuse = 1;
   SystemCall(setsockopt(socket.Get(), SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)), "Socket options");
-  SystemCall(::bind(socket.Get(), Generic(address), sizeof(address)), "Listener bind");
+  SystemCall(::bind(socket.Get(), &Generic(address), sizeof(address)), "Listener bind");
   SystemCall(::listen(socket.Get(), ListenBacklog), "Listener listen");
   socklen_t size = sizeof(address);
-  SystemCall(getsockname(socket.Get(), Generic(address), &size), "Listener socket name");
+  SystemCall(getsockname(socket.Get(), &Generic(address), &size), "Listener socket name");
 }
 auto AdoptListenerSocket(freerdp_listener& listener, Descriptor socket) -> void {
   if (!listener.OpenFromSocket(&listener, socket.Get())) throw ListenerSetupFailed{ "socket adoption" };
@@ -94,9 +94,11 @@ Listener::Listener(Configuration const& configuration, Credentials const& creden
   _listener->info = this;
   // abi: psPeerAccepted, BOOL is int
   _listener->PeerAccepted = [](freerdp_listener* accepting, freerdp_peer* client) noexcept -> int {
-    auto&      owner    = CallbackOwner<Listener>(accepting->info);
+    Expects(accepting != nullptr, "the listener calls back with itself");
+    Expects(client != nullptr, "an accepted peer exists");
+    auto&      owner    = CallbackOwner<Listener, &freerdp_listener::info>(*accepting);
     auto const accepted = [&] {
-      owner.Accept(client);
+      owner.Accept(PeerHandle{ client });
       return true;
     };
     // True transfers ownership even when construction failed and RAII already released the peer.
@@ -109,9 +111,8 @@ Listener::Listener(Configuration const& configuration, Credentials const& creden
 auto Listener::Port() const noexcept -> std::uint32_t {
   return _port;
 }
-auto Listener::Accept(freerdp_peer* client) -> void {
-  PeerHandle accepted{ client };
-  _diagnostics.Log(SDLRDP_LOG_INFO, std::format("Peer accepted: {}.", client->hostname));
+auto Listener::Accept(PeerHandle accepted) -> void {
+  _diagnostics.Log(SDLRDP_LOG_INFO, std::format("Peer accepted: {}.", accepted->hostname));
   _session.Add(_make(std::move(accepted)));
 }
 auto Listener::Listen(std::stop_token const& quit) -> void {

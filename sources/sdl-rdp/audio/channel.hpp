@@ -50,7 +50,8 @@ private:
     Clock::time_point sent;
   };
   auto Activate()                                             -> void;
-  auto Confirm(std::uint8_t id, std::uint16_t timestamp)      -> void;
+  auto FailureSource() const noexcept                         -> Diagnostics const&;
+  auto Confirm(std::uint8_t id, std::uint16_t timestamp)      -> std::uint32_t;
   auto SendBlock()                                            -> bool;
   auto RecordBlock(Clock::time_point now, std::uint8_t block) -> void;
   auto TransportEnded()                                       -> void;
@@ -64,7 +65,7 @@ private:
   SessionAccess&            _session;
   TraceQueue&               _traces;
   SoundContext              _sound;
-  AUDIO_FORMAT              _selected        { };
+  std::uint32_t             _rate            { };
   bool                      _rejected        { };
   bool                      _gate_warned     { };
   bool                      _ready           { };

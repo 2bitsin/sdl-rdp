@@ -39,5 +39,5 @@ private:
   Backend::Listener       _listener;
 };
 namespace Backend {
-auto SetError(sdlrdp_handle* handle, std::string text) -> void;
+auto SetError(sdlrdp_handle& handle, std::string text) -> void;
 }

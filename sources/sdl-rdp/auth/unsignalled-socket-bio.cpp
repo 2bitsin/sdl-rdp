@@ -8,6 +8,7 @@
 #include <cerrno>
 #include <cstddef>
 #include <memory>
+#include <span>
 #include <string_view>
 #include <sys/socket.h>
 #include <tuple>
@@ -20,14 +21,13 @@ constexpr int Unset = -1;
 // OpenSSL's BIO control table dictates its C `long` argument and result.
 using ControlValue = decltype(BIO_ctrl(nullptr, 0, 0, nullptr));
 
-auto Slot(BIO* bio) -> int& {
-  Expects(bio != nullptr, "the BIO exists");
-  auto* const slot = static_cast<int*>(BIO_get_data(bio));
+auto Slot(BIO& bio) -> int& {
+  auto* const slot = static_cast<int*>(BIO_get_data(&bio));
   Expects(slot != nullptr, "the BIO holds its socket slot");
   return *slot;
 }
-auto SocketOf(BIO* bio) -> int {
-  auto const socket = static_cast<int>(BIO_get_fd(bio, nullptr));
+auto SocketOf(BIO& bio) -> int {
+  auto const socket = static_cast<int>(BIO_get_fd(&bio, nullptr));
   Expects(socket >= 0, "the BIO has its socket");
   return socket;
 }
@@ -35,49 +35,53 @@ auto SocketOf(BIO* bio) -> int {
 constexpr auto Unreported = [](std::string_view) noexcept { };
 constexpr int  IoFailed   = -1;
 
-auto Sent(BIO* bio, char const* data, int size) -> int {
-  Expects(data != nullptr, "the data exists");
-  Expects(size >= 0, "the size is not negative");
-  BIO_clear_retry_flags(bio);
-  auto const sent = ::send(SocketOf(bio), data, static_cast<std::size_t>(size), MSG_NOSIGNAL);
-  if (sent < 0 && errno == EINTR) BIO_set_retry_write(bio);
+auto Sent(BIO& bio, std::span<char const> data) -> int {
+  BIO_clear_retry_flags(&bio);
+  auto const sent = ::send(SocketOf(bio), data.data(), data.size(), MSG_NOSIGNAL);
+  if (sent < 0 && errno == EINTR) BIO_set_retry_write(&bio);
   return static_cast<int>(sent);
 }
-auto Received(BIO* bio, char* data, int size) -> int {
-  Expects(data != nullptr, "the buffer exists");
-  Expects(size >= 0, "the size is not negative");
-  BIO_clear_retry_flags(bio);
-  auto const received = ::recv(SocketOf(bio), data, static_cast<std::size_t>(size), 0);
-  if (received < 0 && errno == EINTR) BIO_set_retry_read(bio);
+auto Received(BIO& bio, std::span<char> data) -> int {
+  BIO_clear_retry_flags(&bio);
+  auto const received = ::recv(SocketOf(bio), data.data(), data.size(), 0);
+  if (received < 0 && errno == EINTR) BIO_set_retry_read(&bio);
   return static_cast<int>(received);
 }
 auto Write(BIO* bio, char const* data, int size) noexcept -> int {
-  return Contained(IoFailed, [&] { return Sent(bio, data, size); }, Unreported);
+  Expects(bio != nullptr, "OpenSSL writes through its BIO");
+  Expects(data != nullptr, "the data exists");
+  Expects(size >= 0, "the size is not negative");
+  auto const sending = std::span{ data, static_cast<std::size_t>(size) };
+  return Contained(IoFailed, [&] { return Sent(*bio, sending); }, Unreported);
 }
 auto Read(BIO* bio, char* data, int size) noexcept -> int {
-  return Contained(IoFailed, [&] { return Received(bio, data, size); }, Unreported);
+  Expects(bio != nullptr, "OpenSSL reads through its BIO");
+  Expects(data != nullptr, "the buffer exists");
+  Expects(size >= 0, "the size is not negative");
+  auto const receiving = std::span{ data, static_cast<std::size_t>(size) };
+  return Contained(IoFailed, [&] { return Received(*bio, receiving); }, Unreported);
 }
-auto Adopt(BIO* bio, int socket, ControlValue closing) -> ControlValue {
+auto Adopt(BIO& bio, int socket, ControlValue closing) -> ControlValue {
   Expects(socket >= 0, "the socket is open");
   Expects(closing == BIO_NOCLOSE, "the caller closes the socket");
   Slot(bio) = socket;
-  BIO_set_init(bio, 1);
+  BIO_set_init(&bio, 1);
   return 1;
 }
-auto Reported(BIO* bio, void const* out) -> ControlValue {
-  Expects(out == nullptr, "the socket is read from the result");
-  return Slot(bio);
-}
 auto Control(BIO* bio, int command, ControlValue argument, void* pointer) noexcept -> ControlValue {
+  Expects(bio != nullptr, "OpenSSL controls its BIO");
   // OpenSSL sends an open set of commands; 0 answers every one a plain socket does not support.
   switch (command) {
-  case BIO_C_SET_FD:   return Adopt(bio, *static_cast<int const*>(pointer), argument);
-  case BIO_C_GET_FD:   return Reported(bio, pointer);
+  case BIO_C_SET_FD:
+    Expects(pointer != nullptr, "BIO_set_fd passes its socket");
+    return Adopt(*bio, *static_cast<int const*>(pointer), argument);
+  case BIO_C_GET_FD:   Expects(pointer == nullptr, "the socket is read from the result"); return Slot(*bio);
   case BIO_CTRL_FLUSH: return 1;
   default:             return 0;
   }
 }
 auto Create(BIO* bio) noexcept -> int {
+  Expects(bio != nullptr, "OpenSSL creates into its BIO");
   auto const created = [&] {
     BIO_set_data(bio, std::make_unique<int>(Unset).release());
     return 1;
@@ -85,6 +89,7 @@ auto Create(BIO* bio) noexcept -> int {
   return Contained(0, created, Unreported);
 }
 auto Destroy(BIO* bio) noexcept -> int {
+  Expects(bio != nullptr, "OpenSSL destroys its BIO");
   auto const released = [bio] {
     std::unique_ptr<int> const slot{ static_cast<int*>(BIO_get_data(bio)) };
     BIO_set_data(bio, nullptr);
@@ -101,16 +106,16 @@ auto NewMethod() -> Method {
     throw BioMethodSetupFailed{ };
   return method;
 }
-auto SharedMethod() -> BIO_METHOD const* {
+auto SharedMethod() -> BIO_METHOD const& {
   // A function-local static is initialised once under the C++ runtime's lock.
   static Method const method{ NewMethod() };
-  return method.get();
+  return *method;
 }
 }
 // Unlike OpenSSL's socket BIO it sends with MSG_NOSIGNAL; the caller keeps the socket open while the BIO lives.
 auto UnsignalledSocketBio(int socket) -> Bio {
   Expects(socket >= 0, "the socket is open");
-  Bio bio{ BIO_new(SharedMethod()) };
+  Bio bio{ BIO_new(&SharedMethod()) };
   if (!bio) throw AllocationFailed{ "Socket BIO" };
   std::ignore = BIO_set_fd(bio.get(), socket, BIO_NOCLOSE);
   return bio;

@@ -55,21 +55,10 @@ TEST(DynamicChannels, ActivationReachesTheChannelThatOwnsTheId) {
   Backend::DynamicChannels registry;
   Recorded                 channel;
   Backend::ChannelSlot     slot    { registry, channel };
-  slot.Assign(AssignedId);
+  EXPECT_TRUE(slot.Assign(AssignedId));
   EXPECT_TRUE(registry.Activate(AssignedId));
   EXPECT_EQ(channel.Activations(), 1U);
   EXPECT_EQ(channel.Rejections(), 0U);
-}
-TEST(DynamicChannels, CallbackAssignmentReportsSuccessAndReachesTheOwner) {
-  Headless::Logs             logs;
-  Backend::Diagnostics const diagnostics{ { .log = Headless::Logs::Collect, .log_user = &logs }, false };
-  Backend::DynamicChannels   registry;
-  Recorded                   channel;
-  Backend::ChannelSlot       slot       { registry, channel                                            };
-  EXPECT_TRUE(slot.Assigned(AssignedId, Backend::FailureLog{ diagnostics, "Channel assignment" }));
-  EXPECT_TRUE(registry.Activate(AssignedId));
-  EXPECT_EQ(channel.Activations(), 1U);
-  EXPECT_FALSE(logs.Contains(SDLRDP_LOG_ERROR, "Channel assignment failed"));
 }
 TEST(DynamicChannels, RejectionReachesTheChannelThatOwnsTheId) {
   Backend::DynamicChannels registry;

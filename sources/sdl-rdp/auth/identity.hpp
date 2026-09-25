@@ -10,6 +10,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <type_traits>
 
 namespace Backend {
 struct IdentityNames {
@@ -32,13 +33,17 @@ inline auto IdentityText(std::span<char const> utf8) -> std::string {
 inline auto IdentityText(std::span<std::uint8_t const> utf8) -> std::string {
   return IdentityText(oxbox::utilities::SpanCast<char const>(utf8));
 }
-template <class Unit> auto IdentityField(Unit const* text, std::size_t length) -> std::span<Unit const> {
+template <auto TEXT, auto LENGTH, class Identity>
+auto IdentityField(Identity const& identity)
+    -> std::span<std::remove_pointer_t<std::remove_cvref_t<decltype(identity.*TEXT)>> const> {
+  auto const* const text   = identity.*TEXT;
+  auto const        length = std::size_t{ identity.*LENGTH };
   if (length) utilities::Expects(text != nullptr, "identity buffer covers length");
-  return { text, length };
+  return std::span{ text, length };
 }
 template <class Identity> auto NamesOf(Identity const& identity) -> IdentityNames {
-  return { .user   = IdentityText(IdentityField(identity.User, identity.UserLength)),
-           .domain = IdentityText(IdentityField(identity.Domain, identity.DomainLength)) };
+  return { .user   = IdentityText(IdentityField<&Identity::User, &Identity::UserLength>(identity)),
+           .domain = IdentityText(IdentityField<&Identity::Domain, &Identity::DomainLength>(identity)) };
 }
 inline auto ClientNames(SEC_WINNT_AUTH_IDENTITY const& identity) -> IdentityNames {
   if ((identity.Flags & SEC_WINNT_AUTH_IDENTITY_UNICODE) != 0) return NamesOf(identity);

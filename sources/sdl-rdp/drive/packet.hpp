@@ -40,7 +40,7 @@ private:
   std::vector<std::byte> bytes;
   std::size_t            position{ };
 };
-auto DrivePath(char const* path) -> std::vector<std::byte>;
+auto DrivePath(std::string_view path) -> std::vector<std::byte>;
 template <WireField ValueTy> auto DrivePacket::Read() -> ValueTy {
   auto       reader = Remaining();
   auto const value  = reader.Fetch<ValueTy, std::endian::little>();

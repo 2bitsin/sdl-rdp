@@ -28,8 +28,8 @@ public:
   }
   auto operator=(NtHash const&) -> NtHash& = delete;
   auto operator=(NtHash&&)      -> NtHash& = delete;
-  auto Data()                   -> std::uint8_t* {
-    return bytes.data();
+  auto Key()                    -> NtKey {
+    return bytes;
   }
 
 private:
@@ -39,44 +39,49 @@ struct SettingsPassword {
 public:
            SettingsPassword(SettingsPassword const&) = delete;
            SettingsPassword(SettingsPassword&&)      = delete;
-  explicit SettingsPassword(rdpSettings* value) : settings{ value } { }
+  explicit SettingsPassword(rdpSettings& value) : settings{ value } { }
            ~SettingsPassword() {
-    auto* password = freerdp_settings_get_string_writable(settings, FreeRDP_Password);
+    auto* password = freerdp_settings_get_string_writable(&settings, FreeRDP_Password);
     if (password) OPENSSL_cleanse(password, std::strlen(password));
     // FreeRDP 3.32 include/freerdp/settings.h:553: set_string copies input; nullptr removes the old entry.
-    Ensures(freerdp_settings_set_string(settings, FreeRDP_Password, nullptr), "password cleared");
+    Ensures(freerdp_settings_set_string(&settings, FreeRDP_Password, nullptr), "password cleared");
   }
   auto operator=(SettingsPassword const&) -> SettingsPassword& = delete;
   auto operator=(SettingsPassword&&)      -> SettingsPassword& = delete;
 
 private:
-  rdpSettings* settings;
+  rdpSettings& settings;
 };
 struct PlainPassword {
 public:
            PlainPassword(PlainPassword const&) = delete;
            PlainPassword(PlainPassword&&)      = delete;
-  explicit PlainPassword(char const* text) : value{ text } { }
+  explicit PlainPassword(std::string_view text) : value{ text } { }
            ~PlainPassword() {
     OPENSSL_cleanse(value.data(), value.size());
   }
   auto operator=(PlainPassword const&) -> PlainPassword& = delete;
   auto operator=(PlainPassword&&)      -> PlainPassword& = delete;
-  auto Text() const                    -> char const* {
-    return value.c_str();
+  auto Text() const                    -> std::string const& {
+    return value;
   }
 
 private:
   std::string value;
 };
-auto Setting(freerdp_peer const& client, FreeRDP_Settings_Keys_String key) -> char const* {
-  auto const* value = freerdp_settings_get_string(client.context->settings, key);
+auto Setting(rdpSettings const& settings, FreeRDP_Settings_Keys_String key) -> std::string {
+  auto const* value = freerdp_settings_get_string(&settings, key);
+  return value ? value : "";
+}
+// In place in the buffer SettingsPassword scrubs; Verify copies it once, for the terminator, into PlainPassword.
+auto Password(rdpSettings const& settings) -> std::string_view {
+  auto const* value = freerdp_settings_get_string(&settings, FreeRDP_Password);
   return value ? value : "";
 }
 auto Utf16(std::string const& text) -> std::vector<std::uint8_t> {
   return TranscodeRange<std::vector<std::uint8_t>>(std::as_bytes(std::span(text)), { }, Utf16Little);
 }
-auto NtlmResponseKey(AuthenticationState const& identity, std::uint8_t* nt_hash_v1, std::uint8_t* response) -> bool {
+auto NtlmResponseKey(AuthenticationState const& identity, NtKey nt_hash_v1, NtKey response) -> bool {
   // FreeRDP 3.32 ntlm_compute.c:513 takes the NTLMv2 response key, not the NT hash, and needs SEC_E_OK.
   auto user          = Utf16(identity.User());
   auto domain        = Utf16(identity.Domain());
@@ -85,8 +90,8 @@ auto NtlmResponseKey(AuthenticationState const& identity, std::uint8_t* nt_hash_
   user.resize(user_length + sizeof(char16_t));
   domain.resize(domain_length + sizeof(char16_t));
   using oxbox::utilities::SpanCast;
-  return NTOWFv2FromHashW(nt_hash_v1, SpanCast<std::uint16_t>(std::span(user)).data(), user_length,
-                          SpanCast<std::uint16_t>(std::span(domain)).data(), domain_length, response);
+  return NTOWFv2FromHashW(nt_hash_v1.data(), SpanCast<std::uint16_t>(std::span(user)).data(), user_length,
+                          SpanCast<std::uint16_t>(std::span(domain)).data(), domain_length, response.data());
 }
 }
 Authenticator::Authenticator(PeerLink& link, Configuration const& configuration,
@@ -112,19 +117,20 @@ auto Authenticator::Reject() -> void {
   _diagnostics.Log(SDLRDP_LOG_WARN,
                    std::format("Authentication rejected: user \"{}\" from {}", user, _link.Client().hostname));
 }
-auto Authenticator::Verify(char const* domain, char const* user, char const* password) -> bool {
-  SettingsPassword const clear  { &_link.Settings() };
+auto Authenticator::Verify(std::string const& domain, std::string const& user, std::string_view password) -> bool {
+  SettingsPassword const clear  { _link.Settings() };
   auto const&            config = _configuration.Config();
   auto&                  client = _link.Client();
   _state.Identify(user, domain);
   sspi_FreeAuthIdentity(&client.identity);
-  if (sspi_SetAuthIdentityA(&client.identity, user, domain, nullptr) <= 0) {
+  if (sspi_SetAuthIdentityA(&client.identity, user.c_str(), domain.c_str(), nullptr) <= 0) {
     Reject();
     return false;
   }
   PlainPassword const plain    { password };
-  bool const          accepted = config.verify ? config.verify(config.auth_user, domain, user, plain.Text()) != 0
-                                               : sdlrdp_verify_pair(&config, domain, user, plain.Text()) != 0;
+  bool const          accepted = config.verify
+                            ? config.verify(config.auth_user, domain.c_str(), user.c_str(), plain.Text().c_str()) != 0
+                            : sdlrdp_verify_pair(&config, domain.c_str(), user.c_str(), plain.Text().c_str()) != 0;
   if (!accepted) Reject();
   client.authenticated = accepted;
   return accepted;
@@ -139,18 +145,23 @@ auto Authenticator::Logon(bool automatic) -> bool {
   if (!automatic || _configuration.Config().auth == SDLRDP_AUTH_NONE) return true;
   // FreeRDP 3.32 nla.c:1494 stores delegated credentials in settings, not nla_get_identity().
   std::ignore = _state.TestAndSetChecked();
-  auto& client = _link.Client();
+  auto const& settings = _link.Settings();
   try {
-    std::ignore = Verify(Setting(client, FreeRDP_Domain), Setting(client, FreeRDP_Username),
-                         Setting(client, FreeRDP_Password));
+    std::ignore = Verify(Setting(settings, FreeRDP_Domain), Setting(settings, FreeRDP_Username), Password(settings));
   } catch (...) {
     Reject();
   }
   return true;
 }
+auto Authenticator::Unauthenticated(std::string const& domain, std::string const& user) -> bool {
+  auto& client = _link.Client();
+  client.authenticated = false;
+  return sspi_SetAuthIdentityA(&client.identity, user.c_str(), domain.c_str(), nullptr) > 0;
+}
 auto Authenticator::VerifySettings() -> bool {
-  auto&                  client = _link.Client();
-  SettingsPassword const clear  { client.context->settings };
+  auto&                  client   = _link.Client();
+  auto&                  settings = _link.Settings();
+  SettingsPassword const clear    { settings };
   if (_state.TestAndSetChecked()) {
     if (!_state.Rejected()) return true;
     std::ignore = Denied();
@@ -158,30 +169,27 @@ auto Authenticator::VerifySettings() -> bool {
     return false;
   }
   try {
-    auto const* domain = Setting(client, FreeRDP_Domain);
-    auto const* user   = Setting(client, FreeRDP_Username);
-    if (_configuration.Config().auth == SDLRDP_AUTH_NONE) {
-      client.authenticated = false;
-      return sspi_SetAuthIdentityA(&client.identity, user, domain, nullptr) > 0;
-    }
-    return Verify(domain, user, Setting(client, FreeRDP_Password)) || Denied();
+    auto const domain = Setting(settings, FreeRDP_Domain);
+    auto const user   = Setting(settings, FreeRDP_Username);
+    if (_configuration.Config().auth == SDLRDP_AUTH_NONE) return Unauthenticated(domain, user);
+    return Verify(domain, user, Password(settings)) || Denied();
   } catch (...) {
     Reject();
     return Denied();
   }
 }
-auto Authenticator::ResponseKey(SEC_WINNT_AUTH_IDENTITY const& identity, std::uint8_t* response) -> bool {
+auto Authenticator::ResponseKey(SEC_WINNT_AUTH_IDENTITY const& identity, NtKey response) -> bool {
   auto const names = ClientNames(identity);
   _state.Identify(names.user, names.domain);
   auto const& config = _configuration.Config();
   auto const* domain = _state.Domain().c_str();
   auto const* user   = _state.User().c_str();
   NtHash      hash;
-  bool const  known  = config.lookup ? config.lookup(config.auth_user, domain, user, hash.Data()) != 0
-                                     : sdlrdp_lookup_pair(&config, domain, user, hash.Data()) != 0;
-  return known && NtlmResponseKey(_state, hash.Data(), response);
+  bool const  known  = config.lookup ? config.lookup(config.auth_user, domain, user, hash.Key().data()) != 0
+                                     : sdlrdp_lookup_pair(&config, domain, user, hash.Key().data()) != 0;
+  return known && NtlmResponseKey(_state, hash.Key(), response);
 }
-auto Authenticator::Hash(SEC_WINNT_AUTH_IDENTITY const& identity, std::uint8_t* response) -> bool {
+auto Authenticator::Hash(SEC_WINNT_AUTH_IDENTITY const& identity, NtKey response) -> bool {
   _state.AttemptHash();
   try {
     bool const result = ResponseKey(identity, response);

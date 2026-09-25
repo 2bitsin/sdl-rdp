@@ -28,9 +28,8 @@ constexpr std::size_t BITMAP_RECTANGLE_LIMIT = 0xFFFF;
 constexpr std::size_t BitmapHeaderReserve    = 1024;
 constexpr int         RemoteFxBandRows       = 64;
 
-auto SendSurfaceBits(rdpUpdate* update, sdlrdp_rect area, std::span<std::byte> payload, std::uint32_t codec) -> bool {
-  Expects(update != nullptr, "update exists");
-  Expects(update->SurfaceBits != nullptr, "surface callback exists");
+auto SendSurfaceBits(rdpUpdate& update, sdlrdp_rect area, std::span<std::byte> payload, std::uint32_t codec) -> bool {
+  Expects(update.SurfaceBits != nullptr, "surface callback exists");
   auto command = SURFACE_BITS_COMMAND{ };
   command.cmdType              = CMDTYPE_SET_SURFACE_BITS;
   command.skipCompression      = true;
@@ -44,7 +43,7 @@ auto SendSurfaceBits(rdpUpdate* update, sdlrdp_rect area, std::span<std::byte> p
   command.bmp.height           = Narrowed<std::uint16_t>(area.h);
   command.bmp.bitmapDataLength = Narrowed<std::uint32_t>(payload.size());
   command.bmp.bitmapData       = oxbox::utilities::SpanCast<std::uint8_t>(payload).data();
-  return update->SurfaceBits(update->context, &command);
+  return update.SurfaceBits(update.context, &command);
 }
 
 // Bitmap update corners are inclusive, unlike a surface command's.
@@ -70,15 +69,14 @@ auto BitmapRectangle(sdlrdp_rect area, std::span<std::byte> payload, bool compre
   rectangle.cbCompMainBodySize = Narrowed<std::uint32_t>(payload.size());
   return rectangle;
 }
-auto SendBitmapBand(rdpUpdate* update, std::span<BITMAP_DATA> rectangles) -> bool {
-  Expects(update != nullptr, "update exists");
-  Expects(update->BitmapUpdate != nullptr, "bitmap callback exists");
+auto SendBitmapBand(rdpUpdate& update, std::span<BITMAP_DATA> rectangles) -> bool {
+  Expects(update.BitmapUpdate != nullptr, "bitmap callback exists");
   Expects(!rectangles.empty(), "bitmap batch exists");
   auto batch = BITMAP_UPDATE{ };
   batch.number          = Narrowed<std::uint32_t>(rectangles.size());
   batch.rectangles      = rectangles.data();
   batch.skipCompression = true;
-  return update->BitmapUpdate(update->context, &batch);
+  return update.BitmapUpdate(update.context, &batch);
 }
 
 auto PackedStride(int width, std::uint32_t depth) -> std::uint32_t {
@@ -111,7 +109,7 @@ LegacyFrame::LegacyFrame(PeerLink& link, Configuration const& configuration, Act
       _encoder{ encoder }, _scaler{ scaler } { }
 auto LegacyFrame::SelectEncoder() -> bool {
   auto const previous = _encoder.Codec();
-  if (!_encoder.Select(&_link.Settings(), _configuration.Codec())) return false;
+  if (!_encoder.Select(_link.Settings(), _configuration.Codec())) return false;
   if (previous != _encoder.Codec()) _activation.CodecChanged(_encoder.Codec());
   return true;
 }
@@ -132,7 +130,7 @@ auto LegacyFrame::Prepare() -> bool {
                          : _encoder.Codec() == SDLRDP_CODEC_PLANAR ? LegacyWire::Planar
                          : freerdp_settings_get_bool(&settings, FreeRDP_SurfaceCommandsEnabled) ? LegacyWire::Surface
                                                                                                 : LegacyWire::Bitmap;
-  _format = { .depth = depth, .codec = wire == LegacyWire::Surface ? _encoder.Id(&settings) : 0, .wire = wire };
+  _format = { .depth = depth, .codec = wire == LegacyWire::Surface ? _encoder.Id(settings) : 0, .wire = wire };
   return true;
 }
 auto LegacyFrame::AppendPlanar(Packet& packet, std::size_t& wire_size, sdlrdp_rect area,
@@ -213,7 +211,7 @@ auto LegacyFrame::Describe(Packet& packet) const -> void {
 }
 auto LegacyFrame::Write(Packet& packet) -> bool {
   Expects(!packet.bands.empty(), "encoded packet exists");
-  auto* const update = _link.Context().update;
+  auto& update = *_link.Context().update;
   switch (_format.wire) {
   case LegacyWire::Surface:
     return SendSurfaceBits(update, packet.bands.front().area, packet.bands.front().bytes, _format.codec);

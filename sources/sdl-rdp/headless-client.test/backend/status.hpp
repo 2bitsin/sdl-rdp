@@ -8,15 +8,13 @@
 
 namespace BackendGate {
 inline auto CurrentStatus(sdlrdp_handle& handle) -> std::optional<Backend::PeerStatus> {
-  auto const  session = handle.Session().Lock();
-  auto const  frame   = handle.Frames().Lock();
-  auto const* current = handle.Session().Current(frame);
-  return current ? std::optional{ current->Status(frame) } : std::nullopt;
+  auto const session = handle.Session().Lock();
+  auto const frame   = handle.Frames().Lock();
+  auto const current = handle.Session().Current(frame);
+  return current ? std::optional{ current->get().Status(frame) } : std::nullopt;
 }
 inline auto RequiredStatus(sdlrdp_handle& handle) -> Backend::PeerStatus {
-  auto status = CurrentStatus(handle);
-  utilities::Expects(status.has_value(), "a client is current");
-  return status.value_or(Backend::PeerStatus{ });
+  return utilities::Required(CurrentStatus(handle), "a client is current");
 }
 inline auto RequiredGraphics(sdlrdp_handle& handle) -> Backend::GraphicsTiming {
   auto const graphics = RequiredStatus(handle).graphics;
@@ -28,8 +26,8 @@ inline auto Presented(sdlrdp_handle& handle) -> std::uint64_t {
       [](Backend::FrameStore const& frames, Backend::FrameLock const& held) { return frames.Presented(held); });
 }
 inline auto AllAcknowledged(sdlrdp_handle& handle, Backend::FrameLock const& held) -> bool {
-  auto const* current = handle.Session().Current(held);
-  return current != nullptr && current->Status(held).acknowledged >= handle.Frames().Presented(held);
+  auto const current = handle.Session().Current(held);
+  return current && current->get().Status(held).acknowledged >= handle.Frames().Presented(held);
 }
 inline auto AllAcknowledged(sdlrdp_handle& handle) -> bool {
   auto const frame = handle.Frames().Lock();

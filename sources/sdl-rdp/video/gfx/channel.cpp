@@ -2,9 +2,9 @@
 
 #include <sdl-rdp/configuration/configuration.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
-#include <sdl-rdp/diagnostics/dispatched.hpp>
 #include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
+#include <sdl-rdp/freerdp-facade/handled.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
@@ -29,9 +29,8 @@
 namespace Backend {
 namespace {
 constexpr int MaximumSurfaceDimension = 32766;
-auto Held(RdpgfxServerContext* context) -> GfxChannel& {
-  Expects(context != nullptr, "callback context exists");
-  return CallbackOwner<GfxChannel>(context->custom);
+auto Held(RdpgfxServerContext const& context) -> GfxChannel& {
+  return CallbackOwner<GfxChannel, &RdpgfxServerContext::custom>(context);
 }
 auto Mode(std::uint32_t queue_depth) -> AcknowledgementMode {
   return queue_depth == SUSPEND_FRAME_ACKNOWLEDGEMENT ? AcknowledgementMode::Suspended : AcknowledgementMode::Tracking;
@@ -39,38 +38,26 @@ auto Mode(std::uint32_t queue_depth) -> AcknowledgementMode {
 auto FitsProtocol(sdlrdp_rect desktop) -> bool {
   return desktop.w <= MaximumSurfaceDimension && desktop.h <= MaximumSurfaceDimension;
 }
+constexpr OperationName GraphicsCapabilities   { "Graphics capabilities"          };
+constexpr OperationName GraphicsAcknowledgement{ "Graphics frame acknowledgement" };
+constexpr OperationName GraphicsQoe            { "Graphics QoE acknowledgement"   };
+constexpr OperationName GraphicsAssignment     { "Graphics channel assignment"    };
+using sdl_rdp::freerdp_facade::AssignThrough;
+using sdl_rdp::freerdp_facade::Handled;
 }
 class GfxChannel::Callbacks {
 public:
   static auto Install(RdpgfxServerContext& server) -> void;
-
-private:
-  template <auto HANDLER, class PduTy>
-  static auto Handled(RdpgfxServerContext* context, PduTy const* pdu, OperationName operation) noexcept
-      -> std::uint32_t;
 };
-template <auto HANDLER, class PduTy>
-auto GfxChannel::Callbacks::Handled(RdpgfxServerContext* context, PduTy const* pdu, OperationName operation) noexcept
-    -> std::uint32_t {
-  auto& owner = Held(context);
-  return Dispatched<HANDLER>(ERROR_INTERNAL_ERROR, owner, pdu, FailureLog{ owner._diagnostics, operation });
-}
 auto GfxChannel::Callbacks::Install(RdpgfxServerContext& server) -> void {
-  // abi: psRdpgfxServerCapsAdvertise, UINT is uint32_t
-  server.CapsAdvertise = [](RdpgfxServerContext* context,
-                            RDPGFX_CAPS_ADVERTISE_PDU const* caps) noexcept -> std::uint32_t {
-    return Handled<&GfxChannel::Caps>(context, caps, "Graphics capabilities");
-  };
-  // abi: psRdpgfxServerFrameAcknowledge, UINT is uint32_t
-  server.FrameAcknowledge = [](RdpgfxServerContext* context,
-                               RDPGFX_FRAME_ACKNOWLEDGE_PDU const* ack) noexcept -> std::uint32_t {
-    return Handled<&GfxChannel::Ack>(context, ack, "Graphics frame acknowledgement");
-  };
-  // abi: psRdpgfxServerQoeFrameAcknowledge, UINT is uint32_t
-  server.QoeFrameAcknowledge = [](RdpgfxServerContext* context,
-                                  RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU const* ack) noexcept -> std::uint32_t {
-    return Handled<&GfxChannel::Qoe>(context, ack, "Graphics QoE acknowledgement");
-  };
+  constexpr auto failures = FailuresThrough<&GfxChannel::FailureSource>;
+  constexpr auto assign   = AssignThrough<&GfxChannel::_slot>;
+  constexpr auto failed   = ERROR_INTERNAL_ERROR;
+  // abi: psRdpgfxServerCapsAdvertise, FrameAcknowledge, QoeFrameAcknowledge, UINT is uint32_t; ChannelIdAssigned
+  server.CapsAdvertise       = Handled<Held, &GfxChannel::Caps, GraphicsCapabilities, failures, failed>;
+  server.FrameAcknowledge    = Handled<Held, &GfxChannel::Ack, GraphicsAcknowledgement, failures, failed>;
+  server.QoeFrameAcknowledge = Handled<Held, &GfxChannel::Qoe, GraphicsQoe, failures, failed>;
+  server.ChannelIdAssigned   = Handled<Held, assign, GraphicsAssignment, failures, false>;
 }
 GfxChannel::GfxChannel(PeerLink& link, Diagnostics const& diagnostics, Configuration const& configuration,
                        Activation& activation, FrameSources sources, DynamicChannel& owner)
@@ -78,12 +65,8 @@ GfxChannel::GfxChannel(PeerLink& link, Diagnostics const& diagnostics, Configura
       _sources{ sources }, _context{ rdpgfx_server_context_new(link.Channels()) }, _slot{ link.Dynamic(), owner } { }
 GfxChannel::~GfxChannel() = default;
 auto GfxChannel::Open() -> bool {
-  if (!BindContext(_context.get(), this, _link.Context())) return false;
-  // abi: psRdpgfxServerChannelIdAssigned, BOOL is int
-  _context->ChannelIdAssigned = [](RdpgfxServerContext* assigned, std::uint32_t id) noexcept -> int {
-    auto& owner = Held(assigned);
-    return owner._slot.Assigned(id, FailureLog{ owner._diagnostics, "Graphics channel assignment" });
-  };
+  if (!_context) return false;
+  BindContext(*_context, *this, _link.Context());
   Callbacks::Install(*_context);
   return _context->Initialize(_context.get(), true) && _context->Open(_context.get());
 }
@@ -100,7 +83,7 @@ auto GfxChannel::Confirmed() const noexcept -> bool {
 auto GfxChannel::Timing() const noexcept -> GraphicsTiming const& {
   return _timing;
 }
-auto GfxChannel::Check(std::uint32_t result, char const* operation) const -> bool {
+auto GfxChannel::Check(std::uint32_t result, std::string_view operation) const -> bool {
   if (result == CHANNEL_RC_OK) return true;
   _diagnostics.Log(SDLRDP_LOG_ERROR, std::format("GFX {} failed: {}.", operation, result));
   return false;
@@ -203,5 +186,8 @@ auto GfxChannel::Surface() -> bool {
   _sources.frames.get().Resend();
   Ensures(SameSize(Whole(_surface), desktop), "surface matches the desktop");
   return true;
+}
+auto GfxChannel::FailureSource() const noexcept -> Diagnostics const& {
+  return _diagnostics;
 }
 }

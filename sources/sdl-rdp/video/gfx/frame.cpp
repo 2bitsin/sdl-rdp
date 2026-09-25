@@ -155,7 +155,7 @@ auto GfxChannel::Select() -> bool {
   auto preference = _configuration.Codec();
   auto choice     = CodecChoice();
   auto previous   = _sources.encoder.get().Codec();
-  if (choice == SDLRDP_CODEC_PLANAR && !_sources.encoder.get().SetupPlanar(&_link.Settings(), true)) return false;
+  if (choice == SDLRDP_CODEC_PLANAR && !_sources.encoder.get().SetupPlanar(_link.Settings(), true)) return false;
   // Raw and planar do not populate the persistent progressive surface.
   if (previous != choice && Persistent(choice) && _sources.frames.get().Snapshot()) _sources.frames.get().Include();
   if (previous != choice) _force_idr = true;

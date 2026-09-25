@@ -17,6 +17,6 @@ public:
   static auto Activate(Context const& context)       -> bool;
 
 private:
-  static auto Install(Context const& context, Channel& channel) -> void;
+  static auto Install(Server& server, Channel& channel) -> void;
 };
 }

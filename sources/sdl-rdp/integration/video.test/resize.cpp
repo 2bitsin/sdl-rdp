@@ -55,13 +55,13 @@ public:
     auto const held   = _handle.Session().Lock();
     auto const status = RequiredStatus(_handle);
     Expects(status.resizing, "peer has an in-flight resize");
-    Expects(status.display != nullptr, "peer has a display channel");
     DISPLAY_CONTROL_MONITOR_LAYOUT monitor{ };
     monitor.Flags  = DISPLAY_CONTROL_MONITOR_PRIMARY;
     monitor.Width  = status.desktop.w;
     monitor.Height = status.desktop.h;
     DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const layout{ sizeof(monitor), 1, &monitor };
-    EXPECT_EQ(status.display->DispMonitorLayout(status.display, &layout), CHANNEL_RC_OK);
+    auto& display = utilities::Required(status.display, "peer has a display channel").get();
+    EXPECT_EQ(display.DispMonitorLayout(&display, &layout), CHANNEL_RC_OK);
   }
   auto ConfirmActiveCallback() -> void {
     auto const held = _handle.Session().Lock();
@@ -76,7 +76,7 @@ public:
 
 private:
   static auto CurrentClient(sdlrdp_handle& handle) -> freerdp_peer& {
-    return *RequiredStatus(handle).client;
+    return RequiredStatus(handle).client;
   }
   auto InFinalization() const -> bool {
     auto const current = freerdp_get_state(_client.context);

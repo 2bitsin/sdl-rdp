@@ -1,4 +1,5 @@
 #include <sdl-rdp/freerdp-facade/wake-event.hpp>
+#include <sdl-rdp/freerdp-facade/waitable.hpp>
 
 #include <sdl-rdp/freerdp-facade/manual-reset-event.hpp>
 
@@ -13,6 +14,7 @@
 #include <thread>
 
 namespace {
+using sdl_rdp::freerdp_facade::Waitable;
 auto ConsumePublished(Backend::WakeEvent& wake, std::atomic<std::size_t>& published, std::atomic<std::size_t>& consumed)
     -> void {
   for (int iteration = 0; iteration < 4096; ++iteration) {
@@ -41,10 +43,10 @@ TEST(WakeEvent, ConcurrentPendingAndIdle) {
   producer.request_stop();
   producer.join();
   wake.Transition(Phase::Idle);
-  EXPECT_FALSE(Backend::Signalled(wake.get()));
+  EXPECT_FALSE(Waitable{ wake.get() }.Signalled());
   // Reproduce an event set after a consumer observed Idle, before it stored Idle.
   ASSERT_TRUE(SetEvent(wake.get()));
   wake.Transition(Phase::Idle);
-  EXPECT_FALSE(Backend::Signalled(wake.get()));
+  EXPECT_FALSE(Waitable{ wake.get() }.Signalled());
 }
 }

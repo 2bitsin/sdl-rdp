@@ -20,8 +20,8 @@ namespace Backend {
 auto ResetAuthenticationLogging() -> void {
   LogRoute::WithFilter([](auto& filter) { filter = { }; });
 }
-auto PeerNegotiationLogging(rdpSettings const* settings) -> void {
-  LogRoute::WithFilter([=](auto& filter) { filter.peer_settings = settings; });
+auto PeerNegotiationLogging(rdpSettings const& settings) -> void {
+  LogRoute::WithFilter([&](auto& filter) { filter.peer_settings = std::cref(settings); });
 }
 auto NegotiationRefused() -> bool {
   return LogRoute::WithFilter([](auto const& filter) { return filter.negotiation_failed; });
@@ -92,7 +92,7 @@ auto DetectNegotiationRefusal(LogRoute::Filter& filter, std::string_view prefix,
 }
 auto DetectTlsHandshakeFailure(LogRoute::Filter& filter, std::string_view prefix, std::string_view text) -> bool {
   if (!filter.peer_settings || prefix != "com.freerdp.crypto" || text != "BIO_do_handshake failed") return false;
-  if (freerdp_settings_get_uint32(filter.peer_settings, FreeRDP_SelectedProtocol) != SecurityTls) return false;
+  if (freerdp_settings_get_uint32(&filter.peer_settings->get(), FreeRDP_SelectedProtocol) != SecurityTls) return false;
   filter.handshake_failed = true;
   return true;
 }
@@ -171,10 +171,13 @@ auto LogRoute::Forward(wLogMessage const& message) -> void {
   // SSPI debug output can contain credentials and hashes, including binary dump callbacks.
   if (NtlmMessage(message) && !expected) return;
   auto const level = expected ? SDLRDP_LOG_INFO : LibraryLevel(message.Level);
-  if (routing.active) routing.active->Deliver(level, message.TextString);
+  if (routing.active) routing.active->get().Deliver(level, message);
 }
-auto LogRoute::Deliver(sdlrdp_log_level level, char const* text) const -> void {
-  if (callback && text) callback(user, level, text);
+auto LogRoute::Deliver(sdlrdp_log_level level, wLogMessage const& message) const -> void {
+  _sink(level, message);
+}
+auto LogRoute::Log(sdlrdp_log_level level, std::string const& text) const -> void {
+  _sink(level, text);
 }
 auto LogRoute::Install() -> void {
   auto* root = WLog_GetRoot();
@@ -204,16 +207,15 @@ auto LogRoute::Shared() -> LogRoute::Routing& {
   static Routing routing;
   return routing;
 }
-LogRoute::LogRoute(sdlrdp_config const& config) : callback(config.log), user(config.log_user) {
+LogRoute::LogRoute(sdlrdp_config const& config) : _sink{ config } {
   auto& routing = Shared();
   std::call_once(routing.installed, Install);
   std::scoped_lock const lock(routing.guard);
-  routing.active = this;
-  utilities::Ensures(routing.active == this, "newest handle owns logging");
+  routing.active = std::cref(*this);
 }
 LogRoute::~LogRoute() {
   auto&                  routing = Shared();
   std::scoped_lock const lock(routing.guard);
-  if (routing.active == this) routing.active = nullptr;
+  if (routing.active && &routing.active->get() == this) routing.active.reset();
 }
 }

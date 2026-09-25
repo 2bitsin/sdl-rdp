@@ -34,7 +34,7 @@ auto Behind(std::uint64_t sent, std::uint64_t credit, std::uint32_t rate) -> dou
 }
 auto AudioChannel::Select(std::size_t index) -> void {
   Expects(index < _sound->num_client_formats, "client format exists");
-  _selected                      = _sound->client_formats[index];
+  _rate                          = _sound->client_formats[index].nSamplesPerSec;
   _sound->selected_client_format = Narrowed<std::uint16_t>(index);
   Reset();
   _ready = true;
@@ -88,9 +88,9 @@ auto AudioChannel::Ready(std::uint32_t latency_ms) -> bool {
   ReportGate(available, credit);
   return available;
 }
-auto AudioChannel::Confirm(std::uint8_t id, std::uint16_t timestamp) -> void {
+auto AudioChannel::Confirm(std::uint8_t id, std::uint16_t timestamp) -> std::uint32_t {
   auto found = std::ranges::find(_pending, id, &Block::id);
-  if (found == _pending.end()) return;
+  if (found == _pending.end()) return CHANNEL_RC_OK;
   auto rtt = std::chrono::duration<double, std::milli>(Clock::now() - found->sent).count();
   _traces.Defer("audio-confirm", [&] { return std::format("id={} rtt={:.1f}", id, rtt); });
   if (!_has_confirmation)
@@ -101,6 +101,7 @@ auto AudioChannel::Confirm(std::uint8_t id, std::uint16_t timestamp) -> void {
   _has_confirmation =  true;
   _pending.erase(found);
   _session.AudioChanged();
+  return CHANNEL_RC_OK;
 }
 auto AudioChannel::RecordBlock(Clock::time_point now, std::uint8_t block) -> void {
   if (_blocks_sent++) {

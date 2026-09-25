@@ -68,8 +68,7 @@ auto DrivePacket::Seek(std::size_t offset) -> void {
 auto DrivePacket::Origin(ChannelOrigin channel) -> void {
   origin = std::move(channel);
 }
-auto DrivePath(char const* path) -> std::vector<std::byte> {
-  if (!path) throw NullArgument{ "Drive path" };
+auto DrivePath(std::string_view path) -> std::vector<std::byte> {
   std::string text(path);
   if (text.empty() || text.front() != '/') text.insert(text.begin(), '/');
   auto encoded = TranscodeRange<std::vector<std::byte>>(std::as_bytes(std::span(text)), { }, Utf16Little,

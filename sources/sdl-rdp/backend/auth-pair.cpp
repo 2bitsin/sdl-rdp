@@ -15,11 +15,8 @@
 #include <type_traits>
 
 namespace {
-auto PairName(sdlrdp_config const& config, char const* domain, char const* user) -> bool {
-  utilities::Expects(domain, "credential names exist");
-  utilities::Expects(user, "credential names exist");
-  return config.password && config.user && std::strcmp(config.user, user) == 0
-         && (!config.domain || std::strcmp(config.domain, domain) == 0);
+auto PairName(sdlrdp_config const& config, std::string_view domain, std::string_view user) -> bool {
+  return config.password && config.user && config.user == user && (!config.domain || config.domain == domain);
 }
 }
 auto sdlrdp_verify_pair(sdlrdp_config const* config, char const* domain, char const* user, char const* password)
@@ -44,5 +41,6 @@ auto sdlrdp_lookup_pair(sdlrdp_config const* config, char const* domain, char co
     OPENSSL_cleanse(bytes.data(), bytes.size());
     return int{ result };
   };
-  return Backend::Contained(0, hashed, [](std::string_view text) { Backend::SetError(nullptr, std::string{ text }); });
+  return Backend::Contained(0, hashed,
+                            [](std::string_view text) { Backend::ErrorStore::PublishDetached(std::string{ text }); });
 }

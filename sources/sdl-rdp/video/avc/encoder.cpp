@@ -1,12 +1,11 @@
 #include <sdl-rdp/video/avc/encoder.hpp>
 #include <sdl-rdp/picture/geometry.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
-#include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/utilities/stopwatch.hpp>
 #include <sdl-rdp/video/avc/encoding.hpp>
+#include <sdl-rdp/video/avc/preset.hpp>
 
 #include <winpr/wlog.h>
-#include <algorithm>
 #include <array>
 #include <cstddef>
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage): Required by the ffnvcodec loader.
@@ -19,37 +18,80 @@
 #include <cstdint>
 #include <ffnvcodec/dynlink_loader.h>
 #include <format>
-#include <ranges>
+#include <memory>
+#include <span>
+#include <string>
+#include <string_view>
 #include <utility>
 
 namespace Backend::Avc {
 using utilities::Ensures;
 using utilities::Expects;
+namespace {
+template <auto FREE> struct FreesLibrary {
+  auto operator()(auto* functions) const noexcept -> void {
+    Expects(functions != nullptr, "unique_ptr releases the library it holds");
+    FREE(&functions);
+  }
+};
+class DestroysSession {
+public:
+           DestroysSession() noexcept                    = default;
+  explicit DestroysSession(PNVENCDESTROYENCODER destroy) noexcept : _destroy{ destroy } {
+    Expects(destroy != nullptr, "the session comes with its API table");
+  }
+  auto operator()(void* session) const noexcept -> void {
+    Expects(session != nullptr, "unique_ptr releases the session it holds");
+    Expects(_destroy != nullptr, "the session came with its API table");
+    if (auto const status = _destroy(session); status != NV_ENC_SUCCESS)
+      WLog_ERR("sdlrdp.avc", "AVC420 destroy session failed: %d", int{ status });
+  }
+
+private:
+  PNVENCDESTROYENCODER _destroy = nullptr;
+};
+using CudaLibrary   = std::unique_ptr<CudaFunctions, FreesLibrary<cuda_free_functions>>;
+using NvencLibrary  = std::unique_ptr<NvencFunctions, FreesLibrary<nvenc_free_functions>>;
+using EncodeSession = std::unique_ptr<void, DestroysSession>;
+template <class LibraryTy, class LoadTy> auto Loaded(LibraryTy& library, LoadTy load) -> int {
+  typename LibraryTy::pointer loaded = nullptr;
+  auto const                  status = load(&loaded, nullptr);
+  library.reset(loaded);
+  return status;
+}
+}
 struct Encoder::Impl {
 public:
-  auto Check(int status, char const* operation)                                        -> bool;
-  auto Load()                                                                          -> bool;
-  auto Session()                                                                       -> bool;
-  auto Initialize(std::uint32_t bitrate, std::uint32_t fps)                            -> bool;
-  auto Parameters(std::uint32_t fps, NV_ENC_CONFIG* config) const                      -> NV_ENC_INITIALIZE_PARAMS;
-  auto Buffers()                                                                       -> bool;
-  auto Capability(NV_ENC_CAPS query, int& value, char const* operation)                -> bool;
-  auto MinimumSize()                                                                   -> bool;
-  auto Picture(bool force_idr) const                                                   -> NV_ENC_PIC_PARAMS;
-  auto Fill(std::span<std::uint8_t const> bgrx, std::uint32_t stride, Encoder& timing) -> bool;
-  auto Close()                                                                         -> void;
+  auto Check(int status, std::string_view operation)                                        -> bool;
+  auto Load()                                                                               -> bool;
+  auto Session()                                                                            -> bool;
+  auto Initialize(std::uint32_t bitrate, std::uint32_t fps)                                 -> bool;
+  auto Parameters(std::uint32_t fps, NV_ENC_CONFIG& config) const                           -> NV_ENC_INITIALIZE_PARAMS;
+  auto Buffers()                                                                            -> bool;
+  auto Capability(NV_ENC_CAPS query, int& value, std::string_view operation)                -> bool;
+  auto MinimumSize()                                                                        -> bool;
+  auto Picture(bool force_idr) const                                                        -> NV_ENC_PIC_PARAMS;
+  auto Fill(std::span<std::uint8_t const> bgrx, std::uint32_t stride, EncodingTimes& times) -> bool;
+  auto Encoded(NV_ENC_PIC_PARAMS& pic, std::vector<std::byte>& encoded, EncodingTimes& times) -> bool;
+  auto Close()                                                                              -> void;
 
 private:
   friend class Encoder;
+  template <class ParametersTy, auto LOCK, auto UNLOCK, auto BUFFER> class Locked;
+  using Api = NV_ENCODE_API_FUNCTION_LIST;
+  using LockedInput = Locked<NV_ENC_LOCK_INPUT_BUFFER, &Api::nvEncLockInputBuffer, &Api::nvEncUnlockInputBuffer,
+                             &NV_ENC_LOCK_INPUT_BUFFER::inputBuffer>;
+  using LockedBitstream = Locked<NV_ENC_LOCK_BITSTREAM, &Api::nvEncLockBitstream, &Api::nvEncUnlockBitstream,
+                                 &NV_ENC_LOCK_BITSTREAM::outputBitstream>;
   struct Driver {
-    CudaFunctions*              cuda    = nullptr;
-    NvencFunctions*             loader  = nullptr;
+    CudaLibrary                 cuda;
+    NvencLibrary                loader;
     NV_ENCODE_API_FUNCTION_LIST api     { };
     CUdevice                    device  = 0;
     CUcontext                   context = nullptr;
   };
   struct Handles {
-    void*             session = nullptr;
+    EncodeSession     session;
     NV_ENC_INPUT_PTR  input   = nullptr;
     NV_ENC_OUTPUT_PTR output  = nullptr;
   };
@@ -61,16 +103,15 @@ private:
   bool        first   = true;
   std::string error;
 };
-auto Encoder::Impl::Check(int status, char const* operation) -> bool {
-  Expects(operation, "operation name exists");
+auto Encoder::Impl::Check(int status, std::string_view operation) -> bool {
   if (!status) return true;
   error = std::format("AVC420 {} failed: {}", operation, status);
   WLog_ERR("sdlrdp.avc", "%s", error.c_str());
   return false;
 }
 auto Encoder::Impl::Load() -> bool {
-  return Check(cuda_load_functions(&driver.cuda, nullptr), "load libcuda.so.1")
-         && Check(nvenc_load_functions(&driver.loader, nullptr), "load libnvidia-encode.so.1")
+  return Check(Loaded(driver.cuda, cuda_load_functions), "load libcuda.so.1")
+         && Check(Loaded(driver.loader, nvenc_load_functions), "load libnvidia-encode.so.1")
          && Check(driver.cuda->cuInit(0), "cuInit");
 }
 auto Encoder::Impl::Session() -> bool {
@@ -88,47 +129,12 @@ auto Encoder::Impl::Session() -> bool {
   open.deviceType = NV_ENC_DEVICE_TYPE_CUDA;
   open.device     = driver.context;
   open.apiVersion = NVENCAPI_VERSION;
-  return Check(driver.api.nvEncOpenEncodeSessionEx(&open, &handles.session), "open session");
+  void*      session = nullptr;
+  auto const status  = driver.api.nvEncOpenEncodeSessionEx(&open, &session);
+  handles.session = EncodeSession{ session, DestroysSession{ driver.api.nvEncDestroyEncoder } };
+  return Check(status, "open session");
 }
-namespace {
-auto ConfigureRate(NV_ENC_RC_PARAMS& rc, std::uint32_t bitrate, std::uint32_t fps) -> void {
-  rc.enableLookahead  = 0;
-  rc.lookaheadDepth   = 0;
-  rc.rateControlMode  = NV_ENC_PARAMS_RC_CBR;
-  rc.averageBitRate   = bitrate;
-  rc.vbvBufferSize    = Narrowed<std::uint32_t>(
-      std::clamp<std::uint64_t>(std::uint64_t{ bitrate } * 2 / fps, 1, UINT32_MAX));
-  rc.vbvInitialDelay  = rc.vbvBufferSize;
-  rc.zeroReorderDelay = 1;
-}
-auto ConfigureColour(NV_ENC_CONFIG_H264_VUI_PARAMETERS& vui) -> void {
-  vui.videoSignalTypePresentFlag   = 1;
-  vui.videoFullRangeFlag           = 1;
-  vui.colourDescriptionPresentFlag = 1;
-  vui.colourPrimaries              = NV_ENC_VUI_COLOR_PRIMARIES_BT709;
-  vui.transferCharacteristics      = NV_ENC_VUI_TRANSFER_CHARACTERISTIC_BT709;
-  vui.colourMatrix                 = NV_ENC_VUI_MATRIX_COEFFS_BT709;
-}
-auto ConfigureH264(NV_ENC_CONFIG_H264& h264, std::uint32_t fps) -> void {
-  h264.chromaFormatIDC = 1;
-  h264.level           = NV_ENC_LEVEL_AUTOSELECT;
-  h264.idrPeriod       = NVENC_INFINITE_GOPLENGTH;
-  h264.repeatSPSPPS    = 1;
-  auto refresh = IntraRefreshFor(fps);
-  h264.enableIntraRefresh = 1;
-  h264.intraRefreshPeriod = refresh.period;
-  h264.intraRefreshCnt    = refresh.count;
-  ConfigureColour(h264.h264VUIParameters);
-}
-auto ConfigurePreset(NV_ENC_CONFIG& config, std::uint32_t bitrate, std::uint32_t fps) -> void {
-  config.profileGUID    = NV_ENC_H264_PROFILE_HIGH_GUID;
-  config.gopLength      = NVENC_INFINITE_GOPLENGTH;
-  config.frameIntervalP = 1;
-  ConfigureRate(config.rcParams, bitrate, fps);
-  ConfigureH264(config.encodeCodecConfig.h264Config, fps);
-}
-}
-auto Encoder::Impl::Parameters(std::uint32_t fps, NV_ENC_CONFIG* config) const -> NV_ENC_INITIALIZE_PARAMS {
+auto Encoder::Impl::Parameters(std::uint32_t fps, NV_ENC_CONFIG& config) const -> NV_ENC_INITIALIZE_PARAMS {
   NV_ENC_INITIALIZE_PARAMS init{ };
   init.version           = NV_ENC_INITIALIZE_PARAMS_VER;
   init.encodeGUID        = NV_ENC_CODEC_H264_GUID;
@@ -142,7 +148,7 @@ auto Encoder::Impl::Parameters(std::uint32_t fps, NV_ENC_CONFIG* config) const -
   init.frameRateDen      = 1;
   init.enablePTD         = 1;
   init.enableEncodeAsync = 0;
-  init.encodeConfig      = config;
+  init.encodeConfig      = &config;
   return init;
 }
 auto Encoder::Impl::Initialize(std::uint32_t bitrate, std::uint32_t fps) -> bool {
@@ -152,14 +158,15 @@ auto Encoder::Impl::Initialize(std::uint32_t bitrate, std::uint32_t fps) -> bool
   NV_ENC_PRESET_CONFIG preset{ };
   preset.version           = NV_ENC_PRESET_CONFIG_VER;
   preset.presetCfg.version = NV_ENC_CONFIG_VER;
-  if (!Check(driver.api.nvEncGetEncodePresetConfigEx(handles.session, NV_ENC_CODEC_H264_GUID, NV_ENC_PRESET_P4_GUID,
-                                                     NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY, &preset),
+  if (!Check(driver.api.nvEncGetEncodePresetConfigEx(handles.session.get(), NV_ENC_CODEC_H264_GUID,
+                                                     NV_ENC_PRESET_P4_GUID, NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY,
+                                                     &preset),
              "preset"))
     return false;
   auto& config = preset.presetCfg;
   ConfigurePreset(config, bitrate, fps);
-  auto init = Parameters(fps, &config);
-  return Check(driver.api.nvEncInitializeEncoder(handles.session, &init), "initialize encoder");
+  auto init = Parameters(fps, config);
+  return Check(driver.api.nvEncInitializeEncoder(handles.session.get(), &init), "initialize encoder");
 }
 auto Encoder::Impl::Buffers() -> bool {
   Expects(handles.session != nullptr, "encoder session exists");
@@ -170,15 +177,20 @@ auto Encoder::Impl::Buffers() -> bool {
   in.width     = aligned.width;
   in.height    = aligned.height;
   in.bufferFmt = NV_ENC_BUFFER_FORMAT_IYUV;
-  if (!Check(driver.api.nvEncCreateInputBuffer(handles.session, &in), "create input buffer")) return false;
+  if (!Check(driver.api.nvEncCreateInputBuffer(handles.session.get(), &in), "create input buffer")) return false;
   handles.input = in.inputBuffer;
   NV_ENC_CREATE_BITSTREAM_BUFFER out{ };
   out.version = NV_ENC_CREATE_BITSTREAM_BUFFER_VER;
-  if (!Check(driver.api.nvEncCreateBitstreamBuffer(handles.session, &out), "create bitstream buffer")) return false;
+  if (!Check(driver.api.nvEncCreateBitstreamBuffer(handles.session.get(), &out), "create bitstream buffer"))
+    return false;
   handles.output = out.bitstreamBuffer;
   return true;
 }
 namespace {
+// abi: NVENC lends the access unit as void* plus its length.
+auto Bytes(NV_ENC_LOCK_BITSTREAM const& lock) -> std::span<std::byte const> {
+  return { static_cast<std::byte const*>(lock.bitstreamBufferPtr), lock.bitstreamSizeInBytes };
+}
 auto ConvertInput(NV_ENC_LOCK_INPUT_BUFFER const& lock, prim_size_t const& size, std::span<std::uint8_t const> bgrx,
                   std::uint32_t stride) -> int {
   Expects(lock.pitch >= size.width, "I420 pitch covers aligned width");
@@ -191,33 +203,82 @@ auto ConvertInput(NV_ENC_LOCK_INPUT_BUFFER const& lock, prim_size_t const& size,
                                                  pitches.data(), &size);
 }
 }
-auto Encoder::Impl::Fill(std::span<std::uint8_t const> bgrx, std::uint32_t stride, Encoder& timing) -> bool {
+// NVENC lends a buffer from its lock to its unlock: the unlock runs on every path out, and Unlock reports it.
+template <class ParametersTy, auto LOCK, auto UNLOCK, auto BUFFER>
+class Encoder::Impl::Locked {
+public:
+  Locked(Impl& owner, ParametersTy lock, std::string_view name)
+      : _owner{ owner }, _lock{ lock }, _name{ name }, _locked{ Acquired() } { }
+  Locked(Locked const&) = delete;
+  Locked(Locked&&)      = delete;
+  ~Locked() {
+    if (!_locked) return;
+    if (auto const status = Release(); status != NV_ENC_SUCCESS)
+      WLog_ERR("sdlrdp.avc", "AVC420 unlock %s failed: %d", _name.c_str(), int{ status });
+  }
+  auto     operator=(Locked const&) -> Locked& = delete;
+  auto     operator=(Locked&&)      -> Locked& = delete;
+  explicit operator bool() const               noexcept {
+    return _locked;
+  }
+  auto Lock() const -> ParametersTy const& {
+    Expects(_locked, "a locked buffer is read");
+    return _lock;
+  }
+  auto Unlock() -> bool {
+    Expects(_locked, "a buffer unlocks once");
+    return _owner.Check(Release(), std::format("unlock {}", _name));
+  }
+
+private:
+  auto Acquired() -> bool {
+    return _owner.Check((_owner.driver.api.*LOCK)(_owner.handles.session.get(), &_lock), std::format("lock {}", _name));
+  }
+  auto Release() noexcept -> NVENCSTATUS {
+    _locked = false;
+    return (_owner.driver.api.*UNLOCK)(_owner.handles.session.get(), _lock.*BUFFER);
+  }
+  Impl&        _owner;
+  ParametersTy _lock;
+  std::string  _name;
+  bool         _locked;
+};
+auto Encoder::Impl::Fill(std::span<std::uint8_t const> bgrx, std::uint32_t stride, EncodingTimes& times) -> bool {
   Expects(handles.session != nullptr, "encoder session exists");
   Expects(handles.input != nullptr, "encoder input buffer exists");
-  Stopwatch                watch;
-  NV_ENC_LOCK_INPUT_BUFFER lock { };
-  lock.version     = NV_ENC_LOCK_INPUT_BUFFER_VER;
-  lock.inputBuffer = handles.input;
-  if (!Check(driver.api.nvEncLockInputBuffer(handles.session, &lock), "lock input")) return false;
-  timing.times.upload = watch.Lap();
-  auto status = ConvertInput(lock, { aligned.width, aligned.height }, bgrx, stride);
-  timing.times.convert = watch.Lap();
-  auto unlocked = Check(driver.api.nvEncUnlockInputBuffer(handles.session, handles.input), "unlock input");
-  timing.times.upload += watch.Lap();
+  Stopwatch   watch;
+  LockedInput input{ *this, { .version = NV_ENC_LOCK_INPUT_BUFFER_VER, .inputBuffer = handles.input }, "input" };
+  if (!input) return false;
+  times.upload = watch.Lap();
+  auto const status = ConvertInput(input.Lock(), { aligned.width, aligned.height }, bgrx, stride);
+  times.convert = watch.Lap();
+  auto const unlocked = input.Unlock();
+  times.upload += watch.Lap();
   return Check(status, "BT.709 conversion") && unlocked;
 }
+auto Encoder::Impl::Encoded(NV_ENC_PIC_PARAMS& pic, std::vector<std::byte>& encoded, EncodingTimes& times) -> bool {
+  Stopwatch const watch;
+  if (!Check(driver.api.nvEncEncodePicture(handles.session.get(), &pic), "encode picture")) return false;
+  LockedBitstream bitstream{ *this,
+                             { .version = NV_ENC_LOCK_BITSTREAM_VER, .outputBitstream = handles.output },
+                             "bitstream" };
+  if (!bitstream) return false;
+  times.encode = watch.Elapsed();
+  auto const bytes = Bytes(bitstream.Lock());
+  encoded.assign(bytes.begin(), bytes.end());
+  return bitstream.Unlock();
+}
 auto Encoder::Impl::Close() -> void {
-  if (handles.input) Check(driver.api.nvEncDestroyInputBuffer(handles.session, handles.input), "destroy input");
+  if (handles.input) Check(driver.api.nvEncDestroyInputBuffer(handles.session.get(), handles.input), "destroy input");
   if (handles.output)
-    Check(driver.api.nvEncDestroyBitstreamBuffer(handles.session, handles.output), "destroy bitstream");
-  if (handles.session) Check(driver.api.nvEncDestroyEncoder(handles.session), "destroy session");
+    Check(driver.api.nvEncDestroyBitstreamBuffer(handles.session.get(), handles.output), "destroy bitstream");
+  handles.input  = nullptr;
+  handles.output = nullptr;
+  handles.session.reset();
   if (driver.context) Check(driver.cuda->cuDevicePrimaryCtxRelease(driver.device), "release CUDA context");
-  handles.input   = nullptr;
-  handles.output  = nullptr;
-  handles.session = nullptr;
-  driver.context  = nullptr;
-  nvenc_free_functions(&driver.loader);
-  cuda_free_functions(&driver.cuda);
+  driver.context = nullptr;
+  driver.loader.reset();
+  driver.cuda.reset();
   first = true;
 }
 Encoder::Encoder() : impl(std::make_unique<Impl>()) { }
@@ -252,9 +313,9 @@ auto Encoder::UnavailableReason() -> std::string {
 auto Encoder::Available() -> bool {
   return UnavailableReason().empty();
 }
-auto Encoder::Impl::Capability(NV_ENC_CAPS query, int& value, char const* operation) -> bool {
+auto Encoder::Impl::Capability(NV_ENC_CAPS query, int& value, std::string_view operation) -> bool {
   NV_ENC_CAPS_PARAM caps{ .version = NV_ENC_CAPS_PARAM_VER, .capsToQuery = query, .reserved = { } };
-  return Check(driver.api.nvEncGetEncodeCaps(handles.session, NV_ENC_CODEC_H264_GUID, &caps, &value), operation);
+  return Check(driver.api.nvEncGetEncodeCaps(handles.session.get(), NV_ENC_CODEC_H264_GUID, &caps, &value), operation);
 }
 auto Encoder::Impl::MinimumSize() -> bool {
   int  min_width  = 0;
@@ -302,18 +363,9 @@ auto Encoder::Encode(std::span<std::uint8_t const> bgrx, std::uint32_t stride, b
   Expects(bgrx.size() >= (std::size_t{ impl->aligned.height - 1 } * stride) + (std::size_t{ impl->aligned.width } * 4),
           "source covers aligned height");
   times.convert = times.upload = times.encode = { };
-  if (!impl->Fill(bgrx, stride, *this)) return { };
-  auto            pic   = impl->Picture(force_idr);
-  Stopwatch const watch;
-  if (!impl->Check(impl->driver.api.nvEncEncodePicture(impl->handles.session, &pic), "encode picture")) return { };
-  NV_ENC_LOCK_BITSTREAM lock{ .version = NV_ENC_LOCK_BITSTREAM_VER, .outputBitstream = impl->handles.output };
-  if (!impl->Check(impl->driver.api.nvEncLockBitstream(impl->handles.session, &lock), "lock bitstream")) return { };
-  times.encode = watch.Elapsed();
-  auto const* data = static_cast<std::byte const*>(lock.bitstreamBufferPtr);
-  encoded.assign(data, data + lock.bitstreamSizeInBytes);
-  if (!impl->Check(impl->driver.api.nvEncUnlockBitstream(impl->handles.session, impl->handles.output),
-                   "unlock bitstream"))
-    return { };
+  if (!impl->Fill(bgrx, stride, times)) return { };
+  auto pic = impl->Picture(force_idr);
+  if (!impl->Encoded(pic, encoded, times)) return { };
   impl->first = false;
   Ensures(!encoded.empty(), "one access unit produced synchronously");
   return encoded;

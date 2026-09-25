@@ -12,8 +12,9 @@ constexpr std::size_t MaximumRects = 16;
 }
 auto Region::Add(sdlrdp_rect area) -> void {
   ExpectsBand(area);
-  auto const touching = [&] { return std::ranges::find_if(rects, [&](sdlrdp_rect r) { return Touches(r, area); }); };
-  for (auto found = touching(); found != rects.end(); found = touching()) {
+  auto const touches = [&](sdlrdp_rect rect) { return Touches(rect, area); };
+  for (auto found = std::ranges::find_if(rects, touches); found != rects.end();
+       found = std::ranges::find_if(rects, touches)) {
     area = Union(area, *found);
     rects.erase(found);
   }

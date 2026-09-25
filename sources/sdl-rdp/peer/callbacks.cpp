@@ -3,6 +3,7 @@
 #include <sdl-rdp/auth/authenticator.hpp>
 #include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
+#include <sdl-rdp/freerdp-facade/handled.hpp>
 #include <sdl-rdp/input/events.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/peer/activator.hpp>
@@ -15,14 +16,20 @@
 
 namespace Backend {
 namespace {
-auto Router(freerdp_peer* client) -> PeerCallbacks& {
-  Expects(client != nullptr, "client transport exists");
-  return CallbackOwner<PeerCallbacks>(client->ContextExtra);
+auto PeerOwner(freerdp_peer const& client) -> PeerCallbacks& {
+  return CallbackOwner<PeerCallbacks, &freerdp_peer::ContextExtra>(client);
 }
-auto Router(rdpContext* context) -> PeerCallbacks& {
-  Expects(context != nullptr, "callback context exists");
-  return Router(context->peer);
+auto ContextOwner(rdpContext const& context) -> PeerCallbacks& {
+  Expects(context.peer != nullptr, "the callback context has its peer");
+  return PeerOwner(*context.peer);
 }
+constexpr OperationName PeerActivation      { "Peer activation"               };
+constexpr OperationName PeerCapabilities    { "Peer capabilities"             };
+constexpr OperationName PeerLogon           { "Peer logon"                    };
+constexpr OperationName NtlmHash            { "NTLM hash"                     };
+constexpr OperationName FrameAcknowledgement{ "Surface frame acknowledgement" };
+constexpr OperationName SuppressOutput      { "Suppress output"               };
+using sdl_rdp::freerdp_facade::Handled;
 }
 PeerCallbacks::PeerCallbacks(PeerLink& link, Authenticator& authenticator, Activator& activator,
                              CapabilityCheck& capabilities, OutputControl& output, InputEvents& input)
@@ -36,60 +43,51 @@ PeerCallbacks::PeerCallbacks(PeerLink& link, Authenticator& authenticator, Activ
 auto PeerCallbacks::InstallClient() -> void {
   auto& client = _link.Client();
   // abi: psPeerActivate, psPeerCapabilities, psPeerPostConnect; BOOL is int
-  client.Activate     = [](freerdp_peer* peer) noexcept -> int {
-    auto& owner = Router(peer);
-    return Contained(false, [&] { return owner._activator.Activate(); }, owner.Failures("Peer activation"));
-  };
-  client.Capabilities = [](freerdp_peer* peer) noexcept -> int {
-    auto& owner = Router(peer);
-    return Contained(false, [&] { return owner._capabilities.Accept(); }, owner.Failures("Peer capabilities"));
-  };
+  client.Activate     = Handled<PeerOwner, &PeerCallbacks::Activate, PeerActivation, _failures, false>;
+  client.Capabilities = Handled<PeerOwner, &PeerCallbacks::Capabilities, PeerCapabilities, _failures, false>;
   // PostConnect has no work that can fail: the session starts at Activate.
   client.PostConnect = [](freerdp_peer*) noexcept -> int { return true; };
   InstallAuthentication();
 }
 auto PeerCallbacks::InstallAuthentication() -> void {
-  auto& client = _link.Client();
-  // abi: psPeerLogon, BOOL is int
-  client.Logon = [](freerdp_peer* peer, SEC_WINNT_AUTH_IDENTITY const*, int automatic) noexcept -> int {
-    auto& owner = Router(peer);
-    return Contained(false, [&] { return owner._authenticator.Logon(automatic != 0); }, owner.Failures("Peer logon"));
+  auto&          client = _link.Client();
+  constexpr auto logon  = [](PeerCallbacks& owner, SEC_WINNT_AUTH_IDENTITY const& /*identity*/, int automatic) {
+    return owner._authenticator.Logon(automatic != 0);
   };
-  // abi: psSspiNtlmHashCallback, BYTE is uint8_t, SECURITY_STATUS is LONG, an int32_t
-  client.SspiNtlmHashCallback = [](void* peer, SEC_WINNT_AUTH_IDENTITY const* identity, SecBuffer const*,
-                                   std::uint8_t const*, std::uint8_t const*, SecBuffer const*,
-                                   std::uint8_t* response) noexcept -> std::int32_t {
-    Expects(identity != nullptr, "NTLM identity is supplied");
-    Expects(response != nullptr, "callback response is supplied");
-    auto&      owner = Router(static_cast<freerdp_peer*>(peer));
-    auto const hash  = [&] { return owner._authenticator.Hash(*identity, response) ? SEC_E_OK : SEC_E_LOGON_DENIED; };
-    return Contained(SEC_E_INTERNAL_ERROR, hash, owner.Failures("NTLM hash"));
+  // FreeRDP 3.32 ntlm_compute.c:513 passes the 16-byte hash buffer by its first byte, every other argument set.
+  constexpr auto hash = [](PeerCallbacks& owner, SEC_WINNT_AUTH_IDENTITY const& identity, SecBuffer const&,
+                           std::uint8_t const&, std::uint8_t const&, SecBuffer const&, NtKey response) -> std::int32_t {
+    return owner._authenticator.Hash(identity, response) ? SEC_E_OK : SEC_E_LOGON_DENIED;
   };
+  // abi: psPeerLogon, BOOL is int; psSspiNtlmHashCallback, SECURITY_STATUS is LONG, an int32_t
+  client.Logon                = Handled<PeerOwner, logon, PeerLogon, _failures, false>;
+  client.SspiNtlmHashCallback = Handled<PeerOwner, hash, NtlmHash, _failures, SEC_E_INTERNAL_ERROR>;
 }
 auto PeerCallbacks::InstallUpdates() -> void {
   auto& update = *_link.Context().update;
   // abi: pSurfaceFrameAcknowledge, pSuppressOutput; BOOL is int
-  update.SurfaceFrameAcknowledge = [](rdpContext* context, std::uint32_t id) noexcept -> int {
-    auto&      owner       = Router(context);
-    auto const acknowledge = [&] {
-      owner._output.Acknowledge(id);
-      return true;
-    };
-    return Contained(false, acknowledge, owner.Failures("Surface frame acknowledgement"));
-  };
-  update.SuppressOutput          = [](rdpContext* context, std::uint8_t allow, RECTANGLE_16 const*) noexcept -> int {
-    auto&      owner    = Router(context);
-    auto const suppress = [&] {
-      owner._output.Suppress(allow != 0);
-      return true;
-    };
-    return Contained(false, suppress, owner.Failures("Suppress output"));
-  };
+  update.SurfaceFrameAcknowledge = Handled<ContextOwner, &PeerCallbacks::Acknowledge, FrameAcknowledgement, _failures,
+                                           false>;
+  update.SuppressOutput          = Handled<ContextOwner, &PeerCallbacks::Suppress, SuppressOutput, _failures, false>;
 }
-auto PeerCallbacks::Failures(OperationName operation) const noexcept -> FailureLog {
-  return _input.Failures(operation);
+auto PeerCallbacks::Activate() -> bool {
+  return _activator.Activate();
+}
+auto PeerCallbacks::Capabilities() -> bool {
+  return _capabilities.Accept();
+}
+auto PeerCallbacks::Acknowledge(std::uint32_t id) -> bool {
+  _output.Acknowledge(id);
+  return true;
+}
+auto PeerCallbacks::Suppress(std::uint8_t allow) -> bool {
+  _output.Suppress(allow != 0);
+  return true;
 }
 PeerCallbacks::~PeerCallbacks() {
   _link.Client().ContextExtra = nullptr;
+}
+auto PeerCallbacks::FailureSource() const noexcept -> InputEvents const& {
+  return _input;
 }
 }

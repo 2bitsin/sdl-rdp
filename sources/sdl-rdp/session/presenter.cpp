@@ -94,7 +94,7 @@ auto Presenter::EnsurePicture() -> void {
   auto const session = _session.Lock();
   auto const frame   = _frames.Lock();
   if (!_frames.Ensure(frame)) return;
-  if (auto* const current = _session.Current(session)) current->Repaint(frame, _frames.Bounds(frame));
+  if (auto const current = _session.Current(session)) current->get().Repaint(frame, _frames.Bounds(frame));
 }
 auto Presenter::Resize(Extent size) -> void {
   Expects(size.width > 0, "picture width is positive");
@@ -103,7 +103,7 @@ auto Presenter::Resize(Extent size) -> void {
   auto const             session = _session.Lock();
   auto const             locked  = _session.LockPeersAndFrame();
   if (!_frames.Resize(locked.Frame(), size)) return;
-  if (auto* const current = _session.Current(session)) current->RestartPacing(locked.Frame());
+  if (auto const current = _session.Current(session)) current->get().RestartPacing(locked.Frame());
   locked.ForEach([&](Peer& peer, FrameLock const& frame) { peer.Repaint(frame, Whole(size)); });
 }
 auto Presenter::SetAspect(sdlrdp_aspect value) -> void {
@@ -128,8 +128,8 @@ auto Presenter::WaitFrame(Deadline deadline) -> int {
   auto       frame  = _frames.Lock();
   auto const target = _frames.Presented(frame);
   return _frames.WaitFor(frame, deadline, [&] {
-    auto* const current = _session.Current(frame);
-    return !current || current->Settled(frame, target);
+    auto const current = _session.Current(frame);
+    return !current || current->get().Settled(frame, target);
   });
 }
 }

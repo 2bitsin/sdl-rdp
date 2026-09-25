@@ -58,8 +58,9 @@ auto Redirection::EndAudio() -> void {
   _sound.reset();
   _session.AudioGone();
 }
-auto Redirection::Audio() const noexcept -> AudioChannel* {
-  return _sound.get();
+auto Redirection::Audio() const noexcept -> std::optional<std::reference_wrapper<AudioChannel>> {
+  if (!_sound) return std::nullopt;
+  return std::ref(*_sound);
 }
 auto Redirection::Drive() const -> std::shared_ptr<DriveChannel> {
   return _drive;

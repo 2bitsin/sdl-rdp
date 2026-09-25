@@ -65,28 +65,27 @@ auto Stamp(X509& cert) -> bool {
          && X509_gmtime_adj(X509_getm_notBefore(&cert), 0)
          && X509_gmtime_adj(X509_getm_notAfter(&cert), Validity.count());
 }
-auto Identify(X509& cert, EVP_PKEY* key, std::string const& host) -> bool {
+auto Identify(X509& cert, EVP_PKEY& key, std::string const& host) -> bool {
   auto* const     name      = X509_get_subject_name(&cert);
   auto const      san       = "DNS:" + host;
   Extension const extension(X509V3_EXT_conf_nid(nullptr, nullptr, NID_subject_alt_name, san.c_str()));
-  return X509_set_pubkey(&cert, key)
+  return X509_set_pubkey(&cert, &key)
          && X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC,
                                        oxbox::utilities::SpanCast<std::uint8_t const>(std::span(host)).data(), -1, -1,
                                        0)
          && X509_set_issuer_name(&cert, name) && extension && X509_add_ext(&cert, extension.get(), -1);
 }
-auto SelfSigned(EVP_PKEY* key) -> Certificate {
-  Expects(key != nullptr, "RSA key exists");
+auto SelfSigned(EVP_PKEY& key) -> Certificate {
   Certificate cert(X509_new());
   if (!cert) throw AllocationFailed{ "Certificate" };
-  if (!Stamp(*cert) || !Identify(*cert, key, Hostname()) || !X509_sign(cert.get(), key, EVP_sha256()))
+  if (!Stamp(*cert) || !Identify(*cert, key, Hostname()) || !X509_sign(cert.get(), &key, EVP_sha256()))
     throw CredentialFailed{ "certificate signing" };
   return cert;
 }
 auto Generate(Credentials const& paths) -> void {
   Key const key(EVP_RSA_gen(2048));
   if (!key) throw CredentialFailed{ "RSA key generation" };
-  auto      cert     = SelfSigned(key.get());
+  auto      cert     = SelfSigned(*key);
   auto      fd       = open(paths.Key().c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
   Bio const key_file(fd < 0 ? nullptr : BIO_new_fd(fd, BIO_CLOSE));
   if (key_file)

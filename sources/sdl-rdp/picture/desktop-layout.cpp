@@ -41,8 +41,8 @@ auto DesktopLayout::Matches(sdlrdp_rect picture) const noexcept -> bool {
 auto DesktopLayout::Offer(sdlrdp_rect picture) const noexcept -> sdlrdp_rect {
   return _resizing ? _desktop : picture;
 }
-auto DesktopLayout::Scale(int value, std::uint32_t target, int sdlrdp_rect::* extent) const -> int {
-  Expects(_desktop.*extent > 0, "desktop extent is positive");
-  return Narrowed<int>(std::int64_t{ value } * target / (_desktop.*extent));
+auto Rescale(int value, int extent, std::uint32_t target) -> int {
+  Expects(extent > 0, "the scaled extent is positive");
+  return Narrowed<int>(std::int64_t{ value } * target / extent);
 }
 }

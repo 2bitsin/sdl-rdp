@@ -4,14 +4,18 @@
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/logging.hpp>
 #include <sdl-rdp/freerdp-facade/exceptions.hpp>
+#include <sdl-rdp/freerdp-facade/waitable.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/link/session-access.hpp>
 #include <sdl-rdp/peer/departure.hpp>
+#include <sdl-rdp/peer/exceptions.hpp>
 #include <sdl-rdp/peer/pump.hpp>
 #include <sdl-rdp/peer/wait.hpp>
 #include <sdl-rdp/picture/desktop-layout.hpp>
 #include <sdl-rdp/picture/frame-store.hpp>
+#include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
+#include <sdl-rdp/utilities/scoped.hpp>
 #include <sdl-rdp/video/acknowledgement-window.hpp>
 
 #include <freerdp/settings.h>
@@ -20,8 +24,11 @@
 #include <array>
 #include <cstdint>
 #include <format>
+#include <functional>
 #include <memory>
 #include <ranges>
+#include <string_view>
+#include <tuple>
 #include <utility>
 
 namespace Backend {
@@ -57,20 +64,30 @@ auto ApplySettings(rdpSettings& settings, sdlrdp_auth auth, sdlrdp_rect picture)
          && Apply(settings, Flags(auth), freerdp_settings_set_bool)
          && Apply(settings, numbers, freerdp_settings_set_uint32) && ApplyDesktopSize(settings, picture);
 }
-auto NegotiationLogging(rdpSettings& settings) {
+auto BeginNegotiationLogging(rdpSettings& settings) -> rdpSettings& {
   ResetAuthenticationLogging();
-  PeerNegotiationLogging(&settings);
-  return std::unique_ptr<rdpSettings, decltype([](rdpSettings*) { ResetAuthenticationLogging(); })>{ &settings };
+  PeerNegotiationLogging(settings);
+  return settings;
 }
-auto Connection(PeerLink& link, SessionAccess& session) {
-  auto  disconnect = [&session](freerdp_peer* client) {
-    auto const held = session.Lock();
-    client->Disconnect(client);
-  };
-  auto& client     = link.Client();
-  return std::unique_ptr<freerdp_peer, decltype(disconnect)>{ client.Initialize(&client) ? &client : nullptr,
-                                                              disconnect };
+auto EndNegotiationLogging(rdpSettings& /*settings*/) noexcept -> void {
+  ResetAuthenticationLogging();
 }
+using NegotiationLogging = utilities::RAIIWrap<rdpSettings&, BeginNegotiationLogging, EndNegotiationLogging>;
+struct LiveConnection {
+  std::reference_wrapper<PeerLink>      link;
+  std::reference_wrapper<SessionAccess> session;
+};
+auto Connect(PeerLink& link, SessionAccess& session) -> LiveConnection {
+  auto& client = link.Client();
+  if (!client.Initialize(&client)) throw sdl_rdp::peer::PeerSetupFailed{ "initialization" };
+  return { .link = link, .session = session };
+}
+auto Disconnect(LiveConnection const& live) noexcept -> void {
+  auto const held   = live.session.get().Lock();
+  auto&      client = live.link.get().Client();
+  client.Disconnect(&client);
+}
+using Connection = utilities::RAIIWrap<LiveConnection, Connect, Disconnect>;
 }
 PeerLoop::PeerLoop(PeerLink& link, SessionAccess& session, Diagnostics const& diagnostics,
                    Authenticator const& authenticator, FrameStore& store, PeerWait& wait, PeerPump& pump,
@@ -86,20 +103,25 @@ auto PeerLoop::Stop() -> void {
 }
 auto PeerLoop::Serve(std::stop_token const& quit) -> void {
   std::stop_callback const wake(quit, [this] { _link.Signal(); });
-  auto const               logging = NegotiationLogging(_link.Settings());
-  if (!Configure() || !Run(quit))
-    _diagnostics.Log(SDLRDP_LOG_ERROR,
-                     std::format("Peer initialization failed: {}.",
-                                 freerdp_get_last_error_name(freerdp_get_last_error(&_link.Context()))));
+  NegotiationLogging const logging { _link.Settings() };
+  auto const               served  = [&] {
+    if (!Configure()) throw sdl_rdp::peer::PeerSetupFailed{ "configuration" };
+    Run(quit);
+    return true;
+  };
+  auto const               failed  = [this](std::string_view failure) {
+    _diagnostics.Log(
+        SDLRDP_LOG_ERROR,
+        std::format("{} FreeRDP: {}.", failure, freerdp_get_last_error_name(freerdp_get_last_error(&_link.Context()))));
+  };
+  std::ignore = Contained(false, served, failed);
   _departure.Depart();
 }
-auto PeerLoop::Run(std::stop_token const& quit) -> bool {
-  auto const connection = Connection(_link, _session);
-  if (!connection) return false;
-  std::array<WaitHandle, MAXIMUM_WAIT_OBJECTS> handles{ };
+auto PeerLoop::Run(std::stop_token const& quit) -> void {
+  Connection const                             connection{ _link, _session };
+  std::array<WaitHandle, MAXIMUM_WAIT_OBJECTS> handles   { };
   while (!quit.stop_requested() && Step(quit, handles)) {
   }
-  return true;
 }
 auto PeerLoop::Configure() -> bool {
   auto const picture  = _store.Read([](FrameStore const& store, FrameLock const& held) { return store.Picture(held); });
@@ -119,7 +141,9 @@ auto PeerLoop::Dispatch(std::stop_token const& quit, std::span<WaitHandle> handl
   std::array<WaitHandle, MAXIMUM_WAIT_OBJECTS> signalled{ };
   WaitHandle*                                  end      { };
   try {
-    end = std::ranges::copy_if(handles, signalled.begin(), Signalled).out;
+    end = std::ranges::copy_if(handles, signalled.begin(), [](WaitHandle handle) {
+            return sdl_rdp::freerdp_facade::Waitable{ handle }.Signalled();
+          }).out;
   } catch (EventWaitFailed const&) {
     return false;
   }

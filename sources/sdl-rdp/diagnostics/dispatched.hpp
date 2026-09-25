@@ -9,9 +9,8 @@
 namespace Backend {
 template <auto HANDLER, class OwnerTy, class PduTy>
   requires std::invocable<decltype(HANDLER), OwnerTy&, PduTy const&>
-auto Dispatched(std::uint32_t failure, OwnerTy& owner, PduTy const* pdu, FailureLog const& failures) noexcept
+auto Dispatched(std::uint32_t failure, OwnerTy& owner, PduTy const& pdu, FailureLog const& failures) noexcept
     -> std::uint32_t {
-  Expects(pdu != nullptr, "the channel PDU is supplied");
-  return Contained(failure, [&] { return std::invoke(HANDLER, owner, *pdu); }, failures);
+  return Contained(failure, [&] { return std::invoke(HANDLER, owner, pdu); }, failures);
 }
 }

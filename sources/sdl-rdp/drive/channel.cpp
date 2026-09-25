@@ -5,6 +5,7 @@
 #include <sdl-rdp/drive/capabilities.hpp>
 #include <sdl-rdp/drive/exceptions.hpp>
 #include <sdl-rdp/drive/label.hpp>
+#include <sdl-rdp/freerdp-facade/waitable.hpp>
 #include <sdl-rdp/link/event-queue.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/link/session-access.hpp>
@@ -29,7 +30,6 @@ using Backend::EventQueue;
 using Backend::Narrowed;
 using Backend::PeerLink;
 using Backend::SessionAccess;
-using Backend::Signalled;
 using Backend::WaitHandle;
 using utilities::Expects;
 namespace {
@@ -270,8 +270,9 @@ auto DriveChannel::GeneralClientCapability(DrivePacket& packet, std::size_t star
                   minor, version, flags, bool(flags & RDPDR_DEVICE_REMOVE_PDUS)));
 }
 auto DriveChannel::PumpAvailable() -> bool {
+  sdl_rdp::freerdp_facade::Waitable const ready{ event };
   for (;;) {
-    if (!Signalled(event)) return true;
+    if (!ready.Signalled()) return true;
     std::uint32_t length = 0;
     if (!WTSVirtualChannelRead(channel.get(), 0, nullptr, 0, &length)) throw DriveChannelFailed{ "read" };
     if (!length) return true;
@@ -284,7 +285,7 @@ auto DriveChannel::PumpAvailable() -> bool {
     Receive(packet);
   }
 }
-auto DriveChannel::Name(std::span<std::byte const> bytes, char const* dos) const -> std::string {
+auto DriveChannel::Name(std::span<std::byte const> bytes, std::string_view dos) const -> std::string {
   std::string label(dos);
   try {
     label = DecodeLabel(bytes, drive_version, dos);
@@ -325,14 +326,11 @@ auto DriveChannel::Device(std::uint32_t id) -> std::uint32_t {
   if (found == devices.end()) throw DriveRemoved{ "the requested drive" };
   return found->second.wire;
 }
-auto DriveChannel::List(sdlrdp_drive* out, std::size_t max) -> int {
+auto DriveChannel::List(std::span<sdlrdp_drive> out) -> int {
   std::scoped_lock const lock(mutex);
-  std::size_t            count = 0;
-  for (auto const& [id, device] : devices) {
-    if (count == max) break;
-    out[count++] = device.drive;
-  }
-  return int(count);
+  auto const             listed = devices | std::views::values | std::views::transform(&DeviceEntry::drive)
+                                  | std::views::take(out.size());
+  return Narrowed<int>(std::ranges::copy(listed, out.begin()).out - out.begin());
 }
 auto DriveChannel::WaitAny(std::span<Slot const> slots) -> std::size_t {
   Expects(std::ranges::any_of(slots, [](auto const& slot) { return bool(slot.request); }),

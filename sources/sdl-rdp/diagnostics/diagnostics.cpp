@@ -12,6 +12,6 @@ auto Diagnostics::Emit(std::string const& text) const -> void {
   _logger.Log(SDLRDP_LOG_INFO, text);
 }
 auto Diagnostics::Fail(std::string text) -> void {
-  ErrorStore::Publish(&_errors, std::move(text));
+  _errors.Publish(std::move(text));
 }
 }

@@ -18,4 +18,15 @@ private:
   OperationName                             _operation;
   sdlrdp_log_level                          _level;
 };
+auto FailuresOf(Diagnostics const& diagnostics, OperationName operation) noexcept -> FailureLog;
+template <class SourceTy>
+  requires requires(SourceTy const& source, OperationName operation) { source.Failures(operation); }
+auto FailuresOf(SourceTy const& source, OperationName operation) noexcept -> FailureLog {
+  return source.Failures(operation);
+}
+// A slot's failure projection: the diagnostics, or the failure source, the owner's accessor SOURCE returns.
+template <auto SOURCE>
+constexpr auto FailuresThrough = [](auto const& owner, OperationName operation) noexcept -> FailureLog {
+  return FailuresOf(std::invoke(SOURCE, owner), operation);
+};
 }

@@ -26,6 +26,7 @@ public:
 private:
   class Callbacks;
   auto Created(std::uint32_t channel_id, std::int32_t status) -> bool;
+  auto FailureSource() const noexcept                         -> GraphicsLink const&;
   PeerLink&            _link;
   Activation const&    _activation;
   GraphicsLink&        _graphics;

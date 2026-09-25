@@ -69,15 +69,14 @@ auto FinishSlot(sdlrdp_file& file, std::span<Byte> bytes, TransferProgress& prog
   slot.request.reset();
   --progress.active;
 }
-template <class Byte> auto Transfer(sdlrdp_file* file, std::uint64_t offset, Byte* buffer, std::size_t size) -> int {
-  std::array<Slot, 8> slots    { };
-  TransferProgress    progress { .limit = size };
-  auto                bytes    = std::span(buffer, size);
-  std::ranges::for_each(slots, [&](Slot& slot) { SubmitSlot(*file, offset, bytes, progress, slot); });
+template <class Byte> auto Transfer(sdlrdp_file& file, std::uint64_t offset, std::span<Byte> bytes) -> int {
+  std::array<Slot, 8> slots   { };
+  TransferProgress    progress{ .limit = bytes.size() };
+  std::ranges::for_each(slots, [&](Slot& slot) { SubmitSlot(file, offset, bytes, progress, slot); });
   while (progress.active) {
-    auto& slot = slots[file->Channel()->WaitAny(slots)];
-    FinishSlot(*file, bytes, progress, slot);
-    SubmitSlot(*file, offset, bytes, progress, slot);
+    auto& slot = slots[file.Channel()->WaitAny(slots)];
+    FinishSlot(file, bytes, progress, slot);
+    SubmitSlot(file, offset, bytes, progress, slot);
   }
   if (progress.failure) std::rethrow_exception(progress.failure);
   return int(progress.limit);

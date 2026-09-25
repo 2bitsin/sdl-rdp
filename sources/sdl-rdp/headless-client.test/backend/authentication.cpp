@@ -115,7 +115,7 @@ auto Authentication::Attempt(char const* user, char const* password, char const*
 }
 auto Authentication::PasswordCleared() -> void {
   auto const  status   = RequiredStatus(*handle);
-  auto const* password = freerdp_settings_get_string(status.client->context->settings, FreeRDP_Password);
+  auto const* password = freerdp_settings_get_string(status.client.get().context->settings, FreeRDP_Password);
   EXPECT_TRUE(!password || !*password);
 }
 auto Authentication::ThenRejection(sdlrdp_log_level level, std::string const& text, std::size_t rejected) -> void {

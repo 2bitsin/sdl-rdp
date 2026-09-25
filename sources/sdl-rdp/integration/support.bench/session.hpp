@@ -63,7 +63,7 @@ private:
   using Torn = ::utilities::RAIIWrap<Session&, &Session::_SetUp, &Session::_TearDown>;
 
   std::reference_wrapper<Measurement> _measurement;
-  bool _set_up = false;
+  bool                                _set_up      = false;
 };
 
 // The measurement outlives the case, so the fixture's construction and destruction report into it too.

@@ -2,6 +2,7 @@
 
 #include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
+#include <sdl-rdp/freerdp-facade/handled.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/event-queue.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
@@ -22,10 +23,13 @@ namespace {
 constexpr std::uint32_t MonitorLimit      = 16;
 constexpr std::uint32_t MonitorAreaFactor = 8192;
 using Monitor = DISPLAY_CONTROL_MONITOR_LAYOUT;
-auto Held(DispServerContext* context) -> DisplayControl& {
-  Expects(context != nullptr, "callback context exists");
-  return CallbackOwner<DisplayControl>(context->custom);
+auto Held(DispServerContext const& context) -> DisplayControl& {
+  return CallbackOwner<DisplayControl, &DispServerContext::custom>(context);
 }
+constexpr OperationName DisplayLayout    { "Display layout"             };
+constexpr OperationName DisplayAssignment{ "Display channel assignment" };
+using sdl_rdp::freerdp_facade::AssignThrough;
+using sdl_rdp::freerdp_facade::Handled;
 auto Edge(std::span<Monitor const> monitors, std::regular_invocable<Monitor const&> auto edge,
           std::regular_invocable<std::int64_t, std::int64_t> auto pick) -> std::int64_t {
   return std::ranges::fold_left(monitors | std::views::transform(edge), std::int64_t{ 0 }, pick);
@@ -45,19 +49,11 @@ public:
   static auto Install(DispServerContext& server) -> void;
 };
 auto DisplayControl::Callbacks::Install(DispServerContext& server) -> void {
-  // abi: psDispMonitorLayout, UINT is uint32_t
-  server.DispMonitorLayout = [](DispServerContext* context,
-                                DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const* pdu) noexcept -> std::uint32_t {
-    Expects(pdu != nullptr, "display layout PDU is supplied");
-    auto&      owner    = Held(context);
-    auto const laid_out = [&] { return owner.Layout(*pdu); };
-    return Contained(ERROR_INTERNAL_ERROR, laid_out, FailureLog{ owner._diagnostics, "Display layout" });
-  };
-  // abi: psDispChannelIdAssigned, BOOL is int
-  server.ChannelIdAssigned = [](DispServerContext* context, std::uint32_t channel_id) noexcept -> int {
-    auto& owner = Held(context);
-    return owner._slot.Assigned(channel_id, FailureLog{ owner._diagnostics, "Display channel assignment" });
-  };
+  constexpr auto failures = FailuresThrough<&DisplayControl::FailureSource>;
+  constexpr auto assign   = AssignThrough<&DisplayControl::_slot>;
+  // abi: psDispMonitorLayout, UINT is uint32_t; psDispChannelIdAssigned, BOOL is int
+  server.DispMonitorLayout = Handled<Held, &DisplayControl::Layout, DisplayLayout, failures, ERROR_INTERNAL_ERROR>;
+  server.ChannelIdAssigned = Handled<Held, assign, DisplayAssignment, failures, false>;
 }
 DisplayControl::DisplayControl(PeerLink& link, Activation const& activation, DesktopLayout const& desktop,
                                EventQueue& events, Diagnostics const& diagnostics) noexcept
@@ -68,15 +64,17 @@ auto DisplayControl::Open() -> bool {
       || !DynamicChannelsReady(_link))
     return true;
   _context.reset(disp_server_context_new(_link.Channels()));
-  if (!BindContext(_context.get(), this, _link.Context())) return false;
+  if (!_context) return false;
+  BindContext(*_context, *this, _link.Context());
   Callbacks::Install(*_context);
   _context->MaxNumMonitors        = MonitorLimit;
   _context->MaxMonitorAreaFactorA = _context->MaxMonitorAreaFactorB = MonitorAreaFactor;
   _open                           = _context->Open(_context.get()) == CHANNEL_RC_OK;
   return _open;
 }
-auto DisplayControl::Opened() const noexcept -> DispServerContext* {
-  return _open ? _context.get() : nullptr;
+auto DisplayControl::Opened() const noexcept -> std::optional<std::reference_wrapper<DispServerContext>> {
+  if (!_open) return std::nullopt;
+  return std::ref(*_context);
 }
 auto DisplayControl::Activate() -> bool {
   Expects(_context != nullptr, "an activated display channel is open");
@@ -92,5 +90,8 @@ auto DisplayControl::Layout(DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const& pdu) -> st
       { .type   = SDLRDP_SCREEN,
         .screen = { .width = Narrowed<std::uint32_t>(extent.w), .height = Narrowed<std::uint32_t>(extent.h) } });
   return CHANNEL_RC_OK;
+}
+auto DisplayControl::FailureSource() const noexcept -> Diagnostics const& {
+  return _diagnostics;
 }
 }

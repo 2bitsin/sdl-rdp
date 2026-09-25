@@ -21,7 +21,8 @@ public:
   auto Event() const                           -> WaitHandle;
 
 private:
-  auto Activate() -> bool;
+  auto Activate()                     -> bool;
+  auto FailureSource() const noexcept -> InputEvents const&;
   friend                     Protocol;
   PeerLink&                  _link;
   InputEvents&               _events;
@@ -30,6 +31,9 @@ private:
   ChannelSlot                _slot;
   bool                       _ready  { };
 };
+template <class Protocol> auto InputChannel<Protocol>::FailureSource() const noexcept -> InputEvents const& {
+  return _events;
+}
 template <class Protocol> auto InputChannel<Protocol>::Open() -> bool {
   _context = Protocol::Open(_link, *this);
   return _context != nullptr;

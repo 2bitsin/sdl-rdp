@@ -27,7 +27,7 @@ public:
   auto operator=(Redirection&&)                      -> Redirection& = delete;
   auto OpenStatic(std::span<WaitHandle const> ready) -> bool;
   auto Sound(std::span<WaitHandle const> ready)      -> void;
-  auto Audio() const noexcept                        -> AudioChannel*;
+  auto Audio() const noexcept                        -> std::optional<std::reference_wrapper<AudioChannel>>;
   auto Drive() const                                 -> std::shared_ptr<sdl_rdp::drive::DriveChannel>;
   auto LogAudio() const                              -> void;
   auto Disconnect()                                  -> void;
