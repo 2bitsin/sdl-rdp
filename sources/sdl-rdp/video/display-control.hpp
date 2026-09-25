@@ -1,6 +1,6 @@
 #pragma once
-#include <sdl-rdp/core/channel-slot.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/link/channel-slot.hpp>
 
 #include <freerdp/server/disp.h>
 #include <cstdint>

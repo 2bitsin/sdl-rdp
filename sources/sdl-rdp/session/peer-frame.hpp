@@ -1,5 +1,5 @@
 #pragma once
-#include <sdl-rdp/core/frame-store.hpp>
+#include <sdl-rdp/picture/frame-store.hpp>
 #include <sdl-rdp/session/peer-set.hpp>
 
 #include <concepts>

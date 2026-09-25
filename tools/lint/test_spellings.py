@@ -75,8 +75,8 @@ def test_boundary_names_fail_outside_the_facade(tree):
 
 
 def test_frozen_abi_header_is_exempt(tree):
-    (tree / 'sources/sdl-rdp-abi').mkdir(parents=True)
-    assert findings(tree, 'sources/sdl-rdp-abi/sdl-rdp-backend.h', 'unsigned width;\n') == []
+    (tree / 'sources/sdl-rdp/abi').mkdir(parents=True)
+    assert findings(tree, 'sources/sdl-rdp/abi/backend.h', 'unsigned width;\n') == []
 
 
 def test_sdl_scalars_fail_like_the_winpr_ones(tree):

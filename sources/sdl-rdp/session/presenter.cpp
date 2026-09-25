@@ -1,12 +1,12 @@
 #include <sdl-rdp/session/presenter.hpp>
 
-#include <sdl-rdp/core/configuration.hpp>
-#include <sdl-rdp/core/diagnostics.hpp>
-#include <sdl-rdp/core/frame-store.hpp>
-#include <sdl-rdp/session/peer.hpp>
+#include <sdl-rdp/configuration/configuration.hpp>
+#include <sdl-rdp/diagnostics/diagnostics.hpp>
+#include <sdl-rdp/peer/peer.hpp>
+#include <sdl-rdp/picture/frame-store.hpp>
 #include <sdl-rdp/session/session.hpp>
-#include <sdl-rdp/video/avc.hpp>
-#include <sdl-rdp/video/pointer-store.hpp>
+#include <sdl-rdp/video/avc/encoding.hpp>
+#include <sdl-rdp/video/pointer/store.hpp>
 
 #include <algorithm>
 #include <cstddef>

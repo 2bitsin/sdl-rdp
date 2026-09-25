@@ -1,7 +1,7 @@
 #pragma once
-#include <sdl-rdp/core/frame-store.hpp>
-#include <sdl-rdp/core/session-access.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/link/session-access.hpp>
+#include <sdl-rdp/picture/frame-store.hpp>
 #include <sdl-rdp/session/peer-frame.hpp>
 #include <sdl-rdp/session/peer-set.hpp>
 

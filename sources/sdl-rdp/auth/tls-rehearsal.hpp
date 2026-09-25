@@ -1,5 +1,5 @@
 #pragma once
-#include <sdl-rdp/core/certificate.hpp>
+#include <sdl-rdp/auth/certificate.hpp>
 #include <sdl-rdp/freerdp-facade/releases-peer.hpp>
 #include <sdl-rdp/utilities/socket-pair.hpp>
 

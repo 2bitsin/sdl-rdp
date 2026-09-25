@@ -1,6 +1,6 @@
 #pragma once
-#include <sdl-rdp/core/frame-snapshot.hpp>
-#include <sdl-rdp/core/frame-store.hpp>
+#include <sdl-rdp/picture/frame-snapshot.hpp>
+#include <sdl-rdp/picture/frame-store.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 #include <sdl-rdp/utilities/region.hpp>
 

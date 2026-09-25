@@ -1,6 +1,6 @@
 #include <sdl-rdp/session/peer-set.hpp>
 
-#include <sdl-rdp/session/peer.hpp>
+#include <sdl-rdp/peer/peer.hpp>
 
 #include <utility>
 

@@ -1,5 +1,5 @@
 #pragma once
-#include <sdl-rdp/core/frame-snapshot.hpp>
+#include <sdl-rdp/picture/frame-snapshot.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/video/encoder.hpp>

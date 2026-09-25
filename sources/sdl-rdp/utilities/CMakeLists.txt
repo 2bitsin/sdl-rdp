@@ -1,2 +1,2 @@
 Init_submodule()
-Link_dependencies(oxbox::platform sdl-rdp-abi)
+Link_dependencies(oxbox::platform abi)

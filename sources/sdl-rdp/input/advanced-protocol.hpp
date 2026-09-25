@@ -1,6 +1,6 @@
 #pragma once
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
-#include <sdl-rdp/input/input-protocol.hpp>
+#include <sdl-rdp/input/protocol.hpp>
 
 #include <freerdp/server/ainput.h>
 

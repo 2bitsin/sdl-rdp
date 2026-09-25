@@ -1,0 +1,367 @@
+diff -ruN a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -374,6 +374,10 @@
+ set_option(SDL_OPENVR              "Use OpenVR video driver" OFF)
+ dep_option(SDL_KMSDRM              "Use KMS DRM video driver" ${UNIX_SYS} "SDL_VIDEO" OFF)
+ dep_option(SDL_KMSDRM_SHARED       "Dynamically load KMS DRM support" ON "SDL_KMSDRM;SDL_DEPS_SHARED" OFF)
++set_option(SDL_RDPSTORAGE "Use RDP storage driver" OFF)
++set_option(SDL_RDPAUDIO            "Use RDP audio driver" OFF)
++set_option(SDL_RDP                 "Use RDP video driver" OFF)
++set(SDL_RDP_DYNAMIC "libbackend.so" CACHE STRING "RDP backend library")
+ set_option(SDL_OFFSCREEN           "Use offscreen video driver" ON)
+ dep_option(SDL_DUMMYCAMERA         "Support the dummy camera driver" ON SDL_CAMERA OFF)
+ option_string(SDL_BACKGROUNDING_SIGNAL "number to use for magic backgrounding signal or 'OFF'" OFF)
+@@ -424,6 +428,7 @@
+   set(SDL_DUMMYAUDIO       OFF)
+   set(SDL_DUMMYCAMERA      OFF)
+   set(SDL_DUMMYVIDEO       OFF)
++  set(SDL_RDP              OFF)
+   set(SDL_OFFSCREEN        OFF)
+   set(SDL_RENDER_GPU       OFF)
+   set(SDL_TRAY             OFF)
+@@ -1330,7 +1335,21 @@
+ 
+ 
+ # General SDL subsystem options, valid for all platforms
++if(SDL_RDP OR SDL_RDPAUDIO OR SDL_RDPSTORAGE)
++  enable_language(CXX)
++  set(CMAKE_CXX_STANDARD 23)
++  set(CMAKE_CXX_STANDARD_REQUIRED ON)
++endif()
++if(SDL_RDPSTORAGE)
++  set(SDL_STORAGE_DRIVER_RDP 1)
++  sdl_glob_sources("${SDL3_SOURCE_DIR}/src/storage/rdp/*.cpp")
++endif()
+ if(SDL_AUDIO)
++  if(SDL_RDPAUDIO)
++    set(SDL_AUDIO_DRIVER_RDP 1)
++    set(HAVE_SDL_AUDIO TRUE)
++    sdl_glob_sources("${SDL3_SOURCE_DIR}/src/audio/rdp/*.cpp")
++  endif()
+   # CheckDummyAudio/CheckDiskAudio - valid for all platforms
+   if(SDL_DUMMYAUDIO)
+     set(SDL_AUDIO_DRIVER_DUMMY 1)
+@@ -3501,6 +3520,13 @@
+ # Platform-independent options
+ 
+ if(SDL_VIDEO)
++  if(SDL_RDP)
++    set(SDL_VIDEO_DRIVER_RDP 1)
++    set(SDL_VIDEO_DRIVER_RDP_DYNAMIC "\"${SDL_RDP_DYNAMIC}\"")
++    sdl_glob_sources("${SDL3_SOURCE_DIR}/src/video/rdp/*.cpp")
++    set(HAVE_RDP TRUE)
++    set(HAVE_SDL_VIDEO TRUE)
++  endif()
+   if(SDL_OFFSCREEN)
+     set(SDL_VIDEO_DRIVER_OFFSCREEN 1)
+     sdl_glob_sources(
+diff -ruN a/include/SDL3/SDL_hints.h b/include/SDL3/SDL_hints.h
+--- a/include/SDL3/SDL_hints.h
++++ b/include/SDL3/SDL_hints.h
+@@ -3163,6 +3163,31 @@
+  */
+ #define SDL_HINT_QUIT_ON_LAST_WINDOW_CLOSE "SDL_QUIT_ON_LAST_WINDOW_CLOSE"
+ 
++/* Listener settings are shared by audio and video; set before opening either. */
++/** Path to libSDL3.ini; application hint takes precedence over environment. */
++#define SDL_HINT_RDP_INI "SDL_RDP_INI"
++
++#define SDL_HINT_RDP_BACKEND "SDL_RDP_BACKEND"
++#define SDL_HINT_RDP_BIND "SDL_RDP_BIND"
++#define SDL_HINT_RDP_CERT_DIR "SDL_RDP_CERT_DIR"
++#define SDL_HINT_RDP_CODEC "SDL_RDP_CODEC"
++#define SDL_HINT_RDP_AVC_BITRATE "SDL_RDP_AVC_BITRATE"
++#define SDL_HINT_RDP_AUDIO_LATENCY "SDL_RDP_AUDIO_LATENCY"
++#define SDL_HINT_RDP_AUDIO_LEAD "SDL_RDP_AUDIO_LEAD"
++#define SDL_HINT_RDP_VSYNC "SDL_RDP_VSYNC"
++#define SDL_HINT_RDP_ASPECT "SDL_RDP_ASPECT"
++#define SDL_HINT_RDP_HEIGHT "SDL_RDP_HEIGHT"
++#define SDL_HINT_RDP_PORT "SDL_RDP_PORT"
++#define SDL_HINT_RDP_WAIT_FOR_CLIENT "SDL_RDP_WAIT_FOR_CLIENT"
++#define SDL_HINT_RDP_WIDTH "SDL_RDP_WIDTH"
++#define SDL_HINT_RDP_REFRESH "SDL_RDP_REFRESH"
++/* UTF-8 fixed credentials; unset domain accepts any domain. Set before init. */
++#define SDL_HINT_RDP_USER "SDL_RDP_USER"
++#define SDL_HINT_RDP_PASSWORD "SDL_RDP_PASSWORD"
++#define SDL_HINT_RDP_DOMAIN "SDL_RDP_DOMAIN"
++/* none, tls, nla; defaults to nla with a password hint, otherwise none. */
++#define SDL_HINT_RDP_AUTH "SDL_RDP_AUTH"
++
+ /**
+  * A variable controlling whether the Direct3D device is initialized for
+  * thread-safe operations.
+diff -ruN a/include/SDL3/SDL_video.h b/include/SDL3/SDL_video.h
+--- a/include/SDL3/SDL_video.h
++++ b/include/SDL3/SDL_video.h
+@@ -681,6 +681,26 @@
+  */
+ extern SDL_DECLSPEC SDL_PropertiesID SDLCALL SDL_GetDisplayProperties(SDL_DisplayID displayID);
+ 
++/**
++ * Client drive names separated by newlines. Refreshed while pumping video events.
++ * No native SDL drive-change event is available.
++ */
++#define SDL_PROP_DISPLAY_RDP_DRIVES_STRING "SDL.display.rdp.drives"
++/**
++ * SDL_IOStream* (SDLCALL *)(const char* drive, const char* path, const char* mode).
++ * Opens an uncached client file with SDL_IOFromFile modes; NULL on error.
++ * The drive may be empty to select the first shared drive. Paths use UTF-8 and '/'.
++ * Calls block until the client completes the operation or disconnects.
++ */
++#define SDL_PROP_DISPLAY_RDP_OPEN_FILE_POINTER "SDL.display.rdp.open_file"
++#define SDL_PROP_DISPLAY_RDP_PORT_NUMBER "SDL.display.rdp.port"
++/* Worker-thread callbacks, read at call time. Keep callbacks/userdata alive until quit.
++   bool (SDLCALL *)(void *userdata, const char *domain, const char *user, const char *password)
++   bool (SDLCALL *)(void *userdata, const char *domain, const char *user, Uint8 nt_hash[16])
++   Set after SDL_Init; absent callbacks fall back to the fixed hint pair. */
++#define SDL_PROP_DISPLAY_RDP_VERIFY_POINTER "SDL.display.rdp.verify"
++#define SDL_PROP_DISPLAY_RDP_LOOKUP_POINTER "SDL.display.rdp.lookup"
++#define SDL_PROP_DISPLAY_RDP_AUTH_USERDATA_POINTER "SDL.display.rdp.auth_userdata"
+ #define SDL_PROP_DISPLAY_HDR_ENABLED_BOOLEAN             "SDL.display.HDR_enabled"
+ #define SDL_PROP_DISPLAY_KMSDRM_PANEL_ORIENTATION_NUMBER "SDL.display.KMSDRM.panel_orientation"
+ #define SDL_PROP_DISPLAY_WAYLAND_WL_OUTPUT_POINTER       "SDL.display.wayland.wl_output"
+@@ -1627,6 +1647,19 @@
+  */
+ extern SDL_DECLSPEC SDL_PropertiesID SDLCALL SDL_GetWindowProperties(SDL_Window *window);
+ 
++/* Read-only UTF-8 identity and authentication result of the connected client. */
++#define SDL_PROP_WINDOW_RDP_USER_STRING "SDL.window.rdp.user"
++#define SDL_PROP_WINDOW_RDP_DOMAIN_STRING "SDL.window.rdp.domain"
++#define SDL_PROP_WINDOW_RDP_AUTHENTICATED_BOOLEAN "SDL.window.rdp.authenticated"
++#define SDL_PROP_WINDOW_RDP_CLIENT_NAME_STRING "SDL.window.rdp.client_name"
++#define SDL_PROP_WINDOW_RDP_CODEC_STRING "SDL.window.rdp.codec"
++/**
++ * The connected RDP client's Windows keyboard layout identifier (read-only).
++ *
++ * \since This property is available since SDL 3.4.8.
++ */
++#define SDL_PROP_WINDOW_RDP_KEYBOARD_LAYOUT_NUMBER "SDL.window.rdp.keyboard_layout"
++#define SDL_PROP_WINDOW_RDP_ASPECT_STRING "SDL.window.rdp.aspect"
+ #define SDL_PROP_WINDOW_SHAPE_POINTER                               "SDL.window.shape"
+ #define SDL_PROP_WINDOW_HDR_ENABLED_BOOLEAN                         "SDL.window.HDR_enabled"
+ #define SDL_PROP_WINDOW_SDR_WHITE_LEVEL_FLOAT                       "SDL.window.SDR_white_level"
+diff -ruN a/include/build_config/SDL_build_config.h.cmake b/include/build_config/SDL_build_config.h.cmake
+--- a/include/build_config/SDL_build_config.h.cmake
++++ b/include/build_config/SDL_build_config.h.cmake
+@@ -272,6 +272,9 @@
+ #cmakedefine SDL_AUDIO_DRIVER_COREAUDIO 1
+ #cmakedefine SDL_AUDIO_DRIVER_DISK 1
+ #cmakedefine SDL_AUDIO_DRIVER_DSOUND 1
++#cmakedefine SDL_AUDIO_DRIVER_RDP 1
++#cmakedefine SDL_STORAGE_DRIVER_RDP 1
++#define SDL_RDP_DYNAMIC "@SDL_RDP_DYNAMIC@"
+ #cmakedefine SDL_AUDIO_DRIVER_DUMMY 1
+ #cmakedefine SDL_AUDIO_DRIVER_EMSCRIPTEN 1
+ #cmakedefine SDL_AUDIO_DRIVER_HAIKU 1
+@@ -406,6 +409,8 @@
+ #cmakedefine SDL_VIDEO_DRIVER_KMSDRM_DYNAMIC_GBM @SDL_VIDEO_DRIVER_KMSDRM_DYNAMIC_GBM@
+ #cmakedefine SDL_VIDEO_DRIVER_N3DS 1
+ #cmakedefine SDL_VIDEO_DRIVER_NGAGE 1
++#cmakedefine SDL_VIDEO_DRIVER_RDP 1
++#cmakedefine SDL_VIDEO_DRIVER_RDP_DYNAMIC @SDL_VIDEO_DRIVER_RDP_DYNAMIC@
+ #cmakedefine SDL_VIDEO_DRIVER_OFFSCREEN 1
+ #cmakedefine SDL_VIDEO_DRIVER_PS2 1
+ #cmakedefine SDL_VIDEO_DRIVER_PSP 1
+diff -ruN a/src/SDL_hints.c b/src/SDL_hints.c
+--- a/src/SDL_hints.c
++++ b/src/SDL_hints.c
+@@ -255,6 +255,20 @@
+     return SDL_SetHintWithPriority(name, value, SDL_HINT_NORMAL);
+ }
+ 
++const char *SDL_GetHintFromCode(const char *name)
++{
++    const char *result = NULL;
++    const SDL_PropertiesID hints = GetHintProperties(false);
++    if (name && hints) {
++        SDL_Hint *hint;
++        SDL_LockProperties(hints);
++        hint = (SDL_Hint *)SDL_GetPointerProperty(hints, name, NULL);
++        if (hint) result = SDL_GetPersistentString(hint->value);
++        SDL_UnlockProperties(hints);
++    }
++    return result;
++}
++
+ const char *SDL_GetHint(const char *name)
+ {
+     if (!name) {
+diff -ruN a/src/SDL_hints_c.h b/src/SDL_hints_c.h
+--- a/src/SDL_hints_c.h
++++ b/src/SDL_hints_c.h
+@@ -26,6 +26,7 @@
+ #define SDL_hints_c_h_
+ 
+ extern void SDL_InitHints(void);
++extern const char *SDL_GetHintFromCode(const char *name);
+ extern bool SDL_GetStringBoolean(const char *value, bool default_value);
+ extern int SDL_GetStringInteger(const char *value, int default_value);
+ extern void SDL_QuitHints(void);
+diff -ruN a/src/audio/SDL_audio.c b/src/audio/SDL_audio.c
+--- a/src/audio/SDL_audio.c
++++ b/src/audio/SDL_audio.c
+@@ -95,6 +95,9 @@
+ #ifdef SDL_AUDIO_DRIVER_DISK
+     &DISKAUDIO_bootstrap,
+ #endif
++#ifdef SDL_AUDIO_DRIVER_RDP
++    &RDPAUDIO_bootstrap,
++#endif
+ #ifdef SDL_AUDIO_DRIVER_DUMMY
+     &DUMMYAUDIO_bootstrap,
+ #endif
+diff -ruN a/src/audio/SDL_sysaudio.h b/src/audio/SDL_sysaudio.h
+--- a/src/audio/SDL_sysaudio.h
++++ b/src/audio/SDL_sysaudio.h
+@@ -380,6 +380,7 @@
+ extern AudioBootStrap HAIKUAUDIO_bootstrap;
+ extern AudioBootStrap COREAUDIO_bootstrap;
+ extern AudioBootStrap DISKAUDIO_bootstrap;
++extern AudioBootStrap const RDPAUDIO_bootstrap;
+ extern AudioBootStrap DUMMYAUDIO_bootstrap;
+ extern AudioBootStrap AAUDIO_bootstrap;
+ extern AudioBootStrap OPENSLES_bootstrap;
+diff -ruN a/src/render/SDL_render.c b/src/render/SDL_render.c
+--- a/src/render/SDL_render.c
++++ b/src/render/SDL_render.c
+@@ -1028,7 +1028,8 @@
+     if (displayID == 0) {
+         displayID = SDL_GetPrimaryDisplay();
+     }
+-    mode = SDL_GetDesktopDisplayMode(displayID);
++    mode = window && SDL_strcmp(SDL_GetCurrentVideoDriver(), "rdp") == 0 ?
++        SDL_GetCurrentDisplayMode(displayID) : SDL_GetDesktopDisplayMode(displayID);
+     if (mode && mode->refresh_rate_numerator > 0 && mode->refresh_rate_denominator > 0) {
+         refresh_num = mode->refresh_rate_numerator;
+         refresh_den = mode->refresh_rate_denominator;
+@@ -5490,6 +5491,13 @@
+ static void SDL_SimulateRenderVSync(SDL_Renderer *renderer)
+ {
+     Uint64 now, elapsed;
++    if (renderer->window && SDL_strcmp(SDL_GetCurrentVideoDriver(), "rdp") == 0) {
++        const SDL_DisplayMode *mode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(renderer->window));
++        if (mode && mode->refresh_rate != renderer->rdp_refresh_rate) {
++            renderer->rdp_refresh_rate = mode->refresh_rate;
++            SDL_CalculateSimulatedVSyncInterval(renderer, renderer->window);
++        }
++    }
+     const Uint64 interval = renderer->simulate_vsync_interval_ns;
+ 
+     if (!interval) {
+diff -ruN a/src/render/SDL_sysrender.h b/src/render/SDL_sysrender.h
+--- a/src/render/SDL_sysrender.h
++++ b/src/render/SDL_sysrender.h
+@@ -294,6 +294,7 @@
+     // Whether we should simulate vsync
+     bool wanted_vsync;
+     bool simulate_vsync;
++    float rdp_refresh_rate;
+     Uint64 simulate_vsync_interval_ns;
+     Uint64 last_present;
+ 
+diff -ruN a/src/storage/SDL_storage.c b/src/storage/SDL_storage.c
+--- a/src/storage/SDL_storage.c
++++ b/src/storage/SDL_storage.c
+@@ -25,13 +25,16 @@
+ #include "../filesystem/SDL_sysfilesystem.h"
+ 
+ // Available title storage drivers
+-static TitleStorageBootStrap *titlebootstrap[] = {
++static TitleStorageBootStrap const *titlebootstrap[] = {
+     &GENERIC_titlebootstrap,
++#ifdef SDL_STORAGE_DRIVER_RDP
++    &RDP_titlebootstrap,
++#endif
+     NULL
+ };
+ 
+ // Available user storage drivers
+-static UserStorageBootStrap *userbootstrap[] = {
++static UserStorageBootStrap const *userbootstrap[] = {
+ #ifdef SDL_STORAGE_STEAM
+     &STEAM_userbootstrap,
+ #endif
+@@ -39,6 +42,9 @@
+     &PRIVATE_userbootstrap,
+ #endif
+     &GENERIC_userbootstrap,
++#ifdef SDL_STORAGE_DRIVER_RDP
++    &RDP_userbootstrap,
++#endif
+     NULL
+ };
+ 
+diff -ruN a/src/storage/SDL_sysstorage.h b/src/storage/SDL_sysstorage.h
+--- a/src/storage/SDL_sysstorage.h
++++ b/src/storage/SDL_sysstorage.h
+@@ -40,6 +40,8 @@
+ 
+ // Not all of these are available in a given build. Use #ifdefs, etc.
+ 
++extern TitleStorageBootStrap const RDP_titlebootstrap;
++extern UserStorageBootStrap const RDP_userbootstrap;
+ extern TitleStorageBootStrap GENERIC_titlebootstrap;
+ // Steam does not have title storage APIs
+ 
+diff -ruN a/src/video/SDL_sysvideo.h b/src/video/SDL_sysvideo.h
+--- a/src/video/SDL_sysvideo.h
++++ b/src/video/SDL_sysvideo.h
+@@ -543,6 +543,7 @@
+ extern VideoBootStrap Wayland_bootstrap;
+ extern VideoBootStrap VIVANTE_bootstrap;
+ extern VideoBootStrap Emscripten_bootstrap;
++extern VideoBootStrap const RDP_bootstrap;
+ extern VideoBootStrap OFFSCREEN_bootstrap;
+ extern VideoBootStrap QNX_bootstrap;
+ extern VideoBootStrap OPENVR_bootstrap;
+diff -ruN a/src/video/SDL_video.c b/src/video/SDL_video.c
+--- a/src/video/SDL_video.c
++++ b/src/video/SDL_video.c
+@@ -85,7 +85,7 @@
+ #endif /* GL_RGBA_FLOAT_MODE_ARB */
+ 
+ // Available video drivers
+-static VideoBootStrap *bootstrap[] = {
++static VideoBootStrap const *bootstrap[] = {
+ #ifdef SDL_VIDEO_DRIVER_PRIVATE
+     &PRIVATE_bootstrap,
+ #endif
+@@ -146,6 +146,9 @@
+ #ifdef SDL_VIDEO_DRIVER_QNX
+     &QNX_bootstrap,
+ #endif
++#ifdef SDL_VIDEO_DRIVER_RDP
++    &RDP_bootstrap,
++#endif
+ #ifdef SDL_VIDEO_DRIVER_OFFSCREEN
+     &OFFSCREEN_bootstrap,
+ #endif
+@@ -669,6 +672,7 @@
+                 if (!bootstrap[i]->is_preferred &&
+                     (driver_attempt_len == SDL_strlen(bootstrap[i]->name)) &&
+                     (SDL_strncasecmp(bootstrap[i]->name, driver_attempt, driver_attempt_len) == 0)) {
++                    SDL_ClearError();
+                     video = bootstrap[i]->create();
+                     if (video) {
+                         break;
+@@ -690,7 +694,9 @@
+         SDL_DebugLogBackend("video", bootstrap[i]->name);
+     } else {
+         if (driver_name) {
+-            SDL_SetError("%s not available", driver_name);
++            if (!*SDL_GetError()) {
++                SDL_SetError("%s not available", driver_name);
++            }
+             goto pre_driver_error;
+         }
+         SDL_SetError("No available video device");
+@@ -1450,7 +1456,7 @@
+             (old_mode->format && old_mode->format != new_mode->format) ||
+             (old_mode->w && old_mode->h && (old_mode->w != new_mode->w ||old_mode->h != new_mode->h)) ||
+             (old_mode->pixel_density != 0.0f && old_mode->pixel_density != new_mode->pixel_density) ||
+-            (old_mode->refresh_rate != 0.0f && old_mode->refresh_rate != new_mode->refresh_rate));
++            (old_mode->refresh_rate != new_mode->refresh_rate));
+ }
+ 
+ void SDL_SetDesktopDisplayMode(SDL_VideoDisplay *display, const SDL_DisplayMode *mode)

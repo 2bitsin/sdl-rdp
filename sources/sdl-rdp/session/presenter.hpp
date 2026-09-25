@@ -1,10 +1,10 @@
 #pragma once
-#include <sdl-rdp/core/refresh.hpp>
+#include <sdl-rdp/abi/backend.h>
+#include <sdl-rdp/configuration/refresh.hpp>
 #include <sdl-rdp/utilities/deadline.hpp>
 #include <sdl-rdp/utilities/extent.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
-#include <sdl-rdp/video/pointer-shape.hpp>
-#include <sdl-rdp-abi/sdl-rdp-backend.h>
+#include <sdl-rdp/video/pointer/shape.hpp>
 
 #include <cstdint>
 #include <memory>

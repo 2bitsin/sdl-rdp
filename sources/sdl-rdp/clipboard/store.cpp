@@ -1,0 +1,23 @@
+#include <sdl-rdp/clipboard/store.hpp>
+
+#include <sdl-rdp/clipboard/channel.hpp>
+
+#include <cstdint>
+#include <utility>
+
+namespace Backend {
+auto ClipboardStore::Replace(std::string value) -> std::uint64_t {
+  _unicode = ClipboardUnicode(value);
+  return Generational::Replace(std::move(value));
+}
+auto ClipboardStore::Text() const noexcept -> std::string const& {
+  return Value();
+}
+auto ClipboardStore::Unicode() const noexcept -> std::span<std::byte const> {
+  return _unicode;
+}
+auto ClipboardStore::Export() -> std::string const& {
+  _exported = Value();
+  return _exported;
+}
+}

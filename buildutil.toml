@@ -10,7 +10,7 @@ extensions = []
 contracts = "stop"
 
 [run]
-default = "sdl-rdp-sample"
+default = "sample"
 
 [package]
 kind = "library"

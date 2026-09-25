@@ -1,20 +1,29 @@
 #include <sdl-rdp/session/handle.hpp>
 
-#include <sdl-rdp/session/peer.hpp>
+#include <sdl-rdp/auth/certificate.hpp>
+#include <sdl-rdp/peer/peer.hpp>
 
 #include <cstdint>
 #include <memory>
 #include <utility>
 
+namespace {
+auto Ensured(std::filesystem::path const& directory) -> Backend::Credentials {
+  Backend::Credentials credentials{ directory };
+  Backend::EnsureCertificate(credentials);
+  return credentials;
+}
+}
 sdlrdp_handle::sdlrdp_handle(sdlrdp_config const& config, bool tracing)
     : _diagnostics{ config, tracing }, _configuration{ config },
       _frames{ { .width = config.width, .height = config.height }, config.aspect }, _session{ _frames, _events },
       _presenter{ _diagnostics, _frames, _session, _pointer, _configuration },
       _audio    { _session, _presenter, _configuration                      },
-      _listener{ _configuration, _diagnostics, _session, [this](Backend::PeerHandle accepted) {
-                  return std::make_unique<Backend::Peer>(std::move(accepted), _diagnostics, _events, _configuration,
-                                                         _frames, _pointer, _clipboard, _session);
-                } } { }
+      _listener{ _configuration, Ensured(_configuration.CertificateDirectory()), _diagnostics, _session,
+                 [this](Backend::PeerHandle accepted) {
+                   return std::make_unique<Backend::Peer>(std::move(accepted), _diagnostics, _events, _configuration,
+                                                          _frames, _pointer, _clipboard, _session);
+                 } } { }
 auto sdlrdp_handle::Port() const noexcept -> std::uint32_t {
   return _listener.Port();
 }

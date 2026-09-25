@@ -1,11 +1,11 @@
 #include <sdl-rdp/video/display-control.hpp>
 
-#include <sdl-rdp/core/activation.hpp>
-#include <sdl-rdp/core/desktop-layout.hpp>
-#include <sdl-rdp/core/event-queue.hpp>
-#include <sdl-rdp/core/failure-log.hpp>
-#include <sdl-rdp/core/peer-link.hpp>
+#include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
+#include <sdl-rdp/link/activation.hpp>
+#include <sdl-rdp/link/event-queue.hpp>
+#include <sdl-rdp/link/peer-link.hpp>
+#include <sdl-rdp/picture/desktop-layout.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 

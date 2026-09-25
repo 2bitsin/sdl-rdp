@@ -1,5 +1,5 @@
 #pragma once
-#include <sdl-rdp/core/dynamic-channel.hpp>
+#include <sdl-rdp/link/dynamic-channel.hpp>
 
 #include <functional>
 

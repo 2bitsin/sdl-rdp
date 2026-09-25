@@ -1,8 +1,8 @@
 #pragma once
+#include <sdl-rdp/abi/backend.h>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/freerdp-facade/release-stream.hpp>
 #include <sdl-rdp/utilities/extent.hpp>
-#include <sdl-rdp-abi/sdl-rdp-backend.h>
 
 #include <freerdp/codec/nsc.h>
 #include <freerdp/codec/planar.h>

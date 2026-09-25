@@ -18,7 +18,7 @@ freely, subject to the following restrictions:
    misrepresented as being the original software.
 3. This notice may not be removed or altered from any source distribution.
 
-SDL 3 is downloaded at build time and modified by sources/SDL3/rdp-driver.patch;
+SDL 3 is downloaded at build time and modified by sources/sdl-rdp/SDL3/rdp-driver.patch;
 SDL is distributed under the same zlib licence, copyright Sam Lantinga and the SDL
 contributors. FreeRDP 3 is linked, not copied, and is distributed under the
 Apache License 2.0.

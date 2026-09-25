@@ -1,11 +1,11 @@
 #include <sdl-rdp/session/listener.hpp>
 
 #include <sdl-rdp/auth/tls-rehearsal.hpp>
-#include <sdl-rdp/core/configuration.hpp>
-#include <sdl-rdp/core/diagnostics.hpp>
-#include <sdl-rdp/core/failure-log.hpp>
+#include <sdl-rdp/configuration/configuration.hpp>
+#include <sdl-rdp/diagnostics/diagnostics.hpp>
+#include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
-#include <sdl-rdp/session/peer.hpp>
+#include <sdl-rdp/peer/peer.hpp>
 #include <sdl-rdp/session/session.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
@@ -85,11 +85,10 @@ auto NewStopEvent() -> EventHandle {
   return stop;
 }
 }
-Listener::Listener(Configuration const& configuration, Diagnostics const& diagnostics, Session& session,
-                   PeerFactory make)
-    : _diagnostics{ diagnostics }, _session{ session }, _make{ std::move(make) },
-      _listener{ NewListener(configuration.ServerCredentials()) }, _stop{ NewStopEvent() },
-      _port{ Bind(*_listener, configuration.Config()) } {
+Listener::Listener(Configuration const& configuration, Credentials const& credentials, Diagnostics const& diagnostics,
+                   Session& session, PeerFactory make)
+    : _diagnostics{ diagnostics }, _session{ session }, _make{ std::move(make) }, _listener{ NewListener(credentials) },
+      _stop{ NewStopEvent() }, _port{ Bind(*_listener, configuration.Config()) } {
   _listener->info = this;
   // abi: psPeerAccepted, BOOL is int
   _listener->PeerAccepted = [](freerdp_listener* accepting, freerdp_peer* client) noexcept -> int {

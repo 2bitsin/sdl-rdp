@@ -1,7 +1,7 @@
 #include <sdl-rdp/video/scaler.hpp>
 
-#include <sdl-rdp/core/desktop-layout.hpp>
-#include <sdl-rdp/core/frame-snapshot.hpp>
+#include <sdl-rdp/picture/desktop-layout.hpp>
+#include <sdl-rdp/picture/frame-snapshot.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/copy-rows.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>

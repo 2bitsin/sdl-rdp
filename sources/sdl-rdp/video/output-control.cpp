@@ -1,8 +1,8 @@
 #include <sdl-rdp/video/output-control.hpp>
 
-#include <sdl-rdp/core/activation.hpp>
-#include <sdl-rdp/core/peer-link.hpp>
-#include <sdl-rdp/video/frame-pacing.hpp>
+#include <sdl-rdp/link/activation.hpp>
+#include <sdl-rdp/link/peer-link.hpp>
+#include <sdl-rdp/video/frame/pacing.hpp>
 #include <sdl-rdp/video/graphics-link.hpp>
 #include <sdl-rdp/video/peer-frames.hpp>
 #include <cstdint>

@@ -1,8 +1,8 @@
 #include <sdl-rdp/session/audio-output.hpp>
 
-#include <sdl-rdp/audio/audio.hpp>
-#include <sdl-rdp/core/configuration.hpp>
-#include <sdl-rdp/session/peer.hpp>
+#include <sdl-rdp/audio/channel.hpp>
+#include <sdl-rdp/configuration/configuration.hpp>
+#include <sdl-rdp/peer/peer.hpp>
 #include <sdl-rdp/session/presenter.hpp>
 #include <sdl-rdp/utilities/deadline.hpp>
 

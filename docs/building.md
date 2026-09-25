@@ -8,9 +8,9 @@ runtime and is skipped without one. The build driver `buildutil`, the `oxbox`
 utility library the backend uses and the `freerdp/3.32.0` package are not
 published yet (`freerdp/3.32.0` is private on the project's conan remote); until they are,
 the tree builds only where a conan remote and a package index provide them.
-`./buildutil build` builds everything, `./buildutil test --parallel` runs the
-gate, and `./buildutil build --release` writes the release libraries under
-`_build/<profile>/`.
+`./buildutil build` builds everything, `./buildutil test` runs the gate (Release,
+parallel CTest), and `./buildutil build --release` writes the release libraries
+under `_build/<profile>/`.
 
 The SDL patch touches CMake/build configuration, public hint/video headers, `src/SDL_hints*`, and audio/video/storage bootstrap files to register RDP drivers and hints.
 It adds `src/{audio,storage}/rdp/` drivers; `src/video/SDL_video.c` preserves driver errors and reports initial refresh changes.
@@ -24,7 +24,7 @@ only found next to it at runtime.
 
 # Quality gate
 
-Run `./buildutil test --parallel` and `./buildutil analyze` before committing.
+Run `./buildutil test` and `./buildutil analyze` before committing.
 `tools/lint/shape.py` checks non-blank file lines, class lines, member counts,
 access/function/data ordering, and wholly-comment line percentages in `sources/`;
 function and lambda body lines (over 20 needs an allow entry, over 40 fails),
@@ -47,10 +47,9 @@ inspect shape failures, `python3 tools/lint/clones.py` for the clone gate (jscpd
 4.0.5, 40 tokens, 5 lines), `python3 tools/lint/format.py` to format the tree
 (`--check` to verify) and `python3 tools/lint/cmake.py` for the CMake vocabulary.
 Test fixtures retain protected data members so derived test bodies can use them.
-The driver (`sources/SDL3/rdp`) is C++23 under clang-tidy like the backend;
-its pure logic (INI parsing, refresh scheduling) is the static module
-`sources/sdl-rdp-driver/`, tested beside it, and the backend's C ABI header is
-the header-only module `sources/sdl-rdp-abi/`.
+The driver (`sources/sdl-rdp/SDL3/rdp`) is C++23 under clang-tidy like the backend;
+its INI parser sits beside `settings.cpp`, its one user, and the backend's C ABI header is
+the header-only module `sources/sdl-rdp/abi/`.
 `tools/lint/` is a pytest suite that `buildutil test` runs after CTest:
 `test_gate.py` runs every lint over the tree, the other files test the lints.
 A lint whose tool is missing (`npx`, clang-format 20) fails with the reason
@@ -61,10 +60,11 @@ The driver sources in `rdp/` are compiled directly, not copied into the SDL patc
 For bootstrap changes, extract two pristine copies of the pinned SDL archive,
 apply `rdp-driver.patch` to one, edit it, then regenerate with `diff -ruN a b`.
 
-The gate excludes the `sdl-rdp-bench` label, the module `sources/sdl-rdp/bench/`
-holding the tests that measure the box's real-time scheduling (input and
-clipboard p95 under tight video, PCM clock and cadence, present latency, graphics
-cost); their behaviour halves stay in the gate. The allocation ratchets in
-`sources/sdl-rdp/allocations/` count deterministically and are gate tests.
-`./buildutil test --parallel sdl-rdp-bench` runs the benchmarks. Buildutil has no project
-setting for parallel tests, so every gate command carries `--parallel`.
+What measures the box's real-time scheduling (input and clipboard p95 under
+tight video, PCM clock and cadence, present latency, graphics cost) is
+google-benchmark in the integration module's bench lane,
+`sources/sdl-rdp/integration/{audio,video,sample}.bench/` with the adapter in
+`support.bench/`; their behaviour halves stay in the gate, which never runs the
+bench lane. The allocation ratchets in `sources/sdl-rdp/integration/allocations.test/`
+count deterministically and are gate tests. `./buildutil bench` builds and runs
+the benchmarks.

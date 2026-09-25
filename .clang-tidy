@@ -16,8 +16,8 @@ Checks: >
   -modernize-use-nodiscard, -cert-err58-cpp, -cppcoreguidelines-avoid-do-while,
   -readability-avoid-nested-conditional-operator, -performance-enum-size
 WarningsAsErrors: '*'
-HeaderFilterRegex: 'sources/(sdl-rdp/[^/]+|sdl-rdp-backend|sdl-rdp-sample|SDL3/rdp)/.*\.(hpp|cpp)$'
-ExcludeHeaderFilterRegex: 'sdl-rdp-backend\.h$|/(third-party|_build|_bdudata)/'
+HeaderFilterRegex: 'sources/(sdl-rdp/[^/]+|sample)/.*\.(hpp|cpp)$'
+ExcludeHeaderFilterRegex: 'abi/backend\.h$|/(third-party|_build|_bdudata)/'
 CheckOptions:
   readability-function-size.LineThreshold: 40
   readability-function-size.StatementThreshold: 60

@@ -1,9 +1,9 @@
 #include <sdl-rdp/session/session.hpp>
 
-#include <sdl-rdp/audio/audio.hpp>
-#include <sdl-rdp/core/activation.hpp>
-#include <sdl-rdp/core/event-queue.hpp>
-#include <sdl-rdp/session/peer.hpp>
+#include <sdl-rdp/audio/channel.hpp>
+#include <sdl-rdp/link/activation.hpp>
+#include <sdl-rdp/link/event-queue.hpp>
+#include <sdl-rdp/peer/peer.hpp>
 
 #include <winpr/synch.h>
 #include <cstdint>

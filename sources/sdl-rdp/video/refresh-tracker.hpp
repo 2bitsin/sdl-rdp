@@ -1,5 +1,5 @@
 #pragma once
-#include <sdl-rdp/core/refresh.hpp>
+#include <sdl-rdp/configuration/refresh.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 
 #include <atomic>

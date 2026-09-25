@@ -1,7 +1,7 @@
 #include <sdl-rdp/input/touch-protocol.hpp>
 
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
-#include <sdl-rdp/input/input-events.hpp>
+#include <sdl-rdp/input/events.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
 
 #include <freerdp/channels/wtsvc.h>

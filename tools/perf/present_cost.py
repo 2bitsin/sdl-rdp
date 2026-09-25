@@ -142,7 +142,7 @@ def running(command: list, **options):
 
 
 def sample_environment(install: pathlib.Path, scenario: Scenario, certificates: str) -> dict:
-    return {**os.environ, 'LD_LIBRARY_PATH': str(install), 'SDL_VIDEO_DRIVER': 'rdp',
+    return {**os.environ, 'LD_LIBRARY_PATH': str(install / 'sdl-rdp'), 'SDL_VIDEO_DRIVER': 'rdp',
             'SDL_RDP_PORT': str(scenario.port), 'SDL_RDP_USER': 'qa', 'SDL_RDP_PASSWORD': 'qa',
             'SDL_RDP_CODEC': scenario.codec, 'SDL_RDP_CERT_DIR': certificates}
 
@@ -150,7 +150,7 @@ def sample_environment(install: pathlib.Path, scenario: Scenario, certificates: 
 def sample_command(install: pathlib.Path, scenario: Scenario, result: pathlib.Path) -> list:
     flags = ['--tight', '--size', SIZE] + (['--partial'] if scenario.damage == 'partial' else [])
     return ['valgrind', '--tool=callgrind', '--instr-atstart=no', f'--callgrind-out-file={result}',
-            str(install / 'sdl-rdp-sample'), *flags]
+            str(install / 'sample'), *flags]
 
 
 def client_command(scenario: Scenario) -> list:

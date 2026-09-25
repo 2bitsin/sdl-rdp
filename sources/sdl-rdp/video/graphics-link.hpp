@@ -1,10 +1,10 @@
 #pragma once
-#include <sdl-rdp/core/dynamic-channel.hpp>
-#include <sdl-rdp/core/failure-log.hpp>
+#include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/link/dynamic-channel.hpp>
 #include <sdl-rdp/utilities/factory.hpp>
 #include <sdl-rdp/utilities/operation-name.hpp>
-#include <sdl-rdp/video/gfx.hpp>
+#include <sdl-rdp/video/gfx/channel.hpp>
 
 #include <winpr/wtypes.h>
 #include <chrono>

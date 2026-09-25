@@ -1,2 +1,2 @@
 Init_submodule()
-Link_dependencies(headless-client SDL3 utilities core)
+Link_dependencies(utilities configuration SDL3 headless-client)

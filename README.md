@@ -53,7 +53,7 @@ The backend library must sit next to `libSDL3.so` or be named by `SDL_RDP_BACKEN
 ## Building
 
 Linux only for now; run `./buildutil build` to build everything.
-Run `./buildutil test --parallel` for the gate; see [building and consuming](docs/building.md) for dependencies and packaging.
+Run `./buildutil test` for the gate; see [building and consuming](docs/building.md) for dependencies and packaging.
 
 ## License
 

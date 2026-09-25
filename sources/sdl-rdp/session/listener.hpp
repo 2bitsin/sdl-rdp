@@ -1,9 +1,9 @@
 #pragma once
+#include <sdl-rdp/abi/backend.h>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/freerdp-facade/releases-listener.hpp>
 #include <sdl-rdp/freerdp-facade/releases-peer.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
-#include <sdl-rdp-abi/sdl-rdp-backend.h>
 
 #include <cstdint>
 #include <functional>
@@ -13,13 +13,15 @@
 
 namespace Backend {
 class Configuration;
+class Credentials;
 class Diagnostics;
 class Peer;
 class Session;
 using PeerFactory = std::move_only_function<std::unique_ptr<Peer>(PeerHandle)>;
 class Listener : private Pinned {
 public:
-       Listener(Configuration const& configuration, Diagnostics const& diagnostics, Session& session, PeerFactory make);
+       Listener(Configuration const& configuration, Credentials const& credentials, Diagnostics const& diagnostics,
+                Session& session, PeerFactory make);
   auto Port() const noexcept -> std::uint32_t;
 
 private:

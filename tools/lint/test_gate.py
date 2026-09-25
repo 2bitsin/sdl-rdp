@@ -8,6 +8,7 @@ import cmake
 import columns
 import format as formatter
 import includes
+import prefixes
 import shape
 import spellings
 
@@ -49,3 +50,7 @@ def test_includes():
 
 def test_spellings():
     assert spellings.main() == 0
+
+
+def test_prefixes():
+    assert prefixes.main() == 0

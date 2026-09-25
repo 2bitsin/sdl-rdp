@@ -14,7 +14,7 @@ EQUALS              = r'(?<![=!<>+*/%&|^\-])=(?!=|>)'
 DECL                = r'(.+?[\s*&])([A-Za-z_]\w*(?:\s*\[[^\]]*\])*)\s*(?:(' + EQUALS + r'|[{]|:(?!:))(.*))?;'
 FORBIDDEN           = {'return', 'co_return', 'throw', 'delete', 'using', 'typedef', 'case', 'goto',
                        'else', 'break', 'if', 'while', 'for', 'switch'}
-FROZEN              = 'sources/sdl-rdp-abi/sdl-rdp-backend.h'
+FROZEN              = 'sources/sdl-rdp/abi/backend.h'
 SOURCE_SUFFIXES     = frozenset({'.c', '.h', '.cpp', '.hpp'})
 COLUMN_LIMIT        = 120
 COMMENT_GAP         = 2

@@ -1,12 +1,12 @@
 #include <sdl-rdp/video/graphics-link.hpp>
 
-#include <sdl-rdp/core/activation.hpp>
-#include <sdl-rdp/core/diagnostics.hpp>
-#include <sdl-rdp/core/failure-log.hpp>
-#include <sdl-rdp/core/peer-link.hpp>
+#include <sdl-rdp/diagnostics/diagnostics.hpp>
+#include <sdl-rdp/diagnostics/failure-log.hpp>
+#include <sdl-rdp/link/activation.hpp>
+#include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/video/acknowledgement-window.hpp>
 #include <sdl-rdp/video/encoder.hpp>
-#include <sdl-rdp/video/frame-pacing.hpp>
+#include <sdl-rdp/video/frame/pacing.hpp>
 
 #include <freerdp/settings.h>
 #include <algorithm>

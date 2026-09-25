@@ -38,6 +38,6 @@ For mstsc, leave Remote audio playback set to **Play on this computer**
 (the default). Run the sample with `--tone` for a 440 Hz sine at -12 dBFS;
 add `--tight` to exercise audio alongside frame acknowledgement pacing:
 
-    SDL_VIDEO_DRIVER=rdp SDL_AUDIO_DRIVER=rdp sdl-rdp-sample --tone --tight
+    SDL_VIDEO_DRIVER=rdp SDL_AUDIO_DRIVER=rdp <prefix>/sample --tone --tight
 
 FreeRDP 3.32 still leaks the private rdpsnd critical section and PDU stream after `Initialize(FALSE)` (`rdpsnd_server_stop` returns before any cleanup when it owns no thread; no public cleanup API); the destructor releases the leaked static channel through `WTSVirtualChannelOpen`/`WTSVirtualChannelClose`.

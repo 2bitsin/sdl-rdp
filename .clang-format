@@ -79,7 +79,7 @@ MainIncludeChar: Any
 IncludeCategories:
   - { Regex: '\.generated\.hpp"$', Priority: 2 }
   - { Regex: '^"', Priority: 1 }
-  - { Regex: '^<(sdl-rdp/|sdl-rdp-backend/|oxbox/|SDL3/|freerdp/|winpr/|gtest/|openssl/)', Priority: 3 }
+  - { Regex: '^<(sdl-rdp/|oxbox/|SDL3/|freerdp/|winpr/|gtest/|openssl/)', Priority: 3 }
   - { Regex: '^<', Priority: 4 }
 SortIncludes: CaseSensitive
 SortUsingDeclarations: Never
