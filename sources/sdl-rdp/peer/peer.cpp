@@ -13,12 +13,14 @@ namespace sdl_rdp::peer::detail::peer {
 using sdl_rdp::clipboard::ClipboardChannel;
 using sdl_rdp::drive::DriveChannel;
 using sdl_rdp::link::DynamicChannel;
+using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Rect;
 using sdl_rdp::video::gfx::FrameSources;
 using sdl_rdp::video::gfx::GfxChannel;
 Peer::Peer(PeerHandle accepted, Diagnostics const& diagnostics, EventQueue& events, Configuration const& configuration,
            FrameStore& store, Generational<PointerShape>& pointer, ClipboardStore& clipboard, SessionAccess& session)
-    : _link{ std::move(accepted) }, _traces{ diagnostics }, _activation{ events, _link }, _frames{ store },
+    : _diagnostics{ diagnostics }, _configuration{ configuration }, _store{ store }, _session{ session },
+      _link{ std::move(accepted) }, _traces{ diagnostics }, _activation{ events, _link }, _frames{ store },
       _pacing{ diagnostics, events, configuration, store, _link, _activation, _traces, _statistics },
       _scaler{ _frames, _desktop }, _authenticator{ _link, configuration, diagnostics },
       _graphics{ _link,
@@ -43,27 +45,32 @@ Peer::Peer(PeerHandle accepted, Diagnostics const& diagnostics, EventQueue& even
                       return std::make_unique<ClipboardChannel>(_link, _activation, clipboard, events, diagnostics);
                     },
                     [&, this] { return std::make_shared<DriveChannel>(_link, events, diagnostics, session); } },
-      _channels    { _link, _activation, _graphics, _display, _redirection, _input                },
-      _legacy      { _link, configuration, _activation, _frames, _pacing, _encoder, _scaler       },
-      _pointer     { pointer, _link, diagnostics                                                  },
-      _gate        { _link, store, _frames, _desktop, _pacing, _activation, _graphics             },
-      _capture     { _link, store, _frames, _desktop, _pacing, _statistics, _encoder              },
-      _sender      { _link, _activation, session, _gate, _capture, _pointer, _graphics, _legacy   },
-      _end         { _link, _activation, _authenticator, _frames, store, diagnostics              },
-      _arrival     { session, store, _frames, _link, _activation, _desktop, _pacing, diagnostics  },
-      _activator   { _link, _authenticator, _activation, _encoder, configuration, _arrival        },
-      _capabilities{ _link, _authenticator, _activation, _pacing, _desktop, store, diagnostics    },
-      _output      { _link, _graphics, _pacing, _activation, _frames                              },
-      _callbacks   { _link, _authenticator, _activator, _capabilities, _output, _input_events     },
-      _wait        { _link, _channels, _activation, _pacing, _graphics                            },
-      _pump        { _link, session, _channels, _redirection, _sender, _end, _traces              },
-      _departure   { _link, session, _activation, _redirection, _statistics, diagnostics          },
-      _loop        { _link, session, diagnostics, _authenticator, store, _wait, _pump, _departure } { }
+      _channels{ _link, _activation, _graphics, _display, _redirection, _input               },
+      _legacy  { _link, configuration, _activation, _frames, _pacing, _encoder, _scaler      },
+      _pointer { pointer, _link, diagnostics                                                 },
+      _gate    { _link, store, _frames, _desktop, _pacing, _activation, _graphics            },
+      _capture { _link, store, _frames, _desktop, _pacing, _statistics, _encoder             },
+      _sender  { _link, _activation, session, _gate, _capture, _pointer, _graphics, _legacy  },
+      _end     { _link, _activation, _authenticator, _frames, store, diagnostics             },
+      _arrival { session, store, _frames, _link, _activation, _desktop, _pacing, diagnostics },
+      _output{ _link, _graphics, _pacing, _activation, _frames } {
+  _link.Client().ContextExtra = this;
+  InstallClient();
+  InstallUpdates();
+  _input_events.Install(*_link.Context().input);
+}
+Peer::~Peer() {
+  // The loop thread ends before its callbacks lose their owner.
+  Stop();
+  if (_thread.joinable()) _thread.join();
+  _link.Client().ContextExtra = nullptr;
+}
 auto Peer::Start() -> void {
-  _loop.Start();
+  Expects(!_thread.joinable(), "peer starts once");
+  _thread = std::jthread([this](std::stop_token const& quit) { Serve(quit); });
 }
 auto Peer::Stop() -> void {
-  _loop.Stop();
+  _thread.request_stop();
 }
 auto Peer::Owns(PeerLink const& link) const noexcept -> bool {
   return &_link == &link;

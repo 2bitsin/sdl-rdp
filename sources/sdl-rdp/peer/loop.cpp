@@ -1,4 +1,4 @@
-#include <sdl-rdp/peer/loop.hpp>
+#include <sdl-rdp/peer/peer.hpp>
 
 #include <sdl-rdp/auth/authenticator.hpp>
 #include <sdl-rdp/configuration/setup.hpp>
@@ -9,17 +9,16 @@
 #include <sdl-rdp/freerdp-facade/signalled.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/link/session-access.hpp>
-#include <sdl-rdp/peer/departure.hpp>
 #include <sdl-rdp/peer/exceptions.hpp>
-#include <sdl-rdp/peer/pump.hpp>
-#include <sdl-rdp/peer/wait.hpp>
 #include <sdl-rdp/picture/desktop-layout.hpp>
 #include <sdl-rdp/picture/frame-store.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/geometry.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/utilities/scoped.hpp>
 #include <sdl-rdp/video/acknowledgement-window.hpp>
 
+#include <freerdp/peer.h>
 #include <freerdp/settings.h>
 #include <algorithm>
 #include <array>
@@ -33,7 +32,7 @@
 #include <tuple>
 #include <utility>
 
-namespace sdl_rdp::peer::detail::loop {
+namespace sdl_rdp::peer::detail::peer {
 using sdl_rdp::configuration::AuthMode;
 using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::diagnostics::PeerNegotiationLogging;
@@ -44,13 +43,21 @@ using sdl_rdp::picture::ApplyDesktopSize;
 using sdl_rdp::picture::FrameLock;
 using sdl_rdp::utilities::Contained;
 using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::RAIIWrap;
-using sdl_rdp::utilities::Rect;
+using sdl_rdp::utilities::Unreachable;
 using sdl_rdp::video::AcknowledgedFrameWindow;
+using sdl_rdp::video::GraphicsConnectionWait;
+using sdl_rdp::video::WaitMilliseconds;
+using sdl_rdp::video::frame::Delivery;
 
 namespace {
 using sdl_rdp::freerdp_facade::FirstRefused;
 using sdl_rdp::freerdp_facade::Set;
+constexpr std::uint32_t LoopHandleCount     = 2;
+constexpr std::uint32_t AppendedHandleCount = ChannelHandleLimit + LoopHandleCount;
+// WinPR BIO signals readability only; retry blocked output every 5 ms for static frames.
+constexpr std::uint32_t BlockedRetry = 5;
 using SecurityFlags = std::array<std::pair<FreeRDP_Settings_Keys_Bool, bool>, 12>;
 auto Flags(AuthMode auth) -> SecurityFlags {
   return { {
@@ -103,19 +110,7 @@ auto Disconnect(LiveConnection const& live) noexcept -> void {
 }
 using Connection = RAIIWrap<LiveConnection, Connect, Disconnect>;
 }
-PeerLoop::PeerLoop(PeerLink& link, SessionAccess& session, Diagnostics const& diagnostics,
-                   Authenticator const& authenticator, FrameStore& store, PeerWait& wait, PeerPump& pump,
-                   Departure& departure) noexcept
-    : _link{ link }, _session{ session }, _diagnostics{ diagnostics }, _authenticator{ authenticator }, _store{ store },
-      _wait{ wait }, _pump{ pump }, _departure{ departure } { }
-auto PeerLoop::Start() -> void {
-  Expects(!_thread.joinable(), "peer starts once");
-  _thread = std::jthread([this](std::stop_token const& quit) { Serve(quit); });
-}
-auto PeerLoop::Stop() -> void {
-  _thread.request_stop();
-}
-auto PeerLoop::Serve(std::stop_token const& quit) -> void {
+auto Peer::Serve(std::stop_token const& quit) -> void {
   std::stop_callback const wake(quit, [this] { _link.Signal(); });
   NegotiationLogging const logging { _link.Settings() };
   auto const               served  = [&] {
@@ -129,33 +124,88 @@ auto PeerLoop::Serve(std::stop_token const& quit) -> void {
         std::format("{} FreeRDP: {}.", failure, freerdp_get_last_error_name(freerdp_get_last_error(&_link.Context()))));
   };
   std::ignore = Contained(false, served, failed);
-  _departure.Depart();
+  Depart();
 }
-auto PeerLoop::Run(std::stop_token const& quit) -> void {
+auto Peer::Run(std::stop_token const& quit) -> void {
   Connection const                           connection{ _link, _session };
   std::array<WaitHandle, MaximumWaitHandles> handles   { };
   while (!quit.stop_requested() && Step(quit, handles)) {
   }
 }
-auto PeerLoop::Configure() -> bool {
+auto Peer::Configure() -> bool {
   auto const picture  = _store.Read([](FrameStore const& store, FrameLock const& held) { return store.Picture(held); });
   auto&      settings = _link.Settings();
   _authenticator.InstallCredentials(settings);
   return ApplySettings(settings, _authenticator.Auth(), picture);
 }
-auto PeerLoop::Step(std::stop_token const& quit, std::span<WaitHandle> handles) -> bool {
+auto Peer::Step(std::stop_token const& quit, std::span<WaitHandle> handles) -> bool {
   auto const plan = [&] {
     auto const session = _session.Lock();
-    return _wait.Plan(handles);
+    return Plan(handles);
   }();
   return plan.count && Dispatch(quit, handles.first(plan.count), plan.timeout);
 }
-auto PeerLoop::Dispatch(std::stop_token const& quit, std::span<WaitHandle> handles, std::uint32_t timeout) -> bool {
+auto Peer::Dispatch(std::stop_token const& quit, std::span<WaitHandle> handles, std::uint32_t timeout) -> bool {
   auto const woke = WaitHandle::Any(handles, timeout);
   if (quit.stop_requested()) return false;
   Signalled const fired{ handles };
   // The handle the wait woke on goes last, so no handle starves the others.
   if (woke) std::ranges::rotate(handles, handles.subspan(*woke + 1).begin());
-  return _pump.Service(quit, fired);
+  return Service(quit, fired);
+}
+auto Peer::Plan(std::span<WaitHandle> handles) -> WaitPlan {
+  _graphics.ExpireConfirmation();
+  if (!_activation.Activated()) _link.Invalidate();
+  auto const count = _link.Handles([&] { return CollectHandles(handles); });
+  return { .count = count, .timeout = WaitTimeout() };
+}
+auto Peer::CollectHandles(std::span<WaitHandle> handles) -> std::uint32_t {
+  Expects(handles.size() > AppendedHandleCount, "event array has room for transport and peer handles");
+  auto const budget    = handles.first(handles.size() - AppendedHandleCount);
+  auto const transport = WaitHandle::Collected<&freerdp_peer::GetEventHandles>(_link.Client(), budget);
+  if (transport.empty()) return 0;
+  auto const rest = _channels.Handles(handles.subspan(transport.size()));
+  Expects(rest.size() >= LoopHandleCount, "the loop's own handles fit");
+  rest[0] = _link.Wake();
+  rest[1] = WaitHandle::Of(_link.Channels());
+  return Narrowed<std::uint32_t>(handles.size() - rest.size() + LoopHandleCount);
+}
+auto Peer::WaitTimeout() -> std::uint32_t {
+  auto const blocked = _link.WriteBlocked();
+  if (_activation.Holding()) {
+    auto const remaining = _activation.ActivatedAt() + GraphicsConnectionWait - Activation::Clock::now();
+    auto const wait      = WaitMilliseconds(remaining, 0);
+    return blocked ? std::min(wait, BlockedRetry) : wait;
+  }
+  return blocked ? BlockedRetry : _pacing.Timeout();
+}
+auto Peer::Service(std::stop_token const& quit, Signalled const& ready) -> bool {
+  auto const healthy = Exchange(quit, ready) && Deliver(quit);
+  _traces.Flush();
+  return healthy;
+}
+auto Peer::Exchange(std::stop_token const& quit, Signalled const& ready) -> bool {
+  auto const session = _session.Lock();
+  if (quit.stop_requested()) return false;
+  auto& client = _link.Client();
+  if (!client.CheckFileDescriptor(&client) || !_channels.Pump(ready)) return Ended();
+  _redirection.Sound(ready);
+  return _sender.Drain() || Ended();
+}
+auto Peer::Deliver(std::stop_token const& quit) -> bool {
+  auto const delivery = _sender.Encode(quit);
+  switch (delivery) {
+  case Delivery::Healthy: return true;
+  case Delivery::Stopped: return false;
+  case Delivery::Failed: {
+    auto const session = _session.Lock();
+    return Ended();
+  }
+  default: Unreachable(delivery);
+  }
+}
+auto Peer::Ended() -> bool {
+  _end.Report();
+  return false;
 }
 }

@@ -11,17 +11,12 @@ sdl-rdp/headless-client.test/client/sound.hpp: SoundClient data members 11 > 10 
 sdl-rdp/headless-client.test/drive/observer.cpp:42: DriveObserver::DriveObserver lambda@42 parameters 6 > 5 # FreeRDP pReceiveChannelData signature is the ABI
 sdl-rdp/input/events.cpp:79: InputEvents::InputEvents parameters 7 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp/integration/auth.test/authentication.cpp:30: RejectCertificate lambda@30 parameters 8 > 5 # FreeRDP pVerifyCertificateEx signature is the ABI
-sdl-rdp/peer/activator.cpp:36: Activator::Activator parameters 6 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp/peer/arrival.cpp:54: Arrival::Arrival parameters 8 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
-sdl-rdp/peer/callbacks.cpp:39: PeerCallbacks::PeerCallbacks parameters 6 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
-sdl-rdp/peer/callbacks.cpp:63: PeerCallbacks::InstallAuthentication lambda@63 parameters 7 > 5 # FreeRDP SspiNtlmHashCallback signature is the ABI
-sdl-rdp/peer/capability-check.cpp:23: CapabilityCheck::CapabilityCheck parameters 7 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
+sdl-rdp/peer/callbacks.cpp:84: Peer::InstallAuthentication lambda@84 parameters 7 > 5 # FreeRDP SspiNtlmHashCallback signature is the ABI
 sdl-rdp/peer/channel-set.cpp:33: ChannelSet::ChannelSet parameters 6 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
-sdl-rdp/peer/departure.cpp:17: Departure::Departure parameters 6 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
-sdl-rdp/peer/loop.cpp:106: PeerLoop::PeerLoop parameters 8 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
-sdl-rdp/peer/peer.cpp:19: Peer::Peer parameters 8 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
-sdl-rdp/peer/peer.hpp: Peer data members 31 > 10 # composition root: owns every per-peer part, each wired with only what it uses
-sdl-rdp/peer/pump.cpp:15: PeerPump::PeerPump parameters 7 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
+sdl-rdp/peer/peer.cpp:20: Peer::Peer parameters 8 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
+sdl-rdp/peer/peer.hpp: Peer data members 30 > 10 # composition root: owns every per-peer part, each wired with only what it uses
+sdl-rdp/peer/peer.hpp: Peer member functions 37 > 15 # one peer connection: its thread loop, departure and FreeRDP callbacks are members, each TU a topic (#82)
 sdl-rdp/peer/redirection.cpp:28: Redirection::Redirection parameters 6 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp/peer/transport-end.cpp:70: TransportEnd::TransportEnd parameters 6 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp/sample-gate.test/process/process.cpp:46: Process::Line nesting 3 > 2 # size in #19

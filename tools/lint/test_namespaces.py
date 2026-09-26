@@ -236,3 +236,18 @@ def test_detail_directive_in_a_detail_block_fails(tree):
 def test_detail_directive_in_a_function_fails(tree):
     text = f'{DETAIL}auto F() -> void {{\n  using namespace sdl_rdp::link::detail::peer_link;\n}}\n}}\n'
     assert findings(tree, text, SOURCE) == ['frame-rate.cpp:3']
+
+
+def test_source_without_its_header_defines_an_included_siblings_class(tree):
+    member = 'sources/sdl-rdp/video-codec/loop.cpp'
+    clock  = 'namespace sdl_rdp::video_codec::detail::clock {\nauto Clock::Tick() -> void { }\n}\n'
+    assert findings(tree, f'#include <sdl-rdp/video-codec/clock.hpp>\n{clock}', member) == []
+    assert findings(tree, f'#include <sdl-rdp/link/peer-link.hpp>\n{clock}', member) == ['loop.cpp:2']
+    both = f'#include <sdl-rdp/video-codec/clock.hpp>\n{clock}namespace sdl_rdp::video_codec::detail::loop {{\n}}\n'
+    assert findings(tree, both, member) == ['loop.cpp:5']
+
+
+def test_source_with_its_header_opens_only_its_own_detail(tree):
+    (tree / HEADER).write_text(f'{DETAIL}}}\n')
+    text = '#include <sdl-rdp/video-codec/clock.hpp>\nnamespace sdl_rdp::video_codec::detail::clock {\n}\n'
+    assert findings(tree, text, SOURCE) == ['frame-rate.cpp:2']

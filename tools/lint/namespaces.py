@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Hold every file to its path: declarations in `<folder>::detail::<stem>`, a header re-exporting once, last."""
+"""Hold every file to its path: declarations in `<folder>::detail::<stem>`, a header re-exporting once, last.
+
+A .cpp with no header of its stem may instead open the detail namespace of a sibling header it includes, and only that.
+"""
 import pathlib
 import re
 import sys
@@ -22,6 +25,7 @@ SKIPS    = frozenset(('friend', 'static_assert', 'using', 'namespace', 'extern')
 OPENERS  = {'(': ')', '[': ']', '{': '}'}
 PAIRS    = {'<': '>', '(': ')', '[': ']'}
 STOPS    = frozenset(('(', '=', '{', ';', '[', ','))
+INCLUDE  = re.compile(r'^\s*#\s*include\s*[<"]([^>"]+)[>"]', re.MULTILINE)
 
 
 class Finding(NamedTuple):
@@ -361,11 +365,29 @@ def reach_findings(file, tokens):
             for token, parts in chains(tokens) if reaches_out(file, parts)]
 
 
+def class_headers(root, relative, text):
+    """The detail namespaces a source with no header of its stem may open: its own and each included sibling's."""
+    own = detail_namespace(relative)
+    if relative.suffix == shape.HEADER or (root / relative.with_name(f'{relative.name.split(".")[0]}.hpp')).is_file():
+        return [own]
+    siblings = [SOURCES / name for name in INCLUDE.findall(text)]
+    return [own, *(detail_namespace(sibling) for sibling in siblings
+                   if sibling.parent == relative.parent and sibling.suffix == shape.HEADER
+                   and (root / sibling).is_file())]
+
+
+def own_namespace(tops, candidates):
+    """The first candidate the file opens, else its own stem's."""
+    opened = [namespace_parts(statement)[0] for statement in tops if is_namespace(statement)]
+    return next((name for name in opened if name in candidates), candidates[0])
+
+
 def file_findings(root, relative, details):
-    tokens = code((root / relative).read_text(errors='replace'))
-    file   = File(relative, folder_namespace(relative), detail_namespace(relative), relative.suffix == shape.HEADER,
-                  details)
+    text   = (root / relative).read_text(errors='replace')
+    tokens = code(text)
     tops   = statements(tokens)
+    own    = own_namespace(tops, class_headers(root, relative, text))
+    file   = File(relative, folder_namespace(relative), own, relative.suffix == shape.HEADER, details)
     found  = reach_findings(file, tokens) + directive_findings(file, tokens)
     blocks = []
     for statement in tops:
