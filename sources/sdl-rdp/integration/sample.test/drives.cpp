@@ -30,6 +30,7 @@ using sdl_rdp::sample_gate_test::process::InitializedSdl;
 using sdl_rdp::sample_gate_test::process::Storage;
 using sdl_rdp::sample_gate_test::sample::PrimaryDisplayPort;
 using sdl_rdp::sample_gate_test::sample::Sample;
+using sdl_rdp::sample_gate_test::sample::SetLoopbackHints;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Releases;
 
@@ -95,7 +96,6 @@ auto ThenStorageFiles(SDL_Storage& storage) -> void {
   ASSERT_NO_FATAL_FAILURE(ThenStorageEntries(storage));
 }
 auto VerifyStorage() -> void {
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_STORAGE_TITLE_DRIVER, "rdp"));
   Storage storage{ SDL_OpenTitleStorage("share", 0) };
   ASSERT_NE(storage, nullptr) << SDL_GetError();
   ASSERT_TRUE(SDL_StorageReady(storage.get()));
@@ -146,19 +146,13 @@ auto VerifyStream(OpenFile& open, std::filesystem::path const& path) -> void {
   EXPECT_TRUE(SDL_CloseIO(stream.release()));
   EXPECT_EQ(ReadText(path / "whole"), "content!");
 }
-auto InitializeRdpVideo(std::filesystem::path const& certificates) -> void {
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_CERT_DIR, certificates.c_str()));
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_PORT, "0"));
-  ASSERT_TRUE(SDL_Init(SDL_INIT_VIDEO));
-}
 }
 TEST_F(Sample, DriveStorageAndStream) {
   InitializedSdl const sdl{ [&] {
-    InitializeRdpVideo(certificates.Path());
-    return !HasFatalFailure();
+    return SetLoopbackHints(certificates.Path(), { { .name = SDL_HINT_STORAGE_TITLE_DRIVER, .value = "rdp" } })
+           && SDL_Init(SDL_INIT_VIDEO);
   } };
-  ASSERT_FALSE(HasFatalFailure());
+  ASSERT_TRUE(sdl.Get()) << SDL_GetError();
   auto                               properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
   Client                             client(PrimaryDisplayPort(), false);
   oxbox::platform::ScratchArea const share      { "storage-drive", "sdl-rdp" };

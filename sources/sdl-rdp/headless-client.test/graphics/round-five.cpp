@@ -1,9 +1,9 @@
 #include <sdl-rdp/headless-client.test/graphics/round-five.hpp>
 
 #include <sdl-rdp/configuration/setup.hpp>
-#include <sdl-rdp/headless-client.test/backend/await-acknowledged.hpp>
 #include <sdl-rdp/headless-client.test/backend/events.hpp>
 #include <sdl-rdp/headless-client.test/backend/status.hpp>
+#include <sdl-rdp/headless-client.test/backend/waits.hpp>
 #include <sdl-rdp/headless-client.test/frame/pattern.hpp>
 #include <sdl-rdp/link/event.hpp>
 
@@ -28,6 +28,7 @@ using sdl_rdp::headless_client_test::backend::As;
 using sdl_rdp::headless_client_test::backend::Holds;
 using sdl_rdp::headless_client_test::backend::RequiredStatus;
 using sdl_rdp::headless_client_test::client::Pixels;
+using sdl_rdp::headless_client_test::client::UntilMatches;
 using sdl_rdp::headless_client_test::frame::GraphicsScene;
 using sdl_rdp::headless_client_test::frame::HashPattern;
 using sdl_rdp::link::CodecChanged;
@@ -86,7 +87,7 @@ auto RoundFive::ThenColourDepth(std::uint32_t depth) -> void {
   Pixels pixels(320uz * 200);
   HashPattern(pixels);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 320, 200));
-  ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text();
+  ASSERT_TRUE(UntilMatches(client, pixels)) << logs.Text();
 }
 auto RoundFive::ThenProgressiveDamageCost(Client& client, GraphicsObserver& observer, std::uint64_t before) -> void {
   EXPECT_EQ(observer.Observed().progressive_headers, 1u);

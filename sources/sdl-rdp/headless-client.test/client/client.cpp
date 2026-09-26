@@ -210,13 +210,13 @@ auto PumpInBackground(Client& client) -> std::jthread {
   });
 }
 auto Client::Matches(Pixels const& pixels) -> bool {
-  auto const actual = Framebuffer(Decoded(*instance));
+  auto const actual = DecodedPixels(*this);
   if (pixels.size() != actual.size()) return false;
   if (!tolerance) return std::ranges::equal(pixels, actual, [](auto a, auto b) { return ((a ^ b) & 0x00ffffff) == 0; });
   return std::ranges::equal(pixels, actual, [&](auto a, auto b) { return ChannelError(a, b) <= tolerance; });
 }
 auto Client::MaxError(Pixels const& pixels) const -> std::uint32_t {
-  auto const actual = Framebuffer(Decoded(*instance));
+  auto const actual = DecodedPixels(*this);
   Expects(pixels.size() == actual.size(), "the source matches the decoded frame");
   return std::transform_reduce(
       pixels.begin(), pixels.end(), actual.begin(), 0u, [](auto a, auto b) { return std::max(a, b); }, ChannelError);
@@ -240,7 +240,13 @@ auto Client::DesktopSize() const -> Extent {
   auto const& decoded = Decoded(*instance);
   return { .width = Narrowed<std::uint32_t>(decoded.width), .height = Narrowed<std::uint32_t>(decoded.height) };
 }
+auto DecodedPixels(Client const& client) -> std::span<std::uint32_t const> {
+  return Framebuffer(Decoded(*client.Instance()));
+}
 auto UntilDesktop(Client& client, std::uint32_t width, std::uint32_t height) -> bool {
   return client.Until([&] { return client.DesktopSize() == Extent{ .width = width, .height = height }; });
+}
+auto UntilMatches(Client& client, Pixels const& pixels) -> bool {
+  return client.Until([&] { return client.Matches(pixels); });
 }
 }

@@ -1,12 +1,21 @@
 #include <sdl-rdp/headless-client.test/frame/pattern.hpp>
 
+#include <sdl-rdp/utilities/contract.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
+
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <random>
 
 namespace sdl_rdp::headless_client_test::frame::detail::pattern {
 using sdl_rdp::headless_client_test::client::Pixels;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::ExpectsArea;
+using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::Rows;
 
 auto MovingTilePattern(std::span<std::uint32_t> pixels, std::size_t width, std::size_t height, std::size_t frame)
     -> void {
@@ -28,15 +37,28 @@ auto NoisePattern(std::span<std::uint32_t> pixels, std::uint32_t value) -> void 
 auto HashPattern(std::span<std::uint32_t> pixels, std::uint32_t first) -> void {
   std::ranges::generate(pixels, [index = first]() mutable { return (index++ * 2654435761u) & 0xffffff; });
 }
+auto RandomPattern(std::span<std::uint32_t> pixels, std::uint32_t seed) -> void {
+  std::mt19937 random(seed);  // NOLINT(cert-msc32-c, cert-msc51-cpp): Reproducible codec input.
+  std::ranges::generate(pixels, [&] { return random() & 0x00ffffff; });
+}
+auto FillArea(std::span<std::uint32_t> pixels, std::size_t stride, Rect area, std::uint32_t colour) -> void {
+  ExpectsArea(area);
+  auto const right  = Narrowed<std::size_t>(area.x + area.w);
+  auto const bottom = Narrowed<std::size_t>(area.y + area.h);
+  Expects(right <= stride, "the area fits the stride");
+  Expects(bottom * stride <= pixels.size(), "the area fits the pixels");
+  std::ranges::for_each(Rows(area), [&](Rect row) {
+    auto const first = (Narrowed<std::size_t>(row.y) * stride) + Narrowed<std::size_t>(row.x);
+    std::ranges::fill(pixels.subspan(first, Narrowed<std::size_t>(row.w)), colour);
+  });
+}
 auto GraphicsScene(std::uint32_t frame, bool noise) -> Pixels {
   Pixels     pixels(640uz * 480, 0x00010101);
-  auto const left   = std::size_t{ frame % 640 };
-  auto const width  = std::min(left + 32, 640uz) - left;
+  auto const left   = Narrowed<int>(frame % 640);
   if (noise)
     NoisePattern(pixels, frame + 1);
   else
-    for (std::size_t y = 40; y < 72; ++y)
-      std::ranges::fill(std::span(pixels).subspan((y * 640) + left, width), 0x0000ff00);
+    FillArea(pixels, 640, { .x = left, .y = 40, .w = std::min(left + 32, 640) - left, .h = 32 }, 0x0000ff00);
   return pixels;
 }
 }

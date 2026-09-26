@@ -1,17 +1,19 @@
 #include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/diagnostics/log-sink.hpp>
-#include <sdl-rdp/headless-client.test/backend/await-acknowledged.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
 #include <sdl-rdp/headless-client.test/backend/status.hpp>
+#include <sdl-rdp/headless-client.test/backend/waits.hpp>
 #include <sdl-rdp/headless-client.test/client/display.hpp>
 #include <sdl-rdp/headless-client.test/codec/gate.hpp>
 #include <sdl-rdp/headless-client.test/codec/mode.hpp>
+#include <sdl-rdp/headless-client.test/frame/pattern.hpp>
 #include <sdl-rdp/headless-client.test/graphics/observer.hpp>
 #include <sdl-rdp/headless-client.test/graphics/round-five.hpp>
 #include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/video/graphics-link.hpp>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 
 namespace sdl_rdp::integration::video_test::detail::graphics {
 using sdl_rdp::configuration::Codec;
@@ -19,13 +21,16 @@ using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::headless_client_test::backend::AwaitAllAcknowledged;
 using sdl_rdp::headless_client_test::backend::Clock;
 using sdl_rdp::headless_client_test::backend::RequiredStatus;
+using sdl_rdp::headless_client_test::backend::UntilLogged;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::DisplayClient;
 using sdl_rdp::headless_client_test::client::Pixels;
+using sdl_rdp::headless_client_test::client::UntilMatches;
 using sdl_rdp::headless_client_test::codec::CodecTolerance;
 using sdl_rdp::headless_client_test::codec::Gate;
 using sdl_rdp::headless_client_test::codec::Mode;
 using sdl_rdp::headless_client_test::codec::ModeName;
+using sdl_rdp::headless_client_test::frame::FillArea;
 using sdl_rdp::headless_client_test::frame::GraphicsScene;
 using sdl_rdp::headless_client_test::graphics::GraphicsObserver;
 using sdl_rdp::headless_client_test::graphics::RoundFive;
@@ -35,103 +40,100 @@ using sdl_rdp::video::GraphicsConnectionWait;
 
 class GraphicsGate : public Gate {
 protected:
-  auto ThenFullGraphicsWindow(GraphicsObserver& observer, Rect full) -> void {
+  auto GivenGraphics(bool acknowledging = true) -> void {
+    client = std::make_unique<Client>(backend.Port(), true);
+    client->EnableGraphics();
+    client->Tolerance(CodecTolerance(GetParam().codec, GetParam().surface));
+    observer                       = std::make_unique<GraphicsObserver>(*client);
+    observer->Observed().automatic = acknowledging;
+    ASSERT_TRUE(client->Connect());
+    ASSERT_TRUE(UntilLogged(*client, logs, "GFX confirmed")) << logs.Text(true);
+  }
+  auto ThenFullGraphicsWindow(Rect full) -> void {
     backend.Present(pixels, 320, 200, full);
     EXPECT_FALSE(backend.WaitFrame(std::chrono::milliseconds{ 1 }));
-    EXPECT_EQ(observer.Observed().frames.size(), 2u);
+    EXPECT_EQ(observer->Observed().frames.size(), 2u);
   }
-  auto ThenCumulativeAcknowledgement(Client& client, GraphicsObserver& observer) -> void {
+  auto ThenCumulativeAcknowledgement() -> void {
     EXPECT_FALSE(backend.WaitFrame(std::chrono::milliseconds{ 0 }));
-    ASSERT_TRUE(observer.Ack());
-    ASSERT_TRUE(client.Until([&] { return backend.WaitFrame(std::chrono::milliseconds{ 0 }); }));
+    ASSERT_TRUE(observer->Ack());
+    ASSERT_TRUE(client->Until([&] { return backend.WaitFrame(std::chrono::milliseconds{ 0 }); }));
     RecordProperty("trace", "two unacknowledged frames exhaust the window; suspend releases third; resume waits; "
                             "cumulative ack releases wait");
   }
-  auto ThenGraphicsTakeover(Client& graphics) -> void {
+  auto ThenGraphicsTakeover() -> void {
     Client next(backend.Port(), true);
     next.EnableGraphics();
-    next.Tolerance(graphics.Tolerance());
+    next.Tolerance(client->Tolerance());
     ASSERT_TRUE(next.Connect());
-    ASSERT_TRUE(next.Until([&] { return next.Matches(pixels); })) << logs.Text(true);
+    ASSERT_TRUE(UntilMatches(next, pixels)) << logs.Text(true);
     RecordProperty("trace", "pipeline frame -> legacy takeover frame -> fresh pipeline takeover frame");
   }
-  auto ThenLegacyAndGraphicsTakeover(Client& graphics) -> void {
+  auto ThenLegacyAndGraphicsTakeover() -> void {
     Client legacy(backend.Port(), true);
-    legacy.Tolerance(CodecTolerance(GetParam().codec, GetParam().surface));
+    legacy.Tolerance(client->Tolerance());
     ASSERT_TRUE(legacy.Connect());
-    ASSERT_TRUE(legacy.Until([&] { return legacy.Matches(pixels); }));
+    ASSERT_TRUE(UntilMatches(legacy, pixels));
     EXPECT_FALSE(freerdp_settings_get_bool(legacy.Instance()->context->settings, FreeRDP_SupportGraphicsPipeline));
-    ThenGraphicsTakeover(graphics);
+    ThenGraphicsTakeover();
   }
-  auto WhenQueuedGraphics(Client& client, GraphicsObserver& observer, Rect full) -> void {
-    ASSERT_TRUE(observer.AckFrame(0, 10000000));
+  auto WhenQueuedGraphics(Rect full) -> void {
+    ASSERT_TRUE(observer->AckFrame(0, 10000000));
     backend.Present(pixels, 320, 200, full);
     auto deadline = Clock::now() + std::chrono::milliseconds(80);
-    while (Clock::now() < deadline) ASSERT_TRUE(client.Pump());
-    EXPECT_EQ(observer.Observed().frames.size(), 2u);
+    while (Clock::now() < deadline) ASSERT_TRUE(client->Pump());
+    EXPECT_EQ(observer->Observed().frames.size(), 2u);
   }
-  auto ThenDecodedGraphics(Client& client, GraphicsObserver& observer) -> void {
-    ASSERT_NO_FATAL_FAILURE(Frame(client, { .x = 0, .y = 0, .w = 320, .h = 200 }));
-    RecordProperty("maximum_channel_error", client.MaxError(pixels));
-    EXPECT_LE(client.MaxError(pixels), client.Tolerance());
-    EXPECT_EQ(observer.Observed().commands, GetParam().codec == Codec::Planar ? 200u : 1u);
-    ASSERT_NO_FATAL_FAILURE(ThenConnectedCodec(client, GetParam().codec));
-    ASSERT_NO_FATAL_FAILURE(ThenResized(client, observer));
+  auto ThenDecodedGraphics() -> void {
+    ASSERT_NO_FATAL_FAILURE(Frame({ .x = 0, .y = 0, .w = 320, .h = 200 }));
+    RecordProperty("maximum_channel_error", client->MaxError(pixels));
+    EXPECT_LE(client->MaxError(pixels), client->Tolerance());
+    EXPECT_EQ(observer->Observed().commands, GetParam().codec == Codec::Planar ? 200u : 1u);
+    ASSERT_NO_FATAL_FAILURE(ThenConnectedCodec(*client, GetParam().codec));
+    ASSERT_NO_FATAL_FAILURE(ThenResized());
     RecordProperty("trace", logs.Text(true));
   }
-  auto ThenSuspensionAcknowledged(Client& client, GraphicsObserver& observer) -> void {
+  auto ThenSuspensionAcknowledged() -> void {
     EXPECT_TRUE(backend.WaitFrame(std::chrono::milliseconds{ 0 }));
-    ASSERT_TRUE(observer.Ack());
-    ASSERT_TRUE(client.Pump(20));
+    ASSERT_TRUE(observer->Ack());
+    ASSERT_TRUE(client->Pump(20));
   }
-  static auto ThenResizedSurface(GraphicsObserver const& observer) -> void {
-    ASSERT_EQ(observer.Observed().surfaces.size(), 2u);
-    EXPECT_EQ(observer.Observed().deleted, 1u);
-    EXPECT_EQ(observer.Observed().surfaces.back().width, 352);
-    EXPECT_EQ(observer.Observed().surfaces.back().height, 224);
-    EXPECT_EQ(observer.Observed().progressive_headers, GetParam().codec == Codec::Progressive ? 2u : 0u);
+  auto ThenResizedSurface() -> void {
+    ASSERT_EQ(observer->Observed().surfaces.size(), 2u);
+    EXPECT_EQ(observer->Observed().deleted, 1u);
+    EXPECT_EQ(observer->Observed().surfaces.back().width, 352);
+    EXPECT_EQ(observer->Observed().surfaces.back().height, 224);
+    EXPECT_EQ(observer->Observed().progressive_headers, GetParam().codec == Codec::Progressive ? 2u : 0u);
   }
-  auto GivenUnacknowledged() -> void {
-    graphics_client = std::make_unique<Client>(backend.Port(), true);
-    graphics_client->EnableGraphics();
-    graphics_observer = std::make_unique<GraphicsObserver>(*graphics_client);
-    ConnectUnacknowledged(*graphics_client, *graphics_observer);
-  }
-  auto ConnectUnacknowledged(Client& client, GraphicsObserver& observer) -> void {
-    observer.Observed().automatic = false;
-    ASSERT_TRUE(client.Connect());
-    ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
-  }
-  auto PresentFrames(Client& client, GraphicsObserver& observer, std::uint32_t first, std::uint32_t last) -> void {
+  auto PresentFrames(std::uint32_t first, std::uint32_t last) -> void {
     Rect const full{ .x = 0, .y = 0, .w = 320, .h = 200 };
     std::ranges::for_each(std::views::iota(first, last + 1), [&](std::size_t count) {
       backend.Present(pixels, 320, 200, full);
-      ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() == count; }));
+      ASSERT_TRUE(client->Until([&] { return observer->Observed().frames.size() == count; }));
     });
   }
-  auto ThenResized(Client& client, GraphicsObserver& observer) -> void {
+  auto ThenResized() -> void {
     Pixels     resized(352uz * 224, 0x0055aaff);
     Rect const full   { .x = 0, .y = 0, .w = 352, .h = 224 };
     backend.Present(resized, 352, 224, full);
-    ASSERT_TRUE(client.Until([&] { return client.Matches(resized); })) << logs.Text(true);
-    EXPECT_EQ(client.DesktopSize(), (Extent{ .width = 352, .height = 224 }));
-    ThenResizedSurface(observer);
+    ASSERT_TRUE(UntilMatches(*client, resized)) << logs.Text(true);
+    EXPECT_EQ(client->DesktopSize(), (Extent{ .width = 352, .height = 224 }));
+    ThenResizedSurface();
   }
-  auto FillGraphicsWindow(Client& client, GraphicsObserver& observer, Rect full) -> void {
+  auto FillGraphicsWindow(Rect full) -> void {
     for (std::size_t count = 1; count <= 2; ++count) {
       std::ranges::fill(pixels, count * 0x00202020u);
       backend.Present(pixels, 320, 200, full);
-      ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() == count; })) << logs.Text(true);
+      ASSERT_TRUE(client->Until([&] { return observer->Observed().frames.size() == count; })) << logs.Text(true);
     }
   }
-  auto ThenSuspendedWindow(Client& client, GraphicsObserver& observer) -> void {
+  auto ThenSuspendedWindow() -> void {
     EXPECT_FALSE(backend.WaitFrame(std::chrono::milliseconds{ 0 }));
-    ASSERT_TRUE(observer.Ack(SUSPEND_FRAME_ACKNOWLEDGEMENT));
-    ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() == 3; }));
-    ThenSuspensionAcknowledged(client, observer);
+    ASSERT_TRUE(observer->Ack(SUSPEND_FRAME_ACKNOWLEDGEMENT));
+    ASSERT_TRUE(client->Until([&] { return observer->Observed().frames.size() == 3; }));
+    ThenSuspensionAcknowledged();
   }
-  std::unique_ptr<Client>           graphics_client;
-  std::unique_ptr<GraphicsObserver> graphics_observer;
+  std::unique_ptr<GraphicsObserver> observer;
 };
 namespace {
 auto RecordDamageCost(Client& client, Pixels const& pixels, std::uint64_t before) -> void {
@@ -142,59 +144,46 @@ auto RecordDamageCost(Client& client, Pixels const& pixels, std::uint64_t before
 }
 }
 TEST_P(GraphicsGate, DecodesAndResizes) {
-  Client client(backend.Port(), true);
-  client.EnableGraphics();
-  GraphicsObserver observer(client);
-  client.Tolerance(CodecTolerance(GetParam().codec, GetParam().surface));
-  ASSERT_TRUE(client.Connect());
-  ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); })) << logs.Text(true);
+  ASSERT_NO_FATAL_FAILURE(GivenGraphics());
   ASSERT_TRUE(logs.Contains(LogLevel::Info, "GFX advertised"));
   EXPECT_TRUE(logs.Contains("GFX confirmed version=0x000a0701"));
-  ThenDecodedGraphics(client, observer);
+  ThenDecodedGraphics();
 }
 TEST_P(GraphicsGate, AcknowledgementPacingAndSuspend) {
-  ASSERT_NO_FATAL_FAILURE(GivenUnacknowledged());
-  auto&      client   = *graphics_client;
-  auto&      observer = *graphics_observer;
-  Rect const full     { .x = 0, .y = 0, .w = 320, .h = 200 };
-  ASSERT_NO_FATAL_FAILURE(FillGraphicsWindow(client, observer, full));
-  ASSERT_NO_FATAL_FAILURE(ThenFullGraphicsWindow(observer, full));
-  ASSERT_NO_FATAL_FAILURE(ThenSuspendedWindow(client, observer));
-  ASSERT_NO_FATAL_FAILURE(PresentFrames(client, observer, 4, 5));
-  ThenCumulativeAcknowledgement(client, observer);
+  ASSERT_NO_FATAL_FAILURE(GivenGraphics(false));
+  Rect const full{ .x = 0, .y = 0, .w = 320, .h = 200 };
+  ASSERT_NO_FATAL_FAILURE(FillGraphicsWindow(full));
+  ASSERT_NO_FATAL_FAILURE(ThenFullGraphicsWindow(full));
+  ASSERT_NO_FATAL_FAILURE(ThenSuspendedWindow());
+  ASSERT_NO_FATAL_FAILURE(PresentFrames(4, 5));
+  ThenCumulativeAcknowledgement();
 }
 TEST_P(GraphicsGate, QueueDepthThrottlesBytes) {
-  ASSERT_NO_FATAL_FAILURE(GivenUnacknowledged());
-  ASSERT_NO_FATAL_FAILURE(PresentFrames(*graphics_client, *graphics_observer, 1, 2));
-  auto& client   = *graphics_client;
-  auto& observer = *graphics_observer;
-  ASSERT_NO_FATAL_FAILURE(WhenQueuedGraphics(client, observer, { .x = 0, .y = 0, .w = 320, .h = 200 }));
-  ASSERT_TRUE(observer.AckFrame(0, 0));
-  ASSERT_TRUE(client.Until([&] { return observer.Observed().frames.size() == 3; }));
+  ASSERT_NO_FATAL_FAILURE(GivenGraphics(false));
+  ASSERT_NO_FATAL_FAILURE(PresentFrames(1, 2));
+  ASSERT_NO_FATAL_FAILURE(WhenQueuedGraphics({ .x = 0, .y = 0, .w = 320, .h = 200 }));
+  ASSERT_TRUE(observer->AckFrame(0, 0));
+  ASSERT_TRUE(client->Until([&] { return observer->Observed().frames.size() == 3; }));
   RecordProperty(
       "trace",
       "ack frame 1 with 10000000 queued bytes holds frame 3 despite one free frame slot; queueDepth=0 releases it");
 }
 TEST_P(GraphicsGate, RejectedChannelUsesLegacy) {
-  Client client(backend.Port(), true);
-  client.EnableGraphics();
-  DisplayClient const display(client);
-  client.Tolerance(CodecTolerance(GetParam().codec, GetParam().surface));
-  ASSERT_TRUE(client.Connect());
-  ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX channel rejected"); })) << logs.Text(true);
-  ASSERT_NO_FATAL_FAILURE(Frame(client, { .x = 0, .y = 0, .w = 320, .h = 200 }));
+  client = std::make_unique<Client>(backend.Port(), true);
+  client->EnableGraphics();
+  DisplayClient const display(*client);
+  client->Tolerance(CodecTolerance(GetParam().codec, GetParam().surface));
+  ASSERT_TRUE(client->Connect());
+  ASSERT_TRUE(UntilLogged(*client, logs, "GFX channel rejected")) << logs.Text(true);
+  ASSERT_NO_FATAL_FAILURE(Frame({ .x = 0, .y = 0, .w = 320, .h = 200 }));
   EXPECT_FALSE(logs.Contains("GFX confirmed"));
   RecordProperty("trace",
                  "GCC negotiates GFX; client registers only disp; graphics DVC is rejected; legacy frame decodes");
 }
 TEST_P(GraphicsGate, TakeoverWithLegacy) {
-  Client graphics(backend.Port(), true);
-  graphics.EnableGraphics();
-  graphics.Tolerance(CodecTolerance(GetParam().codec, GetParam().surface));
-  ASSERT_TRUE(graphics.Connect());
-  ASSERT_TRUE(graphics.Until([&] { return logs.Contains("GFX confirmed"); }));
-  ASSERT_NO_FATAL_FAILURE(Frame(graphics, { .x = 0, .y = 0, .w = 320, .h = 200 }));
-  ThenLegacyAndGraphicsTakeover(graphics);
+  ASSERT_NO_FATAL_FAILURE(GivenGraphics());
+  ASSERT_NO_FATAL_FAILURE(Frame({ .x = 0, .y = 0, .w = 320, .h = 200 }));
+  ThenLegacyAndGraphicsTakeover();
 }
 INSTANTIATE_TEST_SUITE_P(Pipeline, GraphicsGate,
                          testing::Values(Mode{ .surface = true, .codec = Codec::Planar },
@@ -217,15 +206,13 @@ TEST_F(RoundFive, ProgressiveDamageAndQoe) {
   auto&            client   = GraphicsClient();
   GraphicsObserver observer(client);
   ASSERT_NO_FATAL_FAILURE(Connect(client));
-  ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }));
+  ASSERT_TRUE(UntilLogged(client, logs, "GFX confirmed"));
   auto pixels = GraphicsScene(5, false);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
   ASSERT_NO_FATAL_FAILURE(AwaitAllAcknowledged(client, backend, logs));
   auto       before = client.Received();
   Rect const damage { .x = 17, .y = 19, .w = 7, .h = 5 };
-  std::ranges::for_each(std::views::iota(damage.y, damage.y + damage.h), [&](int y) {
-    std::ranges::fill(std::span(pixels).subspan((y * 640) + damage.x, damage.w), 0x00ff0000u);
-  });
+  FillArea(pixels, 640, damage, 0x00ff0000u);
   ASSERT_NO_FATAL_FAILURE(PresentProgressiveDamage(client, pixels, damage));
   ASSERT_NO_FATAL_FAILURE(ThenProgressiveDamageCost(client, observer, before));
   RecordDamageCost(client, pixels, before);
@@ -237,7 +224,7 @@ TEST_F(RoundFive, GraphicsVersion101) {
   ASSERT_TRUE(freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_GfxCapsFilter,
                                           ((1u << 11) - 1) & ~(1u << 3)));
   ASSERT_NO_FATAL_FAILURE(Connect(client));
-  ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed version=0x000a0100 flags=0x00000000"); }));
+  ASSERT_TRUE(UntilLogged(client, logs, "GFX confirmed version=0x000a0100 flags=0x00000000"));
   auto pixels = GraphicsScene(3, false);
   ASSERT_NO_FATAL_FAILURE(PresentProgressiveDamage(client, pixels, { .x = 0, .y = 0, .w = 640, .h = 480 }));
   RecordProperty(

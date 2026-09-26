@@ -26,8 +26,10 @@ using sdl_rdp::drive::StatusFailure;
 using sdl_rdp::headless_client_test::client::Clock;
 using sdl_rdp::headless_client_test::drive::DriveChecks;
 using sdl_rdp::headless_client_test::drive::DriveObserver;
+using sdl_rdp::headless_client_test::drive::LargeFileBytes;
 using sdl_rdp::headless_client_test::drive::Pattern;
 using sdl_rdp::headless_client_test::drive::ReadAt;
+using sdl_rdp::headless_client_test::drive::ReadLargeFile;
 using sdl_rdp::headless_client_test::drive::ReplyTo;
 using sdl_rdp::headless_client_test::drive::WriteAt;
 using sdl_rdp::headless_client_test::utilities::ReadText;
@@ -109,14 +111,10 @@ protected:
   auto ThenReadEndsAtDisconnect(File& file) -> void {
     pump.request_stop();
     pump.join();
-    auto read = std::async(std::launch::async, [&] {
-      std::string bytes(static_cast<std::ptrdiff_t>(3 * 1024) * 1024, '\0');
-      return ReadAt(file, 0, bytes);
-    });
+    auto read = std::async(std::launch::async, [&] { return ReadLargeFile(file); });
     std::this_thread::sleep_for(20ms);
     Disconnect();
-    ASSERT_EQ(read.wait_for(2s), std::future_status::ready);
-    EXPECT_THROW(std::ignore = read.get(), PeerDisconnected);
+    ThenAbortedRead(read);
   }
   auto ThenOverflowingOffset(File& file, DriveObserver const& observer) -> void {
     std::array<char, 1> byte{ };
@@ -157,7 +155,7 @@ protected:
   }
 };
 TEST_F(SharedDrive, ReadWriteMetadataAndDirectories) {
-  auto source = Pattern(static_cast<std::ptrdiff_t>(3 * 1024) * 1024);
+  auto source = Pattern(LargeFileBytes);
   Write("disk.img", source);
   auto const opened = Open("disk.img", { .read = true, .write = true });
   auto&      file   = *opened;
@@ -187,7 +185,7 @@ TEST_F(SharedDrive, ConcurrentReadsAndReconnect) {
   std::vector<std::future<bool>> readers;
   for (std::size_t i = 0; i < 4; ++i) {
     auto name   = std::to_string(i);
-    auto source = Pattern(static_cast<std::ptrdiff_t>(3 * 1024) * 1024, i);
+    auto source = Pattern(LargeFileBytes, i);
     Write(name, source);
     readers.push_back(
         std::async(std::launch::async, [&, name, source] { return ReadSharedFile(Files(), drive, name, source); }));
@@ -203,7 +201,7 @@ TEST_F(SharedDrive, ConcurrentReadsAndReconnect) {
   EXPECT_NE(drive, old);
 }
 TEST_F(SharedDrive, DisconnectDuringRead) {
-  Write("large", Pattern(static_cast<std::ptrdiff_t>(3 * 1024) * 1024));
+  Write("large", Pattern(LargeFileBytes));
   auto const opened = Open("large");
   auto&      file   = *opened;
   ASSERT_NO_FATAL_FAILURE(ThenReadEndsAtDisconnect(file));

@@ -1,7 +1,7 @@
 #include <sdl-rdp/headless-client.test/graphics/cost.hpp>
 
-#include <sdl-rdp/headless-client.test/backend/await-acknowledged.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
+#include <sdl-rdp/headless-client.test/backend/waits.hpp>
 #include <sdl-rdp/headless-client.test/frame/pattern.hpp>
 
 #include <array>

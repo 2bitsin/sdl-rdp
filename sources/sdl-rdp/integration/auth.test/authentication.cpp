@@ -2,7 +2,6 @@
 #include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/headless-client.test/client/client.hpp>
 #include <sdl-rdp/session/backend.hpp>
-#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
@@ -199,8 +198,7 @@ TEST_F(Authentication, RejectedCertificateLogs) {
   bool verified = false;
   ASSERT_NO_FATAL_FAILURE(RejectCertificate(backend.Port(), verified));
   constexpr auto closed = "Connection closed before activation: ERRCONNECT_CONNECT_TRANSPORT_FAILED.";
-  EXPECT_TRUE(
-      Until([&] { return std::ranges::any_of(logs, [&](auto const& entry) { return entry.second == closed; }); }));
+  EXPECT_TRUE(Logged([&](auto const& entry) { return entry.second == closed; }));
   backend.Close();
   EXPECT_TRUE(verified);
   ThenCertificateDisconnect(closed);
@@ -237,9 +235,6 @@ TEST_F(Authentication, UnreadableKeyEndsThePeerWithItsReason) {
   std::ofstream{ certificates.Path() / "server.key", std::ios::trunc } << "not a private key\n";
   Client client(backend.Port(), false);
   EXPECT_FALSE(client.Connect());
-  auto const reported = [&] {
-    return std::ranges::any_of(logs, [](auto const& entry) { return entry.second.contains("private key loading"); });
-  };
-  EXPECT_TRUE(Until(reported));
+  EXPECT_TRUE(Logged([](auto const& entry) { return entry.second.contains("private key loading"); }));
 }
 }

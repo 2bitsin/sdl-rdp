@@ -25,12 +25,12 @@ using sdl_rdp::configuration::Codec;
 using sdl_rdp::configuration::InvalidChoice;
 using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::headless_client_test::backend::Clock;
-using sdl_rdp::headless_client_test::backend::As;
 using sdl_rdp::headless_client_test::backend::Holds;
 using sdl_rdp::headless_client_test::backend::LoopbackConfig;
 using sdl_rdp::headless_client_test::backend::WaitingOpen;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::Pixels;
+using sdl_rdp::headless_client_test::client::UntilMatches;
 using sdl_rdp::headless_client_test::codec::CodecTolerance;
 using sdl_rdp::headless_client_test::codec::Gate;
 using sdl_rdp::headless_client_test::codec::Mode;
@@ -39,7 +39,6 @@ using sdl_rdp::headless_client_test::codec::NegotiatedCodec;
 using sdl_rdp::headless_client_test::frame::HashPattern;
 using sdl_rdp::link::Connected;
 using sdl_rdp::link::Disconnected;
-using sdl_rdp::link::Event;
 using sdl_rdp::link::ScreenChanged;
 using sdl_rdp::utilities::Descriptor;
 using sdl_rdp::utilities::Narrowed;
@@ -57,17 +56,6 @@ auto ThenUnblockedPresent(std::future<void>& presenting, Client& client) -> void
   presenting.get();
   ASSERT_EQ(ready, std::future_status::ready);
 }
-auto ThenTakeoverGeometry(Event const& event) -> void {
-  auto const& connected = As<Connected>(event);
-  EXPECT_EQ(connected.width, 320u);
-  EXPECT_EQ(connected.height, 200u);
-}
-auto ThenTakeoverEvents(std::span<Event const> events) -> void {
-  ASSERT_EQ(events.size(), 3u);
-  EXPECT_TRUE(Holds<Disconnected>(events[0]));
-  ThenTakeoverGeometry(events[1]);
-  EXPECT_TRUE(Holds<ScreenChanged>(events[2]));
-}
 auto ThenDisplaced(Client& first) -> void {
   ASSERT_TRUE(freerdp_input_send_keyboard_event(first.Instance()->context->input, KBD_FLAGS_DOWN, 0x30));
   auto deadline  = Clock::now() + std::chrono::seconds(10);
@@ -78,18 +66,16 @@ auto ThenDisplaced(Client& first) -> void {
 }
 }
 TEST_P(Gate, FramesAndInput) {
-  Client client(backend.Port(), GetParam().surface);
-  ASSERT_NO_FATAL_FAILURE(ConnectCodec(client));
+  ASSERT_NO_FATAL_FAILURE(ConnectCodec());
   ASSERT_NO_FATAL_FAILURE(ThenConnected());
-  ASSERT_NO_FATAL_FAILURE(PresentMeasuredFrame(client));
-  ASSERT_NO_FATAL_FAILURE(WhenDamagedBlock(client));
-  ASSERT_NO_FATAL_FAILURE(Input(client));
-  ThenClientDisconnects(client);
+  ASSERT_NO_FATAL_FAILURE(PresentMeasuredFrame());
+  ASSERT_NO_FATAL_FAILURE(WhenDamagedBlock());
+  ASSERT_NO_FATAL_FAILURE(Input(*client));
+  ThenClientDisconnects();
 }
 TEST_P(Gate, ResizeAndWakeup) {
   ASSERT_NO_FATAL_FAILURE(Reopen(640, 480));
-  Client client(backend.Port(), GetParam().surface);
-  ASSERT_NO_FATAL_FAILURE(ConnectCodec(client));
+  ASSERT_NO_FATAL_FAILURE(ConnectCodec());
   ASSERT_NO_FATAL_FAILURE(ThenResizedConnection());
   EXPECT_FALSE(backend.Wait(std::chrono::milliseconds{ 1 }));
   auto waiter   = std::async(std::launch::async, [&] { return backend.Wait(std::chrono::milliseconds{ 30000 }); });
@@ -103,24 +89,19 @@ TEST_P(Gate, ResizeAndWakeup) {
 TEST_P(Gate, LateClientAndBurst) {
   Rect const area{ .x = 0, .y = 0, .w = 320, .h = 200 };
   backend.Present(pixels, 320, 200, area);
-  Client client(backend.Port(), GetParam().surface);
-  ASSERT_NO_FATAL_FAILURE(ConnectCodec(client));
-  ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text();
-  WhenBurstPictures(client, area);
+  ASSERT_NO_FATAL_FAILURE(ConnectCodec());
+  ASSERT_TRUE(UntilMatches(*client, pixels)) << logs.Text();
+  WhenBurstPictures(area);
 }
 TEST_P(Gate, DesktopIsPicture) {
-  backend.Close();
-  auto config = LoopbackConfig(certificates.Path(), { .width = 640, .height = 480 });
-  config.codec = GetParam().codec;
-  ASSERT_NO_FATAL_FAILURE(backend.Open(config, logs));
+  ASSERT_NO_FATAL_FAILURE(Reopen(640, 480));
   Pixels frame(640uz * 480);
   HashPattern(frame);
   Rect const area{ .x = 0, .y = 0, .w = 640, .h = 480 };
   backend.Present(frame, 640, 480, area);
-  Client client(backend.Port(), GetParam().surface);
-  ASSERT_NO_FATAL_FAILURE(ConnectCodec(client));
-  ASSERT_TRUE(client.Until([&] { return client.Matches(frame); })) << logs.Text();
-  ThenPictureDesktop(client);
+  ASSERT_NO_FATAL_FAILURE(ConnectCodec());
+  ASSERT_TRUE(UntilMatches(*client, frame)) << logs.Text();
+  ThenPictureDesktop();
 }
 TEST_P(Gate, WaitForClient) {
   backend.Close();
@@ -131,14 +112,13 @@ TEST_P(Gate, WaitForClient) {
   auto              port    = opening.Receive(std::chrono::seconds(15)).value_or(0);
   ASSERT_GT(port, 0);
   EXPECT_FALSE(opening.Receive(std::chrono::milliseconds(0)).has_value());
-  Client client(Narrowed<std::uint32_t>(port), GetParam().surface);
-  ASSERT_NO_FATAL_FAILURE(ConnectCodec(client));
+  Client waiting(Narrowed<std::uint32_t>(port), GetParam().surface);
+  ASSERT_TRUE(waiting.Connect()) << logs.Text(true);
   EXPECT_EQ(opening.Receive(std::chrono::seconds(15)), std::optional(0));
 }
 TEST_P(Gate, BlockedSinglePresent) {
   ASSERT_NO_FATAL_FAILURE(Reopen(2048, 1536));
-  Client client(backend.Port(), GetParam().surface, 2048, 1536);
-  ASSERT_NO_FATAL_FAILURE(ConnectCodec(client));
+  ASSERT_NO_FATAL_FAILURE(ConnectCodec(2048, 1536));
   auto events = Events(2);
   ASSERT_EQ(events.size(), 2u);
   ASSERT_TRUE(Holds<Connected>(events.front()));
@@ -148,35 +128,35 @@ TEST_P(Gate, BlockedSinglePresent) {
   // Keep the client unpumped until the presenter completes. Completion therefore
   // cannot depend on the client draining output; ten seconds is a progress bound.
   auto presenting = std::async(std::launch::async, [&] { backend.Present(pixels, 2048, 1536, area); });
-  ASSERT_NO_FATAL_FAILURE(ThenUnblockedPresent(presenting, client));
-  EXPECT_TRUE(client.Until([&] { return client.Matches(pixels); }))
-      << "maximum channel error " << client.MaxError(pixels);
-  RecordProperty("max_channel_error", std::to_string(client.MaxError(pixels)));
+  ASSERT_NO_FATAL_FAILURE(ThenUnblockedPresent(presenting, *client));
+  EXPECT_TRUE(UntilMatches(*client, pixels)) << "maximum channel error " << client->MaxError(pixels);
+  RecordProperty("max_channel_error", std::to_string(client->MaxError(pixels)));
 }
 TEST_P(Gate, NewestClientTakesOver) {
-  Client first(backend.Port(), GetParam().surface);
-  ASSERT_TRUE(first.Connect()) << logs.Text(true);
-  ASSERT_EQ(Events(2).size(), 2u);
+  ASSERT_NO_FATAL_FAILURE(ConnectCodec());
+  ASSERT_NO_FATAL_FAILURE(ThenConnected());
   Client second(backend.Port(), GetParam().surface, 400, 240);
   ASSERT_TRUE(second.Connect()) << logs.Text(true);
   auto events = Events(3);
-  ASSERT_NO_FATAL_FAILURE(ThenTakeoverEvents(events));
-  ASSERT_NO_FATAL_FAILURE(ThenDisplaced(first));
+  ASSERT_EQ(events.size(), 3u);
+  EXPECT_TRUE(Holds<Disconnected>(events[0]));
+  ThenConnectionDetails(events[1]);
+  EXPECT_TRUE(Holds<ScreenChanged>(events[2]));
+  ASSERT_NO_FATAL_FAILURE(ThenDisplaced(*client));
   ASSERT_NO_FATAL_FAILURE(Input(second));
   ASSERT_TRUE(second.Disconnect());
   ASSERT_NO_FATAL_FAILURE(ThenDisconnected());
   EXPECT_FALSE(backend.Wait(std::chrono::milliseconds{ 0 }));
 }
 TEST_P(Gate, LiveCodecChange) {
-  Client client(backend.Port(), GetParam().surface);
-  ASSERT_TRUE(client.Connect()) << logs.Text(true);
-  ASSERT_EQ(Events(2).size(), 2u);
+  ASSERT_NO_FATAL_FAILURE(ConnectCodec());
+  ASSERT_NO_FATAL_FAILURE(ThenConnected());
   auto previous = GetParam().codec;
   for (auto codec : { Codec::Raw, Codec::Planar, Codec::RemoteFx, Codec::NsCodec, Codec::Auto }) {
     (*backend).Presentation().SetCodec(codec);
-    client.Tolerance(CodecTolerance(codec, GetParam().surface));
+    client->Tolerance(CodecTolerance(codec, GetParam().surface));
     std::ranges::fill(pixels, 0x00404040u + (Narrowed<std::uint32_t>(std::to_underlying(codec)) * 0x00040404u));
-    ASSERT_NO_FATAL_FAILURE(Frame(client, { .x = 0, .y = 0, .w = 320, .h = 200 }));
+    ASSERT_NO_FATAL_FAILURE(Frame({ .x = 0, .y = 0, .w = 320, .h = 200 }));
     auto expected = NegotiatedCodec(codec, GetParam().surface);
     ASSERT_NO_FATAL_FAILURE(ThenCodecChange(expected, previous));
     previous = expected;
@@ -185,22 +165,20 @@ TEST_P(Gate, LiveCodecChange) {
   EXPECT_THROW((*backend).Presentation().SetCodec(unlisted), InvalidChoice);
 }
 TEST_P(Gate, ExactFlatColour) {
-  Client client(backend.Port(), GetParam().surface);
-  client.Tolerance(std::min(CodecTolerance(GetParam().codec, GetParam().surface), FlatColourError));
-  ASSERT_TRUE(client.Connect()) << logs.Text(true);
-  ASSERT_EQ(Events(2).size(), 2u);
+  ASSERT_NO_FATAL_FAILURE(ConnectCodec());
+  ASSERT_NO_FATAL_FAILURE(ThenConnected());
+  client->Tolerance(std::min(client->Tolerance(), FlatColourError));
   std::ranges::fill(pixels, 0x00ffffffu);
-  ASSERT_NO_FATAL_FAILURE(Frame(client, { .x = 0, .y = 0, .w = 320, .h = 200 }));
-  RecordProperty("maximum_channel_error", client.MaxError(pixels));
+  ASSERT_NO_FATAL_FAILURE(Frame({ .x = 0, .y = 0, .w = 320, .h = 200 }));
+  RecordProperty("maximum_channel_error", client->MaxError(pixels));
 }
 TEST_P(Gate, TinyDamage) {
-  Client client(backend.Port(), GetParam().surface);
-  ASSERT_NO_FATAL_FAILURE(ConnectCodec(client));
-  ASSERT_NO_FATAL_FAILURE(Frame(client, { .x = 0, .y = 0, .w = 320, .h = 200 }));
+  ASSERT_NO_FATAL_FAILURE(ConnectCodec());
+  ASSERT_NO_FATAL_FAILURE(Frame({ .x = 0, .y = 0, .w = 320, .h = 200 }));
   pixels[(51 * 320) + 73] = 0x000000ff;
-  ASSERT_NO_FATAL_FAILURE(Frame(client, { .x = 73, .y = 51, .w = 1, .h = 1 }));
+  ASSERT_NO_FATAL_FAILURE(Frame({ .x = 73, .y = 51, .w = 1, .h = 1 }));
   pixels.back() = 0x00ffffff;
-  Frame(client, { .x = 319, .y = 199, .w = 1, .h = 1 });
+  Frame({ .x = 319, .y = 199, .w = 1, .h = 1 });
 }
 TEST_P(Gate, ProbeClosesBeforeActivation) {
   {

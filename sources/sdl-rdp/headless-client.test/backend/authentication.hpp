@@ -8,6 +8,7 @@
 
 #include <gtest/gtest.h>
 #include <oxbox/platform/scratch-area.hpp>
+#include <algorithm>
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
@@ -56,9 +57,9 @@ public:
 protected:
   auto TearDown()                               -> void override;
   auto Open(AuthMode chosen, bool fixed = true) -> void;
-  auto Until(auto ready)                        -> bool {
+  auto Logged(auto matches)                     -> bool {
     std::unique_lock lock(guard);
-    return logged.wait_for(lock, std::chrono::seconds(10), ready);
+    return logged.wait_for(lock, std::chrono::seconds(10), [&] { return std::ranges::any_of(logs, matches); });
   }
   auto Attempt(std::string_view user, std::string_view password, std::string_view domain, bool nla, bool accepted)
       -> void;

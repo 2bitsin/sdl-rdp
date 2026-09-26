@@ -27,7 +27,9 @@ using sdl_rdp::configuration::Codec;
 using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::headless_client_test::backend::Where;
 using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::DecodedPixels;
 using sdl_rdp::headless_client_test::client::Pixels;
+using sdl_rdp::headless_client_test::frame::FillArea;
 using sdl_rdp::headless_client_test::frame::MovingTilePattern;
 using sdl_rdp::headless_client_test::graphics::GraphicsBackend;
 using sdl_rdp::headless_client_test::graphics::GraphicsObserver;
@@ -54,28 +56,22 @@ auto PadReference(Pixels const& pixels, Extent size, Extent padded) -> Pixels {
 auto Luma(Extent size) -> std::size_t {
   return std::size_t{ size.width } * size.height;
 }
-auto Yuv420Strides(Extent size) -> std::array<std::uint32_t, 3> {
-  return { size.width, size.width / 2, size.width / 2 };
-}
-auto EncodeYuv420(Pixels const& bgrx, Extent size) -> std::vector<std::uint8_t> {
+auto Yuv420RoundTrip(Pixels const& bgrx, Extent size) -> Pixels {
   auto              yuv     { std::vector<std::uint8_t>(Luma(size) * 3 / 2)          };
   std::array        planes  { yuv.data(), &yuv[Luma(size)], &yuv[Luma(size) * 5 / 4] };
-  auto const        strides = Yuv420Strides(size);
+  std::array const  strides { size.width, size.width / 2, size.width / 2             };
   prim_size_t const area    { size.width, size.height                                };
-  auto const        bytes   = oxbox::utilities::SpanCast<std::uint8_t const>(std::span(bgrx));
-  EXPECT_EQ(primitives_get()->RGBToYUV420_8u_P3AC4R(bytes.data(), PIXEL_FORMAT_BGRX32, size.width * PixelBytes,
-                                                    planes.data(), strides.data(), &area),
-            0);
-  return yuv;
-}
-auto DecodeYuv420(std::vector<std::uint8_t> const& yuv, Extent size) -> Pixels {
   auto              decoded { Pixels(Luma(size))                                     };
-  std::array        planes  { yuv.data(), &yuv[Luma(size)], &yuv[Luma(size) * 5 / 4] };
-  auto const        strides = Yuv420Strides(size);
-  prim_size_t const area    { size.width, size.height                                };
-  EXPECT_EQ(primitives_get()->YUV420ToRGB_8u_P3AC4R(planes.data(), strides.data(),
-                                                    oxbox::utilities::SpanCast<std::uint8_t>(std::span(decoded)).data(),
-                                                    size.width * PixelBytes, PIXEL_FORMAT_BGRX32, &area),
+  auto const&       convert = *primitives_get();
+  // YUV420ToRGB takes const BYTE**, which the writable plane array does not convert to.
+  std::array<std::uint8_t const*, 3> encoded{ planes[0], planes[1], planes[2] };
+  EXPECT_EQ(convert.RGBToYUV420_8u_P3AC4R(oxbox::utilities::SpanCast<std::uint8_t const>(std::span(bgrx)).data(),
+                                          PIXEL_FORMAT_BGRX32, size.width * PixelBytes, planes.data(), strides.data(),
+                                          &area),
+            0);
+  EXPECT_EQ(convert.YUV420ToRGB_8u_P3AC4R(encoded.data(), strides.data(),
+                                          oxbox::utilities::SpanCast<std::uint8_t>(std::span(decoded)).data(),
+                                          size.width * PixelBytes, PIXEL_FORMAT_BGRX32, &area),
             0);
   return decoded;
 }
@@ -85,9 +81,8 @@ auto Cropped(std::span<std::uint32_t const> pixels, std::size_t stride, Extent s
          | std::views::join | std::ranges::to<std::vector>();
 }
 auto Yuv420Reference(Pixels const& pixels, Extent size) -> Pixels {
-  Extent const aligned { .width = Aligned(size.width), .height = Aligned(size.height) };
-  auto const   yuv     = EncodeYuv420(PadReference(pixels, size, aligned), aligned);
-  return Cropped(DecodeYuv420(yuv, aligned), aligned.width, size);
+  Extent const aligned{ .width = Aligned(size.width), .height = Aligned(size.height) };
+  return Cropped(Yuv420RoundTrip(PadReference(pixels, size, aligned), aligned), aligned.width, size);
 }
 auto ThenScaledError(Client& client, Pixels const& scaled, Pixels const& reference) -> void {
   ASSERT_EQ(reference.size(), scaled.size());
@@ -140,10 +135,7 @@ protected:
   }
   static auto ReadScaledPixels(Client& client, Pixels& scaled) -> void {
     ASSERT_EQ(client.DesktopSize(), (Extent{ .width = 321, .height = 214 }));
-    auto const& gdi   = *client.Instance()->context->gdi;
-    auto const  frame = std::span(gdi.primary_buffer, std::size_t{ gdi.stride } * 214);
-    scaled = Cropped(oxbox::utilities::SpanCast<std::uint32_t const>(frame), gdi.stride / PixelBytes,
-                     { .width = 321, .height = 214 });
+    scaled = DecodedPixels(client) | std::ranges::to<Pixels>();
   }
 
   auto Frame(Pixels const& pixels, Extent size, Rect damage) -> void {
@@ -292,8 +284,7 @@ TEST_F(AvcAvailable, DecodesPFrameAndResize) {
                          [&](std::size_t i) { return colors[(i % 320) / 80]; });
   ASSERT_NO_FATAL_FAILURE(PresentFrame(pixels));
   Rect const damage{ .x = 18, .y = 20, .w = 8, .h = 6 };
-  std::ranges::for_each(std::views::iota(20, 26),
-                        [&](int y) { std::ranges::fill(std::span(pixels).subspan((y * 320) + 18, 8), 0x55aaffu); });
+  FillArea(pixels, 320, damage, 0x55aaffu);
   ASSERT_NO_FATAL_FAILURE(Frame(pixels, { .width = 320, .height = 200 }, damage));
   ASSERT_NO_FATAL_FAILURE(ThenPFrameDamage());
   ThenAvcResizes(pixels);

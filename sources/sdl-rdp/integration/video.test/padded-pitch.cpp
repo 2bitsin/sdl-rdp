@@ -3,8 +3,8 @@
 #include <sdl-rdp/headless-client.test/backend/config.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
 #include <sdl-rdp/headless-client.test/backend/logs.hpp>
+#include <sdl-rdp/headless-client.test/backend/waits.hpp>
 #include <sdl-rdp/headless-client.test/client/client.hpp>
-#include <sdl-rdp/headless-client.test/client/has-cookie.hpp>
 #include <sdl-rdp/headless-client.test/frame/counter.hpp>
 #include <sdl-rdp/headless-client.test/frame/pattern.hpp>
 #include <sdl-rdp/picture/frame-layout.hpp>
@@ -23,10 +23,10 @@ namespace sdl_rdp::integration::video_test::detail::padded_pitch {
 using oxbox::platform::ScratchArea;
 using sdl_rdp::configuration::Codec;
 using sdl_rdp::headless_client_test::backend::BackendInstance;
+using sdl_rdp::headless_client_test::backend::ConnectWithCookie;
 using sdl_rdp::headless_client_test::backend::Logs;
 using sdl_rdp::headless_client_test::backend::LoopbackConfig;
 using sdl_rdp::headless_client_test::client::Client;
-using sdl_rdp::headless_client_test::client::HasCookie;
 using sdl_rdp::headless_client_test::client::Pixels;
 using sdl_rdp::headless_client_test::frame::FrameCounter;
 using sdl_rdp::headless_client_test::frame::HashPattern;
@@ -55,8 +55,7 @@ TEST(PaddedPitch, ClientFrameEqualsTheSource) {
   BackendInstance backend;
   ASSERT_NO_FATAL_FAILURE(backend.Open(config, logs));
   Client client(backend.Port(), true, Width, Height);
-  ASSERT_TRUE(client.Connect()) << logs.Text(true);
-  ASSERT_TRUE(client.Until([&] { return HasCookie(client); }));
+  ASSERT_NO_FATAL_FAILURE(ConnectWithCookie(client, logs));
   Pixels expected(std::size_t{ Width } * Height);
   HashPattern(expected);
   auto const        source  = Padded(expected);

@@ -1,7 +1,7 @@
 #include <sdl-rdp/configuration/setup.hpp>
-#include <sdl-rdp/headless-client.test/backend/await-acknowledged.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
 #include <sdl-rdp/headless-client.test/backend/status.hpp>
+#include <sdl-rdp/headless-client.test/backend/waits.hpp>
 #include <sdl-rdp/headless-client.test/frame/pattern.hpp>
 #include <sdl-rdp/headless-client.test/graphics/round-five.hpp>
 #include <sdl-rdp/integration/support.bench/session.hpp>
@@ -24,6 +24,7 @@ using sdl_rdp::headless_client_test::backend::AwaitAllAcknowledged;
 using sdl_rdp::headless_client_test::backend::CurrentStatus;
 using sdl_rdp::headless_client_test::backend::RequiredGraphics;
 using sdl_rdp::headless_client_test::backend::RequiredStatus;
+using sdl_rdp::headless_client_test::backend::UntilLogged;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::Clock;
 using sdl_rdp::headless_client_test::client::Pixels;
@@ -103,8 +104,7 @@ auto GraphicsMeasurement::Prepared(Client& client, Codec codec, Scene scene) -> 
   auto const progressive = codec == Codec::Progressive;
   if (progressive) client.EnableGraphics({ .qoe_acknowledgements = true });
   if (!Passes([&] { Connect(client); })) return false;
-  if (progressive && !Check(client.Until([this] { return logs.Contains("GFX confirmed"); }), "the client confirms GFX"))
-    return false;
+  if (progressive && !Check(UntilLogged(client, logs, "GFX confirmed"), "the client confirms GFX")) return false;
   return Passes([&] { Present(ScenePixels(scene, 0), 640, 480); },
                 [&] { AwaitAllAcknowledged(client, backend, logs); });
 }

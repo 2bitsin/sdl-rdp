@@ -154,10 +154,8 @@ auto AudioSession::ThenUnavailableAudio(Client& client, bool unmatched) -> void 
 }
 auto AudioSession::ThenLiveVideoAndInput(Client& client) -> void {
   FrameObserver observer(client);
-  ASSERT_NO_FATAL_FAILURE(Present(Pixels(320uz * 200, 0x123456), 320, 200));
-  ASSERT_TRUE(client.Until([&] { return !observer.Frames().empty(); }));
-  ASSERT_TRUE(observer.Ack());
-  ASSERT_TRUE(backend.WaitFrame(std::chrono::milliseconds{ 10000 }));
+  ASSERT_NO_FATAL_FAILURE(
+      PresentAcknowledged(client, observer, Pixels(320uz * 200, 0x123456), { .width = 320, .height = 200 }));
   ThenLiveInput(client);
 }
 }

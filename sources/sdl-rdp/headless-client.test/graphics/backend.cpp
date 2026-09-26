@@ -2,6 +2,7 @@
 
 #include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/headless-client.test/backend/config.hpp>
+#include <sdl-rdp/headless-client.test/backend/waits.hpp>
 
 #include <chrono>
 #include <cstdint>
@@ -10,6 +11,7 @@
 namespace sdl_rdp::headless_client_test::graphics::detail::backend {
 using sdl_rdp::configuration::Codec;
 using sdl_rdp::headless_client_test::backend::LoopbackConfig;
+using sdl_rdp::headless_client_test::backend::UntilLogged;
 auto GraphicsBackend::OpenGraphics(std::string_view purpose, std::uint32_t width, std::uint32_t height, Codec codec)
     -> void {
   directory.emplace(purpose, "sdl-rdp");
@@ -23,7 +25,6 @@ auto GraphicsBackend::TearDown() -> void {
 }
 auto GraphicsBackend::ConnectGraphics(Client& client) -> void {
   ASSERT_TRUE(client.Connect());
-  ASSERT_TRUE(client.Until([&] { return logs.Contains("GFX confirmed"); }, std::chrono::seconds(20)))
-      << logs.Text(true);
+  ASSERT_TRUE(UntilLogged(client, logs, "GFX confirmed", std::chrono::seconds(20))) << logs.Text(true);
 }
 }

@@ -32,8 +32,11 @@ using sdl_rdp::headless_client_test::backend::Logs;
 using sdl_rdp::headless_client_test::client::Client;
 
 using OpenedFile = std::unique_ptr<File>;
+// Several eight-request read windows, so a read is still in flight when a test cuts the channel.
+inline constexpr std::size_t LargeFileBytes = 3uz * 1024 * 1024;
 auto Pattern(std::size_t size, std::uint32_t seed = 17)                -> std::string;
 auto ReadAt(File& file, std::uint64_t offset, std::span<char> bytes)   -> std::size_t;
+auto ReadLargeFile(File& file)                                         -> std::size_t;
 auto WriteAt(File& file, std::uint64_t offset, std::string_view bytes) -> std::size_t;
 
 class DriveSession : public testing::Test {
@@ -67,8 +70,10 @@ protected:
 
 namespace sdl_rdp::headless_client_test::drive {
 using detail::session::DriveSession;
+using detail::session::LargeFileBytes;
 using detail::session::OpenedFile;
 using detail::session::Pattern;
 using detail::session::ReadAt;
+using detail::session::ReadLargeFile;
 using detail::session::WriteAt;
 }

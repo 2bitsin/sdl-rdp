@@ -1,7 +1,8 @@
 #include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/diagnostics/log-sink.hpp>
-#include <sdl-rdp/headless-client.test/backend/await-acknowledged.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
+#include <sdl-rdp/headless-client.test/backend/waits.hpp>
+#include <sdl-rdp/headless-client.test/frame/pattern.hpp>
 #include <sdl-rdp/headless-client.test/graphics/cost.hpp>
 #include <sdl-rdp/integration/support.bench/session.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
@@ -13,7 +14,6 @@
 #include <cstdint>
 #include <format>
 #include <optional>
-#include <random>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -23,8 +23,10 @@ namespace sdl_rdp::integration::video_bench::detail::graphics_cost {
 using sdl_rdp::configuration::Codec;
 using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::headless_client_test::backend::AwaitAllAcknowledged;
+using sdl_rdp::headless_client_test::backend::UntilLogged;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::Pixels;
+using sdl_rdp::headless_client_test::frame::RandomPattern;
 using sdl_rdp::headless_client_test::graphics::GraphicsCost;
 using sdl_rdp::headless_client_test::graphics::GraphicsObserver;
 using sdl_rdp::integration::support_bench::Check;
@@ -94,12 +96,11 @@ auto FullRandomFrame::TestBody() -> void {
 }
 auto FullRandomFrame::Connected(Client& client) -> bool {
   if (!Check(client.Connect(), "the client connects")) return false;
-  return Check(client.Until([this] { return logs.Contains("GFX confirmed"); }), "the client confirms GFX");
+  return Check(UntilLogged(client, logs, "GFX confirmed"), "the client confirms GFX");
 }
 auto FullRandomFrame::PresentedRandomFrame(Client& client) -> bool {
-  Pixels       pixels(1280uz * 800);
-  std::mt19937 random(17);            // NOLINT(cert-msc32-c, cert-msc51-cpp): Reproducible codec input.
-  std::ranges::generate(pixels, [&] { return random() & 0x00ffffff; });
+  Pixels pixels(1280uz * 800);
+  RandomPattern(pixels, 17);
   Rect const full{ .x = 0, .y = 0, .w = 1280, .h = 800 };
   return Passes([&] { backend.Present(pixels, 1280, 800, full); },
                 [&] { AwaitAllAcknowledged(client, backend, logs); });

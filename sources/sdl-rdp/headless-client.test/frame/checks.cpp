@@ -6,10 +6,8 @@
 #include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 
-#include <freerdp/gdi/gdi.h>
 #include <freerdp/input.h>
 #include <gtest/gtest.h>
-#include <oxbox/utilities/span.hpp>
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -26,7 +24,9 @@ using sdl_rdp::freerdp_facade::WaitHandle;
 using sdl_rdp::headless_client_test::backend::As;
 using sdl_rdp::headless_client_test::backend::Holds;
 using sdl_rdp::headless_client_test::backend::RequiredGraphics;
+using sdl_rdp::headless_client_test::client::DecodedPixels;
 using sdl_rdp::headless_client_test::client::Pixels;
+using sdl_rdp::headless_client_test::client::UntilMatches;
 using sdl_rdp::link::Connected;
 using sdl_rdp::link::Key;
 using sdl_rdp::link::ScreenChanged;
@@ -81,6 +81,14 @@ auto FrameChecks::FillLegacyWindow(Client& client, FrameObserver& observer, Pixe
   EXPECT_EQ(observer.Frames().size(), 2u);
   EXPECT_FALSE(backend.WaitFrame(std::chrono::milliseconds{ 0 }));
 }
+auto FrameChecks::PresentAcknowledged(Client& client, FrameObserver& observer, Pixels const& pixels, Extent size)
+    -> void {
+  auto const before = observer.Frames().size();
+  ASSERT_NO_FATAL_FAILURE(Present(pixels, size.width, size.height));
+  ASSERT_TRUE(client.Until([&] { return observer.Frames().size() > before; }));
+  ASSERT_TRUE(observer.Ack());
+  ASSERT_TRUE(backend.WaitFrame(std::chrono::seconds{ 10 }));
+}
 auto FrameChecks::PresentObserved(Client& client, FrameObserver const& observer, Pixels const& pixels,
                                   std::size_t frames) -> void {
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
@@ -106,8 +114,7 @@ auto FrameChecks::ThenAspectGeometry(Client& client) -> void {
   ThenDesktopGeometry(client, 640, 480);
 }
 auto FrameChecks::ThenScaledHighlight(Client& client) -> void {
-  auto actual    = oxbox::utilities::SpanCast<std::uint32_t const>(
-      std::span(client.Instance()->context->gdi->primary_buffer, 640uz * 480 * 4));
+  auto actual    = DecodedPixels(client);
   auto rows      = std::views::iota(0, 480);
   auto brightest = std::ranges::max_element(rows, { },
                                             [&](int y) { return actual[static_cast<std::size_t>(y) * 640] & 255; });
@@ -159,7 +166,7 @@ auto FrameChecks::ResizePicture(Client& client, GraphicsObserver& observer, Pixe
   auto const before = CountsOf(observer);
   pixels.assign(static_cast<std::size_t>(size.width) * size.height, 0x654321);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, size.width, size.height));
-  ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text(true);
+  ASSERT_TRUE(UntilMatches(client, pixels)) << logs.Text(true);
   ASSERT_GT(observer.Observed().desktops.size(), before.desktops);
   EXPECT_EQ(observer.Observed().desktops.back(), (std::pair{ size.width, size.height }));
   ThenDesktopGeometry(client, size.width, size.height);

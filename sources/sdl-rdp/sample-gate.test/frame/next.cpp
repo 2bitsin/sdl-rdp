@@ -8,7 +8,7 @@
 #include <functional>
 
 namespace sdl_rdp::sample_gate_test::frame::detail::next {
-using sdl_rdp::utilities::Expects;
+using sdl_rdp::headless_client_test::client::DecodedPixels;
 using sdl_rdp::utilities::Rect;
 
 NextFrame::NextFrame(Client& value, std::uint32_t frame)
@@ -24,12 +24,10 @@ auto NextFrame::Observe(PictureUpdate const& update) -> void {
   if (update.delivered && std::ranges::any_of(update.regions, completes)) Inspect();
 }
 auto NextFrame::Inspect() -> void {
-  auto const* context = client.Instance()->context;
-  Expects(context != nullptr, "callback context exists");
-  Expects(context->gdi != nullptr, "decoded framebuffer exists");
-  auto const& gdi    = *context->gdi;
-  auto const  index  = (40 * 640) + static_cast<int>(column);
-  bool const  origin = PatternPixel(gdi, index) == 0x00ff00 && (!column || PatternPixel(gdi, index - 1) != 0x00ff00);
+  auto const decoded = DecodedPixels(client);
+  auto const index   = (40 * 640) + static_cast<int>(column);
+  bool const origin  = PatternPixel(decoded, index) == 0x00ff00
+                       && (!column || PatternPixel(decoded, index - 1) != 0x00ff00);
   if (!received && origin) {
     matches  = Pattern(client, true);
     received = true;

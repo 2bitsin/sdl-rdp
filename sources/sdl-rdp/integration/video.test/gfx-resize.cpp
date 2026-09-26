@@ -12,11 +12,9 @@
 
 #include <gtest/gtest.h>
 #include <oxbox/platform/scratch-area.hpp>
-#include <oxbox/utilities/span.hpp>
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <random>
 #include <ranges>
 #include <span>
 
@@ -26,13 +24,16 @@ using sdl_rdp::headless_client_test::backend::BackendInstance;
 using sdl_rdp::headless_client_test::backend::Logs;
 using sdl_rdp::headless_client_test::backend::LoopbackConfig;
 using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::DecodedPixels;
 using sdl_rdp::headless_client_test::client::Pixels;
+using sdl_rdp::headless_client_test::client::UntilMatches;
+using sdl_rdp::headless_client_test::frame::FillArea;
 using sdl_rdp::headless_client_test::frame::MovingTilePattern;
+using sdl_rdp::headless_client_test::frame::RandomPattern;
 using sdl_rdp::headless_client_test::graphics::GraphicsObserver;
 using sdl_rdp::utilities::AspectRatio;
 using sdl_rdp::utilities::Extent;
 using sdl_rdp::utilities::Narrowed;
-using sdl_rdp::utilities::PixelBytes;
 using sdl_rdp::utilities::Rect;
 namespace {
 class GraphicsResize : public testing::Test {
@@ -79,16 +80,14 @@ auto BilinearRow(Pixels const& pixels, std::size_t y) -> Pixels {
   return std::views::zip_transform([=](std::uint32_t a, std::uint32_t b) { return Blend(a, b, weight); }, top, bottom)
          | std::ranges::to<std::vector>();
 }
-auto ThenBilinearRow(rdpGdi const& gdi, Pixels const& pixels, std::size_t y) -> void {
-  auto const frame    = std::span(gdi.primary_buffer, std::size_t{ gdi.stride } * static_cast<std::size_t>(gdi.height));
-  auto const row      = frame.subspan(y * gdi.stride, 320 * PixelBytes);
-  auto const actual   = oxbox::utilities::SpanCast<std::uint32_t const>(row);
+auto ThenBilinearRow(std::span<std::uint32_t const> decoded, Pixels const& pixels, std::size_t y) -> void {
+  auto const actual   = decoded.subspan(y * 320, 320);
   auto const expected = BilinearRow(pixels, y);
   for (std::size_t x = 0; x < 320; ++x) ASSERT_EQ(actual[x] & 0xffffff, expected[x]) << x << ',' << y;
 }
-auto ThenBilinearPixels(rdpGdi const& gdi, Pixels const& pixels) -> void {
+auto ThenBilinearPixels(std::span<std::uint32_t const> decoded, Pixels const& pixels) -> void {
   for (std::size_t y = 0; y < 240; ++y) {
-    ASSERT_NO_FATAL_FAILURE(ThenBilinearRow(gdi, pixels, y));
+    ASSERT_NO_FATAL_FAILURE(ThenBilinearRow(decoded, pixels, y));
   }
 }
 auto ThenProgressiveGeneration(GraphicsObserver const& observer, std::size_t generations, std::uint32_t w,
@@ -107,16 +106,14 @@ TEST_F(GraphicsResize, RawAspectMatchesBilinear) {
   client.EnableGraphics();
   GraphicsObserver observer(client);
   ASSERT_TRUE(client.Connect());
-  Pixels       pixels(320uz * 200);
-  std::mt19937 random(17);           // NOLINT(cert-msc32-c, cert-msc51-cpp): Reproducible codec input.
-  std::ranges::generate(pixels, [&] { return random() & 0x00ffffff; });
+  Pixels pixels(320uz * 200);
+  RandomPattern(pixels, 17);
   Rect const full{ .x = 0, .y = 0, .w = 320, .h = 200 };
   backend.Present(pixels, 320, 200, full);
   ASSERT_TRUE(client.Until([&] { return !observer.Observed().frames.empty(); })) << logs.Text(true);
   ASSERT_EQ(client.DesktopSize(), (Extent{ .width = 320, .height = 240 }));
-  auto* gdi = client.Instance()->context->gdi;
   ASSERT_EQ(observer.Observed().frames.size(), 1u);
-  ThenBilinearPixels(*gdi, pixels);
+  ThenBilinearPixels(DecodedPixels(client), pixels);
 }
 TEST_F(GraphicsResize, ProgressiveContextAndFullDamage) {
   Client client(backend.Port(), true, 640, 480);
@@ -130,7 +127,7 @@ TEST_F(GraphicsResize, ProgressiveContextAndFullDamage) {
     SCOPED_TRACE(std::to_string(w) + "x" + std::to_string(h));
     Rect const damage{ .x = 0, .y = 0, .w = Narrowed<int>(w), .h = Narrowed<int>(h) };
     backend.Present(pixels, w, h, damage);
-    ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); })) << logs.Text(true);
+    ASSERT_TRUE(UntilMatches(client, pixels)) << logs.Text(true);
     ++generations;
     ASSERT_NO_FATAL_FAILURE(ThenProgressiveGeneration(observer, generations, w, h));
     ASSERT_NO_FATAL_FAILURE(
@@ -140,9 +137,7 @@ TEST_F(GraphicsResize, ProgressiveContextAndFullDamage) {
 using sdl_rdp::headless_client_test::graphics::GraphicsCost;
 
 auto ApplyPlanarDamage(Pixels& pixels, Pixels& expected, Rect part) -> void {
-  std::ranges::for_each(std::views::iota(part.y, part.y + part.h), [&](int row) {
-    std::ranges::fill(std::span(pixels).subspan((row * 354) + part.x, part.w), 0x55aaffu);
-  });
+  FillArea(pixels, 354, part, 0x55aaffu);
   expected       =  pixels;
   pixels.front() ^= 0x00ffffff;
   pixels.back()  ^= 0x00ffffff;
@@ -162,11 +157,9 @@ TEST_F(GraphicsCost, PlanarPartialMatchesFull) {
   ApplyPlanarDamage(pixels, expected, part);
   ASSERT_NO_FATAL_FAILURE(PresentPlanar(client, observer, pixels, expected, part));
   pixels = expected;
-  auto*                     gdi     = client.Instance()->context->gdi;
-  std::vector<std::uint8_t> partial(gdi->primary_buffer,
-                                    gdi->primary_buffer + (std::size_t{ gdi->stride } * gdi->height));
+  auto const partial = DecodedPixels(client) | std::ranges::to<Pixels>();
   ASSERT_NO_FATAL_FAILURE(PresentPlanar(client, observer, pixels, expected, full));
-  EXPECT_TRUE(std::ranges::equal(partial, std::span(gdi->primary_buffer, partial.size())));
+  EXPECT_TRUE(std::ranges::equal(partial, DecodedPixels(client)));
 }
 }
 }

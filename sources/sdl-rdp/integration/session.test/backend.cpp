@@ -7,7 +7,7 @@
 #include <sdl-rdp/headless-client.test/backend/config.hpp>
 #include <sdl-rdp/headless-client.test/backend/events.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
-#include <sdl-rdp/headless-client.test/client/has-cookie.hpp>
+#include <sdl-rdp/headless-client.test/backend/waits.hpp>
 #include <sdl-rdp/headless-client.test/codec/mode.hpp>
 #include <sdl-rdp/headless-client.test/frame/counter.hpp>
 #include <sdl-rdp/headless-client.test/frame/pattern.hpp>
@@ -42,10 +42,10 @@ using sdl_rdp::freerdp_facade::Certificate;
 using sdl_rdp::freerdp_facade::Settings;
 using sdl_rdp::headless_client_test::backend::BackendInstance;
 using sdl_rdp::headless_client_test::backend::Clock;
+using sdl_rdp::headless_client_test::backend::ConnectWithCookie;
 using sdl_rdp::headless_client_test::backend::Logs;
 using sdl_rdp::headless_client_test::backend::LoopbackConfig;
 using sdl_rdp::headless_client_test::client::Client;
-using sdl_rdp::headless_client_test::client::HasCookie;
 using sdl_rdp::headless_client_test::client::Pixels;
 using sdl_rdp::headless_client_test::codec::CodecTolerance;
 using sdl_rdp::headless_client_test::frame::FrameCounter;
@@ -138,8 +138,7 @@ auto WhenFullFrameMeasured(ScratchArea const& certificates, Logs& logs, Pixels c
   ASSERT_NO_FATAL_FAILURE(backend.Open(config, logs));
   Client client(backend.Port(), true, 1024, 768);
   client.Tolerance(CodecTolerance(codec, true));
-  ASSERT_TRUE(client.Connect()) << logs.Text(true);
-  ASSERT_TRUE(client.Until([&] { return HasCookie(client); }));
+  ASSERT_NO_FATAL_FAILURE(ConnectWithCookie(client, logs));
   MeasureFullFrame(backend, client, pixels, codec);
 }
 auto CompressSignedDelta(BITMAP_PLANAR_CONTEXT& encoder, Pixels& pixels, std::vector<std::uint8_t>& compressed,

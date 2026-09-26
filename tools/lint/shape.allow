@@ -11,7 +11,7 @@ sdl-rdp/headless-client.test/client/sound.hpp: SoundClient data members 12 > 10 
 sdl-rdp/headless-client.test/drive/observer.cpp:42: DriveObserver::DriveObserver lambda@42 parameters 6 > 5 # FreeRDP pReceiveChannelData signature is the ABI
 sdl-rdp/headless-client.test/graphics/observer.hpp: GraphicsObserver data members 12 > 10 # seven chained FreeRDP callbacks; Membership and ChannelSubscription replace hand-paired calls (#82)
 sdl-rdp/input/events.cpp:79: InputEvents::InputEvents parameters 7 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
-sdl-rdp/integration/auth.test/authentication.cpp:30: RejectCertificate lambda@30 parameters 8 > 5 # FreeRDP pVerifyCertificateEx signature is the ABI
+sdl-rdp/integration/auth.test/authentication.cpp:29: RejectCertificate lambda@29 parameters 8 > 5 # FreeRDP pVerifyCertificateEx signature is the ABI
 sdl-rdp/peer/arrival.cpp:54: Arrival::Arrival parameters 8 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp/peer/callbacks.cpp:84: Peer::InstallAuthentication lambda@84 parameters 7 > 5 # FreeRDP SspiNtlmHashCallback signature is the ABI
 sdl-rdp/peer/channel-set.cpp:33: ChannelSet::ChannelSet parameters 6 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling

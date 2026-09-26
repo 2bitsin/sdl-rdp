@@ -1,8 +1,8 @@
 #include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/diagnostics/log-sink.hpp>
-#include <sdl-rdp/headless-client.test/backend/await-acknowledged.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
 #include <sdl-rdp/headless-client.test/backend/status.hpp>
+#include <sdl-rdp/headless-client.test/backend/waits.hpp>
 #include <sdl-rdp/headless-client.test/frame/observer.hpp>
 #include <sdl-rdp/headless-client.test/frame/pattern.hpp>
 #include <sdl-rdp/headless-client.test/graphics/round-five.hpp>
@@ -53,10 +53,7 @@ TEST_F(RoundFive, DelayedAcknowledgements) {
   ASSERT_NO_FATAL_FAILURE(Connect(client));
   FrameObserver observer(client);
   Pixels        pixels(640uz * 480, 0x112233);
-  ASSERT_NO_FATAL_FAILURE(Present(pixels, 640, 480));
-  ASSERT_TRUE(client.Until([&] { return observer.Frames().size() == 1; }));
-  ASSERT_TRUE(observer.Ack());
-  ASSERT_TRUE(backend.WaitFrame(std::chrono::milliseconds{ 10000 }));
+  ASSERT_NO_FATAL_FAILURE(PresentAcknowledged(client, observer, pixels, { .width = 640, .height = 480 }));
   observer.Clear(); // Test the negotiated window after ACK support is established.
   ASSERT_NO_FATAL_FAILURE(FillLegacyWindow(client, observer, pixels));
   ASSERT_TRUE(observer.Ack());

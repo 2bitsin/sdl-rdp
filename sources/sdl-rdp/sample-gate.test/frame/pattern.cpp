@@ -1,27 +1,28 @@
 #include <sdl-rdp/sample-gate.test/frame/pattern.hpp>
 
+#include <sdl-rdp/utilities/geometry.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
+
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <ranges>
 
 namespace sdl_rdp::sample_gate_test::frame::detail::pattern {
-auto PatternPixel(rdpGdi const& gdi, int index) -> std::uint32_t {
-  std::uint32_t value = 0;
-  std::memcpy(&value,
-              gdi.primary_buffer + (static_cast<std::size_t>((index / 640)) * gdi.stride)
-                  + ((static_cast<std::ptrdiff_t>(index % 640)) * 4),
-              4);
-  return value & 0xffffff;
+using sdl_rdp::headless_client_test::client::DecodedPixels;
+using sdl_rdp::utilities::Extent;
+using sdl_rdp::utilities::Narrowed;
+
+auto PatternPixel(std::span<std::uint32_t const> decoded, int index) -> std::uint32_t {
+  return decoded[Narrowed<std::size_t>(index)] & 0xffffff;
 }
 
 auto Pattern(Client& client, bool /*pointer*/) -> testing::AssertionResult {
-  auto const* gdi = client.Instance()->context->gdi;
-  if (!gdi || gdi->width != 640 || gdi->height != 480)
+  if (client.DesktopSize() != Extent{ .width = 640, .height = 480 })
     return testing::AssertionFailure() << "framebuffer is not 640x480";
-  auto pixel   = [&](int index) { return PatternPixel(*gdi, index); };
-  auto columns = std::views::iota(0, 640);
-  auto first   = std::ranges::find_if(columns, [&](int x) { return pixel((40 * 640) + x) == 0x00ff00; });
+  auto const decoded = DecodedPixels(client);
+  auto       pixel   = [&](int index) { return PatternPixel(decoded, index); };
+  auto       columns = std::views::iota(0, 640);
+  auto       first   = std::ranges::find_if(columns, [&](int x) { return pixel((40 * 640) + x) == 0x00ff00; });
   if (first == columns.end() || *first > 608) return testing::AssertionFailure() << "no complete green block on row 40";
   auto expected = [&](int index) {
     int const x        = index % 640;

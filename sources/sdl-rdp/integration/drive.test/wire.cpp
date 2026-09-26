@@ -30,8 +30,10 @@ using sdl_rdp::headless_client_test::drive::Completion;
 using sdl_rdp::headless_client_test::drive::DeviceAnnouncement;
 using sdl_rdp::headless_client_test::drive::DriveChecks;
 using sdl_rdp::headless_client_test::drive::DriveObserver;
+using sdl_rdp::headless_client_test::drive::LargeFileBytes;
 using sdl_rdp::headless_client_test::drive::Pattern;
 using sdl_rdp::headless_client_test::drive::ReadAt;
+using sdl_rdp::headless_client_test::drive::ReadLargeFile;
 using sdl_rdp::headless_client_test::drive::ReplyTo;
 using sdl_rdp::headless_client_test::utilities::ThrownText;
 using sdl_rdp::utilities::TranscodeRange;
@@ -73,10 +75,6 @@ auto AnnounceDriveNames(DriveObserver& observer) -> void {
       observer.Send(DeviceAnnouncement(RDPDR_DTYP_FILESYSTEM, 102, std::array{ std::byte{ 0xff }, std::byte{ 0 } })));
   ASSERT_TRUE(observer.Send(DeviceAnnouncement(RDPDR_DTYP_PRINT, 103, { })));
 }
-auto ReadLargeFile(File& file) -> std::size_t {
-  std::string bytes(static_cast<std::ptrdiff_t>(3 * 1024) * 1024, '\0');
-  return ReadAt(file, 0, bytes);
-}
 auto StatWithError(File& file) -> std::string {
   return ThrownText<MalformedResponse>([&] { return file.Stat(); });
 }
@@ -116,17 +114,13 @@ protected:
   auto ThenTruncatedInformation(auto& stat) -> void {
     EXPECT_EQ(stat.get(), "Malformed drive response: truncated.");
   }
-  static auto ThenAbortedRead(std::future<std::size_t>& read) -> void {
-    ASSERT_EQ(read.wait_for(2s), std::future_status::ready);
-    EXPECT_THROW(std::ignore = read.get(), PeerDisconnected);
-  }
   auto ThenEndedChannel(File& file) -> void {
     EXPECT_EQ(logs.Count(LogLevel::Warn, "Drive channel ended: Malformed drive response: truncated."), 1u);
     EXPECT_THROW(file.Close(), PeerDisconnected);
   }
 };
 TEST_F(DriveWire, MalformedChannelKeepsVideoSession) {
-  Write("file", Pattern(static_cast<std::ptrdiff_t>(3 * 1024) * 1024));
+  Write("file", Pattern(LargeFileBytes));
   auto const opened = Open("file");
   auto&      file   = *opened;
   ASSERT_NO_FATAL_FAILURE(HoldRequests());

@@ -22,6 +22,7 @@ using sdl_rdp::drive::PeerDisconnected;
 using sdl_rdp::headless_client_test::backend::EventsOf;
 using sdl_rdp::headless_client_test::backend::LoopbackConfig;
 using sdl_rdp::headless_client_test::client::Pixels;
+using sdl_rdp::headless_client_test::client::UntilMatches;
 using sdl_rdp::link::DriveChanged;
 using sdl_rdp::utilities::Rect;
 
@@ -67,7 +68,7 @@ auto DriveSession::ThenVideoMatches() -> void {
   Pixels     pixels(320uz * 200uz, 0x00446688);
   Rect const damage{ .x = 0, .y = 0, .w = 320, .h = 200 };
   backend.Present(pixels, 320, 200, damage);
-  ASSERT_TRUE(client->Until([&] { return client->Matches(pixels); }));
+  ASSERT_TRUE(UntilMatches(*client, pixels));
 }
 auto DriveSession::Disconnect() -> void {
   pump.request_stop();
@@ -90,6 +91,10 @@ auto DriveSession::Write(std::string const& name, std::string const& bytes) -> v
 }
 auto ReadAt(File& file, std::uint64_t offset, std::span<char> bytes) -> std::size_t {
   return file.Transfer(offset, std::as_writable_bytes(bytes));
+}
+auto ReadLargeFile(File& file) -> std::size_t {
+  std::string bytes(LargeFileBytes, '\0');
+  return ReadAt(file, 0, bytes);
 }
 auto WriteAt(File& file, std::uint64_t offset, std::string_view bytes) -> std::size_t {
   return file.Transfer(offset, std::as_bytes(std::span(bytes)));

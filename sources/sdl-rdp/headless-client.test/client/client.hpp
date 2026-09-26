@@ -14,6 +14,7 @@
 #include <memory>
 #include <optional>
 #include <ranges>
+#include <span>
 #include <string_view>
 #include <thread>
 #include <vector>
@@ -72,14 +73,18 @@ private:
 };
 auto PumpInBackground(Client& client)                                        -> std::jthread;
 auto Tap(Client& client, std::uint16_t scancode)                             -> void;
+auto DecodedPixels(Client const& client)                                     -> std::span<std::uint32_t const>;
 auto UntilDesktop(Client& client, std::uint32_t width, std::uint32_t height) -> bool;
+auto UntilMatches(Client& client, Pixels const& pixels)                      -> bool;
 }
 
 namespace sdl_rdp::headless_client_test::client {
 using detail::client::Client;
 using detail::client::Clock;
+using detail::client::DecodedPixels;
 using detail::client::KeyState;
 using detail::client::Pixels;
 using detail::client::Tap;
 using detail::client::UntilDesktop;
+using detail::client::UntilMatches;
 }

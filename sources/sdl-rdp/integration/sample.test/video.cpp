@@ -20,6 +20,7 @@ using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::DisplayClient;
 using sdl_rdp::headless_client_test::client::Pixels;
 using sdl_rdp::headless_client_test::client::SoundClient;
+using sdl_rdp::headless_client_test::client::UntilMatches;
 using sdl_rdp::sample_gate_test::frame::FullDesktopFrames;
 using sdl_rdp::sample_gate_test::process::AudioStream;
 using sdl_rdp::sample_gate_test::sample::PrimaryDisplayPort;
@@ -70,8 +71,8 @@ auto PresentDesktop(Client& client, SDL_Window& window) -> void {
   ASSERT_NE(surface, nullptr);
   ASSERT_TRUE(SDL_FillSurfaceRect(surface, nullptr, SDL_MapSurfaceRGB(surface, 0x12, 0x34, 0x56)));
   ASSERT_TRUE(SDL_UpdateWindowSurface(&window));
-  Pixels pixels(1280uz * 800, 0x00123456);
-  ASSERT_TRUE(client.Until([&] { return client.Matches(pixels); }));
+  Pixels const pixels(1280uz * 800, 0x00123456);
+  ASSERT_TRUE(UntilMatches(client, pixels));
 }
 auto ConnectDesktop(Client& client, Logs& logs) -> void {
   Expects(client.Instance() != nullptr, "desktop client exists");

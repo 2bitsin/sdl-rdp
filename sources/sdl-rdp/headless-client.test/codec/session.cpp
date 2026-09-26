@@ -9,6 +9,7 @@
 #include <array>
 #include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <utility>
 
@@ -43,9 +44,10 @@ auto CodecSession::SetUp() -> void {
     return x < 40 && y < 30 ? 0x00010101u : bars[x / 40];
   });
 }
-auto CodecSession::ConnectCodec(Client& client) -> void {
-  client.Tolerance(CodecTolerance(GetParam().codec, GetParam().surface));
-  ASSERT_TRUE(client.Connect()) << logs.Text(true);
+auto CodecSession::ConnectCodec(std::uint32_t width, std::uint32_t height) -> void {
+  client = std::make_unique<Client>(backend.Port(), GetParam().surface, width, height);
+  client->Tolerance(CodecTolerance(GetParam().codec, GetParam().surface));
+  ASSERT_TRUE(client->Connect()) << logs.Text(true);
 }
 auto CodecSession::Reopen(std::uint32_t width, std::uint32_t height) -> void {
   backend.Close();
@@ -53,10 +55,11 @@ auto CodecSession::Reopen(std::uint32_t width, std::uint32_t height) -> void {
   config.codec = GetParam().codec;
   ASSERT_NO_FATAL_FAILURE(backend.Open(config, logs));
 }
-auto CodecSession::Frame(Client& client, Rect area) -> void {
+auto CodecSession::Frame(Rect area) -> void {
   backend.Present(pixels, 320, 200, area);
-  ASSERT_TRUE(client.Until([&] { return backend.WaitFrame(std::chrono::milliseconds{ 0 }) && client.Matches(pixels); }))
-      << logs.Text();
+  ASSERT_TRUE(client->Until([&] {
+    return backend.WaitFrame(std::chrono::milliseconds{ 0 }) && client->Matches(pixels);
+  })) << logs.Text();
 }
 auto CodecSession::ThenMotion(Event const& event) -> void {
   auto const& motion = As<MouseMove>(event);
@@ -70,8 +73,8 @@ auto CodecSession::ThenPointerEvents(std::span<Event const> events) -> void {
   EXPECT_EQ(wheel.dx, 0);
   EXPECT_EQ(wheel.dy, 1);
 }
-auto CodecSession::Input(Client& client) -> void {
-  ASSERT_NO_FATAL_FAILURE(SendKeyboardAndMouse(client, 10, 20));
+auto CodecSession::Input(Client& sender) -> void {
+  ASSERT_NO_FATAL_FAILURE(SendKeyboardAndMouse(sender, 10, 20));
   auto events = Events(6);
   ASSERT_EQ(events.size(), 6u);
   ThenKeyboard(events);
@@ -106,9 +109,9 @@ auto CodecSession::ThenDisconnected() -> void {
   ASSERT_EQ(events.size(), 1u);
   ASSERT_TRUE(Holds<Disconnected>(events[0]));
 }
-auto CodecSession::RecordFrameCost(Client& client, std::uint64_t bytes) -> void {
-  RecordProperty("max_channel_error", std::to_string(client.MaxError(pixels)));
-  RecordProperty("wire_bytes", std::to_string(client.Received() - bytes));
+auto CodecSession::RecordFrameCost(std::uint64_t bytes) -> void {
+  RecordProperty("max_channel_error", std::to_string(client->MaxError(pixels)));
+  RecordProperty("wire_bytes", std::to_string(client->Received() - bytes));
   RecordProperty("codec", std::to_string(std::to_underlying(GetParam().codec)));
   RecordProperty("surface", GetParam().surface ? "true" : "false");
 }

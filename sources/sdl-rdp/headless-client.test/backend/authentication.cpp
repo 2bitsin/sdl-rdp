@@ -26,7 +26,6 @@ using sdl_rdp::headless_client_test::backend::EventsOf;
 using sdl_rdp::headless_client_test::backend::LoopbackConfig;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::link::Connected;
-using sdl_rdp::link::Event;
 using sdl_rdp::session::Backend;
 using sdl_rdp::utilities::WipedString;
 
@@ -182,13 +181,11 @@ auto Authentication::ThenCertificateDisconnect(std::string_view closed) -> void 
 auto Authentication::ThenPendingDisconnect(std::uint32_t code) -> void {
   auto const* message = code == FREERDP_ERROR_CONNECT_FAILED ? "Peer transport failed with pending data:"
                                                              : "Peer disconnected:";
-  EXPECT_TRUE(Until([&] {
-    return std::ranges::any_of(logs, [&](auto const& entry) {
-      auto const& [level, text] = entry;
-      if (!text.starts_with(message)) return false;
-      EXPECT_EQ(level, code == FREERDP_ERROR_CONNECT_FAILED ? LogLevel::Error : LogLevel::Info) << text;
-      return true;
-    });
+  EXPECT_TRUE(Logged([&](auto const& entry) {
+    auto const& [level, text] = entry;
+    if (!text.starts_with(message)) return false;
+    EXPECT_EQ(level, code == FREERDP_ERROR_CONNECT_FAILED ? LogLevel::Error : LogLevel::Info) << text;
+    return true;
   }));
 }
 }

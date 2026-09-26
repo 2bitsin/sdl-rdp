@@ -3,6 +3,7 @@
 #include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/headless-client.test/audio/tone-measurements.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
+#include <sdl-rdp/headless-client.test/backend/waits.hpp>
 #include <sdl-rdp/headless-client.test/graphics/observer.hpp>
 #include <sdl-rdp/integration/support.bench/session.hpp>
 #include <sdl-rdp/utilities/deadline.hpp>
@@ -22,6 +23,7 @@ using sdl_rdp::headless_client_test::audio::AudioGate;
 using sdl_rdp::headless_client_test::audio::MaximumGapMs;
 using sdl_rdp::headless_client_test::audio::WriteFrames;
 using sdl_rdp::headless_client_test::backend::BackendInstance;
+using sdl_rdp::headless_client_test::backend::UntilLogged;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::Pixels;
 using sdl_rdp::headless_client_test::client::SoundClient;
@@ -92,7 +94,7 @@ auto AudioContinuousUnderProgressiveLoad::TestBody() -> void {
   client.EnableGraphics();
   GraphicsObserver observer(client);
   if (!Passes([&] { GivenUnconfirmedAudio(client, audio); })) return;
-  if (!Check(client.Until([this] { return logs.Contains("GFX confirmed"); }), "the client confirms GFX")) return;
+  if (!Check(UntilLogged(client, logs, "GFX confirmed"), "the client confirms GFX")) return;
   // Pixel decoding on the client pump thread would delay audio reception independently of server encoding.
   observer.Observed().decode = false;
   ThenProgressiveLoad(client, audio, observer);

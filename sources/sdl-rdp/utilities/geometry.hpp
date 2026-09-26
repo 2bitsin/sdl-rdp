@@ -90,6 +90,7 @@ inline auto Intersect(Rect left, Rect right) -> std::optional<Rect> {
 namespace sdl_rdp::utilities {
 using detail::geometry::AreaBytes;
 using detail::geometry::AspectRatio;
+using detail::geometry::ExpectsArea;
 using detail::geometry::ExpectsBand;
 using detail::geometry::Extent;
 using detail::geometry::PixelBytes;

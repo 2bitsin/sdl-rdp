@@ -1,7 +1,5 @@
 #include <sdl-rdp/headless-client.test/drive/rdpdr-packets.hpp>
 
-#include <sdl-rdp/utilities/narrowed.hpp>
-
 #include <freerdp/channels/rdpdr.h>
 #include <array>
 #include <cstddef>
@@ -9,8 +7,6 @@
 #include <span>
 
 namespace sdl_rdp::headless_client_test::drive::detail::rdpdr_packets {
-using sdl_rdp::utilities::Narrowed;
-
 auto Completion(std::uint32_t device, std::uint32_t id, std::uint32_t status) -> DrivePacket {
   DrivePacket response;
   response.Write(std::uint16_t{ RDPDR_CTYP_CORE });
@@ -34,8 +30,7 @@ auto DeviceAnnouncement(std::uint32_t type, std::uint32_t id, std::span<std::byt
   packet.Write(id);
   constexpr std::array<char, 8> dos{ 'd', 'o', 's' };
   packet.Append(std::as_bytes(std::span(dos)));
-  packet.Write(Narrowed<std::uint32_t>(name.size()));
-  packet.Append(name);
+  packet.AppendCounted(name);
   return packet;
 }
 }
