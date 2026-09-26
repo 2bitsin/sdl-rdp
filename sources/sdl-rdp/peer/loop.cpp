@@ -5,9 +5,8 @@
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/log-level.hpp>
 #include <sdl-rdp/diagnostics/logging.hpp>
-#include <sdl-rdp/freerdp-facade/exceptions.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
-#include <sdl-rdp/freerdp-facade/waitable.hpp>
+#include <sdl-rdp/freerdp-facade/signalled.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/link/session-access.hpp>
 #include <sdl-rdp/peer/departure.hpp>
@@ -17,13 +16,11 @@
 #include <sdl-rdp/picture/desktop-layout.hpp>
 #include <sdl-rdp/picture/frame-store.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
-#include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/utilities/scoped.hpp>
 #include <sdl-rdp/video/acknowledgement-window.hpp>
 
 #include <freerdp/settings.h>
-#include <winpr/synch.h>
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -31,6 +28,7 @@
 #include <functional>
 #include <memory>
 #include <ranges>
+#include <span>
 #include <string_view>
 #include <tuple>
 #include <utility>
@@ -40,13 +38,12 @@ using sdl_rdp::configuration::AuthMode;
 using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::diagnostics::PeerNegotiationLogging;
 using sdl_rdp::diagnostics::ResetAuthenticationLogging;
-using sdl_rdp::freerdp_facade::EventWaitFailed;
-using sdl_rdp::freerdp_facade::Waitable;
+using sdl_rdp::freerdp_facade::MaximumWaitHandles;
+using sdl_rdp::freerdp_facade::Signalled;
 using sdl_rdp::picture::ApplyDesktopSize;
 using sdl_rdp::picture::FrameLock;
 using sdl_rdp::utilities::Contained;
 using sdl_rdp::utilities::Expects;
-using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::RAIIWrap;
 using sdl_rdp::utilities::Rect;
 using sdl_rdp::video::AcknowledgedFrameWindow;
@@ -135,8 +132,8 @@ auto PeerLoop::Serve(std::stop_token const& quit) -> void {
   _departure.Depart();
 }
 auto PeerLoop::Run(std::stop_token const& quit) -> void {
-  Connection const                             connection{ _link, _session };
-  std::array<WaitHandle, MAXIMUM_WAIT_OBJECTS> handles   { };
+  Connection const                           connection{ _link, _session };
+  std::array<WaitHandle, MaximumWaitHandles> handles   { };
   while (!quit.stop_requested() && Step(quit, handles)) {
   }
 }
@@ -154,18 +151,11 @@ auto PeerLoop::Step(std::stop_token const& quit, std::span<WaitHandle> handles) 
   return plan.count && Dispatch(quit, handles.first(plan.count), plan.timeout);
 }
 auto PeerLoop::Dispatch(std::stop_token const& quit, std::span<WaitHandle> handles, std::uint32_t timeout) -> bool {
-  auto const result = WaitForMultipleObjects(Narrowed<std::uint32_t>(handles.size()), handles.data(), false, timeout);
-  if (result == WAIT_FAILED || quit.stop_requested()) return false;
-  std::array<WaitHandle, MAXIMUM_WAIT_OBJECTS> signalled{ };
-  WaitHandle*                                  end      { };
-  try {
-    end = std::ranges::copy_if(handles, signalled.begin(), [](WaitHandle handle) {
-            return Waitable{ handle }.Signalled();
-          }).out;
-  } catch (EventWaitFailed const&) {
-    return false;
-  }
-  if (result < handles.size()) std::ranges::rotate(handles, handles.begin() + result + 1);
-  return _pump.Service(quit, { signalled.begin(), end });
+  auto const woke = WaitHandle::Any(handles, timeout);
+  if (quit.stop_requested()) return false;
+  Signalled const fired{ handles };
+  // The handle the wait woke on goes last, so no handle starves the others.
+  if (woke) std::ranges::rotate(handles, handles.subspan(*woke + 1).begin());
+  return _pump.Service(quit, fired);
 }
 }

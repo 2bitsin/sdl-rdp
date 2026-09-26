@@ -1,6 +1,6 @@
 #pragma once
 #include <sdl-rdp/diagnostics/forward.hpp>
-#include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/link/forward.hpp>
 
 #include <freerdp/server/rdpsnd.h>

@@ -61,12 +61,13 @@ ClipboardChannel::ClipboardChannel(PeerLink& link, Activation const& activation,
 ClipboardChannel::~ClipboardChannel() {
   if (_context) _context->Close(_context.get());
 }
-auto ClipboardChannel::Event() const -> WaitHandle {
-  return _opened ? _context->GetEventHandle(_context.get()) : nullptr;
+auto ClipboardChannel::Event() const -> std::optional<WaitHandle> {
+  if (!_opened) return std::nullopt;
+  return WaitHandle::Lent<&CliprdrServerContext::GetEventHandle>(*_context);
 }
 auto ClipboardChannel::Open() -> bool {
   Expects(!_context, "clipboard opens once");
-  _context.reset(cliprdr_server_context_new(_link.Channels()));
+  _context.reset(cliprdr_server_context_new(_link.Channels().get()));
   if (!_context) return false;
   BindContext(*_context, *this, _link.Context());
   _context->autoInitializationSequence = false;
@@ -79,10 +80,9 @@ auto ClipboardChannel::Open() -> bool {
              == CHANNEL_RC_OK
          && _context->MonitorReady(_context.get(), &monitor) == CHANNEL_RC_OK;
 }
-auto ClipboardChannel::Pump(std::span<WaitHandle const> signaled) -> bool {
+auto ClipboardChannel::Pump(Signalled const& signaled) -> bool {
   Expects(_opened, "clipboard channel open");
-  if (std::ranges::contains(signaled, Event()) && _context->CheckEventHandle(_context.get()) != CHANNEL_RC_OK)
-    return false;
+  if (signaled.Contains(Event()) && _context->CheckEventHandle(_context.get()) != CHANNEL_RC_OK) return false;
   if (!_ready || _announced == _store.Generation()) return true;
   return Announce() == CHANNEL_RC_OK;
 }

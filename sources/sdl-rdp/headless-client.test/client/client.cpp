@@ -2,6 +2,7 @@
 
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
+#include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/headless-client.test/client/channels.hpp>
 #include <sdl-rdp/headless-client.test/client/framebuffer.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
@@ -16,7 +17,6 @@
 #include <freerdp/gdi/gfx.h>
 #include <freerdp/settings.h>
 #include <gtest/gtest.h>
-#include <winpr/synch.h>
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -24,10 +24,12 @@
 #include <cstdlib>
 #include <numeric>
 #include <string_view>
+#include <tuple>
 #include <utility>
 
 namespace sdl_rdp::headless_client_test::client::detail::client {
 using sdl_rdp::freerdp_facade::FirstRefused;
+using sdl_rdp::freerdp_facade::MaximumWaitHandles;
 using sdl_rdp::freerdp_facade::Refusal;
 using sdl_rdp::freerdp_facade::Set;
 using sdl_rdp::freerdp_facade::WaitHandle;
@@ -190,10 +192,11 @@ auto Client::Disconnect() -> bool {
   return freerdp_disconnect(instance.get()) != 0;
 }
 auto Client::Pump(std::uint32_t timeout) -> bool {
-  std::array<WaitHandle, 64> handles { };
-  auto                       count   = freerdp_get_event_handles(instance->context, handles.data(), handles.size());
-  return count && WaitForMultipleObjects(count, handles.data(), false, timeout) != WAIT_FAILED
-         && freerdp_check_event_handles(instance->context);
+  std::array<WaitHandle, MaximumWaitHandles> handles{ };
+  auto const ready = WaitHandle::Collected<freerdp_get_event_handles>(*instance->context, handles);
+  if (ready.empty()) return false;
+  std::ignore = WaitHandle::Any(ready, timeout);
+  return freerdp_check_event_handles(instance->context);
 }
 auto Tap(Client& client, std::uint16_t scancode) -> void {
   ASSERT_TRUE(client.Key(scancode, KeyState::Down)) << "send key down " << scancode;

@@ -26,11 +26,11 @@ using sdl_rdp::freerdp_facade::AssignThrough;
 using sdl_rdp::freerdp_facade::Handled;
 auto Started(AdvancedProtocol::Context const& context) -> bool {
   return context->Initialize(context.get(), true) == CHANNEL_RC_OK && context->Open(context.get()) == CHANNEL_RC_OK
-         && AdvancedProtocol::Service(context) && AdvancedProtocol::Handle(context) != nullptr;
+         && AdvancedProtocol::Service(context) && AdvancedProtocol::Handle(context).has_value();
 }
 }
 template <> auto AdvancedProtocol::Open(PeerLink& link, Channel& channel) -> Context {
-  auto context = Context{ ainput_server_context_new(link.Channels()) };
+  auto context = Context{ ainput_server_context_new(link.Channels().get()) };
   if (!context) return context;
   context->rdpcontext = &link.Context();
   Install(*context, channel);
@@ -39,9 +39,8 @@ template <> auto AdvancedProtocol::Open(PeerLink& link, Channel& channel) -> Con
 template <> auto AdvancedProtocol::Service(Context const& context) -> bool {
   return context->Poll(context.get()) == CHANNEL_RC_OK;
 }
-template <> auto AdvancedProtocol::Handle(Context const& context) -> WaitHandle {
-  WaitHandle event = nullptr;
-  return context->ChannelHandle(context.get(), &event) ? event : nullptr;
+template <> auto AdvancedProtocol::Handle(Context const& context) -> std::optional<WaitHandle> {
+  return WaitHandle::Reported<&ainput_server_context::ChannelHandle>(*context);
 }
 template <> auto AdvancedProtocol::Activate(Context const& context) -> bool {
   return Service(context);
@@ -77,7 +76,7 @@ using sdl_rdp::freerdp_facade::AssignThrough;
 using sdl_rdp::freerdp_facade::Handled;
 }
 template <> auto TouchProtocol::Open(PeerLink& link, Channel& channel) -> Context {
-  auto context = Context{ rdpei_server_context_new(link.Channels()) };
+  auto context = Context{ rdpei_server_context_new(link.Channels().get()) };
   if (!context) return context;
   Install(*context, channel);
   return rdpei_server_init(context.get()) == CHANNEL_RC_OK ? std::move(context) : Context{ };
@@ -85,8 +84,8 @@ template <> auto TouchProtocol::Open(PeerLink& link, Channel& channel) -> Contex
 template <> auto TouchProtocol::Service(Context const& context) -> bool {
   return TouchHandled(rdpei_server_handle_messages(context.get()));
 }
-template <> auto TouchProtocol::Handle(Context const& context) -> WaitHandle {
-  return rdpei_server_get_event_handle(context.get());
+template <> auto TouchProtocol::Handle(Context const& context) -> std::optional<WaitHandle> {
+  return WaitHandle::Lent<rdpei_server_get_event_handle>(*context);
 }
 template <> auto TouchProtocol::Activate(Context const& context) -> bool {
   return rdpei_server_send_sc_ready(context.get(), RDPINPUT_PROTOCOL_V10, 0) == CHANNEL_RC_OK;

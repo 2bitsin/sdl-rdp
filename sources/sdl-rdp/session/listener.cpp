@@ -7,7 +7,8 @@
 #include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/diagnostics/log-level.hpp>
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
-#include <sdl-rdp/freerdp-facade/manual-reset-event.hpp>
+#include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/peer/peer.hpp>
 #include <sdl-rdp/session/exceptions.hpp>
 #include <sdl-rdp/session/session.hpp>
@@ -21,12 +22,14 @@
 #include <winpr/ssl.h>
 #include <winpr/synch.h>
 #include <winpr/wtsapi.h>
+#include <algorithm>
 #include <arpa/inet.h>
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <format>
 #include <mutex>
+#include <span>
 #include <tuple>
 #include <utility>
 
@@ -36,6 +39,7 @@ using sdl_rdp::configuration::Setup;
 using sdl_rdp::diagnostics::FailureLog;
 using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::freerdp_facade::CallbackOwner;
+using sdl_rdp::freerdp_facade::Forever;
 using sdl_rdp::freerdp_facade::ManualResetEvent;
 using sdl_rdp::freerdp_facade::WaitHandle;
 using sdl_rdp::utilities::AllocationFailed;
@@ -49,9 +53,9 @@ auto CloseListener(freerdp_listener* listener) noexcept -> void {
   listener->Close(listener);
 }
 namespace {
-constexpr int           ListenBacklog      = 8;
-constexpr std::size_t   WaitHandleCapacity = 32;
-constexpr std::uint32_t ListenerOwnHandles = 2;
+constexpr int         ListenBacklog      = 8;
+constexpr std::size_t WaitHandleCapacity = 32;
+constexpr std::size_t ListenerOwnHandles = 2;
 // Process-wide and idempotent; OpenSSL 3 releases its state at exit, so neither has a release call.
 auto InitializeProcess(Credentials const& credentials) -> void {
   static std::once_flag once;
@@ -121,7 +125,9 @@ Listener::Listener(Configuration const& configuration, Credentials const& creden
     return Contained(true, accepted, FailureLog{ owner._diagnostics, "Peer construction" });
   };
   _diagnostics.Log(LogLevel::Info, std::format("Listening on port {}", _port));
-  _thread = std::jthread([this](std::stop_token const& quit) { Listen(quit); });
+  _thread = std::jthread([this](std::stop_token const& quit) {
+    std::ignore = Contained([&] { Listen(quit); }, FailureLog{ _diagnostics, "Listener" });
+  });
   Ensures(_port != 0, "bound port is available");
 }
 auto Listener::Port() const noexcept -> std::uint32_t {
@@ -133,15 +139,15 @@ auto Listener::Accept(PeerHandle accepted) -> void {
 }
 auto Listener::Listen(std::stop_token const& quit) -> void {
   std::stop_callback const                   wake(quit, [this] { SetEvent(_stop.get()); });
-  std::array<WaitHandle, WaitHandleCapacity> handles{ };
+  std::array<WaitHandle, WaitHandleCapacity> handles { };
+  auto const                                 budget  = std::span{ handles }.first(handles.size() - ListenerOwnHandles);
   while (!quit.stop_requested()) {
-    auto count = _listener->GetEventHandles(_listener.get(), handles.data(), handles.size() - ListenerOwnHandles);
+    auto const count = WaitHandle::Collected<&freerdp_listener::GetEventHandles>(*_listener, budget).size();
     if (!count) break;
-    handles[count++] = _stop.get();
-    handles[count++] = _session.ReapEvent();
-    if (WaitForMultipleObjects(count, handles.data(), false, INFINITE) == WAIT_FAILED || quit.stop_requested()
-        || !_listener->CheckFileDescriptor(_listener.get()))
-      break;
+    std::ranges::copy(std::array{ WaitHandle{ _stop }, _session.ReapEvent() },
+                      std::span{ handles }.subspan(count).begin());
+    std::ignore = WaitHandle::Any(std::span{ handles }.first(count + ListenerOwnHandles), Forever);
+    if (quit.stop_requested() || !_listener->CheckFileDescriptor(_listener.get())) break;
     _session.Reap();
   }
 }

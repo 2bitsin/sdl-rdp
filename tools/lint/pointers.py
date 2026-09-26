@@ -30,6 +30,7 @@ HEAD_END        = re.compile(r'[{;]')
 THREADS         = os.cpu_count() or 1
 SITE            = ('sitefn', 'sitelambda', 'siteouter')
 HEAD_LINES      = 20
+ISOLATED_REASON = re.compile(r'^\s*// isolated: \S')
 TEMPLATE_HEAD   = re.compile(r'^\s*template\s*<')
 CLASS_HEAD      = re.compile(r'^\s*(?:class|struct|union)\s+(?:(?:\[\[.*?\]\]|alignas\(.*?\))\s*)*(\w+(?:::\w+)*)')
 GCC_ONLY        = ('-fconstexpr-ops-limit=',)
@@ -55,6 +56,7 @@ let anyptr hasCanonicalType(type(anyOf(composite, referenceType(pointee(composit
 let crecord recordDecl(unless(hasAncestor(namespaceDecl())), foreign)
 let owner hasAncestor(functionDecl(unless(isImplicit()),
                                    optionally(cxxMethodDecl(ofClass(cxxRecordDecl().bind("pclass")))),
+                                   optionally(cxxMethodDecl(isPrivate()).bind("pprivate")),
                                    optionally(cxxMethodDecl(hasOverloadedOperatorName("()")).bind("pcall")),
                                    optionally(cxxMethodDecl(ofClass(raii)).bind("praii"))).bind("pfn"))
 let outer functionDecl(unless(isImplicit()), unless(cxxMethodDecl(ofClass(isLambda()))))
@@ -114,6 +116,7 @@ match functionDecl(own, anyOf(hasAnyParameter(hasType(anyptr)), returns(anyptr))
                    hasAnyBody(stmt().bind("body"))).bind("bodied")
 match functionDecl(pret, closure, optionally(hasReturnTypeLoc(typeLoc().bind("rloc"))),
                    optionally(cxxMethodDecl(ofClass(cxxRecordDecl().bind("rclass")))),
+                   optionally(cxxMethodDecl(isPrivate()).bind("rprivate")),
                    optionally(hasAncestor(functionDecl(isExternC()).bind("rexport"))),
                    optionally(decl(isInstantiated()).bind("rinst"))).bind("ret")
 match functionDecl(own, isMain()).bind("entry")
@@ -223,6 +226,11 @@ match declRefExpr(own, to(functionDecl(hasAnyParameter(pparam)).bind("referee"))
 match fieldDecl(own, hasType(fnptr), hasParent(recordDecl().bind("regrecord"))).bind("regfn")
 match fieldDecl(own, hasType(voidptr), hasParent(recordDecl().bind("regrecord"))).bind("regvoid")
 match classTemplateSpecializationDecl(raii).bind("raiitype")
+let friendless cxxRecordDecl(own, unless(isLambda()), unless(has(friendDecl())))
+match fieldDecl(own, isPrivate(), hasType(ptr), unless(hasType(fnptr)),
+                hasParent(friendless.bind("hrecord"))).bind("hidden")
+match cxxRecordDecl(friendless, has(fieldDecl(isPrivate(), hasType(ptr))),
+                    forEach(fieldDecl().bind("rfield"))).bind("frecord")
 enable output print
 let typed allOf(hasType(hasCanonicalType(qualType().bind("type"))), optionally(decl(isInstantiated()).bind("tinst")))
 match parmVarDecl(own, hasType(anyptr), typed).bind("typed")
@@ -505,7 +513,7 @@ class Facts:
             'used': 'used', 'abirecord': 'abirecords', 'reflected': 'reflected', 'dereferenced': 'dereferenced',
             'unwrapped': 'unwrapped', 'ctext': 'ctexts', 'escaped': 'escaped', 'cdef': 'cdefs', 'cside': 'csides',
             'registrar': 'registrars', 'fholder': 'holders', 'raiitype': 'raiitypes', 'saved': 'saved',
-            'cdecl': 'cdecls',
+            'cdecl': 'cdecls', 'pprivate': 'privates', 'rprivate': 'privates',
             'part': 'parts', 'released': 'parts'}
 
     def __init__(self, blocks):
@@ -516,7 +524,8 @@ class Facts:
         self.bodies, self.raii, self.unwrapped, self.ctexts, self.opaque = {}, set(), set(), set(), set()
         self.cdefs, self.csides, self.registrars, self.holders, self.raiitypes = set(), set(), set(), set(), set()
         self.instances, self.lambdas = collections.defaultdict(list), {}
-        self.saved, self.cdecls = set(), set()
+        self.saved, self.cdecls, self.privates = set(), set(), set()
+        self.hidden, self.fields = {}, collections.defaultdict(set)
         self.extended, self.record_fields = {}, collections.defaultdict(set)
         self.types, self.references = collections.defaultdict(set), collections.defaultdict(set)
         self.instance_types, self.acquired = collections.defaultdict(set), collections.defaultdict(set)
@@ -573,6 +582,10 @@ class Facts:
         for name in ('regfn', 'regvoid'):
             if name in block:
                 self.registrations[block['regrecord']][name].add(block[name])
+        if 'hidden' in block:
+            self.hidden[block['hidden']] = block['hrecord']
+        if 'rfield' in block:
+            self.fields[block['frecord']].add(block['rfield'])
 
     def settle(self):
         """What needs every unit: a C side declared anywhere, a registrar defined in another unit than its RAII type."""
@@ -743,6 +756,26 @@ class Facts:
         defined = {declared_name(found) for found in self.cdefs}
         return {found for found in self.cdecls if declared_name(found) not in defined}
 
+    def private(self, function):
+        return self.one_of(function, self.privates)
+
+    @functools.cached_property
+    def isolated(self):
+        """A class whose one field is a private data pointer under its `// isolated:` reason, with no friend and no
+        pointer taken or returned by a member that is not private: the inside of a data structure behind a
+        non-pointer interface."""
+        candidates = {record for field, record in self.hidden.items()
+                      if self.fields[record] == {field} and reasoned(field)}
+        exposed    = {record for _, (function, closure, _, record) in self.pointers
+                      if closure is None and not self.private(function)}
+        exposed   |= {record for function, (record, returned, _, closure) in self.judged_returns().items()
+                      if closure is None and self.pointer(returned) and not self.private(function)}
+        return candidates - exposed
+
+    def inside(self, function, closure, record):
+        """A private member of an isolated class, which the class's interface keeps its pointers behind."""
+        return closure is None and record in self.isolated and self.private(function)
+
     def allowed(self, function, closure):
         """A signature an ABI writes: a C export or main, a slot a C table or C call takes, a reflect tag, a function
         an RAII type or a deleter is made of, a foreign declaration transcribed."""
@@ -779,6 +812,12 @@ class Facts:
         parameters = {lambda_ for _, (_, lambda_, _, _) in self.pointers}
         returned   = {lambda_ for _, returned, _, lambda_ in self.returns.values() if self.pointer(returned)}
         return (parameters | returned) - {None}
+
+
+def reasoned(location):
+    """The declaration sits under its `// isolated: <reason>` line, the reason the Pointers rule asks of it."""
+    above = file_lines(location.path)[location.line - 2] if location.line > 1 else ''
+    return ISOLATED_REASON.match(above) is not None
 
 
 def pointer_text(text, raii_names):
@@ -882,6 +921,8 @@ def finding(root, kind, location, type_text, owner):
 def parameter_findings(root, facts):
     found, adapters = [], facts.adapters(root)
     for parameter, (function, closure, call, record) in facts.judged():
+        if facts.inside(function, closure, record):
+            continue
         allowed   = facts.function(function) in adapters or facts.allowed(function, closure) or facts.deleter(call)
         type_text = facts.type_of(parameter)
         owner     = facts.owner(function, closure, record)
@@ -897,11 +938,14 @@ def parameter_findings(root, facts):
 def findings_from(root, facts):
     abi_shaped = facts.registered() | facts.saved | facts.prefixes
     found      = parameter_findings(root, facts)
+    isolated   = {field for field, record in facts.hidden.items() if record in facts.isolated}
     found     += [finding(root, 'members', member, facts.type_of(member), owner_name(record).removesuffix('::'))
-                  for member, record in facts.members.items() if member not in abi_shaped and facts.pointer(member)]
+                  for member, record in facts.members.items()
+                  if member not in abi_shaped | isolated and facts.pointer(member)]
     found     += [finding(root, 'returns', function, facts.type_of(returned), facts.owner(function, closure, record))
                   for function, (record, returned, export, closure) in facts.judged_returns().items()
-                  if export not in facts.entries and not facts.allowed(function, closure) and facts.pointer(returned)]
+                  if export not in facts.entries and not facts.allowed(function, closure)
+                  and not facts.inside(function, closure, record) and facts.pointer(returned)]
     return sorted(set(found))
 
 

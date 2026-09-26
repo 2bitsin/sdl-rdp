@@ -1,6 +1,6 @@
 #include <sdl-rdp/link/peer-link.hpp>
 
-#include <sdl-rdp/freerdp-facade/manual-reset-event.hpp>
+#include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/link/exceptions.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
@@ -51,8 +51,8 @@ auto PeerLink::Context() const noexcept -> rdpContext& {
 auto PeerLink::Settings() const noexcept -> rdpSettings& {
   return *_client->context->settings;
 }
-auto PeerLink::Channels() const noexcept -> WaitHandle {
-  return _channels.get();
+auto PeerLink::Channels() const noexcept -> ChannelManager const& {
+  return _channels;
 }
 auto PeerLink::Dynamic() noexcept -> DynamicChannels& {
   return _dynamic;
@@ -69,8 +69,8 @@ auto PeerLink::Signal() -> void {
 auto PeerLink::Settle() -> void {
   _wake.Transition(WakeEvent::Phase::Idle);
 }
-auto PeerLink::Wake() const noexcept -> WaitHandle {
-  return _wake.get();
+auto PeerLink::Wake() const -> WaitHandle {
+  return _wake.Handle();
 }
 auto PeerLink::Invalidate() noexcept -> void {
   _handle_count = 0;
@@ -87,12 +87,12 @@ auto ClientHostname(PeerLink const& link) -> std::string {
   return std::string{ Get(link.Settings(), FreeRDP_ClientHostname).value_or(link.Client().hostname) };
 }
 auto DynamicChannelsReady(PeerLink const& link) -> bool {
-  return WTSVirtualChannelManagerGetDrdynvcState(link.Channels()) == DRDYNVC_STATE_READY;
+  return WTSVirtualChannelManagerGetDrdynvcState(link.Channels().get()) == DRDYNVC_STATE_READY;
 }
 auto Joined(PeerLink const& link, std::string_view name) -> bool {
   Expects(name.size() <= CHANNEL_NAME_LEN, "a static channel name fits its protocol field");
   std::array<char, CHANNEL_NAME_LEN + 1> terminated{ };
   CopyTerminated(terminated, name);
-  return WTSVirtualChannelManagerIsChannelJoined(link.Channels(), terminated.data());
+  return WTSVirtualChannelManagerIsChannelJoined(link.Channels().get(), terminated.data());
 }
 }

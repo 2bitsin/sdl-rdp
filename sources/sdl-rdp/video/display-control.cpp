@@ -78,7 +78,7 @@ auto DisplayControl::Open() -> bool {
   if (_open || !freerdp_settings_get_bool(&_link.Settings(), FreeRDP_SupportDisplayControl)
       || !DynamicChannelsReady(_link))
     return true;
-  _context.reset(disp_server_context_new(_link.Channels()));
+  _context.reset(disp_server_context_new(_link.Channels().get()));
   if (!_context) return false;
   BindContext(*_context, *this, _link.Context());
   Callbacks::Install(*_context);

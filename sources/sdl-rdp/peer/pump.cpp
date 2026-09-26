@@ -16,7 +16,7 @@ PeerPump::PeerPump(PeerLink& link, SessionAccess& session, ChannelSet& channels,
                    FrameSender& sender, TransportEnd& end, TraceQueue& traces) noexcept
     : _link{ link }, _session{ session }, _channels{ channels }, _redirection{ redirection }, _sender{ sender },
       _end{ end }, _traces{ traces } { }
-auto PeerPump::Service(std::stop_token const& quit, std::span<WaitHandle const> ready) -> bool {
+auto PeerPump::Service(std::stop_token const& quit, Signalled const& ready) -> bool {
   auto const healthy = Exchange(quit, ready) && Deliver(quit);
   _traces.Flush();
   return healthy;
@@ -25,7 +25,7 @@ auto PeerPump::Ended() -> bool {
   _end.Report();
   return false;
 }
-auto PeerPump::Exchange(std::stop_token const& quit, std::span<WaitHandle const> ready) -> bool {
+auto PeerPump::Exchange(std::stop_token const& quit, Signalled const& ready) -> bool {
   auto const session = _session.Lock();
   if (quit.stop_requested()) return false;
   auto& client = _link.Client();

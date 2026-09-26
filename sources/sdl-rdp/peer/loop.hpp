@@ -1,13 +1,12 @@
 #pragma once
 #include <sdl-rdp/auth/forward.hpp>
 #include <sdl-rdp/diagnostics/forward.hpp>
-#include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/peer/forward.hpp>
 #include <sdl-rdp/picture/forward.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
-#include <winpr/wtypes.h>
 #include <cstdint>
 #include <span>
 #include <stop_token>

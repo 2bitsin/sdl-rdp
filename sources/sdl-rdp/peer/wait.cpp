@@ -7,7 +7,7 @@
 #include <sdl-rdp/video/frame/pacing.hpp>
 #include <sdl-rdp/video/graphics-link.hpp>
 
-#include <freerdp/channels/wtsvc.h>
+#include <freerdp/peer.h>
 #include <algorithm>
 #include <cstdint>
 
@@ -32,15 +32,13 @@ auto PeerWait::Plan(std::span<WaitHandle> handles) -> WaitPlan {
 }
 auto PeerWait::Collect(std::span<WaitHandle> handles) -> std::uint32_t {
   Expects(handles.size() > AppendedHandleCount, "event array has room for transport and peer handles");
-  auto&      client    = _link.Client();
-  auto const budget    = handles.size() - AppendedHandleCount;
-  auto const transport = client.GetEventHandles(&client, handles.data(), budget);
-  if (!transport) return 0;
-  Expects(transport <= budget, "transport respects event budget");
-  auto const rest = _channels.Handles(handles.subspan(transport));
+  auto const budget    = handles.first(handles.size() - AppendedHandleCount);
+  auto const transport = WaitHandle::Collected<&freerdp_peer::GetEventHandles>(_link.Client(), budget);
+  if (transport.empty()) return 0;
+  auto const rest = _channels.Handles(handles.subspan(transport.size()));
   Expects(rest.size() >= LoopHandleCount, "the loop's own handles fit");
   rest[0] = _link.Wake();
-  rest[1] = WTSVirtualChannelManagerGetEventHandle(_link.Channels());
+  rest[1] = WaitHandle::Of(_link.Channels());
   return Narrowed<std::uint32_t>(handles.size() - rest.size() + LoopHandleCount);
 }
 auto PeerWait::Timeout() const -> std::uint32_t {

@@ -9,11 +9,21 @@
 
 #include <freerdp/channels/rdpdr.h>
 #include <algorithm>
+#include <array>
+#include <optional>
+#include <ranges>
 #include <utility>
 
 namespace sdl_rdp::peer::detail::redirection {
 using sdl_rdp::link::Joined;
 using sdl_rdp::utilities::Expects;
+
+namespace {
+template <class ChannelTy> auto EventOf(ChannelTy const& channel) -> std::optional<WaitHandle> {
+  if (!channel) return std::nullopt;
+  return channel->Event();
+}
+}
 
 Redirection::Redirection(PeerLink& link, Activation const& activation, SessionAccess& session,
                          Factory<std::unique_ptr<AudioChannel>> sound,
@@ -36,7 +46,7 @@ auto Redirection::OpenDrive() -> void {
   _drive = _make_drive();
   _drive->Open();
 }
-auto Redirection::OpenStatic(std::span<WaitHandle const> ready) -> bool {
+auto Redirection::OpenStatic(Signalled const& ready) -> bool {
   if (!OpenClipboard()) return false;
   OpenDrive();
   if (_drive) _drive->Pump(ready);
@@ -48,11 +58,11 @@ auto Redirection::OpenSound() -> bool {
   _sound = _make_sound();
   return _sound->Initialize();
 }
-auto Redirection::Sound(std::span<WaitHandle const> ready) -> void {
+auto Redirection::Sound(Signalled const& ready) -> void {
   if (!_activation.Active()) return;
   auto healthy = OpenSound();
   if (!_sound) return;
-  if (healthy && std::ranges::contains(ready, _sound->Event())) healthy = _sound->Pump();
+  if (healthy && ready.Contains(_sound->Event())) healthy = _sound->Pump();
   if (!healthy) EndAudio();
 }
 auto Redirection::EndAudio() -> void {
@@ -75,10 +85,8 @@ auto Redirection::Disconnect() -> void {
 }
 auto Redirection::Handles(std::span<WaitHandle> out) const -> std::span<WaitHandle> {
   Expects(out.size() >= RedirectionHandleLimit, "handle span has room for the redirection channels");
-  auto next = out.begin();
-  if (_drive && _drive->Event()) *next++ = _drive->Event();
-  if (_clipboard) *next++ = _clipboard->Event();
-  if (_sound) *next++ = _sound->Event();
+  auto const events = std::array{ EventOf(_drive), EventOf(_clipboard), EventOf(_sound) };
+  auto const next   = std::ranges::copy(events | std::views::join, out.begin()).out;
   return { next, out.end() };
 }
 }

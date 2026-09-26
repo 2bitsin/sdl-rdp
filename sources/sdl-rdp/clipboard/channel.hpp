@@ -2,18 +2,21 @@
 #include <sdl-rdp/clipboard/forward.hpp>
 #include <sdl-rdp/diagnostics/forward.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/freerdp-facade/signalled.hpp>
+#include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/link/forward.hpp>
 
 #include <freerdp/server/cliprdr.h>
 #include <cstddef>
 #include <cstdint>
-#include <span>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
 namespace sdl_rdp::clipboard::detail::channel {
 using sdl_rdp::diagnostics::Diagnostics;
+using sdl_rdp::freerdp_facade::Signalled;
 using sdl_rdp::freerdp_facade::WaitHandle;
 using sdl_rdp::link::Activation;
 using sdl_rdp::link::EventQueue;
@@ -22,16 +25,16 @@ using sdl_rdp::utilities::Releases;
 
 class ClipboardChannel {
 public:
-       ClipboardChannel(ClipboardChannel const&)                       = delete;
-       ClipboardChannel(ClipboardChannel&&)                            = delete;
+       ClipboardChannel(ClipboardChannel const&)               = delete;
+       ClipboardChannel(ClipboardChannel&&)                    = delete;
        ClipboardChannel(PeerLink& link, Activation const& activation, ClipboardStore& store, EventQueue& events,
                         Diagnostics const& diagnostics) noexcept;
        ~ClipboardChannel();
-  auto operator=(ClipboardChannel const&)         -> ClipboardChannel& = delete;
-  auto operator=(ClipboardChannel&&)              -> ClipboardChannel& = delete;
-  auto Open()                                     -> bool;
-  auto Pump(std::span<WaitHandle const> signaled) -> bool;
-  auto Event() const                              -> WaitHandle;
+  auto operator=(ClipboardChannel const&) -> ClipboardChannel& = delete;
+  auto operator=(ClipboardChannel&&)      -> ClipboardChannel& = delete;
+  auto Open()                             -> bool;
+  auto Pump(Signalled const& signaled)    -> bool;
+  auto Event() const                      -> std::optional<WaitHandle>;
 
 private:
   class Callbacks;

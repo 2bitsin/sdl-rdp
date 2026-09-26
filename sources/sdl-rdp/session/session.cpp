@@ -1,7 +1,7 @@
 #include <sdl-rdp/session/session.hpp>
 
 #include <sdl-rdp/audio/channel.hpp>
-#include <sdl-rdp/freerdp-facade/manual-reset-event.hpp>
+#include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/event-queue.hpp>
 #include <sdl-rdp/link/event.hpp>
@@ -43,8 +43,8 @@ auto Session::Reap() -> void {
   ResetEvent(_reap.get());
   _peers.Reap();
 }
-auto Session::ReapEvent() const noexcept -> WaitHandle {
-  return _reap.get();
+auto Session::ReapEvent() const -> WaitHandle {
+  return WaitHandle{ _reap };
 }
 auto Session::Takeover(PeerLink const& self) -> FrameLock {
   std::scoped_lock const session(_guard);

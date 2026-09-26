@@ -1,11 +1,10 @@
 #pragma once
-#include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/peer/channel-set.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 #include <sdl-rdp/video/frame/forward.hpp>
 
-#include <winpr/wtypes.h>
 #include <cstdint>
 #include <span>
 

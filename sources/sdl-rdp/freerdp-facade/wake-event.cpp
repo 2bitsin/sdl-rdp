@@ -1,9 +1,7 @@
 #include <sdl-rdp/freerdp-facade/wake-event.hpp>
 
-#include <sdl-rdp/freerdp-facade/exceptions.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 
-#include <winpr/file.h>
 #include <winpr/synch.h>
 #include <utility>
 
@@ -14,16 +12,16 @@ using sdl_rdp::utilities::Unreachable;
 WakeEvent::WakeEvent(EventHandle value) : handle(std::move(value)) {
   Expects(handle != nullptr, "wake event owns an event");
 }
-auto WakeEvent::get() const -> HANDLE {
-  return handle.get();
+auto WakeEvent::Handle() const -> WaitHandle {
+  return WaitHandle{ handle };
 }
 auto WakeEvent::Transition(Phase next) -> void {
   switch (next) {
   case Phase::Pending:
-    if (phase.exchange(next) == Phase::Idle) SetEvent(get());
+    if (phase.exchange(next) == Phase::Idle) SetEvent(handle.get());
     break;
   case Phase::Idle:
-    ResetEvent(get());
+    ResetEvent(handle.get());
     phase.store(next);
     break;
   default: Unreachable("known wake phase");

@@ -1,5 +1,6 @@
 #pragma once
-#include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/freerdp-facade/signalled.hpp>
+#include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/input/activated-channel.hpp>
 #include <sdl-rdp/input/forward.hpp>
 #include <sdl-rdp/link/channel-slot.hpp>
@@ -7,10 +8,10 @@
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
-#include <algorithm>
-#include <span>
+#include <optional>
 
 namespace sdl_rdp::input::detail::channel {
+using sdl_rdp::freerdp_facade::Signalled;
 using sdl_rdp::freerdp_facade::WaitHandle;
 using sdl_rdp::link::ChannelSlot;
 using sdl_rdp::link::PeerLink;
@@ -22,9 +23,9 @@ public:
   InputChannel(PeerLink& link, InputEvents& events) noexcept
       : _link{ link }, _events{ events }, _dynamic{ [this] { return Activate(); } }, _slot{ link.Dynamic(), _dynamic } {
   }
-  auto Open()                                  -> bool;
-  auto Pump(std::span<WaitHandle const> ready) -> bool;
-  auto Event() const                           -> WaitHandle;
+  auto Open()                       -> bool;
+  auto Pump(Signalled const& ready) -> bool;
+  auto Event() const                -> std::optional<WaitHandle>;
 
 private:
   auto Activate()                     -> bool;
@@ -44,11 +45,12 @@ template <class Protocol> auto InputChannel<Protocol>::Open() -> bool {
   _context = Protocol::Open(_link, *this);
   return _context != nullptr;
 }
-template <class Protocol> auto InputChannel<Protocol>::Pump(std::span<WaitHandle const> ready) -> bool {
-  return !_ready || !std::ranges::contains(ready, Event()) || Protocol::Service(_context);
+template <class Protocol> auto InputChannel<Protocol>::Pump(Signalled const& ready) -> bool {
+  return !ready.Contains(Event()) || Protocol::Service(_context);
 }
-template <class Protocol> auto InputChannel<Protocol>::Event() const -> WaitHandle {
-  return _ready ? Protocol::Handle(_context) : nullptr;
+template <class Protocol> auto InputChannel<Protocol>::Event() const -> std::optional<WaitHandle> {
+  if (!_ready) return std::nullopt;
+  return Protocol::Handle(_context);
 }
 template <class Protocol> auto InputChannel<Protocol>::Activate() -> bool {
   Expects(_context != nullptr, "an activated input channel is open");

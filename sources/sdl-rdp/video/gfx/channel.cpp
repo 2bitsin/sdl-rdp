@@ -91,7 +91,8 @@ auto GfxChannel::Callbacks::Install(RdpgfxServerContext& server) -> void {
 GfxChannel::GfxChannel(PeerLink& link, Diagnostics const& diagnostics, Configuration const& configuration,
                        Activation& activation, FrameSources sources, DynamicChannel& owner)
     : _link{ link }, _diagnostics{ diagnostics }, _configuration{ configuration }, _activation{ activation },
-      _sources{ sources }, _context{ rdpgfx_server_context_new(link.Channels()) }, _slot{ link.Dynamic(), owner } { }
+      _sources{ sources }, _context{ rdpgfx_server_context_new(link.Channels().get()) },
+      _slot{ link.Dynamic(), owner } { }
 GfxChannel::~GfxChannel() = default;
 auto GfxChannel::Open() -> bool {
   if (!_context) return false;
@@ -100,7 +101,7 @@ auto GfxChannel::Open() -> bool {
   return _context->Initialize(_context.get(), true) && _context->Open(_context.get());
 }
 auto GfxChannel::Event() const -> WaitHandle {
-  return rdpgfx_server_get_event_handle(_context.get());
+  return WaitHandle::Lent<rdpgfx_server_get_event_handle>(*_context);
 }
 auto GfxChannel::Pump() -> bool {
   auto result = rdpgfx_server_handle_messages(_context.get());

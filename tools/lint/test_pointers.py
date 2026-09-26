@@ -908,3 +908,141 @@ def test_the_bench_database_follows_the_builds_own(tmp_path, monkeypatch, databa
                         lambda command, **_: commands.append(command) or subprocess.CompletedProcess(command, 0))
     pointers.bench_database(tmp_path, bench_build(tmp_path, database_age, bench_age))
     assert bool(commands) == reconfigured
+
+
+ISOLATED = '''#include <optional>
+#include <span>
+#include "c.h"
+extern "C" auto c_lend(Dev* dev) -> HANDLE;
+namespace isolation {
+class Sole {
+public:
+  Sole() = default;
+  static auto From(Dev& dev) -> Sole { return Sole{ Call(dev) }; }
+  static auto Many(std::span<Sole const> all) -> std::optional<int>;
+  auto operator==(Sole const& other) const -> bool = default;
+  auto Read() const -> int { return Relayed(_sole_native); }
+private:
+  explicit Sole(HANDLE sole_param) : _sole_native{ sole_param } { }
+  static auto Call(Dev& dev) -> HANDLE { return c_lend(&dev); }
+  template <class... ArgsTy> static auto Relayed(ArgsTy... relayed_args) -> int { return c_read(relayed_args...); }
+  // isolated: the handle is opaque.
+  HANDLE _sole_native{ };
+};
+class Unreasoned {
+public:
+  auto operator==(Unreasoned const& other) const -> bool = default;
+private:
+  HANDLE _unreasoned_native{ };
+};
+class Untagged {
+  // The handle is opaque.
+  HANDLE _untagged_native{ };
+};
+class Guarded {
+protected:
+  auto Get() const -> HANDLE { return _protected_native; }
+private:
+  // isolated: the handle is opaque.
+  HANDLE _protected_native{ };
+};
+class ProtectedField {
+protected:
+  // isolated: the handle is opaque.
+  HANDLE _protected_field{ };
+};
+class Callback {
+  // isolated: the callback is opaque.
+  int (*_callback_field)(Dev*){ };
+};
+class Templated {
+public:
+  template <class T> auto Take(T templated_param) -> void { _templated_native = templated_param; }
+  auto Use() -> void { Take(HANDLE{ }); }
+private:
+  // isolated: the handle is opaque.
+  HANDLE _templated_native{ };
+};
+class Contained {
+public:
+  auto Span() -> std::span<HANDLE> { return { &_contained_native, 1 }; }
+  auto Maybe() const -> std::optional<HANDLE> { return _contained_native; }
+private:
+  // isolated: the handle is opaque.
+  HANDLE _contained_native{ };
+};
+class Referring {
+public:
+  auto Ref() -> HANDLE& { return _referred_native; }
+private:
+  // isolated: the handle is opaque.
+  HANDLE _referred_native{ };
+};
+class Leaky {
+public:
+  auto Get() const -> HANDLE { return _leaky_native; }
+private:
+  // isolated: the handle is opaque.
+  HANDLE _leaky_native{ };
+};
+class Paired {
+  // isolated: the handle is opaque.
+  HANDLE _paired_native{ };
+  int    _paired_count{ };
+};
+class Befriended {
+  friend auto Peek(Befriended const& seen) -> int;
+  // isolated: the handle is opaque.
+  HANDLE _befriended_native{ };
+};
+struct Open {
+  // isolated: the handle is opaque.
+  HANDLE open_native;
+};
+class Crossing {
+public:
+  explicit Crossing(HANDLE crossing_param) : _crossing_native{ crossing_param } { }
+private:
+  // isolated: the handle is opaque.
+  HANDLE _crossing_native;
+};
+}
+'''
+ISOLATION = 'sources/sdl-rdp/freerdp-facade/isolation.cpp'
+
+
+@pytest.fixture(scope='module')
+def isolated(tmp_path_factory):
+    root  = tmp_path_factory.mktemp('isolated')
+    build = tree(root, {ISOLATION: ISOLATED}, [ISOLATION])
+    return {(str(item.path), item.line, item.kind) for item in pointers.findings(root, build)}
+
+
+def isolated_at(isolated, needle, kind):
+    return (ISOLATION, locate(ISOLATED, needle), kind) in isolated
+
+
+def test_a_sole_private_pointer_behind_a_pointer_free_interface_is_the_inside_of_a_data_structure(isolated):
+    assert not isolated_at(isolated, 'HANDLE _sole_native', 'members')
+    assert not isolated_at(isolated, 'HANDLE sole_param', 'parameters')
+    assert not isolated_at(isolated, 'static auto Call(Dev& dev) -> HANDLE', 'returns')
+    assert not any(isolated_at(isolated, 'relayed_args', kind) for kind in pointers.KINDS)
+
+
+@pytest.mark.parametrize('needle', ['HANDLE _leaky_native', '_paired_native', '_befriended_native',
+                                    '_unreasoned_native', 'open_native', '_crossing_native;', '_untagged_native',
+                                    'HANDLE _protected_native', '_protected_field', '_callback_field',
+                                    'HANDLE _templated_native', 'HANDLE _contained_native',
+                                    'HANDLE _referred_native'])
+def test_a_pointer_member_an_interface_exposes_or_shares_stays_a_pointer(isolated, needle):
+    assert isolated_at(isolated, needle, 'members')
+
+
+def test_a_non_private_member_of_a_would_be_isolated_class_is_judged(isolated):
+    assert isolated_at(isolated, 'auto Get() const -> HANDLE', 'returns')
+    assert isolated_at(isolated, 'HANDLE crossing_param', 'parameters')
+    assert isolated_at(isolated, 'auto Get() const -> HANDLE { return _protected_native; }', 'returns')
+    assert isolated_at(isolated, 'T templated_param', 'parameters')
+    assert isolated_at(isolated, 'auto Span() -> std::span<HANDLE>', 'returns')
+    assert isolated_at(isolated, 'auto Maybe() const -> std::optional<HANDLE>', 'returns')
+    assert isolated_at(isolated, 'auto Ref() -> HANDLE&', 'returns')

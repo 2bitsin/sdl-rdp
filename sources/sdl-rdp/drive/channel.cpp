@@ -7,7 +7,6 @@
 #include <sdl-rdp/drive/drive.hpp>
 #include <sdl-rdp/drive/exceptions.hpp>
 #include <sdl-rdp/drive/label.hpp>
-#include <sdl-rdp/freerdp-facade/waitable.hpp>
 #include <sdl-rdp/link/event-queue.hpp>
 #include <sdl-rdp/link/event.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
@@ -16,6 +15,7 @@
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 #include <winpr/nt.h>
+#include <winpr/wtsapi.h>
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -33,26 +33,18 @@
 namespace sdl_rdp::drive::detail::channel {
 using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::drive::Drive;
-using sdl_rdp::freerdp_facade::Waitable;
 using sdl_rdp::link::DriveChanged;
 using sdl_rdp::link::Event;
 using sdl_rdp::utilities::Contained;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::Required;
 namespace {
 auto Header(std::uint32_t type) -> DrivePacket {
   DrivePacket packet;
   packet.Write(std::uint16_t{ RDPDR_CTYP_CORE });
   packet.Write(Narrowed<std::uint16_t>(type));
   return packet;
-}
-auto ChannelEvent(WaitHandle channel) -> WaitHandle {
-  void*         data = nullptr;
-  std::uint32_t size = 0;
-  if (!WTSVirtualChannelQuery(channel, WTSVirtualEventHandle, &data, &size)) throw DriveChannelFailed{ "event query" };
-  auto* event = *static_cast<WaitHandle*>(data);
-  WTSFreeMemory(data);
-  return event;
 }
 auto Announcement(std::uint32_t type, std::uint32_t client_id) -> DrivePacket {
   auto packet = Header(type);
@@ -85,16 +77,16 @@ DriveChannel::DriveChannel(PeerLink& link, EventQueue& events, Diagnostics const
 DriveChannel::~DriveChannel() {
   Disconnect();
 }
-auto DriveChannel::Event() const -> WaitHandle {
+auto DriveChannel::Event() const -> std::optional<WaitHandle> {
   return event;
 }
 auto DriveChannel::Open() -> bool {
   Expects(!channel, "drive channel opens once");
   auto const opened = [this] {
     auto name = std::to_array(RDPDR_CHANNEL_NAME);
-    channel.reset(WTSVirtualChannelOpen(_link.Channels(), WTS_CURRENT_SESSION, name.data()));
+    channel.reset(WTSVirtualChannelOpen(_link.Channels().get(), WTS_CURRENT_SESSION, name.data()));
     if (!channel) throw DriveChannelFailed{ "open" };
-    event = ChannelEvent(channel.get());
+    event = WaitHandle::Of(channel);
     auto packet = Announcement(PAKID_CORE_SERVER_ANNOUNCE, client_id);
     Write(packet);
     return true;
@@ -222,13 +214,13 @@ auto DriveChannel::Receive(DrivePacket& packet) -> void {
     while (count--) Remove(packet.Read<std::uint32_t>());
   }
 }
-auto DriveChannel::Pump(std::span<WaitHandle const> signaled) -> bool {
+auto DriveChannel::Pump(Signalled const& signaled) -> bool {
   std::scoped_lock const lock(mutex);
   if (!connected) {
     CloseTransport();
     return true;
   }
-  if (!std::ranges::contains(signaled, event)) return true;
+  if (!signaled.Contains(event)) return true;
   auto const pumped = Contained(
       std::optional<bool>{ }, [this] -> std::optional<bool> { return PumpAvailable(); }, Ending(*this));
   if (pumped) return *pumped;
@@ -277,7 +269,7 @@ auto DriveChannel::GeneralClientCapability(DrivePacket& packet, std::size_t star
                   minor, version, flags, (flags & RDPDR_DEVICE_REMOVE_PDUS) != 0));
 }
 auto DriveChannel::PumpAvailable() -> bool {
-  Waitable const ready{ event };
+  auto const ready = Required(event, "a pumped drive channel has its event");
   for (;;) {
     if (!ready.Signalled()) return true;
     std::uint32_t length = 0;
@@ -313,7 +305,7 @@ auto DriveChannel::Shutdown() -> void {
 auto DriveChannel::CloseTransport() -> void {
   if (channel) _link.Invalidate();
   channel.reset();
-  event = nullptr;
+  event.reset();
 }
 auto DriveChannel::Device(std::uint32_t id) -> std::uint32_t {
   Expects(connected, "a request addresses a connected peer");

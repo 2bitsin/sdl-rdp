@@ -101,7 +101,7 @@ auto AudioChannel::Callbacks::Install(RdpsndServerContext& sound) -> void {
 AudioChannel::AudioChannel(PeerLink& link, Diagnostics const& diagnostics, EventQueue& events, SessionAccess& session,
                            TraceQueue& traces)
     : _link{ link }, _diagnostics{ diagnostics }, _events{ events }, _session{ session }, _traces{ traces },
-      _sound{ rdpsnd_server_context_new(link.Channels()) } {
+      _sound{ rdpsnd_server_context_new(link.Channels().get()) } {
   if (!_sound) throw AllocationFailed{ "Audio channel" };
   _sound->server_formats = audio_formats_new(2);
   if (!_sound->server_formats) throw AllocationFailed{ "Audio format" };
@@ -128,7 +128,7 @@ auto AudioChannel::Pump() -> bool {
 }
 auto AudioChannel::Event() const -> WaitHandle {
   Expects(_sound != nullptr, "sound context exists");
-  return rdpsnd_server_get_event_handle(_sound.get());
+  return WaitHandle::Lent<rdpsnd_server_get_event_handle>(*_sound);
 }
 auto AudioChannel::Rate() const -> std::uint32_t {
   return _ready ? _rate : 0;
@@ -178,7 +178,7 @@ auto AudioChannel::SendBlock() -> bool {
   if (_sound->SendSamples2(_sound.get(), _sound->selected_client_format, _buffer.data(),
                            _buffer.size() * sizeof(std::int16_t), timestamp, 0)
           != CHANNEL_RC_OK
-      || !WTSVirtualChannelManagerCheckFileDescriptorEx(_link.Channels(), false)) {
+      || !WTSVirtualChannelManagerCheckFileDescriptorEx(_link.Channels().get(), false)) {
     TransportEnded();
     return false;
   }

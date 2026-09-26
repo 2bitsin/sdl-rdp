@@ -24,8 +24,8 @@ GraphicsLink::GraphicsLink(PeerLink& link, Diagnostics const& diagnostics, Activ
                            Factory<std::unique_ptr<GfxChannel>, DynamicChannel&> make) noexcept
     : _link{ link }, _diagnostics{ diagnostics }, _activation{ activation }, _pacing{ pacing }, _encoder{ encoder },
       _make{ std::move(make) } { }
-auto GraphicsLink::Pump(std::span<WaitHandle const> ready) -> bool {
-  if (_channel) return !std::ranges::contains(ready, _channel->Event()) || _channel->Pump();
+auto GraphicsLink::Pump(Signalled const& ready) -> bool {
+  if (_channel) return !ready.Contains(_channel->Event()) || _channel->Pump();
   if (_attempted || !freerdp_settings_get_bool(&_link.Settings(), FreeRDP_SupportGraphicsPipeline)
       || !DynamicChannelsReady(_link))
     return true;

@@ -2,11 +2,11 @@
 #include <sdl-rdp/audio/forward.hpp>
 #include <sdl-rdp/clipboard/forward.hpp>
 #include <sdl-rdp/drive/channel.hpp>
-#include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/freerdp-facade/signalled.hpp>
+#include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/utilities/factory.hpp>
 
-#include <winpr/wtypes.h>
 #include <cstddef>
 #include <memory>
 #include <span>
@@ -15,6 +15,7 @@ namespace sdl_rdp::peer::detail::redirection {
 using sdl_rdp::audio::AudioChannel;
 using sdl_rdp::clipboard::ClipboardChannel;
 using sdl_rdp::drive::DriveChannel;
+using sdl_rdp::freerdp_facade::Signalled;
 using sdl_rdp::freerdp_facade::WaitHandle;
 using sdl_rdp::link::Activation;
 using sdl_rdp::link::PeerLink;
@@ -24,21 +25,21 @@ using sdl_rdp::utilities::Factory;
 inline constexpr std::size_t RedirectionHandleLimit = 3;
 class Redirection {
 public:
-       Redirection(Redirection const&)                               = delete;
-       Redirection(Redirection&&)                                    = delete;
+       Redirection(Redirection const&)                          = delete;
+       Redirection(Redirection&&)                               = delete;
        Redirection(PeerLink& link, Activation const& activation, SessionAccess& session,
                    Factory<std::unique_ptr<AudioChannel>> sound, Factory<std::unique_ptr<ClipboardChannel>> clipboard,
                    Factory<std::shared_ptr<DriveChannel>> drive) noexcept;
        ~Redirection();
-  auto operator=(Redirection const&)                 -> Redirection& = delete;
-  auto operator=(Redirection&&)                      -> Redirection& = delete;
-  auto OpenStatic(std::span<WaitHandle const> ready) -> bool;
-  auto Sound(std::span<WaitHandle const> ready)      -> void;
-  auto Audio() const noexcept                        -> std::optional<std::reference_wrapper<AudioChannel>>;
-  auto Drive() const                                 -> std::shared_ptr<DriveChannel>;
-  auto LogAudio() const                              -> void;
-  auto Disconnect()                                  -> void;
-  auto Handles(std::span<WaitHandle> out) const      -> std::span<WaitHandle>;
+  auto operator=(Redirection const&)            -> Redirection& = delete;
+  auto operator=(Redirection&&)                 -> Redirection& = delete;
+  auto OpenStatic(Signalled const& ready)       -> bool;
+  auto Sound(Signalled const& ready)            -> void;
+  auto Audio() const noexcept                   -> std::optional<std::reference_wrapper<AudioChannel>>;
+  auto Drive() const                            -> std::shared_ptr<DriveChannel>;
+  auto LogAudio() const                         -> void;
+  auto Disconnect()                             -> void;
+  auto Handles(std::span<WaitHandle> out) const -> std::span<WaitHandle>;
 
 private:
   auto OpenClipboard() -> bool;

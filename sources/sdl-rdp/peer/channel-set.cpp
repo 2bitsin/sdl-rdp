@@ -20,26 +20,23 @@ constexpr OperationName ChannelCreation{ "Dynamic channel creation" };
 }
 class ChannelSet::Callbacks {
 public:
-  static auto Register(WaitHandle manager, ChannelSet& channels) -> CreationRegistration {
+  static auto Register(ChannelManager const& manager, ChannelSet& channels) -> CreationRegistration {
     using sdl_rdp::freerdp_facade::Handled;
     using sdl_rdp::freerdp_facade::Itself;
     constexpr auto failures = FailuresThrough<&ChannelSet::FailureSource>;
     // abi: psDVCCreationStatusCallback, BOOL is int
     WTSVirtualChannelManagerSetDVCCreationCallback(
-        manager, Handled<Itself<ChannelSet>, &ChannelSet::Created, ChannelCreation, failures, false>, &channels);
-    return CreationRegistration{ manager };
+        manager.get(), Handled<Itself<ChannelSet>, &ChannelSet::Created, ChannelCreation, failures, false>, &channels);
+    return CreationRegistration{ manager.get() };
   }
 };
-auto ForgetChannelCreation(WaitHandle manager) -> void {
-  WTSVirtualChannelManagerSetDVCCreationCallback(manager, nullptr, nullptr);
-}
 ChannelSet::ChannelSet(PeerLink& link, Activation const& activation, GraphicsLink& graphics, DisplayControl& display,
                        Redirection& redirection, Input& input)
     : _link{ link }, _activation{ activation }, _graphics{ graphics }, _display{ display }, _redirection{ redirection },
       _input{ input }, _registration{ Callbacks::Register(link.Channels(), *this) } { }
-auto ChannelSet::Pump(std::span<WaitHandle const> ready) -> bool {
+auto ChannelSet::Pump(Signalled const& ready) -> bool {
   if (!_activation.Active()) return true;
-  return WTSVirtualChannelManagerCheckFileDescriptor(_link.Channels()) && _input.Channels(ready)
+  return WTSVirtualChannelManagerCheckFileDescriptor(_link.Channels().get()) && _input.Channels(ready)
          && _redirection.OpenStatic(ready) && _display.Open() && _graphics.Pump(ready);
 }
 auto ChannelSet::Handles(std::span<WaitHandle> out) const -> std::span<WaitHandle> {

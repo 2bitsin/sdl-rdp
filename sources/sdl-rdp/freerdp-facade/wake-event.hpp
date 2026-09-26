@@ -1,5 +1,6 @@
 #pragma once
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 
 #include <atomic>
 
@@ -8,7 +9,7 @@ class WakeEvent {
 public:
   enum class Phase{ Idle, Pending };
   explicit WakeEvent(EventHandle value);
-  auto     get() const            -> HANDLE;
+  auto     Handle() const         -> WaitHandle;
   auto     Transition(Phase next) -> void;
 
 private:

@@ -1,7 +1,8 @@
 #pragma once
 #include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/diagnostics/forward.hpp>
-#include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/freerdp-facade/signalled.hpp>
+#include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/link/dynamic-channel.hpp>
 #include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/utilities/factory.hpp>
@@ -10,7 +11,6 @@
 #include <sdl-rdp/video/frame/forward.hpp>
 #include <sdl-rdp/video/gfx/channel.hpp>
 
-#include <winpr/wtypes.h>
 #include <chrono>
 #include <cstddef>
 #include <memory>
@@ -20,6 +20,7 @@
 namespace sdl_rdp::video::detail::graphics_link {
 using sdl_rdp::diagnostics::Diagnostics;
 using sdl_rdp::diagnostics::FailureLog;
+using sdl_rdp::freerdp_facade::Signalled;
 using sdl_rdp::freerdp_facade::WaitHandle;
 using sdl_rdp::link::Activation;
 using sdl_rdp::link::DynamicChannel;
@@ -35,7 +36,7 @@ class GraphicsLink final : public DynamicChannel {
 public:
        GraphicsLink(PeerLink& link, Diagnostics const& diagnostics, Activation& activation, FramePacing const& pacing,
                     Encoder const& encoder, Factory<std::unique_ptr<GfxChannel>, DynamicChannel&> make) noexcept;
-  auto Pump(std::span<WaitHandle const> ready)          -> bool;
+  auto Pump(Signalled const& ready)                     -> bool;
   auto ExpireConfirmation()                             -> void;
   auto Confirmed() const                                -> bool;
   auto Capacity() const                                 -> std::size_t;

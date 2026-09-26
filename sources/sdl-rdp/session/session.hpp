@@ -1,5 +1,6 @@
 #pragma once
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/link/session-access.hpp>
 #include <sdl-rdp/picture/frame-store.hpp>
@@ -38,7 +39,7 @@ public:
   [[nodiscard]] auto LockPeersAndFrame()                                  -> PeerFrame;
   auto               Add(std::unique_ptr<Peer> peer)                      -> void;
   auto               Reap()                                               -> void;
-  auto               ReapEvent() const noexcept                           -> WaitHandle;
+  auto               ReapEvent() const                                    -> WaitHandle;
   [[nodiscard]] auto Takeover(PeerLink const& self)                       -> FrameLock     override;
   auto               Depart(PeerLink const& self, Activation& activation) -> void          override;
   auto               Current(SessionLock const& held) const               -> CurrentPeer;

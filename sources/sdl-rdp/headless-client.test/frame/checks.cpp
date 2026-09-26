@@ -1,6 +1,6 @@
 #include <sdl-rdp/headless-client.test/frame/checks.hpp>
 
-#include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
 #include <sdl-rdp/headless-client.test/backend/status.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
@@ -10,7 +10,6 @@
 #include <freerdp/input.h>
 #include <gtest/gtest.h>
 #include <oxbox/utilities/span.hpp>
-#include <winpr/synch.h>
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -22,6 +21,7 @@
 
 namespace sdl_rdp::headless_client_test::frame::detail::checks {
 using sdl_rdp::configuration::Codec;
+using sdl_rdp::freerdp_facade::MaximumWaitHandles;
 using sdl_rdp::freerdp_facade::WaitHandle;
 using sdl_rdp::headless_client_test::backend::As;
 using sdl_rdp::headless_client_test::backend::Holds;
@@ -140,10 +140,10 @@ auto FrameChecks::ThenProducerFrame(Client& client, FrameObserver& observer, std
   testing::Test::RecordProperty("acknowledged_frames", std::to_string(observer.Frames().size()));
 }
 auto FrameChecks::ThenReadable(Client& client) -> void {
-  std::array<WaitHandle, 64> handles{ };
-  auto count = freerdp_get_event_handles(client.Instance()->context, handles.data(), handles.size());
-  ASSERT_GT(count, 0u);
-  ASSERT_LT(WaitForMultipleObjects(count, handles.data(), false, 10000), WAIT_OBJECT_0 + count);
+  std::array<WaitHandle, MaximumWaitHandles> handles{ };
+  auto const ready = WaitHandle::Collected<freerdp_get_event_handles>(*client.Instance()->context, handles);
+  ASSERT_FALSE(ready.empty());
+  ASSERT_TRUE(WaitHandle::Any(ready, 10000).has_value());
 }
 auto FrameChecks::ThenQoe(Client& client, GraphicsObserver& observer) -> void {
   RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU qoe     { observer.Observed().frames.back().frameId, 1234, 7, 9 };

@@ -4,10 +4,10 @@
 #include <sdl-rdp/drive/packet.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/freerdp-facade/rdpdr.hpp>
+#include <sdl-rdp/freerdp-facade/signalled.hpp>
+#include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/link/forward.hpp>
 
-#include <winpr/wtsapi.h>
-#include <winpr/wtypes.h>
 #include <atomic>
 #include <condition_variable>
 #include <cstddef>
@@ -15,6 +15,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -24,6 +25,7 @@ using sdl_rdp::diagnostics::Diagnostics;
 using sdl_rdp::drive::Drive;
 using sdl_rdp::freerdp_facade::IrpMajor;
 using sdl_rdp::freerdp_facade::IrpMinor;
+using sdl_rdp::freerdp_facade::Signalled;
 using sdl_rdp::freerdp_facade::VirtualChannel;
 using sdl_rdp::freerdp_facade::WaitHandle;
 using sdl_rdp::link::EventQueue;
@@ -44,23 +46,23 @@ struct Slot {
 // FreeRDP 3.32 server/rdpdr.h:103 Drive* uses 32-bit offsets and a private reader; this peer owns both directions.
 class DriveChannel : public std::enable_shared_from_this<DriveChannel> {
 public:
-       DriveChannel(DriveChannel const&)                           = delete;
-       DriveChannel(DriveChannel&&)                                = delete;
+       DriveChannel(DriveChannel const&)                     = delete;
+       DriveChannel(DriveChannel&&)                          = delete;
   DriveChannel(PeerLink& link, EventQueue& events, Diagnostics const& diagnostics, SessionAccess& session) noexcept;
        ~DriveChannel();
-  auto operator=(DriveChannel const&)             -> DriveChannel& = delete;
-  auto operator=(DriveChannel&&)                  -> DriveChannel& = delete;
-  auto Open()                                     -> bool;
-  auto Pump(std::span<WaitHandle const> signaled) -> bool;
-  auto Event() const                              -> WaitHandle;
-  auto Disconnect()                               -> void;
-  auto Abort(std::string const& cause)            -> void;
-  auto List()                                     -> std::vector<Drive>;
+  auto operator=(DriveChannel const&)       -> DriveChannel& = delete;
+  auto operator=(DriveChannel&&)            -> DriveChannel& = delete;
+  auto Open()                               -> bool;
+  auto Pump(Signalled const& signaled)      -> bool;
+  auto Event() const                        -> std::optional<WaitHandle>;
+  auto Disconnect()                         -> void;
+  auto Abort(std::string const& cause)      -> void;
+  auto List()                               -> std::vector<Drive>;
   auto Send(std::uint32_t drive, std::uint32_t file, IrpMajor major, DrivePacket const& body,
             IrpMinor minor = IrpMinor::None) -> std::shared_ptr<DriveRequest>;
   auto Wait(std::shared_ptr<DriveRequest> const& request, std::string const& path, bool end = false) -> DrivePacket;
-  auto WaitAny(std::span<Slot const> slots)       -> std::size_t;
-  auto Warn(std::string_view cause) const         -> void;
+  auto WaitAny(std::span<Slot const> slots) -> std::size_t;
+  auto Warn(std::string_view cause) const   -> void;
 
 private:
   struct DeviceEntry {
@@ -89,7 +91,7 @@ private:
   Diagnostics const&                                     _diagnostics;
   SessionAccess&                                         _session;
   VirtualChannel                                         channel;
-  WaitHandle                                             event        { };
+  std::optional<WaitHandle>                              event;
   std::atomic<bool>                                      connected    { true };
   std::uint32_t                                          next         { 1    };
   std::uint32_t                                          client_id    { 1    };
