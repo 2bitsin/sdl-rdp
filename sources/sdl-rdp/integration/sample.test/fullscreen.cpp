@@ -25,6 +25,7 @@ using namespace std::chrono_literals;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::DisplayClient;
 using sdl_rdp::headless_client_test::client::Tap;
+using sdl_rdp::headless_client_test::client::UntilDesktop;
 using sdl_rdp::headless_client_test::frame::FrameObserver;
 using sdl_rdp::sample_gate_test::client::ChangeMonitor;
 using sdl_rdp::sample_gate_test::frame::FirstFrameSize;
@@ -34,12 +35,13 @@ using sdl_rdp::sample_gate_test::sample::AspectOptions;
 using sdl_rdp::sample_gate_test::sample::Sample;
 using sdl_rdp::sample_gate_test::sample::Words;
 using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Extent;
 
 namespace {
 class FullscreenSample : public Sample {
 protected:
   static auto ThenWindowedPicture(Client& client) -> void {
-    ASSERT_TRUE(client.UntilDesktop(640, 480));
+    ASSERT_TRUE(UntilDesktop(client, 640, 480));
   }
   auto ThenRelativeMotion(Client& client, rdpInput& input) -> void {
     ASSERT_TRUE(freerdp_input_send_mouse_event(&input, PTR_FLAGS_MOVE, 330, 192));
@@ -65,8 +67,7 @@ protected:
     ThenWindowedPicture(client);
   }
   static auto ThenExclusiveSize(FirstFrameSize const& frame) -> void {
-    EXPECT_EQ(frame.Width(), 320);
-    EXPECT_EQ(frame.Height(), 200);
+    EXPECT_EQ(frame.Size(), (Extent{ .width = 320, .height = 200 }));
   }
 };
 TEST_F(FullscreenSample, ExplicitFullscreenBeforeConnect) {
@@ -203,8 +204,7 @@ protected:
                                      std::size_t deliveries) -> void {
     EXPECT_EQ(desktop.Full(), baseline);
     EXPECT_GT(desktop.Deliveries(), deliveries);
-    EXPECT_EQ(client.Instance()->context->gdi->width, 320);
-    EXPECT_EQ(client.Instance()->context->gdi->height, 200);
+    EXPECT_EQ(client.DesktopSize(), (Extent{ .width = 320, .height = 200 }));
   }
   auto DelayAcknowledgement(Client& client, FrameObserver& frames) -> void {
     Expects(frames.Acknowledgements().size() >= 2, "two previous acknowledgements define the delay");
@@ -224,9 +224,9 @@ protected:
     ASSERT_TRUE(frames.Ack());
     ASSERT_TRUE(client.Until([&] { return frames.Frames().size() >= before + 2; }));
     ASSERT_NO_FATAL_FAILURE(ThenIncrementalPicture(client, desktop, baseline, deliveries));
-    auto const& gdi = *client.Instance()->context->gdi;
-    SDL_Log("%s", std::format("trace exclusive {} gdi={}x{} new_full_desktop={} frames={}", change, gdi.width,
-                              gdi.height, desktop.Full() - baseline, frames.Frames().size() - before)
+    auto const size = client.DesktopSize();
+    SDL_Log("%s", std::format("trace exclusive {} gdi={}x{} new_full_desktop={} frames={}", change, size.width,
+                              size.height, desktop.Full() - baseline, frames.Frames().size() - before)
                       .c_str());
   }
   auto Start() -> void {

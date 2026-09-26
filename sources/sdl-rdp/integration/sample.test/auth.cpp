@@ -1,3 +1,4 @@
+#include <sdl-rdp/sample-gate.test/process/initialized-sdl.hpp>
 #include <sdl-rdp/sample-gate.test/sample/launch.hpp>
 #include <sdl-rdp/sample-gate.test/sample/sample.hpp>
 
@@ -7,14 +8,18 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <initializer_list>
 #include <string>
 #include <string_view>
 
 namespace sdl_rdp::integration::sample_test::detail::auth {
 using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::sample_gate_test::process::InitializedSdl;
 using sdl_rdp::sample_gate_test::sample::AnnouncedPort;
+using sdl_rdp::sample_gate_test::sample::Hint;
 using sdl_rdp::sample_gate_test::sample::PrimaryDisplayPort;
 using sdl_rdp::sample_gate_test::sample::Sample;
+using sdl_rdp::sample_gate_test::sample::SetLoopbackHints;
 using sdl_rdp::utilities::Expects;
 
 namespace {
@@ -92,29 +97,6 @@ private:
   std::atomic<std::size_t> looked_up = 0;
   std::atomic<bool>        arguments = true;
 };
-struct Quit {
-public:
-  Quit(Quit const&) = delete;
-  Quit(Quit&&)      = delete;
-  Quit()            = default;
-  ~Quit() {
-    SDL_Quit();
-    SDL_ResetHints();
-  }
-  auto operator=(Quit const&) -> Quit& = delete;
-  auto operator=(Quit&&)      -> Quit& = delete;
-};
-auto GivenAuthenticationHints(std::filesystem::path const& certificates) -> void {
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_PORT, "0"));
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_CERT_DIR, certificates.c_str()));
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_AUTH, "nla"));
-}
-auto GivenAccountHints() -> void {
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_USER, "alice"));
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_PASSWORD, "account-secret"));
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_DOMAIN, "LAB"));
-}
 auto GivenVerifyProperty(SDL_PropertiesID properties, PropertyCredentials& credentials) -> void {
   ASSERT_TRUE(SDL_SetPointerProperty(properties, SDL_PROP_DISPLAY_RDP_AUTH_USERDATA_POINTER, &credentials));
   ASSERT_TRUE(SDL_SetPointerProperty(properties, SDL_PROP_DISPLAY_RDP_VERIFY_POINTER,
@@ -142,19 +124,22 @@ auto ConnectPropertyCredentials(std::uint32_t port) -> void {
     ASSERT_TRUE(client.Connect());
   }
 }
+// SDL quits when use returns, so the caller reads the tallies after every verifier call has finished.
+auto WithRdpDisplay(std::filesystem::path const& certificates, std::initializer_list<Hint> hints, auto const& use)
+    -> void {
+  InitializedSdl const sdl{ [&] { return SetLoopbackHints(certificates, hints) && SDL_Init(SDL_INIT_VIDEO); } };
+  ASSERT_TRUE(sdl.Get()) << SDL_GetError();
+  use(SDL_GetDisplayProperties(SDL_GetPrimaryDisplay()), PrimaryDisplayPort());
+}
 }
 TEST(DriverAuthentication, PropertiesReadAtCallTime) {
   oxbox::platform::ScratchArea const certificates{ "driver-auth", "sdl-rdp" };
-  ASSERT_NO_FATAL_FAILURE(GivenAuthenticationHints(certificates.Path()));
-  PropertyCredentials credentials;
-  ASSERT_TRUE(SDL_Init(SDL_INIT_VIDEO));
-  Quit const quit;
-  auto       properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
-  auto       port       = PrimaryDisplayPort();
-  ASSERT_NO_FATAL_FAILURE(GivenPropertyCredentials(properties, credentials));
-  ASSERT_NO_FATAL_FAILURE(ConnectPropertyCredentials(port));
-  SDL_Quit();
-  SDL_ResetHints();
+  PropertyCredentials                credentials;
+  ASSERT_NO_FATAL_FAILURE(WithRdpDisplay(certificates.Path(), { { .name = SDL_HINT_RDP_AUTH, .value = "nla" } },
+                                         [&](SDL_PropertiesID properties, std::uint32_t port) {
+                                           ASSERT_NO_FATAL_FAILURE(GivenPropertyCredentials(properties, credentials));
+                                           ASSERT_NO_FATAL_FAILURE(ConnectPropertyCredentials(port));
+                                         }));
   EXPECT_EQ(credentials.Verified(), 2u);
   EXPECT_EQ(credentials.LookedUp(), 1u);
   EXPECT_TRUE(credentials.Arguments());
@@ -163,18 +148,17 @@ TEST(DriverAuthentication, PropertiesReadAtCallTime) {
 // The relay's own rule: a published verifier and no lookup leaves NLA's hash to the configured account.
 TEST(DriverAuthentication, VerifyOnlyLeavesTheHashToTheAccount) {
   oxbox::platform::ScratchArea const certificates{ "driver-auth-account", "sdl-rdp" };
-  ASSERT_NO_FATAL_FAILURE(GivenAuthenticationHints(certificates.Path()));
-  ASSERT_NO_FATAL_FAILURE(GivenAccountHints());
-  PropertyCredentials credentials{ "account-secret" };
-  ASSERT_TRUE(SDL_Init(SDL_INIT_VIDEO));
-  Quit const quit;
-  auto       properties = SDL_GetDisplayProperties(SDL_GetPrimaryDisplay());
-  auto       port       = PrimaryDisplayPort();
-  ASSERT_NO_FATAL_FAILURE(GivenVerifyProperty(properties, credentials));
-  EXPECT_FALSE(ConnectNla(port, "property-secret"));
-  EXPECT_TRUE(ConnectNla(port, "account-secret"));
-  SDL_Quit();
-  SDL_ResetHints();
+  PropertyCredentials                credentials { "account-secret"                 };
+  std::initializer_list<Hint> const  account     { { .name = SDL_HINT_RDP_AUTH    , .value = "nla"            },
+                                                   { .name = SDL_HINT_RDP_USER    , .value = "alice"          },
+                                                   { .name = SDL_HINT_RDP_PASSWORD, .value = "account-secret" },
+                                                   { .name = SDL_HINT_RDP_DOMAIN  , .value = "LAB"            } };
+  ASSERT_NO_FATAL_FAILURE(
+      WithRdpDisplay(certificates.Path(), account, [&](SDL_PropertiesID properties, std::uint32_t port) {
+        ASSERT_NO_FATAL_FAILURE(GivenVerifyProperty(properties, credentials));
+        EXPECT_FALSE(ConnectNla(port, "property-secret"));
+        EXPECT_TRUE(ConnectNla(port, "account-secret"));
+      }));
   EXPECT_EQ(credentials.Verified(), 1u);
   EXPECT_EQ(credentials.LookedUp(), 0u);
   EXPECT_TRUE(credentials.Arguments());

@@ -1,6 +1,7 @@
 #pragma once
 #include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/headless-client.test/backend/logs.hpp>
+#include <sdl-rdp/utilities/pinned.hpp>
 
 #include <SDL3/SDL_log.h>
 #include <optional>
@@ -8,6 +9,7 @@
 namespace sdl_rdp::sample_gate_test::process::detail::captured_logs {
 using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::headless_client_test::backend::Logs;
+using sdl_rdp::utilities::Pinned;
 
 struct Capture {
   bool                           forwarded = false;
@@ -16,14 +18,10 @@ struct Capture {
 
 auto Level(SDL_LogPriority priority) -> LogLevel;
 
-class CapturedLogs {
+class CapturedLogs : private Pinned {
 public:
   explicit CapturedLogs(Logs& logs, Capture capture = { });
-           CapturedLogs(CapturedLogs const&)               = delete;
-           CapturedLogs(CapturedLogs&&)                    = delete;
            ~CapturedLogs();
-  auto     operator=(CapturedLogs const&) -> CapturedLogs& = delete;
-  auto     operator=(CapturedLogs&&)      -> CapturedLogs& = delete;
 
 private:
   // abi: SDL_LogOutputFunction

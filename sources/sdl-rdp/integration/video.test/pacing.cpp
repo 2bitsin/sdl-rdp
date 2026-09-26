@@ -35,6 +35,7 @@ using sdl_rdp::utilities::AspectRatio;
 using sdl_rdp::utilities::Contained;
 using sdl_rdp::utilities::DeadlineAfter;
 using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Extent;
 using sdl_rdp::utilities::Rect;
 
 namespace {
@@ -96,8 +97,8 @@ TEST_F(RoundFive, AspectAndMouse) {
   ThenScaledHighlight(client);
   ASSERT_NO_FATAL_FAILURE(ThenAspectMouse(client));
   (*backend).Presentation().SetAspect(std::nullopt);
-  ASSERT_TRUE(client.Until([&] { return client.Instance()->context->gdi->height == 350 && client.Matches(pixels); }));
-  EXPECT_EQ(client.Instance()->context->gdi->width, 640);
+  ASSERT_TRUE(client.Until(
+      [&] { return client.DesktopSize() == Extent{ .width = 640, .height = 350 } && client.Matches(pixels); }));
 }
 TEST_F(RoundFive, SparseRegions) {
   for (auto codec : { Codec::Raw, Codec::Planar, Codec::RemoteFx, Codec::NsCodec }) {

@@ -16,8 +16,8 @@ using sdl_rdp::headless_client_test::utilities::ObserverSet;
 using sdl_rdp::utilities::Expects;
 
 PointerObserver::PointerObserver(Client& client)
-    : context(ClientContext(client)), pointer(PointerUpdates(client)), original(pointer.PointerNew) {
-  ObserverSet::Of(context).Add(*this);
+    : context(ClientContext(client)), pointer(PointerUpdates(client)), original(pointer.PointerNew),
+      membership(context, *this) {
   // abi: pPointerNew, BOOL is int
   pointer.PointerNew = [](rdpContext* context, POINTER_NEW_UPDATE const* update) -> int {
     Expects(context != nullptr, "the pointer shape names its client context");
@@ -28,7 +28,6 @@ PointerObserver::PointerObserver(Client& client)
 }
 PointerObserver::~PointerObserver() {
   pointer.PointerNew = original;
-  ObserverSet::Of(context).Remove<PointerObserver>();
 }
 auto PointerObserver::Red() const -> bool {
   return red;

@@ -22,6 +22,11 @@ using sdl_rdp::headless_client_test::drive::ShareDrive;
 using sdl_rdp::headless_client_test::utilities::ReadText;
 
 namespace {
+// The override port wins over the environment's conflicting SDL_RDP_PORT.
+auto SetSettingsHints(std::filesystem::path const& certificates, std::filesystem::path const& file) -> bool {
+  return SetLoopbackHints(certificates, { { .name = SDL_HINT_RDP_SETTINGS, .value = file.string() } },
+                          SDL_HINT_OVERRIDE);
+}
 auto ThenWrittenBytes(std::string const& output) -> void {
   for (std::size_t i = 0; i < output.size(); ++i) {
     auto expected = i >= 1024uz * 1024 && i < static_cast<std::ptrdiff_t>(2 * 1024) * 1024
@@ -98,10 +103,7 @@ auto SampleChecks::WhenSettingsEnvironmentConflicts() -> void {
   ASSERT_TRUE(SDL_Init(SDL_INIT_VIDEO)) << SDL_GetError();
 }
 auto SampleChecks::GivenSettingsHints(std::filesystem::path const& file) -> void {
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_SETTINGS, file.c_str()));
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_CERT_DIR, certificates.Path().c_str()));
-  ASSERT_TRUE(SDL_SetHintWithPriority(SDL_HINT_RDP_PORT, "0", SDL_HINT_OVERRIDE));
+  ASSERT_TRUE(SetSettingsHints(certificates.Path(), file));
   WhenSettingsEnvironmentConflicts();
 }
 auto SampleChecks::ThenReloadedAspect() -> void {
@@ -112,10 +114,7 @@ auto SampleChecks::ThenReloadedAspect() -> void {
   SDL_Quit();
 }
 auto SampleChecks::ThenReloadedSettings(std::filesystem::path const& file) -> void {
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_SETTINGS, file.c_str()));
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));
-  ASSERT_TRUE(SDL_SetHintWithPriority(SDL_HINT_RDP_PORT, "0", SDL_HINT_OVERRIDE));
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_RDP_CERT_DIR, certificates.Path().c_str()));
+  ASSERT_TRUE(SetSettingsHints(certificates.Path(), file));
   ASSERT_TRUE(SDL_Init(SDL_INIT_VIDEO)) << SDL_GetError();
   ThenReloadedAspect();
 }

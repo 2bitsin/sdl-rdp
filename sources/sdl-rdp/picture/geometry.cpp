@@ -60,7 +60,7 @@ auto PictureGeometry::Bounds() const noexcept -> Rect {
 }
 auto PictureGeometry::Resize(Extent size) -> bool {
   std::ignore = Desktop(size);
-  if (_size.width == size.width && _size.height == size.height) return false;
+  if (_size == size) return false;
   _size = size;
   return true;
 }

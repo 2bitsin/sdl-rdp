@@ -9,6 +9,7 @@
 #include <array>
 
 namespace sdl_rdp::headless_client_test::drive::detail::share_drive {
+using sdl_rdp::headless_client_test::client::ChannelLoader;
 using sdl_rdp::headless_client_test::client::LoadStaticChannel;
 using sdl_rdp::utilities::Expects;
 
@@ -20,10 +21,6 @@ auto ShareDrive(Client& client, std::filesystem::path const& path, std::string c
   std::array<char const*, 3> arguments { "drive", name.c_str(), path.c_str() };
   auto const                 added     = freerdp_client_add_device_channel(settings, 3, arguments.data());
   Expects(added, "drive device configured");
-  // abi: pLoadChannels, BOOL is int
-  client.Instance()->LoadChannels = [](freerdp* instance) -> int {
-    Expects(instance != nullptr, "channel loading names its client");
-    return LoadStaticChannel(*instance, "rdpdr");
-  };
+  client.Instance()->LoadChannels = ChannelLoader<LoadStaticChannel, "rdpdr">;
 }
 }

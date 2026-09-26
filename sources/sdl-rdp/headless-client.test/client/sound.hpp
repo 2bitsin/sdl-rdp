@@ -1,6 +1,8 @@
 #pragma once
 #include "client.hpp"
 #include <sdl-rdp/headless-client.test/client/forward.hpp>
+#include <sdl-rdp/headless-client.test/utilities/observer-set.hpp>
+#include <sdl-rdp/utilities/pinned.hpp>
 
 #include <freerdp/codec/audio.h>
 #include <winpr/wtsapi.h>
@@ -12,6 +14,8 @@
 #include <vector>
 
 namespace sdl_rdp::headless_client_test::client::detail::sound {
+using sdl_rdp::headless_client_test::utilities::Membership;
+using sdl_rdp::utilities::Pinned;
 
 struct SoundCapture {
   struct Confirmation {
@@ -35,15 +39,11 @@ struct SoundCapture {
   bool                           auto_confirm           = true;
   bool                           opened                 = false;
 };
-class SoundClient {
+class SoundClient : private Pinned {
 public:
   using Confirmation = SoundCapture::Confirmation;
   explicit SoundClient(Client& target);
-           SoundClient(SoundClient const&)               = delete;
-           SoundClient(SoundClient&&)                    = delete;
            ~SoundClient();
-  auto     operator=(SoundClient const&) -> SoundClient& = delete;
-  auto     operator=(SoundClient&&)      -> SoundClient& = delete;
 
   auto Send(std::span<std::byte const> bytes)    -> bool;
   auto Capture(std::span<std::byte const> bytes) -> void;
@@ -65,6 +65,7 @@ private:
   std::uint16_t                   timestamp      = 0;
   std::uint8_t                    block          = 0;
   bool                            expecting_wave = false;
+  Membership<SoundClient>         membership;
 };
 }
 

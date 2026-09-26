@@ -13,23 +13,25 @@ using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::DisplayClient;
 using sdl_rdp::sample_gate_test::frame::FullDesktopFrames;
 using sdl_rdp::sample_gate_test::process::CapturedLogs;
+using sdl_rdp::sample_gate_test::process::InitializedSdl;
 using sdl_rdp::sample_gate_test::process::Window;
 using sdl_rdp::sample_gate_test::sample::Sample;
+using sdl_rdp::utilities::Extent;
 
 class VideoDriver : public Sample {
 protected:
   auto        ThenDesktopPicture(Client& client, DisplayClient& display) -> void;
   static auto ThenDesktopEvent(int width, int height)                    -> void;
-  auto        GivenFullscreen()                                          -> void;
-  auto        GivenVideoHints()                                          -> void;
+  auto        GivenFullscreen(std::optional<Extent> size = std::nullopt) -> void;
   auto        SetUp()                                                    -> void override;
   auto        StormSizes()                                               -> void;
   static auto Desktop(int width, int height)                             -> void;
   auto        TearDown()                                                 -> void override;
   auto        ThenResizeStorm(Client& client, DisplayClient& display)    -> void;
   auto ThenExclusivePicture(Client& client, DisplayClient& display, FullDesktopFrames const& frames) -> void;
-  Window                      window;
-  std::optional<CapturedLogs> captured;
+  std::optional<CapturedLogs>   captured;
+  std::optional<InitializedSdl> sdl;
+  Window                        window;
 };
 }
 

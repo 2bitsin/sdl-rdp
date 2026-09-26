@@ -1,6 +1,5 @@
 #include <sdl-rdp/sample-gate.test/sample/launch.hpp>
 
-#include <SDL3/SDL_hints.h>
 #include <SDL3/SDL_video.h>
 #include <oxbox/utilities/number-text.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
@@ -25,19 +24,7 @@ auto BuildRoot() -> std::filesystem::path {
   return { };
 }
 
-auto SetCertificateHint(std::filesystem::path const& certificates) -> bool {
-  return SDL_SetHint("SDL_RDP_CERT_DIR", certificates.c_str());
-}
-
 // env applies its assignments in order, so an environment entry overrides the defaults before it.
-auto SetLoopbackHints(std::filesystem::path const& certificates, std::initializer_list<Hint> hints) -> bool {
-  std::array const loopback { Hint{ .name = SDL_HINT_VIDEO_DRIVER, .value = "rdp" },
-                              Hint{ .name = "SDL_RDP_PORT", .value = "0"          },
-                              Hint{ .name = "SDL_RDP_BIND", .value = "127.0.0.1" } };
-  auto const       set      = [](Hint const& hint) { return SDL_SetHint(hint.name.c_str(), hint.value.c_str()); };
-  return std::ranges::all_of(loopback, set) && std::ranges::all_of(hints, set) && SetCertificateHint(certificates);
-}
-
 auto Arguments(std::filesystem::path const& certificates, Words const& environment, Words const& options) -> Words {
   Expects(std::filesystem::is_directory(certificates), "certificate directory exists");
   Words arguments{ "env",
@@ -64,5 +51,14 @@ auto PrimaryDisplayPort() -> std::uint32_t {
 }
 auto AspectOptions() -> Words {
   return { "--size", "640x350", "--aspect", "4:3" };
+}
+auto SetLoopbackHints(std::filesystem::path const& certificates, std::initializer_list<Hint> extra,
+                      SDL_HintPriority port_priority) -> bool {
+  std::array const loopback { Hint{ .name = SDL_HINT_VIDEO_DRIVER, .value = "rdp" },
+                              Hint{ .name = "SDL_RDP_BIND", .value = "127.0.0.1"  },
+                              Hint{ .name = "SDL_RDP_CERT_DIR", .value = certificates.string() } };
+  auto const       set      = [](Hint const& hint) { return SDL_SetHint(hint.name.c_str(), hint.value.c_str()); };
+  return SDL_SetHintWithPriority("SDL_RDP_PORT", "0", port_priority) && std::ranges::all_of(loopback, set)
+         && std::ranges::all_of(extra, set);
 }
 }

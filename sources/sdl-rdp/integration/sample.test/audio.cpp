@@ -94,8 +94,8 @@ TEST_F(AudioDriver, AudioOnlyPlaysBlackDesktop) {
   Client      client(port, true);
   SoundClient audio(client);
   ASSERT_NO_FATAL_FAILURE(ConnectAudio(client, audio));
-  auto*  gdi   = client.Instance()->context->gdi;
-  Pixels black(Narrowed<std::size_t>(gdi->width) * gdi->height);
+  auto const size  = client.DesktopSize();
+  Pixels     black(Narrowed<std::size_t>(size.width) * size.height);
   ASSERT_TRUE(client.Until([&] { return client.Matches(black); }));
   ASSERT_NO_FATAL_FAILURE(ThenPcm(client, audio));
   EXPECT_EQ(SDL_WasInit(SDL_INIT_VIDEO), 0u);

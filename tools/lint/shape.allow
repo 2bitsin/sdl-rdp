@@ -7,8 +7,9 @@ sdl-rdp/clipboard/channel.hpp: ClipboardChannel data members 15 > 10 # collabora
 sdl-rdp/drive/channel.hpp: DriveChannel data members 14 > 10 # collaborators replace Peer&; split in #6
 sdl-rdp/drive/channel.hpp: DriveChannel member functions 27 > 15 # split in #6
 sdl-rdp/headless-client.test/client/sound-protocol.cpp:107: SoundProtocol::Opened parameters 7 > 5 # WinPR PCHANNEL_OPEN_EVENT_EX_FN signature is the ABI
-sdl-rdp/headless-client.test/client/sound.hpp: SoundClient data members 11 > 10 # split in #6
+sdl-rdp/headless-client.test/client/sound.hpp: SoundClient data members 12 > 10 # split in #6; its Membership replaces the hand-paired Add/Remove (#82)
 sdl-rdp/headless-client.test/drive/observer.cpp:42: DriveObserver::DriveObserver lambda@42 parameters 6 > 5 # FreeRDP pReceiveChannelData signature is the ABI
+sdl-rdp/headless-client.test/graphics/observer.hpp: GraphicsObserver data members 12 > 10 # seven chained FreeRDP callbacks; Membership and ChannelSubscription replace hand-paired calls (#82)
 sdl-rdp/input/events.cpp:79: InputEvents::InputEvents parameters 7 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp/integration/auth.test/authentication.cpp:30: RejectCertificate lambda@30 parameters 8 > 5 # FreeRDP pVerifyCertificateEx signature is the ABI
 sdl-rdp/peer/arrival.cpp:54: Arrival::Arrival parameters 8 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling

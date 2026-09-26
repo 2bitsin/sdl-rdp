@@ -10,6 +10,7 @@
 #include <utility>
 
 namespace sdl_rdp::sample_gate_test::sample::detail::session {
+using sdl_rdp::headless_client_test::client::UntilDesktop;
 using sdl_rdp::sample_gate_test::client::ConnectDrive;
 using sdl_rdp::sample_gate_test::frame::Pattern;
 
@@ -47,7 +48,7 @@ auto SampleSession::GivenFullscreen() -> void {
 }
 auto SampleSession::ThenExplicitGeometry(Client& client, std::uint32_t height) -> void {
   ASSERT_TRUE(Read("event GEOMETRY window=320x200 desktop=320x200"));
-  ASSERT_TRUE(client.UntilDesktop(320, height));
+  ASSERT_TRUE(UntilDesktop(client, 320, height));
 }
 auto SampleSession::GivenAudioProcess(Words const& environment, Words const& options) -> void {
   ASSERT_NO_FATAL_FAILURE(GivenProcess(environment, options));

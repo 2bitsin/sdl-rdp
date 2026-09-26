@@ -30,6 +30,7 @@ using sdl_rdp::headless_client_test::utilities::ReadText;
 using sdl_rdp::link::Connected;
 using sdl_rdp::link::Event;
 using sdl_rdp::link::ScreenChanged;
+using sdl_rdp::utilities::Extent;
 using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::Rect;
 using sdl_rdp::utilities::Required;
@@ -43,8 +44,7 @@ auto ResidentBytes() -> std::size_t {
 }
 }
 auto Gate::ThenPictureDesktop(Client& client) -> void {
-  EXPECT_EQ(client.Instance()->context->gdi->width, 640);
-  EXPECT_EQ(client.Instance()->context->gdi->height, 480);
+  EXPECT_EQ(client.DesktopSize(), (Extent{ .width = 640, .height = 480 }));
   EXPECT_FALSE(logs.Contains("failed"));
 }
 auto Gate::WhenBurstPictures(Client& client, Rect area) -> void {

@@ -16,8 +16,8 @@ using sdl_rdp::headless_client_test::utilities::ObserverSet;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
 
-FrameObserver::FrameObserver(Client& client) : update(ClientUpdates(client)), original(update.SurfaceFrameMarker) {
-  ObserverSet::Of(*update.context).Add(*this);
+FrameObserver::FrameObserver(Client& client)
+    : update(ClientUpdates(client)), original(update.SurfaceFrameMarker), membership(*update.context, *this) {
   // abi: pSurfaceFrameMarker, BOOL is int
   update.SurfaceFrameMarker = [](rdpContext* context, SURFACE_FRAME_MARKER const* marker) -> int {
     Expects(context != nullptr, "the frame marker names its client context");
@@ -28,7 +28,6 @@ FrameObserver::FrameObserver(Client& client) : update(ClientUpdates(client)), or
 }
 FrameObserver::~FrameObserver() {
   update.SurfaceFrameMarker = original;
-  ObserverSet::Of(*update.context).Remove<FrameObserver>();
 }
 auto FrameObserver::Ack() -> bool {
   if (ids.empty()) return false;

@@ -13,6 +13,7 @@
 
 namespace sdl_rdp::headless_client_test::frame::detail::update_hook {
 using sdl_rdp::headless_client_test::client::ClientUpdates;
+using sdl_rdp::headless_client_test::utilities::Membership;
 using sdl_rdp::headless_client_test::utilities::ObserverSet;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Rect;
@@ -41,38 +42,33 @@ auto Desktop(rdpContext const& context) -> Extent {
 }
 }
 
-class PictureUpdateHook::Installation {
+class PictureUpdateHook::Installation : private Pinned {
 public:
-       Installation(Client& client, Observer observer);
-       Installation(Installation const&)               = delete;
-       Installation(Installation&&)                    = delete;
-       ~Installation();
-  auto operator=(Installation const&) -> Installation& = delete;
-  auto operator=(Installation&&)      -> Installation& = delete;
+  Installation(Client& client, Observer observer);
+  ~Installation();
 
 private:
   // abi: pSurfaceBits and pBitmapUpdate, BOOL is int
   template <auto original, PictureCommand command, class Wire>
   static auto Receive(rdpContext* context, Wire const* wire) -> int;
-  rdpUpdate&    update;
-  pSurfaceBits  surface;
-  pBitmapUpdate bitmap;
-  Observer      observer;
+  rdpUpdate&               update;
+  pSurfaceBits             surface;
+  pBitmapUpdate            bitmap;
+  Observer                 observer;
+  Membership<Installation> membership;
 };
 
 PictureUpdateHook::Installation::Installation(Client& client, Observer observer)
     : update(ClientUpdates(client)), surface(update.SurfaceBits), bitmap(update.BitmapUpdate),
-      observer(std::move(observer)) {
+      observer(std::move(observer)), membership(*update.context, *this) {
   Expects(surface, "surface callback is installed");
   Expects(bitmap, "bitmap callback is installed");
-  ObserverSet::Of(*update.context).Add(*this);
   update.SurfaceBits  = Receive<&Installation::surface, PictureCommand::Surface>;
   update.BitmapUpdate = Receive<&Installation::bitmap, PictureCommand::Bitmap>;
 }
 PictureUpdateHook::Installation::~Installation() {
   update.SurfaceBits  = surface;
   update.BitmapUpdate = bitmap;
-  ObserverSet::Of(*update.context).Remove<Installation>();
 }
 template <auto original, PictureCommand command, class Wire>
 auto PictureUpdateHook::Installation::Receive(rdpContext* context, Wire const* wire) -> int {

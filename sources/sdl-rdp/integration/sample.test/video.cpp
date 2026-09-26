@@ -25,6 +25,7 @@ using sdl_rdp::sample_gate_test::process::AudioStream;
 using sdl_rdp::sample_gate_test::sample::PrimaryDisplayPort;
 using sdl_rdp::sample_gate_test::video::VideoDriver;
 using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Extent;
 
 namespace {
 auto ThenUnchangedPicture(DisplayClient& display, FullDesktopFrames const& frames) -> void {
@@ -124,11 +125,7 @@ TEST_F(VideoDriver, WindowResizeMovesDesktopMode) {
 }
 
 TEST_F(VideoDriver, FullscreenModeMovesDesktopMode) {
-  auto mode = *SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
-  mode.w = 1920;
-  mode.h = 1080;
-  ASSERT_TRUE(SDL_SetWindowFullscreenMode(window.get(), &mode));
-  ASSERT_TRUE(SDL_SetWindowFullscreen(window.get(), true));
+  ASSERT_NO_FATAL_FAILURE(GivenFullscreen(Extent{ .width = 1920, .height = 1080 }));
   ASSERT_NO_FATAL_FAILURE(Desktop(1920, 1080));
   EXPECT_TRUE(SDL_GetWindowFlags(window.get()) & SDL_WINDOW_FULLSCREEN);
   ASSERT_TRUE(SDL_SetWindowFullscreen(window.get(), false));
@@ -166,6 +163,5 @@ TEST_F(VideoDriver, AudioEventChangesOpenDeviceFormat) {
   ASSERT_TRUE(client.Connect());
   ASSERT_TRUE(client.Until([&] { return audio.CaptureState().ready; }));
   ASSERT_NO_FATAL_FAILURE(ThenAudioDeviceChanges(client, *stream));
-  SDL_ResetHint(SDL_HINT_AUDIO_DRIVER);
 }
 }

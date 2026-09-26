@@ -1,18 +1,16 @@
 #pragma once
+#include <sdl-rdp/utilities/pinned.hpp>
 #include <memory>
 #include <span>
 #include <spawn.h>
 #include <string>
 
 namespace sdl_rdp::sample_gate_test::process::detail::spawn_actions {
-class SpawnActions {
+using sdl_rdp::utilities::Pinned;
+class SpawnActions : private Pinned {
 public:
        SpawnActions();
-       SpawnActions(SpawnActions const&)                                                          = delete;
-       SpawnActions(SpawnActions&&)                                                               = delete;
        ~SpawnActions();
-  auto operator=(SpawnActions const&)                                            -> SpawnActions& = delete;
-  auto operator=(SpawnActions&&)                                                 -> SpawnActions& = delete;
   auto Redirect(int descriptor, int target)                                      -> void;
   auto Spawn(std::string const& program, std::span<std::string> arguments) const -> pid_t;
 

@@ -15,6 +15,7 @@
 #include <sdl-rdp/headless-client.test/utilities/io.hpp>
 #include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
+#include <sdl-rdp/utilities/pinned.hpp>
 
 #include <gtest/gtest.h>
 #include <openssl/pem.h>
@@ -54,6 +55,7 @@ using sdl_rdp::headless_client_test::utilities::ReadText;
 using sdl_rdp::utilities::Descriptor;
 using sdl_rdp::utilities::Extent;
 using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::Pinned;
 using sdl_rdp::utilities::Rect;
 using sdl_rdp::utilities::Releases;
 
@@ -223,10 +225,8 @@ TEST(Logging, NoFreerdpStdout) {
   ThenLoggingChild(child, output);
 }
 
-struct ProcessEnvironment {
+struct ProcessEnvironment : private Pinned {
 public:
-  ProcessEnvironment(ProcessEnvironment const&) = delete;
-  ProcessEnvironment(ProcessEnvironment&&)      = delete;
   ProcessEnvironment() {
     if (auto* value = getenv("XDG_DATA_HOME")) data = value;
   }
@@ -237,8 +237,6 @@ public:
     else
       unsetenv("XDG_DATA_HOME");
   }
-  auto operator=(ProcessEnvironment const&) -> ProcessEnvironment& = delete;
-  auto operator=(ProcessEnvironment&&)      -> ProcessEnvironment& = delete;
 
 private:
   std::filesystem::path      cwd  = std::filesystem::current_path();

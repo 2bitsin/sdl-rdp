@@ -179,7 +179,7 @@ auto ThenPresentRecovery(RateTrace const& trace) -> void {
 }
 auto Resized(Client& client, std::uint32_t width) -> bool {
   return DisplayClient::Of(client, [width](auto const& display) { return display.Layout(width, 480); })
-         && client.Until([&] { return std::cmp_equal(client.Instance()->context->gdi->width, width); });
+         && client.Until([&] { return client.DesktopSize().width == width; });
 }
 auto AwaitRateClient(Client& client, FrameObserver& frames) -> void {
   ASSERT_TRUE(

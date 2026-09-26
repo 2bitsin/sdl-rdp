@@ -31,6 +31,7 @@ using sdl_rdp::configuration::AuthMode;
 using sdl_rdp::configuration::Codec;
 using namespace std::chrono_literals;
 using sdl_rdp::headless_client_test::client::Clock;
+using sdl_rdp::headless_client_test::client::UntilDesktop;
 using sdl_rdp::sample_gate_test::process::InitializedSdl;
 using sdl_rdp::sample_gate_test::process::Process;
 using sdl_rdp::sample_gate_test::process::Storage;
@@ -220,8 +221,7 @@ TEST_F(Sample, SettingsApplicationHintWins) {
   ASSERT_NO_FATAL_FAILURE(Launch(SettingsArguments(directory.Path(), certificates.Path(), { }, { "--aspect", "2:1" })));
   auto client = AnnouncedClient(640, 480);
   ASSERT_NO_FATAL_FAILURE(Connect(client));
-  ASSERT_TRUE(client.Until([&] { return client.Instance()->context->gdi->width == 960; }));
-  EXPECT_EQ(client.Instance()->context->gdi->height, 480);
+  ASSERT_TRUE(UntilDesktop(client, 960, 480));
   Escape(client);
 }
 

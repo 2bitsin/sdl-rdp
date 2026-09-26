@@ -24,6 +24,7 @@ using namespace std::chrono_literals;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::Clock;
 using sdl_rdp::headless_client_test::client::DisplayClient;
+using sdl_rdp::headless_client_test::client::UntilDesktop;
 using sdl_rdp::headless_client_test::utilities::AnsiText;
 using sdl_rdp::headless_client_test::utilities::UnicodeText;
 using sdl_rdp::sample_gate_test::client::ChangeMonitor;
@@ -156,7 +157,7 @@ TEST_F(DesktopSample, FullscreenFollowsScreen) {
   ASSERT_NO_FATAL_FAILURE(Connect(client));
   ASSERT_NO_FATAL_FAILURE(ThenSizeEvents("data1=1024 data2=768"));
   ASSERT_NO_FATAL_FAILURE(ChangeMonitor(client));
-  ASSERT_TRUE(client.UntilDesktop(1920, 1080));
+  ASSERT_TRUE(UntilDesktop(client, 1920, 1080));
   ASSERT_NO_FATAL_FAILURE(ThenSizeEvents("data1=1920 data2=1080"));
   Escape(client);
 }

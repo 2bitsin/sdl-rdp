@@ -13,8 +13,8 @@ using sdl_rdp::headless_client_test::utilities::ObserverSet;
 using sdl_rdp::utilities::Expects;
 
 PositionObserver::PositionObserver(Client& client)
-    : context(ClientContext(client)), pointer(PointerUpdates(client)), original(pointer.PointerPosition) {
-  ObserverSet::Of(context).Add(*this);
+    : context(ClientContext(client)), pointer(PointerUpdates(client)), original(pointer.PointerPosition),
+      membership(context, *this) {
   // abi: pPointerPosition, BOOL is int
   pointer.PointerPosition = [](rdpContext* context, POINTER_POSITION_UPDATE const* position) -> int {
     Expects(context != nullptr, "the pointer position names its client context");
@@ -25,7 +25,6 @@ PositionObserver::PositionObserver(Client& client)
 }
 PositionObserver::~PositionObserver() {
   pointer.PointerPosition = original;
-  ObserverSet::Of(context).Remove<PositionObserver>();
 }
 auto PositionObserver::Count() const -> std::size_t {
   return count;

@@ -7,15 +7,13 @@
 #include <oxbox/platform/scratch-area.hpp>
 #include <array>
 #include <cstddef>
-#include <filesystem>
 #include <memory>
-#include <utility>
 
 namespace sdl_rdp::integration::allocations_test::detail::driver_present {
-using sdl_rdp::utilities::Expects;
 namespace {
 using sdl_rdp::sample_gate_test::process::InitializedSdl;
 using sdl_rdp::sample_gate_test::process::Window;
+using sdl_rdp::sample_gate_test::sample::SetLoopbackHints;
 constexpr int Width  = 640;
 constexpr int Height = 480;
 // With no peer the backend's frame pool settles at 2 buffers on the second present (measured under gdb).
@@ -25,17 +23,6 @@ constexpr std::size_t MeasuredPresents = 100;
 constexpr std::array Damage{ SDL_Rect{ .x = 0, .y = 40, .w = Width, .h = 32 },
                              SDL_Rect{ .x = 64, .y = 200, .w = 64, .h = 64  },
                              SDL_Rect{ .x = 320, .y = 400, .w = 32, .h = 32 } };
-
-auto StartVideo(std::filesystem::path const& certificates) -> bool {
-  for (auto [name, value] : { std::pair{ SDL_HINT_VIDEO_DRIVER, "rdp" },
-                              { SDL_HINT_RDP_PORT    , "0"                  },
-                              { SDL_HINT_RDP_BIND    , "127.0.0.1"          },
-                              { SDL_HINT_RDP_CERT_DIR, certificates.c_str() } }) {
-    auto const accepted = SDL_SetHint(name, value);
-    Expects(accepted, "the rdp hints are accepted");
-  }
-  return SDL_Init(SDL_INIT_VIDEO);
-}
 
 auto Present(SDL_Window& window) -> void {
   SDL_PumpEvents();
@@ -52,8 +39,7 @@ auto ExpectNoneBetween(Tally const& before, Tally const& after) -> void {
 
 TEST(DriverAllocations, NonePerPresentOnceWarm) {
   oxbox::platform::ScratchArea const certificates{ "driver-allocations", "sdl-rdp" };
-
-  InitializedSdl const video{ [&] { return StartVideo(certificates.Path()); } };
+  InitializedSdl const video{ [&] { return SetLoopbackHints(certificates.Path()) && SDL_Init(SDL_INIT_VIDEO); } };
   ASSERT_TRUE(video.Get()) << SDL_GetError();
   Window const window{ SDL_CreateWindow("driver allocations", Width, Height, 0) };
   ASSERT_TRUE(window) << SDL_GetError();

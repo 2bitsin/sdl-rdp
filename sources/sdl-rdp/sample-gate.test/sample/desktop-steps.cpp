@@ -13,6 +13,7 @@
 namespace sdl_rdp::sample_gate_test::sample::detail::desktop_steps {
 using namespace std::chrono_literals;
 using sdl_rdp::headless_client_test::client::Clock;
+using sdl_rdp::headless_client_test::client::UntilDesktop;
 using sdl_rdp::headless_client_test::utilities::UnicodeText;
 using sdl_rdp::sample_gate_test::client::ThenAdvanced;
 using sdl_rdp::sample_gate_test::frame::Pattern;
@@ -54,7 +55,7 @@ auto SampleDesktopSteps::ThenDesktopMode(Client& client, std::uint32_t w, std::u
                                     + std::to_string(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED)
                                     + std::format(" width={} height={}", w, h)));
   ASSERT_TRUE(Read(std::format("event GEOMETRY window={}x{} desktop={}x{}", w, h, w, h)));
-  ASSERT_TRUE(client.UntilDesktop(w, h));
+  ASSERT_TRUE(UntilDesktop(client, w, h));
 }
 auto SampleDesktopSteps::ThenWaitingPort(std::uint32_t port) -> void {
   ASSERT_TRUE(Read("port ")) << "port after connection: " << process->Transcript();

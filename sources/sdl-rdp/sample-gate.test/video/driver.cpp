@@ -1,15 +1,17 @@
 #include <sdl-rdp/sample-gate.test/video/driver.hpp>
 
 #include <sdl-rdp/sample-gate.test/sample/launch.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 
 #include <utility>
 
 namespace sdl_rdp::sample_gate_test::video::detail::driver {
 using sdl_rdp::sample_gate_test::sample::SetLoopbackHints;
+using sdl_rdp::utilities::Extent;
+using sdl_rdp::utilities::Narrowed;
 
 auto VideoDriver::ThenDesktopPicture(Client& client, DisplayClient& display) -> void {
-  EXPECT_EQ(client.Instance()->context->gdi->width, 1280);
-  EXPECT_EQ(client.Instance()->context->gdi->height, 800);
+  EXPECT_EQ(client.DesktopSize(), (Extent{ .width = 1280, .height = 800 }));
   EXPECT_FALSE(logs.Contains("Unexpected client message")) << logs.Text(true);
   RecordProperty("DesktopResize_calls", display.Observed().desktops);
 }
@@ -22,21 +24,25 @@ auto VideoDriver::ThenDesktopEvent(int width, int height) -> void {
   EXPECT_EQ(event.display.data2, height);
   EXPECT_FALSE(SDL_HasEvent(SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED));
 }
-auto VideoDriver::GivenFullscreen() -> void {
+auto VideoDriver::GivenFullscreen(std::optional<Extent> size) -> void {
   auto mode = *SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
+  if (size) {
+    mode.w = Narrowed<int>(size->width);
+    mode.h = Narrowed<int>(size->height);
+  }
   ASSERT_TRUE(SDL_SetWindowFullscreenMode(window.get(), &mode));
   ASSERT_TRUE(SDL_SetWindowFullscreen(window.get(), true));
-}
-auto VideoDriver::GivenVideoHints() -> void {
-  ASSERT_TRUE(
-      SetLoopbackHints(certificates.Path(),
-                       { { "SDL_RDP_CODEC", "planar" }, { "SDL_RDP_WIDTH", "1280" }, { "SDL_RDP_HEIGHT", "800" } }));
 }
 auto VideoDriver::SetUp() -> void {
   ASSERT_NO_FATAL_FAILURE(Sample::SetUp());
   captured.emplace(logs);
-  ASSERT_NO_FATAL_FAILURE(GivenVideoHints());
-  ASSERT_TRUE(SDL_Init(SDL_INIT_VIDEO)) << SDL_GetError();
+  sdl.emplace([this] {
+    return SetLoopbackHints(certificates.Path(), { { .name = "SDL_RDP_CODEC" , .value = "planar" },
+                                                   { .name = "SDL_RDP_WIDTH" , .value = "1280"   },
+                                                   { .name = "SDL_RDP_HEIGHT", .value = "800"    } })
+           && SDL_Init(SDL_INIT_VIDEO);
+  });
+  ASSERT_TRUE(sdl->Get()) << SDL_GetError();
   window.reset(SDL_CreateWindow("desktop mode", 1280, 800, 0));
   ASSERT_NE(window, nullptr) << SDL_GetError();
   SDL_FlushEvents(SDL_EVENT_FIRST, SDL_EVENT_LAST);
@@ -55,11 +61,8 @@ auto VideoDriver::Desktop(int width, int height) -> void {
 }
 auto VideoDriver::TearDown() -> void {
   window.reset();
-  SDL_Quit();
+  sdl.reset();
   captured.reset();
-  for (auto const* hint : { SDL_HINT_VIDEO_DRIVER, "SDL_RDP_PORT", "SDL_RDP_BIND", "SDL_RDP_CODEC", "SDL_RDP_WIDTH",
-                            "SDL_RDP_HEIGHT", "SDL_RDP_CERT_DIR" })
-    SDL_ResetHint(hint);
   Sample::TearDown();
 }
 auto VideoDriver::ThenResizeStorm(Client& client, DisplayClient& display) -> void {

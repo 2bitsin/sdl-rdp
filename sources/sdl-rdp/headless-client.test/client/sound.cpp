@@ -17,12 +17,12 @@ using sdl_rdp::headless_client_test::utilities::ObserverSet;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
 
-SoundClient::SoundClient(Client& target) : client(target), previous_load(ClientHandle(client).LoadChannels) {
-  auto const playback = freerdp_settings_set_bool(client.Instance()->context->settings, FreeRDP_AudioPlayback, true);
+SoundClient::SoundClient(Client& target)
+    : client(target), previous_load(ClientHandle(client).LoadChannels), membership(ClientContext(client), *this) {
+  auto const playback = freerdp_settings_set_bool(ClientContext(client).settings, FreeRDP_AudioPlayback, true);
   Expects(playback, "sound playback enabled");
-  ObserverSet::Of(*client.Instance()->context).Add(*this);
   // abi: pLoadChannels, BOOL is int
-  client.Instance()->LoadChannels = [](freerdp* instance) -> int {
+  ClientHandle(client).LoadChannels = [](freerdp* instance) -> int {
     Expects(instance != nullptr, "channel loading names its client");
     Expects(instance->context != nullptr, "the loading client has its context");
     auto const sound = ObserverSet::Of(*instance->context).Held<SoundClient>();
@@ -34,8 +34,7 @@ SoundClient::SoundClient(Client& target) : client(target), previous_load(ClientH
 }
 SoundClient::~SoundClient() {
   client.Disconnect();
-  client.Instance()->LoadChannels = previous_load;
-  ObserverSet::Of(*client.Instance()->context).Remove<SoundClient>();
+  ClientHandle(client).LoadChannels = previous_load;
 }
 auto SoundClient::Send(std::span<std::byte const> bytes) -> bool {
   Expects(!bytes.empty(), "sound PDU is nonempty");

@@ -17,6 +17,7 @@ using sdl_rdp::headless_client_test::client::Clock;
 using sdl_rdp::headless_client_test::client::SoundClient;
 using sdl_rdp::sample_gate_test::process::AudioStream;
 using sdl_rdp::sample_gate_test::process::CapturedLogs;
+using sdl_rdp::sample_gate_test::process::InitializedSdl;
 using sdl_rdp::sample_gate_test::process::LockedStream;
 using std::chrono_literals::operator""ms;
 
@@ -41,8 +42,6 @@ protected:
     ASSERT_NO_FATAL_FAILURE(ThenLead(client, audio, frames, 150));
     then_refilled(audio, resumed);
   }
-  auto GivenAudioBackend()                                                      -> void;
-  auto GivenAudioHints()                                                        -> void;
   auto GivenSoundClient()                                                       -> void;
   auto PlayPcm(std::size_t count)                                               -> void;
   auto PlayFlushed(std::span<std::int16_t const> pcm)                           -> Clock::time_point;
@@ -52,10 +51,11 @@ protected:
   auto ThenPcm(Client& client, SoundClient& audio)                              -> void;
   auto SetUp()                                                                  -> void override;
   auto TearDown()                                                               -> void override;
-  std::unique_ptr<Client>      sound_client;
-  std::unique_ptr<SoundClient> sound;
-  std::optional<CapturedLogs>  captured;
-  AudioStream                  stream;
+  std::optional<CapturedLogs>   captured;
+  std::optional<InitializedSdl> sdl;
+  std::unique_ptr<Client>       sound_client;
+  std::unique_ptr<SoundClient>  sound;
+  AudioStream                   stream;
 };
 }
 

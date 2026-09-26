@@ -139,10 +139,9 @@ protected:
     }));
   }
   static auto ReadScaledPixels(Client& client, Pixels& scaled) -> void {
-    auto const& gdi = *client.Instance()->context->gdi;
-    ASSERT_EQ(gdi.width, 321);
-    ASSERT_EQ(gdi.height, 214);
-    auto const frame = std::span(gdi.primary_buffer, std::size_t{ gdi.stride } * 214);
+    ASSERT_EQ(client.DesktopSize(), (Extent{ .width = 321, .height = 214 }));
+    auto const& gdi   = *client.Instance()->context->gdi;
+    auto const  frame = std::span(gdi.primary_buffer, std::size_t{ gdi.stride } * 214);
     scaled = Cropped(oxbox::utilities::SpanCast<std::uint32_t const>(frame), gdi.stride / PixelBytes,
                      { .width = 321, .height = 214 });
   }

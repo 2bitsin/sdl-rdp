@@ -22,7 +22,7 @@ auto InitializeSdl(std::function<bool()> const& initialize) -> bool;
 auto QuitSdl(bool initialized) noexcept                     -> void;
 auto LockStream(SDL_AudioStream& stream)                    -> StreamLock;
 auto UnlockStream(StreamLock const& lock) noexcept          -> void;
-// SDL_Quit runs even when an assertion returns early.
+// SDL_Quit runs even when an assertion returns early, and clears every hint and SDL's environment copy.
 using InitializedSdl = RAIIWrap<bool, InitializeSdl, QuitSdl>;
 using Window         = std::unique_ptr<SDL_Window, Releases<SDL_DestroyWindow>>;
 using Renderer       = std::unique_ptr<SDL_Renderer, Releases<SDL_DestroyRenderer>>;

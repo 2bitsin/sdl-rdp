@@ -15,12 +15,10 @@
 #include <cstdint>
 #include <ranges>
 #include <span>
-#include <string_view>
 #include <utility>
 
 namespace sdl_rdp::headless_client_test::client::detail::clipboard {
 using sdl_rdp::clipboard::SendGeneralCapabilities;
-using sdl_rdp::headless_client_test::utilities::ObserverSet;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
 
@@ -39,26 +37,9 @@ auto AnnounceFormat(CliprdrClientContext& context, bool unicode) -> std::uint32_
 }
 class ClipboardClient::Callbacks {
 public:
-  // abi: pChannelConnectedEventHandler
-  static auto ChannelConnected(void* context, ChannelConnectedEventArgs const* event) -> void;
-  static auto Attach(ClipboardClient& self, CliprdrClientContext& context)            -> void;
-  static auto InstallFormats(CliprdrClientContext& context)                           -> void;
-  static auto InstallData(CliprdrClientContext& context)                              -> void;
+  static auto InstallFormats(CliprdrClientContext& context) -> void;
+  static auto InstallData(CliprdrClientContext& context)    -> void;
 };
-auto ClipboardClient::Callbacks::ChannelConnected(void* context, ChannelConnectedEventArgs const* event) -> void {
-  Expects(context != nullptr, "the channel event names its client context");
-  Expects(event != nullptr, "channel event is supplied");
-  if (std::string_view(event->name) != CLIPRDR_SVC_CHANNEL_NAME) return;
-  auto* channel = static_cast<CliprdrClientContext*>(event->pInterface);
-  Expects(channel != nullptr, "the clipboard channel interface exists");
-  Attach(*ObserverSet::Of(*static_cast<rdpContext*>(context)).Held<ClipboardClient>(), *channel);
-}
-auto ClipboardClient::Callbacks::Attach(ClipboardClient& self, CliprdrClientContext& context) -> void {
-  context.custom = &self;
-  InstallFormats(context);
-  InstallData(context);
-  self.channel.Publish(context);
-}
 // abi: the pcCliprdr server message callbacks, UINT is uint32_t
 auto ClipboardClient::Callbacks::InstallFormats(CliprdrClientContext& context) -> void {
   context.MonitorReady             = [](CliprdrClientContext* ctx, CLIPRDR_MONITOR_READY const*) -> std::uint32_t {
@@ -93,23 +74,21 @@ auto ClipboardClient::Callbacks::InstallData(CliprdrClientContext& context) -> v
 }
 
 ClipboardClient::ClipboardClient(Client& value, std::vector<std::byte> initial)
-    : client(value), outgoing(std::move(initial)) {
-  auto& context = ClientContext(client);
-  ObserverSet::Of(context).Add(*this);
+    : client(value), outgoing(std::move(initial)), membership(ClientContext(client), *this),
+      connections(ClientContext(client)) {
   freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
-  auto const redirected = freerdp_settings_set_bool(context.settings, FreeRDP_RedirectClipboard, true);
+  auto const redirected = freerdp_settings_set_bool(ClientContext(client).settings, FreeRDP_RedirectClipboard, true);
   Expects(redirected, "clipboard enabled");
-  PubSub_SubscribeChannelConnected(context.pubSub, Callbacks::ChannelConnected);
-  // abi: pLoadChannels, BOOL is int
-  ClientHandle(client).LoadChannels = [](freerdp* instance) -> int {
-    Expects(instance != nullptr, "channel loading names its client");
-    return LoadStaticChannel(*instance, CLIPRDR_SVC_CHANNEL_NAME);
-  };
+  ClientHandle(client).LoadChannels = ChannelLoader<LoadStaticChannel, CLIPRDR_SVC_CHANNEL_NAME>;
 }
 ClipboardClient::~ClipboardClient() {
   client.Disconnect();
-  PubSub_UnsubscribeChannelConnected(client.Instance()->context->pubSub, Callbacks::ChannelConnected);
-  ObserverSet::Of(*client.Instance()->context).Remove<ClipboardClient>();
+}
+auto ClipboardClient::Attach(CliprdrClientContext& context) -> void {
+  context.custom = this;
+  Callbacks::InstallFormats(context);
+  Callbacks::InstallData(context);
+  channel.Publish(context);
 }
 auto ClipboardClient::Received(std::span<std::byte const> bytes) -> bool {
   std::scoped_lock const lock(guard);

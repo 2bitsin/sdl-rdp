@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <iosfwd>
 #include <optional>
 #include <ranges>
 #include <source_location>
@@ -14,7 +15,14 @@ inline constexpr std::size_t PixelBytes = 4;
 struct Extent {
   std::uint32_t width { };
   std::uint32_t height{ };
+
+  friend constexpr auto operator==(Extent, Extent) noexcept -> bool = default;
 };
+// gtest prints an Extent through this; a template, so this header needs <iosfwd> only.
+template <class CharTy, class TraitsTy>
+auto operator<<(std::basic_ostream<CharTy, TraitsTy>& output, Extent size) -> std::basic_ostream<CharTy, TraitsTy>& {
+  return output << size.width << CharTy{ 'x' } << size.height;
+}
 struct AspectRatio {
   std::uint32_t numerator  { };
   std::uint32_t denominator{ };

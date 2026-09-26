@@ -113,9 +113,8 @@ TEST_F(GraphicsResize, RawAspectMatchesBilinear) {
   Rect const full{ .x = 0, .y = 0, .w = 320, .h = 200 };
   backend.Present(pixels, 320, 200, full);
   ASSERT_TRUE(client.Until([&] { return !observer.Observed().frames.empty(); })) << logs.Text(true);
+  ASSERT_EQ(client.DesktopSize(), (Extent{ .width = 320, .height = 240 }));
   auto* gdi = client.Instance()->context->gdi;
-  ASSERT_EQ(gdi->width, 320);
-  ASSERT_EQ(gdi->height, 240);
   ASSERT_EQ(observer.Observed().frames.size(), 1u);
   ThenBilinearPixels(*gdi, pixels);
 }

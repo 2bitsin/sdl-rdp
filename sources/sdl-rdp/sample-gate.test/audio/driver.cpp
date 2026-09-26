@@ -14,7 +14,7 @@ namespace sdl_rdp::sample_gate_test::audio::detail::driver {
 using sdl_rdp::sample_gate_test::process::Capture;
 using sdl_rdp::sample_gate_test::process::ListeningPort;
 using sdl_rdp::sample_gate_test::process::ProcfsSelf;
-using sdl_rdp::sample_gate_test::sample::SetCertificateHint;
+using sdl_rdp::sample_gate_test::sample::SetLoopbackHints;
 using sdl_rdp::utilities::Sleeping;
 using sdl_rdp::utilities::Until;
 
@@ -31,17 +31,6 @@ auto AudioDriver::ReceiveLead() -> void {
   ASSERT_NO_FATAL_FAILURE(PlayPcm(48000uz * 5 * 2));
   ASSERT_NO_FATAL_FAILURE(GivenSoundClient());
   ThenLead(*sound_client, *sound, 0, 140);
-}
-auto AudioDriver::GivenAudioBackend() -> void {
-  ASSERT_TRUE(SetCertificateHint(certificates.Path()));
-}
-auto AudioDriver::GivenAudioHints() -> void {
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "rdp"));
-  ASSERT_TRUE(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "rdp"));
-  ASSERT_TRUE(SDL_SetHint("SDL_RDP_PORT", "0"));
-  ASSERT_TRUE(SDL_SetHint("SDL_RDP_BIND", "127.0.0.1"));
-  ASSERT_TRUE(SDL_SetHint("SDL_RDP_CODEC", "planar"));
-  GivenAudioBackend();
 }
 auto AudioDriver::GivenSoundClient() -> void {
   sound_client = std::make_unique<Client>(ListeningPort(ProcfsSelf()), true);
@@ -78,8 +67,12 @@ auto AudioDriver::ThenPcm(Client& client, SoundClient& audio) -> void {
 }
 auto AudioDriver::SetUp() -> void {
   captured.emplace(logs, Capture{ .forwarded = true });
-  ASSERT_NO_FATAL_FAILURE(GivenAudioHints());
-  ASSERT_TRUE(SDL_Init(SDL_INIT_AUDIO)) << SDL_GetError();
+  sdl.emplace([this] {
+    return SetLoopbackHints(certificates.Path(), { { .name = SDL_HINT_AUDIO_DRIVER, .value = "rdp"    },
+                                                   { .name = "SDL_RDP_CODEC"      , .value = "planar" } })
+           && SDL_Init(SDL_INIT_AUDIO);
+  });
+  ASSERT_TRUE(sdl->Get()) << SDL_GetError();
   ASSERT_NO_FATAL_FAILURE(OpenStream());
   auto port = ListeningPort(ProcfsSelf());
   ASSERT_GT(port, 0u);
@@ -88,10 +81,7 @@ auto AudioDriver::TearDown() -> void {
   sound.reset();
   sound_client.reset();
   stream.reset();
-  SDL_Quit();
+  sdl.reset();
   captured.reset();
-  for (auto const* hint : { SDL_HINT_AUDIO_DRIVER, SDL_HINT_VIDEO_DRIVER, "SDL_RDP_PORT", "SDL_RDP_BIND",
-                            "SDL_RDP_CERT_DIR", "SDL_RDP_CODEC", SDL_HINT_RDP_AUDIO_LEAD })
-    SDL_ResetHint(hint);
 }
 }

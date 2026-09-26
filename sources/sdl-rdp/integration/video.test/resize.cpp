@@ -8,6 +8,7 @@
 #include <sdl-rdp/link/event.hpp>
 #include <sdl-rdp/session/backend.hpp>
 #include <sdl-rdp/utilities/geometry.hpp>
+#include <sdl-rdp/utilities/pinned.hpp>
 
 #include <array>
 #include <condition_variable>
@@ -32,12 +33,11 @@ using sdl_rdp::link::ScreenChanged;
 using sdl_rdp::session::Backend;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Extent;
+using sdl_rdp::utilities::Pinned;
 using sdl_rdp::utilities::Required;
 
-class ResizeProbe {
+class ResizeProbe : private Pinned {
 public:
-           ResizeProbe(ResizeProbe const&) = delete;
-           ResizeProbe(ResizeProbe&&)      = delete;
   explicit ResizeProbe(Backend& backend)
       : _backend{ backend }, _client{ CurrentClient(backend) }, _original{ _client.context->update->DesktopResize },
         _capabilities{ _client.ClientCapabilities } {
@@ -68,9 +68,7 @@ public:
     _client.ClientCapabilities             = _capabilities;
     active.Withdraw();
   }
-  auto operator=(ResizeProbe const&) -> ResizeProbe& = delete;
-  auto operator=(ResizeProbe&&)      -> ResizeProbe& = delete;
-  auto AwaitFinalizing()             -> bool {
+  auto AwaitFinalizing() -> bool {
     auto held = _backend.Session().Lock();
     return _changed.wait_for(held, std::chrono::seconds(10), [&] { return InFinalization(); });
   }
@@ -137,8 +135,7 @@ protected:
     EXPECT_EQ(display.Observed().echoes, display.Observed().echo_resize ? expected : 0u);
   }
   static auto ThenFinalDesktop(Client& client, Extent last) -> void {
-    EXPECT_EQ(client.Instance()->context->gdi->width, static_cast<std::int32_t>(last.width));
-    EXPECT_EQ(client.Instance()->context->gdi->height, static_cast<std::int32_t>(last.height));
+    EXPECT_EQ(client.DesktopSize(), last);
     EXPECT_FALSE(freerdp_shall_disconnect_context(client.Instance()->context));
   }
   auto WhenResizeBurst(ResizeProbe& probe, Extent last) -> void {
@@ -161,7 +158,7 @@ protected:
     Pixels pixels(static_cast<std::size_t>(last.width) * last.height, 0);
     ASSERT_TRUE(client.Until([&] { return display.Observed().desktops && client.Matches(pixels); }))
         << "server calls=" << probe.Calls() << " client calls=" << display.Observed().desktops
-        << " GDI=" << client.Instance()->context->gdi->width << "x" << client.Instance()->context->gdi->height << "\n"
+        << " GDI=" << client.DesktopSize() << "\n"
         << logs.Text(true);
     for (std::size_t i = 0; i < 20; ++i) ASSERT_TRUE(client.Pump(5));
     ASSERT_NO_FATAL_FAILURE(ThenFinalDesktop(client, last));
@@ -190,8 +187,7 @@ auto ThenSingleScreen(std::vector<Event> const& events, std::uint32_t width, std
   EXPECT_EQ(As<ScreenChanged>(screens.front()).height, height);
 }
 auto ThenOriginalPicture(Client& client) -> void {
-  EXPECT_EQ(client.Instance()->context->gdi->width, 640);
-  EXPECT_EQ(client.Instance()->context->gdi->height, 480);
+  EXPECT_EQ(client.DesktopSize(), (Extent{ .width = 640, .height = 480 }));
 }
 }
 TEST_F(ResizeStorm, CoalescesThreeSizesDuringFinalization) {
@@ -224,13 +220,13 @@ TEST_F(RoundFive, ResizeDesktop) {
                       freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopHeight));
   };
   ASSERT_NO_FATAL_FAILURE(Connect(client, false));
-  EXPECT_EQ(client.Instance()->context->gdi->width, 640);
+  EXPECT_EQ(client.DesktopSize().width, 640u);
   (*backend).Presentation().Resize({ .width = 800, .height = 600 });
   Pixels pixels(800uz * 600, 0x123456);
   ASSERT_NO_FATAL_FAILURE(Present(pixels, 800, 600));
-  ASSERT_TRUE(client.Until([&] { return client.Instance()->context->gdi->width == 800 && client.Matches(pixels); }))
-      << logs.Text();
-  EXPECT_EQ(client.Instance()->context->gdi->height, 600);
+  ASSERT_TRUE(client.Until([&] {
+    return client.DesktopSize() == Extent{ .width = 800, .height = 600 } && client.Matches(pixels);
+  })) << logs.Text();
 }
 TEST_F(RoundFive, PictureSizeReactivatesDesktop) {
   for (bool const graphics : { false, true }) {

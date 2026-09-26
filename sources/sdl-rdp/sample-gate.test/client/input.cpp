@@ -1,11 +1,9 @@
 #include <sdl-rdp/sample-gate.test/client/input.hpp>
 
-#include <oxbox/utilities/hash.hpp>
 #include <array>
 #include <string>
 
 namespace sdl_rdp::sample_gate_test::client::detail::input {
-using oxbox::utilities::HashString;
 using sdl_rdp::headless_client_test::client::ClientHandle;
 using sdl_rdp::utilities::Expects;
 
@@ -15,18 +13,15 @@ auto EnableDynamicChannel(rdpSettings& settings, std::string const& name) -> voi
   auto const       enabled = freerdp_client_add_dynamic_channel(&settings, names.size(), names.data());
   Expects(enabled, "dynamic channel enabled");
 }
-template <class ChannelTy> auto Interface(ChannelConnectedEventArgs const& event) -> ChannelTy& {
-  Expects(event.pInterface != nullptr, "the connected channel carries its interface");
-  return *static_cast<ChannelTy*>(event.pInterface);
-}
 }
 
-InputClient::InputClient(Client& client) : context(ClientContext(client)) {
-  ObserverSet::Of(context).Add(*this);
+InputClient::InputClient(Client& client)
+    : membership(ClientContext(client), *this), advanced_connections(ClientContext(client)),
+      touch_connections(ClientContext(client)) {
+  auto& settings = *ClientContext(client).settings;
   freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
-  EnableDynamicChannel(*context.settings, AINPUT_CHANNEL_NAME);
-  EnableDynamicChannel(*context.settings, RDPEI_CHANNEL_NAME);
-  PubSub_SubscribeChannelConnected(context.pubSub, ChannelConnected);
+  EnableDynamicChannel(settings, AINPUT_CHANNEL_NAME);
+  EnableDynamicChannel(settings, RDPEI_CHANNEL_NAME);
   // abi: pLoadChannels, BOOL is int
   ClientHandle(client).LoadChannels = [](freerdp* instance) -> int {
     Expects(instance != nullptr, "the loading client exists");
@@ -34,22 +29,11 @@ InputClient::InputClient(Client& client) : context(ClientContext(client)) {
     return freerdp_client_load_addins(loading.channels, loading.settings);
   };
 }
-InputClient::~InputClient() {
-  PubSub_UnsubscribeChannelConnected(context.pubSub, ChannelConnected);
-  ObserverSet::Of(context).Remove<InputClient>();
+auto InputClient::AdvancedConnected(AInputClientContext& channel) -> void {
+  advanced.Publish(channel);
 }
-auto InputClient::ChannelConnected(void* context, ChannelConnectedEventArgs const* event) -> void {
-  Expects(context != nullptr, "the channel event names its client context");
-  Expects(event != nullptr, "event is supplied");
-  ObserverSet::Of(*static_cast<rdpContext*>(context)).Held<InputClient>()->Connected(*event);
-}
-auto InputClient::Connected(ChannelConnectedEventArgs const& event) -> void {
-  Expects(event.name != nullptr, "event name is supplied");
-  switch (HashString(event.name)) {
-  case HashString(AINPUT_DVC_CHANNEL_NAME): advanced.Publish(Interface<AInputClientContext>(event)); return;
-  case HashString(RDPEI_DVC_CHANNEL_NAME):  touch.Publish(Interface<RdpeiClientContext>(event)); return;
-  default:                                  return;
-  }
+auto InputClient::TouchConnected(RdpeiClientContext& channel) -> void {
+  touch.Publish(channel);
 }
 auto InputClient::Advanced() const -> Published<AInputClientContext> const& {
   return advanced;

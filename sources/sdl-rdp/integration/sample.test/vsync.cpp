@@ -19,6 +19,7 @@ using namespace std::chrono_literals;
 using sdl_rdp::configuration::RefreshMode;
 using sdl_rdp::sample_gate_test::process::Capture;
 using sdl_rdp::sample_gate_test::process::CapturedLogs;
+using sdl_rdp::sample_gate_test::process::InitializedSdl;
 using sdl_rdp::sample_gate_test::process::Renderer;
 using sdl_rdp::sample_gate_test::process::Window;
 using sdl_rdp::sample_gate_test::sample::PrimaryDisplayPort;
@@ -45,25 +46,26 @@ protected:
     ASSERT_TRUE(SDL_RenderClear(renderer.get()));
     ASSERT_TRUE(SDL_RenderPresent(renderer.get()));
   }
-  auto GivenRendererHints() -> void {
-    ASSERT_TRUE(SetLoopbackHints(certificates.Path(), { { "SDL_RDP_CODEC" , "raw" },
-                                                        { "SDL_RDP_WIDTH" , "640" },
-                                                        { "SDL_RDP_HEIGHT", "480" },
-                                                        { "SDL_RDP_VSYNC" , "0"   } }));
-  }
   auto SetUp() -> void override {
     Expects(window == nullptr, "fixture has no window");
     ASSERT_NO_FATAL_FAILURE(Sample::SetUp());
     if (auto* value = std::getenv("SDL_RDP_TRACE")) previous_trace = value;
     ASSERT_EQ(setenv("SDL_RDP_TRACE", "1", 1), 0);
     captured.emplace(logs, Capture{ .video = SDL_LOG_PRIORITY_INFO });
-    ASSERT_TRUE(SDL_SetHint("SDL_RDP_REFRESH", std::string(GetParam().hint).c_str()));
     CreateRenderer();
   }
   auto CreateRenderer() -> void {
     Expects(window == nullptr, "window has not been created");
-    ASSERT_NO_FATAL_FAILURE(GivenRendererHints());
-    ASSERT_TRUE(SDL_Init(SDL_INIT_VIDEO));
+    sdl.emplace([this] {
+      return SetLoopbackHints(certificates.Path(),
+                              { { .name = "SDL_RDP_CODEC"  , .value = "raw"                        },
+                                { .name = "SDL_RDP_WIDTH"  , .value = "640"                        },
+                                { .name = "SDL_RDP_HEIGHT" , .value = "480"                        },
+                                { .name = "SDL_RDP_VSYNC"  , .value = "0"                          },
+                                { .name = "SDL_RDP_REFRESH", .value = std::string(GetParam().hint) } })
+             && SDL_Init(SDL_INIT_VIDEO);
+    });
+    ASSERT_TRUE(sdl->Get()) << SDL_GetError();
     window.reset(SDL_CreateWindow("vsync recovery", 640, 480, SDL_WINDOW_FULLSCREEN));
     ASSERT_NE(window, nullptr);
     renderer.reset(SDL_CreateRenderer(window.get(), "software"));
@@ -87,21 +89,19 @@ protected:
   auto TearDown() -> void override {
     renderer.reset();
     window.reset();
-    SDL_Quit();
+    sdl.reset();
     captured.reset();
-    for (auto const* hint : { SDL_HINT_VIDEO_DRIVER, "SDL_RDP_PORT", "SDL_RDP_BIND", "SDL_RDP_CODEC", "SDL_RDP_WIDTH",
-                              "SDL_RDP_HEIGHT", "SDL_RDP_VSYNC", "SDL_RDP_REFRESH", "SDL_RDP_CERT_DIR" })
-      SDL_ResetHint(hint);
     if (previous_trace.empty())
       unsetenv("SDL_RDP_TRACE");
     else
       setenv("SDL_RDP_TRACE", previous_trace.c_str(), 1);
     Sample::TearDown();
   }
-  Window                      window;
-  Renderer                    renderer;
-  std::optional<CapturedLogs> captured;
-  std::string                 previous_trace;
+  std::optional<CapturedLogs>   captured;
+  std::optional<InitializedSdl> sdl;
+  Window                        window;
+  Renderer                      renderer;
+  std::string                   previous_trace;
 };
 
 TEST_P(VsyncRecovery, HeldAcknowledgementAndDisplayChannelResize) {

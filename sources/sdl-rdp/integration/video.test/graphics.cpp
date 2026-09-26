@@ -29,6 +29,7 @@ using sdl_rdp::headless_client_test::codec::ModeName;
 using sdl_rdp::headless_client_test::frame::GraphicsScene;
 using sdl_rdp::headless_client_test::graphics::GraphicsObserver;
 using sdl_rdp::headless_client_test::graphics::RoundFive;
+using sdl_rdp::utilities::Extent;
 using sdl_rdp::utilities::Rect;
 using sdl_rdp::video::GraphicsConnectionWait;
 
@@ -113,7 +114,7 @@ protected:
     Rect const full   { .x = 0, .y = 0, .w = 352, .h = 224 };
     backend.Present(resized, 352, 224, full);
     ASSERT_TRUE(client.Until([&] { return client.Matches(resized); })) << logs.Text(true);
-    EXPECT_EQ(client.Instance()->context->gdi->width, 352);
+    EXPECT_EQ(client.DesktopSize(), (Extent{ .width = 352, .height = 224 }));
     ThenResizedSurface(observer);
   }
   auto FillGraphicsWindow(Client& client, GraphicsObserver& observer, Rect full) -> void {

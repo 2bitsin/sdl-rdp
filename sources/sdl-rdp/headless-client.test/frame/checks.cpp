@@ -96,8 +96,7 @@ auto FrameChecks::SuppressAndCheckInput(Client& client) -> void {
   ASSERT_TRUE(Holds<Key>(suppressed.front()));
 }
 auto FrameChecks::ThenDesktopGeometry(Client& client, std::uint32_t w, std::uint32_t h) -> void {
-  EXPECT_EQ(client.Instance()->context->gdi->width, Narrowed<int>(w));
-  EXPECT_EQ(client.Instance()->context->gdi->height, Narrowed<int>(h));
+  EXPECT_EQ(client.DesktopSize(), (Extent{ .width = w, .height = h }));
 }
 auto FrameChecks::ThenAspectGeometry(Client& client) -> void {
   auto events = Events(2);

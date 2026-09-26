@@ -2,6 +2,7 @@
 #include <sdl-rdp/headless-client.test/utilities/observer-set.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/deadline.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/releases.hpp>
 
 #include <freerdp/freerdp.h>
@@ -20,6 +21,7 @@
 namespace sdl_rdp::headless_client_test::client::detail::client {
 using sdl_rdp::headless_client_test::utilities::ObserverSet;
 using sdl_rdp::utilities::DeadlineAfter;
+using sdl_rdp::utilities::Extent;
 using sdl_rdp::utilities::Releases;
 
 using Clock = std::chrono::steady_clock;
@@ -58,18 +60,19 @@ public:
     };
     return sdl_rdp::utilities::Until(DeadlineAfter(timeout), pumped, ready);
   }
-  auto UntilDesktop(std::uint32_t width, std::uint32_t height) -> bool;
-  auto Instance() const                                        -> ClientInstance const&;
-  auto Tolerance() const                                       -> std::uint32_t;
-  auto Tolerance(std::uint32_t value)                          -> void;
+  auto DesktopSize() const            -> Extent;
+  auto Instance() const               -> ClientInstance const&;
+  auto Tolerance() const              -> std::uint32_t;
+  auto Tolerance(std::uint32_t value) -> void;
 
 private:
   std::unique_ptr<ObserverSet> observers { std::make_unique<ObserverSet>() };
   ClientInstance               instance  { freerdp_new()                   };
   std::uint32_t                tolerance = 0;
 };
-auto PumpInBackground(Client& client)            -> std::jthread;
-auto Tap(Client& client, std::uint16_t scancode) -> void;
+auto PumpInBackground(Client& client)                                        -> std::jthread;
+auto Tap(Client& client, std::uint16_t scancode)                             -> void;
+auto UntilDesktop(Client& client, std::uint32_t width, std::uint32_t height) -> bool;
 }
 
 namespace sdl_rdp::headless_client_test::client {
@@ -78,4 +81,5 @@ using detail::client::Clock;
 using detail::client::KeyState;
 using detail::client::Pixels;
 using detail::client::Tap;
+using detail::client::UntilDesktop;
 }

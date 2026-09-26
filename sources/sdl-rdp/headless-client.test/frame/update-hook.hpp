@@ -1,6 +1,7 @@
 #pragma once
 #include <sdl-rdp/headless-client.test/client/client.hpp>
 #include <sdl-rdp/utilities/geometry.hpp>
+#include <sdl-rdp/utilities/pinned.hpp>
 
 #include <functional>
 #include <memory>
@@ -9,6 +10,7 @@
 namespace sdl_rdp::headless_client_test::frame::detail::update_hook {
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::utilities::Extent;
+using sdl_rdp::utilities::Pinned;
 using sdl_rdp::utilities::Rect;
 
 enum class PictureCommand{ Surface, Bitmap };
@@ -18,16 +20,12 @@ struct PictureUpdate {
   Extent                desktop;
   bool                  delivered;
 };
-class PictureUpdateHook {
+class PictureUpdateHook : private Pinned {
 public:
   using Observer = std::function<void(PictureUpdate const& update)>;
 
-       PictureUpdateHook(Client& client, Observer observer);
-       PictureUpdateHook(PictureUpdateHook const&)               = delete;
-       PictureUpdateHook(PictureUpdateHook&&)                    = delete;
-       ~PictureUpdateHook();
-  auto operator=(PictureUpdateHook const&) -> PictureUpdateHook& = delete;
-  auto operator=(PictureUpdateHook&&)      -> PictureUpdateHook& = delete;
+  PictureUpdateHook(Client& client, Observer observer);
+  ~PictureUpdateHook();
 
 private:
   class Installation;

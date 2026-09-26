@@ -6,10 +6,11 @@
 #include <sdl-rdp/headless-client.test/client/handles.hpp>
 #include <cstddef>
 #include <cstdint>
-#include <string_view>
 
 namespace sdl_rdp::headless_client_test::graphics::detail::observer {
+using sdl_rdp::headless_client_test::client::ClientContext;
 using sdl_rdp::headless_client_test::client::ClientUpdates;
+using sdl_rdp::headless_client_test::utilities::Delegated;
 using sdl_rdp::headless_client_test::utilities::ObserverLease;
 using sdl_rdp::headless_client_test::utilities::ObserverSet;
 using sdl_rdp::utilities::Expects;
@@ -27,39 +28,19 @@ auto Held(RdpgfxClientContext& channel) -> ObserverLease<GraphicsObserver> {
   return Held(*decoder.context);
 }
 }
-class GraphicsObserver::Callbacks {
-public:
-  // abi: pChannelConnectedEventHandler
-  static auto ChannelConnected(void* context, ChannelConnectedEventArgs const* event)      -> void;
-  static auto Attach(GraphicsObserver& observer, RdpgfxClientContext& context)             -> void;
-  static auto ObserveEndFrames(GraphicsObserver& observer, RdpgfxClientContext& connected) -> void;
-};
-auto GraphicsObserver::Callbacks::ChannelConnected(void* context, ChannelConnectedEventArgs const* event) -> void {
-  Expects(context != nullptr, "the channel event names its client context");
-  Expects(event != nullptr, "channel event is supplied");
-  if (std::string_view(event->name) != RDPGFX_DVC_CHANNEL_NAME) return;
-  auto* channel = static_cast<RdpgfxClientContext*>(event->pInterface);
-  Expects(channel != nullptr, "the graphics channel interface exists");
-  Attach(*ObserverSet::Of(*static_cast<rdpContext*>(context)).Held<GraphicsObserver>(), *channel);
-}
 GraphicsObserver::GraphicsObserver(Client& target)
-    : client(target), desktop_resize(ClientUpdates(client).DesktopResize) {
-  ObserverSet::Of(*client.Instance()->context).Add(*this);
-  // abi: pDesktopResize, BOOL is int
-  client.Instance()->context->update->DesktopResize = [](rdpContext* context) -> int {
-    Expects(context != nullptr, "resize names its client context");
-    auto const self = Held(*context);
-    self->observed.desktops.emplace_back(freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopWidth),
-                                         freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopHeight));
-    return self->desktop_resize(context);
-  };
-  PubSub_SubscribeChannelConnected(client.Instance()->context->pubSub, Callbacks::ChannelConnected);
+    : client(target), desktop_resize(ClientUpdates(client).DesktopResize), membership(ClientContext(client), *this),
+      connections(ClientContext(client)) {
+  ClientUpdates(client).DesktopResize = Delegated<&GraphicsObserver::Resize>;
 }
 GraphicsObserver::~GraphicsObserver() {
   client.Disconnect();
-  PubSub_UnsubscribeChannelConnected(client.Instance()->context->pubSub, Callbacks::ChannelConnected);
-  client.Instance()->context->update->DesktopResize = desktop_resize;
-  ObserverSet::Of(*client.Instance()->context).Remove<GraphicsObserver>();
+  ClientUpdates(client).DesktopResize = desktop_resize;
+}
+auto GraphicsObserver::Resize(rdpContext& context) -> bool {
+  observed.desktops.emplace_back(freerdp_settings_get_uint32(context.settings, FreeRDP_DesktopWidth),
+                                 freerdp_settings_get_uint32(context.settings, FreeRDP_DesktopHeight));
+  return desktop_resize(&context);
 }
 auto GraphicsObserver::Ack(std::uint32_t depth) -> bool {
   Expects(channel.has_value(), "channel is installed");
@@ -81,10 +62,10 @@ auto GraphicsObserver::Observed() -> GraphicsCapture& {
 auto GraphicsObserver::Observed() const -> GraphicsCapture const& {
   return observed;
 }
-auto GraphicsObserver::Callbacks::Attach(GraphicsObserver& observer, RdpgfxClientContext& context) -> void {
-  observer.channel = context;
-  observer.create  = context.CreateSurface;
-  observer.remove  = context.DeleteSurface;
+auto GraphicsObserver::Attach(RdpgfxClientContext& context) -> void {
+  channel = context;
+  create  = context.CreateSurface;
+  remove  = context.DeleteSurface;
   // abi: pcRdpgfxCreateSurface and pcRdpgfxDeleteSurface, UINT is uint32_t
   context.CreateSurface = [](RdpgfxClientContext* channel, RDPGFX_CREATE_SURFACE_PDU const* surface) -> std::uint32_t {
     Expects(channel != nullptr, "the graphics callback names its channel");
@@ -100,7 +81,7 @@ auto GraphicsObserver::Callbacks::Attach(GraphicsObserver& observer, RdpgfxClien
     if (channel->GetSurfaceData(channel, surface->surfaceId)) ++self->observed.deleted;
     return self->remove(channel, surface);
   };
-  observer.ObserveFrameLifecycle();
+  ObserveFrameLifecycle();
 }
 auto GraphicsObserver::ObserveAvc(RDPGFX_SURFACE_COMMAND const& command) -> void {
   Expects(command.extra, "AVC command has a parsed bitmap stream");
@@ -157,10 +138,10 @@ auto GraphicsObserver::ObserveFrames() -> void {
     *send_acks = false;
     return CHANNEL_RC_OK;
   };
-  Callbacks::ObserveEndFrames(*this, connected);
+  ObserveEndFrames(connected);
 }
-auto GraphicsObserver::Callbacks::ObserveEndFrames(GraphicsObserver& observer, RdpgfxClientContext& connected) -> void {
-  observer.end = connected.EndFrame;
+auto GraphicsObserver::ObserveEndFrames(RdpgfxClientContext& connected) -> void {
+  end = connected.EndFrame;
   // abi: pcRdpgfxEndFrame, UINT is uint32_t
   connected.EndFrame = [](RdpgfxClientContext* channel, RDPGFX_END_FRAME_PDU const* frame) -> std::uint32_t {
     Expects(channel != nullptr, "the graphics callback names its channel");

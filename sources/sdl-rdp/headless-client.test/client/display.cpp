@@ -16,59 +16,31 @@
 namespace sdl_rdp::headless_client_test::client::detail::display {
 using sdl_rdp::freerdp_facade::FirstRefused;
 using sdl_rdp::freerdp_facade::Refusal;
+using sdl_rdp::headless_client_test::utilities::Delegated;
 using sdl_rdp::utilities::Expects;
 namespace {
-// abi: pLoadChannels, BOOL is int
-auto LoadDisplayChannel(freerdp* instance) -> int {
-  Expects(instance != nullptr, "channel loading names its client");
-  return LoadDynamicChannel(*instance, "disp");
-}
 auto Held(DispClientContext& channel) -> DisplayClient& {
   Expects(channel.custom != nullptr, "the display channel carries its observer");
   return *static_cast<DisplayClient*>(channel.custom);
 }
 }
-class DisplayClient::Callbacks {
-public:
-  static auto Install(rdpUpdate& update) -> void;
-  // abi: pChannelConnectedEventHandler
-  static auto ChannelConnected(void* context, ChannelConnectedEventArgs const* event) -> void;
-};
-auto DisplayClient::Callbacks::Install(rdpUpdate& update) -> void {
-  // abi: pDesktopResize, BOOL is int
-  update.DesktopResize = [](rdpContext* context) -> int {
-    Expects(context != nullptr, "resize names its client context");
-    return ObserverSet::Of(*context).Held<DisplayClient>()->Resize(*context);
-  };
-}
-auto DisplayClient::Callbacks::ChannelConnected(void* context, ChannelConnectedEventArgs const* event) -> void {
-  Expects(context != nullptr, "the channel event names its client context");
-  Expects(event != nullptr, "channel event is supplied");
-  if (std::string_view(event->name) != DISP_DVC_CHANNEL_NAME) return;
-  auto* channel = static_cast<DispClientContext*>(event->pInterface);
-  Expects(channel != nullptr, "the display channel interface exists");
-  ObserverSet::Of(*static_cast<rdpContext*>(context)).Held<DisplayClient>()->Connected(*channel);
-}
-DisplayClient::DisplayClient(Client& client) : client(client), desktop_resize(ClientUpdates(client).DesktopResize) {
-  auto& context = ClientContext(client);
-  ObserverSet::Of(context).Add(*this);
-  Callbacks::Install(ClientUpdates(client));
+DisplayClient::DisplayClient(Client& client)
+    : client(client), desktop_resize(ClientUpdates(client).DesktopResize), membership(ClientContext(client), *this),
+      connections(ClientContext(client)) {
+  ClientUpdates(client).DesktopResize = Delegated<&DisplayClient::Resize>;
   freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
   std::array<std::pair<FreeRDP_Settings_Keys_Bool, bool>, 2> const display_control{ {
       { FreeRDP_SupportDisplayControl     , true },
       { FreeRDP_SynchronousDynamicChannels, true },
   } };
 
-  auto const refused_display_control = FirstRefused(*context.settings, display_control);
+  auto const refused_display_control = FirstRefused(*ClientContext(client).settings, display_control);
   Expects(!refused_display_control.has_value(), Refusal("display control", refused_display_control));
-  PubSub_SubscribeChannelConnected(context.pubSub, Callbacks::ChannelConnected);
-  ClientHandle(client).LoadChannels = LoadDisplayChannel;
+  ClientHandle(client).LoadChannels = ChannelLoader<LoadDynamicChannel, "disp">;
 }
 DisplayClient::~DisplayClient() {
   client.Disconnect();
-  client.Instance()->context->update->DesktopResize = desktop_resize;
-  PubSub_UnsubscribeChannelConnected(client.Instance()->context->pubSub, Callbacks::ChannelConnected);
-  ObserverSet::Of(*client.Instance()->context).Remove<DisplayClient>();
+  ClientUpdates(client).DesktopResize = desktop_resize;
 }
 auto DisplayClient::Monitor(std::uint32_t width, std::uint32_t height, std::uint32_t millimetres)
     -> DISPLAY_CONTROL_MONITOR_LAYOUT {

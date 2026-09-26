@@ -36,8 +36,8 @@ auto ObserveDrive(DriveCapture& capture, std::span<std::byte const> bytes) -> vo
 }
 }
 
-DriveObserver::DriveObserver(Client& client) : instance(ClientHandle(client)), original(instance.ReceiveChannelData) {
-  ObserverSet::Of(*instance.context).Add(*this);
+DriveObserver::DriveObserver(Client& client)
+    : instance(ClientHandle(client)), original(instance.ReceiveChannelData), membership(*instance.context, *this) {
   // abi: pReceiveChannelData, UINT16 is uint16_t, BYTE is uint8_t, UINT32 is uint32_t, BOOL is int
   instance.ReceiveChannelData = [](freerdp* receiver, std::uint16_t id, std::uint8_t const* data, std::size_t size,
                                    std::uint32_t flags, std::size_t total) -> int {
@@ -51,7 +51,6 @@ DriveObserver::DriveObserver(Client& client) : instance(ClientHandle(client)), o
 }
 DriveObserver::~DriveObserver() {
   instance.ReceiveChannelData = original;
-  ObserverSet::Of(*instance.context).Remove<DriveObserver>();
 }
 auto DriveObserver::Send(DrivePacket const& packet) -> bool {
   return SendStaticChannel(instance, RDPDR_CHANNEL_NAME, std::span(packet.Bytes()));

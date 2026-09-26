@@ -1,5 +1,8 @@
 #pragma once
+#include <sdl-rdp/headless-client.test/client/channels.hpp>
 #include <sdl-rdp/headless-client.test/client/client.hpp>
+#include <sdl-rdp/headless-client.test/utilities/observer-set.hpp>
+#include <sdl-rdp/utilities/pinned.hpp>
 
 #include <freerdp/client/rdpgfx.h>
 #include <freerdp/event.h>
@@ -11,7 +14,10 @@
 #include <vector>
 
 namespace sdl_rdp::headless_client_test::graphics::detail::observer {
+using sdl_rdp::headless_client_test::client::ChannelSubscription;
 using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::utilities::Membership;
+using sdl_rdp::utilities::Pinned;
 
 struct GraphicsCapture {
   struct Reset {
@@ -35,15 +41,11 @@ struct GraphicsCapture {
   std::size_t                                          progressive_headers = 0;
   std::size_t                                          commands            = 0;
 };
-class GraphicsObserver {
+class GraphicsObserver : private Pinned {
 public:
   using Reset = GraphicsCapture::Reset;
-           GraphicsObserver(GraphicsObserver const&)                             = delete;
-           GraphicsObserver(GraphicsObserver&&)                                  = delete;
   explicit GraphicsObserver(Client& target);
            ~GraphicsObserver();
-  auto     operator=(GraphicsObserver const&)               -> GraphicsObserver& = delete;
-  auto     operator=(GraphicsObserver&&)                    -> GraphicsObserver& = delete;
   auto     Ack(std::uint32_t depth = 0)                     -> bool;
   auto     AckFrame(std::size_t index, std::uint32_t depth) -> bool;
   auto     Channel() const                                  -> RdpgfxClientContext&;
@@ -51,22 +53,26 @@ public:
   auto     Observed() const                                 -> GraphicsCapture const&;
 
 private:
-  class Callbacks;
+  auto Attach(RdpgfxClientContext& context)              -> void;
+  auto Resize(rdpContext& context)                       -> bool;
   auto ObserveAvc(RDPGFX_SURFACE_COMMAND const& command) -> void;
   auto ObserveFrameLifecycle()                           -> void;
   auto ObserveResets()                                   -> void;
   auto ObserveFrames()                                   -> void;
+  auto ObserveEndFrames(RdpgfxClientContext& connected)  -> void;
 
-  std::optional<std::reference_wrapper<RdpgfxClientContext>> channel;
-  GraphicsCapture                                            observed;
-  Client&                                                    client;
-  pcRdpgfxFrameAcknowledge                                   original       = nullptr;
-  pcRdpgfxEndFrame                                           end            = nullptr;
-  pcRdpgfxSurfaceCommand                                     surface        = nullptr;
-  pcRdpgfxCreateSurface                                      create         = nullptr;
-  pcRdpgfxDeleteSurface                                      remove         = nullptr;
-  pcRdpgfxResetGraphics                                      reset          = nullptr;
-  pDesktopResize                                             desktop_resize = nullptr;
+  std::optional<std::reference_wrapper<RdpgfxClientContext>>              channel;
+  GraphicsCapture                                                         observed;
+  Client&                                                                 client;
+  pcRdpgfxFrameAcknowledge                                                original       = nullptr;
+  pcRdpgfxEndFrame                                                        end            = nullptr;
+  pcRdpgfxSurfaceCommand                                                  surface        = nullptr;
+  pcRdpgfxCreateSurface                                                   create         = nullptr;
+  pcRdpgfxDeleteSurface                                                   remove         = nullptr;
+  pcRdpgfxResetGraphics                                                   reset          = nullptr;
+  pDesktopResize                                                          desktop_resize = nullptr;
+  Membership<GraphicsObserver>                                            membership;
+  ChannelSubscription<RDPGFX_DVC_CHANNEL_NAME, &GraphicsObserver::Attach> connections;
 };
 }
 

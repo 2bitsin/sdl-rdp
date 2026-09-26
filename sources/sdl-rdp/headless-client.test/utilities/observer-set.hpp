@@ -1,6 +1,8 @@
 #pragma once
 #include "observer-lease.hpp"
 #include <sdl-rdp/headless-client.test/backend/lease-count.hpp>
+#include <sdl-rdp/utilities/contract.hpp>
+#include <sdl-rdp/utilities/scoped.hpp>
 
 #include <freerdp/freerdp.h>
 #include <any>
@@ -12,6 +14,8 @@
 
 namespace sdl_rdp::headless_client_test::utilities::detail::observer_set {
 using sdl_rdp::headless_client_test::backend::LeaseCount;
+using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::RAIIWrap;
 
 class ObserverSet {
 public:
@@ -47,8 +51,26 @@ template <class ObserverTy> auto ObserverSet::Held() -> ObserverLease<ObserverTy
   auto&                  found = Attached(typeid(ObserverTy));
   return { std::any_cast<std::reference_wrapper<ObserverTy>>(found.observer).get(), found.leases };
 }
+template <class ObserverTy> auto Join(rdpContext& context, ObserverTy& observer) -> rdpContext& {
+  ObserverSet::Of(context).Add(observer);
+  return context;
+}
+template <class ObserverTy> auto Leave(rdpContext& context) noexcept -> void {
+  ObserverSet::Of(context).Remove<ObserverTy>();
+}
+// The client's callbacks reach the observer for the holder's lifetime; the release waits out their leases.
+template <class ObserverTy> using Membership = RAIIWrap<rdpContext&, Join<ObserverTy>, Leave<ObserverTy>>;
+template <class OwnerTy, class MemberTy> auto OwnerOf(MemberTy OwnerTy::*) -> OwnerTy;
+// abi: pDesktopResize and pEndPaint, BOOL is int; the context's observer answers through MEMBER.
+template <auto MEMBER> auto Delegated(rdpContext* context) -> int {
+  Expects(context != nullptr, "the callback names its client context");
+  return std::invoke(MEMBER, *ObserverSet::Of(*context).Held<decltype(OwnerOf(MEMBER))>(), *context);
+}
 }
 
 namespace sdl_rdp::headless_client_test::utilities {
+using detail::observer_set::Membership;
+using detail::observer_set::Delegated;
 using detail::observer_set::ObserverSet;
+using detail::observer_set::OwnerOf;
 }

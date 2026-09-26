@@ -1,5 +1,7 @@
 #pragma once
 #include <sdl-rdp/headless-client.test/client/client.hpp>
+#include <sdl-rdp/headless-client.test/utilities/observer-set.hpp>
+#include <sdl-rdp/utilities/pinned.hpp>
 
 #include <freerdp/update.h>
 #include <cstdint>
@@ -8,15 +10,13 @@
 namespace sdl_rdp::headless_client_test::frame::detail::observer {
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::Clock;
+using sdl_rdp::headless_client_test::utilities::Membership;
+using sdl_rdp::utilities::Pinned;
 
-class FrameObserver {
+class FrameObserver : private Pinned {
 public:
-           FrameObserver(FrameObserver const&)               = delete;
-           FrameObserver(FrameObserver&&)                    = delete;
   explicit FrameObserver(Client& client);
            ~FrameObserver();
-  auto     operator=(FrameObserver const&) -> FrameObserver& = delete;
-  auto     operator=(FrameObserver&&)      -> FrameObserver& = delete;
 
   auto Ack()                            -> bool;
   auto Frames() const                   -> std::vector<std::uint32_t> const&;
@@ -32,8 +32,9 @@ private:
   pSurfaceFrameMarker            original;
   std::vector<std::uint32_t>     ids;
   std::vector<Clock::time_point> received;
-  bool                           coherent  = true;
+  bool                           coherent   = true;
   std::vector<Clock::time_point> ack_times;
+  Membership<FrameObserver>      membership;
 };
 }
 
