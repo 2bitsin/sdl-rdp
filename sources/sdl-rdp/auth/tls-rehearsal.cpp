@@ -6,7 +6,7 @@
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/exceptions.hpp>
-#include <sdl-rdp/utilities/system-call.hpp>
+#include <sdl-rdp/utilities/posix.hpp>
 
 #include <freerdp/freerdp.h>
 #include <freerdp/peer.h>
@@ -27,6 +27,7 @@ using sdl_rdp::auth::detail::unsignalled_socket_bio::UnsignalledSocketBio;
 using sdl_rdp::freerdp_facade::Bio;
 using sdl_rdp::link::PeerContextFailed;
 using sdl_rdp::utilities::AllocationFailed;
+using sdl_rdp::utilities::ConnectedSockets;
 using sdl_rdp::utilities::Contained;
 using sdl_rdp::utilities::Descriptor;
 using sdl_rdp::utilities::Ensures;
@@ -105,12 +106,13 @@ auto ConnectTls(int socket, std::chrono::milliseconds limit) noexcept -> bool {
 }
 }
 TlsRehearsal::TlsRehearsal(Credentials const& credentials, std::chrono::milliseconds limit)
-    : blocked_call_limit(Bounding(limit)), server(ServingPeer(ends.TakeServer(), credentials)) { }
+    : blocked_call_limit(Bounding(limit)), ends(ConnectedSockets()),
+      server(ServingPeer(std::move(ends.server), credentials)) { }
 auto TlsRehearsal::Perform() && -> void {
-  auto       handshake = std::async(std::launch::async, ConnectTls, ends.Client(), blocked_call_limit);
+  auto       handshake = std::async(std::launch::async, ConnectTls, ends.client.Get(), blocked_call_limit);
   auto const accepted  = AcceptTls(*server);
   // FreeRDP 3.32 transport.c:708 keeps the server socket open after a failed accept, so the client would wait for it.
-  StopDirection(ends.Client(), SHUT_RD);
+  StopDirection(ends.client.Get(), SHUT_RD);
   auto const connected = handshake.get();
   if (!accepted) throw TlsAcceptRefused{ };
   if (!connected) throw TlsHandshakeFailed{ };

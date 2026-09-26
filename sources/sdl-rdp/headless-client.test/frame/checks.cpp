@@ -3,8 +3,8 @@
 #include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
 #include <sdl-rdp/headless-client.test/backend/status.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
 
 #include <freerdp/gdi/gdi.h>
 #include <freerdp/input.h>

@@ -1,7 +1,7 @@
 #include <sdl-rdp/headless-client.test/graphics/session.hpp>
 
 #include <sdl-rdp/configuration/setup.hpp>
-#include <sdl-rdp/diagnostics/log-level.hpp>
+#include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/headless-client.test/backend/await-acknowledged.hpp>
 #include <sdl-rdp/headless-client.test/backend/config.hpp>
 #include <sdl-rdp/headless-client.test/backend/events.hpp>

@@ -1,6 +1,6 @@
 #include <sdl-rdp/headless-client.test/audio/gate.hpp>
 
-#include <sdl-rdp/diagnostics/log-level.hpp>
+#include <sdl-rdp/diagnostics/log-sink.hpp>
 
 #include <algorithm>
 #include <chrono>

@@ -23,8 +23,8 @@
 #include <sdl-rdp/peer/wait.hpp>
 #include <sdl-rdp/picture/desktop-layout.hpp>
 #include <sdl-rdp/utilities/generational.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/video/display-control.hpp>
 #include <sdl-rdp/video/encoder.hpp>
 #include <sdl-rdp/video/frame/capture.hpp>

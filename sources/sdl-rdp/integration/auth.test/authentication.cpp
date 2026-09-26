@@ -1,5 +1,5 @@
 #include <sdl-rdp/headless-client.test/backend/authentication.hpp>
-#include <sdl-rdp/configuration/auth-mode.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/headless-client.test/client/client.hpp>
 #include <sdl-rdp/session/backend.hpp>
 #include <algorithm>

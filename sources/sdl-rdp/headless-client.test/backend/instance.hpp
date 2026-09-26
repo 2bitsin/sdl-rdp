@@ -6,7 +6,7 @@
 #include <sdl-rdp/link/event.hpp>
 #include <sdl-rdp/picture/frame-layout.hpp>
 #include <sdl-rdp/session/backend.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 
 #include <chrono>
 #include <cstdint>

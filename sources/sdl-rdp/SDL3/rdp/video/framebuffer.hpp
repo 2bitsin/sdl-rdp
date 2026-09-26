@@ -1,7 +1,7 @@
 #pragma once
 #include <sdl-rdp/SDL3/rdp/driver.hpp>
 #include <sdl-rdp/SDL3/rdp/sdl/resources.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <cstddef>
 #include <span>
 #include <vector>

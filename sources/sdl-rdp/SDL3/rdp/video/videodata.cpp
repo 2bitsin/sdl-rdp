@@ -3,7 +3,7 @@
 #include <sdl-rdp/SDL3/rdp/exceptions.hpp>
 #include <sdl-rdp/SDL3/rdp/sdl/boundary.hpp>
 #include <sdl-rdp/SDL3/rdp/settings/options.hpp>
-#include <sdl-rdp/configuration/codec.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/session/backend.hpp>
 
 namespace sdl3::rdp::video::detail::videodata {

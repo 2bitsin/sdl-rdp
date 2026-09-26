@@ -58,6 +58,7 @@ LOGICAL              = frozenset(('&&', '||', 'and', 'or'))
 BRANCHES             = LOGICAL | {'if', 'for', 'while', 'case', 'catch', '?'}
 SCOPES               = frozenset(('namespace', 'extern', 'class', 'struct', 'union'))
 EVALUATED            = frozenset(('constexpr', 'consteval'))
+OVERRIDERS           = frozenset(('override', 'final'))
 SPECIFIERS           = frozenset(('static', 'virtual', 'inline', 'constexpr', 'consteval', 'explicit', 'friend',
                                   'extern'))
 POINTER_NOT_RESULTS  = EXPRESSION_KEYWORDS | NOT_DECLARATORS | {'auto'}
@@ -173,6 +174,7 @@ class ClassTally:
     highest:      int                 = -1
     layout:       int                 = 0
     bodiless:     int                 = 0
+    changing:     int                 = 0
     functions:    list[str]           = dataclasses.field(default_factory=list)
     data:         collections.Counter = dataclasses.field(default_factory=collections.Counter)
     declarations: collections.Counter = dataclasses.field(default_factory=collections.Counter)
@@ -462,7 +464,9 @@ def tally_members(source, item):
             tally.enter(member.access)
         elif (found := declarator(source, member.first, member.end, item.name)) is not None:
             tally.function(found.name, item.name)
-            tally.bodiless += source.words(member.end - 2, member.end) in BODILESS
+            bodiless = source.words(member.end - 2, member.end) in BODILESS
+            tally.bodiless += bodiless
+            tally.changing += not bodiless and not observes(source, member, found)
         elif (count := data_count(source, member.first, member.end)):
             tally.datum(count)
     return tally
@@ -502,9 +506,24 @@ def outermost(item, items):
 
 
 def behaves(source, item):
-    """A class behaves when it declares a member function that is not defaulted, deleted or pure."""
+    """A class behaves when it declares a member function that is not defaulted, deleted or pure, unless a value."""
     tally = tally_members(source, item)
-    return len(tally.functions) > tally.bodiless
+    return len(tally.functions) > tally.bodiless and not value_type(tally)
+
+
+def value_type(tally):
+    """Public data and no other state, every operation over it const or static: one concept with its peers."""
+    hidden = tally.data['private'] + tally.data['protected']
+    return tally.data['public'] > 0 and not hidden and not tally.changing
+
+
+def observes(source, member, found):
+    """A member function that cannot change its object: const-qualified or static, and not virtual."""
+    head = source.words(member.first, found.parameters)
+    closing = source.pairs.get(found.parameters, found.parameters)
+    tail = source.words(closing + 1, member.end)
+    virtual = 'virtual' in head or not OVERRIDERS.isdisjoint(tail)
+    return not virtual and (source.word(closing + 1) == 'const' or 'static' in head)
 
 
 def body_owner(source, function, items, plain):

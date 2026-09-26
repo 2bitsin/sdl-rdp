@@ -1,7 +1,7 @@
 #include <sdl-rdp/headless-client.test/codec/gate.hpp>
 
-#include <sdl-rdp/configuration/codec.hpp>
-#include <sdl-rdp/diagnostics/log-level.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
+#include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/headless-client.test/backend/events.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
 #include <sdl-rdp/headless-client.test/client/has-cookie.hpp>

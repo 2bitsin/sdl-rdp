@@ -5,7 +5,7 @@
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
-#include <sdl-rdp/utilities/transcode.hpp>
+#include <sdl-rdp/utilities/text.hpp>
 
 #include <cstddef>
 #include <cstdint>

@@ -1,7 +1,6 @@
 #pragma once
 #include <sdl-rdp/headless-client.test/client/client.hpp>
-#include <sdl-rdp/utilities/extent.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 
 #include <functional>
 #include <memory>

@@ -1,7 +1,7 @@
 #pragma once
 #include <sdl-rdp/diagnostics/forward.hpp>
-#include <sdl-rdp/drive/drive.hpp>
 #include <sdl-rdp/drive/packet.hpp>
+#include <sdl-rdp/drive/records.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/freerdp-facade/rdpdr.hpp>
 #include <sdl-rdp/freerdp-facade/signalled.hpp>

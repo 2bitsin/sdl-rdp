@@ -338,6 +338,26 @@ def test_header_classes_and_bodies(tmp_path, source, expected):
     assert labels(tmp_path, source, 'sample.hpp') == expected
 
 
+@pytest.mark.parametrize(('source', 'expected'), [
+    ('struct Size {\n  int w{ };\n  int h{ };\n  constexpr auto Area() const -> int { return w * h; }\n};\n', []),
+    ('struct Size {\n  int w{ };\n  auto Twice() const -> int;\n};\n', []),
+    ('struct Count {\n  int n{ };\n  auto Add() -> void;\n};\n', ['classes with member functions 2 > 1']),
+    ('class Size {\npublic:\n  auto Area() const -> int;\nprivate:\n  int w{ };\n};\n',
+     ['classes with member functions 2 > 1']),
+    ('struct Shape {\n  int w{ };\n  virtual auto Area() const -> int;\n};\n', ['classes with member functions 2 > 1']),
+    ('struct Note {\n  auto Text() const -> int;\n};\n', ['classes with member functions 2 > 1']),
+    ('struct Size {\n  int w{ };\n  static auto Unit() -> Size;\n};\n', []),
+    ('struct Count {\n  int n{ };\n  constexpr auto Add() -> void { ++n; }\n};\n',
+     ['classes with member functions 2 > 1']),
+    ('struct S {\n  int w{ };\n  constexpr auto operator+=(S other) -> S&;\n};\n',
+     ['classes with member functions 2 > 1']),
+    ('struct Shape : Base {\n  int w{ };\n  auto Area() const -> int override;\n};\n',
+     ['classes with member functions 2 > 1'])])
+def test_value_types_share_a_header(tmp_path, source, expected):
+    found = labels(tmp_path, 'class A {\npublic:\n  void F();\n};\n' + source, 'sample.hpp')
+    assert [label for label in found if label.startswith('classes with')] == expected
+
+
 def test_sources_are_not_measured_as_headers(tmp_path):
     assert labels(tmp_path, 'class A {\n  void F() { }\n};\nclass B {\n  void G() { }\n};\n') == []
 

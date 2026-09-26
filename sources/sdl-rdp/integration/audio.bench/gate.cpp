@@ -1,12 +1,12 @@
 #include <sdl-rdp/headless-client.test/audio/gate.hpp>
 
-#include <sdl-rdp/configuration/codec.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/headless-client.test/audio/tone-measurements.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
 #include <sdl-rdp/headless-client.test/graphics/observer.hpp>
 #include <sdl-rdp/integration/support.bench/session.hpp>
 #include <sdl-rdp/utilities/deadline.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/stopwatch.hpp>
 
 #include <chrono>

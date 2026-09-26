@@ -1,7 +1,6 @@
-#include <sdl-rdp/configuration/codec.hpp>
 #include <sdl-rdp/configuration/exceptions.hpp>
 #include <sdl-rdp/configuration/setup.hpp>
-#include <sdl-rdp/diagnostics/log-level.hpp>
+#include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/headless-client.test/backend/config.hpp>
 #include <sdl-rdp/headless-client.test/backend/events.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
@@ -10,10 +9,10 @@
 #include <sdl-rdp/headless-client.test/codec/mode.hpp>
 #include <sdl-rdp/headless-client.test/frame/pattern.hpp>
 #include <sdl-rdp/link/event.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
+#include <sdl-rdp/utilities/posix.hpp>
 #include <sdl-rdp/utilities/support.test/out-of-range-enum.hpp>
-#include <sdl-rdp/utilities/system-call.hpp>
 
 #include <algorithm>
 #include <cstddef>

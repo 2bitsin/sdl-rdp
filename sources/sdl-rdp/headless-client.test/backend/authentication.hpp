@@ -2,10 +2,8 @@
 #include "instance.hpp"
 #include "status.hpp"
 #include <sdl-rdp/auth/account.hpp>
-#include <sdl-rdp/configuration/auth-mode.hpp>
 #include <sdl-rdp/configuration/credential-check.hpp>
 #include <sdl-rdp/configuration/setup.hpp>
-#include <sdl-rdp/diagnostics/log-level.hpp>
 #include <sdl-rdp/diagnostics/log-sink.hpp>
 
 #include <gtest/gtest.h>

@@ -5,7 +5,7 @@
 #include <sdl-rdp/headless-client.test/backend/events.hpp>
 #include <sdl-rdp/headless-client.test/drive/share-drive.hpp>
 #include <sdl-rdp/link/event.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 
 #include <oxbox/platform/file-writer.hpp>
 #include <algorithm>

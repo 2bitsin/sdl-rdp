@@ -1,5 +1,4 @@
 #include <oxbox/utilities/span.hpp>
-#include <sdl-rdp/configuration/codec.hpp>
 #include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/headless-client.test/backend/config.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
@@ -9,7 +8,7 @@
 #include <sdl-rdp/headless-client.test/frame/counter.hpp>
 #include <sdl-rdp/headless-client.test/frame/pattern.hpp>
 #include <sdl-rdp/picture/frame-layout.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 
 #include <gtest/gtest.h>
 #include <oxbox/platform/scratch-area.hpp>

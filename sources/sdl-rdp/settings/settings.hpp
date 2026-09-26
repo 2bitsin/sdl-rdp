@@ -1,6 +1,5 @@
 #pragma once
-#include <sdl-rdp/configuration/auth-mode.hpp>
-#include <sdl-rdp/configuration/codec.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/settings/aspect.hpp>
 #include <sdl-rdp/settings/refresh.hpp>
 #include <sdl-rdp/utilities/bounded.hpp>

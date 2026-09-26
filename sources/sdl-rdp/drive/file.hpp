@@ -1,7 +1,7 @@
 #pragma once
 #include <sdl-rdp/drive/channel.hpp>
-#include <sdl-rdp/drive/file-status.hpp>
 #include <sdl-rdp/drive/packet.hpp>
+#include <sdl-rdp/drive/records.hpp>
 #include <sdl-rdp/freerdp-facade/rdpdr.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 

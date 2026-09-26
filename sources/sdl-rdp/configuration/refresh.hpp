@@ -1,13 +1,18 @@
 #pragma once
-#include <sdl-rdp/configuration/refresh-mode.hpp>
-
+#include <_buildutil/reflect.hpp>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 
 namespace sdl_rdp::configuration::detail::refresh {
 inline constexpr std::uint32_t MillihertzPerHz = 1000;
-using sdl_rdp::configuration::RefreshMode;
+enum class RefreshMode : std::uint8_t {
+  Fixed = 0,
+  Client _Label("auto-client")          = 1,
+  Average _Label("auto-client-average") = 2,
+  Sender _Label("auto-sender")          = 3
+};
+constexpr auto reflect_scheme(RefreshMode* tag);
 
 enum class Direction{ Down, Hold, Up };
 struct WireSample {
@@ -51,5 +56,6 @@ private:
 namespace sdl_rdp::configuration {
 using detail::refresh::MillihertzPerHz;
 using detail::refresh::Refresh;
+using detail::refresh::RefreshMode;
 using detail::refresh::WireSample;
 }

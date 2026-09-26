@@ -1,5 +1,5 @@
 #pragma once
-#include <sdl-rdp/utilities/rect.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/video/gfx/channel.hpp>
 
 #include <freerdp/peer.h>

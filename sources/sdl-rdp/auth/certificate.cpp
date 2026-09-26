@@ -3,9 +3,8 @@
 #include <sdl-rdp/auth/exceptions.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
-#include <sdl-rdp/utilities/descriptor.hpp>
 #include <sdl-rdp/utilities/exceptions.hpp>
-#include <sdl-rdp/utilities/system-call.hpp>
+#include <sdl-rdp/utilities/posix.hpp>
 
 #include <freerdp/crypto/certificate.h>
 #include <freerdp/crypto/privatekey.h>

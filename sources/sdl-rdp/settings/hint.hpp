@@ -1,6 +1,6 @@
 #pragma once
 #include <sdl-rdp/settings/settings.hpp>
-#include <sdl-rdp/utilities/ascii.hpp>
+#include <sdl-rdp/utilities/text.hpp>
 
 #include <_buildutil/reflect.hpp>
 #include <algorithm>

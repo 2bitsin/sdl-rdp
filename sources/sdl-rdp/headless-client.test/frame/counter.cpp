@@ -1,6 +1,6 @@
 #include <sdl-rdp/headless-client.test/frame/counter.hpp>
 
-#include <sdl-rdp/utilities/rect.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 
 #include <algorithm>
 #include <cstddef>

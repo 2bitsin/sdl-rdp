@@ -1,7 +1,7 @@
 #pragma once
 #include <sdl-rdp/picture/forward.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/video/forward.hpp>
 #include <sdl-rdp/video/tap.hpp>
 

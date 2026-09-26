@@ -1,9 +1,9 @@
 #pragma once
-#include <sdl-rdp/configuration/codec.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/headless-client.test/backend/events.hpp>
 #include <sdl-rdp/headless-client.test/frame/observer.hpp>
 #include <sdl-rdp/headless-client.test/graphics/observer.hpp>
-#include <sdl-rdp/utilities/extent.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 
 #include <atomic>
 #include <cstddef>

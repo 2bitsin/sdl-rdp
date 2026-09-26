@@ -2,11 +2,11 @@
 #include <freerdp/channels/rdpdr.h>
 #include <oxbox/utilities/span.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
-#include <sdl-rdp/diagnostics/log-level.hpp>
+#include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/drive/capabilities.hpp>
-#include <sdl-rdp/drive/drive.hpp>
 #include <sdl-rdp/drive/exceptions.hpp>
 #include <sdl-rdp/drive/label.hpp>
+#include <sdl-rdp/drive/records.hpp>
 #include <sdl-rdp/link/event-queue.hpp>
 #include <sdl-rdp/link/event.hpp>
 #include <sdl-rdp/link/peer-link.hpp>

@@ -1,7 +1,7 @@
 #include <sdl-rdp/picture/frame-store.hpp>
 
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
 
 #include <cstdint>
 #include <source_location>

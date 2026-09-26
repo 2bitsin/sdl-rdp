@@ -1,9 +1,8 @@
 #pragma once
 #include "observer.hpp"
-#include <sdl-rdp/configuration/codec.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/headless-client.test/frame/checks.hpp>
-#include <sdl-rdp/utilities/aspect-ratio.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 
 #include <gtest/gtest.h>
 #include <cstddef>

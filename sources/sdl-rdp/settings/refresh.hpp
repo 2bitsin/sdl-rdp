@@ -1,5 +1,5 @@
 #pragma once
-#include <sdl-rdp/configuration/refresh-mode.hpp>
+#include <sdl-rdp/configuration/refresh.hpp>
 #include <sdl-rdp/utilities/bounded.hpp>
 
 #include <cstdint>

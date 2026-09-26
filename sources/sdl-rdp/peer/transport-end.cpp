@@ -2,7 +2,7 @@
 
 #include <sdl-rdp/auth/authenticator.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
-#include <sdl-rdp/diagnostics/log-level.hpp>
+#include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/diagnostics/logging.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/peer-link.hpp>

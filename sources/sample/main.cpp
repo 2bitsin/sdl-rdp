@@ -1,10 +1,7 @@
 #include <sample/auth.hpp>
 #include <sample/check.hpp>
-#include <sample/clipboard.hpp>
 #include <sample/drives.hpp>
 #include <sample/events.hpp>
-#include <sample/input.hpp>
-#include <sample/printed.hpp>
 #include <sample/released.hpp>
 
 #include <SDL3/SDL.h>
@@ -64,6 +61,21 @@ auto PrintCodecChange(SDL_Window& window, std::string& previous) -> void {
   }
 }
 
+auto InputMode(SDL_Event const& event, SDL_Window& window) -> void {
+  if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat) return;
+  switch (event.key.scancode) {
+  case SDL_SCANCODE_F6: Check(SDL_SetWindowSize(&window, 1920, 1080)); break;
+  case SDL_SCANCODE_F2:
+    Check(SDL_TextInputActive(&window) ? SDL_StopTextInput(&window) : SDL_StartTextInput(&window));
+    SDL_Log("event TEXT_MODE active=%d", SDL_TextInputActive(&window));
+    break;
+  case SDL_SCANCODE_F3:
+    Check(SDL_SetWindowRelativeMouseMode(&window, !SDL_GetWindowRelativeMouseMode(&window)));
+    SDL_Log("event RELATIVE_MODE active=%d", SDL_GetWindowRelativeMouseMode(&window));
+    break;
+  default: break;
+  }
+}
 auto WindowShortcut(SDL_Event const& event, SDL_Window& window) -> void {
   if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat) return;
   if (event.key.scancode == SDL_SCANCODE_F4)

@@ -1,6 +1,6 @@
 #include <sdl-rdp/headless-client.test/utilities/octets.hpp>
 
-#include <sdl-rdp/utilities/transcode.hpp>
+#include <sdl-rdp/utilities/text.hpp>
 
 #include <oxbox/utilities/span.hpp>
 #include <oxbox/utilities/transcode.hpp>

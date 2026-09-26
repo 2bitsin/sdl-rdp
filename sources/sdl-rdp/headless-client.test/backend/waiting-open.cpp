@@ -1,7 +1,6 @@
 #include <sdl-rdp/headless-client.test/backend/waiting-open.hpp>
 #include <oxbox/utilities/number-text.hpp>
 #include <sdl-rdp/configuration/setup.hpp>
-#include <sdl-rdp/diagnostics/log-level.hpp>
 #include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
 #include <sdl-rdp/link/event.hpp>

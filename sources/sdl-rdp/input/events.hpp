@@ -3,9 +3,9 @@
 #include <sdl-rdp/diagnostics/forward.hpp>
 #include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/picture/forward.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/operation-name.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
 
 #include <freerdp/freerdp.h>
 #include <freerdp/server/rdpei.h>

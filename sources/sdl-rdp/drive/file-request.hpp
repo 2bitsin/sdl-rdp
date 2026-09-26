@@ -1,6 +1,6 @@
 #pragma once
-#include <sdl-rdp/drive/file-access.hpp>
 #include <sdl-rdp/drive/packet.hpp>
+#include <sdl-rdp/drive/records.hpp>
 #include <sdl-rdp/freerdp-facade/rdpdr.hpp>
 
 #include <cstddef>

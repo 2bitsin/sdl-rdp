@@ -1,4 +1,4 @@
-#include <sdl-rdp/configuration/codec.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/headless-client.test/backend/events.hpp>
 #include <sdl-rdp/headless-client.test/backend/status.hpp>
 #include <sdl-rdp/headless-client.test/client/display.hpp>
@@ -7,7 +7,7 @@
 #include <sdl-rdp/headless-client.test/utilities/published.hpp>
 #include <sdl-rdp/link/event.hpp>
 #include <sdl-rdp/session/backend.hpp>
-#include <sdl-rdp/utilities/extent.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 
 #include <array>
 #include <condition_variable>

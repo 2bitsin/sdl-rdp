@@ -1,5 +1,5 @@
 #pragma once
-#include <sdl-rdp/configuration/codec.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
 #include <sdl-rdp/headless-client.test/backend/logs.hpp>
 #include <sdl-rdp/headless-client.test/client/client.hpp>

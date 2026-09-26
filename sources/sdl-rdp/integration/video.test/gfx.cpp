@@ -1,5 +1,5 @@
-#include <sdl-rdp/configuration/codec.hpp>
-#include <sdl-rdp/diagnostics/log-level.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
+#include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/headless-client.test/backend/events.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
 #include <sdl-rdp/headless-client.test/frame/pattern.hpp>
@@ -7,9 +7,7 @@
 #include <sdl-rdp/headless-client.test/graphics/observer.hpp>
 #include <sdl-rdp/picture/geometry.hpp>
 #include <sdl-rdp/session/backend.hpp>
-#include <sdl-rdp/utilities/aspect-ratio.hpp>
-#include <sdl-rdp/utilities/extent.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/video/avc/encoder.hpp>
 #include <sdl-rdp/video/avc/encoding.hpp>
 #include <sdl-rdp/video/gfx/protocol.hpp>

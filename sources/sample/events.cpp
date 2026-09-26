@@ -2,18 +2,23 @@
 
 #include <sample/auth.hpp>
 #include <sample/check.hpp>
-#include <sample/clipboard.hpp>
-#include <sample/input.hpp>
 
 #include <algorithm>
 #include <array>
 #include <cstdint>
 #include <format>
+#include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
 
 namespace sample::detail::events {
+auto Printed(std::string_view text) -> int {
+  Check(std::in_range<int>(text.size()));
+  return static_cast<int>(text.size());
+}
+
 namespace {
 constexpr std::array<std::pair<std::uint32_t, std::string_view>, 24> EventLabels{ {
     { SDL_EVENT_KEYBOARD_ADDED              , "KEYBOARD_ADDED"               },
@@ -56,7 +61,39 @@ auto PrintGeometry(SDL_Event const& event, SDL_Window& window) -> void {
     SDL_Log("event GEOMETRY window=%dx%d desktop=%dx%d", w, h, mode->w, mode->h);
   }
 }
-
+auto PrintClipboardEvent(SDL_Event const& event) -> bool {
+  if (event.type != SDL_EVENT_CLIPBOARD_UPDATE) return false;
+  std::unique_ptr<char, decltype(&SDL_free)> const text(SDL_GetClipboardText(), SDL_free);
+  if (text)
+    SDL_Log("event CLIPBOARD text=%s", text.get());
+  else
+    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s", SDL_GetError());
+  return true;
+}
+auto TouchName(std::uint32_t type) -> std::optional<std::string_view> {
+  switch (type) {
+  case SDL_EVENT_FINGER_DOWN:     return "FINGER_DOWN";
+  case SDL_EVENT_FINGER_MOTION:   return "FINGER_MOTION";
+  case SDL_EVENT_FINGER_UP:       return "FINGER_UP";
+  case SDL_EVENT_FINGER_CANCELED: return "FINGER_CANCELED";
+  default:                        return std::nullopt;
+  }
+}
+auto PrintInput(SDL_Event const& event, SDL_Window& window) -> bool {
+  if (event.type == SDL_EVENT_TEXT_INPUT) {
+    SDL_Log("event TEXT_INPUT text=%s", event.text.text);
+    return true;
+  }
+  auto const name = TouchName(event.type);
+  if (!name) return false;
+  int width  = 0;
+  int height = 0;
+  Check(SDL_GetWindowSize(&window, &width, &height));
+  SDL_Log("event %.*s id=%" SDL_PRIu64 " x=%.3f y=%.3f pressure=%.3f window_x=%.0f window_y=%.0f", Printed(*name),
+          name->data(), event.tfinger.fingerID, event.tfinger.x, event.tfinger.y, event.tfinger.pressure,
+          event.tfinger.x * static_cast<float>(width), event.tfinger.y * static_cast<float>(height));
+  return true;
+}
 }
 auto PrintAudioFormat(SDL_AudioDeviceID device) -> void {
   SDL_AudioSpec actual;

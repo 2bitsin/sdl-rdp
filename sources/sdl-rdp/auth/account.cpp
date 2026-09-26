@@ -1,7 +1,7 @@
 #include <sdl-rdp/auth/account.hpp>
 
 #include <sdl-rdp/freerdp-facade/ntlm.hpp>
-#include <sdl-rdp/utilities/transcode.hpp>
+#include <sdl-rdp/utilities/text.hpp>
 
 #include <openssl/crypto.h>
 

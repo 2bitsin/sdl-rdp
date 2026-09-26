@@ -1,7 +1,7 @@
 #include <sdl-rdp/utilities/region.hpp>
 
 #include <sdl-rdp/utilities/contract.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 
 #include <algorithm>
 #include <cstddef>

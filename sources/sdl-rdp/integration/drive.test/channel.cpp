@@ -1,8 +1,7 @@
-#include <sdl-rdp/drive/directory-entry.hpp>
-#include <sdl-rdp/drive/drive.hpp>
 #include <sdl-rdp/drive/exceptions.hpp>
 #include <sdl-rdp/drive/file.hpp>
 #include <sdl-rdp/drive/files.hpp>
+#include <sdl-rdp/drive/records.hpp>
 #include <sdl-rdp/headless-client.test/drive/checks.hpp>
 #include <sdl-rdp/headless-client.test/drive/rdpdr-packets.hpp>
 #include <sdl-rdp/headless-client.test/utilities/io.hpp>

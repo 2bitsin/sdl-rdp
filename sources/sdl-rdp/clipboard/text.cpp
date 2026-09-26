@@ -3,7 +3,7 @@
 #include <sdl-rdp/clipboard/channel.hpp>
 #include <sdl-rdp/clipboard/exceptions.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
-#include <sdl-rdp/utilities/transcode.hpp>
+#include <sdl-rdp/utilities/text.hpp>
 
 #include <algorithm>
 #include <cstdint>

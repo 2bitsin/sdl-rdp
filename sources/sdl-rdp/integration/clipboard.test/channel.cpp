@@ -6,7 +6,7 @@
 #include <sdl-rdp/headless-client.test/utilities/octets.hpp>
 #include <sdl-rdp/link/event.hpp>
 #include <sdl-rdp/utilities/exceptions.hpp>
-#include <sdl-rdp/utilities/transcode.hpp>
+#include <sdl-rdp/utilities/text.hpp>
 
 #include <gtest/gtest.h>
 #include <oxbox/platform/scratch-area.hpp>

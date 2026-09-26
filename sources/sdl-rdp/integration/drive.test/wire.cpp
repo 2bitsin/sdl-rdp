@@ -1,13 +1,13 @@
-#include <sdl-rdp/diagnostics/log-level.hpp>
-#include <sdl-rdp/drive/drive.hpp>
+#include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/drive/exceptions.hpp>
 #include <sdl-rdp/drive/file.hpp>
+#include <sdl-rdp/drive/records.hpp>
 #include <sdl-rdp/headless-client.test/client/channels.hpp>
 #include <sdl-rdp/headless-client.test/drive/checks.hpp>
 #include <sdl-rdp/headless-client.test/drive/rdpdr-packets.hpp>
 #include <sdl-rdp/headless-client.test/utilities/thrown-text.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
-#include <sdl-rdp/utilities/transcode.hpp>
+#include <sdl-rdp/utilities/text.hpp>
 
 #include <freerdp/channels/rdpdr.h>
 #include <array>

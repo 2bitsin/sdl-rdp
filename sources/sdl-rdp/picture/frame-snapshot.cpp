@@ -2,7 +2,7 @@
 
 #include <sdl-rdp/picture/geometry.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 
 #include <cstddef>
 #include <cstdint>

@@ -1,6 +1,5 @@
 #pragma once
 #include <sdl-rdp/utilities/contract.hpp>
-#include <sdl-rdp/utilities/extent.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 
 #include <algorithm>
@@ -10,7 +9,19 @@
 #include <ranges>
 #include <source_location>
 
-namespace sdl_rdp::utilities::detail::rect {
+namespace sdl_rdp::utilities::detail::geometry {
+inline constexpr std::size_t PixelBytes = 4;
+struct Extent {
+  std::uint32_t width { };
+  std::uint32_t height{ };
+};
+struct AspectRatio {
+  std::uint32_t numerator  { };
+  std::uint32_t denominator{ };
+};
+constexpr auto operator==(AspectRatio left, AspectRatio right) noexcept -> bool {
+  return left.numerator == right.numerator && left.denominator == right.denominator;
+}
 struct Rect {
   int x{ };
   int y{ };
@@ -69,13 +80,16 @@ inline auto Intersect(Rect left, Rect right) -> std::optional<Rect> {
 }
 
 namespace sdl_rdp::utilities {
-using detail::rect::AreaBytes;
-using detail::rect::ExpectsBand;
-using detail::rect::Rect;
-using detail::rect::RowBytes;
-using detail::rect::Rows;
-using detail::rect::SameSize;
-using detail::rect::Touches;
-using detail::rect::Union;
-using detail::rect::Whole;
+using detail::geometry::AreaBytes;
+using detail::geometry::AspectRatio;
+using detail::geometry::ExpectsBand;
+using detail::geometry::Extent;
+using detail::geometry::PixelBytes;
+using detail::geometry::Rect;
+using detail::geometry::RowBytes;
+using detail::geometry::Rows;
+using detail::geometry::SameSize;
+using detail::geometry::Touches;
+using detail::geometry::Union;
+using detail::geometry::Whole;
 }

@@ -1,5 +1,5 @@
 #pragma once
-#include <sdl-rdp/configuration/codec.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
 
 #include <gtest/gtest.h>
 #include <cstdint>

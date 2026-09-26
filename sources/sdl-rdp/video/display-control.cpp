@@ -9,8 +9,8 @@
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/picture/desktop-layout.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
 
 #include <freerdp/channels/wtsvc.h>
 #include <freerdp/settings.h>

@@ -5,7 +5,7 @@
 #include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/failure-log.hpp>
-#include <sdl-rdp/diagnostics/log-level.hpp>
+#include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/freerdp-facade/wait-handle.hpp>
@@ -14,9 +14,8 @@
 #include <sdl-rdp/session/session.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
-#include <sdl-rdp/utilities/descriptor.hpp>
 #include <sdl-rdp/utilities/exceptions.hpp>
-#include <sdl-rdp/utilities/system-call.hpp>
+#include <sdl-rdp/utilities/posix.hpp>
 
 #include <freerdp/channels/channels.h>
 #include <winpr/ssl.h>

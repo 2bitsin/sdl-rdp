@@ -1,5 +1,5 @@
 #include <sdl-rdp/headless-client.test/backend/logs.hpp>
-#include <sdl-rdp/diagnostics/log-level.hpp>
+#include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <cstddef>
 #include <regex>
 

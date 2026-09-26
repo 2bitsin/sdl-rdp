@@ -1,5 +1,5 @@
 #pragma once
-#include <sdl-rdp/utilities/extent.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 #include <sdl-rdp/video/avc/encoding.hpp>
 

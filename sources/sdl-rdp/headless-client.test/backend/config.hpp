@@ -1,6 +1,6 @@
 #pragma once
 #include <sdl-rdp/configuration/setup.hpp>
-#include <sdl-rdp/utilities/extent.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 
 #include <filesystem>
 

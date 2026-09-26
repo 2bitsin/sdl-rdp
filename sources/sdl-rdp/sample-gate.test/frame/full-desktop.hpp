@@ -1,7 +1,7 @@
 #pragma once
 #include <sdl-rdp/headless-client.test/client/client.hpp>
 #include <sdl-rdp/headless-client.test/frame/update-hook.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <cstddef>
 #include <vector>
 

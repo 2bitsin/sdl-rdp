@@ -2,7 +2,7 @@
 
 #include <sdl-rdp/configuration/configuration.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
-#include <sdl-rdp/diagnostics/log-level.hpp>
+#include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/diagnostics/trace-queue.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/event-queue.hpp>

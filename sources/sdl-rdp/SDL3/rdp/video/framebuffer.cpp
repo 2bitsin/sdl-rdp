@@ -5,8 +5,8 @@
 #include <sdl-rdp/picture/frame-layout.hpp>
 #include <sdl-rdp/session/backend.hpp>
 #include <sdl-rdp/utilities/deadline.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
 #include <algorithm>
 #include <chrono>
 #include <cstddef>

@@ -7,13 +7,19 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
-namespace sdl_rdp::utilities::detail::transcode {
+namespace sdl_rdp::utilities::detail::text {
 inline constexpr oxbox::utilities::TextFormat Utf16Little{ .encoding = oxbox::utilities::Encoding::UTF16,
                                                            .order    = std::endian::little };
+// ASCII only, never the locale's: identifiers and hint names are ASCII.
+constexpr auto AsciiUpper(char letter) -> char {
+  return letter >= 'a' && letter <= 'z' ? static_cast<char>(letter - 'a' + 'A') : letter;
+}
+auto CopyTerminated(std::span<char> field, std::string_view text) -> void;
 template <class Output, class Map = std::identity>
 auto TranscodeRange(std::span<std::byte const> input, oxbox::utilities::TextFormat source,
                     oxbox::utilities::TextFormat target, Map map = { }) -> Output {
@@ -38,7 +44,9 @@ auto Utf16(std::string_view utf8) -> std::u16string;
 }
 
 namespace sdl_rdp::utilities {
-using detail::transcode::TranscodeRange;
-using detail::transcode::Utf16;
-using detail::transcode::Utf16Little;
+using detail::text::AsciiUpper;
+using detail::text::CopyTerminated;
+using detail::text::TranscodeRange;
+using detail::text::Utf16;
+using detail::text::Utf16Little;
 }

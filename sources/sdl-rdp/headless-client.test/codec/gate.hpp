@@ -1,7 +1,7 @@
 #pragma once
 #include "session.hpp"
 #include <sdl-rdp/link/event.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 
 namespace sdl_rdp::headless_client_test::codec::detail::gate {
 using sdl_rdp::headless_client_test::client::Client;

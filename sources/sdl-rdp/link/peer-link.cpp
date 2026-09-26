@@ -5,7 +5,7 @@
 #include <sdl-rdp/link/exceptions.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/exceptions.hpp>
-#include <sdl-rdp/utilities/terminated-copy.hpp>
+#include <sdl-rdp/utilities/text.hpp>
 
 #include <freerdp/channels/wtsvc.h>
 #include <freerdp/settings.h>

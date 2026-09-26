@@ -1,7 +1,7 @@
 #pragma once
 #include "instance.hpp"
 #include "logs.hpp"
-#include <sdl-rdp/configuration/codec.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/headless-client.test/client/client.hpp>
 #include <sdl-rdp/headless-client.test/frame/pattern.hpp>
 #include <sdl-rdp/link/event.hpp>

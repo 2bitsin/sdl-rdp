@@ -9,9 +9,9 @@
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/picture/geometry.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/utilities/operation-name.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/utilities/stopwatch.hpp>
 #include <sdl-rdp/video/acknowledgement-window.hpp>
 #include <sdl-rdp/video/encoder.hpp>

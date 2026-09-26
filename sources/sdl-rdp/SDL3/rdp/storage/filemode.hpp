@@ -1,5 +1,5 @@
 #pragma once
-#include <sdl-rdp/drive/file-access.hpp>
+#include <sdl-rdp/drive/records.hpp>
 #include <string_view>
 namespace sdl3::rdp::storage::detail::filemode {
 using sdl_rdp::drive::FileAccess;

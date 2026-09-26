@@ -1,8 +1,7 @@
 #include <sdl-rdp/settings/file.hpp>
 
-#include <sdl-rdp/configuration/auth-mode.hpp>
-#include <sdl-rdp/configuration/codec.hpp>
-#include <sdl-rdp/configuration/refresh-mode.hpp>
+#include <sdl-rdp/configuration/refresh.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/settings/exceptions.hpp>
 
 #include <gtest/gtest.h>

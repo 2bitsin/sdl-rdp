@@ -1,9 +1,9 @@
 #include <sdl-rdp/peer/loop.hpp>
 
 #include <sdl-rdp/auth/authenticator.hpp>
-#include <sdl-rdp/configuration/auth-mode.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
-#include <sdl-rdp/diagnostics/log-level.hpp>
+#include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/diagnostics/logging.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/freerdp-facade/signalled.hpp>
@@ -16,7 +16,7 @@
 #include <sdl-rdp/picture/desktop-layout.hpp>
 #include <sdl-rdp/picture/frame-store.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/scoped.hpp>
 #include <sdl-rdp/video/acknowledgement-window.hpp>
 

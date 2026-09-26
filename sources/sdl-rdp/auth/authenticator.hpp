@@ -1,8 +1,8 @@
 #pragma once
 #include <sdl-rdp/auth/credentials.hpp>
 #include <sdl-rdp/auth/state.hpp>
-#include <sdl-rdp/configuration/auth-mode.hpp>
 #include <sdl-rdp/configuration/forward.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/diagnostics/forward.hpp>
 #include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/utilities/nt-owf.hpp>

@@ -1,6 +1,7 @@
 #pragma once
+#include <string_view>
 
-namespace sdl_rdp::utilities::detail::descriptor {
+namespace sdl_rdp::utilities::detail::posix {
 class Descriptor {
 public:
   explicit           Descriptor(int owned)                                 noexcept;
@@ -17,8 +18,17 @@ private:
   static constexpr int Closed     = -1;
   int                  descriptor;
 };
+struct SocketPair {
+  Descriptor server;
+  Descriptor client;
+};
+auto SystemCall(int result, std::string_view operation) -> int;
+auto ConnectedSockets()                                 -> SocketPair;
 }
 
 namespace sdl_rdp::utilities {
-using detail::descriptor::Descriptor;
+using detail::posix::ConnectedSockets;
+using detail::posix::Descriptor;
+using detail::posix::SocketPair;
+using detail::posix::SystemCall;
 }

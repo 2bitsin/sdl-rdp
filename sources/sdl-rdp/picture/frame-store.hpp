@@ -1,12 +1,10 @@
 #pragma once
 #include <sdl-rdp/picture/frame-snapshot.hpp>
 #include <sdl-rdp/picture/geometry.hpp>
-#include <sdl-rdp/utilities/aspect-ratio.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/deadline.hpp>
-#include <sdl-rdp/utilities/extent.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
 
 #include <chrono>
 #include <concepts>

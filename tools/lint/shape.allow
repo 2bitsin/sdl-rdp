@@ -1,4 +1,4 @@
-sample/main.cpp:86: DrawScheduled parameters 6 > 5 # size in #19
+sample/main.cpp:98: DrawScheduled parameters 6 > 5 # size in #19
 sdl-rdp/SDL3/rdp/video/videodata.hpp: SDL_VideoData data members 11 > 10 # holds its share of the driver since OwnedDriver went (#82)
 sdl-rdp/SDL3/rdp/video/videodata.hpp: SDL_VideoData member functions 16 > 15 # Driver(), the SDL callbacks' way to the driver, since OwnedDriver went (#82)
 sdl-rdp/audio/channel.hpp: AudioChannel data members 24 > 10 # collaborators replace Peer&; split in #6

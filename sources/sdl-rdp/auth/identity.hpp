@@ -1,6 +1,6 @@
 #pragma once
 #include <sdl-rdp/utilities/contract.hpp>
-#include <sdl-rdp/utilities/transcode.hpp>
+#include <sdl-rdp/utilities/text.hpp>
 
 #include <oxbox/utilities/span.hpp>
 #include <winpr/sspi.h>

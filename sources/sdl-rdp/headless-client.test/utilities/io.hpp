@@ -1,6 +1,6 @@
 #pragma once
 #include <sdl-rdp/utilities/contract.hpp>
-#include <sdl-rdp/utilities/descriptor.hpp>
+#include <sdl-rdp/utilities/posix.hpp>
 
 #include <array>
 #include <cerrno>

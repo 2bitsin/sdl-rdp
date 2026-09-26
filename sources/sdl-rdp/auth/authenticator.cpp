@@ -5,7 +5,7 @@
 #include <sdl-rdp/configuration/configuration.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/failure-log.hpp>
-#include <sdl-rdp/diagnostics/log-level.hpp>
+#include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/diagnostics/logging.hpp>
 #include <sdl-rdp/freerdp-facade/ntlm.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
@@ -13,8 +13,7 @@
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
-#include <sdl-rdp/utilities/terminated-copy.hpp>
-#include <sdl-rdp/utilities/transcode.hpp>
+#include <sdl-rdp/utilities/text.hpp>
 
 #include <freerdp/settings.h>
 #include <algorithm>

@@ -2,9 +2,8 @@
 #include <sdl-rdp/SDL3/rdp/driver.hpp>
 #include <sdl-rdp/SDL3/rdp/sdl/boundary.hpp>
 #include <sdl-rdp/SDL3/rdp/sdl/resources.hpp>
-#include <sdl-rdp/drive/directory-entry.hpp>
-#include <sdl-rdp/drive/file-status.hpp>
 #include <sdl-rdp/drive/files.hpp>
+#include <sdl-rdp/drive/records.hpp>
 #include <sdl-rdp/session/backend.hpp>
 #include <array>
 #include <cstddef>

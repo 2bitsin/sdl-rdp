@@ -1,7 +1,7 @@
 #include <sdl-rdp/configuration/validation.hpp>
 
-#include <sdl-rdp/configuration/auth-mode.hpp>
 #include <sdl-rdp/configuration/exceptions.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/picture/geometry.hpp>
 #include <sdl-rdp/utilities/exceptions.hpp>
 

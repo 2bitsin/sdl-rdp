@@ -2,8 +2,8 @@
 
 #include <sdl-rdp/sample-gate.test/process/spawn-actions.hpp>
 
-#include <sdl-rdp/utilities/descriptor.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
+#include <sdl-rdp/utilities/posix.hpp>
 #include <array>
 #include <cerrno>
 #include <chrono>

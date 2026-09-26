@@ -11,7 +11,7 @@
 #include <sdl-rdp/link/event-queue.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/picture/frame-store.hpp>
-#include <sdl-rdp/utilities/socket-pair.hpp>
+#include <sdl-rdp/utilities/posix.hpp>
 #include <sdl-rdp/video/encoder.hpp>
 #include <sdl-rdp/video/frame/pacing.hpp>
 #include <sdl-rdp/video/frame/statistics.hpp>
@@ -37,6 +37,7 @@ using sdl_rdp::link::DynamicChannel;
 using sdl_rdp::link::EventQueue;
 using sdl_rdp::link::PeerLink;
 using sdl_rdp::picture::FrameStore;
+using sdl_rdp::utilities::ConnectedSockets;
 using sdl_rdp::utilities::SocketPair;
 using sdl_rdp::video::Encoder;
 using sdl_rdp::video::GraphicsLink;
@@ -50,7 +51,7 @@ auto Config(ScratchArea const& certificates) -> Setup {
 }
 auto AcceptedPeer(SocketPair& sockets) -> PeerHandle {
   WTSRegisterWtsApiFunctionTable(FreeRDP_InitWtsApi());
-  return PeerHandle{ freerdp_peer_new(sockets.TakeServer().Release()) };
+  return PeerHandle{ freerdp_peer_new(sockets.server.Release()) };
 }
 class PeerParts : public testing::Test {
 protected:
@@ -61,7 +62,7 @@ protected:
   EventQueue          _events;
   Configuration const _configuration{ Config(_certificates), _account      };
   FrameStore          _store        { { .width = 320, .height = 200 }, { } };
-  SocketPair          _sockets;
+  SocketPair          _sockets      { ConnectedSockets()                   };
   PeerLink            _link         { AcceptedPeer(_sockets)               };
 };
 class GraphicsLinkParts : public PeerParts {

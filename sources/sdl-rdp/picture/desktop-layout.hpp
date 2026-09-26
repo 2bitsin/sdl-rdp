@@ -1,6 +1,5 @@
 #pragma once
-#include <sdl-rdp/utilities/extent.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 
 #include <freerdp/settings.h>
 #include <cstdint>

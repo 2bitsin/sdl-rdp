@@ -1,4 +1,4 @@
-#include <sdl-rdp/utilities/rect.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 
 #include <sdl-rdp/utilities/region.hpp>
 
@@ -6,8 +6,7 @@
 #include <limits>
 #include <tuple>
 
-namespace sdl_rdp::utilities::detail::rect {
-using sdl_rdp::utilities::Rect;
+namespace sdl_rdp::utilities::detail::geometry {
 namespace {
 auto ThenOverlapBounds(Rect const& bounds) -> void {
   EXPECT_EQ(bounds.x, 0);

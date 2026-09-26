@@ -1,5 +1,5 @@
 #include "defaults.hpp"
-#include <sdl-rdp/configuration/codec.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
 
 namespace sdl3::rdp::settings::detail::defaults {
 using sdl_rdp::configuration::Codec;

@@ -1,11 +1,11 @@
 #include <sdl-rdp/video/legacy-frame.hpp>
 
-#include <sdl-rdp/configuration/codec.hpp>
 #include <sdl-rdp/configuration/configuration.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/video/encoder.hpp>
 #include <sdl-rdp/video/frame/pacing.hpp>
 #include <sdl-rdp/video/peer-frames.hpp>

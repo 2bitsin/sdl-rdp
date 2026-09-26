@@ -1,6 +1,6 @@
 #include <sdl-rdp/sample-gate.test/sample/process.hpp>
 
-#include <sdl-rdp/diagnostics/log-level.hpp>
+#include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/sample-gate.test/sample/launch.hpp>
 
 #include <SDL3/SDL.h>

@@ -1,14 +1,13 @@
 #pragma once
-#include <sdl-rdp/configuration/codec.hpp>
 #include <sdl-rdp/configuration/forward.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/diagnostics/forward.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/link/dynamic-channels.hpp>
 #include <sdl-rdp/link/forward.hpp>
-#include <sdl-rdp/utilities/extent.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/utilities/stopwatch.hpp>
 #include <sdl-rdp/video/avc/encoder.hpp>
 #include <sdl-rdp/video/avc/encoding.hpp>

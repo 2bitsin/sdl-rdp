@@ -1,5 +1,5 @@
 #pragma once
-#include <sdl-rdp/diagnostics/log-level.hpp>
+#include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/headless-client.test/backend/logs.hpp>
 
 #include <SDL3/SDL_log.h>

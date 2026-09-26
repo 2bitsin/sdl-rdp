@@ -1,8 +1,7 @@
 #include <sdl-rdp/session/backend.hpp>
 
-#include <sdl-rdp/configuration/codec.hpp>
 #include <sdl-rdp/configuration/setup.hpp>
-#include <sdl-rdp/diagnostics/log-level.hpp>
+#include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/headless-client.test/backend/config.hpp>
@@ -14,8 +13,8 @@
 #include <sdl-rdp/headless-client.test/frame/pattern.hpp>
 #include <sdl-rdp/headless-client.test/utilities/child-process.hpp>
 #include <sdl-rdp/headless-client.test/utilities/io.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
 
 #include <gtest/gtest.h>
 #include <openssl/pem.h>

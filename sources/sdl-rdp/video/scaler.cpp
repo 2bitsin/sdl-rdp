@@ -3,8 +3,8 @@
 #include <sdl-rdp/picture/desktop-layout.hpp>
 #include <sdl-rdp/picture/frame-snapshot.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/video/peer-frames.hpp>
 
 #include <algorithm>

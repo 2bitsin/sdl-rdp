@@ -1,8 +1,8 @@
 #pragma once
 #include <sdl-rdp/picture/frame-snapshot.hpp>
 #include <sdl-rdp/picture/frame-store.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/utilities/region.hpp>
 
 #include <cstdint>

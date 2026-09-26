@@ -1,11 +1,10 @@
 #pragma once
 #include "observer.hpp"
-#include <sdl-rdp/diagnostics/log-level.hpp>
-#include <sdl-rdp/drive/drive.hpp>
-#include <sdl-rdp/drive/file-access.hpp>
+#include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/drive/file-request.hpp>
 #include <sdl-rdp/drive/file.hpp>
 #include <sdl-rdp/drive/files.hpp>
+#include <sdl-rdp/drive/records.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
 #include <sdl-rdp/headless-client.test/backend/logs.hpp>
 #include <sdl-rdp/headless-client.test/client/client.hpp>

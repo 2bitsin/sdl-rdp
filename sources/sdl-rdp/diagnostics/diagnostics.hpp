@@ -1,5 +1,4 @@
 #pragma once
-#include <sdl-rdp/diagnostics/log-level.hpp>
 #include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/diagnostics/logging.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>

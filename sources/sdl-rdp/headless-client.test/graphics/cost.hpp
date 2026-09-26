@@ -1,8 +1,8 @@
 #pragma once
 #include "backend.hpp"
 #include "observer.hpp"
-#include <sdl-rdp/configuration/codec.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 
 #include <cstdint>
 #include <vector>

@@ -1,7 +1,7 @@
 #include <sdl-rdp/video/encoder.hpp>
 
 #include <sdl-rdp/utilities/contract.hpp>
-#include <sdl-rdp/utilities/extent.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/utilities/stopwatch.hpp>
 

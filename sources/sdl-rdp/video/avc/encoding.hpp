@@ -1,5 +1,5 @@
 #pragma once
-#include <sdl-rdp/utilities/extent.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 
 #include <chrono>
 #include <cstdint>

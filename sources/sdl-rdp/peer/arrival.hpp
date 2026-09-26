@@ -1,5 +1,5 @@
 #pragma once
-#include <sdl-rdp/configuration/codec.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/diagnostics/forward.hpp>
 #include <sdl-rdp/link/event.hpp>
 #include <sdl-rdp/link/forward.hpp>

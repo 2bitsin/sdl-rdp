@@ -1,6 +1,6 @@
 #include <sdl-rdp/headless-client.test/audio/gate.hpp>
 
-#include <sdl-rdp/configuration/codec.hpp>
+#include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/headless-client.test/graphics/observer.hpp>
 #include <sdl-rdp/session/exceptions.hpp>
 

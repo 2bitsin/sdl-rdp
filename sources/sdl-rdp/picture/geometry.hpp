@@ -1,7 +1,5 @@
 #pragma once
-#include <sdl-rdp/utilities/aspect-ratio.hpp>
-#include <sdl-rdp/utilities/extent.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 
 #include <cstdint>
 #include <limits>

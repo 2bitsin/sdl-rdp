@@ -1,7 +1,7 @@
 #include <sdl-rdp/sample-gate.test/frame/next.hpp>
 
 #include <sdl-rdp/sample-gate.test/frame/pattern.hpp>
-#include <sdl-rdp/utilities/rect.hpp>
+#include <sdl-rdp/utilities/geometry.hpp>
 
 #include <algorithm>
 #include <cstdint>
