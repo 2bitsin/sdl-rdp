@@ -2,6 +2,7 @@
 #include <sdl-rdp/diagnostics/forward.hpp>
 #include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/link/forward.hpp>
+#include <sdl-rdp/utilities/pinned.hpp>
 
 #include <freerdp/server/rdpsnd.h>
 #include <chrono>
@@ -19,6 +20,7 @@ using sdl_rdp::freerdp_facade::WaitHandle;
 using sdl_rdp::link::EventQueue;
 using sdl_rdp::link::PeerLink;
 using sdl_rdp::link::SessionAccess;
+using sdl_rdp::utilities::Pinned;
 using sdl_rdp::utilities::Releases;
 
 inline constexpr std::uint32_t CompatibleRate = 44100;
@@ -26,16 +28,12 @@ inline constexpr std::uint32_t NativeRate     = 48000;
 // abi: release steps no single FreeRDP free function performs as a plain call.
 auto FreeSoundContext(RdpsndServerContext* sound) noexcept -> void;
 using SoundContext = std::unique_ptr<RdpsndServerContext, Releases<FreeSoundContext>>;
-class AudioChannel {
+class AudioChannel : private Pinned {
 public:
-       AudioChannel(AudioChannel const&)                            = delete;
-       AudioChannel(AudioChannel&&)                                 = delete;
   using Clock = std::chrono::steady_clock;
        AudioChannel(PeerLink& link, Diagnostics const& diagnostics, EventQueue& events, SessionAccess& session,
                     TraceQueue& traces);
        ~AudioChannel();
-  auto operator=(AudioChannel const&)              -> AudioChannel& = delete;
-  auto operator=(AudioChannel&&)                   -> AudioChannel& = delete;
   auto Initialize()                                -> bool;
   auto Pump()                                      -> bool;
   auto Event() const                               -> WaitHandle;

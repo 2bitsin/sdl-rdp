@@ -5,6 +5,7 @@
 #include <sdl-rdp/freerdp-facade/signalled.hpp>
 #include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/link/forward.hpp>
+#include <sdl-rdp/utilities/pinned.hpp>
 
 #include <freerdp/server/cliprdr.h>
 #include <cstddef>
@@ -21,20 +22,17 @@ using sdl_rdp::freerdp_facade::WaitHandle;
 using sdl_rdp::link::Activation;
 using sdl_rdp::link::EventQueue;
 using sdl_rdp::link::PeerLink;
+using sdl_rdp::utilities::Pinned;
 using sdl_rdp::utilities::Releases;
 
-class ClipboardChannel {
+class ClipboardChannel : private Pinned {
 public:
-       ClipboardChannel(ClipboardChannel const&)               = delete;
-       ClipboardChannel(ClipboardChannel&&)                    = delete;
        ClipboardChannel(PeerLink& link, Activation const& activation, ClipboardStore& store, EventQueue& events,
                         Diagnostics const& diagnostics) noexcept;
        ~ClipboardChannel();
-  auto operator=(ClipboardChannel const&) -> ClipboardChannel& = delete;
-  auto operator=(ClipboardChannel&&)      -> ClipboardChannel& = delete;
-  auto Open()                             -> bool;
-  auto Pump(Signalled const& signaled)    -> bool;
-  auto Event() const                      -> std::optional<WaitHandle>;
+  auto Open()                          -> bool;
+  auto Pump(Signalled const& signaled) -> bool;
+  auto Event() const                   -> std::optional<WaitHandle>;
 
 private:
   class Callbacks;

@@ -9,7 +9,6 @@
 #include <sdl-rdp/video/encoder.hpp>
 #include <sdl-rdp/video/frame/pacing.hpp>
 #include <sdl-rdp/video/peer-frames.hpp>
-#include <sdl-rdp/video/planar-rows.hpp>
 
 #include <freerdp/codec/color.h>
 #include <freerdp/constants.h>
@@ -31,7 +30,7 @@ using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::Rect;
 using sdl_rdp::utilities::RowBytes;
 using sdl_rdp::utilities::Unreachable;
-using sdl_rdp::video::detail::planar_rows::EncodePlanarRows;
+using sdl_rdp::video::EncodePlanarRows;
 
 namespace {
 constexpr std::size_t BITMAP_RECTANGLE_LIMIT = 0xFFFF;
@@ -94,7 +93,7 @@ auto PackedStride(int width, std::uint32_t depth) -> std::uint32_t {
 }
 auto Convert(PixelBand band, std::uint32_t depth) -> std::vector<std::byte> {
   Expects(std::ranges::contains(std::array{ 16u, 24u }, depth), "supported packed colour depth");
-  auto const             area      = band.Area();
+  auto const             area      = band.area;
   auto const             format    = depth == 16 ? PIXEL_FORMAT_RGB16 : PIXEL_FORMAT_BGR24;
   auto const             stride    = PackedStride(area.w, depth);
   std::vector<std::byte> converted(std::size_t{ stride } * Narrowed<std::size_t>(area.h));
@@ -102,7 +101,7 @@ auto Convert(PixelBand band, std::uint32_t depth) -> std::vector<std::byte> {
   auto const             width     = Narrowed<std::uint32_t>(area.w);
   auto const             height    = Narrowed<std::uint32_t>(area.h);
   auto const             source    = Narrowed<std::uint32_t>(RowBytes(area.w));
-  if (!freerdp_image_copy(target.data(), format, stride, 0, 0, width, height, band.Pixels().data(), PIXEL_FORMAT_BGRX32,
+  if (!freerdp_image_copy(target.data(), format, stride, 0, 0, width, height, band.pixels.data(), PIXEL_FORMAT_BGRX32,
                           source, 0, 0, nullptr, FREERDP_FLIP_NONE))
     return { };
   return converted;
@@ -169,7 +168,7 @@ auto LegacyFrame::Planar(Rect area) -> bool {
   return true;
 }
 auto LegacyFrame::AppendBand(PixelBand band) -> bool {
-  auto const area = band.Area();
+  auto const area = band.area;
   if (_format.depth != 32) {
     auto converted = Convert(band, _format.depth);
     if (converted.empty()) return false;
@@ -177,8 +176,8 @@ auto LegacyFrame::AppendBand(PixelBand band) -> bool {
     return true;
   }
   auto const raw = _encoder.SelectedCodec() == Codec::Raw;
-  if (!raw && !_encoder.Encode(band.Pixels(), area.w, area.h)) return false;
-  auto const payload = raw ? oxbox::utilities::AsBytes(band.Pixels()) : _encoder.Payload();
+  if (!raw && !_encoder.Encode(band.pixels, area.w, area.h)) return false;
+  auto const payload = raw ? oxbox::utilities::AsBytes(band.pixels) : _encoder.Payload();
   _queue.packets.push_back({ { Band{ .area = area, .bytes = { payload.begin(), payload.end() } } }, { } });
   return true;
 }

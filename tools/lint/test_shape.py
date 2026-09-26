@@ -319,6 +319,11 @@ def test_report_is_the_allow_entry(tmp_path, capsys):
     ('class A {\npublic:\n  void F();\n};\nclass Pinned {\nprotected:\n  Pinned() = default;\n'
      '  Pinned(Pinned const&) = delete;\n};\n', []),
     ('class A {\npublic:\n  void F();\nprivate:\n  struct Inner {\n    void G();\n  };\n};\n', []),
+    ('class Sink {\npublic:\n  virtual ~Sink() = default;\n  virtual auto Log(int level) -> void = 0;\n};\n'
+     'class A {\npublic:\n  void F();\n};\n', []),
+    ('class Sink {\npublic:\n  virtual ~Sink() = default;\n  virtual auto Log(int level) -> void = 0;\n'
+     '  auto Warn() -> void;\n};\nclass A {\npublic:\n  void F();\n};\n', ['classes with member functions 2 > 1']),
+    ('class Sink {\npublic:\n  virtual ~Sink() = default;\n  virtual auto Log(int level) -> void = 0;\n};\n', []),
     ('template <class T> class A {\npublic:\n  A() { }\n  T F() const { return value; }\n'
      'private:\n  T value;\n};\n', []),
     ('class A {\npublic:\n  int F() const { return value; }\nprivate:\n  int value;\n};\n',

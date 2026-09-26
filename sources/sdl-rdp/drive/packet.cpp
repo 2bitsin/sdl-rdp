@@ -4,9 +4,11 @@
 #include <sdl-rdp/drive/exceptions.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/utilities/transcode.hpp>
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -14,6 +16,7 @@
 namespace sdl_rdp::drive::detail::packet {
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::InvalidEncoding;
+using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::NullArgument;
 using sdl_rdp::utilities::Reported;
 using sdl_rdp::utilities::TranscodeRange;
@@ -37,6 +40,10 @@ auto DrivePacket::Zero(std::size_t count) -> void {
 }
 auto DrivePacket::Append(std::span<std::byte const> data) -> void {
   Writer{ bytes }.Append(data);
+}
+auto DrivePacket::AppendCounted(std::span<std::byte const> data) -> void {
+  Write(Narrowed<std::uint32_t>(data.size()));
+  Append(data);
 }
 auto DrivePacket::Skip(std::size_t count) -> void {
   auto reader = Remaining();

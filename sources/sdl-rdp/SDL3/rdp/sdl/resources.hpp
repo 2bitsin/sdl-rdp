@@ -1,7 +1,6 @@
 #pragma once
 #include "checkedacquisition.hpp"
 #include "internals.hpp"
-#include "pointerstate.hpp"
 #include <sdl-rdp/utilities/scoped.hpp>
 #include <tuple>
 namespace sdl3::rdp::sdl::detail::resources {
@@ -13,6 +12,16 @@ using ScopedMutexLock      = RAIIWrap<SDL_Mutex&, LockMutex, UnlockMutex>;
 auto LockProperties(SDL_PropertiesID properties)            -> SDL_PropertiesID;
 auto UnlockProperties(SDL_PropertiesID properties) noexcept -> void;
 using ScopedPropertiesLock = RAIIWrap<SDL_PropertiesID, LockProperties, UnlockProperties>;
+// SDL handles are C pointers; this policy and CheckedAcquisition are the only place their null value is spelled.
+template <typename HandleTy> class PointerState {
+public:
+  static auto IsNull(HandleTy const& value) noexcept -> bool {
+    return value == nullptr;
+  }
+  static auto MakeNull(HandleTy& value) noexcept -> void {
+    value = nullptr;
+  }
+};
 template <typename HandleTy, auto ACQUIRE, auto RELEASE>
 using Resource = RAIIWrap<HandleTy, CheckedAcquisition<ACQUIRE>{ }, RELEASE, PointerState<HandleTy>::IsNull,
                           PointerState<HandleTy>::MakeNull>;

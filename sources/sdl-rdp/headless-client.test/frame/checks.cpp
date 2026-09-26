@@ -150,7 +150,7 @@ auto FrameChecks::ThenQoe(Client& client, GraphicsObserver& observer) -> void {
   auto&                            channel = observer.Channel();
   ASSERT_EQ(channel.QoeFrameAcknowledge(&channel, &qoe), CHANNEL_RC_OK);
   ASSERT_TRUE(client.Until([&] {
-    auto const received = RequiredGraphics(*backend).Qoe();
+    auto const received = RequiredGraphics(*backend).qoe;
     return received.timestamp == qoe.timestamp && received.timeDiffSE == 7 && received.timeDiffEDR == 9;
   }));
   EXPECT_FALSE(logs.Contains("GFX QoE"));

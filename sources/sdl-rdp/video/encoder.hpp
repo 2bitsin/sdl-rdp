@@ -2,13 +2,17 @@
 #include <sdl-rdp/configuration/codec.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/utilities/extent.hpp>
+#include <sdl-rdp/utilities/rect.hpp>
+#include <sdl-rdp/video/scaler.hpp>
 
 #include <freerdp/codec/nsc.h>
 #include <freerdp/codec/planar.h>
 #include <freerdp/codec/rfx.h>
 #include <freerdp/settings.h>
 #include <winpr/stream.h>
+#include <algorithm>
 #include <chrono>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -18,7 +22,10 @@
 namespace sdl_rdp::video::detail::encoder {
 using sdl_rdp::configuration::Codec;
 using sdl_rdp::utilities::Extent;
+using sdl_rdp::utilities::Rect;
 using sdl_rdp::utilities::Releases;
+using sdl_rdp::utilities::RowBytes;
+using sdl_rdp::utilities::Rows;
 
 // abi: release steps no single FreeRDP free function performs as a plain call.
 auto FreeStream(wStream* stream) noexcept -> void;
@@ -64,8 +71,17 @@ private:
   NsCodecContext           nsc;
   StreamHandle             stream;
 };
+template <std::predicate<Rect, std::span<std::byte const>> Consume>
+auto EncodePlanarRows(Encoder& encoder, Scaler& scaler, Rect area, Consume consume) -> bool {
+  std::vector<std::uint8_t> scratch(RowBytes(area.w));
+  return std::ranges::all_of(Rows(area), [&](Rect row) {
+    auto const pixels = scaler.Copy(row, scratch, RowOrder::TopDown);
+    return encoder.Encode(pixels.pixels, row.w, 1) && consume(row, encoder.Payload());
+  });
+}
 }
 
 namespace sdl_rdp::video {
+using detail::encoder::EncodePlanarRows;
 using detail::encoder::Encoder;
 }

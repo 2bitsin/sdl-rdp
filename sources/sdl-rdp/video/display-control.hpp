@@ -1,7 +1,8 @@
 #pragma once
 #include <sdl-rdp/diagnostics/forward.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
-#include <sdl-rdp/link/channel-slot.hpp>
+#include <sdl-rdp/link/dynamic-channel.hpp>
+#include <sdl-rdp/link/dynamic-channels.hpp>
 #include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/picture/forward.hpp>
 
@@ -13,8 +14,8 @@
 namespace sdl_rdp::video::detail::display_control {
 using sdl_rdp::diagnostics::Diagnostics;
 using sdl_rdp::link::Activation;
-using sdl_rdp::link::ChannelSlot;
 using sdl_rdp::link::DynamicChannel;
+using sdl_rdp::link::DynamicChannels;
 using sdl_rdp::link::EventQueue;
 using sdl_rdp::link::PeerLink;
 using sdl_rdp::picture::DesktopLayout;
@@ -32,16 +33,17 @@ public:
 private:
   class Callbacks;
   auto Layout(DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const& pdu) -> std::uint32_t;
+  auto Assign(std::uint32_t id)                              -> bool;
   auto FailureSource() const noexcept                        -> Diagnostics const&;
   using DisplayContext = std::unique_ptr<DispServerContext, Releases<disp_server_context_free>>;
-  PeerLink&            _link;
-  Activation const&    _activation;
-  DesktopLayout const& _desktop;
-  EventQueue&          _events;
-  Diagnostics const&   _diagnostics;
-  DisplayContext       _context;
-  ChannelSlot          _slot;
-  bool                 _open       { };
+  PeerLink&                                  _link;
+  Activation const&                          _activation;
+  DesktopLayout const&                       _desktop;
+  EventQueue&                                _events;
+  Diagnostics const&                         _diagnostics;
+  DisplayContext                             _context;
+  std::optional<DynamicChannels::Assignment> _assignment;
+  bool                                       _open       { };
 };
 }
 

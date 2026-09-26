@@ -33,8 +33,8 @@ auto StartRefresh(Driver& driver) -> int {
 auto DesktopDisplayMode(Driver& driver) -> SDL_DisplayMode {
   SDL_DisplayMode mode{ };
   mode.format                   = SDL_PIXELFORMAT_XRGB8888;
-  mode.w                        = static_cast<int>(driver.Config().Width());
-  mode.h                        = static_cast<int>(driver.Config().Height());
+  mode.w                        = Narrowed<int>(driver.Config().width);
+  mode.h                        = Narrowed<int>(driver.Config().height);
   mode.refresh_rate_numerator   = StartRefresh(driver);
   mode.refresh_rate_denominator = 1;
   mode.refresh_rate             = static_cast<float>(mode.refresh_rate_numerator);

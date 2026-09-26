@@ -1,5 +1,6 @@
 #pragma once
 #include <sdl-rdp/configuration/forward.hpp>
+#include <sdl-rdp/configuration/refresh.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/forward.hpp>
 #include <sdl-rdp/link/forward.hpp>
@@ -8,8 +9,8 @@
 #include <sdl-rdp/video/acknowledgement-window.hpp>
 #include <sdl-rdp/video/forward.hpp>
 #include <sdl-rdp/video/frame/statistics.hpp>
-#include <sdl-rdp/video/refresh-tracker.hpp>
 
+#include <atomic>
 #include <concepts>
 #include <cstdint>
 #include <format>
@@ -55,16 +56,18 @@ public:
 
 private:
   auto Adjust(std::invocable<Refresh&> auto step) -> void;
-  Diagnostics const&    _diagnostics;
-  EventQueue&           _events;
-  Configuration const&  _configuration;
-  FrameStore&           _store;
-  PeerLink&             _link;
-  Activation const&     _activation;
-  TraceQueue&           _traces;
-  FrameStatistics&      _statistics;
-  AcknowledgementWindow _window;
-  RefreshTracker        _refresh;
+  Diagnostics const&         _diagnostics;
+  EventQueue&                _events;
+  Configuration const&       _configuration;
+  FrameStore&                _store;
+  PeerLink&                  _link;
+  Activation const&          _activation;
+  TraceQueue&                _traces;
+  FrameStatistics&           _statistics;
+  AcknowledgementWindow      _window;
+  Refresh                    _refresh;
+  std::atomic<std::uint32_t> _effective;
+  bool                       _unavailable_logged{ };
 };
 }
 

@@ -3,6 +3,7 @@
 #include <sdl-rdp/drive/file-status.hpp>
 #include <sdl-rdp/drive/packet.hpp>
 #include <sdl-rdp/freerdp-facade/rdpdr.hpp>
+#include <sdl-rdp/utilities/pinned.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -13,16 +14,13 @@
 namespace sdl_rdp::drive::detail::file {
 using sdl_rdp::freerdp_facade::IrpMajor;
 using sdl_rdp::freerdp_facade::IrpMinor;
+using sdl_rdp::utilities::Pinned;
 
 // An open file on a redirected drive; closing it is a request the peer answers, so the destructor contains it.
-class File {
+class File : private Pinned {
 public:
-       File(File const&)                                                         = delete;
-       File(File&&)                                                              = delete;
        File(std::shared_ptr<DriveChannel> source, std::uint32_t device, std::uint32_t file, std::string name);
        ~File();
-  auto operator=(File const&)                                           -> File& = delete;
-  auto operator=(File&&)                                                -> File& = delete;
   auto Close()                                                          -> void;
   auto Channel() const                                                  -> std::shared_ptr<DriveChannel> const&;
   auto Drive() const                                                    -> std::uint32_t;

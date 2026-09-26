@@ -1,6 +1,5 @@
 #pragma once
-#include <sdl-rdp/video/sent-frame.hpp>
-
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -11,9 +10,14 @@ namespace sdl_rdp::video::detail::acknowledgement_window {
 inline constexpr auto        AcknowledgementTimeout  = std::chrono::seconds(1);
 inline constexpr std::size_t AcknowledgedFrameWindow = 2;
 auto WaitMilliseconds(std::chrono::nanoseconds remaining, std::int64_t floor) -> std::uint32_t;
+struct SentFrame {
+  std::uint32_t                         id       { };
+  std::uint64_t                         presented{ };
+  std::chrono::steady_clock::time_point at;
+};
 class AcknowledgementWindow {
 public:
-  using Clock = SentFrame::Clock;
+  using Clock = std::chrono::steady_clock;
   auto Enabled() const noexcept                              -> bool;
   auto Enable() noexcept                                     -> void;
   auto Disable() noexcept                                    -> void;
@@ -39,5 +43,6 @@ private:
 namespace sdl_rdp::video {
 using detail::acknowledgement_window::AcknowledgedFrameWindow;
 using detail::acknowledgement_window::AcknowledgementWindow;
+using detail::acknowledgement_window::SentFrame;
 using detail::acknowledgement_window::WaitMilliseconds;
 }

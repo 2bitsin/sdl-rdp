@@ -40,8 +40,7 @@ auto Record(Named const& entry, bool last) -> DrivePacket {
   record.Write(entry.size);
   record.Write(std::uint64_t{ 4096 });
   record.Write(entry.attributes);
-  record.Write(Narrowed<std::uint32_t>(name.size()));
-  record.Append(name);
+  record.AppendCounted(name);
   return record;
 }
 // MS-FSCC 2.4.10 FILE_DIRECTORY_INFORMATION records behind the IRP response's Length field.
@@ -50,8 +49,7 @@ auto Response(std::initializer_list<Named> entries) -> DrivePacket {
   std::size_t index = 0;
   for (auto const& entry : entries) body.Append(Record(entry, ++index == entries.size()).Bytes());
   DrivePacket response;
-  response.Write(Narrowed<std::uint32_t>(body.Bytes().size()));
-  response.Append(body.Bytes());
+  response.AppendCounted(body.Bytes());
   return response;
 }
 auto Tree() -> DrivePacket {

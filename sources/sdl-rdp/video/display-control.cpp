@@ -40,7 +40,6 @@ auto Held(DispServerContext const& context) -> DisplayControl& {
 }
 constexpr OperationName DisplayLayout    { "Display layout"             };
 constexpr OperationName DisplayAssignment{ "Display channel assignment" };
-using sdl_rdp::freerdp_facade::AssignThrough;
 using sdl_rdp::freerdp_facade::Handled;
 auto Edge(std::span<Monitor const> monitors, std::regular_invocable<Monitor const&> auto edge,
           std::regular_invocable<std::int64_t, std::int64_t> auto pick) -> std::int64_t {
@@ -65,15 +64,13 @@ public:
 };
 auto DisplayControl::Callbacks::Install(DispServerContext& server) -> void {
   constexpr auto failures = FailuresThrough<&DisplayControl::FailureSource>;
-  constexpr auto assign   = AssignThrough<&DisplayControl::_slot>;
   // abi: psDispMonitorLayout, UINT is uint32_t; psDispChannelIdAssigned, BOOL is int
   server.DispMonitorLayout = Handled<Held, &DisplayControl::Layout, DisplayLayout, failures, ERROR_INTERNAL_ERROR>;
-  server.ChannelIdAssigned = Handled<Held, assign, DisplayAssignment, failures, false>;
+  server.ChannelIdAssigned = Handled<Held, &DisplayControl::Assign, DisplayAssignment, failures, false>;
 }
 DisplayControl::DisplayControl(PeerLink& link, Activation const& activation, DesktopLayout const& desktop,
                                EventQueue& events, Diagnostics const& diagnostics) noexcept
-    : _link{ link }, _activation{ activation }, _desktop{ desktop }, _events{ events }, _diagnostics{ diagnostics },
-      _slot{ link.Dynamic(), *this } { }
+    : _link{ link }, _activation{ activation }, _desktop{ desktop }, _events{ events }, _diagnostics{ diagnostics } { }
 auto DisplayControl::Open() -> bool {
   if (_open || !freerdp_settings_get_bool(&_link.Settings(), FreeRDP_SupportDisplayControl)
       || !DynamicChannelsReady(_link))
@@ -96,6 +93,10 @@ auto DisplayControl::Activate() -> bool {
   return _context->DisplayControlCaps(_context.get()) == CHANNEL_RC_OK;
 }
 auto DisplayControl::Reject() -> void { }
+auto DisplayControl::Assign(std::uint32_t id) -> bool {
+  _assignment.emplace(_link.Dynamic().Assign(id, *this));
+  return true;
+}
 auto DisplayControl::Layout(DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const& pdu) -> std::uint32_t {
   if (!pdu.NumMonitors || !_activation.Active()) return CHANNEL_RC_OK;
   auto const extent = Covering({ pdu.Monitors, pdu.NumMonitors });

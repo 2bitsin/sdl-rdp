@@ -9,6 +9,7 @@
 #include <sdl-rdp/utilities/aspect-ratio.hpp>
 #include <sdl-rdp/utilities/deadline.hpp>
 #include <sdl-rdp/utilities/extent.hpp>
+#include <sdl-rdp/utilities/generational.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 #include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/video/pointer/forward.hpp>
@@ -32,15 +33,16 @@ using sdl_rdp::picture::FrameStore;
 using sdl_rdp::utilities::AspectRatio;
 using sdl_rdp::utilities::Deadline;
 using sdl_rdp::utilities::Extent;
+using sdl_rdp::utilities::Generational;
 using sdl_rdp::utilities::Pinned;
 using sdl_rdp::utilities::Rect;
 using sdl_rdp::video::pointer::PointerLayout;
-using sdl_rdp::video::pointer::PointerStore;
+using sdl_rdp::video::pointer::PointerShape;
 
 class Presenter : private Pinned {
 public:
-       Presenter(Diagnostics const& diagnostics, FrameStore& frames, Session& session, PointerStore& pointer,
-                 Configuration& configuration);
+  Presenter(Diagnostics const& diagnostics, FrameStore& frames, Session& session, Generational<PointerShape>& pointer,
+            Configuration& configuration);
   auto Present(std::span<std::uint8_t const> pixels, FrameLayout const& layout, std::span<Rect const> damage) -> void;
   auto Resize(Extent requested)                                                                               -> void;
   auto SetAspect(std::optional<AspectRatio> value)                                                            -> void;
@@ -59,7 +61,7 @@ private:
   Diagnostics const&                                      _diagnostics;
   FrameStore&                                             _frames;
   Session&                                                _session;
-  PointerStore&                                           _pointer;
+  Generational<PointerShape>&                             _pointer;
   Configuration&                                          _configuration;
 };
 }

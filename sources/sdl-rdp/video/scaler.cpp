@@ -3,7 +3,6 @@
 #include <sdl-rdp/picture/desktop-layout.hpp>
 #include <sdl-rdp/picture/frame-snapshot.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
-#include <sdl-rdp/utilities/copy-rows.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/video/peer-frames.hpp>
@@ -13,10 +12,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <ranges>
+#include <span>
 #include <utility>
 
 namespace sdl_rdp::video::detail::scaler {
-using sdl_rdp::utilities::CopyRows;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::ExpectsBand;
 using sdl_rdp::utilities::Narrowed;
@@ -25,6 +24,29 @@ using sdl_rdp::utilities::Rect;
 using sdl_rdp::utilities::RowBytes;
 
 namespace {
+template <class Byte> struct Pitched {
+  std::span<Byte> bytes;
+  std::size_t     pitch{ };
+};
+struct RowBlock {
+  std::size_t rows     { };
+  std::size_t row_bytes{ };
+};
+template <class Byte> auto CoversRows(Pitched<Byte> image, RowBlock block) -> bool {
+  return block.rows == 0 || image.bytes.size() >= ((block.rows - 1) * image.pitch) + block.row_bytes;
+}
+auto CopyRows(Pitched<std::uint8_t const> source, Pitched<std::uint8_t> destination, RowBlock block, bool flip)
+    -> void {
+  Expects(source.pitch >= block.row_bytes, "pitches cover copied bytes");
+  Expects(destination.pitch >= block.row_bytes, "pitches cover copied bytes");
+  auto const source_covered      = CoversRows(source, block);
+  auto const destination_covered = CoversRows(destination, block);
+  Expects(source_covered, "source covers rows");
+  Expects(destination_covered, "destination covers rows");
+  for (auto row : std::views::iota(std::size_t{ 0 }, block.rows))
+    std::ranges::copy(source.bytes.subspan(row * source.pitch, block.row_bytes),
+                      destination.bytes.subspan((flip ? block.rows - row - 1 : row) * destination.pitch).begin());
+}
 auto Destination(RowOrder order, int row, int rows) -> std::size_t {
   return Narrowed<std::size_t>(order == RowOrder::BottomUp ? rows - row - 1 : row);
 }
@@ -103,7 +125,7 @@ auto Scaler::Fill(Rect area, std::span<std::uint8_t> buffer, std::size_t pitch, 
           .pitch = snapshot.Stride() },
         { .bytes = buffer, .pitch = pitch }, { .rows = Narrowed<std::size_t>(area.h), .row_bytes = stride },
         order == RowOrder::BottomUp);
-  return { area, buffer.first(size) };
+  return { .area = area, .pixels = buffer.first(size) };
 }
 auto Scaler::Resample(Rect area, std::span<std::uint8_t> buffer, std::size_t pitch, RowOrder order) -> void {
   auto const& snapshot = _frames.Snapshot();

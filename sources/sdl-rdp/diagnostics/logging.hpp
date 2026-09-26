@@ -1,6 +1,7 @@
 #pragma once
 #include <sdl-rdp/diagnostics/log-level.hpp>
 #include <sdl-rdp/diagnostics/log-sink.hpp>
+#include <sdl-rdp/utilities/pinned.hpp>
 
 #include <freerdp/settings.h>
 #include <winpr/wlog.h>
@@ -12,6 +13,7 @@
 #include <string_view>
 #include <thread>
 namespace sdl_rdp::diagnostics::detail::logging {
+using sdl_rdp::utilities::Pinned;
 
 // MS-RDPBCGR 2.2.1.1.1 requestedProtocols (FreeRDP keeps these constants private).
 inline constexpr std::uint32_t SecurityTls = 0x01, SecurityNla = 0x02, SecurityRdstls = 0x04, SecurityNlaExt = 0x08,
@@ -22,7 +24,7 @@ auto TlsHandshakeFailed()                                -> bool;
 auto ExpectedDisconnect(std::uint32_t code)              -> bool;
 auto AuthenticationRejectedLogging()                     -> void;
 auto ResetAuthenticationLogging()                        -> void;
-class LogRoute {
+class LogRoute : private Pinned {
 public:
   struct Filter {
     bool                                                     authentication_failed{ false };
@@ -31,11 +33,7 @@ public:
     bool                                                     handshake_failed     { false };
   };
   explicit    LogRoute(LogSink& sink);
-              LogRoute(LogRoute const&)                                     = delete;
-              LogRoute(LogRoute&&)                                          = delete;
               ~LogRoute();
-  auto        operator=(LogRoute const&)                       -> LogRoute& = delete;
-  auto        operator=(LogRoute&&)                            -> LogRoute& = delete;
   auto        Log(LogLevel level, std::string_view text) const -> void;
   static auto WithFilter(auto operation)                       -> decltype(auto) {
     auto&                  routing = Shared();

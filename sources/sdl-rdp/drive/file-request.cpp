@@ -2,7 +2,6 @@
 
 #include <sdl-rdp/drive/exceptions.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
-#include <sdl-rdp/utilities/narrowed.hpp>
 
 #include <winpr/nt.h>
 #include <cstddef>
@@ -10,7 +9,6 @@
 #include <utility>
 
 namespace sdl_rdp::drive::detail::file_request {
-using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::Unreachable;
 namespace {
 auto Validated(FileAccess access) -> FileAccess {
@@ -47,8 +45,7 @@ auto FileRequest::Create(std::span<std::byte const> name) const -> DrivePacket {
   packet.Write(std::uint32_t{ FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE });
   packet.Write(_disposition);
   packet.Write(CreateOptions(_kind));
-  packet.Write(Narrowed<std::uint32_t>(name.size()));
-  packet.Append(name);
+  packet.AppendCounted(name);
   return packet;
 }
 }

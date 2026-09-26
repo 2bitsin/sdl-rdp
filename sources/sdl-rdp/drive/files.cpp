@@ -5,7 +5,6 @@
 #include <sdl-rdp/drive/listing.hpp>
 #include <sdl-rdp/freerdp-facade/rdpdr.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
-#include <sdl-rdp/utilities/narrowed.hpp>
 
 #include <cstddef>
 #include <string>
@@ -18,7 +17,6 @@ using sdl_rdp::freerdp_facade::IrpMajor;
 using sdl_rdp::freerdp_facade::IrpMinor;
 using sdl_rdp::utilities::Ensures;
 using sdl_rdp::utilities::Expects;
-using sdl_rdp::utilities::Narrowed;
 
 namespace {
 auto Query(File& directory, bool first, std::span<std::byte const> pattern) -> DrivePacket {
@@ -32,8 +30,7 @@ auto RenameBody(std::string_view destination) -> DrivePacket {
   DrivePacket body;
   body.Write(std::uint8_t{ 0 });
   body.Write(std::uint8_t{ 0 });
-  body.Write(Narrowed<std::uint32_t>(target.size()));
-  body.Append(target);
+  body.AppendCounted(target);
   return body;
 }
 }

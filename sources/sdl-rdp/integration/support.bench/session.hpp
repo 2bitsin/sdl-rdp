@@ -2,22 +2,23 @@
 #include "checks.hpp"
 #include "measurement.hpp"
 
-#include <sdl-rdp/utilities/real-text.hpp>
 #include <sdl-rdp/utilities/scoped.hpp>
 #include <sdl-rdp/utilities/stopwatch.hpp>
 
 #include <gtest/gtest.h>
 #include <benchmark/benchmark.h>
+#include <charconv>
 #include <concepts>
 #include <format>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 
 namespace sdl_rdp::integration::support_bench::detail::session {
-using sdl_rdp::utilities::ParseReal;
 using sdl_rdp::utilities::RAIIWrap;
 using sdl_rdp::utilities::Timed;
 
@@ -42,12 +43,16 @@ protected:
   auto Record(std::string const& name, double value) -> void {
     _measurement.get().Record(name, value);
   }
+  // oxbox #49: a floating-point number_text replaces this parse.
   auto Recorded(std::string const& name, std::string_view text) -> std::optional<double> {
-    auto const value = ParseReal<double>(text);
-    if (!value)
+    double     value  { };
+    auto const last   = std::to_address(text.end());
+    auto const parsed = std::from_chars(std::to_address(text.begin()), last, value);
+    if (parsed.ec != std::errc{ } || parsed.ptr != last) {
       Fail(std::format("{} is a number: '{}'", name, text));
-    else
-      Record(name, *value);
+      return std::nullopt;
+    }
+    Record(name, value);
     return value;
   }
   auto Label(std::string text) -> void {

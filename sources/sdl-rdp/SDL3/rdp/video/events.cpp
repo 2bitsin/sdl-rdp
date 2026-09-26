@@ -3,7 +3,7 @@
 #include "window.hpp"
 #include <sdl-rdp/SDL3/rdp/audio/bootstrap.hpp>
 #include <sdl-rdp/SDL3/rdp/sdl/boundary.hpp>
-#include <sdl-rdp/SDL3/rdp/settings/constants.hpp>
+#include <sdl-rdp/configuration/refresh.hpp>
 #include <sdl-rdp/link/event.hpp>
 #include <sdl-rdp/session/backend.hpp>
 #include <sdl-rdp/settings/settings.hpp>
@@ -22,8 +22,8 @@
 namespace sdl3::rdp::video::detail::events {
 using sdl3::rdp::audio::AudioRate;
 using sdl3::rdp::sdl::Boundary;
-using sdl3::rdp::settings::MillihertzPerHertz;
 using sdl3::rdp::storage::UpdateDrives;
+using sdl_rdp::configuration::MillihertzPerHz;
 using sdl_rdp::link::AudioChanged;
 using sdl_rdp::link::ClipboardChanged;
 using sdl_rdp::link::CodecChanged;
@@ -100,21 +100,19 @@ auto ApplyRefresh(SDL_VideoData& data, std::uint32_t millihertz) -> void {
   Expects(millihertz > 0, "refresh event specifies positive millihertz");
   auto& display = *SDL_GetVideoDisplay(data.Display());
   if (SameRefresh(Narrowed<std::uint32_t>(display.current_mode->refresh_rate_numerator),
-                  Narrowed<std::uint32_t>(display.current_mode->refresh_rate_denominator), millihertz,
-                  MillihertzPerHertz))
+                  Narrowed<std::uint32_t>(display.current_mode->refresh_rate_denominator), millihertz, MillihertzPerHz))
     return;
   auto& mode = data.RefreshMode(*display.current_mode);
-  mode.refresh_rate             = static_cast<float>(millihertz) / static_cast<float>(MillihertzPerHertz);
+  mode.refresh_rate             = static_cast<float>(millihertz) / static_cast<float>(MillihertzPerHz);
   mode.refresh_rate_numerator   = static_cast<int>(millihertz);
-  mode.refresh_rate_denominator = static_cast<int>(MillihertzPerHertz);
+  mode.refresh_rate_denominator = static_cast<int>(MillihertzPerHz);
   SDL_SetCurrentDisplayMode(&display, &mode);
 }
 auto RestoreRefresh(SDL_VideoData& data) -> void {
   auto const& desktop = SDL_GetVideoDisplay(data.Display())->desktop_mode;
   if (desktop.refresh_rate_denominator <= 0) return;
-  ApplyRefresh(data,
-               Narrowed<std::uint32_t>(Narrowed<std::uint64_t>(desktop.refresh_rate_numerator) * MillihertzPerHertz
-                                       / Narrowed<std::uint64_t>(desktop.refresh_rate_denominator)));
+  ApplyRefresh(data, Narrowed<std::uint32_t>(Narrowed<std::uint64_t>(desktop.refresh_rate_numerator) * MillihertzPerHz
+                                             / Narrowed<std::uint64_t>(desktop.refresh_rate_denominator)));
 }
 auto PublishClient(SDL_Window& window, Connected const& client) -> void {
   auto const        properties = SDL_GetWindowProperties(&window);

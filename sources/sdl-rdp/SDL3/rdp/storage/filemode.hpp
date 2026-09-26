@@ -9,8 +9,6 @@ class FileMode {
 public:
   explicit FileMode(std::string_view mode);
   auto     Access() const  -> FileAccess;
-  auto     Reads() const   -> bool;
-  auto     Writes() const  -> bool;
   auto     Appends() const -> bool;
 private:
   static auto AccessOf(std::string_view mode) -> FileAccess;

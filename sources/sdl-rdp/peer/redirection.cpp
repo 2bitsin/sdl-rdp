@@ -25,10 +25,8 @@ template <class ChannelTy> auto EventOf(ChannelTy const& channel) -> std::option
 }
 }
 
-Redirection::Redirection(PeerLink& link, Activation const& activation, SessionAccess& session,
-                         Factory<std::unique_ptr<AudioChannel>> sound,
-                         Factory<std::unique_ptr<ClipboardChannel>> clipboard,
-                         Factory<std::shared_ptr<DriveChannel>> drive) noexcept
+Redirection::Redirection(PeerLink& link, Activation const& activation, SessionAccess& session, MakeSound sound,
+                         MakeClipboard clipboard, MakeDrive drive) noexcept
     : _link{ link }, _activation{ activation }, _session{ session }, _make_sound{ std::move(sound) },
       _make_clipboard{ std::move(clipboard) }, _make_drive{ std::move(drive) } { }
 Redirection::~Redirection() {

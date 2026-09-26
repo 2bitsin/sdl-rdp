@@ -231,20 +231,16 @@ auto ConvertInput(NV_ENC_LOCK_INPUT_BUFFER const& lock, prim_size_t const& size,
 }
 // NVENC lends a buffer from its lock to its unlock: the unlock runs on every path out, and Unlock reports it.
 template <class ParametersTy, auto LOCK, auto UNLOCK, auto BUFFER>
-class Encoder::Impl::Locked {
+class Encoder::Impl::Locked : private Pinned {
 public:
   Locked(Impl& owner, ParametersTy lock, std::string_view name)
       : _owner{ owner }, _lock{ lock }, _name{ name }, _locked{ Acquired() } { }
-  Locked(Locked const&) = delete;
-  Locked(Locked&&)      = delete;
   ~Locked() {
     if (!_locked) return;
     if (auto const status = Release(); status != NV_ENC_SUCCESS)
       WLog_ERR("sdlrdp.avc", "AVC420 unlock %s failed: %d", _name.c_str(), int{ status });
   }
-  auto     operator=(Locked const&) -> Locked& = delete;
-  auto     operator=(Locked&&)      -> Locked& = delete;
-  explicit operator bool() const               noexcept {
+  explicit operator bool() const noexcept {
     return _locked;
   }
   auto Lock() const -> ParametersTy const& {

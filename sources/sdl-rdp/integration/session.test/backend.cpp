@@ -14,7 +14,6 @@
 #include <sdl-rdp/headless-client.test/frame/pattern.hpp>
 #include <sdl-rdp/headless-client.test/utilities/child-process.hpp>
 #include <sdl-rdp/headless-client.test/utilities/io.hpp>
-#include <sdl-rdp/utilities/copy-rows.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/utilities/rect.hpp>
 
@@ -53,7 +52,6 @@ using sdl_rdp::headless_client_test::frame::FrameCounter;
 using sdl_rdp::headless_client_test::frame::HashPattern;
 using sdl_rdp::headless_client_test::utilities::ChildProcess;
 using sdl_rdp::headless_client_test::utilities::ReadText;
-using sdl_rdp::utilities::CopyRows;
 using sdl_rdp::utilities::Descriptor;
 using sdl_rdp::utilities::Extent;
 using sdl_rdp::utilities::Narrowed;
@@ -93,15 +91,6 @@ auto RunLogChild(int output) -> int {
 auto LoggingChild(Descriptor output) -> ChildProcess {
   return ChildProcess{ [&output] { return RunLogChild(output.Get()); } };
 }
-}
-TEST(CopyRows, PaddedRows) {
-  std::array<std::uint8_t, 8> source     { 1, 2, 9, 9, 3, 4, 9, 9 };
-  std::array<std::uint8_t, 6> destination{ 8, 8, 8, 8, 8, 8       };
-  CopyRows({ .bytes = source, .pitch = 4 }, { .bytes = destination, .pitch = 3 }, { .rows = 2, .row_bytes = 2 });
-  EXPECT_EQ(destination, (std::array<std::uint8_t, 6>{ 1, 2, 8, 3, 4, 8 }));
-  CopyRows({ .bytes = source, .pitch = 4 }, { .bytes = destination, .pitch = 3 }, { .rows = 2, .row_bytes = 2 }, true);
-  EXPECT_EQ(destination, (std::array<std::uint8_t, 6>{ 3, 4, 8, 1, 2, 8 }));
-  CopyRows({ }, { }, { });
 }
 namespace {
 // 192.0.2.1 is TEST-NET-1 (RFC 5737), an address no interface on the box carries.

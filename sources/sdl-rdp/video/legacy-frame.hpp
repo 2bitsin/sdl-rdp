@@ -5,7 +5,7 @@
 #include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/video/forward.hpp>
 #include <sdl-rdp/video/frame/forward.hpp>
-#include <sdl-rdp/video/pixel-band.hpp>
+#include <sdl-rdp/video/scaler.hpp>
 
 #include <freerdp/update.h>
 #include <cstddef>

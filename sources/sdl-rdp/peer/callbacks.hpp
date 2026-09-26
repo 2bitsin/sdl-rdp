@@ -5,6 +5,7 @@
 #include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/peer/forward.hpp>
 #include <sdl-rdp/utilities/operation-name.hpp>
+#include <sdl-rdp/utilities/pinned.hpp>
 #include <sdl-rdp/video/forward.hpp>
 
 #include <cstdint>
@@ -14,17 +15,14 @@ using sdl_rdp::auth::Authenticator;
 using sdl_rdp::diagnostics::FailuresThrough;
 using sdl_rdp::input::InputEvents;
 using sdl_rdp::link::PeerLink;
+using sdl_rdp::utilities::Pinned;
 using sdl_rdp::video::OutputControl;
 
-class PeerCallbacks {
+class PeerCallbacks : private Pinned {
 public:
-       PeerCallbacks(PeerCallbacks const&)               = delete;
-       PeerCallbacks(PeerCallbacks&&)                    = delete;
-       PeerCallbacks(PeerLink& link, Authenticator& authenticator, Activator& activator, CapabilityCheck& capabilities,
-                     OutputControl& output, InputEvents& input);
-       ~PeerCallbacks();
-  auto operator=(PeerCallbacks const&) -> PeerCallbacks& = delete;
-  auto operator=(PeerCallbacks&&)      -> PeerCallbacks& = delete;
+  PeerCallbacks(PeerLink& link, Authenticator& authenticator, Activator& activator, CapabilityCheck& capabilities,
+                OutputControl& output, InputEvents& input);
+  ~PeerCallbacks();
 
 private:
   auto InstallClient()                -> void;

@@ -1,7 +1,6 @@
 #include "bootstrap.hpp"
 #include <oxbox/utilities/span.hpp>
 #include <sdl-rdp/SDL3/rdp/driver.hpp>
-#include <sdl-rdp/SDL3/rdp/owneddriver.hpp>
 #include <sdl-rdp/SDL3/rdp/sdl/boundary.hpp>
 #include <sdl-rdp/SDL3/rdp/settings/options.hpp>
 #include <sdl-rdp/SDL3/rdp/storage/drive.hpp>
@@ -36,7 +35,7 @@ auto PeriodFrames(int frequency) -> int {
 }
 auto AudioLead(Driver const& driver) -> std::uint64_t {
   auto const lead = driver.Options().Value<&Settings::audio_lead>().Get();
-  if (std::cmp_greater_equal(lead, driver.Config().AudioLatency())) InvalidSetting<LeadTooLong>();
+  if (std::cmp_greater_equal(lead, driver.Config().audio_latency_ms)) InvalidSetting<LeadTooLong>();
   return static_cast<std::uint64_t>(lead) * SDL_NS_PER_MS;
 }
 auto OpenAudio(Driver& driver) -> std::reference_wrapper<Driver> {
@@ -51,18 +50,19 @@ using AudioSession = RAIIWrap<std::reference_wrapper<Driver>, OpenAudio, CloseAu
 }
 
 using sdl3::rdp::Driver;
-using sdl3::rdp::OwnedDriver;
 using sdl3::rdp::audio::detail::bootstrap::AudioLead;
 using sdl3::rdp::audio::detail::bootstrap::AudioSession;
 
 // SDL declares this tag as a struct; the members stay private.
-struct SDL_PrivateAudioData : private OwnedDriver {
+struct SDL_PrivateAudioData {
 public:
-  using OwnedDriver::Driver;
   explicit SDL_PrivateAudioData(std::shared_ptr<sdl3::rdp::Driver> driver)
-      : OwnedDriver{ std::move(driver) }, _lead{ AudioLead(Driver()) }, _rate{ Driver().Backend().Audio().Rate() },
-        _session{ Driver() } { }
-  auto     Buffer() -> std::vector<std::uint8_t>& {
+      : _driver{ std::move(driver) }, _lead{ AudioLead(*_driver) }, _rate{ _driver->Backend().Audio().Rate() },
+        _session{ *_driver } { }
+  auto     Driver() noexcept -> sdl3::rdp::Driver& {
+    return *_driver;
+  }
+  auto Buffer() -> std::vector<std::uint8_t>& {
     return _buffer;
   }
   auto Rate() const -> std::uint32_t {
@@ -81,11 +81,12 @@ public:
     return delay;
   }
 private:
-  std::vector<std::uint8_t> _buffer;
-  std::uint64_t             _next   { SDL_GetTicksNS() };
-  std::uint64_t             _lead;
-  std::uint32_t             _rate;
-  AudioSession const        _session;
+  std::shared_ptr<sdl3::rdp::Driver> _driver;
+  std::vector<std::uint8_t>          _buffer;
+  std::uint64_t                      _next   { SDL_GetTicksNS() };
+  std::uint64_t                      _lead;
+  std::uint32_t                      _rate;
+  AudioSession const                 _session;
 };
 namespace sdl3::rdp::audio::detail::bootstrap {
 namespace {

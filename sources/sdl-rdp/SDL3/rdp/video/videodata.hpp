@@ -1,17 +1,18 @@
 #pragma once
 #include "framebuffer.hpp"
-#include <sdl-rdp/SDL3/rdp/owneddriver.hpp>
+#include <sdl-rdp/SDL3/rdp/driver.hpp>
 #include <sdl-rdp/SDL3/rdp/sdl/resources.hpp>
 #include <sdl-rdp/SDL3/rdp/storage/drive.hpp>
 #include <sdl-rdp/link/event.hpp>
+#include <memory>
 #include <span>
 #include <vector>
 // SDL declares this tag as a struct; the members stay private.
-struct SDL_VideoData : private sdl3::rdp::OwnedDriver {
+struct SDL_VideoData {
 public:
   using FramebufferRef = std::optional<std::reference_wrapper<sdl3::rdp::video::Framebuffer>>;
-  using sdl3::rdp::OwnedDriver::Driver;
   explicit SDL_VideoData(std::shared_ptr<sdl3::rdp::Driver> driver);
+  auto     Driver() noexcept                                -> sdl3::rdp::Driver&;
   auto     Display() const                                  -> SDL_DisplayID;
   auto     Display(SDL_DisplayID display)                   -> void;
   auto     AttachTouch(SDL_TouchID touch)                   -> void;
@@ -27,6 +28,7 @@ public:
   auto     Detach() noexcept                                -> void;
   auto     PollEvents()                                     -> std::span<sdl_rdp::link::Event const>;
 private:
+  std::shared_ptr<sdl3::rdp::Driver>                _driver;
   SDL_DisplayID                                     _display       { };
   std::optional<sdl3::rdp::AuthenticationDisplay>   _authentication;
   std::optional<std::reference_wrapper<SDL_Window>> _window;

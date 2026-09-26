@@ -17,18 +17,19 @@ template <typename ValueTy>
 concept WireField = std::unsigned_integral<ValueTy> && !std::same_as<ValueTy, bool>;
 class DrivePacket {
 public:
-  [[noreturn]] auto                 Invalid(std::string_view cause) const   -> void;
-  template <WireField ValueTy> auto Read()                                  -> ValueTy;
-  template <WireField ValueTy> auto Write(ValueTy value)                    -> void;
-  auto                              Zero(std::size_t count)                 -> void;
-  auto                              Append(std::span<std::byte const> data) -> void;
-  auto                              Skip(std::size_t count)                 -> void;
-  auto                              Text(std::size_t count)                 -> std::string;
-  auto                              Bytes()                                 -> std::vector<std::byte>&;
-  auto                              Bytes() const                           -> std::vector<std::byte> const&;
-  auto                              Position() const                        -> std::size_t;
-  auto                              Seek(std::size_t offset)                -> void;
-  auto                              Origin(ChannelOrigin channel)           -> void;
+  [[noreturn]] auto                 Invalid(std::string_view cause) const          -> void;
+  template <WireField ValueTy> auto Read()                                         -> ValueTy;
+  template <WireField ValueTy> auto Write(ValueTy value)                           -> void;
+  auto                              Zero(std::size_t count)                        -> void;
+  auto                              Append(std::span<std::byte const> data)        -> void;
+  auto                              AppendCounted(std::span<std::byte const> data) -> void;
+  auto                              Skip(std::size_t count)                        -> void;
+  auto                              Text(std::size_t count)                        -> std::string;
+  auto                              Bytes()                                        -> std::vector<std::byte>&;
+  auto                              Bytes() const                                  -> std::vector<std::byte> const&;
+  auto                              Position() const                               -> std::size_t;
+  auto                              Seek(std::size_t offset)                       -> void;
+  auto                              Origin(ChannelOrigin channel)                  -> void;
 
 private:
   using Writer = oxbox::utilities::GrowingWriter<std::endian::little>;

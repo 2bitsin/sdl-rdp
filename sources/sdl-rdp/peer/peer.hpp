@@ -22,6 +22,7 @@
 #include <sdl-rdp/peer/transport-end.hpp>
 #include <sdl-rdp/peer/wait.hpp>
 #include <sdl-rdp/picture/desktop-layout.hpp>
+#include <sdl-rdp/utilities/generational.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 #include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/video/display-control.hpp>
@@ -37,6 +38,7 @@
 #include <sdl-rdp/video/peer-frames.hpp>
 #include <sdl-rdp/video/pointer/forward.hpp>
 #include <sdl-rdp/video/pointer/sender.hpp>
+#include <sdl-rdp/video/pointer/shape.hpp>
 #include <sdl-rdp/video/scaler.hpp>
 
 #include <memory>
@@ -60,6 +62,7 @@ using sdl_rdp::link::SessionAccess;
 using sdl_rdp::picture::DesktopLayout;
 using sdl_rdp::picture::FrameLock;
 using sdl_rdp::picture::FrameStore;
+using sdl_rdp::utilities::Generational;
 using sdl_rdp::utilities::Pinned;
 using sdl_rdp::utilities::Rect;
 using sdl_rdp::video::DisplayControl;
@@ -75,12 +78,12 @@ using sdl_rdp::video::frame::FramePacing;
 using sdl_rdp::video::frame::FrameSender;
 using sdl_rdp::video::frame::FrameStatistics;
 using sdl_rdp::video::pointer::PointerSender;
-using sdl_rdp::video::pointer::PointerStore;
+using sdl_rdp::video::pointer::PointerShape;
 
 class Peer : private Pinned {
 public:
        Peer(PeerHandle accepted, Diagnostics const& diagnostics, EventQueue& events, Configuration const& configuration,
-            FrameStore& store, PointerStore& pointer, ClipboardStore& clipboard, SessionAccess& session);
+            FrameStore& store, Generational<PointerShape>& pointer, ClipboardStore& clipboard, SessionAccess& session);
   auto Start()                                                      -> void;
   auto Stop()                                                       -> void;
   auto Owns(PeerLink const& link) const noexcept                    -> bool;

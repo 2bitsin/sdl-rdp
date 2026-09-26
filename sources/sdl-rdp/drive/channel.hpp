@@ -7,6 +7,7 @@
 #include <sdl-rdp/freerdp-facade/signalled.hpp>
 #include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/link/forward.hpp>
+#include <sdl-rdp/utilities/pinned.hpp>
 
 #include <atomic>
 #include <condition_variable>
@@ -31,6 +32,7 @@ using sdl_rdp::freerdp_facade::WaitHandle;
 using sdl_rdp::link::EventQueue;
 using sdl_rdp::link::PeerLink;
 using sdl_rdp::link::SessionAccess;
+using sdl_rdp::utilities::Pinned;
 struct DriveRequest {
   bool          done    { };
   bool          removed { };
@@ -44,14 +46,10 @@ struct Slot {
   std::size_t                   count  { };
 };
 // FreeRDP 3.32 server/rdpdr.h:103 Drive* uses 32-bit offsets and a private reader; this peer owns both directions.
-class DriveChannel : public std::enable_shared_from_this<DriveChannel> {
+class DriveChannel : public std::enable_shared_from_this<DriveChannel>, private Pinned {
 public:
-       DriveChannel(DriveChannel const&)                     = delete;
-       DriveChannel(DriveChannel&&)                          = delete;
   DriveChannel(PeerLink& link, EventQueue& events, Diagnostics const& diagnostics, SessionAccess& session) noexcept;
        ~DriveChannel();
-  auto operator=(DriveChannel const&)       -> DriveChannel& = delete;
-  auto operator=(DriveChannel&&)            -> DriveChannel& = delete;
   auto Open()                               -> bool;
   auto Pump(Signalled const& signaled)      -> bool;
   auto Event() const                        -> std::optional<WaitHandle>;

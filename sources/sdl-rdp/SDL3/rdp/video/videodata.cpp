@@ -31,7 +31,6 @@ auto SDLCALL HintChanged(void* context, [[maybe_unused]] char const* name, char 
 }
 }
 
-using sdl3::rdp::OwnedDriver;
 using sdl3::rdp::sdl::Surface;
 using sdl3::rdp::video::detail::videodata::ApplyAspect;
 using sdl3::rdp::video::detail::videodata::ApplyCodec;
@@ -39,8 +38,11 @@ using sdl3::rdp::video::detail::videodata::HintChanged;
 using sdl_rdp::settings::Settings;
 
 SDL_VideoData::SDL_VideoData(std::shared_ptr<sdl3::rdp::Driver> driver)
-    : OwnedDriver{ std::move(driver) }, _codec{ SDL_HINT_RDP_CODEC, HintChanged<&Settings::codec, ApplyCodec>, this },
+    : _driver{ std::move(driver) }, _codec{ SDL_HINT_RDP_CODEC, HintChanged<&Settings::codec, ApplyCodec>, this },
       _aspect{ SDL_HINT_RDP_ASPECT, HintChanged<&Settings::aspect, ApplyAspect>, this } { }
+auto SDL_VideoData::Driver() noexcept -> sdl3::rdp::Driver& {
+  return *_driver;
+}
 auto SDL_VideoData::PollEvents() -> std::span<sdl_rdp::link::Event const> {
   Driver().Backend().Events().Poll(_polled);
   return _polled;

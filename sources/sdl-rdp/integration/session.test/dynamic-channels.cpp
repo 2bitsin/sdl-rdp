@@ -1,8 +1,8 @@
+#include <sdl-rdp/link/dynamic-channels.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/headless-client.test/backend/contract-run.hpp>
 #include <sdl-rdp/headless-client.test/backend/logs.hpp>
-#include <sdl-rdp/link/channel-slot.hpp>
 
 #include <gtest/gtest.h>
 #include <cstddef>
@@ -10,7 +10,6 @@
 
 namespace sdl_rdp::integration::session_test::detail::dynamic_channels {
 using sdl_rdp::headless_client_test::backend::ContractRun;
-using sdl_rdp::link::ChannelSlot;
 using sdl_rdp::link::DynamicChannel;
 using sdl_rdp::link::DynamicChannels;
 namespace {
@@ -59,8 +58,7 @@ auto AssignDuplicate() -> int {
 TEST(DynamicChannels, ActivationReachesTheChannelThatOwnsTheId) {
   DynamicChannels registry;
   Recorded        channel;
-  ChannelSlot     slot    { registry, channel };
-  EXPECT_TRUE(slot.Assign(AssignedId));
+  auto const      assigned = registry.Assign(AssignedId, channel);
   EXPECT_TRUE(registry.Activate(AssignedId));
   EXPECT_EQ(channel.Activations(), 1U);
   EXPECT_EQ(channel.Rejections(), 0U);
@@ -68,21 +66,19 @@ TEST(DynamicChannels, ActivationReachesTheChannelThatOwnsTheId) {
 TEST(DynamicChannels, RejectionReachesTheChannelThatOwnsTheId) {
   DynamicChannels registry;
   Recorded        channel;
-  ChannelSlot     slot    { registry, channel };
-  slot.Assign(AssignedId);
+  auto const      assigned = registry.Assign(AssignedId, channel);
   registry.Reject(AssignedId);
   EXPECT_EQ(channel.Rejections(), 1U);
   EXPECT_EQ(channel.Activations(), 0U);
 }
-TEST(DynamicChannels, DestroyedSlotFreesItsIdForTheNextChannel) {
+TEST(DynamicChannels, DestroyedAssignmentFreesItsIdForTheNextChannel) {
   DynamicChannels registry;
   Recorded        first;
   Recorded        second;
   {
-    ChannelSlot{ registry, first }.Assign(AssignedId);
+    auto const released = registry.Assign(AssignedId, first);
   }
-  ChannelSlot slot{ registry, second };
-  slot.Assign(AssignedId);
+  auto const assigned = registry.Assign(AssignedId, second);
   EXPECT_TRUE(registry.Activate(AssignedId));
   EXPECT_EQ(first.Activations(), 0U);
   EXPECT_EQ(second.Activations(), 1U);

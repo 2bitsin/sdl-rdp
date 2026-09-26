@@ -17,7 +17,6 @@
 #include <sdl-rdp/video/encoder.hpp>
 #include <sdl-rdp/video/frame/pacing.hpp>
 #include <sdl-rdp/video/peer-frames.hpp>
-#include <sdl-rdp/video/planar-rows.hpp>
 #include <sdl-rdp/video/scaler.hpp>
 
 #include <freerdp/channels/wtsvc.h>
@@ -53,7 +52,7 @@ using sdl_rdp::utilities::Unreachable;
 using sdl_rdp::utilities::Whole;
 using sdl_rdp::video::avc::Bitrate;
 using sdl_rdp::video::avc::ReplicateEdges;
-using sdl_rdp::video::detail::planar_rows::EncodePlanarRows;
+using sdl_rdp::video::EncodePlanarRows;
 using sdl_rdp::video::frame::AcknowledgementMode;
 
 namespace {
@@ -71,7 +70,6 @@ constexpr OperationName GraphicsCapabilities   { "Graphics capabilities"        
 constexpr OperationName GraphicsAcknowledgement{ "Graphics frame acknowledgement" };
 constexpr OperationName GraphicsQoe            { "Graphics QoE acknowledgement"   };
 constexpr OperationName GraphicsAssignment     { "Graphics channel assignment"    };
-using sdl_rdp::freerdp_facade::AssignThrough;
 using sdl_rdp::freerdp_facade::Handled;
 }
 class GfxChannel::Callbacks {
@@ -80,20 +78,22 @@ public:
 };
 auto GfxChannel::Callbacks::Install(RdpgfxServerContext& server) -> void {
   constexpr auto failures = FailuresThrough<&GfxChannel::FailureSource>;
-  constexpr auto assign   = AssignThrough<&GfxChannel::_slot>;
   constexpr auto failed   = ERROR_INTERNAL_ERROR;
   // abi: psRdpgfxServerCapsAdvertise, FrameAcknowledge, QoeFrameAcknowledge, UINT is uint32_t; ChannelIdAssigned
   server.CapsAdvertise       = Handled<Held, &GfxChannel::Caps, GraphicsCapabilities, failures, failed>;
   server.FrameAcknowledge    = Handled<Held, &GfxChannel::Ack, GraphicsAcknowledgement, failures, failed>;
   server.QoeFrameAcknowledge = Handled<Held, &GfxChannel::Qoe, GraphicsQoe, failures, failed>;
-  server.ChannelIdAssigned   = Handled<Held, assign, GraphicsAssignment, failures, false>;
+  server.ChannelIdAssigned   = Handled<Held, &GfxChannel::Assign, GraphicsAssignment, failures, false>;
 }
 GfxChannel::GfxChannel(PeerLink& link, Diagnostics const& diagnostics, Configuration const& configuration,
                        Activation& activation, FrameSources sources, DynamicChannel& owner)
     : _link{ link }, _diagnostics{ diagnostics }, _configuration{ configuration }, _activation{ activation },
-      _sources{ sources }, _context{ rdpgfx_server_context_new(link.Channels().get()) },
-      _slot{ link.Dynamic(), owner } { }
+      _sources{ sources }, _context{ rdpgfx_server_context_new(link.Channels().get()) }, _owner{ owner } { }
 GfxChannel::~GfxChannel() = default;
+auto GfxChannel::Assign(std::uint32_t id) -> bool {
+  _assignment.emplace(_link.Dynamic().Assign(id, _owner));
+  return true;
+}
 auto GfxChannel::Open() -> bool {
   if (!_context) return false;
   BindContext(*_context, *this, _link.Context());
@@ -178,10 +178,10 @@ auto GfxChannel::ConfirmedCapability(RDPGFX_CAPSET const& cap) -> void {
   Expects(cap.version, "supported capabilities confirmed");
   _avc_allowed = AllowsAvc(cap);
   ResetAvc();
-  _confirmed = true;
-  _timing.Ready(Activation::Clock::now() - _activation.ActivatedAt());
-  _surface = { };
-  _headers = false;
+  _confirmed         = true;
+  _timing.ready_time = Activation::Clock::now() - _activation.ActivatedAt();
+  _surface           = { };
+  _headers           = false;
   _prepared.clear();
 }
 auto GfxChannel::Ack(RDPGFX_FRAME_ACKNOWLEDGE_PDU const& ack) -> std::uint32_t {
@@ -191,7 +191,7 @@ auto GfxChannel::Ack(RDPGFX_FRAME_ACKNOWLEDGE_PDU const& ack) -> std::uint32_t {
   return CHANNEL_RC_OK;
 }
 auto GfxChannel::Qoe(RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU const& ack) -> std::uint32_t {
-  _timing.Record(ack);
+  _timing.qoe = ack;
   return CHANNEL_RC_OK;
 }
 auto GfxChannel::FrameWindow() const -> std::size_t {
@@ -448,7 +448,7 @@ auto GfxChannel::Raw() -> bool {
   return EachArea(_confirmed, _surface, _sources.scaler.get(), [&](Rect area) {
     _band.resize(AreaBytes(area));
     auto const band = _sources.scaler.get().Copy(area, _band, RowOrder::TopDown);
-    return Command(area, oxbox::utilities::AsBytes(band.Pixels()), RDPGFX_CODECID_UNCOMPRESSED);
+    return Command(area, oxbox::utilities::AsBytes(band.pixels), RDPGFX_CODECID_UNCOMPRESSED);
   });
 }
 auto GfxChannel::Planar() -> bool {

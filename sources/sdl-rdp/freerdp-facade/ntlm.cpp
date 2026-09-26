@@ -2,6 +2,7 @@
 
 #include <sdl-rdp/freerdp-facade/exceptions.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
+#include <sdl-rdp/utilities/pinned.hpp>
 #include <sdl-rdp/utilities/wiped-string.hpp>
 
 #include <oxbox/utilities/span.hpp>
@@ -10,21 +11,18 @@
 
 namespace sdl_rdp::freerdp_facade::detail::ntlm {
 using sdl_rdp::utilities::Narrowed;
+using sdl_rdp::utilities::Pinned;
 using sdl_rdp::utilities::Wipe;
 
 namespace {
 // WinPR 3.32 ntlm.h:41 takes every string as a writable, terminated LPWSTR measured in bytes.
-class WideArgument {
+class WideArgument : private Pinned {
 public:
   explicit WideArgument(std::u16string_view text) : _text{ text } { }
-           WideArgument(WideArgument const&) = delete;
-           WideArgument(WideArgument&&)      = delete;
            ~WideArgument() {
     Wipe(std::as_writable_bytes(std::span{ _text }));
   }
-  auto operator=(WideArgument const&) -> WideArgument& = delete;
-  auto operator=(WideArgument&&)      -> WideArgument& = delete;
-  auto Units()                        -> std::span<std::uint16_t> {
+  auto Units() -> std::span<std::uint16_t> {
     return oxbox::utilities::SpanCast<std::uint16_t>(std::span(_text));
   }
   auto Bytes() const -> std::uint32_t {

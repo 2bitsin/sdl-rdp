@@ -33,20 +33,20 @@ auto AcknowledgementWindow::Frame() const noexcept -> std::uint32_t {
   return _frame_id;
 }
 auto AcknowledgementWindow::Record(std::uint64_t sequence, Clock::time_point now) -> void {
-  if (_enabled) _pending.emplace_back(_frame_id, sequence, now);
+  if (_enabled) _pending.push_back({ .id = _frame_id, .presented = sequence, .at = now });
 }
 auto AcknowledgementWindow::Accept(std::uint32_t id) -> std::vector<SentFrame> {
-  auto found = std::ranges::find(_pending, id, &SentFrame::Id);
+  auto found = std::ranges::find(_pending, id, &SentFrame::id);
   if (found == _pending.end()) return { };
-  _acknowledged = found->Presented();
+  _acknowledged = found->presented;
   std::vector<SentFrame> settled(std::make_move_iterator(_pending.begin()), std::make_move_iterator(found + 1));
   _pending.erase(_pending.begin(), found + 1);
   return settled;
 }
 auto AcknowledgementWindow::Expire(Clock::time_point now) -> std::size_t {
   std::size_t expired = 0;
-  for (; !_pending.empty() && _pending.front().Age(now) >= AcknowledgementTimeout; ++expired) {
-    _acknowledged = _pending.front().Presented();
+  for (; !_pending.empty() && now - _pending.front().at >= AcknowledgementTimeout; ++expired) {
+    _acknowledged = _pending.front().presented;
     _pending.pop_front();
   }
   return expired;
@@ -56,7 +56,7 @@ auto AcknowledgementWindow::Open(std::size_t window) const noexcept -> bool {
 }
 auto AcknowledgementWindow::Remaining(Clock::time_point now) const -> std::uint32_t {
   if (_pending.empty()) return INFINITE;
-  return WaitMilliseconds(AcknowledgementTimeout - _pending.front().Age(now), 1);
+  return WaitMilliseconds(AcknowledgementTimeout - (now - _pending.front().at), 1);
 }
 auto AcknowledgementWindow::Settled(std::uint64_t target) const noexcept -> bool {
   return !_enabled || _acknowledged + 1 >= target;

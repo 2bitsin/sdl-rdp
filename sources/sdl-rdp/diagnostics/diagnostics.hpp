@@ -1,7 +1,7 @@
 #pragma once
 #include <sdl-rdp/diagnostics/log-level.hpp>
 #include <sdl-rdp/diagnostics/log-sink.hpp>
-#include <sdl-rdp/diagnostics/logger.hpp>
+#include <sdl-rdp/diagnostics/logging.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
 #include <chrono>
@@ -33,8 +33,8 @@ public:
   }
 
 private:
-  Logger _logger;
-  bool   _tracing;
+  LogRoute _route;
+  bool     _tracing;
 };
 }
 

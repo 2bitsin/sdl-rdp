@@ -2,13 +2,11 @@
 #include <oxbox/utilities/text.hpp>
 #include <sdl-rdp/SDL3/rdp/driver.hpp>
 #include <sdl-rdp/SDL3/rdp/exceptions.hpp>
-#include <sdl-rdp/SDL3/rdp/owneddriver.hpp>
 #include <sdl-rdp/SDL3/rdp/sdl/boundary.hpp>
 #include <sdl-rdp/drive/drive.hpp>
 #include <sdl-rdp/drive/file.hpp>
 #include <sdl-rdp/drive/files.hpp>
 #include <sdl-rdp/session/backend.hpp>
-#include <sdl-rdp/utilities/void-buffer.hpp>
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -22,9 +20,7 @@ using sdl3::rdp::sdl::Stream;
 using sdl3::rdp::settings::Text;
 using sdl_rdp::drive::Drive;
 using sdl_rdp::drive::FileKind;
-using sdl_rdp::utilities::BytesOf;
 using sdl_rdp::utilities::Expects;
-using sdl_rdp::utilities::VoidBuffer;
 namespace {
 auto FirstDrive(std::span<Drive const> drives) -> std::uint32_t {
   if (drives.empty()) throw DriveUnavailable{ "none is shared" };
@@ -36,14 +32,13 @@ auto NamedDrive(std::span<Drive const> drives, std::string const& name) -> std::
   return found->id;
 }
 // One open drive file behind an SDL stream; the stream position is SDL's, the file's offset is per transfer.
-class StreamFile : private OwnedDriver {
+class StreamFile {
 public:
-  using OwnedDriver::Driver;
   StreamFile(std::shared_ptr<sdl3::rdp::Driver> driver, std::uint32_t drive, std::string const& path, FileMode mode)
-      : OwnedDriver{ std::move(driver) },
-        _file{ Driver().Backend().Drive().Open(drive, path, mode.Access(), FileKind::File) }, _mode{ mode } { }
+      : _driver{ std::move(driver) },
+        _file{ _driver->Backend().Drive().Open(drive, path, mode.Access(), FileKind::File) }, _mode{ mode } { }
   auto Current() -> sdl_rdp::drive::File& {
-    return Driver().Backend().Drive().Attached(*_file);
+    return _driver->Backend().Drive().Attached(*_file);
   }
   auto Mode() const -> FileMode {
     return _mode;
@@ -61,6 +56,7 @@ public:
     });
   }
 private:
+  std::shared_ptr<sdl3::rdp::Driver>    _driver;
   std::unique_ptr<sdl_rdp::drive::File> _file;
   FileMode                              _mode;
   std::int64_t                          _position{ };
@@ -147,8 +143,8 @@ auto FileInterface(FileMode mode) -> SDL_IOStreamInterface {
   interface.version = sizeof(interface);
   interface.size    = FileSize;
   interface.seek    = FileSeek;
-  interface.read    = mode.Reads() ? Transfer<void> : nullptr;
-  interface.write   = mode.Writes() ? Transfer<void const> : nullptr;
+  interface.read    = mode.Access().read ? Transfer<void> : nullptr;
+  interface.write   = mode.Access().write ? Transfer<void const> : nullptr;
   interface.close   = FileClose;
   return interface;
 }

@@ -8,6 +8,7 @@
 #include <sample/released.hpp>
 
 #include <SDL3/SDL.h>
+#include <oxbox/utilities/hash.hpp>
 #include <oxbox/utilities/number-text.hpp>
 #include <oxbox/utilities/text.hpp>
 #include <algorithm>
@@ -28,6 +29,8 @@
 
 namespace sample::detail::main {
 namespace {
+using oxbox::utilities::HashString;
+using oxbox::utilities::literals::operator""_hash;
 using Window      = std::unique_ptr<SDL_Window, Released<SDL_DestroyWindow>>;
 using Cursor      = std::unique_ptr<SDL_Cursor, Released<SDL_DestroyCursor>>;
 using Surface     = std::unique_ptr<SDL_Surface, Released<SDL_DestroySurface>>;
@@ -179,23 +182,16 @@ auto FlagOption(std::string_view name, Options& options) -> bool {
   return true;
 }
 auto ValueOption(std::string_view name, std::string_view value, Options& options) -> bool {
-  if (name == "--clip")
-    options.clip = value;
-  else if (name == "--ls")
-    options.drives.list = value;
-  else if (name == "--cat")
-    options.drives.cat = value;
-  else if (name == "--write")
-    options.drives.write = value;
-  else if (name == "--aspect")
-    Check(SDL_SetHint(SDL_HINT_RDP_ASPECT, std::string{ value }.c_str()));
-  else if (name == "--size")
-    options.size = ParseSize(value);
-  else if (name == "--mode")
-    options.mode = ParseSize(value);
-  else
-    return false;
-  return true;
+  switch (HashString(name)) {
+  case "--clip"_hash:   options.clip = value; return true;
+  case "--ls"_hash:     options.drives.list = value; return true;
+  case "--cat"_hash:    options.drives.cat = value; return true;
+  case "--write"_hash:  options.drives.write = value; return true;
+  case "--aspect"_hash: Check(SDL_SetHint(SDL_HINT_RDP_ASPECT, std::string{ value }.c_str())); return true;
+  case "--size"_hash:   options.size = ParseSize(value); return true;
+  case "--mode"_hash:   options.mode = ParseSize(value); return true;
+  default:              return false;
+  }
 }
 auto ParseOptions(std::span<std::string_view const> arguments, Authenticator& authentication) -> Options {
   Options options;

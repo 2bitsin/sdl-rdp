@@ -3,7 +3,6 @@
 #include <sdl-rdp/utilities/pinned.hpp>
 #include <sdl-rdp/utilities/rect.hpp>
 #include <sdl-rdp/video/forward.hpp>
-#include <sdl-rdp/video/pixel-band.hpp>
 #include <sdl-rdp/video/tap.hpp>
 
 #include <cstddef>
@@ -17,6 +16,10 @@ using sdl_rdp::utilities::Pinned;
 using sdl_rdp::utilities::Rect;
 
 enum class RowOrder{ TopDown, BottomUp };
+struct PixelBand {
+  Rect                    area;
+  std::span<std::uint8_t> pixels;
+};
 class Scaler : private Pinned {
 public:
        Scaler(PeerFrames const& source, DesktopLayout const& layout) noexcept;
@@ -41,6 +44,7 @@ private:
 }
 
 namespace sdl_rdp::video {
+using detail::scaler::PixelBand;
 using detail::scaler::RowOrder;
 using detail::scaler::Scaler;
 }

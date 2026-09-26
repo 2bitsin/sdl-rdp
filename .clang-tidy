@@ -25,3 +25,6 @@ CheckOptions:
   # gtest macros expand to switch/if blockers, not the test's own flow; per-lane config is buildutil #154
   readability-function-cognitive-complexity.IgnoreMacros: true
   cppcoreguidelines-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic: true
+  # utilities::Pinned deletes copy and move, so a class inheriting it states C.21 through its base.
+  cppcoreguidelines-special-member-functions.AllowImplicitlyDeletedCopyOrMove: true
+  cppcoreguidelines-special-member-functions.AllowMissingMoveFunctionsWhenCopyIsDeleted: true

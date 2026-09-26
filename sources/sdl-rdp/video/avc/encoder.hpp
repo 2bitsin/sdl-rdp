@@ -1,5 +1,6 @@
 #pragma once
 #include <sdl-rdp/utilities/extent.hpp>
+#include <sdl-rdp/utilities/pinned.hpp>
 #include <sdl-rdp/video/avc/encoding.hpp>
 
 #include <cstddef>
@@ -11,15 +12,12 @@
 
 namespace sdl_rdp::video::avc::detail::encoder {
 using sdl_rdp::utilities::Extent;
+using sdl_rdp::utilities::Pinned;
 
-class Encoder {
+class Encoder : private Pinned {
 public:
               Encoder();
-              Encoder(Encoder const&)                                                 = delete;
-              Encoder(Encoder&&)                                                      = delete;
               ~Encoder();
-  auto        operator=(Encoder const&)                                   -> Encoder& = delete;
-  auto        operator=(Encoder&&)                                        -> Encoder& = delete;
   static auto Available()                                                 -> bool;
   static auto UnavailableReason()                                         -> std::string;
   auto        Open(Extent size, std::uint32_t bitrate, std::uint32_t fps) -> bool;

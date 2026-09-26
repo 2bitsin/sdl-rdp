@@ -1,17 +1,14 @@
 #pragma once
+#include <sdl-rdp/utilities/pinned.hpp>
 
 namespace sdl_rdp::link::detail::dynamic_channel {
-class DynamicChannel {
+using sdl_rdp::utilities::Pinned;
+class DynamicChannel : private Pinned {
 public:
-  DynamicChannel()                      = default;
-  DynamicChannel(DynamicChannel const&) = delete;
-  DynamicChannel(DynamicChannel&&)      = delete;
   // cppcoreguidelines-virtual-class-destructor flags a protected one at every implementer's forward declaration.
-  virtual      ~DynamicChannel()                                   = default;
-  auto         operator=(DynamicChannel const&) -> DynamicChannel& = delete;
-  auto         operator=(DynamicChannel&&)      -> DynamicChannel& = delete;
-  virtual auto Activate()                       -> bool            = 0;
-  virtual auto Reject()                         -> void            = 0;
+  virtual      ~DynamicChannel()  = default;
+  virtual auto Activate() -> bool = 0;
+  virtual auto Reject()   -> void = 0;
 };
 }
 

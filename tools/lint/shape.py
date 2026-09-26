@@ -61,7 +61,7 @@ EVALUATED            = frozenset(('constexpr', 'consteval'))
 SPECIFIERS           = frozenset(('static', 'virtual', 'inline', 'constexpr', 'consteval', 'explicit', 'friend',
                                   'extern'))
 POINTER_NOT_RESULTS  = EXPRESSION_KEYWORDS | NOT_DECLARATORS | {'auto'}
-GENERATED            = (['=', 'default'], ['=', 'delete'])
+BODILESS             = (['=', 'default'], ['=', 'delete'], ['=', '0'])
 ACCESS               = frozenset(('public', 'protected', 'private'))
 RANKS                = {'public': 0, 'protected': 1, 'private': 2}
 FUNCTION_LIMITS      = {'complexity': COMPLEXITY, 'parameters': PARAMETERS, 'nesting': NESTING}
@@ -172,7 +172,7 @@ class ClassTally:
     access:       str
     highest:      int                 = -1
     layout:       int                 = 0
-    generated:    int                 = 0
+    bodiless:     int                 = 0
     functions:    list[str]           = dataclasses.field(default_factory=list)
     data:         collections.Counter = dataclasses.field(default_factory=collections.Counter)
     declarations: collections.Counter = dataclasses.field(default_factory=collections.Counter)
@@ -462,7 +462,7 @@ def tally_members(source, item):
             tally.enter(member.access)
         elif (found := declarator(source, member.first, member.end, item.name)) is not None:
             tally.function(found.name, item.name)
-            tally.generated += source.words(member.end - 2, member.end) in GENERATED
+            tally.bodiless += source.words(member.end - 2, member.end) in BODILESS
         elif (count := data_count(source, member.first, member.end)):
             tally.datum(count)
     return tally
@@ -502,9 +502,9 @@ def outermost(item, items):
 
 
 def behaves(source, item):
-    """A class behaves when it declares a member function that is not defaulted or deleted."""
+    """A class behaves when it declares a member function that is not defaulted, deleted or pure."""
     tally = tally_members(source, item)
-    return len(tally.functions) > tally.generated
+    return len(tally.functions) > tally.bodiless
 
 
 def body_owner(source, function, items, plain):

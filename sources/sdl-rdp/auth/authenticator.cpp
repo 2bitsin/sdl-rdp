@@ -12,6 +12,7 @@
 #include <sdl-rdp/link/event.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
+#include <sdl-rdp/utilities/pinned.hpp>
 #include <sdl-rdp/utilities/terminated-copy.hpp>
 #include <sdl-rdp/utilities/transcode.hpp>
 
@@ -30,15 +31,14 @@ using sdl_rdp::freerdp_facade::Get;
 using sdl_rdp::freerdp_facade::NtOwfV2;
 using sdl_rdp::utilities::Contained;
 using sdl_rdp::utilities::Ensures;
+using sdl_rdp::utilities::Pinned;
 using sdl_rdp::utilities::Utf16;
 using sdl_rdp::utilities::Wipe;
 using sdl_rdp::utilities::WipedString;
 
 namespace {
-struct SettingsPassword {
+struct SettingsPassword : private Pinned {
 public:
-           SettingsPassword(SettingsPassword const&) = delete;
-           SettingsPassword(SettingsPassword&&)      = delete;
   explicit SettingsPassword(rdpSettings& value) : settings{ value } { }
            ~SettingsPassword() {
     auto* password = freerdp_settings_get_string_writable(&settings, FreeRDP_Password);
@@ -47,8 +47,6 @@ public:
     auto const cleared = freerdp_settings_set_string(&settings, FreeRDP_Password, nullptr);
     Ensures(cleared, "password cleared");
   }
-  auto operator=(SettingsPassword const&) -> SettingsPassword& = delete;
-  auto operator=(SettingsPassword&&)      -> SettingsPassword& = delete;
 
 private:
   rdpSettings& settings;

@@ -13,7 +13,7 @@ using sdl_rdp::picture::FrameStore;
 using sdl_rdp::session::Backend;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Required;
-using sdl_rdp::video::GraphicsTiming;
+using sdl_rdp::video::gfx::GraphicsTiming;
 
 inline auto CurrentStatus(Backend& backend) -> std::optional<PeerStatus> {
   auto const frame   = backend.Frames().Lock();

@@ -24,7 +24,8 @@ auto AsPath(std::string const& text) -> std::filesystem::path {
 auto AsWiped(std::string const& text) -> WipedString {
   return WipedString{ text };
 }
-auto Built(Options const& options) -> Setup {
+}
+auto SetupFrom(Options const& options) -> Setup {
   return { .bind             = options.Get<&Settings::bind>(),
            .port             = options.Value<&Settings::port>().Get(),
            .cert_dir         = options.Get<&Settings::cert_dir>().transform(AsPath),
@@ -40,19 +41,5 @@ auto Built(Options const& options) -> Setup {
            .password         = options.Get<&Settings::password>().transform(AsWiped),
            .domain           = options.Get<&Settings::domain>(),
            .avc_bitrate_kbps = options.Value<&Settings::avc_bitrate>().Get() };
-}
-}
-Configuration::Configuration(Options const& options) : _setup{ Built(options) } { }
-auto Configuration::Get() const noexcept -> Setup const& {
-  return _setup;
-}
-auto Configuration::Width() const noexcept -> std::uint32_t {
-  return _setup.width;
-}
-auto Configuration::Height() const noexcept -> std::uint32_t {
-  return _setup.height;
-}
-auto Configuration::AudioLatency() const noexcept -> std::uint32_t {
-  return _setup.audio_latency_ms;
 }
 }

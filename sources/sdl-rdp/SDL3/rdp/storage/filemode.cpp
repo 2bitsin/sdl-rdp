@@ -20,12 +20,6 @@ FileMode::FileMode(std::string_view mode) : _access{ AccessOf(mode) }, _append{ 
 auto FileMode::Access() const -> FileAccess {
   return _access;
 }
-auto FileMode::Reads() const -> bool {
-  return _access.read;
-}
-auto FileMode::Writes() const -> bool {
-  return _access.write;
-}
 auto FileMode::Appends() const -> bool {
   return _append;
 }

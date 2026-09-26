@@ -1,6 +1,6 @@
 #pragma once
 #include <sdl-rdp/utilities/rect.hpp>
-#include <sdl-rdp/video/graphics-timing.hpp>
+#include <sdl-rdp/video/gfx/channel.hpp>
 
 #include <freerdp/peer.h>
 #include <freerdp/server/disp.h>
@@ -11,7 +11,7 @@
 
 namespace sdl_rdp::peer::detail::status {
 using sdl_rdp::utilities::Rect;
-using sdl_rdp::video::GraphicsTiming;
+using sdl_rdp::video::gfx::GraphicsTiming;
 
 struct PeerStatus {
   std::reference_wrapper<freerdp_peer>                     client;

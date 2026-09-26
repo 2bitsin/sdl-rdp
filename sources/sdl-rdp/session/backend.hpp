@@ -12,8 +12,9 @@
 #include <sdl-rdp/session/listener.hpp>
 #include <sdl-rdp/session/presenter.hpp>
 #include <sdl-rdp/session/session.hpp>
+#include <sdl-rdp/utilities/generational.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
-#include <sdl-rdp/video/pointer/store.hpp>
+#include <sdl-rdp/video/pointer/shape.hpp>
 
 #include <cstdint>
 #include <string>
@@ -28,8 +29,9 @@ using sdl_rdp::diagnostics::LogSink;
 using sdl_rdp::drive::DriveFiles;
 using sdl_rdp::link::EventQueue;
 using sdl_rdp::picture::FrameStore;
+using sdl_rdp::utilities::Generational;
 using sdl_rdp::utilities::Pinned;
-using sdl_rdp::video::pointer::PointerStore;
+using sdl_rdp::video::pointer::PointerShape;
 
 // The composition root: one listener, its session and everything a driver reaches.
 class Backend : private Pinned {
@@ -50,16 +52,16 @@ public:
   auto SetRelativeMouse(bool relative)         -> void;
 
 private:
-  diagnostics::Diagnostics _diagnostics;
-  EventQueue               _events;
-  Configuration            _configuration;
-  FrameStore               _frames;
-  PointerStore             _pointer;
-  ClipboardStore           _clipboard;
-  session::Session         _session;
-  Presenter                _presenter;
-  AudioOutput              _audio;
-  Listener                 _listener;
+  diagnostics::Diagnostics   _diagnostics;
+  EventQueue                 _events;
+  Configuration              _configuration;
+  FrameStore                 _frames;
+  Generational<PointerShape> _pointer;
+  ClipboardStore             _clipboard;
+  session::Session           _session;
+  Presenter                  _presenter;
+  AudioOutput                _audio;
+  Listener                   _listener;
 };
 }
 

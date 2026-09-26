@@ -1266,6 +1266,14 @@ def test_qualified_class_constructor_without_destructor_is_a_member():
     assert align(source) == expected
 
 
+def test_template_class_constructor_keeps_its_indent_on_a_second_pass():
+    source = ('template <class P> class Channel final : public Base {\npublic:\n  Channel(Link& link) noexcept;\n'
+              '  auto Open() -> bool;\n  auto Activate() -> bool override;\n};\n')
+    once = align(source)
+    assert once.startswith('template <class P> class Channel final : public Base {\npublic:\n       Channel(')
+    assert align(once) == once
+
+
 def test_default_joins_the_case_run():
     cases  = 'switch (phase) {\ncase Phase::DOWN: return 1;\n'
     source = cases + 'case Phase::UP: return 2;\ndefault: return 0;\n}\n'

@@ -8,7 +8,6 @@
 #include <sdl-rdp/session/session.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/video/avc/encoding.hpp>
-#include <sdl-rdp/video/pointer/store.hpp>
 
 #include <algorithm>
 #include <cstddef>
@@ -72,8 +71,8 @@ auto ComposePicture(std::span<std::uint8_t const> source, std::uint32_t pitch, F
   });
 }
 }
-Presenter::Presenter(Diagnostics const& diagnostics, FrameStore& frames, Session& session, PointerStore& pointer,
-                     Configuration& configuration)
+Presenter::Presenter(Diagnostics const& diagnostics, FrameStore& frames, Session& session,
+                     Generational<PointerShape>& pointer, Configuration& configuration)
     : _diagnostics{ diagnostics }, _frames{ frames }, _session{ session }, _pointer{ pointer },
       _configuration{ configuration } { }
 auto Presenter::Present(std::span<std::uint8_t const> pixels, FrameLayout const& layout, std::span<Rect const> damage)

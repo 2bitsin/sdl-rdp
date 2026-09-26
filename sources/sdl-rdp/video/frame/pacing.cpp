@@ -13,11 +13,11 @@
 
 #include <cstdint>
 #include <format>
+#include <utility>
 
 namespace sdl_rdp::video::frame::detail::pacing {
 using sdl_rdp::configuration::MillihertzPerHz;
 using sdl_rdp::configuration::RefreshMode;
-using sdl_rdp::configuration::WireSample;
 using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::link::RefreshChanged;
 using sdl_rdp::link::SampleWire;
@@ -27,20 +27,21 @@ using sdl_rdp::utilities::Unreachable;
 namespace {
 using Clock        = AcknowledgementWindow::Clock;
 using Milliseconds = std::chrono::duration<double, std::milli>;
-auto WarnUnmeasured(RefreshTracker& refresh, Diagnostics const& diagnostics, WireSample const& wire) -> void {
-  if (wire.available || refresh.Mode() != RefreshMode::Sender || refresh.TestAndSetUnavailableLogged()) return;
-  diagnostics.Log(LogLevel::Warn, "auto-sender TCP measurements unavailable; adapting only to blocked writes.");
-}
 }
 FramePacing::FramePacing(Diagnostics const& diagnostics, EventQueue& events, Configuration const& configuration,
                          FrameStore& store, PeerLink& link, Activation const& activation, TraceQueue& traces,
                          FrameStatistics& statistics) noexcept
     : _diagnostics{ diagnostics }, _events{ events }, _configuration{ configuration }, _store{ store }, _link{ link },
-      _activation{ activation }, _traces{ traces }, _statistics{ statistics } { }
+      _activation{ activation }, _traces{ traces }, _statistics{ statistics }, _effective{ _refresh.Rate() } { }
 auto FramePacing::Adjust(std::invocable<Refresh&> auto step) -> void {
-  if (!_refresh.Adjust(step) || !_activation.Active()) return;
-  _events.Push(RefreshChanged{ _refresh.Effective() * MillihertzPerHz });
-  _diagnostics.Line("refresh", [&] { return std::format("hz={}", _refresh.Effective()); });
+  auto const previous = _refresh.Rate();
+  step(_refresh);
+  auto const rate = _refresh.Rate();
+  Expects(rate > 0, "effective refresh is positive");
+  _effective.store(rate);
+  if (rate == previous || !_activation.Active()) return;
+  _events.Push(RefreshChanged{ rate * MillihertzPerHz });
+  _diagnostics.Line("refresh", [&] { return std::format("hz={}", rate); });
 }
 auto FramePacing::Restart(FrameLock const& held) -> void {
   Expects(_store.Holds(held), "restarting pacing holds the frame lock");
@@ -65,7 +66,8 @@ auto FramePacing::Sent(PeerFrames& frames, FrameCost const& cost) -> void {
     return std::format("id={} bytes={} outq={} unacked={} tcp_rtt={}", _window.Frame(), cost.bytes, wire.outq,
                        wire.unacked, wire.rtt);
   });
-  WarnUnmeasured(_refresh, _diagnostics, wire);
+  if (!wire.available && _refresh.Mode() == RefreshMode::Sender && !std::exchange(_unavailable_logged, true))
+    _diagnostics.Log(LogLevel::Warn, "auto-sender TCP measurements unavailable; adapting only to blocked writes.");
   Adjust([&](Refresh& rate) {
     if (cost.bytes) rate.Written(wire, cost.bytes);
   });
@@ -79,11 +81,11 @@ auto FramePacing::Accept(std::uint32_t id) -> void {
   if (settled.empty()) return;
   auto const now = Clock::now();
   _traces.Defer("ack",
-                [&] { return std::format("id={} age={:.1f}", id, Milliseconds{ settled.back().Age(now) }.count()); });
+                [&] { return std::format("id={} age={:.1f}", id, Milliseconds{ now - settled.back().at }.count()); });
   for (auto const& sent : settled) {
-    _statistics.Acknowledged(sent.Age(now));
+    _statistics.Acknowledged(now - sent.at);
     if (_refresh.Mode() == RefreshMode::Average && &sent != &settled.back()) continue;
-    Adjust([&](Refresh& rate) { rate.Acknowledge(now, sent.Age(now)); });
+    Adjust([&](Refresh& rate) { rate.Acknowledge(now, now - sent.at); });
   }
   _store.Notify();
   _link.Signal();
@@ -106,7 +108,7 @@ auto FramePacing::Timeout() -> std::uint32_t {
   return _window.Remaining(Clock::now());
 }
 auto FramePacing::Effective() const noexcept -> std::uint32_t {
-  return _refresh.Effective();
+  return _effective.load();
 }
 auto FramePacing::Frame() const noexcept -> std::uint32_t {
   return _window.Frame();

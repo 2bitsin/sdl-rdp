@@ -73,16 +73,7 @@ auto Invoked(OwnerTy& owner, ArgsTy... args) -> decltype(auto) {
 }
 
 // The registration hands back the owner it was given.
-template <class OwnerTy> constexpr auto Itself   = [](OwnerTy& owner) -> OwnerTy& { return owner; };
-template <class> struct                 MemberOf;
-template <class MemberTy, class OwnerTy> struct MemberOf<MemberTy OwnerTy::*> {
-  using Owner = OwnerTy;
-};
-// A channel-id handler: the owner's slot, the member SLOT names, takes the assigned id.
-template <auto SLOT>
-constexpr auto AssignThrough = [](typename MemberOf<decltype(SLOT)>::Owner& owner, std::uint32_t id) -> bool {
-  return std::invoke(SLOT, owner).Assign(id);
-};
+template <class OwnerTy> constexpr auto Itself = [](OwnerTy& owner) -> OwnerTy& { return owner; };
 
 // abi: the slot's signature is the C table's; its context is checked once and the owner found through it, its
 // leading arguments reach the handler as references, and a throw becomes FAILURE, reported through FAILURES.
@@ -107,7 +98,6 @@ auto Handled(ContextTy* context, ArgsTy... args) noexcept -> ResultTy {
 }
 
 namespace sdl_rdp::freerdp_facade {
-using detail::handled::AssignThrough;
 using detail::handled::Handled;
 using detail::handled::Itself;
 }

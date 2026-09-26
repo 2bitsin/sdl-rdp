@@ -144,14 +144,14 @@ auto GraphicsMeasurement::RecordFrames(Client& client, Codec codec, Scene scene)
 auto GraphicsMeasurement::RecordGraphicsTiming(Client& client) -> void {
   auto const qoe_arrived = client.Until([this] {
     auto const status = CurrentStatus(*backend);
-    return status.has_value() && status->graphics.has_value() && status->graphics->Qoe().frameId == status->frame;
+    return status.has_value() && status->graphics.has_value() && status->graphics->qoe.frameId == status->frame;
   });
   if (!Check(qoe_arrived, "the client acknowledges the last frame's QoE")) return;
   auto const timing = RequiredGraphics(*backend);
-  Record("activation_to_gfx_ms", std::chrono::duration<double, std::milli>(timing.ReadyTime()).count());
-  Record("client_decode_ms", timing.Qoe().timeDiffSE);
-  Record("client_render_ms", timing.Qoe().timeDiffEDR);
-  Record("client_qoe_frame", timing.Qoe().frameId);
+  Record("activation_to_gfx_ms", std::chrono::duration<double, std::milli>(timing.ready_time).count());
+  Record("client_decode_ms", timing.qoe.timeDiffSE);
+  Record("client_render_ms", timing.qoe.timeDiffEDR);
+  Record("client_qoe_frame", timing.qoe.frameId);
   Check(!logs.Contains("GFX QoE"), "no QoE diagnostic is logged");
 }
 auto GraphicsMeasurement::EncodeDuration() -> std::chrono::nanoseconds {

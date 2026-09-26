@@ -1,13 +1,11 @@
 #include "drive.hpp"
 #include <sdl-rdp/SDL3/rdp/driver.hpp>
-#include <sdl-rdp/SDL3/rdp/owneddriver.hpp>
 #include <sdl-rdp/SDL3/rdp/sdl/boundary.hpp>
 #include <sdl-rdp/SDL3/rdp/sdl/resources.hpp>
 #include <sdl-rdp/drive/directory-entry.hpp>
 #include <sdl-rdp/drive/file-status.hpp>
 #include <sdl-rdp/drive/files.hpp>
 #include <sdl-rdp/session/backend.hpp>
-#include <sdl-rdp/utilities/void-buffer.hpp>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -24,32 +22,31 @@ using sdl3::rdp::sdl::StorageHandle;
 using sdl_rdp::drive::DirectoryEntry;
 using sdl_rdp::drive::DriveFiles;
 using sdl_rdp::drive::FileStatus;
-using sdl_rdp::utilities::ByteBuffer;
-using sdl_rdp::utilities::BytesOf;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::NotImplemented;
-using sdl_rdp::utilities::VoidBuffer;
 namespace {
 constexpr std::size_t DirectoryBatch = 32;
 constexpr std::size_t CopyChunkBytes = 65536;
-class Storage : private OwnedDriver {
+class Storage {
 public:
-  using OwnedDriver::Driver;
-  using OwnedDriver::Owner;
        Storage(std::shared_ptr<sdl3::rdp::Driver> driver, std::optional<std::string> name)
-      : OwnedDriver{ std::move(driver) }, _name{ std::move(name) } { }
+      : _driver{ std::move(driver) }, _name{ std::move(name) } { }
+  auto Owner() const noexcept -> std::shared_ptr<sdl3::rdp::Driver> const& {
+    return _driver;
+  }
   auto Drive() const -> std::uint32_t {
     return _drive;
   }
   auto Files() -> DriveFiles {
-    return Driver().Backend().Drive();
+    return _driver->Backend().Drive();
   }
   auto Resolve() -> void {
-    _drive = DriveId(Driver(), _name);
+    _drive = DriveId(*_driver, _name);
   }
 private:
-  std::optional<std::string> _name;
-  std::uint32_t              _drive{ };
+  std::shared_ptr<sdl3::rdp::Driver> _driver;
+  std::optional<std::string>         _name;
+  std::uint32_t                      _drive { };
 };
 // SDL storage callbacks carry the Storage through an opaque context pointer.
 auto Opened(void* context) -> Storage& {

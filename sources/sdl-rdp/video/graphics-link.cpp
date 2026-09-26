@@ -20,8 +20,7 @@ using sdl_rdp::link::DynamicChannelsReady;
 using sdl_rdp::utilities::Expects;
 
 GraphicsLink::GraphicsLink(PeerLink& link, Diagnostics const& diagnostics, Activation& activation,
-                           FramePacing const& pacing, Encoder const& encoder,
-                           Factory<std::unique_ptr<GfxChannel>, DynamicChannel&> make) noexcept
+                           FramePacing const& pacing, Encoder const& encoder, MakeGfx make) noexcept
     : _link{ link }, _diagnostics{ diagnostics }, _activation{ activation }, _pacing{ pacing }, _encoder{ encoder },
       _make{ std::move(make) } { }
 auto GraphicsLink::Pump(Signalled const& ready) -> bool {

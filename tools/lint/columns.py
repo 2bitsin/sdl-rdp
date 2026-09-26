@@ -780,7 +780,7 @@ def constructor_indents(lines):
     owners = {fields.signature.split('(', 1)[0].lstrip('~'): base for _, fields in functions
               if not fields.typ and is_function_declaration(fields, set())}
     for line in lines:
-        if match := re.match(r'\s*(?:class|struct)\s+(?:\w+::)*(\w+).*\{', line.code):
+        if match := re.match(r'\s*(?:template\s*<.*>\s*)?(?:class|struct)\s+(?:\w+::)*(\w+).*\{', line.code):
             owners[match[1]] = indentation(line.line) + ' ' * INDENT_WIDTH
     return owners
 
