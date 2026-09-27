@@ -1,26 +1,26 @@
 sample/main.cpp:98: DrawScheduled parameters 6 > 5 # size in #19
 sdl-rdp/SDL3/rdp/video/videodata.hpp: SDL_VideoData data members 11 > 10 # holds its share of the driver since OwnedDriver went (#82)
 sdl-rdp/SDL3/rdp/video/videodata.hpp: SDL_VideoData member functions 16 > 15 # Driver(), the SDL callbacks' way to the driver, since OwnedDriver went (#82)
-sdl-rdp/audio/channel.hpp: AudioChannel data members 24 > 10 # collaborators replace Peer&; split in #6
-sdl-rdp/audio/channel.hpp: AudioChannel member functions 22 > 15 # AudioProtocol friend folded in; FailureSource, the accessor Handled reports through; split in #6
+sdl-rdp/audio/channel.hpp: AudioChannel data members 23 > 10 # collaborators replace Peer&; split in #6
+sdl-rdp/audio/channel.hpp: AudioChannel member functions 20 > 15 # the two SoundChannelEvents overrides beside the send and pacing verbs; split in #6
 sdl-rdp/clipboard/channel.hpp: ClipboardChannel data members 13 > 10 # collaborators replace Peer&; split in #6
 sdl-rdp/drive/channel.hpp: DriveChannel data members 14 > 10 # collaborators replace Peer&; split in #6
 sdl-rdp/drive/channel.hpp: DriveChannel member functions 27 > 15 # split in #6
-sdl-rdp/freerdp-facade/connection.cpp:165: ResponseKey parameters 7 > 5 # FreeRDP SspiNtlmHashCallback signature is the ABI
+sdl-rdp/freerdp-facade/connection.cpp:158: ResponseKey parameters 7 > 5 # FreeRDP SspiNtlmHashCallback signature is the ABI
 sdl-rdp/freerdp-facade/connection.hpp: Connection member functions 25 > 15 # one freerdp_peer handle: lifecycle, transport, authentication and error verbs, each with a caller, and the private moved-from check they share; the raw Context() goes with facade-5
 sdl-rdp/freerdp-facade/settings.hpp: classes with member functions 2 > 1 # SettingsReader and the SettingsView that writes through it: one view, split so a read path cannot write (facade-1 M1)
 sdl-rdp/headless-client.test/client/sound-protocol.cpp:107: SoundProtocol::Opened parameters 7 > 5 # WinPR PCHANNEL_OPEN_EVENT_EX_FN signature is the ABI
 sdl-rdp/headless-client.test/client/sound.hpp: SoundClient data members 12 > 10 # split in #6; its Membership replaces the hand-paired Add/Remove (#82)
 sdl-rdp/headless-client.test/drive/observer.cpp:42: DriveObserver::DriveObserver lambda@42 parameters 6 > 5 # FreeRDP pReceiveChannelData signature is the ABI
 sdl-rdp/headless-client.test/graphics/observer.hpp: GraphicsObserver data members 12 > 10 # seven chained FreeRDP callbacks; Membership and ChannelSubscription replace hand-paired calls (#82)
-sdl-rdp/input/events.cpp:78: InputEvents::InputEvents parameters 7 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
-sdl-rdp/integration/auth.test/authentication.cpp:32: RejectCertificate lambda@32 parameters 8 > 5 # FreeRDP pVerifyCertificateEx signature is the ABI
+sdl-rdp/input/events.cpp:83: InputEvents::InputEvents parameters 7 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
+sdl-rdp/integration/auth.test/authentication.cpp:34: RejectCertificate lambda@34 parameters 8 > 5 # FreeRDP pVerifyCertificateEx signature is the ABI
 sdl-rdp/peer/arrival.cpp:55: Arrival::Arrival parameters 8 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp/peer/channel-set.cpp:12: ChannelSet::ChannelSet parameters 7 > 5 # collaborators replace Peer&, plus the diagnostics its creation slot logs to; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp/peer/peer.cpp:20: Peer::Peer parameters 8 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp/peer/peer.hpp: Peer data members 30 > 10 # composition root: owns every per-peer part, each wired with only what it uses
 sdl-rdp/peer/peer.hpp: Peer member functions 36 > 15 # one peer connection: its thread loop, departure and ConnectionEvents overrides are members, each TU a topic (#82)
-sdl-rdp/peer/redirection.cpp:29: Redirection::Redirection parameters 6 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
+sdl-rdp/peer/redirection.cpp:31: Redirection::Redirection parameters 6 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp/peer/transport-end.cpp:77: TransportEnd::TransportEnd parameters 6 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp/sample-gate.test/process/process.cpp:46: Process::Line nesting 3 > 2 # size in #19
 sdl-rdp/video/frame/capture.cpp:18: FrameCapture::FrameCapture parameters 7 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling

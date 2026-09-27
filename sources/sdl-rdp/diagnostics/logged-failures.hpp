@@ -11,8 +11,8 @@ using sdl_rdp::diagnostics::Diagnostics;
 using sdl_rdp::diagnostics::FailureLog;
 using sdl_rdp::utilities::OperationName;
 
-// A slot owner's failure sink: what INTERFACE's slots report is logged through the diagnostics it is given.
-template <class InterfaceTy> class LoggedFailures : public InterfaceTy {
+// A slot owner's failure sink: what each interface's slots report is logged through the diagnostics it is given.
+template <class... InterfacesTy> class LoggedFailures : public InterfacesTy... {
 protected:
   explicit LoggedFailures(Diagnostics const& diagnostics) noexcept : _diagnostics{ diagnostics } { }
   auto     Logger() const noexcept -> Diagnostics const& {

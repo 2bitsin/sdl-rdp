@@ -1,37 +1,37 @@
 #pragma once
 #include <sdl-rdp/diagnostics/forward.hpp>
+#include <sdl-rdp/diagnostics/logged-failures.hpp>
+#include <sdl-rdp/freerdp-facade/sound-channel.hpp>
 #include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/link/forward.hpp>
-#include <sdl-rdp/utilities/pinned.hpp>
 
-#include <freerdp/server/rdpsnd.h>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
-#include <memory>
 #include <span>
 #include <vector>
 
 namespace sdl_rdp::audio::detail::channel {
 using sdl_rdp::diagnostics::Diagnostics;
+using sdl_rdp::diagnostics::LoggedFailures;
 using sdl_rdp::diagnostics::TraceQueue;
+using sdl_rdp::freerdp_facade::BlockConfirm;
+using sdl_rdp::freerdp_facade::SoundChannel;
+using sdl_rdp::freerdp_facade::SoundChannelEvents;
+using sdl_rdp::freerdp_facade::SoundClient;
 using sdl_rdp::freerdp_facade::WaitHandle;
 using sdl_rdp::link::EventQueue;
 using sdl_rdp::link::PeerLink;
 using sdl_rdp::link::SessionAccess;
-using sdl_rdp::utilities::Pinned;
-using sdl_rdp::utilities::Releases;
 
 inline constexpr std::uint32_t CompatibleRate = 44100;
 inline constexpr std::uint32_t NativeRate     = 48000;
-using SoundContext = std::unique_ptr<RdpsndServerContext, Releases<rdpsnd_server_context_free>>;
-class AudioChannel : private Pinned {
+class AudioChannel final : public LoggedFailures<SoundChannelEvents> {
 public:
   using Clock = std::chrono::steady_clock;
        AudioChannel(PeerLink& link, Diagnostics const& diagnostics, EventQueue& events, SessionAccess& session,
                     TraceQueue& traces);
-       ~AudioChannel();
   auto Initialize()                                -> bool;
   auto Pump()                                      -> bool;
   auto Event() const                               -> WaitHandle;
@@ -42,30 +42,27 @@ public:
   auto AdoptServerClock()                          -> void;
   auto Ready(std::uint32_t latency_ms)             -> bool;
   auto Send(std::span<std::int16_t const> samples) -> bool;
+  auto Activated(SoundClient const& client)        -> void override;
+  auto Confirmed(BlockConfirm confirm)             -> void override;
 
 private:
-  class Callbacks;
   struct Block {
     std::uint8_t      id    { };
     std::uint64_t     frames{ };
     Clock::time_point sent;
   };
-  auto Activate()                                             -> void;
-  auto FailureSource() const noexcept                         -> Diagnostics const&;
-  auto Confirm(std::uint8_t id, std::uint16_t timestamp)      -> std::uint32_t;
   auto SendBlock()                                            -> bool;
   auto RecordBlock(Clock::time_point now, std::uint8_t block) -> void;
   auto TransportEnded()                                       -> void;
   auto Credit()                                               -> std::uint64_t;
   auto ReportGate(bool available, std::uint64_t credit)       -> void;
   auto Select(std::size_t index)                              -> void;
-  auto RejectFormats()                                        -> void;
+  auto RejectFormats(SoundClient const& client)               -> void;
   PeerLink&                 _link;
-  Diagnostics const&        _diagnostics;
   EventQueue&               _events;
   SessionAccess&            _session;
   TraceQueue&               _traces;
-  SoundContext              _sound;
+  SoundChannel              _sound;
   std::uint32_t             _rate            { };
   bool                      _rejected        { };
   bool                      _gate_warned     { };

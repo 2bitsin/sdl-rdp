@@ -34,6 +34,7 @@ struct Recorded {
   POINTER_NEW_UPDATE                color           { };
   std::vector<POINTER_LARGE_UPDATE> large;
   std::optional<std::uint32_t>      system;
+  POINTER_POSITION_UPDATE           position        { };
 };
 auto Of(rdpContext const& context) -> Recorded& {
   return *static_cast<Recorded*>(context.peer->ContextExtra);
@@ -66,6 +67,10 @@ constexpr auto          System    = [](Recorded& recorded, POINTER_SYSTEM_UPDATE
   recorded.system = system.type;
   return true;
 };
+constexpr auto          Position  = [](Recorded& recorded, POINTER_POSITION_UPDATE const& position) {
+  recorded.position = position;
+  return true;
+};
 auto Record(rdpUpdate& update) -> void {
   update.SurfaceFrameMarker = Handled<Of, Marker, Recording, Ignored, false>;
   update.SurfaceBits        = Handled<Of, Surface, Recording, Ignored, false>;
@@ -73,9 +78,10 @@ auto Record(rdpUpdate& update) -> void {
   update.DesktopResize      = Handled<Of, Resize, Recording, Ignored, false>;
 }
 auto Record(rdpPointerUpdate& pointer) -> void {
-  pointer.PointerNew    = Handled<Of, Color, Recording, Ignored, false>;
-  pointer.PointerLarge  = Handled<Of, Large, Recording, Ignored, false>;
-  pointer.PointerSystem = Handled<Of, System, Recording, Ignored, false>;
+  pointer.PointerNew      = Handled<Of, Color, Recording, Ignored, false>;
+  pointer.PointerLarge    = Handled<Of, Large, Recording, Ignored, false>;
+  pointer.PointerSystem   = Handled<Of, System, Recording, Ignored, false>;
+  pointer.PointerPosition = Handled<Of, Position, Recording, Ignored, false>;
 }
 class UpdateSlots : public testing::Test {
 protected:
@@ -203,6 +209,11 @@ TEST_F(UpdateSlots, LargePointerSendsTheCallersBuffers) {
 TEST_F(UpdateSlots, HidePointerIsTheNullSystemPointer) {
   EXPECT_TRUE(updates.HidePointer());
   EXPECT_EQ(recorded.system, SYSPTR_NULL);
+}
+TEST_F(UpdateSlots, MovePointerCarriesThePosition) {
+  EXPECT_TRUE(updates.MovePointer(640, 360));
+  EXPECT_EQ(recorded.position.xPos, 640);
+  EXPECT_EQ(recorded.position.yPos, 360);
 }
 TEST(ConvertPixels, PacksEachRowToFourBytes) {
   std::array<std::uint8_t, 24> const bgrx   { 0x10, 0x20, 0x30, 0, 0x40, 0x50, 0x60, 0, 0x70, 0x80, 0x90, 0,

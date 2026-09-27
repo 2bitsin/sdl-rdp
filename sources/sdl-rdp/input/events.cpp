@@ -1,7 +1,7 @@
 #include <sdl-rdp/input/events.hpp>
 
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
-#include <sdl-rdp/diagnostics/failure-log.hpp>
+#include <sdl-rdp/freerdp-facade/updates.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/event-queue.hpp>
 #include <sdl-rdp/link/event.hpp>
@@ -11,23 +11,25 @@
 #include <sdl-rdp/picture/frame-store.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 
-#include <freerdp/freerdp.h>
-#include <freerdp/server/ainput.h>
 #include <algorithm>
 #include <array>
+#include <bitset>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <format>
 #include <functional>
+#include <optional>
 #include <ranges>
 #include <span>
 #include <string_view>
 #include <utility>
 
 namespace sdl_rdp::input::detail::events {
+using sdl_rdp::freerdp_facade::ContactPhase;
 using sdl_rdp::freerdp_facade::PointerButton;
 using sdl_rdp::freerdp_facade::PointerButtonCount;
+using sdl_rdp::freerdp_facade::Updates;
 using sdl_rdp::link::Event;
 using sdl_rdp::link::MouseButton;
 using sdl_rdp::link::MouseMove;
@@ -69,22 +71,22 @@ auto LinkButton(PointerButton button) -> std::uint32_t {
 auto PushButtons(EventQueue& events, std::ranges::input_range auto&& pressed, bool down) -> void {
   for (auto const button : pressed) events.Push(MouseButton{ .button = LinkButton(button), .down = down });
 }
-auto Pressed(PointerEvent const& event) -> auto {
-  return AllButtons | std::views::filter([&event](PointerButton button) {
-           return event.buttons.test(std::to_underlying(button));
-         });
+auto Pressed(std::bitset<PointerButtonCount> const& buttons) -> auto {
+  return AllButtons
+         | std::views::filter([&buttons](PointerButton button) { return buttons.test(std::to_underlying(button)); });
+}
+template <class EventTy> auto PushPresses(EventQueue& events, EventTy const& event) -> void {
+  PushButtons(events, Pressed(event.buttons), event.down);
+  if (event.wheel) events.Push(MouseWheel{ .dx = event.wheel->horizontal, .dy = event.wheel->vertical });
 }
 }
 InputEvents::InputEvents(PeerLink& link, Activation const& activation, DesktopLayout const& desktop, EventQueue& events,
                          FrameStore& store, Diagnostics const& diagnostics, SessionAccess& session) noexcept
     : LoggedFailures{ diagnostics }, _link{ link }, _activation{ activation }, _desktop{ desktop }, _events{ events },
-      _store{ store }, _diagnostics{ diagnostics }, _session{ session } { }
-auto InputEvents::Failures(OperationName operation) const noexcept -> FailureLog {
-  return { _diagnostics, operation };
-}
+      _store{ store }, _session{ session } { }
 auto InputEvents::Key(KeyEvent event) -> void {
   WhenActive([&] {
-    _diagnostics.Line("key", [&] {
+    Logger().Line("key", [&] {
       return std::format("code={} extended={} down={}", event.code, int{ event.extended }, int{ event.down });
     });
     _events.Push(sdl_rdp::link::Key{ .scancode = event.code, .extended = event.extended, .down = event.down });
@@ -94,34 +96,25 @@ auto InputEvents::Unicode(UnicodeEvent event) -> void {
   WhenActive([&] {
     auto const point = oxbox::utilities::UtfDecode(_unicode[event.down], event.code);
     if (!point || *point == oxbox::utilities::INVALID_CODEPOINT<>) return;
-    _diagnostics.Line("key",
-                      [&] { return std::format("codepoint={} down={}", std::uint32_t{ *point }, int{ event.down }); });
+    Logger().Line("key",
+                  [&] { return std::format("codepoint={} down={}", std::uint32_t{ *point }, int{ event.down }); });
     _events.Push(TextInput{ .codepoint = *point, .down = event.down });
   });
 }
 auto InputEvents::Pointer(PointerEvent const& event) -> bool {
   return WhenActive(true, [&] {
     if (event.buttons.any())
-      _diagnostics.Line("mouse", [&] {
+      Logger().Line("mouse", [&] {
         return std::format("buttons={} down={} x={} y={}", event.buttons.to_string(), int{ event.down }, event.x,
                            event.y);
       });
     if (event.moved && !Motion(event.x, event.y)) return false;
-    PushButtons(_events, Pressed(event), event.down);
-    if (event.wheel) _events.Push(MouseWheel{ .dx = event.wheel->horizontal, .dy = event.wheel->vertical });
+    PushPresses(_events, event);
     return true;
   });
 }
 namespace {
-constexpr int                                                    EdgeFraction  = 8;
-constexpr float                                                  WheelUnit     = 120.0F * 65536;
-constexpr std::array<std::pair<std::uint64_t, PointerButton>, 5> AinputButtons {
-  { { AINPUT_FLAGS_BUTTON1 , PointerButton::Left    },
-    { AINPUT_FLAGS_BUTTON3 , PointerButton::Middle  },
-    { AINPUT_FLAGS_BUTTON2 , PointerButton::Right   },
-    { AINPUT_XFLAGS_BUTTON1, PointerButton::Back    },
-    { AINPUT_XFLAGS_BUTTON2, PointerButton::Forward } }
-};
+constexpr int EdgeFraction = 8;
 auto Outside(int value, int extent) -> bool {
   return value < extent / EdgeFraction || value >= extent * (EdgeFraction - 1) / EdgeFraction;
 }
@@ -151,11 +144,9 @@ auto InputEvents::Point(MouseMode mode) noexcept -> void {
 }
 auto InputEvents::Center() -> bool {
   Expects(_activation.Active(), "active peer has a desktop");
-  auto const                    desktop  = _desktop.Desktop();
-  auto&                         context  = _link.Connection().Context();
-  POINTER_POSITION_UPDATE const position { Narrowed<std::uint32_t>(desktop.w / 2),
-                                           Narrowed<std::uint32_t>(desktop.h / 2) };
-  _mouse.warp_requested = context.update->pointer->PointerPosition(&context, &position);
+  auto const desktop = _desktop.Desktop();
+  _mouse.warp_requested = Updates{ _link.Connection() }.MovePointer(Narrowed<std::uint32_t>(desktop.w / 2),
+                                                                    Narrowed<std::uint32_t>(desktop.h / 2));
   return _mouse.warp_requested;
 }
 auto InputEvents::Motion(int x, int y) -> bool {
@@ -173,57 +164,48 @@ auto InputEvents::Motion(int x, int y) -> bool {
   if (!warped && (dx || dy)) Scaled<RelativeMotion>(dx, dy);
   return NearEdge(desktop, x, y) ? Center() : true;
 }
-auto InputEvents::AdvancedPointer(std::uint64_t flags, std::int32_t x, std::int32_t y) -> std::uint32_t {
-  return WhenActive(std::uint32_t{ CHANNEL_RC_OK }, [&] {
-    bool const moved   = flags & AINPUT_FLAGS_MOVE;
-    bool const shifted = moved && (flags & AINPUT_FLAGS_REL);
-    if (moved) _mouse.have_relative = (flags & (AINPUT_FLAGS_REL | AINPUT_FLAGS_HAVE_REL)) != 0;
+auto InputEvents::AdvancedPointer(AdvancedPointerEvent const& event) -> bool {
+  return WhenActive(true, [&] {
+    bool const shifted = event.moved && event.relative;
+    if (event.moved) _mouse.have_relative = event.relative_capable;
     if (_mouse.have_relative) _mouse.warp_requested = false;
-    if (shifted && _mouse.mode == MouseMode::Relative) Scaled<RelativeMotion>(x, y);
-    if (moved && !shifted && !Motion(x, y)) return std::uint32_t{ ERROR_INTERNAL_ERROR };
-    auto const flagged = [flags](auto const& entry) { return (flags & entry.first) != 0; };
-    PushButtons(_events, AinputButtons | std::views::filter(flagged) | std::views::values,
-                (flags & AINPUT_FLAGS_DOWN) != 0);
-    if (flags & AINPUT_FLAGS_WHEEL)
-      _events.Push(MouseWheel{ .dx = static_cast<float>(x) / WheelUnit, .dy = static_cast<float>(y) / WheelUnit });
-    return std::uint32_t{ CHANNEL_RC_OK };
+    if (shifted && _mouse.mode == MouseMode::Relative) Scaled<RelativeMotion>(event.x, event.y);
+    if (event.moved && !shifted && !Motion(event.x, event.y)) return false;
+    PushPresses(_events, event);
+    return true;
   });
 }
 namespace {
 constexpr std::uint32_t PressureScale = 1024;
-auto Phase(std::uint32_t flags) -> TouchPhase {
-  if (flags & RDPINPUT_CONTACT_FLAG_CANCELED) return TouchPhase::Cancel;
-  if (flags & RDPINPUT_CONTACT_FLAG_UP) return TouchPhase::Up;
-  if (flags & RDPINPUT_CONTACT_FLAG_DOWN) return TouchPhase::Down;
-  return TouchPhase::Move;
+auto Phase(ContactPhase phase) -> TouchPhase {
+  switch (phase) {
+  case ContactPhase::Down:   return TouchPhase::Down;
+  case ContactPhase::Move:   return TouchPhase::Move;
+  case ContactPhase::Up:     return TouchPhase::Up;
+  case ContactPhase::Cancel: return TouchPhase::Cancel;
+  default:                   Unreachable(phase);
+  }
 }
-auto Pressure(RDPINPUT_CONTACT_DATA const& contact) -> float {
-  if (!(contact.fieldsPresent & CONTACT_DATA_PRESSURE_PRESENT)) return 1.0F;
-  return static_cast<float>(std::min(contact.pressure, PressureScale)) / static_cast<float>(PressureScale);
+auto Pressure(std::optional<std::uint32_t> pressure) -> float {
+  if (!pressure) return 1.0F;
+  return static_cast<float>(std::min(*pressure, PressureScale)) / static_cast<float>(PressureScale);
 }
 auto Unit(std::int32_t value, int extent) -> float {
   return std::clamp(static_cast<float>(value) / static_cast<float>(extent), 0.0F, 1.0F);
 }
-auto Contact(Rect desktop, RDPINPUT_CONTACT_DATA const& contact) -> Event {
+auto Contact(Rect desktop, TouchContact const& contact) -> Event {
   Expects(desktop.w > 0, "desktop width is positive");
   Expects(desktop.h > 0, "desktop height is positive");
-  return Touch{ .id       = contact.contactId,
+  return Touch{ .id       = contact.id,
                 .x        = Unit(contact.x, desktop.w),
                 .y        = Unit(contact.y, desktop.h),
-                .pressure = Pressure(contact),
-                .phase    = Phase(contact.contactFlags) };
-}
-auto Contacts(RDPINPUT_TOUCH_EVENT const& event) {
-  return std::span(event.frames, event.frameCount) | std::views::transform([](RDPINPUT_TOUCH_FRAME const& frame) {
-           return std::span(frame.contacts, frame.contactCount);
-         })
-         | std::views::join;
+                .pressure = Pressure(contact.pressure),
+                .phase    = Phase(contact.phase) };
 }
 }
-auto InputEvents::Touch(RDPINPUT_TOUCH_EVENT const& event) -> std::uint32_t {
-  return WhenActive(std::uint32_t{ CHANNEL_RC_OK }, [&] {
-    for (auto const& contact : Contacts(event)) _events.Push(Contact(_desktop.Desktop(), contact));
-    return std::uint32_t{ CHANNEL_RC_OK };
+auto InputEvents::Touch(std::span<TouchContact const> contacts) -> void {
+  WhenActive([&] {
+    for (auto const& contact : contacts) _events.Push(Contact(_desktop.Desktop(), contact));
   });
 }
 }

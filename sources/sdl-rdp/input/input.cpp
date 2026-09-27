@@ -9,8 +9,8 @@
 namespace sdl_rdp::input::detail::input {
 using sdl_rdp::utilities::Expects;
 
-Input::Input(PeerLink& link, InputEvents& events) noexcept
-    : _link{ link }, _advanced{ link, events }, _touch{ link, events } { }
+Input::Input(PeerLink& link, InputEvents& events, Diagnostics const& diagnostics) noexcept
+    : _link{ link }, _advanced{ link, events, diagnostics }, _touch{ link, events, diagnostics } { }
 auto Input::Channels(Signalled const& ready) -> bool {
   if (!_link.Channels().DynamicReady()) return true;
   if (!_opened) return Open();

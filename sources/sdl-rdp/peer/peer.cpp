@@ -36,7 +36,7 @@ Peer::Peer(Connection accepted, Diagnostics const& diagnostics, EventQueue& even
                  } },
       _display     { _link, _activation, _desktop, events, diagnostics                 },
       _input_events{ _link, _activation, _desktop, events, store, diagnostics, session },
-      _input       { _link, _input_events                                              },
+      _input       { _link, _input_events, diagnostics                                 },
       _redirection{ _link,
                     _activation,
                     session,

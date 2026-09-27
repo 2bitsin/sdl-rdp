@@ -1,9 +1,11 @@
 #include <sdl-rdp/freerdp-facade/connection.hpp>
 
+#include <sdl-rdp/freerdp-facade/button-flags.hpp>
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
 #include <sdl-rdp/freerdp-facade/exceptions.hpp>
 #include <sdl-rdp/freerdp-facade/handled.hpp>
 #include <sdl-rdp/freerdp-facade/ntlm.hpp>
+#include <sdl-rdp/freerdp-facade/record-array.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/exceptions.hpp>
@@ -24,10 +26,7 @@
 #include <winpr/sspi.h>
 #include <winpr/wtsapi.h>
 #include <algorithm>
-#include <array>
 #include <bit>
-#include <bitset>
-#include <cstddef>
 #include <cstdint>
 #include <mutex>
 #include <optional>
@@ -96,15 +95,9 @@ auto IdentityText(std::span<std::uint8_t const> utf8) -> std::string {
   return TranscodeRange<std::string>(oxbox::utilities::AsBytes(text),
                                      { .encoding = Encoding::UTF8, .order = std::endian::native }, { });
 }
-template <auto TEXT, auto LENGTH, class IdentityTy> auto IdentityField(IdentityTy const& identity) -> std::string {
-  auto const* const text   = identity.*TEXT;
-  auto const        length = std::size_t{ identity.*LENGTH };
-  if (length) Expects(text != nullptr, "identity buffer covers length");
-  return IdentityText(std::span{ text, length });
-}
 template <class IdentityTy> auto NamesOf(IdentityTy const& identity) -> Identity {
-  return { .user   = IdentityField<&IdentityTy::User, &IdentityTy::UserLength>(identity),
-           .domain = IdentityField<&IdentityTy::Domain, &IdentityTy::DomainLength>(identity) };
+  return { .user   = IdentityText(RecordArray<&IdentityTy::User, &IdentityTy::UserLength>(identity)),
+           .domain = IdentityText(RecordArray<&IdentityTy::Domain, &IdentityTy::DomainLength>(identity)) };
 }
 auto Named(SEC_WINNT_AUTH_IDENTITY const& identity) -> Identity {
   if ((identity.Flags & SEC_WINNT_AUTH_IDENTITY_UNICODE) != 0) return NamesOf(identity);
@@ -206,21 +199,13 @@ auto InstallUpdateSlots(rdpUpdate& update) -> void {
 }
 
 // MS-RDPBCGR 2.2.8.1.1.3.1.1.3: a wheel rotation is 9-bit two's complement, 120 units a notch.
-constexpr int                      WheelSignExtension = 0x200;
-constexpr float                    WheelNotch         = 120.0F;
-template <std::size_t COUNT> using ButtonFlags        = std::array<std::pair<std::uint16_t, PointerButton>, COUNT>;
-constexpr ButtonFlags<3>           MouseButtons       { { { PTR_FLAGS_BUTTON1, PointerButton::Left   },
-                                                          { PTR_FLAGS_BUTTON2, PointerButton::Right  },
-                                                          { PTR_FLAGS_BUTTON3, PointerButton::Middle } } };
-constexpr ButtonFlags<2>           ExtendedButtons    { { { PTR_XFLAGS_BUTTON1, PointerButton::Back    },
-                                                          { PTR_XFLAGS_BUTTON2, PointerButton::Forward } } };
-template <std::size_t COUNT>
-auto Buttons(std::uint16_t flags, ButtonFlags<COUNT> const& table) -> std::bitset<PointerButtonCount> {
-  std::bitset<PointerButtonCount> buttons;
-  for (auto const [flag, button] : table)
-    if (flags & flag) buttons.set(std::to_underlying(button));
-  return buttons;
-}
+constexpr int                           WheelSignExtension = 0x200;
+constexpr float                         WheelNotch         = 120.0F;
+constexpr ButtonFlags<std::uint16_t, 3> MouseButtons       { { { PTR_FLAGS_BUTTON1, PointerButton::Left   },
+                                                               { PTR_FLAGS_BUTTON2, PointerButton::Right  },
+                                                               { PTR_FLAGS_BUTTON3, PointerButton::Middle } } };
+constexpr ButtonFlags<std::uint16_t, 2> ExtendedButtons    { { { PTR_XFLAGS_BUTTON1, PointerButton::Back    },
+                                                               { PTR_XFLAGS_BUTTON2, PointerButton::Forward } } };
 auto Wheel(std::uint16_t flags) -> std::optional<WheelTurn> {
   if (!(flags & (PTR_FLAGS_WHEEL | PTR_FLAGS_HWHEEL))) return std::nullopt;
   int rotation = flags & WheelRotationMask;

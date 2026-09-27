@@ -4,6 +4,7 @@
 #include <sdl-rdp/clipboard/channel.hpp>
 #include <sdl-rdp/drive/channel.hpp>
 #include <sdl-rdp/freerdp-facade/clipboard-channel.hpp>
+#include <sdl-rdp/freerdp-facade/sound-channel.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/link/session-access.hpp>
@@ -17,6 +18,7 @@
 
 namespace sdl_rdp::peer::detail::redirection {
 using sdl_rdp::freerdp_facade::ClipboardChannelName;
+using sdl_rdp::freerdp_facade::SoundChannelName;
 using sdl_rdp::utilities::Expects;
 
 namespace {
@@ -52,7 +54,7 @@ auto Redirection::OpenStatic(Signalled const& ready) -> bool {
   return !_clipboard || _clipboard->Pump(ready);
 }
 auto Redirection::OpenSound() -> bool {
-  if (std::exchange(_sound_attempted, true) || !_link.Channels().Joined(RDPSND_CHANNEL_NAME)) return true;
+  if (std::exchange(_sound_attempted, true) || !_link.Channels().Joined(SoundChannelName)) return true;
   _link.Invalidate();
   _sound = _make_sound();
   return _sound->Initialize();

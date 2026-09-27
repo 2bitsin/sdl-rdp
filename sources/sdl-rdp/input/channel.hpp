@@ -1,69 +1,44 @@
 #pragma once
+#include <sdl-rdp/diagnostics/forward.hpp>
+#include <sdl-rdp/freerdp-facade/advanced-input-channel.hpp>
 #include <sdl-rdp/freerdp-facade/signalled.hpp>
+#include <sdl-rdp/freerdp-facade/touch-channel.hpp>
 #include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/input/activated-channel.hpp>
+#include <sdl-rdp/input/channel-assignment.hpp>
 #include <sdl-rdp/input/forward.hpp>
-#include <sdl-rdp/link/dynamic-channels.hpp>
-#include <sdl-rdp/link/peer-link.hpp>
-#include <sdl-rdp/utilities/contract.hpp>
+#include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
-#include <cstdint>
 #include <optional>
 
 namespace sdl_rdp::input::detail::channel {
+using sdl_rdp::diagnostics::Diagnostics;
+using sdl_rdp::freerdp_facade::AdvancedInputChannel;
 using sdl_rdp::freerdp_facade::Signalled;
+using sdl_rdp::freerdp_facade::TouchChannel;
 using sdl_rdp::freerdp_facade::WaitHandle;
-using sdl_rdp::link::DynamicChannels;
 using sdl_rdp::link::PeerLink;
-using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Pinned;
 
-template <class Protocol> class InputChannel final : private Pinned {
+// A dynamic input channel of the facade, opened once the dynamic channels are ready and serviced once activated.
+template <class ChannelTy> class InputChannel final : private Pinned {
 public:
-       InputChannel(PeerLink& link, InputEvents& events) noexcept;
+       InputChannel(PeerLink& link, InputEvents& events, Diagnostics const& diagnostics) noexcept;
   auto Open()                       -> bool;
   auto Pump(Signalled const& ready) -> bool;
   auto Event() const                -> std::optional<WaitHandle>;
 
 private:
-  auto Activate()                     -> bool;
-  auto Assign(std::uint32_t id)       -> bool;
-  auto FailureSource() const noexcept -> InputEvents const&;
-  friend                                     Protocol;
-  PeerLink&                                  _link;
-  InputEvents&                               _events;
-  typename Protocol::Context                 _context;
-  ActivatedChannel                           _dynamic;
-  std::optional<DynamicChannels::Assignment> _assignment;
-  bool                                       _ready     { };
+  auto Activate() -> bool;
+  // Each member refers to the one above it; destruction runs in reverse and makes no project callback.
+  ActivatedChannel  _dynamic;
+  ChannelAssignment _assignee;
+  ChannelTy         _channel;
+  bool              _ready   { };
 };
-template <class Protocol>
-InputChannel<Protocol>::InputChannel(PeerLink& link, InputEvents& events) noexcept
-    : _link{ link }, _events{ events }, _dynamic{ [this] { return Activate(); } } { }
-template <class Protocol> auto InputChannel<Protocol>::FailureSource() const noexcept -> InputEvents const& {
-  return _events;
-}
-template <class Protocol> auto InputChannel<Protocol>::Open() -> bool {
-  _context = Protocol::Open(_link, *this);
-  return _context != nullptr;
-}
-template <class Protocol> auto InputChannel<Protocol>::Pump(Signalled const& ready) -> bool {
-  return !ready.Contains(Event()) || Protocol::Service(_context);
-}
-template <class Protocol> auto InputChannel<Protocol>::Event() const -> std::optional<WaitHandle> {
-  if (!_ready) return std::nullopt;
-  return Protocol::Handle(_context);
-}
-template <class Protocol> auto InputChannel<Protocol>::Activate() -> bool {
-  Expects(_context != nullptr, "an activated input channel is open");
-  _ready = true;
-  return Protocol::Activate(_context);
-}
-template <class Protocol> auto InputChannel<Protocol>::Assign(std::uint32_t id) -> bool {
-  _assignment.emplace(_link.Dynamic().Assign(id, _dynamic));
-  return true;
-}
+extern template class InputChannel<AdvancedInputChannel>;
+extern template class InputChannel<TouchChannel>;
 }
 
 namespace sdl_rdp::input {

@@ -3,6 +3,8 @@
 #include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/headless-client.test/client/client.hpp>
 #include <sdl-rdp/session/backend.hpp>
+
+#include <freerdp/peer.h>
 #include <cstddef>
 #include <cstdint>
 #include <fstream>

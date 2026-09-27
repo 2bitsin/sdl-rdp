@@ -43,6 +43,7 @@ public:
   auto     Pointer(PointerImage const& image)                   -> bool;
   auto     LargePointer(PointerImage const& image)              -> bool;
   auto     HidePointer()                                        -> bool;
+  auto     MovePointer(std::uint32_t x, std::uint32_t y)        -> bool;
 
 private:
   rdp_context& _context;

@@ -158,6 +158,12 @@ auto Updates::HidePointer() -> bool {
   POINTER_SYSTEM_UPDATE const hidden{ SYSPTR_NULL };
   return table.PointerSystem(&_context, &hidden) != 0;
 }
+auto Updates::MovePointer(std::uint32_t x, std::uint32_t y) -> bool {
+  auto& table = PointerTable(_context);
+  Expects(table.PointerPosition != nullptr, "pointer position callback exists");
+  POINTER_POSITION_UPDATE const position{ x, y };
+  return table.PointerPosition(&_context, &position) != 0;
+}
 auto ConvertPixels(std::span<std::uint8_t const> bgrx, Extent size, PixelFormat format) -> std::vector<std::byte> {
   auto const code   = Code(format);
   auto const stride = PackedStride(size.width, FreeRDPGetBitsPerPixel(code));

@@ -13,6 +13,7 @@
 #include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
+#include <freerdp/peer.h>
 #include <array>
 #include <condition_variable>
 #include <cstddef>
