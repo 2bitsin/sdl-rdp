@@ -17,7 +17,7 @@ def tracked(root):
 
 def counted(root):
     if not shutil.which('cloc'):
-        raise RuntimeError('cloc is not installed (the build image adds it)')
+        raise RuntimeError('cloc is not installed')
     result = subprocess.run(['cloc', '--list-file=-', '--by-file', '--json', '--quiet'], cwd=root,
                             input=tracked(root).replace('\0', '\n'), capture_output=True, text=True, check=True)
     table = json.loads(result.stdout or '{}')
