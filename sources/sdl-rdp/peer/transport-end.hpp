@@ -17,14 +17,14 @@ using sdl_rdp::video::PeerFrames;
 
 class TransportEnd : private Pinned {
 public:
-  TransportEnd(PeerLink& link, Activation const& activation, Authenticator& authenticator, PeerFrames const& frames,
-               FrameStore& store, Diagnostics const& diagnostics) noexcept;
+       TransportEnd(PeerLink const& link, Activation const& activation, Authenticator& authenticator,
+                    PeerFrames const& frames, FrameStore& store, Diagnostics const& diagnostics) noexcept;
   auto Report() -> void;
 
 private:
   auto SecurityEnded() const -> bool;
   auto PendingOutput() const -> bool;
-  PeerLink&          _link;
+  PeerLink const&    _link;
   Activation const&  _activation;
   Authenticator&     _authenticator;
   PeerFrames const&  _frames;

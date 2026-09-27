@@ -31,7 +31,7 @@ auto Started(AdvancedProtocol::Context const& context) -> bool {
 template <> auto AdvancedProtocol::Open(PeerLink& link, Channel& channel) -> Context {
   auto context = Context{ ainput_server_context_new(link.Channels().get()) };
   if (!context) return context;
-  context->rdpcontext = &link.Context();
+  context->rdpcontext = &link.Connection().Context();
   Install(*context, channel);
   return Started(context) ? std::move(context) : Context{ };
 }
@@ -48,7 +48,7 @@ template <> auto AdvancedProtocol::Install(ainput_server_context& server, Channe
   server.data = &channel;
   constexpr auto failures = FailuresThrough<&AdvancedChannel::FailureSource>;
   constexpr auto pointer  = [](AdvancedChannel& channel, std::uint64_t /*timestamp*/, std::uint64_t flags,
-                               std::int32_t x, std::int32_t y) { return channel._events.Pointer(flags, x, y); };
+                               std::int32_t x, std::int32_t y) { return channel._events.AdvancedPointer(flags, x, y); };
   // abi: psAInputServerMouseEvent; psAInputChannelIdAssigned, BOOL is int
   server.MouseEvent        = Handled<Advanced, pointer, AdvancedMouse, failures, ERROR_INTERNAL_ERROR>;
   server.ChannelIdAssigned = Handled<Advanced, &AdvancedChannel::Assign, AdvancedAssignment, failures, false>;

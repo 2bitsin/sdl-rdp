@@ -20,8 +20,7 @@ FrameSender::FrameSender(PeerLink& link, Activation const& activation, SessionAc
       _pointer{ pointer }, _graphics{ graphics }, _legacy{ legacy } { }
 auto FrameSender::Drain() -> bool {
   if (!_activation.Active()) return true;
-  auto& client = _link.Client();
-  if (client.DrainOutputBuffer(&client) < 0) return false;
+  if (!_link.Connection().DrainOutput()) return false;
   if (!_gate.Admit() || _activation.Holding()) return true;
   if (!_pointer.Send()) return false;
   auto const captured = _capture.Next();

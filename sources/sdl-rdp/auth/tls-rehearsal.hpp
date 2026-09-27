@@ -1,12 +1,12 @@
 #pragma once
 #include <sdl-rdp/auth/certificate.hpp>
-#include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/freerdp-facade/connection.hpp>
 #include <sdl-rdp/utilities/posix.hpp>
 
 #include <chrono>
 
 namespace sdl_rdp::auth::detail::tls_rehearsal {
-using sdl_rdp::freerdp_facade::PeerHandle;
+using sdl_rdp::freerdp_facade::Connection;
 using sdl_rdp::utilities::SocketPair;
 
 // Bounds each blocked send or receive of the rehearsal client: a local handshake takes milliseconds, a hung peer never.
@@ -21,7 +21,7 @@ public:
 private:
   std::chrono::milliseconds blocked_call_limit;
   SocketPair                ends;
-  PeerHandle                server;
+  Connection                server;
 };
 }
 

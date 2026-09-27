@@ -26,7 +26,7 @@ auto FrameCapture::Next() -> CaptureState {
 }
 auto FrameCapture::Begin() -> bool {
   Expects(!_desktop.Resizing(), "no resize in flight");
-  auto const active = freerdp_is_active_state(&_link.Context());
+  auto const active = _link.Connection().Active();
   Expects(active, "a frame begins on an active client");
   auto const picture = Take();
   if (!_frames.Snapshot()) return true;
@@ -44,9 +44,9 @@ auto FrameCapture::Take() -> Rect {
   return picture;
 }
 auto FrameCapture::Resize(Rect picture) -> bool {
-  auto& context = _link.Context();
+  auto& context = _link.Connection().Context();
   _desktop.BeginResize(picture);
-  ApplyDesktopSize(_link.Settings(), picture);
+  ApplyDesktopSize(_link.Connection().Settings(), picture);
   if (!context.update->DesktopResize(&context)) return false;
   _frames.Resend();
   return true;

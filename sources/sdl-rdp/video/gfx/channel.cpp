@@ -96,7 +96,7 @@ auto GfxChannel::Assign(std::uint32_t id) -> bool {
 }
 auto GfxChannel::Open() -> bool {
   if (!_context) return false;
-  BindContext(*_context, *this, _link.Context());
+  BindContext(*_context, *this, _link.Connection().Context());
   Callbacks::Install(*_context);
   return _context->Initialize(_context.get(), true) && _context->Open(_context.get());
 }
@@ -350,7 +350,7 @@ auto GfxChannel::Select() -> bool {
   auto preference = _configuration.CodecPreference();
   auto choice     = CodecChoice();
   auto previous   = _sources.encoder.get().SelectedCodec();
-  if (choice == Codec::Planar && !_sources.encoder.get().SetupPlanar(_link.Settings(), true)) return false;
+  if (choice == Codec::Planar && !_sources.encoder.get().SetupPlanar(_link.Connection().Settings(), true)) return false;
   // Raw and planar do not populate the persistent progressive surface.
   if (previous != choice && Persistent(choice) && _sources.frames.get().Snapshot()) _sources.frames.get().Include();
   if (previous != choice) _force_idr = true;

@@ -1,6 +1,6 @@
 #include <sdl-rdp/headless-client.test/backend/authentication.hpp>
 
-#include <sdl-rdp/auth/identity.hpp>
+#include <sdl-rdp/auth/authenticator.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/headless-client.test/backend/config.hpp>
 #include <sdl-rdp/headless-client.test/backend/events.hpp>
@@ -15,6 +15,7 @@
 #include <format>
 #include <span>
 #include <string_view>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -23,7 +24,6 @@ using sdl_rdp::auth::Account;
 using sdl_rdp::auth::QualifiedName;
 using sdl_rdp::configuration::AuthMode;
 using sdl_rdp::diagnostics::LogLevel;
-using sdl_rdp::freerdp_facade::SettingsView;
 using sdl_rdp::freerdp_facade::StringKey;
 using sdl_rdp::headless_client_test::backend::EventsOf;
 using sdl_rdp::headless_client_test::backend::LoopbackConfig;
@@ -129,7 +129,7 @@ auto Authentication::Attempt(std::string_view user, std::string_view password, s
 }
 auto Authentication::PasswordCleared() -> void {
   auto const status   = RequiredStatus(*backend);
-  auto const password = SettingsView{ *status.client.get().context->settings }.Get(StringKey::Password);
+  auto const password = std::as_const(status.connection.get()).Settings().Get(StringKey::Password);
   EXPECT_TRUE(!password || password->empty());
 }
 auto Authentication::ThenRejection(LogLevel level, std::string const& text, std::size_t rejected) -> void {

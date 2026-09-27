@@ -1,12 +1,11 @@
 #pragma once
+#include <sdl-rdp/freerdp-facade/connection.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
-#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/freerdp-facade/wake-event.hpp>
 #include <sdl-rdp/link/dynamic-channels.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
-#include <freerdp/freerdp.h>
 #include <concepts>
 #include <cstdint>
 #include <string>
@@ -14,24 +13,17 @@
 
 namespace sdl_rdp::link::detail::peer_link {
 using sdl_rdp::freerdp_facade::ChannelManager;
-using sdl_rdp::freerdp_facade::PeerHandle;
-using sdl_rdp::freerdp_facade::SettingsReader;
-using sdl_rdp::freerdp_facade::SettingsView;
 using sdl_rdp::freerdp_facade::WaitHandle;
 using sdl_rdp::freerdp_facade::WakeEvent;
 using sdl_rdp::utilities::Pinned;
 
 class PeerLink : private Pinned {
 public:
-  explicit PeerLink(PeerHandle accepted);
-  auto     Client() const noexcept              -> freerdp_peer&;
-  auto     Context() const noexcept             -> rdpContext&;
-  auto     Settings() const noexcept            -> SettingsReader;
-  auto     Settings() noexcept                  -> SettingsView;
+  explicit PeerLink(freerdp_facade::Connection accepted);
+  auto     Connection() const noexcept          -> freerdp_facade::Connection const&;
+  auto     Connection() noexcept                -> freerdp_facade::Connection&;
   auto     Channels() const noexcept            -> ChannelManager const&;
   auto     Dynamic() noexcept                   -> DynamicChannels&;
-  auto     Socket() const noexcept              -> int;
-  auto     WriteBlocked() const                 -> bool;
   auto     Signal()                             -> void;
   auto     Settle()                             -> void;
   auto     Wake() const                         -> WaitHandle;
@@ -40,16 +32,13 @@ public:
     if (!_handle_count) _handle_count = collect();
     return _handle_count;
   }
-  auto Refuse(std::uint32_t reason) -> void;
-  auto Close()                      -> void;
 
 private:
-  PeerHandle      _client;
-  int             _socket;
-  WakeEvent       _wake;
-  ChannelManager  _channels;
-  DynamicChannels _dynamic;
-  std::uint32_t   _handle_count{ };
+  freerdp_facade::Connection _connection;
+  WakeEvent                  _wake;
+  ChannelManager             _channels;
+  DynamicChannels            _dynamic;
+  std::uint32_t              _handle_count{ };
 };
 auto ClientHostname(PeerLink const& link)                -> std::string;
 auto DynamicChannelsReady(PeerLink const& link)          -> bool;

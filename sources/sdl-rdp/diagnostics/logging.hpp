@@ -1,5 +1,6 @@
 #pragma once
 #include <sdl-rdp/diagnostics/log-sink.hpp>
+#include <sdl-rdp/freerdp-facade/connection.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
@@ -12,6 +13,7 @@
 #include <string_view>
 #include <thread>
 namespace sdl_rdp::diagnostics::detail::logging {
+using sdl_rdp::freerdp_facade::Cause;
 using sdl_rdp::freerdp_facade::SettingsReader;
 using sdl_rdp::utilities::Pinned;
 
@@ -21,7 +23,7 @@ inline constexpr std::uint32_t SecurityTls = 0x01, SecurityNla = 0x02, SecurityR
 auto PeerNegotiationLogging(SettingsReader settings) -> void;
 auto NegotiationRefused()                            -> bool;
 auto TlsHandshakeFailed()                            -> bool;
-auto ExpectedDisconnect(std::uint32_t code)          -> bool;
+auto ExpectedDisconnect(Cause cause)                 -> bool;
 auto AuthenticationRejectedLogging()                 -> void;
 auto ResetAuthenticationLogging()                    -> void;
 class LogRoute : private Pinned {

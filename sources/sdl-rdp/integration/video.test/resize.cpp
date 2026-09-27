@@ -104,7 +104,7 @@ public:
 
 private:
   static auto CurrentClient(Backend& backend) -> freerdp_peer& {
-    return RequiredStatus(backend).client;
+    return *RequiredStatus(backend).connection.get().Context().peer;
   }
   auto InFinalization() const -> bool {
     auto const current = freerdp_get_state(_client.context);

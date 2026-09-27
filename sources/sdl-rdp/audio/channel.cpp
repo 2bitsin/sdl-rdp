@@ -110,7 +110,7 @@ AudioChannel::AudioChannel(PeerLink& link, Diagnostics const& diagnostics, Event
   _sound->server_formats[1] = StereoPcm(NativeRate);
   _sound->src_format = &_sound->server_formats[0];
   _sound->data = this;
-  _sound->rdpcontext = &_link.Context();
+  _sound->rdpcontext = &_link.Connection().Context();
   _sound->use_dynamic_virtual_channel = false;
   _sound->latency = 10;
   Callbacks::Install(*_sound);

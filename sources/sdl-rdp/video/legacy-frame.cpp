@@ -12,7 +12,7 @@
 #include <sdl-rdp/video/peer-frames.hpp>
 
 #include <freerdp/codec/color.h>
-#include <freerdp/update.h>
+#include <freerdp/freerdp.h>
 #include <oxbox/utilities/span.hpp>
 #include <algorithm>
 #include <array>
@@ -119,13 +119,13 @@ LegacyFrame::LegacyFrame(PeerLink& link, Configuration const& configuration, Act
       _encoder{ encoder }, _scaler{ scaler } { }
 auto LegacyFrame::SelectEncoder() -> bool {
   auto const previous = _encoder.SelectedCodec();
-  if (!_encoder.Select(_link.Settings(), _configuration.CodecPreference())) return false;
+  if (!_encoder.Select(_link.Connection().Settings(), _configuration.CodecPreference())) return false;
   if (previous != _encoder.SelectedCodec()) _activation.CodecChanged(_encoder.SelectedCodec());
   return true;
 }
 auto LegacyFrame::Marker(std::uint16_t action) -> bool {
-  if (!_link.Settings().Get(BoolKey::FrameMarkerCommandEnabled)) return true;
-  auto&                      context = _link.Context();
+  if (!_link.Connection().Settings().Get(BoolKey::FrameMarkerCommandEnabled)) return true;
+  auto&                      context = _link.Connection().Context();
   SURFACE_FRAME_MARKER const marker  { action, _pacing.Frame() };
   return context.update->SurfaceFrameMarker(&context, &marker);
 }
@@ -134,7 +134,7 @@ auto LegacyFrame::Prepare() -> bool {
   _queue.packets.clear();
   _queue.next.reset();
   if (!SelectEncoder()) return false;
-  auto const settings = _link.Settings();
+  auto const settings = _link.Connection().Settings();
   auto const depth    = settings.Get(NumberKey::ColorDepth);
   auto const wire     = depth != 32 ? LegacyWire::Bitmap
                         : _encoder.SelectedCodec() == Codec::Planar ? LegacyWire::Planar
@@ -220,7 +220,7 @@ auto LegacyFrame::Describe(Packet& packet) const -> void {
 }
 auto LegacyFrame::Write(Packet& packet) -> bool {
   Expects(!packet.bands.empty(), "encoded packet exists");
-  auto& update = *_link.Context().update;
+  auto& update = *_link.Connection().Context().update;
   switch (_format.wire) {
   case LegacyWire::Surface:
     return SendSurfaceBits(update, packet.bands.front().area, packet.bands.front().bytes, _format.codec);
@@ -230,7 +230,7 @@ auto LegacyFrame::Write(Packet& packet) -> bool {
   }
 }
 auto LegacyFrame::Finish() -> bool {
-  if (_link.WriteBlocked()) return true;
+  if (_link.Connection().WriteBlocked()) return true;
   if (!Marker(SURFACECMD_FRAMEACTION_END)) return false;
   _pacing.Sent(_frames,
                { .bytes = PacketBytes(_queue.packets), .encoded = _encoder.EncodeTime(), .avc = std::nullopt });
@@ -244,10 +244,10 @@ auto LegacyFrame::Send() -> bool {
     _queue.next = 0;
   }
   for (auto& index = *_queue.next; index < _queue.packets.size(); ++index) {
-    if (_link.WriteBlocked()) return true;
+    if (_link.Connection().WriteBlocked()) return true;
     if (!Write(_queue.packets[index])) return false;
   }
-  return _link.WriteBlocked() || Finish();
+  return _link.Connection().WriteBlocked() || Finish();
 }
 auto LegacyFrame::Delivered() const noexcept -> bool {
   return !_frames.Snapshot();

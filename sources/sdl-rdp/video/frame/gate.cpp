@@ -7,8 +7,6 @@
 #include <sdl-rdp/video/graphics-link.hpp>
 #include <sdl-rdp/video/peer-frames.hpp>
 
-#include <freerdp/freerdp.h>
-
 namespace sdl_rdp::video::frame::detail::gate {
 
 FrameGate::FrameGate(PeerLink& link, FrameStore& store, PeerFrames& frames, DesktopLayout& desktop, FramePacing& pacing,
@@ -18,11 +16,11 @@ FrameGate::FrameGate(PeerLink& link, FrameStore& store, PeerFrames& frames, Desk
 auto FrameGate::Settle() -> bool {
   auto const frame = _store.Lock();
   _link.Settle();
-  if (_link.WriteBlocked()) {
+  if (_link.Connection().WriteBlocked()) {
     _pacing.Blocked();
     return false;
   }
-  if (!freerdp_is_active_state(&_link.Context())) return false;
+  if (!_link.Connection().Active()) return false;
   if (_desktop.EndResize()) {
     _pacing.Restart(frame);
     _frames.Invalidate(frame);

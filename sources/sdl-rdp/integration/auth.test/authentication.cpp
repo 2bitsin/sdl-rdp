@@ -173,10 +173,10 @@ auto DisconnectWithPending(Backend& backend, std::uint32_t code) -> void {
   auto const frame   = backend.Frames().Lock();
   auto&      current = Required(backend.Session().Current(frame), "a client is current").get();
   current.Repaint(frame, { .x = 0, .y = 0, .w = 1, .h = 1 });
-  auto& client = current.Status(frame).client.get();
-  freerdp_set_last_error(client.context, code);
+  auto& context = current.Status(frame).connection.get().Context();
+  freerdp_set_last_error(&context, code);
   // abi: psPeerCheckFileDescriptor, BOOL is int
-  client.CheckFileDescriptor = [](freerdp_peer*) -> int { return false; };
+  context.peer->CheckFileDescriptor = [](freerdp_peer*) -> int { return false; };
   current.Signal();
 }
 }

@@ -18,7 +18,6 @@
 #include <sdl-rdp/utilities/scoped.hpp>
 #include <sdl-rdp/video/acknowledgement-window.hpp>
 
-#include <freerdp/peer.h>
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -97,46 +96,42 @@ auto EndNegotiationLogging(SettingsReader /*settings*/) noexcept -> void {
 }
 using NegotiationLogging = RAIIWrap<SettingsReader, BeginNegotiationLogging, EndNegotiationLogging>;
 struct LiveConnection {
-  std::reference_wrapper<PeerLink>      link;
+  std::reference_wrapper<Connection>    connection;
   std::reference_wrapper<SessionAccess> session;
 };
-auto Connect(PeerLink& link, SessionAccess& session) -> LiveConnection {
-  auto& client = link.Client();
-  if (!client.Initialize(&client)) throw PeerSetupFailed{ "initialization" };
-  return { .link = link, .session = session };
+auto Connect(Connection& connection, SessionAccess& session) -> LiveConnection {
+  if (!connection.Initialize()) throw PeerSetupFailed{ "initialization" };
+  return { .connection = connection, .session = session };
 }
 auto Disconnect(LiveConnection const& live) noexcept -> void {
-  auto const held   = live.session.get().Lock();
-  auto&      client = live.link.get().Client();
-  client.Disconnect(&client);
+  auto const held = live.session.get().Lock();
+  live.connection.get().Disconnect();
 }
-using Connection = RAIIWrap<LiveConnection, Connect, Disconnect>;
+using Live = RAIIWrap<LiveConnection, Connect, Disconnect>;
 }
 auto Peer::Serve(std::stop_token const& quit) -> void {
   std::stop_callback const wake(quit, [this] { _link.Signal(); });
-  NegotiationLogging const logging { _link.Settings() };
+  NegotiationLogging const logging { _link.Connection().Settings() };
   auto const               served  = [&] {
     Configure();
     Run(quit);
     return true;
   };
   auto const               failed  = [this](std::string_view failure) {
-    _diagnostics.Log(
-        LogLevel::Error,
-        std::format("{} FreeRDP: {}.", failure, freerdp_get_last_error_name(freerdp_get_last_error(&_link.Context()))));
+    _diagnostics.Log(LogLevel::Error, std::format("{} FreeRDP: {}.", failure, _link.Connection().Error().name));
   };
   std::ignore = Contained(false, served, failed);
   Depart();
 }
 auto Peer::Run(std::stop_token const& quit) -> void {
-  Connection const                           connection{ _link, _session };
-  std::array<WaitHandle, MaximumWaitHandles> handles   { };
+  Live const                                 live   { _link.Connection(), _session };
+  std::array<WaitHandle, MaximumWaitHandles> handles{ };
   while (!quit.stop_requested() && Step(quit, handles)) {
   }
 }
 auto Peer::Configure() -> void {
   auto const picture  = _store.Read([](FrameStore const& store, FrameLock const& held) { return store.Picture(held); });
-  auto const settings = _link.Settings();
+  auto const settings = _link.Connection().Settings();
   _authenticator.InstallCredentials(settings);
   ApplySettings(settings, _authenticator.Auth(), picture);
 }
@@ -164,7 +159,7 @@ auto Peer::Plan(std::span<WaitHandle> handles) -> WaitPlan {
 auto Peer::CollectHandles(std::span<WaitHandle> handles) -> std::uint32_t {
   Expects(handles.size() > AppendedHandleCount, "event array has room for transport and peer handles");
   auto const budget    = handles.first(handles.size() - AppendedHandleCount);
-  auto const transport = WaitHandle::Collected<&freerdp_peer::GetEventHandles>(_link.Client(), budget);
+  auto const transport = _link.Connection().EventHandles(budget);
   if (transport.empty()) return 0;
   auto const rest = _channels.Handles(handles.subspan(transport.size()));
   Expects(rest.size() >= LoopHandleCount, "the loop's own handles fit");
@@ -173,7 +168,7 @@ auto Peer::CollectHandles(std::span<WaitHandle> handles) -> std::uint32_t {
   return Narrowed<std::uint32_t>(handles.size() - rest.size() + LoopHandleCount);
 }
 auto Peer::WaitTimeout() -> std::uint32_t {
-  auto const blocked = _link.WriteBlocked();
+  auto const blocked = _link.Connection().WriteBlocked();
   if (_activation.Holding()) {
     auto const remaining = _activation.ActivatedAt() + GraphicsConnectionWait - Activation::Clock::now();
     auto const wait      = WaitMilliseconds(remaining, 0);
@@ -189,8 +184,7 @@ auto Peer::Service(std::stop_token const& quit, Signalled const& ready) -> bool 
 auto Peer::Exchange(std::stop_token const& quit, Signalled const& ready) -> bool {
   auto const session = _session.Lock();
   if (quit.stop_requested()) return false;
-  auto& client = _link.Client();
-  if (!client.CheckFileDescriptor(&client) || !_channels.Pump(ready)) return Ended();
+  if (!_link.Connection().Pump() || !_channels.Pump(ready)) return Ended();
   _redirection.Sound(ready);
   return _sender.Drain() || Ended();
 }

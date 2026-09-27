@@ -3,8 +3,9 @@
 #include <sdl-rdp/auth/authenticator.hpp>
 #include <sdl-rdp/clipboard/forward.hpp>
 #include <sdl-rdp/configuration/forward.hpp>
-#include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/diagnostics/trace-queue.hpp>
+#include <sdl-rdp/freerdp-facade/connection-events.hpp>
+#include <sdl-rdp/freerdp-facade/connection.hpp>
 #include <sdl-rdp/freerdp-facade/signalled.hpp>
 #include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/input/events.hpp>
@@ -20,7 +21,8 @@
 #include <sdl-rdp/picture/desktop-layout.hpp>
 #include <sdl-rdp/utilities/generational.hpp>
 #include <sdl-rdp/utilities/geometry.hpp>
-#include <sdl-rdp/utilities/pinned.hpp>
+#include <sdl-rdp/utilities/nt-owf.hpp>
+#include <sdl-rdp/utilities/operation-name.hpp>
 #include <sdl-rdp/video/display-control.hpp>
 #include <sdl-rdp/video/encoder.hpp>
 #include <sdl-rdp/video/frame/capture.hpp>
@@ -39,8 +41,10 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <stop_token>
+#include <string_view>
 #include <thread>
 
 namespace sdl_rdp::peer::detail::peer {
@@ -49,9 +53,11 @@ using sdl_rdp::auth::Authenticator;
 using sdl_rdp::clipboard::ClipboardStore;
 using sdl_rdp::configuration::Configuration;
 using sdl_rdp::diagnostics::Diagnostics;
-using sdl_rdp::diagnostics::FailuresThrough;
 using sdl_rdp::diagnostics::TraceQueue;
-using sdl_rdp::freerdp_facade::PeerHandle;
+using sdl_rdp::freerdp_facade::Connection;
+using sdl_rdp::freerdp_facade::ConnectionEvents;
+using sdl_rdp::freerdp_facade::Identity;
+using sdl_rdp::freerdp_facade::Observation;
 using sdl_rdp::freerdp_facade::Signalled;
 using sdl_rdp::freerdp_facade::WaitHandle;
 using sdl_rdp::input::Input;
@@ -65,7 +71,8 @@ using sdl_rdp::picture::DesktopLayout;
 using sdl_rdp::picture::FrameLock;
 using sdl_rdp::picture::FrameStore;
 using sdl_rdp::utilities::Generational;
-using sdl_rdp::utilities::Pinned;
+using sdl_rdp::utilities::NtOwf;
+using sdl_rdp::utilities::OperationName;
 using sdl_rdp::utilities::Rect;
 using sdl_rdp::video::DisplayControl;
 using sdl_rdp::video::Encoder;
@@ -82,11 +89,11 @@ using sdl_rdp::video::frame::FrameStatistics;
 using sdl_rdp::video::pointer::PointerSender;
 using sdl_rdp::video::pointer::PointerShape;
 
-class Peer : private Pinned {
+class Peer final : public ConnectionEvents {
 public:
-       Peer(PeerHandle accepted, Diagnostics const& diagnostics, EventQueue& events, Configuration const& configuration,
+       Peer(Connection accepted, Diagnostics const& diagnostics, EventQueue& events, Configuration const& configuration,
             FrameStore& store, Generational<PointerShape>& pointer, ClipboardStore& clipboard, SessionAccess& session);
-       ~Peer();
+       ~Peer() override;
   auto Start()                                                      -> void;
   auto Stop()                                                       -> void;
   auto Owns(PeerLink const& link) const noexcept                    -> bool;
@@ -99,7 +106,7 @@ public:
   auto Settled(FrameLock const& held, std::uint64_t target) const   -> bool;
   auto Redirected() const noexcept                                  -> Redirection const&;
   auto Point(MouseMode mode)                                        -> void;
-  auto Status(FrameLock const& held) const                          -> PeerStatus;
+  auto Status(FrameLock const& held)                                -> PeerStatus;
 
 private:
   struct WaitPlan {
@@ -123,15 +130,14 @@ private:
   auto Depart()             -> void;
   auto LogDeparture() const -> void;
 
-  auto InstallClient()                -> void;
-  auto InstallAuthentication()        -> void;
-  auto InstallUpdates()               -> void;
-  auto Activate()                     -> bool;
-  auto AcceptCapabilities()           -> bool;
-  auto Acknowledge(std::uint32_t id)  -> bool;
-  auto Suppress(std::uint8_t allow)   -> bool;
-  auto FailureSource() const noexcept -> InputEvents const&;
-  static constexpr auto _failures = FailuresThrough<&Peer::FailureSource>;
+  auto Activate()                                                      -> bool                 override;
+  auto Capabilities()                                                  -> bool                 override;
+  auto Logon(bool automatic)                                           -> bool                 override;
+  auto NtlmHash(Identity const& identity)                              -> std::optional<NtOwf> override;
+  auto NtlmRefused(std::string_view cause)                             -> void                 override;
+  auto FrameAcknowledged(std::uint32_t frame)                          -> void                 override;
+  auto SuppressOutput(bool allow)                                      -> void                 override;
+  auto Failed(OperationName operation, std::string_view failure) const -> void                 override;
 
   Diagnostics const&   _diagnostics;
   Configuration const& _configuration;
@@ -162,6 +168,7 @@ private:
   TransportEnd    _end;
   Arrival         _arrival;
   OutputControl   _output;
+  Observation     _observation;
   std::jthread    _thread;
 };
 }

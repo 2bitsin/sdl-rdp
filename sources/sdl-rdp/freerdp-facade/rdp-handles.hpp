@@ -1,7 +1,6 @@
 #pragma once
 #include <sdl-rdp/utilities/releases.hpp>
 
-#include <freerdp/peer.h>
 #include <openssl/bio.h>
 #include <openssl/x509.h>
 #include <winpr/handle.h>
@@ -17,7 +16,6 @@ using ChannelManager = std::unique_ptr<void, Releases<WTSCloseServer>>;
 using Bio            = std::unique_ptr<BIO, Releases<BIO_free>>;
 using Certificate    = std::unique_ptr<X509, Releases<X509_free>>;
 using VirtualChannel = std::unique_ptr<void, Releases<WTSVirtualChannelClose>>;
-using PeerHandle     = std::unique_ptr<freerdp_peer, Releases<freerdp_peer_context_free, freerdp_peer_free>>;
 auto ManualResetEvent(std::string_view subject) -> EventHandle;
 // abi: the release step of a channel manager's dynamic channel creation callback, handed the manager.
 auto ForgetChannelCreation(HANDLE manager) -> void;
@@ -31,6 +29,5 @@ using detail::rdp_handles::ChannelManager;
 using detail::rdp_handles::CreationRegistration;
 using detail::rdp_handles::EventHandle;
 using detail::rdp_handles::ManualResetEvent;
-using detail::rdp_handles::PeerHandle;
 using detail::rdp_handles::VirtualChannel;
 }

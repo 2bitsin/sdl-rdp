@@ -1,7 +1,7 @@
 #pragma once
 #include <sdl-rdp/utilities/contract.hpp>
 
-#include <freerdp/freerdp.h>
+struct rdp_context;
 
 namespace sdl_rdp::freerdp_facade::detail::callback_owner {
 using sdl_rdp::utilities::Expects;
@@ -16,7 +16,7 @@ concept ServerContext = requires(Context context) {
   context.rdpcontext = nullptr;
 };
 template <ServerContext ContextTy, class OwnerTy>
-auto BindContext(ContextTy& context, OwnerTy& owner, rdpContext& session) noexcept -> void {
+auto BindContext(ContextTy& context, OwnerTy& owner, rdp_context& session) noexcept -> void {
   context.custom     = &owner;
   context.rdpcontext = &session;
 }

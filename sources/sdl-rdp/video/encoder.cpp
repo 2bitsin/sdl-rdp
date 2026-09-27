@@ -5,7 +5,7 @@
 #include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/utilities/stopwatch.hpp>
 
-#include <freerdp/constants.h>
+#include <freerdp/settings_types.h>
 #include <oxbox/utilities/span.hpp>
 #include <algorithm>
 #include <array>

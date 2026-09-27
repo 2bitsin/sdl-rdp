@@ -1,13 +1,10 @@
 [includes]
 sources/sdl-rdp/audio/channel.cpp: 1
 sources/sdl-rdp/audio/channel.hpp: 1
-sources/sdl-rdp/auth/authenticator.hpp: 1
-sources/sdl-rdp/auth/identity.hpp: 1
-sources/sdl-rdp/auth/tls-rehearsal.cpp: 3
 sources/sdl-rdp/clipboard/capabilities.hpp: 1
 sources/sdl-rdp/clipboard/channel.cpp: 2
 sources/sdl-rdp/clipboard/channel.hpp: 1
-sources/sdl-rdp/diagnostics/logging.cpp: 2
+sources/sdl-rdp/diagnostics/logging.cpp: 1
 sources/sdl-rdp/diagnostics/logging.hpp: 1
 sources/sdl-rdp/drive/capabilities.cpp: 1
 sources/sdl-rdp/drive/channel.cpp: 3
@@ -41,7 +38,7 @@ sources/sdl-rdp/headless-client.test/graphics/round-five.cpp: 2
 sources/sdl-rdp/headless-client.test/graphics/session.cpp: 1
 sources/sdl-rdp/headless-client.test/utilities/observer-set.hpp: 1
 sources/sdl-rdp/input/events.cpp: 2
-sources/sdl-rdp/input/events.hpp: 2
+sources/sdl-rdp/input/events.hpp: 1
 sources/sdl-rdp/input/protocol.cpp: 1
 sources/sdl-rdp/input/protocol.hpp: 2
 sources/sdl-rdp/integration/drive.test/wire.cpp: 1
@@ -49,15 +46,10 @@ sources/sdl-rdp/integration/rig-utilities.test/observer-set.cpp: 1
 sources/sdl-rdp/integration/sample.test/auth.cpp: 1
 sources/sdl-rdp/integration/tls-race.test/rehearsal.cpp: 2
 sources/sdl-rdp/integration/video.test/gfx.cpp: 1
-sources/sdl-rdp/integration/video.test/graphics-link.cpp: 2
 sources/sdl-rdp/link/peer-link.cpp: 2
-sources/sdl-rdp/link/peer-link.hpp: 1
-sources/sdl-rdp/peer/callbacks.cpp: 3
 sources/sdl-rdp/peer/channel-set.cpp: 1
-sources/sdl-rdp/peer/loop.cpp: 1
-sources/sdl-rdp/peer/peer.cpp: 1
 sources/sdl-rdp/peer/redirection.cpp: 1
-sources/sdl-rdp/peer/status.hpp: 2
+sources/sdl-rdp/peer/status.hpp: 1
 sources/sdl-rdp/sample-gate.test/client/bounded-connect.hpp: 1
 sources/sdl-rdp/sample-gate.test/client/input.cpp: 1
 sources/sdl-rdp/sample-gate.test/client/input.hpp: 2
@@ -66,8 +58,7 @@ sources/sdl-rdp/sample-gate.test/sample/checks.cpp: 1
 sources/sdl-rdp/sample-gate.test/sample/input.cpp: 1
 sources/sdl-rdp/sample-gate.test/sample/process.cpp: 2
 sources/sdl-rdp/sample-gate.test/sample/process.hpp: 1
-sources/sdl-rdp/session/listener.cpp: 4
-sources/sdl-rdp/session/listener.hpp: 1
+sources/sdl-rdp/session/listener.cpp: 1
 sources/sdl-rdp/session/session.cpp: 1
 sources/sdl-rdp/video/acknowledgement-window.cpp: 1
 sources/sdl-rdp/video/avc/encoder.cpp: 2
@@ -77,7 +68,6 @@ sources/sdl-rdp/video/display-control.hpp: 1
 sources/sdl-rdp/video/encoder.cpp: 1
 sources/sdl-rdp/video/encoder.hpp: 4
 sources/sdl-rdp/video/frame/capture.cpp: 2
-sources/sdl-rdp/video/frame/gate.cpp: 1
 sources/sdl-rdp/video/gfx/channel.cpp: 2
 sources/sdl-rdp/video/gfx/channel.hpp: 2
 sources/sdl-rdp/video/gfx/protocol.hpp: 2
@@ -90,14 +80,10 @@ sources/sdl-rdp/video/pointer/shape.hpp: 1
 sources/sdl-rdp/SDL3/rdp/settings/options.cpp: 2
 sources/sdl-rdp/audio/channel.cpp: 29
 sources/sdl-rdp/audio/channel.hpp: 2
-sources/sdl-rdp/auth/authenticator.cpp: 7
-sources/sdl-rdp/auth/authenticator.hpp: 3
-sources/sdl-rdp/auth/identity.hpp: 3
-sources/sdl-rdp/auth/tls-rehearsal.cpp: 5
 sources/sdl-rdp/clipboard/capabilities.hpp: 9
 sources/sdl-rdp/clipboard/channel.cpp: 48
 sources/sdl-rdp/clipboard/channel.hpp: 6
-sources/sdl-rdp/diagnostics/logging.cpp: 26
+sources/sdl-rdp/diagnostics/logging.cpp: 20
 sources/sdl-rdp/diagnostics/logging.hpp: 2
 sources/sdl-rdp/drive/capabilities.cpp: 26
 sources/sdl-rdp/drive/channel.cpp: 34
@@ -136,8 +122,8 @@ sources/sdl-rdp/headless-client.test/graphics/session.cpp: 2
 sources/sdl-rdp/headless-client.test/input/steps.hpp: 9
 sources/sdl-rdp/headless-client.test/utilities/observer-set.cpp: 4
 sources/sdl-rdp/headless-client.test/utilities/observer-set.hpp: 7
-sources/sdl-rdp/input/events.cpp: 49
-sources/sdl-rdp/input/events.hpp: 2
+sources/sdl-rdp/input/events.cpp: 26
+sources/sdl-rdp/input/events.hpp: 1
 sources/sdl-rdp/input/protocol.cpp: 24
 sources/sdl-rdp/input/protocol.hpp: 6
 sources/sdl-rdp/integration/auth.test/authentication.cpp: 6
@@ -153,19 +139,13 @@ sources/sdl-rdp/integration/session.test/codecs.cpp: 4
 sources/sdl-rdp/integration/session.test/trace.cpp: 2
 sources/sdl-rdp/integration/tls-race.test/rehearsal.cpp: 5
 sources/sdl-rdp/integration/video.test/gfx.cpp: 4
-sources/sdl-rdp/integration/video.test/graphics-link.cpp: 3
 sources/sdl-rdp/integration/video.test/graphics.cpp: 2
 sources/sdl-rdp/integration/video.test/pacing.cpp: 22
 sources/sdl-rdp/integration/video.test/resize.cpp: 18
-sources/sdl-rdp/link/peer-link.cpp: 13
-sources/sdl-rdp/link/peer-link.hpp: 2
-sources/sdl-rdp/peer/callbacks.cpp: 14
+sources/sdl-rdp/link/peer-link.cpp: 8
 sources/sdl-rdp/peer/channel-set.cpp: 2
-sources/sdl-rdp/peer/loop.cpp: 3
-sources/sdl-rdp/peer/peer.cpp: 1
 sources/sdl-rdp/peer/redirection.cpp: 3
-sources/sdl-rdp/peer/status.hpp: 2
-sources/sdl-rdp/peer/transport-end.cpp: 2
+sources/sdl-rdp/peer/status.hpp: 1
 sources/sdl-rdp/sample-gate.test/client/bounded-connect.cpp: 2
 sources/sdl-rdp/sample-gate.test/client/bounded-connect.hpp: 2
 sources/sdl-rdp/sample-gate.test/client/input.cpp: 15
@@ -188,8 +168,7 @@ sources/sdl-rdp/sample-gate.test/sample/sample.cpp: 30
 sources/sdl-rdp/sample-gate.test/sample/sample.hpp: 6
 sources/sdl-rdp/sample-gate.test/video/driver.cpp: 1
 sources/sdl-rdp/sample-gate.test/video/rate-exercise.cpp: 2
-sources/sdl-rdp/session/listener.cpp: 13
-sources/sdl-rdp/session/listener.hpp: 3
+sources/sdl-rdp/session/listener.cpp: 1
 sources/sdl-rdp/session/session.cpp: 2
 sources/sdl-rdp/video/acknowledgement-window.cpp: 1
 sources/sdl-rdp/video/avc/encoder.cpp: 7
@@ -199,8 +178,6 @@ sources/sdl-rdp/video/display-control.cpp: 15
 sources/sdl-rdp/video/display-control.hpp: 4
 sources/sdl-rdp/video/encoder.cpp: 34
 sources/sdl-rdp/video/encoder.hpp: 8
-sources/sdl-rdp/video/frame/capture.cpp: 1
-sources/sdl-rdp/video/frame/gate.cpp: 1
 sources/sdl-rdp/video/gfx/channel.cpp: 59
 sources/sdl-rdp/video/gfx/channel.hpp: 13
 sources/sdl-rdp/video/gfx/protocol.hpp: 34
@@ -211,7 +188,6 @@ sources/sdl-rdp/video/pointer/shape.cpp: 7
 sources/sdl-rdp/video/pointer/shape.hpp: 4
 
 [facade headers]
-sources/sdl-rdp/freerdp-facade/callback-owner.hpp: 1
 sources/sdl-rdp/freerdp-facade/nvenc.hpp: 1
-sources/sdl-rdp/freerdp-facade/rdp-handles.hpp: 3
+sources/sdl-rdp/freerdp-facade/rdp-handles.hpp: 2
 sources/sdl-rdp/freerdp-facade/wait-handle.hpp: 1

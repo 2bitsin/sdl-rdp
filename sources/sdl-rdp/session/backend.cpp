@@ -13,7 +13,7 @@
 namespace sdl_rdp::session::detail::backend {
 using sdl_rdp::auth::Credentials;
 using sdl_rdp::auth::EnsureCertificate;
-using sdl_rdp::freerdp_facade::PeerHandle;
+using sdl_rdp::freerdp_facade::Connection;
 using sdl_rdp::input::MouseMode;
 using sdl_rdp::peer::Peer;
 using sdl_rdp::utilities::Deadline;
@@ -31,7 +31,7 @@ Backend::Backend(Setup const& setup, LogSink& log, CredentialCheck const& check)
       _presenter{ _diagnostics, _frames, _session, _pointer, _configuration },
       _audio    { _session, _presenter, _configuration                      },
       _listener{ _configuration, Ensured(_configuration.CertificateDirectory()), _diagnostics, _session,
-                 [this](PeerHandle accepted) {
+                 [this](Connection accepted) {
                    return std::make_unique<Peer>(std::move(accepted), _diagnostics, _events, _configuration, _frames,
                                                  _pointer, _clipboard, _session);
                  } } {

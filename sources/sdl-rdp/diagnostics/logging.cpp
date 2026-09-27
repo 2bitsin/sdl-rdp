@@ -4,7 +4,6 @@
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 
-#include <freerdp/error.h>
 #include <oxbox/utilities/number-text.hpp>
 #include <winpr/wlog.h>
 #include <algorithm>
@@ -19,6 +18,7 @@ namespace sdl_rdp::diagnostics::detail::logging {
 using sdl_rdp::freerdp_facade::NumberKey;
 using sdl_rdp::utilities::Contained;
 using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Unreachable;
 
 auto ResetAuthenticationLogging() -> void {
   LogRoute::WithFilter([](auto& filter) { filter = { }; });
@@ -35,15 +35,17 @@ auto TlsHandshakeFailed() -> bool {
 auto AuthenticationRejectedLogging() -> void {
   LogRoute::WithFilter([](auto& filter) { filter.authentication_failed = true; });
 }
-auto ExpectedDisconnect(std::uint32_t code) -> bool {
-  switch (code) {
-  case FREERDP_ERROR_CONNECT_TRANSPORT_FAILED:
-  case FREERDP_ERROR_LOGOFF_BY_USER:
-  case FREERDP_ERROR_DISCONNECTED_BY_OTHER_CONNECTION:
-  case FREERDP_ERROR_RPC_INITIATED_DISCONNECT:
-  case FREERDP_ERROR_AUTHENTICATION_FAILED:
-  case FREERDP_ERROR_SERVER_DENIED_CONNECTION: return true;
-  default:                                     return false;
+auto ExpectedDisconnect(Cause cause) -> bool {
+  switch (cause) {
+  case Cause::TransportFailed:
+  case Cause::LogoffByUser:
+  case Cause::OtherConnection:
+  case Cause::RpcInitiated:
+  case Cause::AuthenticationFailed:
+  case Cause::ServerDenied: return true;
+  case Cause::None:
+  case Cause::Other: return false;
+  default:           Unreachable(cause);
   }
 }
 namespace {

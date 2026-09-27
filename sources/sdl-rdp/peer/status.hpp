@@ -1,8 +1,8 @@
 #pragma once
+#include <sdl-rdp/freerdp-facade/connection.hpp>
 #include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/video/gfx/channel.hpp>
 
-#include <freerdp/peer.h>
 #include <freerdp/server/disp.h>
 #include <chrono>
 #include <cstdint>
@@ -10,11 +10,12 @@
 #include <optional>
 
 namespace sdl_rdp::peer::detail::status {
+using sdl_rdp::freerdp_facade::Connection;
 using sdl_rdp::utilities::Rect;
 using sdl_rdp::video::gfx::GraphicsTiming;
 
 struct PeerStatus {
-  std::reference_wrapper<freerdp_peer>                     client;
+  std::reference_wrapper<Connection>                       connection;
   std::optional<std::reference_wrapper<DispServerContext>> display;
   Rect                                                     desktop         { };
   bool                                                     resizing        { };

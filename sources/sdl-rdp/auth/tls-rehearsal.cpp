@@ -3,15 +3,11 @@
 #include <sdl-rdp/auth/exceptions.hpp>
 #include <sdl-rdp/auth/unsignalled-socket-bio.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
-#include <sdl-rdp/link/exceptions.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/exceptions.hpp>
 #include <sdl-rdp/utilities/posix.hpp>
 
-#include <freerdp/freerdp.h>
-#include <freerdp/peer.h>
-#include <freerdp/transport_io.h>
 #include <openssl/ssl.h>
 #include <cerrno>
 #include <chrono>
@@ -26,9 +22,6 @@
 namespace sdl_rdp::auth::detail::tls_rehearsal {
 using sdl_rdp::auth::detail::unsignalled_socket_bio::UnsignalledSocketBio;
 using sdl_rdp::freerdp_facade::Bio;
-using sdl_rdp::freerdp_facade::SettingsView;
-using sdl_rdp::link::PeerContextFailed;
-using sdl_rdp::utilities::AllocationFailed;
 using sdl_rdp::utilities::ConnectedSockets;
 using sdl_rdp::utilities::Contained;
 using sdl_rdp::utilities::Descriptor;
@@ -43,26 +36,11 @@ using sdl_rdp::utilities::Expects;
 using SslContext = std::unique_ptr<SSL_CTX, Releases<SSL_CTX_free>>;
 using SslSession = std::unique_ptr<SSL, Releases<SSL_free>>;
 
-auto AdoptedPeer(Descriptor socket) -> PeerHandle {
-  PeerHandle peer{ freerdp_peer_new(socket.Get()) };
-  if (!peer) throw AllocationFailed{ "TLS rehearsal peer" };
-  std::ignore = socket.Release();
-  return peer;
-}
-auto ServingPeer(Descriptor socket, Credentials const& credentials) -> PeerHandle {
+auto Serving(Descriptor socket, Credentials const& credentials) -> Connection {
   Expects(socket.Owns(), "the server end is open");
-  auto peer = AdoptedPeer(std::move(socket));
-  if (!freerdp_peer_context_new(peer.get())) throw PeerContextFailed{ "TLS rehearsal" };
-  Ensures(peer->context != nullptr, "the peer has a context");
-  SettingsView{ *peer->context->settings }.InstallServerCredentials(credentials.Key(), credentials.Certificate());
-  return peer;
-}
-auto AcceptTls(freerdp_peer& peer) -> bool {
-  Expects(peer.context != nullptr, "the peer has a context");
-  auto const* const io = freerdp_get_io_callbacks(peer.context);
-  Expects(io != nullptr, "the peer has transport callbacks");
-  Expects(io->TLSAccept != nullptr, "the peer can accept TLS");
-  return io->TLSAccept(freerdp_get_transport(peer.context)) != 0;
+  Connection server{ std::move(socket) };
+  server.Settings().InstallServerCredentials(credentials.Key(), credentials.Certificate());
+  return server;
 }
 auto Timeval(std::chrono::microseconds span) -> timeval {
   auto const seconds = std::chrono::floor<std::chrono::seconds>(span);
@@ -109,10 +87,10 @@ auto ConnectTls(int socket, std::chrono::milliseconds limit) noexcept -> bool {
 }
 TlsRehearsal::TlsRehearsal(Credentials const& credentials, std::chrono::milliseconds limit)
     : blocked_call_limit(Bounding(limit)), ends(ConnectedSockets()),
-      server(ServingPeer(std::move(ends.server), credentials)) { }
+      server(Serving(std::move(ends.server), credentials)) { }
 auto TlsRehearsal::Perform() && -> void {
   auto       handshake = std::async(std::launch::async, ConnectTls, ends.client.Get(), blocked_call_limit);
-  auto const accepted  = AcceptTls(*server);
+  auto const accepted  = server.AcceptTls();
   // FreeRDP 3.32 transport.c:708 keeps the server socket open after a failed accept, so the client would wait for it.
   StopDirection(ends.client.Get(), SHUT_RD);
   auto const connected = handshake.get();

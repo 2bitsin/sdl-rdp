@@ -73,10 +73,11 @@ DisplayControl::DisplayControl(PeerLink& link, Activation const& activation, Des
                                EventQueue& events, Diagnostics const& diagnostics) noexcept
     : _link{ link }, _activation{ activation }, _desktop{ desktop }, _events{ events }, _diagnostics{ diagnostics } { }
 auto DisplayControl::Open() -> bool {
-  if (_open || !_link.Settings().Get(BoolKey::SupportDisplayControl) || !DynamicChannelsReady(_link)) return true;
+  if (_open || !_link.Connection().Settings().Get(BoolKey::SupportDisplayControl) || !DynamicChannelsReady(_link))
+    return true;
   _context.reset(disp_server_context_new(_link.Channels().get()));
   if (!_context) return false;
-  BindContext(*_context, *this, _link.Context());
+  BindContext(*_context, *this, _link.Connection().Context());
   Callbacks::Install(*_context);
   _context->MaxNumMonitors        = MonitorLimit;
   _context->MaxMonitorAreaFactorA = _context->MaxMonitorAreaFactorB = MonitorAreaFactor;

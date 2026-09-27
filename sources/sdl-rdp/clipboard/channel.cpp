@@ -69,7 +69,7 @@ auto ClipboardChannel::Open() -> bool {
   Expects(!_context, "clipboard opens once");
   _context.reset(cliprdr_server_context_new(_link.Channels().get()));
   if (!_context) return false;
-  BindContext(*_context, *this, _link.Context());
+  BindContext(*_context, *this, _link.Connection().Context());
   _context->autoInitializationSequence = false;
   _context->useLongFormatNames         = true;
   Callbacks::Install(*_context);

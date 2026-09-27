@@ -5,19 +5,19 @@
 #include <sdl-rdp/drive/channel.hpp>
 #include <sdl-rdp/video/gfx/channel.hpp>
 
-#include <freerdp/error.h>
 #include <algorithm>
 #include <utility>
 
 namespace sdl_rdp::peer::detail::peer {
 using sdl_rdp::clipboard::ClipboardChannel;
 using sdl_rdp::drive::DriveChannel;
+using sdl_rdp::freerdp_facade::Refusal;
 using sdl_rdp::link::DynamicChannel;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Rect;
 using sdl_rdp::video::gfx::FrameSources;
 using sdl_rdp::video::gfx::GfxChannel;
-Peer::Peer(PeerHandle accepted, Diagnostics const& diagnostics, EventQueue& events, Configuration const& configuration,
+Peer::Peer(Connection accepted, Diagnostics const& diagnostics, EventQueue& events, Configuration const& configuration,
            FrameStore& store, Generational<PointerShape>& pointer, ClipboardStore& clipboard, SessionAccess& session)
     : _diagnostics{ diagnostics }, _configuration{ configuration }, _store{ store }, _session{ session },
       _link{ std::move(accepted) }, _traces{ diagnostics }, _activation{ events, _link }, _frames{ store },
@@ -45,25 +45,20 @@ Peer::Peer(PeerHandle accepted, Diagnostics const& diagnostics, EventQueue& even
                       return std::make_unique<ClipboardChannel>(_link, _activation, clipboard, events, diagnostics);
                     },
                     [&, this] { return std::make_shared<DriveChannel>(_link, events, diagnostics, session); } },
-      _channels{ _link, _activation, _graphics, _display, _redirection, _input               },
-      _legacy  { _link, configuration, _activation, _frames, _pacing, _encoder, _scaler      },
-      _pointer { pointer, _link, diagnostics                                                 },
-      _gate    { _link, store, _frames, _desktop, _pacing, _activation, _graphics            },
-      _capture { _link, store, _frames, _desktop, _pacing, _statistics, _encoder             },
-      _sender  { _link, _activation, session, _gate, _capture, _pointer, _graphics, _legacy  },
-      _end     { _link, _activation, _authenticator, _frames, store, diagnostics             },
-      _arrival { session, store, _frames, _link, _activation, _desktop, _pacing, diagnostics },
-      _output{ _link, _graphics, _pacing, _activation, _frames } {
-  _link.Client().ContextExtra = this;
-  InstallClient();
-  InstallUpdates();
-  _input_events.Install(*_link.Context().input);
-}
+      _channels   { _link, _activation, _graphics, _display, _redirection, _input               },
+      _legacy     { _link, configuration, _activation, _frames, _pacing, _encoder, _scaler      },
+      _pointer    { pointer, _link, diagnostics                                                 },
+      _gate       { _link, store, _frames, _desktop, _pacing, _activation, _graphics            },
+      _capture    { _link, store, _frames, _desktop, _pacing, _statistics, _encoder             },
+      _sender     { _link, _activation, session, _gate, _capture, _pointer, _graphics, _legacy  },
+      _end        { _link, _activation, _authenticator, _frames, store, diagnostics             },
+      _arrival    { session, store, _frames, _link, _activation, _desktop, _pacing, diagnostics },
+      _output     { _link, _graphics, _pacing, _activation, _frames                             },
+      _observation{ _link.Connection().Observe(*this, _input_events)                            } { }
 Peer::~Peer() {
   // The loop thread ends before its callbacks lose their owner.
   Stop();
   if (_thread.joinable()) _thread.join();
-  _link.Client().ContextExtra = nullptr;
 }
 auto Peer::Start() -> void {
   Expects(!_thread.joinable(), "peer starts once");
@@ -78,8 +73,9 @@ auto Peer::Owns(PeerLink const& link) const noexcept -> bool {
 auto Peer::Evict() -> bool {
   if (!_activation.Deactivate()) return false;
   _redirection.Disconnect();
-  _link.Refuse(ERRINFO_DISCONNECTED_BY_OTHER_CONNECTION);
-  _link.Close();
+  auto& connection = _link.Connection();
+  connection.Refuse(Refusal::OtherConnection);
+  connection.Close();
   Stop();
   return true;
 }
@@ -113,9 +109,9 @@ auto Peer::Point(MouseMode mode) -> void {
   _input_events.Point(mode);
   _link.Signal();
 }
-auto Peer::Status(FrameLock const& held) const -> PeerStatus {
+auto Peer::Status(FrameLock const& held) -> PeerStatus {
   auto const timing = _graphics.Timing();
-  return { .client           = std::ref(_link.Client()),
+  return { .connection       = std::ref(_link.Connection()),
            .display          = _display.Opened(),
            .desktop          = _desktop.Desktop(),
            .resizing         = _desktop.Resizing(),

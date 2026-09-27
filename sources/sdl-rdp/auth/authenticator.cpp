@@ -1,12 +1,11 @@
 #include <sdl-rdp/auth/authenticator.hpp>
 
-#include <sdl-rdp/auth/identity.hpp>
 #include <sdl-rdp/configuration/configuration.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/diagnostics/logging.hpp>
-#include <sdl-rdp/freerdp-facade/ntlm.hpp>
+#include <sdl-rdp/freerdp-facade/connection.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/link/event.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
@@ -23,15 +22,15 @@ namespace sdl_rdp::auth::detail::authenticator {
 using sdl_rdp::configuration::AuthMode;
 using sdl_rdp::diagnostics::AuthenticationRejectedLogging;
 using sdl_rdp::diagnostics::LogLevel;
-using sdl_rdp::freerdp_facade::NtOwfV2;
+using sdl_rdp::freerdp_facade::Refusal;
 using sdl_rdp::freerdp_facade::StringKey;
 using sdl_rdp::utilities::Contained;
 using sdl_rdp::utilities::Ensures;
 using sdl_rdp::utilities::Pinned;
-using sdl_rdp::utilities::Utf16;
 using sdl_rdp::utilities::WipedString;
 
 namespace {
+constexpr OperationName ResponseKeyLookup{ "NTLM response key" };
 struct SettingsPassword : private Pinned {
 public:
   explicit SettingsPassword(SettingsView value) : settings{ value } { }
@@ -55,30 +54,28 @@ auto Authenticator::Auth() const noexcept -> AuthMode {
 }
 auto Authenticator::Reject() -> void {
   if (_state.TestAndSetRejected()) return;
-  _link.Client().authenticated = false;
+  auto& connection = _link.Connection();
+  connection.SetAuthenticated(false);
   AuthenticationRejectedLogging();
   auto const user = QualifiedName(_state.Domain(), _state.User());
   _diagnostics.Log(LogLevel::Warn,
-                   std::format("Authentication rejected: user \"{}\" from {}", user, _link.Client().hostname));
+                   std::format("Authentication rejected: user \"{}\" from {}", user, connection.Hostname()));
 }
 auto Authenticator::Verify(std::string const& domain, std::string const& user, std::string_view password) -> bool {
-  SettingsPassword const clear  { _link.Settings() };
-  auto&                  client = _link.Client();
+  auto&                  connection = _link.Connection();
+  SettingsPassword const clear      { connection.Settings() };
   _state.Identify(user, domain);
-  sspi_FreeAuthIdentity(&client.identity);
-  if (sspi_SetAuthIdentityA(&client.identity, user.c_str(), domain.c_str(), nullptr) <= 0) {
-    Reject();
-    return false;
-  }
+  connection.Identify({ .user = user, .domain = domain });
   WipedString const plain    { password };
   bool const        accepted = _configuration.Credentials().Verifies(domain, user, plain.Text());
   if (!accepted) Reject();
-  client.authenticated = accepted;
+  connection.SetAuthenticated(accepted);
   return accepted;
 }
 auto Authenticator::Denied() -> bool {
-  _link.Client().authenticated = false;
-  _link.Refuse(ERRINFO_SERVER_DENIED_CONNECTION);
+  auto& connection = _link.Connection();
+  connection.SetAuthenticated(false);
+  connection.Refuse(Refusal::ServerDenied);
   return false;
 }
 auto Authenticator::Logon(bool automatic) -> bool {
@@ -86,7 +83,7 @@ auto Authenticator::Logon(bool automatic) -> bool {
   if (!automatic || _configuration.Config().auth == AuthMode::None) return true;
   // FreeRDP 3.32 nla.c:1494 stores delegated credentials in settings, not nla_get_identity().
   std::ignore = _state.TestAndSetChecked();
-  auto const settings = _link.Settings();
+  auto const settings = _link.Connection().Settings();
   auto const verified = [&] {
     return Verify(std::string{ settings.Get(StringKey::Domain).value_or("") },
                   std::string{ settings.Get(StringKey::Username).value_or("") },
@@ -96,18 +93,18 @@ auto Authenticator::Logon(bool automatic) -> bool {
   return true;
 }
 auto Authenticator::Unauthenticated(std::string const& domain, std::string const& user) -> bool {
-  auto& client = _link.Client();
-  client.authenticated = false;
-  return sspi_SetAuthIdentityA(&client.identity, user.c_str(), domain.c_str(), nullptr) > 0;
+  auto& connection = _link.Connection();
+  connection.SetAuthenticated(false);
+  connection.Identify({ .user = user, .domain = domain });
+  return true;
 }
 auto Authenticator::VerifySettings() -> bool {
-  auto&                  client   = _link.Client();
-  auto const             settings = _link.Settings();
+  auto const             settings = _link.Connection().Settings();
   SettingsPassword const clear    { settings };
   if (_state.TestAndSetChecked()) {
     if (!_state.Rejected()) return true;
     std::ignore = Denied();
-    Ensures(!client.authenticated, "a rejected peer is not authenticated at activation");
+    Ensures(!_link.Connection().Authenticated(), "a rejected peer is not authenticated at activation");
     return false;
   }
   auto const verified = [&] -> std::optional<bool> {
@@ -124,21 +121,20 @@ auto Authenticator::VerifySettings() -> bool {
 auto Authenticator::NtHash(std::string const& domain, std::string const& user) const -> std::optional<NtOwf> {
   return _configuration.Credentials().NtHash(domain, user);
 }
-auto Authenticator::ResponseKey(SEC_WINNT_AUTH_IDENTITY const& identity, NtKey response) -> bool {
-  auto const names = ClientNames(identity);
-  _state.Identify(names.user, names.domain);
-  auto const hash = NtHash(_state.Domain(), _state.User());
-  if (!hash) return false;
-  // FreeRDP 3.32 ntlm_compute.c:513 takes the NTLMv2 response key, not the NT hash.
-  auto const key = NtOwfV2(*hash, Utf16(_state.User()), Utf16(_state.Domain()));
-  std::ranges::copy(key.Bytes(), response.begin());
-  return true;
-}
-auto Authenticator::Hash(SEC_WINNT_AUTH_IDENTITY const& identity, NtKey response) -> bool {
+auto Authenticator::NtlmHash(Identity const& identity) -> std::optional<NtOwf> {
   _state.AttemptHash();
-  bool const keyed = Contained(false, [&] { return ResponseKey(identity, response); }, Failures("NTLM response key"));
-  if (!keyed) Reject();
-  return keyed;
+  auto const lookup = [&] {
+    _state.Identify(identity.user, identity.domain);
+    return NtHash(_state.Domain(), _state.User());
+  };
+  auto       hash   = Contained(std::optional<NtOwf>{ }, lookup, Failures(ResponseKeyLookup));
+  if (!hash) Reject();
+  return hash;
+}
+auto Authenticator::NtlmRefused(std::string_view cause) -> void {
+  _state.AttemptHash();
+  Failures(ResponseKeyLookup)(cause);
+  Reject();
 }
 auto Authenticator::Failures(OperationName operation) const noexcept -> FailureLog {
   return FailureLog{ _diagnostics, operation, LogLevel::Warn };
@@ -146,10 +142,7 @@ auto Authenticator::Failures(OperationName operation) const noexcept -> FailureL
 auto Authenticator::End() -> void {
   if (_state.Abandoned()) Reject();
 }
-auto AuthenticationIdentity(freerdp_peer const& client) -> ClientIdentity {
-  auto names = ClientNames(client.identity);
-  return { .user          = std::move(names.user),
-           .domain        = std::move(names.domain),
-           .authenticated = client.authenticated != 0 };
+auto QualifiedName(std::string_view domain, std::string_view user) -> std::string {
+  return domain.empty() ? std::string(user) : std::string(domain) + "\\" + std::string(user);
 }
 }

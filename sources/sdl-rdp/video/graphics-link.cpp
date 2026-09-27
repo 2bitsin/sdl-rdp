@@ -26,7 +26,8 @@ GraphicsLink::GraphicsLink(PeerLink& link, Diagnostics const& diagnostics, Activ
       _make{ std::move(make) } { }
 auto GraphicsLink::Pump(Signalled const& ready) -> bool {
   if (_channel) return !ready.Contains(_channel->Event()) || _channel->Pump();
-  if (_attempted || !_link.Settings().Get(BoolKey::SupportGraphicsPipeline) || !DynamicChannelsReady(_link))
+  if (_attempted || !_link.Connection().Settings().Get(BoolKey::SupportGraphicsPipeline)
+      || !DynamicChannelsReady(_link))
     return true;
   _attempted = true;
   _link.Invalidate();

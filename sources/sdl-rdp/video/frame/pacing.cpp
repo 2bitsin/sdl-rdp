@@ -56,12 +56,12 @@ auto FramePacing::Blocked() -> void {
   Adjust([](Refresh& rate) { rate.Blocked(Clock::now()); });
 }
 auto FramePacing::Drained() -> void {
-  if (_refresh.AwaitingEmpty()) Adjust([&](Refresh& rate) { rate.Drained(SampleWire(_link.Socket())); });
+  if (_refresh.AwaitingEmpty()) Adjust([&](Refresh& rate) { rate.Drained(SampleWire(_link.Connection().Socket())); });
 }
 auto FramePacing::Sent(PeerFrames& frames, FrameCost const& cost) -> void {
   auto const held = _store.Lock();
   auto const now  = Clock::now();
-  auto const wire = SampleWire(_link.Socket());
+  auto const wire = SampleWire(_link.Connection().Socket());
   _traces.Defer("frame", [&] {
     return std::format("id={} bytes={} outq={} unacked={} tcp_rtt={}", _window.Frame(), cost.bytes, wire.outq,
                        wire.unacked, wire.rtt);

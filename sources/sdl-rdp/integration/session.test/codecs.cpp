@@ -15,9 +15,12 @@
 #include <sdl-rdp/utilities/support.test/out-of-range-enum.hpp>
 
 #include <algorithm>
+#include <arpa/inet.h>
 #include <cstddef>
 #include <cstdint>
 #include <future>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <utility>
 
 namespace sdl_rdp::integration::session_test::detail::codecs {

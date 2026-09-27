@@ -2,8 +2,6 @@
 
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/failure-log.hpp>
-#include <sdl-rdp/freerdp-facade/callback-owner.hpp>
-#include <sdl-rdp/freerdp-facade/handled.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/event-queue.hpp>
 #include <sdl-rdp/link/event.hpp>
@@ -13,11 +11,12 @@
 #include <sdl-rdp/picture/frame-store.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 
-#include <freerdp/input.h>
+#include <freerdp/freerdp.h>
 #include <freerdp/server/ainput.h>
 #include <algorithm>
 #include <array>
 #include <concepts>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <functional>
@@ -27,7 +26,8 @@
 #include <utility>
 
 namespace sdl_rdp::input::detail::events {
-using sdl_rdp::freerdp_facade::CallbackOwner;
+using sdl_rdp::freerdp_facade::PointerButton;
+using sdl_rdp::freerdp_facade::PointerButtonCount;
 using sdl_rdp::link::Event;
 using sdl_rdp::link::MouseButton;
 using sdl_rdp::link::MouseMove;
@@ -41,40 +41,39 @@ using sdl_rdp::picture::Rescale;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::Rect;
+using sdl_rdp::utilities::Unreachable;
 
 template <class Result> auto InputEvents::WhenActive(Result idle, std::invocable auto action) -> Result {
   auto const session = _session.Lock();
   return _activation.Active() ? Result{ action() } : idle;
 }
+auto InputEvents::WhenActive(std::invocable auto action) -> void {
+  auto const session = _session.Lock();
+  if (_activation.Active()) action();
+}
 namespace {
-template <std::unsigned_integral Flags>
-auto PushButtons(EventQueue& events, std::span<Flags const> buttons, Flags flags, std::uint32_t first, bool down)
-    -> void {
-  for (auto const [index, button] : std::views::enumerate(buttons))
-    if (flags & button) events.Push(MouseButton{ .button = first + Narrowed<std::uint32_t>(index), .down = down });
+constexpr std::array AllButtons{ PointerButton::Left, PointerButton::Middle, PointerButton::Right, PointerButton::Back,
+                                 PointerButton::Forward };
+static_assert(AllButtons.size() == PointerButtonCount, "every pointer button has its link number");
+// The link numbers mouse buttons from 1 in the order the driver's table reads them (SDL3/rdp/video/events.cpp).
+auto LinkButton(PointerButton button) -> std::uint32_t {
+  switch (button) {
+  case PointerButton::Left:    return 1;
+  case PointerButton::Middle:  return 2;
+  case PointerButton::Right:   return 3;
+  case PointerButton::Back:    return 4;
+  case PointerButton::Forward: return 5;
+  default:                     Unreachable(button);
+  }
 }
-constexpr std::uint32_t                FirstButton         = 1;
-constexpr std::uint32_t                FirstExtendedButton = 4;
-constexpr int                          WheelSignExtension  = 0x200;
-constexpr float                        WheelNotch          = 120.0F;
-constexpr std::array<std::uint16_t, 3> PointerButtons      { PTR_FLAGS_BUTTON1, PTR_FLAGS_BUTTON3, PTR_FLAGS_BUTTON2 };
-constexpr std::array<std::uint16_t, 2> ExtendedButtons     { PTR_XFLAGS_BUTTON1, PTR_XFLAGS_BUTTON2                  };
-auto PushMouseWheel(EventQueue& events, std::uint16_t flags) -> void {
-  if (!(flags & (PTR_FLAGS_WHEEL | PTR_FLAGS_HWHEEL))) return;
-  int rotation = flags & WheelRotationMask;
-  if (flags & PTR_FLAGS_WHEEL_NEGATIVE) rotation -= WheelSignExtension;
-  float const notches = static_cast<float>(rotation) / WheelNotch;
-  events.Push(
-      MouseWheel{ .dx = (flags & PTR_FLAGS_HWHEEL) ? notches : 0, .dy = (flags & PTR_FLAGS_WHEEL) ? notches : 0 });
+auto PushButtons(EventQueue& events, std::ranges::input_range auto&& pressed, bool down) -> void {
+  for (auto const button : pressed) events.Push(MouseButton{ .button = LinkButton(button), .down = down });
 }
-auto Owner(rdpInput const& input) -> InputEvents& {
-  return CallbackOwner<InputEvents, &rdpInput::param1>(input);
+auto Pressed(PointerEvent const& event) -> auto {
+  return AllButtons | std::views::filter([&event](PointerButton button) {
+           return event.buttons.test(std::to_underlying(button));
+         });
 }
-constexpr OperationName KeyboardEvent       { "Keyboard event"         };
-constexpr OperationName UnicodeKeyboardEvent{ "Unicode keyboard event" };
-constexpr OperationName MouseEvent          { "Mouse event"            };
-constexpr OperationName ExtendedMouseEvent  { "Extended mouse event"   };
-using sdl_rdp::freerdp_facade::Handled;
 }
 InputEvents::InputEvents(PeerLink& link, Activation const& activation, DesktopLayout const& desktop, EventQueue& events,
                          FrameStore& store, Diagnostics const& diagnostics, SessionAccess& session) noexcept
@@ -83,56 +82,49 @@ InputEvents::InputEvents(PeerLink& link, Activation const& activation, DesktopLa
 auto InputEvents::Failures(OperationName operation) const noexcept -> FailureLog {
   return { _diagnostics, operation };
 }
-auto InputEvents::Install(rdpInput& input) -> void {
-  input.param1 = this;
-  // abi: pKeyboardEvent, pUnicodeKeyboardEvent, pMouseEvent, pExtendedMouseEvent; BOOL is int
-  constexpr auto failures = &InputEvents::Failures;
-  input.KeyboardEvent        = Handled<Owner, &InputEvents::Key, KeyboardEvent, failures, false>;
-  input.UnicodeKeyboardEvent = Handled<Owner, &InputEvents::Text, UnicodeKeyboardEvent, failures, false>;
-  input.MouseEvent           = Handled<Owner, &InputEvents::Mouse, MouseEvent, failures, false>;
-  input.ExtendedMouseEvent   = Handled<Owner, &InputEvents::ExtendedMouse, ExtendedMouseEvent, failures, false>;
+auto InputEvents::Failed(OperationName operation, std::string_view failure) const -> void {
+  Failures(operation)(failure);
 }
-auto InputEvents::Key(std::uint16_t flags, std::uint8_t code) -> bool {
-  return WhenActive(true, [&] {
-    bool const extended = flags & KBD_FLAGS_EXTENDED;
-    bool const down     = !(flags & KBD_FLAGS_RELEASE);
+auto InputEvents::Key(KeyEvent event) -> void {
+  WhenActive([&] {
+    _diagnostics.Line("key", [&] {
+      return std::format("code={} extended={} down={}", event.code, int{ event.extended }, int{ event.down });
+    });
+    _events.Push(sdl_rdp::link::Key{ .scancode = event.code, .extended = event.extended, .down = event.down });
+  });
+}
+auto InputEvents::Unicode(UnicodeEvent event) -> void {
+  WhenActive([&] {
+    auto const point = oxbox::utilities::UtfDecode(_unicode[event.down], event.code);
+    if (!point || *point == oxbox::utilities::INVALID_CODEPOINT<>) return;
     _diagnostics.Line("key",
-                      [&] { return std::format("code={} extended={} down={}", code, int{ extended }, int{ down }); });
-    _events.Push(sdl_rdp::link::Key{ .scancode = code, .extended = extended, .down = down });
-    return true;
+                      [&] { return std::format("codepoint={} down={}", std::uint32_t{ *point }, int{ event.down }); });
+    _events.Push(TextInput{ .codepoint = *point, .down = event.down });
   });
 }
-auto InputEvents::Text(std::uint16_t flags, std::uint16_t code) -> bool {
+auto InputEvents::Pointer(PointerEvent const& event) -> bool {
   return WhenActive(true, [&] {
-    bool const down  = !(flags & KBD_FLAGS_RELEASE);
-    auto const point = oxbox::utilities::UtfDecode(_unicode[down], code);
-    if (!point || *point == oxbox::utilities::INVALID_CODEPOINT<>) return true;
-    _diagnostics.Line("key", [&] { return std::format("codepoint={} down={}", std::uint32_t{ *point }, int{ down }); });
-    _events.Push(TextInput{ .codepoint = *point, .down = down });
-    return true;
-  });
-}
-auto InputEvents::Mouse(std::uint16_t flags, std::uint16_t x, std::uint16_t y) -> bool {
-  return WhenActive(true, [&] {
-    if (flags & (PTR_FLAGS_BUTTON1 | PTR_FLAGS_BUTTON2 | PTR_FLAGS_BUTTON3))
-      _diagnostics.Line("mouse", [&] { return std::format("flags={} x={} y={}", flags, x, y); });
-    if ((flags & PTR_FLAGS_MOVE) && !Motion(x, y)) return false;
-    PushButtons<std::uint16_t>(_events, PointerButtons, flags, FirstButton, flags & PTR_FLAGS_DOWN);
-    PushMouseWheel(_events, flags);
-    return true;
-  });
-}
-auto InputEvents::ExtendedMouse(std::uint16_t flags) -> bool {
-  return WhenActive(true, [&] {
-    PushButtons<std::uint16_t>(_events, ExtendedButtons, flags, FirstExtendedButton, flags & PTR_XFLAGS_DOWN);
+    if (event.buttons.any())
+      _diagnostics.Line("mouse", [&] {
+        return std::format("buttons={} down={} x={} y={}", event.buttons.to_string(), int{ event.down }, event.x,
+                           event.y);
+      });
+    if (event.moved && !Motion(event.x, event.y)) return false;
+    PushButtons(_events, Pressed(event), event.down);
+    if (event.wheel) _events.Push(MouseWheel{ .dx = event.wheel->horizontal, .dy = event.wheel->vertical });
     return true;
   });
 }
 namespace {
-constexpr int                          EdgeFraction  = 8;
-constexpr float                        WheelUnit     = 120.0F * 65536;
-constexpr std::array<std::uint64_t, 5> AinputButtons { AINPUT_FLAGS_BUTTON1, AINPUT_FLAGS_BUTTON3, AINPUT_FLAGS_BUTTON2,
-                                                       AINPUT_XFLAGS_BUTTON1, AINPUT_XFLAGS_BUTTON2 };
+constexpr int                                                    EdgeFraction  = 8;
+constexpr float                                                  WheelUnit     = 120.0F * 65536;
+constexpr std::array<std::pair<std::uint64_t, PointerButton>, 5> AinputButtons {
+  { { AINPUT_FLAGS_BUTTON1 , PointerButton::Left    },
+    { AINPUT_FLAGS_BUTTON3 , PointerButton::Middle  },
+    { AINPUT_FLAGS_BUTTON2 , PointerButton::Right   },
+    { AINPUT_XFLAGS_BUTTON1, PointerButton::Back    },
+    { AINPUT_XFLAGS_BUTTON2, PointerButton::Forward } }
+};
 auto Outside(int value, int extent) -> bool {
   return value < extent / EdgeFraction || value >= extent * (EdgeFraction - 1) / EdgeFraction;
 }
@@ -163,7 +155,7 @@ auto InputEvents::Point(MouseMode mode) noexcept -> void {
 auto InputEvents::Center() -> bool {
   Expects(_activation.Active(), "active peer has a desktop");
   auto const                    desktop  = _desktop.Desktop();
-  auto&                         context  = _link.Context();
+  auto&                         context  = _link.Connection().Context();
   POINTER_POSITION_UPDATE const position { Narrowed<std::uint32_t>(desktop.w / 2),
                                            Narrowed<std::uint32_t>(desktop.h / 2) };
   _mouse.warp_requested = context.update->pointer->PointerPosition(&context, &position);
@@ -184,7 +176,7 @@ auto InputEvents::Motion(int x, int y) -> bool {
   if (!warped && (dx || dy)) Scaled<RelativeMotion>(dx, dy);
   return NearEdge(desktop, x, y) ? Center() : true;
 }
-auto InputEvents::Pointer(std::uint64_t flags, std::int32_t x, std::int32_t y) -> std::uint32_t {
+auto InputEvents::AdvancedPointer(std::uint64_t flags, std::int32_t x, std::int32_t y) -> std::uint32_t {
   return WhenActive(std::uint32_t{ CHANNEL_RC_OK }, [&] {
     bool const moved   = flags & AINPUT_FLAGS_MOVE;
     bool const shifted = moved && (flags & AINPUT_FLAGS_REL);
@@ -192,7 +184,9 @@ auto InputEvents::Pointer(std::uint64_t flags, std::int32_t x, std::int32_t y) -
     if (_mouse.have_relative) _mouse.warp_requested = false;
     if (shifted && _mouse.mode == MouseMode::Relative) Scaled<RelativeMotion>(x, y);
     if (moved && !shifted && !Motion(x, y)) return std::uint32_t{ ERROR_INTERNAL_ERROR };
-    PushButtons<std::uint64_t>(_events, AinputButtons, flags, FirstButton, flags & AINPUT_FLAGS_DOWN);
+    auto const flagged = [flags](auto const& entry) { return (flags & entry.first) != 0; };
+    PushButtons(_events, AinputButtons | std::views::filter(flagged) | std::views::values,
+                (flags & AINPUT_FLAGS_DOWN) != 0);
     if (flags & AINPUT_FLAGS_WHEEL)
       _events.Push(MouseWheel{ .dx = static_cast<float>(x) / WheelUnit, .dy = static_cast<float>(y) / WheelUnit });
     return std::uint32_t{ CHANNEL_RC_OK };

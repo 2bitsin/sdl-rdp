@@ -4,6 +4,7 @@
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/diagnostics/logging.hpp>
+#include <sdl-rdp/freerdp-facade/connection.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
@@ -30,6 +31,8 @@ using sdl_rdp::diagnostics::SecurityRdstls;
 using sdl_rdp::diagnostics::SecurityTls;
 using sdl_rdp::diagnostics::TlsHandshakeFailed;
 using sdl_rdp::freerdp_facade::BoolKey;
+using sdl_rdp::freerdp_facade::Cause;
+using sdl_rdp::freerdp_facade::LastError;
 using sdl_rdp::freerdp_facade::NumberKey;
 using sdl_rdp::freerdp_facade::SettingsReader;
 
@@ -57,26 +60,27 @@ auto HandshakeFailure(SettingsReader settings, std::string const& protocols) -> 
   return std::format("TLS handshake failed: client requested {}, server selected {}", protocols,
                      ProtocolNames(selected, !selected));
 }
-auto ReportDisconnect(Diagnostics const& diagnostics, Activation const& activation, std::uint32_t code, bool pending,
-                      std::string_view error) -> void {
+auto ReportDisconnect(Diagnostics const& diagnostics, Activation const& activation, LastError const& error,
+                      bool pending) -> void {
   auto const activated = activation.Activated();
-  if (ExpectedDisconnect(code))
-    diagnostics.Log(LogLevel::Info, activated ? std::format("Peer disconnected: {}.", error)
-                                              : std::format("Connection closed before activation: {}.", error));
+  if (ExpectedDisconnect(error.cause))
+    diagnostics.Log(LogLevel::Info, activated ? std::format("Peer disconnected: {}.", error.name)
+                                              : std::format("Connection closed before activation: {}.", error.name));
   else if (activation.Active() && pending)
-    diagnostics.Log(LogLevel::Error, std::format("Peer transport failed with pending data: {}.", error));
+    diagnostics.Log(LogLevel::Error, std::format("Peer transport failed with pending data: {}.", error.name));
   else if (!activated)
-    diagnostics.Log(LogLevel::Info, code ? std::format("Connection closed before activation: {}.", error)
-                                         : "Connection closed before activation.");
+    diagnostics.Log(LogLevel::Info, error.cause != Cause::None
+                                        ? std::format("Connection closed before activation: {}.", error.name)
+                                        : "Connection closed before activation.");
 }
 }
-TransportEnd::TransportEnd(PeerLink& link, Activation const& activation, Authenticator& authenticator,
+TransportEnd::TransportEnd(PeerLink const& link, Activation const& activation, Authenticator& authenticator,
                            PeerFrames const& frames, FrameStore& store, Diagnostics const& diagnostics) noexcept
     : _link{ link }, _activation{ activation }, _authenticator{ authenticator }, _frames{ frames }, _store{ store },
       _diagnostics{ diagnostics } { }
 auto TransportEnd::SecurityEnded() const -> bool {
   if (!NegotiationRefused() && !TlsHandshakeFailed()) return false;
-  SettingsReader const settings = _link.Settings();
+  auto const settings = _link.Connection().Settings();
   // FreeRDP 3.32 nego.c:1663 publishes requestedProtocols even after a failure response.
   auto const requested = settings.Get(NumberKey::RequestedProtocols);
   auto const protocols = ProtocolNames(requested, !requested);
@@ -86,12 +90,12 @@ auto TransportEnd::SecurityEnded() const -> bool {
 }
 auto TransportEnd::PendingOutput() const -> bool {
   auto const frame = _store.Lock();
-  return _frames.Pending(frame) || _link.WriteBlocked();
+  return _frames.Pending(frame) || _link.Connection().WriteBlocked();
 }
 auto TransportEnd::Report() -> void {
   if (SecurityEnded()) return;
   _authenticator.End();
-  auto const code = freerdp_get_last_error(&_link.Context());
-  ReportDisconnect(_diagnostics, _activation, code, PendingOutput(), freerdp_get_last_error_name(code));
+  auto const error = _link.Connection().Error();
+  ReportDisconnect(_diagnostics, _activation, error, PendingOutput());
 }
 }

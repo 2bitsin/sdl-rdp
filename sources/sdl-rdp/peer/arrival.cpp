@@ -1,6 +1,5 @@
 #include <sdl-rdp/peer/arrival.hpp>
 
-#include <sdl-rdp/auth/authenticator.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/link/activation.hpp>
@@ -16,7 +15,6 @@
 #include <utility>
 
 namespace sdl_rdp::peer::detail::arrival {
-using sdl_rdp::auth::AuthenticationIdentity;
 using sdl_rdp::configuration::MillihertzPerHz;
 using sdl_rdp::freerdp_facade::BoolKey;
 using sdl_rdp::freerdp_facade::NumberKey;
@@ -29,9 +27,10 @@ using sdl_rdp::video::frame::AcknowledgementMode;
 namespace {
 auto ConnectedFrom(PeerLink const& link, DesktopLayout const& desktop, std::uint32_t refresh_millihertz, Codec codec)
     -> Connected {
-  auto const settings = link.Settings();
-  auto const screen   = desktop.Screen();
-  auto       identity = AuthenticationIdentity(link.Client());
+  auto const& connection = link.Connection();
+  auto const  settings   = connection.Settings();
+  auto const  screen     = desktop.Screen();
+  auto        claim      = connection.Claimed();
   return { .width              = settings.Get(NumberKey::DesktopWidth),
            .height             = settings.Get(NumberKey::DesktopHeight),
            .bpp                = settings.Get(NumberKey::ColorDepth),
@@ -41,9 +40,9 @@ auto ConnectedFrom(PeerLink const& link, DesktopLayout const& desktop, std::uint
            .screen_height      = screen.height,
            .refresh_millihertz = refresh_millihertz,
            .keyboard_layout    = settings.Get(NumberKey::KeyboardLayout),
-           .user               = std::move(identity.user),
-           .domain             = std::move(identity.domain),
-           .authenticated      = identity.authenticated };
+           .user               = std::move(claim.user),
+           .domain             = std::move(claim.domain),
+           .authenticated      = connection.Authenticated() };
 }
 auto ScreenOf(DesktopLayout const& desktop) -> ScreenChanged {
   auto const screen = desktop.Screen();
@@ -68,11 +67,12 @@ auto Arrival::Enter(Connected connection, Codec codec) -> void {
     _link.Signal();
   }
   _activation.Hold(std::move(connection), ScreenOf(_desktop));
-  if (!_link.Settings().Get(BoolKey::SupportGraphicsPipeline)) _activation.Announce(codec, _pacing.Effective());
+  if (!_link.Connection().Settings().Get(BoolKey::SupportGraphicsPipeline))
+    _activation.Announce(codec, _pacing.Effective());
 }
 auto Arrival::Admit(Codec codec) -> void {
   auto connection = Connection(codec);
-  _pacing.Acknowledgements(Acknowledging(_link.Settings()));
+  _pacing.Acknowledgements(Acknowledging(_link.Connection().Settings()));
   _desktop.Assign(Whole({ .width = connection.width, .height = connection.height }));
   _diagnostics.Line("connect", [&] { return std::format("client={}", connection.client_name); });
   Enter(std::move(connection), codec);
