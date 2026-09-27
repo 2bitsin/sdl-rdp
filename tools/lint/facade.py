@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """includes: a production file outside freerdp-facade includes <freerdp/...> or <winpr/...>, held to facade.baseline.
-names: a production file outside the facade names a FreeRDP or WinPR declaration (facade.names) in code.
+names: a production file outside the facade names a FreeRDP or WinPR declaration (facade.names) in code, outside a
+branch only Windows compiles, where the Win32 names WinPR clones are the platform's own.
 facade headers: a header of the facade includes <freerdp/...> or <winpr/...>; tests and benches do not ship."""
 import argparse
 import collections
@@ -22,6 +23,9 @@ SECTIONS = ('includes', 'names', 'facade headers')
 INCLUDE  = re.compile(r'^[ \t]*#[ \t]*include[ \t]*[<"](?:freerdp|winpr)/', re.M)
 SECTION  = re.compile(r'^\[(.+)\]$')
 ENTRY    = re.compile(r'^(\S+): ([1-9]\d*)$')
+WINDOWS  = re.compile(r'[ \t]*#[ \t]*(?:ifdef[ \t]+(?:_WIN32|SDL_PLATFORM_WINDOWS)'
+                      r'|if[ \t]+defined[ \t]*(?:\([ \t]*(?:_WIN32|SDL_PLATFORM_WINDOWS)[ \t]*\)'
+                      r'|[ \t]+(?:_WIN32|SDL_PLATFORM_WINDOWS)))[ \t]*')
 
 
 def read_names(path):
@@ -47,8 +51,22 @@ def production(path):
             and path.with_suffix('').suffix not in RIGS)
 
 
+def outside_windows(lexemes):
+    """The lexemes outside every `#if` whose one condition is a Windows target; its `#else` is counted again."""
+    level = 0
+    for token in lexemes:
+        directive = shape.DIRECTIVE.match(token.value) if token.value.lstrip().startswith('#') else None
+        if level == 0 and directive and WINDOWS.fullmatch(token.value.rstrip('\n')):
+            level = 1
+        elif level:
+            level = shape.disabled_level(directive.group(1) if directive else '', level)
+        else:
+            yield token
+
+
 def named(text, names):
-    return sum(1 for token in spellings.words(text) if token.value in names)
+    tokens = spellings.code_words(outside_windows(shape.enabled_lexemes(text)))
+    return sum(1 for token in tokens if token.value in names)
 
 
 def counts(root, names):

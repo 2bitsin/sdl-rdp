@@ -18,7 +18,7 @@ using QueriedMemory = std::unique_ptr<void, Releases<WTSFreeMemory>>;
 static_assert(MaximumWaitHandles == MAXIMUM_WAIT_OBJECTS);
 static_assert(Forever == INFINITE);
 }
-WaitHandle::WaitHandle(EventHandle const& event) : WaitHandle{ Adopted(event.get()) } { }
+WaitHandle::WaitHandle(EventHandle const& event) : WaitHandle{ Adopted(event._event.get()) } { }
 auto WaitHandle::Of(ServerHandle const& manager) -> WaitHandle {
   Expects(manager != nullptr, "the channel manager is open");
   return Adopted(WTSVirtualChannelManagerGetEventHandle(manager.get()));
@@ -44,7 +44,7 @@ auto WaitHandle::Any(std::span<WaitHandle const> handles, std::uint32_t timeout)
   Ensures(result - WAIT_OBJECT_0 < handles.size(), "WinPR woke on an awaited handle");
   return result - WAIT_OBJECT_0;
 }
-auto WaitHandle::Adopted(HANDLE native) -> WaitHandle {
+auto WaitHandle::Adopted(void* native) -> WaitHandle {
   Expects(native != nullptr, "a waitable handle exists");
   Expects(native != INVALID_HANDLE_VALUE, "a waitable handle is valid");
   WaitHandle adopted;

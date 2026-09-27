@@ -54,7 +54,12 @@ def forbidden(relative):
 
 def words(text):
     """Code tokens outside comments and literals, directive bodies included, #include lines excluded."""
-    for token in shape.enabled_lexemes(text):
+    return code_words(shape.enabled_lexemes(text))
+
+
+def code_words(lexemes):
+    """The code tokens of lexemes, as `words` reads a whole text."""
+    for token in lexemes:
         if token.value.lstrip().startswith('#'):
             yield from directive_words(token)
         elif not token.value.startswith(('//', '/*', *shape.LITERALS, "'")):

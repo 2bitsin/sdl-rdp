@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Align declaration and statement columns while preserving protected C and C++ text."""
 import argparse
+import itertools
 import pathlib
 import re
 from types import SimpleNamespace
@@ -442,7 +443,8 @@ def is_function_declaration(fields, constructors):
         return True
     name = fields.signature.split('(', 1)[0]
     special = re.fullmatch(r'=\s*(?:default|delete)', fields.specifier)
-    return name in constructors or bool(special) or name in fields.signature[len(name) + 1:]
+    recurs  = re.search(rf'\b{re.escape(name)}\b', fields.signature[len(name) + 1:])
+    return name in constructors or bool(special) or bool(recurs)
 
 
 def accepted_kind(item, constructors):
@@ -636,12 +638,12 @@ def is_comment_only(line, hidden):
     return bool(line.strip() and not hidden.replace('@', '').strip() and line.lstrip().startswith(('//', '/*', '*')))
 
 
-def group_key(item):
+def group_key(item, depth):
     indent = item.indent
     if item.kind == 'ctor' and item.fields.prefix:
         indent += ' ' * (len(item.fields.prefix) + 1)
     kind = ('table', len(item.fields.cells)) if item.kind == 'table' else item.kind
-    return indent, kind
+    return indent, kind, depth
 
 
 class Group:
@@ -769,28 +771,35 @@ def constructor_tail_end(physical, index):
     return index + 1 if code.lstrip().startswith(':') and code.rstrip().endswith('{ }') else index
 
 
+def brace_depths(lines):
+    """The brace depth each line starts at."""
+    return list(itertools.accumulate((line.code.count('{') - line.code.count('}') for line in lines), initial=0))
+
+
 def member_functions(lines):
-    functions = [(indentation(line.line), parse_function(line.line.strip(), line.code.strip())) for line in lines]
-    return [(indent, parsed[1]) for indent, parsed in functions if parsed and parsed[0] == 'function']
+    functions = [(indentation(line.line), depth, parse_function(line.line.strip(), line.code.strip()))
+                 for line, depth in zip(lines, brace_depths(lines))]
+    return [(indent, depth, parsed[1]) for indent, depth, parsed in functions if parsed and parsed[0] == 'function']
 
 
 def constructor_indents(lines):
+    """Each constructor name's member indent and the brace depth its declarations sit at."""
     functions = member_functions(lines)
-    base = min((indent for indent, _ in functions), key=len, default='')
-    owners = {fields.signature.split('(', 1)[0].lstrip('~'): base for _, fields in functions
+    base = min(((indent, depth) for indent, depth, _ in functions), key=lambda owner: len(owner[0]), default=('', 0))
+    owners = {fields.signature.split('(', 1)[0].lstrip('~'): base for _, _, fields in functions
               if not fields.typ and is_function_declaration(fields, set())}
-    for line in lines:
+    for line, depth in zip(lines, brace_depths(lines)):
         if match := re.match(r'\s*(?:template\s*<.*>\s*)?(?:class|struct)\s+(?:\w+::)*(\w+).*\{', line.code):
-            owners[match[1]] = indentation(line.line) + ' ' * INDENT_WIDTH
+            owners[match[1]] = indentation(line.line) + ' ' * INDENT_WIDTH, depth + 1
     return owners
 
 
 def normalise_member_indents(lines):
     owners = constructor_indents(lines)
-    for line in lines:
+    for line, depth in zip(lines, brace_depths(lines)):
         match = re.match(r'\s*~?(\w+)\(', line.code)
-        if match and match[1] in owners:
-            indent = owners[match[1]]
+        if match and match[1] in owners and owners[match[1]][1] == depth:
+            indent = owners[match[1]][0]
             line = line._replace(line=indent + line.line.lstrip(), code=indent + line.code.lstrip())
         yield line
 
@@ -991,7 +1000,7 @@ def still_open(open_groups, depth, item_key=None):
     return {key: group for key, group in open_groups.items() if stays_open(key, depth, item_key)}
 
 
-def stream_groups(logicals, items):
+def stream_groups(logicals, items, depths):
     groups, open_groups = [], {}
     for position, (item, continued) in enumerate(items):
         if continued:
@@ -999,7 +1008,7 @@ def stream_groups(logicals, items):
         if item is None:
             open_groups = still_open(open_groups, len(indentation(logicals[position].text)))
             continue
-        key = group_key(item)
+        key = group_key(item, depths[logicals[position].key[0]])
         if item.kind not in MINOR_KINDS:
             open_groups = still_open(open_groups, len(key[0]), key)
         if key not in open_groups:
@@ -1037,11 +1046,12 @@ def constructor_names(code):
 
 
 def stream_members(streams, physical, constructors):
-    groups = []
+    groups, depths = [], brace_depths(physical)
     for stream, logicals in streams.items():
         parsed = stream_items(physical, stream, logicals, constructors)
+        levels = depths if stream is None else [0] * len(depths)
         groups += [[Member(logicals[p].key, parsed[p][0], logicals[p].extra) for p in positions]
-                   for positions in stream_groups(logicals, parsed)]
+                   for positions in stream_groups(logicals, parsed, levels)]
     return groups
 
 

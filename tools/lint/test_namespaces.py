@@ -168,6 +168,13 @@ def test_reexport_reads_declarator_lists_and_constrained_templates(tree):
     assert findings(tree, text) == []
 
 
+def test_reexport_names_an_operator_the_file_declares(tree):
+    text = (f'{DETAIL}enum class Set {{ }};\nconstexpr auto operator|(Set a, Set b) -> Set {{ return a; }}\n}}\n'
+            f'{EXPORT}using detail::frame_rate::Set;\nusing detail::frame_rate::operator|;\n}}\n')
+    assert findings(tree, text) == []
+    assert findings(tree, text.replace('operator|;', 'operator&;')) == ['frame-rate.hpp:5']
+
+
 def test_export_block_holds_only_using_declarations(tree):
     text = f'{DETAIL}class Rate {{}};\n}}\n{EXPORT}using detail::frame_rate::Rate;\nint y;\n}}\n'
     assert findings(tree, text) == ['frame-rate.hpp:4']

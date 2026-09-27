@@ -1,27 +1,5 @@
 [includes]
-sources/sdl-rdp/diagnostics/logging.cpp: 1
-sources/sdl-rdp/diagnostics/logging.hpp: 1
-sources/sdl-rdp/drive/capabilities.cpp: 1
-sources/sdl-rdp/drive/channel.cpp: 2
-sources/sdl-rdp/drive/file-request.cpp: 1
-sources/sdl-rdp/drive/label.cpp: 1
-sources/sdl-rdp/peer/redirection.cpp: 1
-sources/sdl-rdp/session/listener.cpp: 1
-sources/sdl-rdp/session/session.cpp: 1
 
 [names]
-sources/sdl-rdp/SDL3/rdp/settings/options.cpp: 2
-sources/sdl-rdp/diagnostics/logging.cpp: 20
-sources/sdl-rdp/diagnostics/logging.hpp: 2
-sources/sdl-rdp/drive/capabilities.cpp: 26
-sources/sdl-rdp/drive/channel.cpp: 29
-sources/sdl-rdp/drive/file-request.cpp: 13
-sources/sdl-rdp/drive/label.cpp: 1
-sources/sdl-rdp/peer/redirection.cpp: 1
-sources/sdl-rdp/session/listener.cpp: 1
-sources/sdl-rdp/session/session.cpp: 2
 
 [facade headers]
-sources/sdl-rdp/freerdp-facade/nvenc.hpp: 1
-sources/sdl-rdp/freerdp-facade/rdp-handles.hpp: 2
-sources/sdl-rdp/freerdp-facade/wait-handle.hpp: 1

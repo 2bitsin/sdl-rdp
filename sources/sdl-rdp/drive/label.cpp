@@ -2,7 +2,6 @@
 #include <sdl-rdp/drive/exceptions.hpp>
 #include <sdl-rdp/utilities/text.hpp>
 
-#include <freerdp/channels/rdpdr.h>
 #include <bit>
 #include <stdexcept>
 #include <string>
@@ -10,11 +9,12 @@
 
 namespace sdl_rdp::drive::detail::label {
 using sdl_rdp::utilities::TranscodeRange;
-auto DecodeLabel(std::span<std::byte const> bytes, std::uint32_t drive_version, std::string_view dos) -> std::string {
+auto DecodeLabel(std::span<std::byte const> bytes, std::optional<CapabilityVersion> drive_version, std::string_view dos)
+    -> std::string {
   if (!bytes.empty()) {
     if (bytes.back() != std::byte{ }) throw InvalidDriveName{ "unterminated" };
     // FreeRDP 3.32 drive_main.c:1023 sends UTF-8 despite advertising drive capability v2.
-    bool const wide   = drive_version >= DRIVE_CAPABILITY_VERSION_02 && bytes.size() >= 2 && bytes.size() % 2 == 0
+    bool const wide   = drive_version >= CapabilityVersion::V2 && bytes.size() >= 2 && bytes.size() % 2 == 0
                         && bytes[bytes.size() - 2] == std::byte{ };
     auto       format = wide ? oxbox::utilities::TextFormat{ .encoding = oxbox::utilities::Encoding::UTF16,
                                                              .order    = std::endian::little }

@@ -9,6 +9,7 @@
 
 namespace sdl_rdp::drive::detail::file_request {
 using sdl_rdp::freerdp_facade::AccessMask;
+using sdl_rdp::freerdp_facade::CreateDisposition;
 
 enum class FileKind{ File, Directory, Any };
 class FileRequest {
@@ -17,9 +18,9 @@ public:
   auto Create(std::span<std::byte const> name) const -> DrivePacket;
 
 private:
-  std::uint32_t _access;
-  std::uint32_t _disposition;
-  FileKind      _kind;
+  AccessMask        _access;
+  CreateDisposition _disposition;
+  FileKind          _kind;
 };
 }
 

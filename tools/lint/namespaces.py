@@ -293,13 +293,21 @@ def exported_names(file, blocks):
     return names
 
 
+def reexported(statement):
+    """The (stem, Name) of a `using detail::<stem>::Name;` line, an operator's name included, or None."""
+    values = [token.value for token in statement]
+    name   = values[5:-1]
+    if values[:3] != ['using', 'detail', '::'] or values[4:5] != ['::'] or values[-1:] != [';']:
+        return None
+    if len(name) == 1 or (len(name) == 2 and name[0] == 'operator'):
+        return values[3], ''.join(name)
+    return None
+
+
 def reexports(block, exported):
     """Whether a block is only `using detail::<stem>::Name;` lines, each naming a (stem, Name) the file declares."""
-    values = [token.value for token in block.tokens]
-    return bool(values) and len(values) % 7 == 0 and all(
-        values[start:start + 3] == ['using', 'detail', '::'] and values[start + 4] == '::'
-        and (values[start + 3], values[start + 5]) in exported and values[start + 6] == ';'
-        for start in range(0, len(values), 7))
+    found = [reexported(statement) for statement in statements(block.tokens)]
+    return bool(found) and all(pair in exported for pair in found)
 
 
 def export_findings(file, block, exported):

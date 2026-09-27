@@ -21,7 +21,7 @@ sdl-rdp/peer/channel-set.cpp:12: ChannelSet::ChannelSet parameters 7 > 5 # colla
 sdl-rdp/peer/peer.cpp:20: Peer::Peer parameters 8 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp/peer/peer.hpp: Peer data members 29 > 10 # composition root: owns every per-peer part, each wired with only what it uses
 sdl-rdp/peer/peer.hpp: Peer member functions 36 > 15 # one peer connection: its thread loop, departure and ConnectionEvents overrides are members, each TU a topic (#82)
-sdl-rdp/peer/redirection.cpp:31: Redirection::Redirection parameters 6 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
+sdl-rdp/peer/redirection.cpp:32: Redirection::Redirection parameters 6 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp/peer/transport-end.cpp:77: TransportEnd::TransportEnd parameters 6 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling
 sdl-rdp/sample-gate.test/process/process.cpp:46: Process::Line nesting 3 > 2 # size in #19
 sdl-rdp/video/frame/capture.cpp:18: FrameCapture::FrameCapture parameters 7 > 5 # collaborators replace Peer&; 6-8 constructor parameters listed per the #19 ruling

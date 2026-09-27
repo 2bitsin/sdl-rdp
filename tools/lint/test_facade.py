@@ -149,3 +149,42 @@ def test_update_shrinks_an_existing_baseline_and_prints_the_totals(tree, held, c
     assert facade.main(held) == 0
     counted(tree, {'sources/sdl-rdp/video/a.cpp': 'UINT32 a;\nUINT32 b;\nUINT32 c;\n'})
     assert facade.main(held) == 1
+
+
+WINDOWS_BRANCH = ('#if defined(SDL_PLATFORM_WINDOWS)\n#include <winpr/wtypes.h>\nUINT32 a;\n#if 1\nUINT32 b;\n#endif\n'
+                  '#else\nUINT32 c;\n#endif\n#ifdef _WIN32\nUINT32 d;\n#endif\n#if defined(_WIN32) && X\nUINT32 e;\n'
+                  '#endif\n')
+
+
+def test_a_branch_only_windows_compiles_names_win32_and_its_include_still_counts(tree):
+    found = counted(tree, {'sources/sdl-rdp/video/a.cpp': WINDOWS_BRANCH})
+    assert found == {'includes': {'sources/sdl-rdp/video/a.cpp': 1}, 'names': {'sources/sdl-rdp/video/a.cpp': 2},
+                     'facade headers': {}}
+
+
+EMPTY = '[includes]\n\n[names]\n\n[facade headers]\n'
+
+
+def test_an_empty_baseline_holds_a_clean_tree_and_update_keeps_its_form(tree, held, capsys):
+    counted(tree, {'sources/sdl-rdp/video/a.cpp': 'auto a = 0u;\n'})
+    (tree / 'baseline').write_text(EMPTY)
+    assert facade.main(held) == 0
+    assert facade.main([*held, '--update']) == 0
+    assert (tree / 'baseline').read_text() == EMPTY
+    assert capsys.readouterr().out.splitlines() == [
+        'includes: 0 files, 0 -> 0 files, 0', 'names: 0 files, 0 -> 0 files, 0',
+        'facade headers: 0 files, 0 -> 0 files, 0']
+    counted(tree, {'sources/sdl-rdp/video/a.cpp': 'UINT32 a;\n'})
+    assert facade.main(held) == 1
+
+
+def test_an_elif_after_a_windows_branch_counts_again(tree):
+    text  = '#if defined(_WIN32)\nUINT32 a;\n#elif defined(__linux__)\nUINT32 b;\n#else\nUINT32 c;\n#endif\n'
+    found = counted(tree, {'sources/sdl-rdp/video/a.cpp': text})
+    assert found['names'] == {'sources/sdl-rdp/video/a.cpp': 2}
+
+
+def test_a_branch_every_target_but_windows_compiles_counts(tree):
+    text  = '#ifndef _WIN32\nUINT32 a;\n#endif\n#if !defined(SDL_PLATFORM_WINDOWS)\nUINT32 b;\n#endif\n'
+    found = counted(tree, {'sources/sdl-rdp/video/a.cpp': text})
+    assert found['names'] == {'sources/sdl-rdp/video/a.cpp': 2}

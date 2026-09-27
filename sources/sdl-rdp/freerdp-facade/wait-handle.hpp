@@ -3,7 +3,6 @@
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 
-#include <winpr/wtypes.h>
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -14,6 +13,7 @@
 
 namespace sdl_rdp::freerdp_facade::detail::wait_handle {
 using sdl_rdp::freerdp_facade::detail::rdp_handles::ChannelHandle;
+using sdl_rdp::freerdp_facade::detail::rdp_handles::EventHandle;
 using sdl_rdp::freerdp_facade::detail::rdp_handles::ServerHandle;
 using sdl_rdp::utilities::Ensures;
 using sdl_rdp::utilities::Narrowed;
@@ -21,6 +21,7 @@ using sdl_rdp::utilities::Narrowed;
 inline constexpr std::size_t   MaximumWaitHandles = 64;
 inline constexpr std::uint32_t Forever            = 0xFFFFFFFF;
 // A waitable WinPR lends; the object it came from owns and closes it, a default one is no handle.
+// abi: WinPR's HANDLE is void*, the type every waitable below is spelled in (asserted in rdp-handles.cpp).
 class WaitHandle {
 public:
               WaitHandle() noexcept = default;
@@ -36,11 +37,11 @@ public:
   auto        operator==(WaitHandle const& other) const noexcept              -> bool = default;
 
 private:
-  static auto Adopted(HANDLE native) -> WaitHandle;
+  static auto Adopted(void* native) -> WaitHandle;
   template <auto QUERY, class ContextTy, class... ArgumentsTy>
   static auto Call(ContextTy& context, ArgumentsTy... arguments) -> decltype(auto);
   // isolated: WinPR's waitable is opaque, and nothing outside this class reads it.
-  HANDLE _native{ };
+  void* _native{ };
 };
 template <auto QUERY, class ContextTy, class... ArgumentsTy>
 auto WaitHandle::Call(ContextTy& context, ArgumentsTy... arguments) -> decltype(auto) {
@@ -53,15 +54,15 @@ template <auto QUERY, class ContextTy> auto WaitHandle::Lent(ContextTy& context)
   return Adopted(Call<QUERY>(context));
 }
 template <auto QUERY, class ContextTy> auto WaitHandle::Reported(ContextTy& context) -> std::optional<WaitHandle> {
-  HANDLE reported{ };
+  void* reported{ };
   if (!Call<QUERY>(context, &reported)) return std::nullopt;
   return Adopted(reported);
 }
 template <auto QUERY, class ContextTy>
 auto WaitHandle::Collected(ContextTy& context, std::span<WaitHandle> out) -> std::span<WaitHandle> {
-  std::array<HANDLE, MaximumWaitHandles> natives { };
-  auto const                             budget  = std::min(out.size(), natives.size());
-  std::size_t const count = Call<QUERY>(context, natives.data(), Narrowed<std::uint32_t>(budget));
+  std::array<void*, MaximumWaitHandles> natives { };
+  auto const                            budget  = std::min(out.size(), natives.size());
+  std::size_t const                     count   = Call<QUERY>(context, natives.data(), Narrowed<std::uint32_t>(budget));
   Ensures(count <= budget, "FreeRDP collects within the budget it is given");
   std::ranges::transform(std::span{ natives }.first(count), out.begin(), &WaitHandle::Adopted);
   return out.first(count);

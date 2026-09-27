@@ -16,7 +16,6 @@
 #include <sdl-rdp/utilities/exceptions.hpp>
 #include <sdl-rdp/utilities/posix.hpp>
 
-#include <winpr/synch.h>
 #include <algorithm>
 #include <arpa/inet.h>
 #include <array>
@@ -91,7 +90,7 @@ auto Listener::Accepted(Connection accepted) -> void {
   _session.Add(_make(std::move(accepted)));
 }
 auto Listener::Listen(std::stop_token const& quit) -> void {
-  std::stop_callback const                   wake(quit, [this] { SetEvent(_stop.get()); });
+  std::stop_callback const                   wake(quit, [this] { _stop.Set(); });
   std::array<WaitHandle, WaitHandleCapacity> handles { };
   auto const                                 budget  = std::span{ handles }.first(handles.size() - ListenerOwnHandles);
   while (!quit.stop_requested()) {

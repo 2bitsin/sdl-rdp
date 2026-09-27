@@ -1,10 +1,10 @@
 #pragma once
 #include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/freerdp-facade/connection.hpp>
+#include <sdl-rdp/freerdp-facade/log-appender.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
-#include <winpr/wlog.h>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -14,6 +14,7 @@
 #include <thread>
 namespace sdl_rdp::diagnostics::detail::logging {
 using sdl_rdp::freerdp_facade::Cause;
+using sdl_rdp::freerdp_facade::LogMessage;
 using sdl_rdp::freerdp_facade::SettingsReader;
 using sdl_rdp::utilities::Pinned;
 
@@ -50,10 +51,8 @@ private:
     std::optional<std::reference_wrapper<LogRoute const>> active;
     std::map<std::thread::id, Filter>                     filters;
   };
-  static auto Shared()                                                  -> Routing&;
-  static auto Forward(wLogMessage const& message)                       -> void;
-  static auto Install()                                                 -> void;
-  auto        Deliver(LogLevel level, wLogMessage const& message) const -> void;
+  static auto Shared()                           -> Routing&;
+  static auto Forward(LogMessage const& message) -> void;
   std::reference_wrapper<LogSink> _sink;
 };
 }

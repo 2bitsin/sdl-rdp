@@ -11,7 +11,6 @@ namespace sdl_rdp::video::gfx::detail::protocol {
 using sdl_rdp::freerdp_facade::GfxCapability;
 using sdl_rdp::freerdp_facade::GfxCapsFlags;
 using sdl_rdp::freerdp_facade::GfxVersion;
-using sdl_rdp::freerdp_facade::Has;
 
 inline constexpr std::array versions{ GfxVersion::V8, GfxVersion::V81, GfxVersion::V10, GfxVersion::V101,
                                       GfxVersion::V102, GfxVersion::V103, GfxVersion::V104, GfxVersion::V105,

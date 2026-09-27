@@ -7,7 +7,6 @@
 #include <sdl-rdp/link/event.hpp>
 #include <sdl-rdp/peer/peer.hpp>
 
-#include <winpr/synch.h>
 #include <cstdint>
 #include <utility>
 
@@ -19,9 +18,6 @@ using sdl_rdp::utilities::Ensures;
 using sdl_rdp::utilities::Expects;
 
 namespace {
-auto ReapSignal() -> EventHandle {
-  return ManualResetEvent("Peer reaping event");
-}
 auto AnnounceDeparture(Session& session, EventQueue& events, Peer const& peer) -> void {
   auto const sound = peer.Redirected().Audio();
   events.Push(Disconnected{ });
@@ -29,7 +25,7 @@ auto AnnounceDeparture(Session& session, EventQueue& events, Peer const& peer) -
 }
 }
 Session::Session(FrameStore& frames, EventQueue& events)
-    : _reap{ ReapSignal() }, _frames{ frames }, _events{ events } { }
+    : _reap{ ManualResetEvent("Peer reaping event") }, _frames{ frames }, _events{ events } { }
 auto Session::Lock() -> SessionLock {
   return SessionLock{ _guard };
 }
@@ -40,7 +36,7 @@ auto Session::Add(std::unique_ptr<Peer> peer) -> void {
   _peers.Add(std::move(peer));
 }
 auto Session::Reap() -> void {
-  ResetEvent(_reap.get());
+  _reap.Reset();
   _peers.Reap();
 }
 auto Session::ReapEvent() const -> WaitHandle {
@@ -70,7 +66,7 @@ auto Session::Depart(PeerLink const& self, Activation& activation) -> void {
   _frames.Notify();
   AudioChanged();
   activation.Finish();
-  SetEvent(_reap.get());
+  _reap.Set();
 }
 auto Session::Current(SessionLock const& held) const -> CurrentPeer {
   Expects(held.mutex() == &_guard, "reading the current peer holds the session lock");

@@ -1,11 +1,16 @@
 #pragma once
 #include <sdl-rdp/freerdp-facade/assignment-sink.hpp>
+#include <sdl-rdp/utilities/flags.hpp>
 
 #include <cstdint>
 #include <span>
-#include <utility>
+#include <type_traits>
 
 namespace sdl_rdp::freerdp_facade::detail::graphics_channel_events {
+using sdl_rdp::utilities::Has;
+using sdl_rdp::utilities::operator&;
+using sdl_rdp::utilities::operator|;
+
 // The capability versions of MS-RDPEGFX 2.2.3; a client may advertise any other value.
 enum class GfxVersion : std::uint32_t {
   V8      = 0x00080004,
@@ -29,15 +34,7 @@ enum class GfxCapsFlags : std::uint32_t {
   AvcThinClient    = 0x40,
   ScaledMapDisable = 0x80,
 };
-constexpr auto operator|(GfxCapsFlags left, GfxCapsFlags right) noexcept -> GfxCapsFlags {
-  return static_cast<GfxCapsFlags>(std::to_underlying(left) | std::to_underlying(right));
-}
-constexpr auto operator&(GfxCapsFlags left, GfxCapsFlags right) noexcept -> GfxCapsFlags {
-  return static_cast<GfxCapsFlags>(std::to_underlying(left) & std::to_underlying(right));
-}
-constexpr auto Has(GfxCapsFlags flags, GfxCapsFlags flag) noexcept -> bool {
-  return (flags & flag) != GfxCapsFlags{ };
-}
+auto FlagSet(GfxCapsFlags /*set*/) -> std::true_type;
 struct GfxCapability {
   GfxVersion   version{ };
   GfxCapsFlags flags  { };
@@ -69,6 +66,5 @@ using detail::graphics_channel_events::GfxCapability;
 using detail::graphics_channel_events::GfxCapsFlags;
 using detail::graphics_channel_events::GfxVersion;
 using detail::graphics_channel_events::GraphicsChannelEvents;
-using detail::graphics_channel_events::Has;
 using detail::graphics_channel_events::QoeAck;
 }

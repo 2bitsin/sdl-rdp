@@ -13,8 +13,10 @@ public:
   auto     Transition(Phase next) -> void;
 
 private:
+  // The unit test sets the event behind the phase, the race Transition(Idle) repairs.
+  friend class       WakeEventProbe;
   EventHandle        handle;
-  std::atomic<Phase> phase { Phase::Idle };
+  std::atomic<Phase> phase         { Phase::Idle };
 };
 }
 

@@ -56,7 +56,7 @@ auto Entry(DrivePacket& packet) -> DirectoryEntry {
   DirectoryEntry entry;
   entry.size = packet.Read<std::uint64_t>();
   packet.Skip(allocation_size_field_size);
-  entry.directory = (packet.Read<std::uint32_t>() & std::to_underlying(FileAttribute::Directory)) != 0;
+  entry.directory = Has(packet.Read<FileAttribute>(), FileAttribute::Directory);
   entry.name      = packet.Text(packet.Read<std::uint32_t>());
   return entry;
 }
@@ -65,7 +65,7 @@ auto DirectoryQuery(bool first, std::span<std::byte const> pattern) -> DrivePack
   if (first) Expects(!pattern.empty(), "the first query carries its pattern");
   constexpr std::size_t padding_after_path_length = 23;
   DrivePacket           packet;
-  packet.Write(std::to_underlying(InformationClass::Directory));
+  packet.Write(InformationClass::Directory);
   packet.Write(std::uint8_t{ first });
   packet.Write(Narrowed<std::uint32_t>(first ? pattern.size() : 0));
   packet.Zero(padding_after_path_length);

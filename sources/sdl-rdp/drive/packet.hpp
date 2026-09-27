@@ -9,12 +9,16 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace sdl_rdp::drive::detail::packet {
 using ChannelOrigin = std::weak_ptr<channel::DriveChannel>;
 template <typename ValueTy>
-concept WireField = std::unsigned_integral<ValueTy> && !std::same_as<ValueTy, bool>;
+concept WireWord = std::unsigned_integral<ValueTy> && !std::same_as<ValueTy, bool>;
+template <typename ValueTy>
+concept WireField = WireWord<ValueTy> || (std::is_scoped_enum_v<ValueTy> && WireWord<std::underlying_type_t<ValueTy>>);
 class DrivePacket {
 public:
   [[noreturn]] auto                 Invalid(std::string_view cause) const          -> void;
@@ -41,13 +45,20 @@ private:
 };
 auto DrivePath(std::string_view path) -> std::vector<std::byte>;
 template <WireField ValueTy> auto DrivePacket::Read() -> ValueTy {
-  auto       reader = Remaining();
-  auto const value  = reader.Fetch<ValueTy, std::endian::little>();
-  Consumed(reader, "truncated");
-  return value;
+  if constexpr (std::is_enum_v<ValueTy>) {
+    return ValueTy{ Read<std::underlying_type_t<ValueTy>>() };
+  } else {
+    auto       reader = Remaining();
+    auto const value  = reader.Fetch<ValueTy, std::endian::little>();
+    Consumed(reader, "truncated");
+    return value;
+  }
 }
 template <WireField ValueTy> auto DrivePacket::Write(ValueTy value) -> void {
-  Writer{ bytes }.Put(value);
+  if constexpr (std::is_enum_v<ValueTy>)
+    Write(std::to_underlying(value));
+  else
+    Writer{ bytes }.Put(value);
 }
 }
 

@@ -5,7 +5,6 @@
 
 #include <chrono>
 #include <cstddef>
-#include <utility>
 
 namespace sdl_rdp::drive::detail::information {
 using sdl_rdp::freerdp_facade::FileAttribute;
@@ -14,7 +13,7 @@ using sdl_rdp::utilities::Narrowed;
 auto InformationRequest(InformationClass type, DrivePacket const& body) -> DrivePacket {
   constexpr std::size_t padding_after_length = 24;
   DrivePacket           packet;
-  packet.Write(std::to_underlying(type));
+  packet.Write(type);
   packet.Write(Narrowed<std::uint32_t>(body.Bytes().size()));
   packet.Zero(padding_after_length);
   packet.Append(body.Bytes());
@@ -32,9 +31,8 @@ auto Basic(DrivePacket basic) -> BasicInformation {
   basic.Skip(last_write_time_offset);
   auto const modified = basic.Read<std::uint64_t>();
   basic.Skip(change_time_size);
-  auto const attributes = basic.Read<std::uint32_t>();
-  return { .directory = (attributes & std::to_underlying(FileAttribute::Directory)) != 0,
-           .modified  = UnixSeconds(modified) };
+  auto const attributes = basic.Read<FileAttribute>();
+  return { .directory = Has(attributes, FileAttribute::Directory), .modified = UnixSeconds(modified) };
 }
 // MS-FSCC 2.4.41 FILE_STANDARD_INFORMATION.
 auto EndOfFile(DrivePacket standard) -> std::uint64_t {

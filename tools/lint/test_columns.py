@@ -1289,3 +1289,37 @@ def test_qualified_declarations_align_and_definitions_do_not():
                              'template <> auto P::Service(Context const& context) -> bool;\n'
                              'auto P::Reject() -> void { }\n'
                              'auto P::Layout(Pdu const& pdu) -> int {\n')
+
+
+CALLS_IN_BODIES = '''auto GeneralCapability(DrivePacket& packet) -> void {
+  DrivePacket body;
+  body.Write(std::uint32_t{ 0 });
+  Capability(packet, CapabilityType::General, CapabilityVersion::V2, body);
+}
+auto DriveCapability(DrivePacket& packet) -> void {
+  Capability(packet, CapabilityType::Drive, CapabilityVersion::V2, { });
+}
+'''
+
+
+@pytest.mark.parametrize('source', [CALLS_IN_BODIES, CALLS_IN_BODIES.replace('CapabilityType::', 'Capability::')],
+                         ids=['scope_prefixed_by_the_name', 'scope_named_by_the_name'])
+def test_a_call_in_a_body_is_never_grouped_with_the_function_heads(source):
+    assert align(source) == source
+
+
+def test_a_group_never_spans_a_change_in_brace_depth():
+    physical = columns.physical_lines('int a{ 1 };\nint bb{ 22 };\n')
+    logicals = columns.logical_streams(columns.line_segments(physical, {}), {})[None]
+    items    = columns.stream_items(physical, None, logicals, set())
+    assert columns.stream_groups(logicals, items, [0, 0]) == [[0, 1]]
+    assert columns.stream_groups(logicals, items, [0, 1]) == [[0], [1]]
+
+
+def test_a_call_is_a_function_declaration_only_when_its_name_recurs_as_a_word():
+    def call(signature):
+        fields = columns.FunctionFields._make(dict.fromkeys(columns.FunctionFields._fields, '').values())
+        return fields._replace(signature=signature)
+    assert not columns.is_function_declaration(call('Capability(packet, CapabilityType::General)'), set())
+    assert columns.is_function_declaration(call('Capability(Capability const& other)'), set())
+    assert not columns.is_function_declaration(call('Base::operator[](index)'), set())

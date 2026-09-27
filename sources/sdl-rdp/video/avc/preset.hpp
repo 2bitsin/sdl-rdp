@@ -1,5 +1,5 @@
 #pragma once
-#include <sdl-rdp/freerdp-facade/nvenc.hpp>
+#include <ffnvcodec/nvEncodeAPI.h>
 
 #include <cstdint>
 

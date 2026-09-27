@@ -24,8 +24,10 @@
 namespace sdl_rdp::drive::detail::channel {
 using sdl_rdp::diagnostics::Diagnostics;
 using sdl_rdp::drive::Drive;
+using sdl_rdp::freerdp_facade::CapabilityVersion;
 using sdl_rdp::freerdp_facade::IrpMajor;
 using sdl_rdp::freerdp_facade::IrpMinor;
+using sdl_rdp::freerdp_facade::NtStatus;
 using sdl_rdp::freerdp_facade::Signalled;
 using sdl_rdp::freerdp_facade::VirtualChannel;
 using sdl_rdp::freerdp_facade::WaitHandle;
@@ -37,7 +39,7 @@ struct DriveRequest {
   bool          done    { };
   bool          removed { };
   std::uint32_t drive   { };
-  std::uint32_t status  { };
+  NtStatus      status  { };
   DrivePacket   response;
 };
 struct Slot {
@@ -67,22 +69,22 @@ private:
     std::uint32_t wire { };
     Drive         drive;
   };
-  auto AnnounceDevice(std::uint32_t wire, std::string label)              -> void;
-  auto Device(std::uint32_t id)                                           -> std::uint32_t;
-  auto GeneralClientCapability(DrivePacket& packet, std::size_t start, std::size_t length, std::uint32_t version) const
-      -> void;
-  auto PumpAvailable()                                                    -> bool;
-  auto Write(DrivePacket& packet)                                         -> void;
-  auto Receive(DrivePacket& packet)                                       -> void;
-  auto Capabilities()                                                     -> void;
-  auto ClientCapabilities(DrivePacket& packet)                            -> void;
-  auto Name(std::span<std::byte const> bytes, std::string_view dos) const -> std::string;
-  auto Shutdown()                                                         -> void;
-  auto CloseTransport()                                                   -> void;
-  auto Fail(std::string_view cause)                                       -> void;
-  auto Announce(DrivePacket& packet)                                      -> void;
-  auto Remove(std::uint32_t wire)                                         -> void;
-  auto Complete(DrivePacket& packet)                                      -> void;
+  auto AnnounceDevice(std::uint32_t wire, std::string label)               -> void;
+  auto Device(std::uint32_t id)                                            -> std::uint32_t;
+  auto GeneralClientCapability(DrivePacket& packet, std::size_t start, std::size_t length,
+                               CapabilityVersion version) const -> void;
+  auto PumpAvailable()                                                     -> bool;
+  auto Write(DrivePacket& packet)                                          -> void;
+  auto Receive(DrivePacket& packet)                                        -> void;
+  auto Capabilities()                                                      -> void;
+  auto ClientCapabilities(DrivePacket& packet)                             -> void;
+  auto Label(std::span<std::byte const> bytes, std::string_view dos) const -> std::string;
+  auto Shutdown()                                                          -> void;
+  auto CloseTransport()                                                    -> void;
+  auto Fail(std::string_view cause)                                        -> void;
+  auto Announce(DrivePacket& packet)                                       -> void;
+  auto Remove(std::uint32_t wire)                                          -> void;
+  auto Complete(DrivePacket& packet)                                       -> void;
   std::mutex                                             mutex;
   PeerLink&                                              _link;
   EventQueue&                                            _events;
@@ -93,7 +95,7 @@ private:
   std::atomic<bool>                                      connected    { true };
   std::uint32_t                                          next         { 1    };
   std::uint32_t                                          client_id    { 1    };
-  std::uint32_t                                          drive_version{ };
+  std::optional<CapabilityVersion>                       drive_version;
   std::map<std::uint32_t, DeviceEntry>                   devices;
   std::map<std::uint32_t, std::shared_ptr<DriveRequest>> pending;
   std::condition_variable_any                            changed;

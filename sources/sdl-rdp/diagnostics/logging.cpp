@@ -1,23 +1,18 @@
 #include <sdl-rdp/diagnostics/logging.hpp>
 
-#include <sdl-rdp/diagnostics/exceptions.hpp>
-#include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 
 #include <oxbox/utilities/number-text.hpp>
-#include <winpr/wlog.h>
 #include <algorithm>
 #include <array>
-#include <atomic>
 #include <cstdint>
-#include <cstdlib>
 #include <mutex>
 #include <string_view>
 
 namespace sdl_rdp::diagnostics::detail::logging {
+using sdl_rdp::freerdp_facade::InstallLogAppender;
+using sdl_rdp::freerdp_facade::LogSeverity;
 using sdl_rdp::freerdp_facade::NumberKey;
-using sdl_rdp::utilities::Contained;
-using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Unreachable;
 
 auto ResetAuthenticationLogging() -> void {
@@ -150,62 +145,34 @@ auto AuthenticationEcho(LogRoute::Filter& filter, std::string_view prefix, std::
   filter.authentication_failed = true;
   return true;
 }
-auto ExpectedPeerMessage(LogRoute::Filter& filter, wLogMessage const& message) -> bool {
-  if (!message.PrefixString || !message.TextString) return false;
-  auto prefix = std::string_view(message.PrefixString);
-  auto text   = std::string_view(message.TextString);
+auto ExpectedPeerMessage(LogRoute::Filter& filter, std::string_view prefix, std::string_view text) -> bool {
   return ExpectedLibraryMessage(prefix, text) || SspiRejectionEcho(filter, prefix, text)
          || DetectNegotiationRefusal(filter, prefix, text) || DetectTlsHandshakeFailure(filter, prefix, text)
          || NegotiationEcho(filter, prefix, text) || TransportEcho(prefix, text)
          || AuthenticationEcho(filter, prefix, text);
 }
-auto NtlmMessage(wLogMessage const& message) -> bool {
-  return message.PrefixString && std::string_view(message.PrefixString) == "com.winpr.sspi.NTLM";
+auto LibraryLevel(LogSeverity severity) -> LogLevel {
+  switch (severity) {
+  case LogSeverity::Info: return LogLevel::Info;
+  case LogSeverity::Warn: return LogLevel::Warn;
+  case LogSeverity::Error:
+  case LogSeverity::Fatal: return LogLevel::Error;
+  default:                 Unreachable(severity);
+  }
 }
-auto LibraryLevel(std::uint32_t level) -> LogLevel {
-  if (level == WLOG_ERROR) return LogLevel::Error;
-  return level == WLOG_WARN ? LogLevel::Warn : LogLevel::Info;
 }
-}
-auto LogRoute::Forward(wLogMessage const& message) -> void {
-  auto&                  routing = Shared();
+auto LogRoute::Forward(LogMessage const& message) -> void {
+  auto&                  routing  = Shared();
   std::scoped_lock const lock(routing.guard);
-  auto&                  filter  = routing.filters[std::this_thread::get_id()];
-  if (message.Level < WLOG_INFO || message.Type != WLOG_MESSAGE_TEXT) return;
-  auto const expected = ExpectedPeerMessage(filter, message);
+  auto&                  filter   = routing.filters[std::this_thread::get_id()];
+  auto const             expected = ExpectedPeerMessage(filter, message.prefix, message.text);
   // SSPI debug output can contain credentials and hashes, including binary dump callbacks.
-  if (NtlmMessage(message) && !expected) return;
-  auto const level = expected ? LogLevel::Info : LibraryLevel(message.Level);
-  if (routing.active) routing.active->get().Deliver(level, message);
-}
-auto LogRoute::Deliver(LogLevel level, wLogMessage const& message) const -> void {
-  if (message.TextString) _sink.get().Log(level, message.TextString);
+  if (message.prefix == "com.winpr.sspi.NTLM" && !expected) return;
+  auto const level = expected ? LogLevel::Info : LibraryLevel(message.severity);
+  if (routing.active) routing.active->get().Log(level, message.text);
 }
 auto LogRoute::Log(LogLevel level, std::string_view text) const -> void {
   _sink.get().Log(level, text);
-}
-auto LogRoute::Install() -> void {
-  auto* root = WLog_GetRoot();
-  Expects(root != nullptr, "WLog root exists");
-  // abi: wLogCallbackMessage_t and its siblings, BOOL is int
-  constexpr auto forward   = [](wLogMessage const* message) noexcept -> int {
-    Expects(message != nullptr, "WLog message exists");
-    auto const forwarded = [&] {
-      Forward(*message);
-      return true;
-    };
-    // The log route is the only reporting channel, so its own failure has nowhere further to go.
-    return Contained(false, forwarded, [](std::string_view) noexcept { });
-  };
-  wLogCallbacks  callbacks { forward, forward, forward, forward };
-  if (!WLog_SetLogAppenderType(root, WLOG_APPENDER_CALLBACK)
-      || !WLog_ConfigureAppender(WLog_GetLogAppender(root), "callbacks", &callbacks))
-    throw LogCallbackFailed{ };
-  WLog_Layout_SetPrefixFormat(root, WLog_GetLogLayout(root), "%mn");
-  if (auto* level = std::getenv("WLOG_LEVEL"))
-    WLog_SetStringLogLevel(root, level);
-  else
-    WLog_SetLogLevel(root, WLOG_WARN);
 }
 auto LogRoute::Shared() -> LogRoute::Routing& {
   // WLog has no user pointer; this owner lasts as long as its process-wide callback.
@@ -214,7 +181,7 @@ auto LogRoute::Shared() -> LogRoute::Routing& {
 }
 LogRoute::LogRoute(LogSink& sink) : _sink{ sink } {
   auto& routing = Shared();
-  std::call_once(routing.installed, Install);
+  std::call_once(routing.installed, [] { InstallLogAppender(Forward); });
   std::scoped_lock const lock(routing.guard);
   routing.active = std::cref(*this);
 }

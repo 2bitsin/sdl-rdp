@@ -4,12 +4,12 @@
 #include <sdl-rdp/clipboard/channel.hpp>
 #include <sdl-rdp/drive/channel.hpp>
 #include <sdl-rdp/freerdp-facade/clipboard-channel.hpp>
+#include <sdl-rdp/freerdp-facade/rdpdr.hpp>
 #include <sdl-rdp/freerdp-facade/sound-channel.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/link/session-access.hpp>
 
-#include <freerdp/channels/rdpdr.h>
 #include <algorithm>
 #include <array>
 #include <optional>
@@ -18,6 +18,7 @@
 
 namespace sdl_rdp::peer::detail::redirection {
 using sdl_rdp::freerdp_facade::ClipboardChannelName;
+using sdl_rdp::freerdp_facade::DriveChannelName;
 using sdl_rdp::freerdp_facade::SoundChannelName;
 using sdl_rdp::utilities::Expects;
 
@@ -42,7 +43,7 @@ auto Redirection::OpenClipboard() -> bool {
   return _clipboard->Open();
 }
 auto Redirection::OpenDrive() -> void {
-  if (_drive || !_link.Channels().Joined(RDPDR_SVC_CHANNEL_NAME)) return;
+  if (_drive || !_link.Channels().Joined(DriveChannelName)) return;
   _link.Invalidate();
   _drive = _make_drive();
   _drive->Open();

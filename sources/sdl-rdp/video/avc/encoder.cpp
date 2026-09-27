@@ -24,9 +24,9 @@ auto LoaderFailure(std::string& detail, std::string_view format, std::string_vie
   sdl_rdp::video::avc::detail::encoder::LoaderFailure(*static_cast<std::string*>(ctx), msg, __VA_ARGS__)
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage): Required by the ffnvcodec loader.
 #define FFNV_DEBUG_LOG_FUNC(ctx, msg, ...) static_cast<void>(0)
-#include <sdl-rdp/freerdp-facade/nvenc.hpp>
 #include <cstdint>
 #include <ffnvcodec/dynlink_loader.h>
+#include <ffnvcodec/nvEncodeAPI.h>
 #include <format>
 #include <functional>
 #include <memory>

@@ -1,5 +1,4 @@
 #include <sdl-rdp/drive/channel.hpp>
-#include <freerdp/channels/rdpdr.h>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/drive/capabilities.hpp>
@@ -13,10 +12,8 @@
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
-#include <winpr/nt.h>
 #include <algorithm>
 #include <array>
-#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -31,6 +28,15 @@
 namespace sdl_rdp::drive::detail::channel {
 using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::drive::Drive;
+using sdl_rdp::freerdp_facade::CapabilityType;
+using sdl_rdp::freerdp_facade::Component;
+using sdl_rdp::freerdp_facade::DeviceType;
+using sdl_rdp::freerdp_facade::DriveChannelName;
+using sdl_rdp::freerdp_facade::ExtendedPdu;
+using sdl_rdp::freerdp_facade::Name;
+using sdl_rdp::freerdp_facade::PacketId;
+using sdl_rdp::freerdp_facade::ProtocolMajor;
+using sdl_rdp::freerdp_facade::ProtocolMinorRdp6x;
 using sdl_rdp::link::DriveChanged;
 using sdl_rdp::link::Event;
 using sdl_rdp::utilities::Contained;
@@ -38,27 +44,41 @@ using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::Required;
 namespace {
-auto Header(std::uint32_t type) -> DrivePacket {
+auto Header(PacketId type) -> DrivePacket {
   DrivePacket packet;
-  packet.Write(std::uint16_t{ RDPDR_CTYP_CORE });
-  packet.Write(Narrowed<std::uint16_t>(type));
+  packet.Write(Component::Core);
+  packet.Write(type);
   return packet;
 }
-auto Announcement(std::uint32_t type, std::uint32_t client_id) -> DrivePacket {
+auto Announcement(PacketId type, std::uint32_t client_id) -> DrivePacket {
   auto packet = Header(type);
-  packet.Write(std::uint16_t{ RDPDR_VERSION_MAJOR });
-  packet.Write(std::uint16_t{ RDPDR_VERSION_MINOR_RDP6X });
+  packet.Write(ProtocolMajor);
+  packet.Write(ProtocolMinorRdp6x);
   packet.Write(client_id);
   return packet;
 }
 auto IoRequest(std::span<std::uint32_t const> header, DrivePacket const& body) -> DrivePacket {
-  auto packet = Header(PAKID_CORE_DEVICE_IOREQUEST);
+  auto packet = Header(PacketId::DeviceIoRequest);
   std::ranges::for_each(header, [&packet](std::uint32_t field) { packet.Write(field); });
   packet.Append(body.Bytes());
   return packet;
 }
 auto DriveEvent(bool added, Drive const& drive) -> Event {
   return DriveChanged{ .added = added, .id = drive.id, .name = drive.name };
+}
+// MS-RDPEFS 2.2.2.6: the confirmed id follows the client's version.
+auto ConfirmedClientId(DrivePacket& packet) -> std::uint32_t {
+  packet.Skip(sizeof(std::uint16_t) * 2);
+  return packet.Read<std::uint32_t>();
+}
+// A listing or a read that reaches its end completes with NoMoreFiles or EndOfFile, which the caller expects.
+auto Failed(NtStatus status, bool end) -> bool {
+  switch (status) {
+  case NtStatus::Success: return false;
+  case NtStatus::NoMoreFiles:
+  case NtStatus::EndOfFile: return !end;
+  default:                  return true;
+  }
 }
 // Logs why the channel ends while its peer is connected; the caller shuts the channel down after it.
 auto Ending(DriveChannel const& channel) -> auto {
@@ -81,9 +101,9 @@ auto DriveChannel::Event() const -> std::optional<WaitHandle> {
 auto DriveChannel::Open() -> bool {
   Expects(!channel, "drive channel opens once");
   auto const opened = [this] {
-    channel = _link.Channels().Open(RDPDR_CHANNEL_NAME);
+    channel = _link.Channels().Open(DriveChannelName);
     event   = channel->Handle();
-    auto packet = Announcement(PAKID_CORE_SERVER_ANNOUNCE, client_id);
+    auto packet = Announcement(PacketId::ServerAnnounce, client_id);
     Write(packet);
     return true;
   };
@@ -97,34 +117,34 @@ auto DriveChannel::Write(DrivePacket& packet) -> void {
   _link.Signal();
 }
 auto DriveChannel::Capabilities() -> void {
-  auto                    packet           = Header(PAKID_CORE_SERVER_CAPABILITY);
+  auto                    packet           = Header(PacketId::ServerCapability);
   constexpr std::uint32_t capability_count = 2;
   packet.Write(std::uint16_t{ capability_count });
   packet.Write(std::uint16_t{ 0 });
   GeneralCapability(packet);
   DriveCapability(packet);
   Write(packet);
-  packet = Announcement(PAKID_CORE_CLIENTID_CONFIRM, client_id);
+  packet = Announcement(PacketId::ClientIdConfirm, client_id);
   Write(packet);
-  auto logged_on = Header(PAKID_CORE_USER_LOGGEDON);
+  auto logged_on = Header(PacketId::UserLoggedOn);
   Write(logged_on);
 }
 auto DriveChannel::Announce(DrivePacket& packet) -> void {
   auto count = packet.Read<std::uint32_t>();
   while (count--) {
-    auto                type = packet.Read<std::uint32_t>();
+    auto                type = packet.Read<DeviceType>();
     auto                wire = packet.Read<std::uint32_t>();
     std::array<char, 9> name { };
     for (std::size_t i = 0; i < 8; ++i) name[i] = static_cast<char>(packet.Read<std::uint8_t>());
     auto length = packet.Read<std::uint32_t>();
     auto begin  = packet.Position();
     packet.Skip(length);
-    auto response = Header(PAKID_CORE_DEVICE_REPLY);
+    auto response = Header(PacketId::DeviceReply);
     response.Write(wire);
-    response.Write(std::bit_cast<std::uint32_t>(type == RDPDR_DTYP_FILESYSTEM ? STATUS_SUCCESS : STATUS_NOT_SUPPORTED));
+    response.Write(type == DeviceType::Filesystem ? NtStatus::Success : NtStatus::NotSupported);
     Write(response);
-    if (type != RDPDR_DTYP_FILESYSTEM) continue;
-    auto label = Name(std::span(packet.Bytes()).subspan(begin, length), name.data());
+    if (type != DeviceType::Filesystem) continue;
+    auto label = Label(std::span(packet.Bytes()).subspan(begin, length), name.data());
     AnnounceDevice(wire, std::move(label));
   }
 }
@@ -134,15 +154,17 @@ auto DriveChannel::ClientCapabilities(DrivePacket& packet) -> void {
   packet.Skip(2);
   while (count--) {
     auto start   = packet.Position();
-    auto type    = packet.Read<std::uint16_t>();
+    auto type    = packet.Read<CapabilityType>();
     auto length  = packet.Read<std::uint16_t>();
-    auto version = packet.Read<std::uint32_t>();
-    if (length < capability_header_size) throw ShortCapability{ type, length };
+    auto version = packet.Read<CapabilityVersion>();
+    if (length < capability_header_size) throw ShortCapability{ std::to_underlying(type), length };
     packet.Skip(length - capability_header_size);
     auto end = packet.Position();
-    if (type == CAP_DRIVE_TYPE) drive_version = version;
-    if (type == CAP_GENERAL_TYPE) {
-      GeneralClientCapability(packet, start, length, version);
+    // The default: printer, port and smartcard capabilities are valid (MS-RDPEFS 2.2.1.2) and none is redirected.
+    switch (type) {
+    case CapabilityType::Drive:   drive_version = version; break;
+    case CapabilityType::General: GeneralClientCapability(packet, start, length, version); break;
+    default:                      break;
     }
     packet.Seek(end);
   }
@@ -173,7 +195,7 @@ auto DriveChannel::Remove(std::uint32_t wire) -> void {
 auto DriveChannel::Complete(DrivePacket& packet) -> void {
   packet.Read<std::uint32_t>();
   auto id     = packet.Read<std::uint32_t>();
-  auto status = packet.Read<std::uint32_t>();
+  auto status = packet.Read<NtStatus>();
   auto found  = pending.find(id);
   if (found == pending.end()) {
     Warn(std::format("Unknown drive completion id {}; ignored.", id));
@@ -188,22 +210,18 @@ auto DriveChannel::Complete(DrivePacket& packet) -> void {
   changed.notify_all();
 }
 auto DriveChannel::Receive(DrivePacket& packet) -> void {
-  if (packet.Read<std::uint16_t>() != RDPDR_CTYP_CORE) return;
-  auto type = packet.Read<std::uint16_t>();
-  if (type == PAKID_CORE_CLIENTID_CONFIRM) {
-    packet.Skip(4);
-    client_id = packet.Read<std::uint32_t>();
-  } else if (type == PAKID_CORE_CLIENT_CAPABILITY)
-    ClientCapabilities(packet);
-  else if (type == PAKID_CORE_CLIENT_NAME)
-    Capabilities();
-  else if (type == PAKID_CORE_DEVICELIST_ANNOUNCE)
-    Announce(packet);
-  else if (type == PAKID_CORE_DEVICE_IOCOMPLETION)
-    Complete(packet);
-  else if (type == PAKID_CORE_DEVICELIST_REMOVE) {
-    auto count = packet.Read<std::uint32_t>();
-    while (count--) Remove(packet.Read<std::uint32_t>());
+  if (packet.Read<Component>() != Component::Core) return;
+  // The default: server-direction ids (announce, capabilities, reply, I/O request, logon) never come from a client.
+  switch (packet.Read<PacketId>()) {
+  case PacketId::ClientIdConfirm:    client_id = ConfirmedClientId(packet); break;
+  case PacketId::ClientCapability:   ClientCapabilities(packet); break;
+  case PacketId::ClientName:         Capabilities(); break;
+  case PacketId::DeviceListAnnounce: Announce(packet); break;
+  case PacketId::DeviceIoCompletion: Complete(packet); break;
+  case PacketId::DeviceListRemove:
+    for (auto count = packet.Read<std::uint32_t>(); count > 0; --count) Remove(packet.Read<std::uint32_t>());
+    break;
+  default: break;
   }
 }
 auto DriveChannel::Pump(Signalled const& signaled) -> bool {
@@ -245,20 +263,21 @@ auto DriveChannel::AnnounceDevice(std::uint32_t wire, std::string label) -> void
   _events.Push(DriveEvent(true, stored.drive));
 }
 auto DriveChannel::GeneralClientCapability(DrivePacket& packet, std::size_t start, std::size_t length,
-                                           std::uint32_t version) const -> void {
+                                           CapabilityVersion version) const -> void {
   constexpr std::size_t general_caps_v1_size          = 40;
   constexpr std::size_t protocol_major_version_offset = 16;
   constexpr std::size_t io_code_fields_size           = 8;
-  if (length < general_caps_v1_size) throw ShortCapability{ CAP_GENERAL_TYPE, length };
+  if (length < general_caps_v1_size) throw ShortCapability{ std::to_underlying(CapabilityType::General), length };
   packet.Seek(start + protocol_major_version_offset);
   auto major = packet.Read<std::uint16_t>();
   auto minor = packet.Read<std::uint16_t>();
   packet.Skip(io_code_fields_size);
-  auto flags = packet.Read<std::uint32_t>();
+  auto const extended = packet.Read<ExtendedPdu>();
   _diagnostics.Log(
       LogLevel::Info,
       std::format("Drive client version {}.{}, general capability {}, extended PDU 0x{:08x}, device removal {}.", major,
-                  minor, version, flags, (flags & RDPDR_DEVICE_REMOVE_PDUS) != 0));
+                  minor, std::to_underlying(version), std::to_underlying(extended),
+                  Has(extended, ExtendedPdu::DeviceRemove)));
 }
 auto DriveChannel::PumpAvailable() -> bool {
   auto const ready = Required(event, "a pumped drive channel has its event");
@@ -278,7 +297,7 @@ auto DriveChannel::PumpAvailable() -> bool {
     Receive(packet);
   }
 }
-auto DriveChannel::Name(std::span<std::byte const> bytes, std::string_view dos) const -> std::string {
+auto DriveChannel::Label(std::span<std::byte const> bytes, std::string_view dos) const -> std::string {
   return Contained(
       std::string{ dos }, [&] { return DecodeLabel(bytes, drive_version, dos); },
       [&](std::string_view cause) { Warn(std::format("{} Using DOS name '{}'.", cause, dos)); });
@@ -331,14 +350,8 @@ auto DriveChannel::Wait(std::shared_ptr<DriveRequest> const& request, std::strin
   changed.wait(lock, [&] { return request->done || request->removed || !connected; });
   if (!connected) throw PeerDisconnected{ path };
   if (request->removed) throw DriveRemoved{ path };
-  if (request->status
-      && (!end
-          || (request->status != std::bit_cast<std::uint32_t>(STATUS_NO_MORE_FILES)
-              && request->status != std::bit_cast<std::uint32_t>(STATUS_END_OF_FILE)))) {
-    // WinPR owns the NTSTATUS name table; unknown client values retain their code.
-    auto const* name = NtStatus2Tag(static_cast<NTSTATUS>(request->status));
-    throw StatusFailure{ path, name ? name : "unknown NTSTATUS", request->status };
-  }
+  if (Failed(request->status, end))
+    throw StatusFailure{ path, Name(request->status), std::to_underlying(request->status) };
   request->response.Origin(weak_from_this());
   return std::move(request->response);
 }
