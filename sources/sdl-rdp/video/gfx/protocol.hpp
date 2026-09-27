@@ -1,72 +1,50 @@
 #pragma once
-#include <sdl-rdp/utilities/contract.hpp>
+#include <sdl-rdp/freerdp-facade/graphics-channel-events.hpp>
 
-#include <freerdp/channels/rdpgfx.h>
-#include <winpr/sysinfo.h>
 #include <algorithm>
 #include <array>
-#include <cstdint>
+#include <optional>
 #include <ranges>
 #include <span>
 
 namespace sdl_rdp::video::gfx::detail::protocol {
-using sdl_rdp::utilities::Expects;
+using sdl_rdp::freerdp_facade::GfxCapability;
+using sdl_rdp::freerdp_facade::GfxCapsFlags;
+using sdl_rdp::freerdp_facade::GfxVersion;
+using sdl_rdp::freerdp_facade::Has;
 
-inline constexpr std::array versions{ RDPGFX_CAPVERSION_8, RDPGFX_CAPVERSION_81, RDPGFX_CAPVERSION_10,
-                                      RDPGFX_CAPVERSION_101, RDPGFX_CAPVERSION_102, RDPGFX_CAPVERSION_103,
-                                      RDPGFX_CAPVERSION_104, RDPGFX_CAPVERSION_105, RDPGFX_CAPVERSION_106,
-                                      RDPGFX_CAPVERSION_106_ERR, RDPGFX_CAPVERSION_107 };
-inline constexpr std::uint32_t Version101DataLength = 16;
-inline constexpr std::uint32_t FlagsDataLength      = 4;
-inline auto AllowsAvc(RDPGFX_CAPSET const& cap) -> bool {
-  return cap.version == RDPGFX_CAPVERSION_81
-             ? (cap.flags & RDPGFX_CAPS_FLAG_AVC420_ENABLED) != 0
-             : cap.version >= RDPGFX_CAPVERSION_10 && !(cap.flags & RDPGFX_CAPS_FLAG_AVC_DISABLED);
+inline constexpr std::array versions{ GfxVersion::V8, GfxVersion::V81, GfxVersion::V10, GfxVersion::V101,
+                                      GfxVersion::V102, GfxVersion::V103, GfxVersion::V104, GfxVersion::V105,
+                                      GfxVersion::V106, GfxVersion::V106Err, GfxVersion::V107 };
+inline auto AllowsAvc(GfxCapability cap) -> bool {
+  return cap.version == GfxVersion::V81 ? Has(cap.flags, GfxCapsFlags::Avc420Enabled)
+                                        : cap.version >= GfxVersion::V10 && !Has(cap.flags, GfxCapsFlags::AvcDisabled);
 }
-inline auto CapabilityDataLength(std::uint32_t version) -> std::uint32_t {
-  return version == RDPGFX_CAPVERSION_101 ? Version101DataLength : FlagsDataLength;
+inline auto Acceptable(GfxCapability cap) -> bool {
+  return std::ranges::contains(versions, cap.version);
 }
-inline auto Acceptable(RDPGFX_CAPSET const& cap) -> bool {
-  return std::ranges::contains(versions, cap.version) && cap.length >= CapabilityDataLength(cap.version);
-}
-inline auto Newest(std::span<RDPGFX_CAPSET const> caps) -> RDPGFX_CAPSET {
+inline auto Newest(std::span<GfxCapability const> caps) -> std::optional<GfxCapability> {
   auto       acceptable = caps | std::views::filter(Acceptable);
-  auto const newest     = std::ranges::max_element(acceptable, { }, &RDPGFX_CAPSET::version);
-  return newest == acceptable.end() ? RDPGFX_CAPSET{ } : *newest;
+  auto const newest     = std::ranges::max_element(acceptable, { }, &GfxCapability::version);
+  return newest == acceptable.end() ? std::nullopt : std::optional{ *newest };
 }
-inline auto AnsweredFlags(RDPGFX_CAPSET const& cap, bool avc) -> std::uint32_t {
-  if (cap.version == RDPGFX_CAPVERSION_101) return 0;
-  auto const kept = cap.flags
-                    & (RDPGFX_CAPS_FLAG_THINCLIENT | RDPGFX_CAPS_FLAG_SMALL_CACHE | RDPGFX_CAPS_FLAG_SCALEDMAP_DISABLE);
-  if (cap.version == RDPGFX_CAPVERSION_81) return avc ? kept | RDPGFX_CAPS_FLAG_AVC420_ENABLED : kept;
-  return cap.version >= RDPGFX_CAPVERSION_10 && !avc ? kept | RDPGFX_CAPS_FLAG_AVC_DISABLED : kept;
+// MS-RDPEGFX 2.2.3.4: version 10.1 carries reserved bytes in place of flags.
+inline auto AnsweredFlags(GfxCapability cap, bool avc) -> GfxCapsFlags {
+  if (cap.version == GfxVersion::V101) return GfxCapsFlags{ };
+  auto const kept = cap.flags & (GfxCapsFlags::ThinClient | GfxCapsFlags::SmallCache | GfxCapsFlags::ScaledMapDisable);
+  if (cap.version == GfxVersion::V81) return avc ? kept | GfxCapsFlags::Avc420Enabled : kept;
+  return cap.version >= GfxVersion::V10 && !avc ? kept | GfxCapsFlags::AvcDisabled : kept;
 }
-inline auto SelectCapability(std::span<RDPGFX_CAPSET const> caps, bool avc_available = false) -> RDPGFX_CAPSET {
-  auto selected = Newest(caps);
-  if (!selected.version) return selected;
-  selected.length = CapabilityDataLength(selected.version);
-  selected.flags  = AnsweredFlags(selected, avc_available && AllowsAvc(selected));
-  return selected;
-}
-inline auto FrameTimestamp(SYSTEMTIME const& time) -> std::uint32_t {
-  constexpr std::uint32_t HourShift       = 22;
-  constexpr std::uint32_t MinuteShift     = 16;
-  constexpr std::uint32_t SecondShift     = 10;
-  constexpr std::uint32_t HourBits        = 5;
-  constexpr std::uint32_t MinuteBits      = 6;
-  constexpr std::uint32_t SecondBits      = 6;
-  constexpr std::uint32_t MillisecondBits = 10;
-  Expects(time.wHour < (1u << HourBits), "MS-RDPEGFX 2.2.2.11 timestamp fields fit");
-  Expects(time.wMinute < (1u << MinuteBits), "MS-RDPEGFX 2.2.2.11 timestamp fields fit");
-  Expects(time.wSecond < (1u << SecondBits), "MS-RDPEGFX 2.2.2.11 timestamp fields fit");
-  Expects(time.wMilliseconds < (1u << MillisecondBits), "MS-RDPEGFX 2.2.2.11 timestamp fields fit");
-  return (std::uint32_t{ time.wHour } << HourShift) | (std::uint32_t{ time.wMinute } << MinuteShift)
-         | (std::uint32_t{ time.wSecond } << SecondShift) | time.wMilliseconds;
+inline auto SelectCapability(std::span<GfxCapability const> caps, bool avc_available = false)
+    -> std::optional<GfxCapability> {
+  return Newest(caps).transform([avc_available](GfxCapability selected) {
+    return GfxCapability{ .version = selected.version,
+                          .flags   = AnsweredFlags(selected, avc_available && AllowsAvc(selected)) };
+  });
 }
 }
 
 namespace sdl_rdp::video::gfx {
 using detail::protocol::AllowsAvc;
-using detail::protocol::FrameTimestamp;
 using detail::protocol::SelectCapability;
 }

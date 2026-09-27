@@ -1,5 +1,6 @@
 #include <sdl-rdp/freerdp-facade/updates.hpp>
 
+#include <sdl-rdp/freerdp-facade/lent.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 
@@ -42,12 +43,6 @@ auto Action(FrameAction action) -> std::uint32_t {
 // MS-RDPBCGR 2.2.9.1.1.3.1.2.2: a bitmap's scanlines are padded to four bytes.
 auto PackedStride(std::uint32_t width, std::uint32_t depth) -> std::uint32_t {
   return (width * (depth / 8) + 3) & ~3u;
-}
-// abi: FreeRDP types the payload fields BYTE* but only reads them (3.32 surface.c:317, update.c:339,2433-2484).
-template <class ElementTy> auto Lent(std::span<ElementTy const> bytes) -> std::span<std::uint8_t> {
-  auto const view = oxbox::utilities::SpanCast<std::uint8_t const>(bytes);
-  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast): the abi line above; FreeRDP never writes the payload.
-  return { const_cast<std::uint8_t*>(view.data()), view.size() };
 }
 // Bitmap update corners are inclusive, unlike a surface command's.
 auto BitmapData(Bitmap const& bitmap) -> BITMAP_DATA {

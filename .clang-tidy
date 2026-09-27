@@ -1,4 +1,5 @@
 # Private names deliberately use leading underscores; disable the reserved-identifier check and its CERT aliases.
+# A flag enum holds combinations no enumerator names, the documented false positive of optin EnumCastOutOfRange.
 Checks: >
   bugprone-*, cert-*, clang-analyzer-*, concurrency-*, cppcoreguidelines-*,
   misc-*, modernize-*, performance-*, portability-*, readability-*,
@@ -12,7 +13,8 @@ Checks: >
   -readability-identifier-naming, -bugprone-easily-swappable-parameters,
   -bugprone-reserved-identifier, -cert-dcl37-c, -cert-dcl51-cpp, -readability-uppercase-literal-suffix, -readability-implicit-bool-conversion,
   -modernize-use-nodiscard, -cert-err58-cpp, -cppcoreguidelines-avoid-do-while,
-  -readability-avoid-nested-conditional-operator, -performance-enum-size
+  -readability-avoid-nested-conditional-operator, -performance-enum-size,
+  -clang-analyzer-optin.core.EnumCastOutOfRange
 WarningsAsErrors: '*'
 HeaderFilterRegex: 'sources/(sdl-rdp/[^/]+|sample)/.*\.(hpp|cpp)$'
 ExcludeHeaderFilterRegex: '/(third-party|_build|_bdudata)/'

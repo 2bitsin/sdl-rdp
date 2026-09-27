@@ -12,9 +12,6 @@ sources/sdl-rdp/input/protocol.hpp: 2
 sources/sdl-rdp/peer/redirection.cpp: 1
 sources/sdl-rdp/session/listener.cpp: 1
 sources/sdl-rdp/session/session.cpp: 1
-sources/sdl-rdp/video/gfx/channel.cpp: 1
-sources/sdl-rdp/video/gfx/channel.hpp: 1
-sources/sdl-rdp/video/gfx/protocol.hpp: 2
 
 [names]
 sources/sdl-rdp/SDL3/rdp/settings/options.cpp: 2
@@ -33,9 +30,6 @@ sources/sdl-rdp/input/protocol.hpp: 6
 sources/sdl-rdp/peer/redirection.cpp: 2
 sources/sdl-rdp/session/listener.cpp: 1
 sources/sdl-rdp/session/session.cpp: 2
-sources/sdl-rdp/video/gfx/channel.cpp: 51
-sources/sdl-rdp/video/gfx/channel.hpp: 9
-sources/sdl-rdp/video/gfx/protocol.hpp: 34
 
 [facade headers]
 sources/sdl-rdp/freerdp-facade/nvenc.hpp: 1

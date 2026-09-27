@@ -1,5 +1,6 @@
 #include <sdl-rdp/video/gfx/protocol.hpp>
 
+#include <sdl-rdp/utilities/support.test/out-of-range-enum.hpp>
 #include <sdl-rdp/video/avc/encoding.hpp>
 #include <sdl-rdp/video/avc/regions.hpp>
 
@@ -7,67 +8,51 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <ranges>
+#include <utility>
+#include <vector>
 
 namespace sdl_rdp::video::gfx::detail::protocol {
+using sdl_rdp::utilities::support_test::OutOfRangeEnum;
 using sdl_rdp::video::avc::Bitrate;
 using sdl_rdp::video::avc::Regions;
 using sdl_rdp::video::avc::ReplicateEdges;
 namespace {
-TEST(GraphicsCapability, HighestSupportedVersion) {
-  std::array<RDPGFX_CAPSET, 4> caps{ { { .version = RDPGFX_CAPVERSION_81 , .length = 4 , .flags = 0 },
-                                       { .version = 0xffffffff           , .length = 16, .flags = 0 },
-                                       { .version = RDPGFX_CAPVERSION_107, .length = 4 , .flags = 0 },
-                                       { .version = RDPGFX_CAPVERSION_10 , .length = 4 , .flags = 0 } } };
-  EXPECT_EQ(SelectCapability(caps).version, RDPGFX_CAPVERSION_107);
-  std::ranges::reverse(caps);
-  EXPECT_EQ(SelectCapability(caps).version, RDPGFX_CAPVERSION_107);
-  EXPECT_EQ(SelectCapability({ }).version, 0u);
-  RDPGFX_CAPSET unknown{ 0xffffffff, 16, 0 };
-  EXPECT_EQ(SelectCapability({ &unknown, 1 }).version, 0u);
+constexpr auto NoFlags  = GfxCapsFlags{ };
+const auto     AllFlags = OutOfRangeEnum<GfxCapsFlags>(0xffffffff);
+const auto     Unknown  = OutOfRangeEnum<GfxVersion>(0xffffffff);
+auto Version(std::optional<GfxCapability> cap) -> std::optional<GfxVersion> {
+  return cap.transform(&GfxCapability::version);
 }
-TEST(GraphicsCapability, Version101ReservedLength) {
-  std::array<RDPGFX_CAPSET, 2> caps{ { { .version = RDPGFX_CAPVERSION_10 , .length = 4, .flags = 0          },
-                                       { .version = RDPGFX_CAPVERSION_101, .length = 4, .flags = 0xffffffff } } };
-  EXPECT_EQ(SelectCapability(caps).version, RDPGFX_CAPVERSION_10);
-  caps.back().length = 16;
-  auto selected = SelectCapability(caps);
-  EXPECT_EQ(selected.version, RDPGFX_CAPVERSION_101);
-  EXPECT_EQ(selected.length, 16u);
-  EXPECT_EQ(selected.flags, 0u);
+auto Flags(std::optional<GfxCapability> cap) -> std::optional<GfxCapsFlags> {
+  return cap.transform(&GfxCapability::flags);
+}
+TEST(GraphicsCapability, HighestSupportedVersion) {
+  std::array<GfxCapability, 4> caps{ { { .version = GfxVersion::V81 , .flags = NoFlags },
+                                       { .version = Unknown         , .flags = NoFlags },
+                                       { .version = GfxVersion::V107, .flags = NoFlags },
+                                       { .version = GfxVersion::V10 , .flags = NoFlags } } };
+  EXPECT_EQ(Version(SelectCapability(caps)), GfxVersion::V107);
+  std::ranges::reverse(caps);
+  EXPECT_EQ(Version(SelectCapability(caps)), GfxVersion::V107);
+  EXPECT_FALSE(SelectCapability({ }).has_value());
+  GfxCapability const unknown{ .version = Unknown, .flags = NoFlags };
+  EXPECT_FALSE(SelectCapability(std::array{ unknown }).has_value());
+}
+TEST(GraphicsCapability, Version101AnswersWithoutFlags) {
+  std::array<GfxCapability, 2> caps{ { { .version = GfxVersion::V10 , .flags = NoFlags  },
+                                       { .version = GfxVersion::V101, .flags = AllFlags } } };
+  EXPECT_EQ(Version(SelectCapability(caps)), GfxVersion::V101);
+  EXPECT_EQ(Flags(SelectCapability(caps)), NoFlags);
 }
 TEST(GraphicsCapability, MasksFlagsAndDisablesAvc) {
-  constexpr auto handled = RDPGFX_CAPS_FLAG_THINCLIENT | RDPGFX_CAPS_FLAG_SMALL_CACHE
-                           | RDPGFX_CAPS_FLAG_SCALEDMAP_DISABLE;
-  for (std::uint32_t const version : { RDPGFX_CAPVERSION_8, RDPGFX_CAPVERSION_81, RDPGFX_CAPVERSION_10,
-                                       RDPGFX_CAPVERSION_102, RDPGFX_CAPVERSION_107 }) {
-    RDPGFX_CAPSET cap      { version, 4, 0xffffffff };
-    auto          selected = SelectCapability({ &cap, 1 });
-    EXPECT_EQ(selected.flags, handled | (version >= RDPGFX_CAPVERSION_10 ? RDPGFX_CAPS_FLAG_AVC_DISABLED : 0));
-    EXPECT_EQ(selected.length, 4u);
-    cap.length = 3;
-    EXPECT_EQ(SelectCapability({ &cap, 1 }).version, 0u);
+  constexpr auto handled = GfxCapsFlags::ThinClient | GfxCapsFlags::SmallCache | GfxCapsFlags::ScaledMapDisable;
+  for (auto const version : { GfxVersion::V8, GfxVersion::V81, GfxVersion::V10, GfxVersion::V102, GfxVersion::V107 }) {
+    GfxCapability const cap      { .version = version, .flags = AllFlags };
+    auto const          selected = SelectCapability(std::array{ cap });
+    EXPECT_EQ(Flags(selected), version >= GfxVersion::V10 ? handled | GfxCapsFlags::AvcDisabled : handled);
   }
-}
-TEST(GraphicsTimestamp, PacksIndependentFields) {
-  SYSTEMTIME time{ };
-  EXPECT_EQ(FrameTimestamp(time), 0u);
-  time.wHour = 1;
-  EXPECT_EQ(FrameTimestamp(time), 0x00400000u);
-  time.wHour   = 0;
-  time.wMinute = 1;
-  EXPECT_EQ(FrameTimestamp(time), 0x00010000u);
-  time.wMinute = 0;
-  time.wSecond = 1;
-  EXPECT_EQ(FrameTimestamp(time), 0x00000400u);
-  time.wSecond       = 0;
-  time.wMilliseconds = 1;
-  EXPECT_EQ(FrameTimestamp(time), 1u);
-  time.wHour         = 23;
-  time.wMinute       = 59;
-  time.wSecond       = 59;
-  time.wMilliseconds = 999;
-  EXPECT_EQ(FrameTimestamp(time), 0x05fbefe7u);
 }
 TEST(Avc, Bitrate) {
   EXPECT_EQ(Bitrate({ 1920, 1080 }), 16000000u);
@@ -95,50 +80,47 @@ auto ThenRegionBounds(Regions const& regions) -> void {
   EXPECT_EQ(regions.Bounds().w, 22);
   EXPECT_EQ(regions.Bounds().h, 21);
 }
-auto ThenRegionQuality(auto const& q) -> void {
-  EXPECT_EQ(q.qp_value, 0x9a);
-  EXPECT_EQ(q.quality_value, 100);
-  EXPECT_EQ(q.p, 1);
-  EXPECT_EQ(q.qp, 26);
-}
 TEST(Avc, RegionMetablock) {
   Regions regions;
   regions.Add({ .x = 17, .y = 19, .w = 7, .h = 5 });
   regions.Add({ .x = 2, .y = 3, .w = 4, .h = 6 });
   EXPECT_EQ(regions.Bytes(), 24u);
   ThenRegionBounds(regions);
-  EXPECT_EQ(regions.Areas()[0].right, 24);
-  EXPECT_EQ(regions.Areas()[0].bottom, 24);
-  for (auto q : regions.Quality()) {
-    ThenRegionQuality(q);
-  }
+  auto const metablock = regions.Metablock();
+  ASSERT_EQ(metablock.regions.size(), 2u);
+  EXPECT_EQ(metablock.regions.front().x + metablock.regions.front().w, 24);
+  EXPECT_EQ(metablock.regions.front().y + metablock.regions.front().h, 24);
+  EXPECT_EQ(metablock.quality.qp, 26);
+  EXPECT_EQ(metablock.quality.quality, 100);
+  EXPECT_TRUE(metablock.quality.progressive);
 }
-auto ThenAvailableCapability(RDPGFX_CAPSET const& cap, std::uint32_t version) -> void {
+auto ThenAvailableCapability(GfxCapability const& cap) -> void {
   for (bool const available : { false, true }) {
-    auto          selected = SelectCapability({ &cap, 1 }, available);
-    std::uint32_t expected = 0;
-    if (version == RDPGFX_CAPVERSION_81 && available) expected = RDPGFX_CAPS_FLAG_AVC420_ENABLED;
-    if (version >= RDPGFX_CAPVERSION_10 && version != RDPGFX_CAPVERSION_101 && !available)
-      expected = RDPGFX_CAPS_FLAG_AVC_DISABLED;
-    EXPECT_EQ(selected.flags, expected) << version << ' ' << available;
+    auto const version  = cap.version;
+    auto const selected = SelectCapability(std::array{ cap }, available);
+    auto       expected = NoFlags;
+    if (version == GfxVersion::V81 && available) expected = GfxCapsFlags::Avc420Enabled;
+    if (version >= GfxVersion::V10 && version != GfxVersion::V101 && !available) expected = GfxCapsFlags::AvcDisabled;
+    EXPECT_EQ(Flags(selected), expected) << std::to_underlying(version) << ' ' << available;
   }
 }
 TEST(GraphicsCapability, AllowsAvcWhenOfferedAndAvailable) {
-  for (std::uint32_t const version : { RDPGFX_CAPVERSION_8, RDPGFX_CAPVERSION_81, RDPGFX_CAPVERSION_10,
-                                       RDPGFX_CAPVERSION_101, RDPGFX_CAPVERSION_102, RDPGFX_CAPVERSION_107 }) {
-    RDPGFX_CAPSET cap{ version, version == RDPGFX_CAPVERSION_101 ? 16u : 4u, RDPGFX_CAPS_FLAG_AVC420_ENABLED };
-    ThenAvailableCapability(cap, version);
-    cap.flags = version >= RDPGFX_CAPVERSION_10 ? RDPGFX_CAPS_FLAG_AVC_DISABLED : 0;
-    auto selected = SelectCapability({ &cap, 1 }, true);
-    EXPECT_EQ(selected.flags,
-              version >= RDPGFX_CAPVERSION_10 && version != RDPGFX_CAPVERSION_101 ? RDPGFX_CAPS_FLAG_AVC_DISABLED : 0u);
+  for (auto const version :
+       { GfxVersion::V8, GfxVersion::V81, GfxVersion::V10, GfxVersion::V101, GfxVersion::V102, GfxVersion::V107 }) {
+    GfxCapability cap{ .version = version, .flags = GfxCapsFlags::Avc420Enabled };
+    ThenAvailableCapability(cap);
+    cap.flags = version >= GfxVersion::V10 ? GfxCapsFlags::AvcDisabled : NoFlags;
+    auto const selected = SelectCapability(std::array{ cap }, true);
+    EXPECT_EQ(Flags(selected),
+              version >= GfxVersion::V10 && version != GfxVersion::V101 ? GfxCapsFlags::AvcDisabled : NoFlags);
   }
 }
 TEST(GraphicsCapability, WithoutEncoderTheConfirmedSetNeverAllowsAvc) {
-  for (std::uint32_t const version : { RDPGFX_CAPVERSION_81, RDPGFX_CAPVERSION_10, RDPGFX_CAPVERSION_107 }) {
-    RDPGFX_CAPSET const offered{ version, 4u, RDPGFX_CAPS_FLAG_AVC420_ENABLED };
-    EXPECT_TRUE(AllowsAvc(offered)) << version;
-    EXPECT_FALSE(AllowsAvc(SelectCapability({ &offered, 1 }, false))) << version;
+  for (auto const version : { GfxVersion::V81, GfxVersion::V10, GfxVersion::V107 }) {
+    GfxCapability const offered{ .version = version, .flags = GfxCapsFlags::Avc420Enabled };
+    EXPECT_TRUE(AllowsAvc(offered)) << std::to_underlying(version);
+    EXPECT_EQ(SelectCapability(std::array{ offered }, false).transform(AllowsAvc), std::optional{ false })
+        << std::to_underlying(version);
   }
 }
 }
