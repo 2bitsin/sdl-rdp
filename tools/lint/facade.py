@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""includes: a file outside freerdp-facade includes <freerdp/...> or <winpr/...>, per line, held to facade.baseline.
-names: a file outside the facade names a FreeRDP or WinPR declaration (facade.names) outside comments and literals.
-facade headers: a header of the facade includes <freerdp/...> or <winpr/...>."""
+"""includes: a production file outside freerdp-facade includes <freerdp/...> or <winpr/...>, held to facade.baseline.
+names: a production file outside the facade names a FreeRDP or WinPR declaration (facade.names) in code.
+facade headers: a header of the facade includes <freerdp/...> or <winpr/...>; tests and benches do not ship."""
 import argparse
 import collections
 import pathlib
@@ -15,6 +15,9 @@ import spellings
 ROOT     = pathlib.Path(__file__).resolve().parents[2]
 LINT     = pathlib.Path(__file__).resolve().parent
 FACADE   = pathlib.Path('sources/sdl-rdp/freerdp-facade')
+PACKAGE  = pathlib.Path('sources/sdl-rdp')
+SAMPLE   = pathlib.Path('sources/sample')
+RIGS     = ('.test', '.bench')
 SECTIONS = ('includes', 'names', 'facade headers')
 INCLUDE  = re.compile(r'^[ \t]*#[ \t]*include[ \t]*[<"](?:freerdp|winpr)/', re.M)
 SECTION  = re.compile(r'^\[(.+)\]$')
@@ -33,6 +36,17 @@ def sources(root):
                   if pathlib.Path(name).suffix in shape.EXTENSIONS and (root / name).is_file())
 
 
+def production(path):
+    """A file that ships: the sample, or the package outside the rigs, `integration/` and every test or bench."""
+    if path.is_relative_to(SAMPLE):
+        return True
+    if not path.is_relative_to(PACKAGE):
+        return False
+    folders = path.relative_to(PACKAGE).parent.parts
+    return (not any(folder == 'integration' or folder.endswith(RIGS) for folder in folders)
+            and path.with_suffix('').suffix not in RIGS)
+
+
 def named(text, names):
     return sum(1 for token in spellings.words(text) if token.value in names)
 
@@ -43,11 +57,12 @@ def counts(root, names):
     for relative in sources(root):
         text     = (root / relative).read_text(errors='replace')
         included = len(INCLUDE.findall(text))
-        if not relative.is_relative_to(FACADE):
+        inside   = relative.is_relative_to(FACADE)
+        if inside and relative.suffix in ('.h', '.hpp'):
+            found['facade headers'][str(relative)] = included
+        elif not inside and production(relative):
             found['includes'][str(relative)] = included
             found['names'][str(relative)]    = named(text, names)
-        elif relative.suffix in ('.h', '.hpp'):
-            found['facade headers'][str(relative)] = included
     return {section: +counter for section, counter in found.items()}
 
 

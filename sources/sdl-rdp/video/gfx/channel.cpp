@@ -19,7 +19,6 @@
 #include <sdl-rdp/video/peer-frames.hpp>
 #include <sdl-rdp/video/scaler.hpp>
 
-#include <freerdp/channels/wtsvc.h>
 #include <oxbox/utilities/span.hpp>
 #include <oxbox/utilities/text.hpp>
 #include <winpr/sysinfo.h>
@@ -88,7 +87,8 @@ auto GfxChannel::Callbacks::Install(RdpgfxServerContext& server) -> void {
 GfxChannel::GfxChannel(PeerLink& link, Diagnostics const& diagnostics, Configuration const& configuration,
                        Activation& activation, FrameSources sources, DynamicChannel& owner)
     : _link{ link }, _diagnostics{ diagnostics }, _configuration{ configuration }, _activation{ activation },
-      _sources{ sources }, _context{ rdpgfx_server_context_new(link.Channels().get()) }, _owner{ owner } { }
+      _sources{ sources }, _context{ link.Channels().Create<GraphicsContext, rdpgfx_server_context_new>() },
+      _owner{ owner } { }
 GfxChannel::~GfxChannel() = default;
 auto GfxChannel::Assign(std::uint32_t id) -> bool {
   _assignment.emplace(_link.Dynamic().Assign(id, _owner));

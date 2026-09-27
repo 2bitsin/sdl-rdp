@@ -1,5 +1,6 @@
 """The facade lint: FreeRDP includes and names per file outside the facade, held to a shrink-only baseline."""
 import collections
+import pathlib
 import subprocess
 
 import pytest
@@ -49,6 +50,29 @@ def test_names_are_counted_in_code_and_directives(tree):
 def test_comments_literals_and_disabled_code_are_not_counted(tree):
     text = '// abi: UINT32 is uint32_t\nauto a = "rdpContext";\n/* CHANNEL_RC_OK */\n#if 0\nUINT32 b;\n#endif\n'
     assert counted(tree, {'sources/sdl-rdp/video/a.cpp': text})['names'] == {}
+
+
+@pytest.mark.parametrize('path', [
+    'sources/sdl-rdp/headless-client.test/client/channels.cpp', 'sources/sdl-rdp/integration/audio.test/rate.cpp',
+    'sources/sdl-rdp/integration/support.bench/adapter.hpp', 'sources/sdl-rdp/integration/main.cpp',
+    'sources/sdl-rdp/video/encoder.test.cpp', 'sources/sdl-rdp/video/support.test.hpp',
+    'sources/sdl-rdp/video/encoder.bench.cpp', 'sources/sdl-rdp/utilities/unit.test/support.hpp'])
+def test_tests_benches_rigs_and_integration_do_not_ship(path):
+    assert not facade.production(pathlib.Path(path))
+
+
+@pytest.mark.parametrize('path', [
+    'sources/sdl-rdp/video/encoder.cpp', 'sources/sdl-rdp/SDL3/rdp/driver.hpp', 'sources/sample/main.cpp',
+    'sources/sample/main.test.cpp'])
+def test_the_package_and_the_whole_sample_ship(path):
+    assert facade.production(pathlib.Path(path))
+
+
+def test_a_test_includes_freely(tree):
+    (tree / 'sources/sdl-rdp/integration').mkdir()
+    found = counted(tree, {'sources/sdl-rdp/video/a.test.cpp': '#include <freerdp/peer.h>\nrdpContext* c;\n',
+                           'sources/sdl-rdp/integration/a.cpp': '#include <freerdp/peer.h>\nUINT32 a;\n'})
+    assert found == {'includes': {}, 'names': {}, 'facade headers': {}}
 
 
 def test_growth_and_a_new_file_fail():

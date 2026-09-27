@@ -2,9 +2,9 @@
 #include <sdl-rdp/diagnostics/forward.hpp>
 #include <sdl-rdp/drive/packet.hpp>
 #include <sdl-rdp/drive/records.hpp>
-#include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/freerdp-facade/rdpdr.hpp>
 #include <sdl-rdp/freerdp-facade/signalled.hpp>
+#include <sdl-rdp/freerdp-facade/virtual-channel.hpp>
 #include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
@@ -88,7 +88,7 @@ private:
   EventQueue&                                            _events;
   Diagnostics const&                                     _diagnostics;
   SessionAccess&                                         _session;
-  VirtualChannel                                         channel;
+  std::optional<VirtualChannel>                          channel;
   std::optional<WaitHandle>                              event;
   std::atomic<bool>                                      connected    { true };
   std::uint32_t                                          next         { 1    };

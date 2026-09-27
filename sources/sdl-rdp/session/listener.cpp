@@ -74,7 +74,7 @@ auto NewStopEvent() -> EventHandle {
 }
 Listener::Listener(Configuration const& configuration, Credentials const& credentials, Diagnostics const& diagnostics,
                    Session& session, PeerFactory make)
-    : _diagnostics{ diagnostics }, _session{ session }, _make{ std::move(make) },
+    : LoggedFailures{ diagnostics }, _diagnostics{ diagnostics }, _session{ session }, _make{ std::move(make) },
       _listener{ Bound(configuration.Config()), *this }, _stop{ NewStopEvent() } {
   RehearseTls(credentials);
   _diagnostics.Log(LogLevel::Info, std::format("Listening on port {}", _listener.Port()));
@@ -89,9 +89,6 @@ auto Listener::Port() const noexcept -> std::uint32_t {
 auto Listener::Accepted(Connection accepted) -> void {
   _diagnostics.Log(LogLevel::Info, std::format("Peer accepted: {}.", accepted.Hostname()));
   _session.Add(_make(std::move(accepted)));
-}
-auto Listener::Failed(OperationName operation, std::string_view failure) const -> void {
-  FailureLog{ _diagnostics, operation }(failure);
 }
 auto Listener::Listen(std::stop_token const& quit) -> void {
   std::stop_callback const                   wake(quit, [this] { SetEvent(_stop.get()); });

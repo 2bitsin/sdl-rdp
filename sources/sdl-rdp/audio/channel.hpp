@@ -25,9 +25,7 @@ using sdl_rdp::utilities::Releases;
 
 inline constexpr std::uint32_t CompatibleRate = 44100;
 inline constexpr std::uint32_t NativeRate     = 48000;
-// abi: release steps no single FreeRDP free function performs as a plain call.
-auto FreeSoundContext(RdpsndServerContext* sound) noexcept -> void;
-using SoundContext = std::unique_ptr<RdpsndServerContext, Releases<FreeSoundContext>>;
+using SoundContext = std::unique_ptr<RdpsndServerContext, Releases<rdpsnd_server_context_free>>;
 class AudioChannel : private Pinned {
 public:
   using Clock = std::chrono::steady_clock;

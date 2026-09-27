@@ -13,7 +13,6 @@
 #include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 
-#include <freerdp/channels/wtsvc.h>
 #include <algorithm>
 #include <concepts>
 #include <cstdint>
@@ -25,7 +24,6 @@ using sdl_rdp::diagnostics::FailuresThrough;
 using sdl_rdp::freerdp_facade::BindContext;
 using sdl_rdp::freerdp_facade::BoolKey;
 using sdl_rdp::freerdp_facade::CallbackOwner;
-using sdl_rdp::link::DynamicChannelsReady;
 using sdl_rdp::link::ScreenChanged;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
@@ -73,9 +71,9 @@ DisplayControl::DisplayControl(PeerLink& link, Activation const& activation, Des
                                EventQueue& events, Diagnostics const& diagnostics) noexcept
     : _link{ link }, _activation{ activation }, _desktop{ desktop }, _events{ events }, _diagnostics{ diagnostics } { }
 auto DisplayControl::Open() -> bool {
-  if (_open || !_link.Connection().Settings().Get(BoolKey::SupportDisplayControl) || !DynamicChannelsReady(_link))
+  if (_open || !_link.Connection().Settings().Get(BoolKey::SupportDisplayControl) || !_link.Channels().DynamicReady())
     return true;
-  _context.reset(disp_server_context_new(_link.Channels().get()));
+  _context = _link.Channels().Create<DisplayContext, disp_server_context_new>();
   if (!_context) return false;
   BindContext(*_context, *this, _link.Connection().Context());
   Callbacks::Install(*_context);

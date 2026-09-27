@@ -15,7 +15,6 @@
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/operation-name.hpp>
 
-#include <freerdp/channels/wtsvc.h>
 #include <oxbox/utilities/span.hpp>
 #include <winpr/clipboard.h>
 #include <algorithm>
@@ -67,7 +66,7 @@ auto ClipboardChannel::Event() const -> std::optional<WaitHandle> {
 }
 auto ClipboardChannel::Open() -> bool {
   Expects(!_context, "clipboard opens once");
-  _context.reset(cliprdr_server_context_new(_link.Channels().get()));
+  _context = _link.Channels().Create<ClipboardContext, cliprdr_server_context_new>();
   if (!_context) return false;
   BindContext(*_context, *this, _link.Connection().Context());
   _context->autoInitializationSequence = false;

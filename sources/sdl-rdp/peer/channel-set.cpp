@@ -1,43 +1,23 @@
 #include <sdl-rdp/peer/channel-set.hpp>
 
-#include <sdl-rdp/diagnostics/failure-log.hpp>
-#include <sdl-rdp/freerdp-facade/handled.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
-#include <sdl-rdp/utilities/operation-name.hpp>
 #include <sdl-rdp/video/display-control.hpp>
 
-#include <freerdp/channels/wtsvc.h>
 #include <cstdint>
 
 namespace sdl_rdp::peer::detail::channel_set {
-using sdl_rdp::diagnostics::FailuresThrough;
 using sdl_rdp::utilities::Expects;
-using sdl_rdp::utilities::OperationName;
 
-namespace {
-constexpr OperationName ChannelCreation{ "Dynamic channel creation" };
-}
-class ChannelSet::Callbacks {
-public:
-  static auto Register(ChannelManager const& manager, ChannelSet& channels) -> CreationRegistration {
-    using sdl_rdp::freerdp_facade::Handled;
-    using sdl_rdp::freerdp_facade::Itself;
-    constexpr auto failures = FailuresThrough<&ChannelSet::FailureSource>;
-    // abi: psDVCCreationStatusCallback, BOOL is int
-    WTSVirtualChannelManagerSetDVCCreationCallback(
-        manager.get(), Handled<Itself<ChannelSet>, &ChannelSet::Created, ChannelCreation, failures, false>, &channels);
-    return CreationRegistration{ manager.get() };
-  }
-};
 ChannelSet::ChannelSet(PeerLink& link, Activation const& activation, GraphicsLink& graphics, DisplayControl& display,
-                       Redirection& redirection, Input& input)
-    : _link{ link }, _activation{ activation }, _graphics{ graphics }, _display{ display }, _redirection{ redirection },
-      _input{ input }, _registration{ Callbacks::Register(link.Channels(), *this) } { }
+                       Redirection& redirection, Input& input, Diagnostics const& diagnostics)
+    : LoggedFailures{ diagnostics }, _link{ link }, _activation{ activation }, _graphics{ graphics },
+      _display{ display }, _redirection{ redirection }, _input{ input },
+      _registration{ link.Channels().OnDynamicCreation(*this) } { }
 auto ChannelSet::Pump(Signalled const& ready) -> bool {
   if (!_activation.Active()) return true;
-  return WTSVirtualChannelManagerCheckFileDescriptor(_link.Channels().get()) && _input.Channels(ready)
-         && _redirection.OpenStatic(ready) && _display.Open() && _graphics.Pump(ready);
+  return _link.Channels().Pump() && _input.Channels(ready) && _redirection.OpenStatic(ready) && _display.Open()
+         && _graphics.Pump(ready);
 }
 auto ChannelSet::Handles(std::span<WaitHandle> out) const -> std::span<WaitHandle> {
   Expects(out.size() >= ChannelHandleLimit, "handle span has room for every channel");
@@ -48,8 +28,5 @@ auto ChannelSet::Created(std::uint32_t channel_id, std::int32_t status) -> bool 
   if (status >= 0) return _link.Dynamic().Activate(channel_id);
   _link.Dynamic().Reject(channel_id);
   return true;
-}
-auto ChannelSet::FailureSource() const noexcept -> GraphicsLink const& {
-  return _graphics;
 }
 }

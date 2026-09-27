@@ -1,6 +1,5 @@
 #include <sdl-rdp/drive/channel.hpp>
 #include <freerdp/channels/rdpdr.h>
-#include <oxbox/utilities/span.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/drive/capabilities.hpp>
@@ -15,7 +14,6 @@
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 #include <winpr/nt.h>
-#include <winpr/wtsapi.h>
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -83,10 +81,8 @@ auto DriveChannel::Event() const -> std::optional<WaitHandle> {
 auto DriveChannel::Open() -> bool {
   Expects(!channel, "drive channel opens once");
   auto const opened = [this] {
-    auto name = std::to_array(RDPDR_CHANNEL_NAME);
-    channel.reset(WTSVirtualChannelOpen(_link.Channels().get(), WTS_CURRENT_SESSION, name.data()));
-    if (!channel) throw DriveChannelFailed{ "open" };
-    event = WaitHandle::Of(channel);
+    channel = _link.Channels().Open(RDPDR_CHANNEL_NAME);
+    event   = channel->Handle();
     auto packet = Announcement(PAKID_CORE_SERVER_ANNOUNCE, client_id);
     Write(packet);
     return true;
@@ -96,12 +92,8 @@ auto DriveChannel::Open() -> bool {
   return false;
 }
 auto DriveChannel::Write(DrivePacket& packet) -> void {
-  Expects(channel != nullptr, "drive transport exists");
-  std::uint32_t written = 0;
-  if (!WTSVirtualChannelWrite(channel.get(), oxbox::utilities::SpanCast<char>(std::span(packet.Bytes())).data(),
-                              packet.Bytes().size(), &written)
-      || written != packet.Bytes().size())
-    throw TransportDisconnected{ };
+  Expects(channel.has_value(), "drive transport exists");
+  if (!channel || !channel->Write(packet.Bytes())) throw TransportDisconnected{ };
   _link.Signal();
 }
 auto DriveChannel::Capabilities() -> void {
@@ -270,17 +262,19 @@ auto DriveChannel::GeneralClientCapability(DrivePacket& packet, std::size_t star
 }
 auto DriveChannel::PumpAvailable() -> bool {
   auto const ready = Required(event, "a pumped drive channel has its event");
+  Expects(channel.has_value(), "a pumped drive channel is open");
+  if (!channel) throw DriveChannelFailed{ "read" };
+  auto& open = *channel;
   for (;;) {
     if (!ready.Signalled()) return true;
-    std::uint32_t length = 0;
-    if (!WTSVirtualChannelRead(channel.get(), 0, nullptr, 0, &length)) throw DriveChannelFailed{ "read" };
-    if (!length) return true;
+    auto const pending = open.Pending();
+    if (!pending) throw DriveChannelFailed{ "read" };
+    if (!*pending) return true;
     DrivePacket packet;
-    packet.Bytes().resize(length);
-    if (!WTSVirtualChannelRead(channel.get(), 0, oxbox::utilities::SpanCast<char>(std::span(packet.Bytes())).data(),
-                               length, &length))
-      throw DriveChannelFailed{ "read" };
-    packet.Bytes().resize(length);
+    packet.Bytes().resize(*pending);
+    auto const read = open.Read(packet.Bytes());
+    if (!read) throw DriveChannelFailed{ "read" };
+    packet.Bytes().resize(*read);
     Receive(packet);
   }
 }

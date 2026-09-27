@@ -19,11 +19,11 @@ static_assert(MaximumWaitHandles == MAXIMUM_WAIT_OBJECTS);
 static_assert(Forever == INFINITE);
 }
 WaitHandle::WaitHandle(EventHandle const& event) : WaitHandle{ Adopted(event.get()) } { }
-auto WaitHandle::Of(ChannelManager const& manager) -> WaitHandle {
+auto WaitHandle::Of(ServerHandle const& manager) -> WaitHandle {
   Expects(manager != nullptr, "the channel manager is open");
   return Adopted(WTSVirtualChannelManagerGetEventHandle(manager.get()));
 }
-auto WaitHandle::Of(VirtualChannel const& channel) -> WaitHandle {
+auto WaitHandle::Of(ChannelHandle const& channel) -> WaitHandle {
   Expects(channel != nullptr, "the virtual channel is open");
   void*         data = nullptr;
   std::uint32_t size = 0;

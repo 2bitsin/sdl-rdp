@@ -7,13 +7,12 @@
 #include <ranges>
 
 namespace sdl_rdp::input::detail::input {
-using sdl_rdp::link::DynamicChannelsReady;
 using sdl_rdp::utilities::Expects;
 
 Input::Input(PeerLink& link, InputEvents& events) noexcept
     : _link{ link }, _advanced{ link, events }, _touch{ link, events } { }
 auto Input::Channels(Signalled const& ready) -> bool {
-  if (!DynamicChannelsReady(_link)) return true;
+  if (!_link.Channels().DynamicReady()) return true;
   if (!_opened) return Open();
   return _advanced.Pump(ready) && _touch.Pump(ready);
 }

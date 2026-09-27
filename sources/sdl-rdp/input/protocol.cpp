@@ -6,7 +6,6 @@
 #include <sdl-rdp/input/events.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
 
-#include <freerdp/channels/wtsvc.h>
 #include <cstdint>
 #include <utility>
 
@@ -29,7 +28,7 @@ auto Started(AdvancedProtocol::Context const& context) -> bool {
 }
 }
 template <> auto AdvancedProtocol::Open(PeerLink& link, Channel& channel) -> Context {
-  auto context = Context{ ainput_server_context_new(link.Channels().get()) };
+  auto context = link.Channels().Create<Context, ainput_server_context_new>();
   if (!context) return context;
   context->rdpcontext = &link.Connection().Context();
   Install(*context, channel);
@@ -73,7 +72,7 @@ constexpr OperationName TouchAssignment{ "Touch channel assignment" };
 using sdl_rdp::freerdp_facade::Handled;
 }
 template <> auto TouchProtocol::Open(PeerLink& link, Channel& channel) -> Context {
-  auto context = Context{ rdpei_server_context_new(link.Channels().get()) };
+  auto context = link.Channels().Create<Context, rdpei_server_context_new>();
   if (!context) return context;
   Install(*context, channel);
   return rdpei_server_init(context.get()) == CHANNEL_RC_OK ? std::move(context) : Context{ };

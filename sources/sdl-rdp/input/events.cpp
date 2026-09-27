@@ -77,13 +77,10 @@ auto Pressed(PointerEvent const& event) -> auto {
 }
 InputEvents::InputEvents(PeerLink& link, Activation const& activation, DesktopLayout const& desktop, EventQueue& events,
                          FrameStore& store, Diagnostics const& diagnostics, SessionAccess& session) noexcept
-    : _link{ link }, _activation{ activation }, _desktop{ desktop }, _events{ events }, _store{ store },
-      _diagnostics{ diagnostics }, _session{ session } { }
+    : LoggedFailures{ diagnostics }, _link{ link }, _activation{ activation }, _desktop{ desktop }, _events{ events },
+      _store{ store }, _diagnostics{ diagnostics }, _session{ session } { }
 auto InputEvents::Failures(OperationName operation) const noexcept -> FailureLog {
   return { _diagnostics, operation };
-}
-auto InputEvents::Failed(OperationName operation, std::string_view failure) const -> void {
-  Failures(operation)(failure);
 }
 auto InputEvents::Key(KeyEvent event) -> void {
   WhenActive([&] {

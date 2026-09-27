@@ -164,7 +164,7 @@ auto Peer::CollectHandles(std::span<WaitHandle> handles) -> std::uint32_t {
   auto const rest = _channels.Handles(handles.subspan(transport.size()));
   Expects(rest.size() >= LoopHandleCount, "the loop's own handles fit");
   rest[0] = _link.Wake();
-  rest[1] = WaitHandle::Of(_link.Channels());
+  rest[1] = _link.Channels().Handle();
   return Narrowed<std::uint32_t>(handles.size() - rest.size() + LoopHandleCount);
 }
 auto Peer::WaitTimeout() -> std::uint32_t {

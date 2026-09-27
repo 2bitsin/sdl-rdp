@@ -1,6 +1,7 @@
 #pragma once
 #include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/diagnostics/forward.hpp>
+#include <sdl-rdp/diagnostics/logged-failures.hpp>
 #include <sdl-rdp/freerdp-facade/input-sink.hpp>
 #include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/picture/forward.hpp>
@@ -12,11 +13,11 @@
 #include <array>
 #include <concepts>
 #include <cstdint>
-#include <string_view>
 
 namespace sdl_rdp::input::detail::events {
 using sdl_rdp::diagnostics::Diagnostics;
 using sdl_rdp::diagnostics::FailureLog;
+using sdl_rdp::diagnostics::LoggedFailures;
 using sdl_rdp::freerdp_facade::InputSink;
 using sdl_rdp::freerdp_facade::KeyEvent;
 using sdl_rdp::freerdp_facade::PointerEvent;
@@ -38,14 +39,13 @@ struct MouseState {
   int       last_x        { };
   int       last_y        { };
 };
-class InputEvents final : public InputSink {
+class InputEvents final : public LoggedFailures<InputSink> {
 public:
        InputEvents(PeerLink& link, Activation const& activation, DesktopLayout const& desktop, EventQueue& events,
                    FrameStore& store, Diagnostics const& diagnostics, SessionAccess& session) noexcept;
   auto Key(KeyEvent event)                                                  -> void override;
   auto Unicode(UnicodeEvent event)                                          -> void override;
   auto Pointer(PointerEvent const& event)                                   -> bool override;
-  auto Failed(OperationName operation, std::string_view failure) const      -> void override;
   auto AdvancedPointer(std::uint64_t flags, std::int32_t x, std::int32_t y) -> std::uint32_t;
   auto Touch(RDPINPUT_TOUCH_EVENT const& event)                             -> std::uint32_t;
   auto Point(MouseMode mode) noexcept                                       -> void;

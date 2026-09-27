@@ -1,6 +1,6 @@
 #pragma once
+#include <sdl-rdp/freerdp-facade/channel-manager.hpp>
 #include <sdl-rdp/freerdp-facade/connection.hpp>
-#include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/freerdp-facade/wake-event.hpp>
 #include <sdl-rdp/link/dynamic-channels.hpp>
@@ -9,7 +9,6 @@
 #include <concepts>
 #include <cstdint>
 #include <string>
-#include <string_view>
 
 namespace sdl_rdp::link::detail::peer_link {
 using sdl_rdp::freerdp_facade::ChannelManager;
@@ -23,6 +22,7 @@ public:
   auto     Connection() const noexcept          -> freerdp_facade::Connection const&;
   auto     Connection() noexcept                -> freerdp_facade::Connection&;
   auto     Channels() const noexcept            -> ChannelManager const&;
+  auto     Channels() noexcept                  -> ChannelManager&;
   auto     Dynamic() noexcept                   -> DynamicChannels&;
   auto     Signal()                             -> void;
   auto     Settle()                             -> void;
@@ -40,14 +40,10 @@ private:
   DynamicChannels            _dynamic;
   std::uint32_t              _handle_count{ };
 };
-auto ClientHostname(PeerLink const& link)                -> std::string;
-auto DynamicChannelsReady(PeerLink const& link)          -> bool;
-auto Joined(PeerLink const& link, std::string_view name) -> bool;
+auto ClientHostname(PeerLink const& link) -> std::string;
 }
 
 namespace sdl_rdp::link {
 using detail::peer_link::ClientHostname;
-using detail::peer_link::DynamicChannelsReady;
-using detail::peer_link::Joined;
 using detail::peer_link::PeerLink;
 }

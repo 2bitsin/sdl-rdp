@@ -14,7 +14,6 @@
 #include <sdl-rdp/utilities/exceptions.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 
-#include <freerdp/channels/wtsvc.h>
 #include <oxbox/utilities/text.hpp>
 #include <algorithm>
 #include <array>
@@ -29,20 +28,12 @@ namespace sdl_rdp::audio::detail::channel {
 using sdl_rdp::diagnostics::FailuresThrough;
 using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::freerdp_facade::CallbackOwner;
-using sdl_rdp::freerdp_facade::VirtualChannel;
 using sdl_rdp::link::AudioChanged;
 using sdl_rdp::utilities::AllocationFailed;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::OperationName;
 
-auto FreeSoundContext(RdpsndServerContext* sound) noexcept -> void {
-  auto* const channels = sound->vcm;
-  rdpsnd_server_context_free(sound);
-  // FreeRDP leaks the channel of a context without its own thread (2bitsin/FreeRDP#1); reopening returns it to close.
-  auto                 name    = std::to_array(RDPSND_CHANNEL_NAME);
-  VirtualChannel const channel { WTSVirtualChannelOpen(channels, WTS_CURRENT_SESSION, name.data()) };
-}
 namespace {
 auto Owner(RdpsndServerContext const& context) -> AudioChannel& {
   return CallbackOwner<AudioChannel, &RdpsndServerContext::data>(context);
@@ -101,7 +92,7 @@ auto AudioChannel::Callbacks::Install(RdpsndServerContext& sound) -> void {
 AudioChannel::AudioChannel(PeerLink& link, Diagnostics const& diagnostics, EventQueue& events, SessionAccess& session,
                            TraceQueue& traces)
     : _link{ link }, _diagnostics{ diagnostics }, _events{ events }, _session{ session }, _traces{ traces },
-      _sound{ rdpsnd_server_context_new(link.Channels().get()) } {
+      _sound{ link.Channels().Create<SoundContext, rdpsnd_server_context_new>() } {
   if (!_sound) throw AllocationFailed{ "Audio channel" };
   _sound->server_formats = audio_formats_new(2);
   if (!_sound->server_formats) throw AllocationFailed{ "Audio format" };
@@ -115,7 +106,11 @@ AudioChannel::AudioChannel(PeerLink& link, Diagnostics const& diagnostics, Event
   _sound->latency = 10;
   Callbacks::Install(*_sound);
 }
-AudioChannel::~AudioChannel() = default;
+AudioChannel::~AudioChannel() {
+  _sound.reset();
+  // The freed context leaves its channel open (2bitsin/FreeRDP#1).
+  _link.Channels().Reclaim(RDPSND_CHANNEL_NAME);
+}
 auto AudioChannel::Initialize() -> bool {
   Expects(_sound != nullptr, "sound context exists");
   return _sound->Initialize(_sound.get(), false) == CHANNEL_RC_OK;
@@ -178,7 +173,7 @@ auto AudioChannel::SendBlock() -> bool {
   if (_sound->SendSamples2(_sound.get(), _sound->selected_client_format, _buffer.data(),
                            _buffer.size() * sizeof(std::int16_t), timestamp, 0)
           != CHANNEL_RC_OK
-      || !WTSVirtualChannelManagerCheckFileDescriptorEx(_link.Channels().get(), false)) {
+      || !_link.Channels().Flush()) {
     TransportEnded();
     return false;
   }

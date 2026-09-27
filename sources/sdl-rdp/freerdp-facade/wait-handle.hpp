@@ -13,6 +13,8 @@
 #include <type_traits>
 
 namespace sdl_rdp::freerdp_facade::detail::wait_handle {
+using sdl_rdp::freerdp_facade::detail::rdp_handles::ChannelHandle;
+using sdl_rdp::freerdp_facade::detail::rdp_handles::ServerHandle;
 using sdl_rdp::utilities::Ensures;
 using sdl_rdp::utilities::Narrowed;
 
@@ -23,8 +25,8 @@ class WaitHandle {
 public:
               WaitHandle() noexcept = default;
   explicit    WaitHandle(EventHandle const& event);
-  static auto Of(ChannelManager const& manager) -> WaitHandle;
-  static auto Of(VirtualChannel const& channel) -> WaitHandle;
+  static auto Of(ServerHandle const& manager)  -> WaitHandle;
+  static auto Of(ChannelHandle const& channel) -> WaitHandle;
   template <auto QUERY, class ContextTy> static auto Lent(ContextTy& context) -> WaitHandle;
   template <auto QUERY, class ContextTy> static auto Reported(ContextTy& context) -> std::optional<WaitHandle>;
   template <auto QUERY, class ContextTy>

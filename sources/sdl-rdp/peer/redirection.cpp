@@ -15,7 +15,6 @@
 #include <utility>
 
 namespace sdl_rdp::peer::detail::redirection {
-using sdl_rdp::link::Joined;
 using sdl_rdp::utilities::Expects;
 
 namespace {
@@ -33,13 +32,13 @@ Redirection::~Redirection() {
   Disconnect();
 }
 auto Redirection::OpenClipboard() -> bool {
-  if (_clipboard || !Joined(_link, CLIPRDR_SVC_CHANNEL_NAME)) return true;
+  if (_clipboard || !_link.Channels().Joined(CLIPRDR_SVC_CHANNEL_NAME)) return true;
   _link.Invalidate();
   _clipboard = _make_clipboard();
   return _clipboard->Open();
 }
 auto Redirection::OpenDrive() -> void {
-  if (_drive || !Joined(_link, RDPDR_SVC_CHANNEL_NAME)) return;
+  if (_drive || !_link.Channels().Joined(RDPDR_SVC_CHANNEL_NAME)) return;
   _link.Invalidate();
   _drive = _make_drive();
   _drive->Open();
@@ -51,7 +50,7 @@ auto Redirection::OpenStatic(Signalled const& ready) -> bool {
   return !_clipboard || _clipboard->Pump(ready);
 }
 auto Redirection::OpenSound() -> bool {
-  if (std::exchange(_sound_attempted, true) || !Joined(_link, RDPSND_CHANNEL_NAME)) return true;
+  if (std::exchange(_sound_attempted, true) || !_link.Channels().Joined(RDPSND_CHANNEL_NAME)) return true;
   _link.Invalidate();
   _sound = _make_sound();
   return _sound->Initialize();

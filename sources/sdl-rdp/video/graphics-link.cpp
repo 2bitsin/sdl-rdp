@@ -17,7 +17,6 @@
 namespace sdl_rdp::video::detail::graphics_link {
 using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::freerdp_facade::BoolKey;
-using sdl_rdp::link::DynamicChannelsReady;
 using sdl_rdp::utilities::Expects;
 
 GraphicsLink::GraphicsLink(PeerLink& link, Diagnostics const& diagnostics, Activation& activation,
@@ -27,7 +26,7 @@ GraphicsLink::GraphicsLink(PeerLink& link, Diagnostics const& diagnostics, Activ
 auto GraphicsLink::Pump(Signalled const& ready) -> bool {
   if (_channel) return !ready.Contains(_channel->Event()) || _channel->Pump();
   if (_attempted || !_link.Connection().Settings().Get(BoolKey::SupportGraphicsPipeline)
-      || !DynamicChannelsReady(_link))
+      || !_link.Channels().DynamicReady())
     return true;
   _attempted = true;
   _link.Invalidate();

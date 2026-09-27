@@ -3,7 +3,6 @@
 #include <sdl-rdp/auth/authenticator.hpp>
 #include <sdl-rdp/configuration/configuration.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
-#include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/link/activation.hpp>
@@ -20,7 +19,6 @@
 #include <cstdint>
 
 namespace sdl_rdp::peer::detail::peer {
-using sdl_rdp::diagnostics::FailureLog;
 using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::picture::ApplyDesktopSize;
 
@@ -69,8 +67,5 @@ auto Peer::FrameAcknowledged(std::uint32_t frame) -> void {
 }
 auto Peer::SuppressOutput(bool allow) -> void {
   _output.Suppress(allow);
-}
-auto Peer::Failed(OperationName operation, std::string_view failure) const -> void {
-  FailureLog{ _diagnostics, operation }(failure);
 }
 }
