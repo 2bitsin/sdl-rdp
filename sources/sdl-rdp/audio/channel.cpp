@@ -60,7 +60,7 @@ constexpr std::chrono::milliseconds Latency{ 10                                 
 AudioChannel::AudioChannel(PeerLink& link, Diagnostics const& diagnostics, EventQueue& events, SessionAccess& session,
                            TraceQueue& traces)
     : LoggedFailures{ diagnostics }, _link{ link }, _events{ events }, _session{ session }, _traces{ traces },
-      _sound{ link.Channels(), link.Connection(), *this, Offered, Latency } { }
+      _sound{ link.Channels(), *this, Offered, Latency } { }
 auto AudioChannel::Initialize() -> bool {
   return _sound.Initialize();
 }

@@ -1,25 +1,29 @@
 #include <sdl-rdp/freerdp-facade/channel-manager.hpp>
 
-#include <sdl-rdp/freerdp-facade/connection.hpp>
+#include <sdl-rdp/freerdp-facade/connection.test.hpp>
 #include <sdl-rdp/freerdp-facade/exceptions.hpp>
-#include <sdl-rdp/utilities/posix.hpp>
+#include <sdl-rdp/freerdp-facade/support.test/unjoined-connection.hpp>
+#include <sdl-rdp/utilities/releases.hpp>
 
 #include <freerdp/channels/rdpdr.h>
 #include <freerdp/server/rdpsnd.h>
 #include <gtest/gtest.h>
+#include <cstdint>
+#include <memory>
 #include <tuple>
-#include <utility>
 
 namespace sdl_rdp::freerdp_facade::detail::channel_manager {
 namespace {
-using sdl_rdp::utilities::ConnectedSockets;
-using sdl_rdp::utilities::SocketPair;
+using sdl_rdp::freerdp_facade::support_test::UnjoinedConnection;
+using sdl_rdp::utilities::Releases;
+using SoundContext = std::unique_ptr<RdpsndServerContext, Releases<rdpsnd_server_context_free>>;
 
+constexpr std::uint32_t Installed = 7;
+constexpr auto          Install   = [](RdpsndServerContext& context) { context.latency = Installed; };
 class Unjoined : public testing::Test {
 protected:
-  SocketPair     sockets   { ConnectedSockets()        };
-  Connection     connection{ std::move(sockets.server) };
-  ChannelManager manager   { connection.Context()      };
+  UnjoinedConnection unjoined;
+  ChannelManager&    manager { unjoined.channels };
 };
 }
 TEST_F(Unjoined, NoStaticChannelIsJoinedBeforeTheClientJoinsIt) {
@@ -38,5 +42,13 @@ TEST_F(Unjoined, TheDynamicChannelIsNotReadyBeforeActivation) {
 }
 TEST_F(Unjoined, ANameLongerThanTheProtocolFieldIsAContractFailure) {
   EXPECT_DEATH(std::ignore = manager.Joined("longerthan8"), "fits its protocol field");
+}
+TEST_F(Unjoined, ABoundContextCarriesItsOwnerAndItsSessionWithItsSlotsInstalled) {
+  int owner{ };
+  auto const bound{ manager.Bound<SoundContext, rdpsnd_server_context_new, &RdpsndServerContext::data, Install, int>(
+      owner) };
+  EXPECT_EQ(bound->data, &owner);
+  EXPECT_EQ(bound->rdpcontext, &ConnectionProbe::Context(unjoined.connection));
+  EXPECT_EQ(bound->latency, Installed);
 }
 }

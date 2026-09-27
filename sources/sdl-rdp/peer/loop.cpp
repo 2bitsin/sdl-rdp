@@ -118,7 +118,7 @@ auto Peer::Serve(std::stop_token const& quit) -> void {
     return true;
   };
   auto const               failed  = [this](std::string_view failure) {
-    _diagnostics.Log(LogLevel::Error, std::format("{} FreeRDP: {}.", failure, _link.Connection().Error().name));
+    Logger().Log(LogLevel::Error, std::format("{} FreeRDP: {}.", failure, _link.Connection().Error().name));
   };
   std::ignore = Contained(false, served, failed);
   Depart();

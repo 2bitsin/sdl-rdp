@@ -36,7 +36,6 @@ public:
 private:
   auto Accepted(Connection accepted)       -> void override;
   auto Listen(std::stop_token const& quit) -> void;
-  Diagnostics const&       _diagnostics;
   Session&                 _session;
   PeerFactory              _make;
   freerdp_facade::Listener _listener;

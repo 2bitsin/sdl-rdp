@@ -15,7 +15,7 @@ using sdl_rdp::utilities::SocketPair;
 struct UnjoinedConnection {
   SocketPair     sockets   { ConnectedSockets()        };
   Connection     connection{ std::move(sockets.server) };
-  ChannelManager channels  { connection.Context()      };
+  ChannelManager channels  { connection                };
 };
 }
 

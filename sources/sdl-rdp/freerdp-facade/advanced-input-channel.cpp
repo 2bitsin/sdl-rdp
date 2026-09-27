@@ -21,14 +21,16 @@ namespace {
 constexpr OperationName AdvancedMouse      { "Advanced input mouse event"        };
 constexpr OperationName AdvancedAssignment { "Advanced input channel assignment" };
 constexpr float         WheelUnit          = 120.0F * 65536;
+constexpr auto          UserData           = &ainput_server_context::data;
+using Owner = AdvancedInputChannel;
 
 constexpr ButtonFlags<std::uint64_t, 5> AdvancedButtons{ { { AINPUT_FLAGS_BUTTON1 , PointerButton::Left    },
                                                            { AINPUT_FLAGS_BUTTON3 , PointerButton::Middle  },
                                                            { AINPUT_FLAGS_BUTTON2 , PointerButton::Right   },
                                                            { AINPUT_XFLAGS_BUTTON1, PointerButton::Back    },
                                                            { AINPUT_XFLAGS_BUTTON2, PointerButton::Forward } } };
-auto Owner(ainput_server_context const& context) -> AdvancedInputChannel& {
-  return CallbackOwner<AdvancedInputChannel, &ainput_server_context::data>(context);
+auto Channel(ainput_server_context const& context) -> Owner& {
+  return CallbackOwner<Owner, UserData>(context);
 }
 auto Wheel(std::uint64_t flags, std::int32_t x, std::int32_t y) -> std::optional<WheelTurn> {
   if (!(flags & AINPUT_FLAGS_WHEEL)) return std::nullopt;
@@ -44,47 +46,29 @@ auto Pointer(std::uint64_t flags, std::int32_t x, std::int32_t y) -> AdvancedPoi
            .y                = y,
            .wheel            = Wheel(flags, x, y) };
 }
+auto Mouse(AdvancedInputChannelEvents& events, std::uint64_t /*timestamp*/, std::uint64_t flags, std::int32_t x,
+           std::int32_t y) -> std::uint32_t {
+  return events.AdvancedPointer(Pointer(flags, x, y)) ? CHANNEL_RC_OK : ERROR_INTERNAL_ERROR;
+}
 }
 class AdvancedInputChannel::Slots {
 public:
   static auto Install(ainput_server_context& context) -> void;
-
-private:
-  static auto Mouse(AdvancedInputChannel& channel, std::uint64_t timestamp, std::uint64_t flags, std::int32_t x,
-                    std::int32_t y) -> std::uint32_t;
-  static auto Assigned(AdvancedInputChannel& channel, std::uint32_t id) -> bool;
 };
 auto AdvancedInputChannel::Slots::Install(ainput_server_context& context) -> void {
-  constexpr auto events   = [](AdvancedInputChannel const& channel, OperationName operation) noexcept {
-    return SinkFailures(channel._events, operation);
-  };
-  constexpr auto assignee = [](AdvancedInputChannel const& channel, OperationName operation) noexcept {
-    return SinkFailures(channel._assignee, operation);
-  };
+  constexpr auto events   = [](ainput_server_context const& bound) -> auto& { return Channel(bound)._events; };
+  constexpr auto assignee = [](ainput_server_context const& bound) -> auto& { return Channel(bound)._assignee; };
   // abi: psAInputServerMouseEvent, UINT is uint32_t; psAInputChannelIdAssigned, BOOL is int
-  context.MouseEvent        = Handled<Owner, &Slots::Mouse, AdvancedMouse, events, ERROR_INTERNAL_ERROR>;
-  context.ChannelIdAssigned = Handled<Owner, &Slots::Assigned, AdvancedAssignment, assignee, false>;
-}
-auto AdvancedInputChannel::Slots::Mouse(AdvancedInputChannel& channel, std::uint64_t /*timestamp*/, std::uint64_t flags,
-                                        std::int32_t x, std::int32_t y) -> std::uint32_t {
-  return channel._events.AdvancedPointer(Pointer(flags, x, y)) ? CHANNEL_RC_OK : ERROR_INTERNAL_ERROR;
-}
-auto AdvancedInputChannel::Slots::Assigned(AdvancedInputChannel& channel, std::uint32_t id) -> bool {
-  channel._assignee.ChannelAssigned(id);
-  return true;
+  context.MouseEvent        = Handled<events, Mouse, AdvancedMouse, SinkFailures, ERROR_INTERNAL_ERROR>;
+  context.ChannelIdAssigned = Handled<assignee, Assigned, AdvancedAssignment, SinkFailures, false>;
 }
 
-AdvancedInputChannel::AdvancedInputChannel(ChannelManager& channels, Connection& connection,
-                                           AdvancedInputChannelEvents& events, AssignmentSink& assignee) noexcept
-    : _channels{ channels }, _connection{ connection }, _events{ events }, _assignee{ assignee } { }
+AdvancedInputChannel::AdvancedInputChannel(ChannelManager& channels, AdvancedInputChannelEvents& events,
+                                           AssignmentSink& assignee) noexcept
+    : _channels{ channels }, _events{ events }, _assignee{ assignee } { }
 auto AdvancedInputChannel::Open() -> bool {
   Expects(_context == nullptr, "an advanced input channel opens once");
-  _context = _channels.Create<AdvancedInputContext, ainput_server_context_new>();
-  if (!_context) return false;
-  auto& context = *_context;
-  context.data       = this;
-  context.rdpcontext = &_connection.Context();
-  Slots::Install(context);
+  _context = _channels.Bound<AdvancedInputContext, ainput_server_context_new, UserData, &Slots::Install, Owner>(*this);
   return Started();
 }
 auto AdvancedInputChannel::Pump() -> bool {

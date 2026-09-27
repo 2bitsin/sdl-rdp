@@ -1,5 +1,5 @@
 #pragma once
-#include <sdl-rdp/freerdp-facade/failure-sink.hpp>
+#include <sdl-rdp/freerdp-facade/assignment-sink.hpp>
 
 #include <cstdint>
 #include <span>
@@ -55,12 +55,11 @@ struct QoeAck {
   std::uint16_t time_diff_edr{ };
 };
 // What a graphics channel's client PDUs report. CapsAdvertise's false: the advertisement was not confirmed.
-class GraphicsChannelEvents : public FailureSink {
+class GraphicsChannelEvents : public AssignmentSink {
 public:
   virtual auto CapsAdvertise(std::span<GfxCapability const> advertised) -> bool = 0;
   virtual auto FrameAcknowledge(FrameAck ack)                           -> void = 0;
   virtual auto QoeFrameAcknowledge(QoeAck ack)                          -> void = 0;
-  virtual auto ChannelAssigned(std::uint32_t id)                        -> void = 0;
 };
 }
 

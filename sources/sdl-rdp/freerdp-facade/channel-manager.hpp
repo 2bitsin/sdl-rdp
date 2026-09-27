@@ -1,8 +1,11 @@
 #pragma once
 #include <sdl-rdp/freerdp-facade/dynamic-creation-sink.hpp>
+#include <sdl-rdp/freerdp-facade/forward.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/freerdp-facade/virtual-channel.hpp>
 #include <sdl-rdp/freerdp-facade/wait-handle.hpp>
+#include <sdl-rdp/utilities/exceptions.hpp>
+#include <sdl-rdp/utilities/pinned.hpp>
 #include <sdl-rdp/utilities/releases.hpp>
 
 #include <concepts>
@@ -13,11 +16,14 @@
 struct rdp_context;
 
 namespace sdl_rdp::freerdp_facade::detail::channel_manager {
+using sdl_rdp::freerdp_facade::Connection;
 using sdl_rdp::freerdp_facade::DynamicCreationSink;
 using sdl_rdp::freerdp_facade::VirtualChannel;
 using sdl_rdp::freerdp_facade::WaitHandle;
 using sdl_rdp::freerdp_facade::detail::rdp_handles::ChannelHandle;
 using sdl_rdp::freerdp_facade::detail::rdp_handles::ServerHandle;
+using sdl_rdp::utilities::AllocationFailed;
+using sdl_rdp::utilities::Pinned;
 using sdl_rdp::utilities::Releases;
 
 // abi: the release step of a dynamic channel creation slot, handed the manager it is set on.
@@ -30,9 +36,9 @@ concept OwningHandle = std::same_as<HandleTy,
                        && !std::same_as<typename HandleTy::deleter_type,
                                         std::default_delete<typename HandleTy::element_type>>;
 // A connection's virtual channel manager: its static channels by name, its dynamic channel state, its send queue.
-class ChannelManager {
+class ChannelManager : private Pinned {
 public:
-  explicit           ChannelManager(rdp_context& context);
+  explicit           ChannelManager(Connection& connection);
   auto               Open(std::string_view name)                  -> VirtualChannel;
   auto               Reclaim(std::string_view name) noexcept      -> void;
   auto               Joined(std::string_view name) const          -> bool;
@@ -41,15 +47,22 @@ public:
   auto               Flush()                                      -> bool;
   auto               Handle() const                               -> WaitHandle;
   [[nodiscard]] auto OnDynamicCreation(DynamicCreationSink& sink) -> CreationRegistration;
-  template <OwningHandle ContextTy, auto CREATE>
+  // A channel's server context: OWNER points at the owner, the connection is its session, INSTALL sets its slots.
+  template <OwningHandle ContextTy, auto CREATE, auto OWNER, auto INSTALL, class OwnerTy>
     requires std::same_as<std::invoke_result_t<decltype(CREATE), ServerHandle::pointer>, typename ContextTy::pointer>
-  auto Create() -> ContextTy {
-    return ContextTy{ CREATE(Server().get()) };
+  auto Bound(std::type_identity_t<OwnerTy>& owner) -> ContextTy {
+    ContextTy context{ CREATE(_handle.get()) };
+    if (!context) throw AllocationFailed{ "Channel context" };
+    auto& bound = *context;
+    bound.*OWNER = &owner;
+    if constexpr (requires { bound.rdpcontext = &_session; }) bound.rdpcontext = &_session;
+    INSTALL(bound);
+    return context;
   }
 
 private:
   auto Opened(std::string_view name) noexcept -> ChannelHandle;
-  auto Server() const                         -> ServerHandle const&;
+  rdp_context& _session;
   ServerHandle _handle;
 };
 }

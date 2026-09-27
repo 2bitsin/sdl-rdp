@@ -63,8 +63,7 @@ auto FitsProtocol(Rect desktop) -> bool {
 GfxChannel::GfxChannel(PeerLink& link, Diagnostics const& diagnostics, Configuration const& configuration,
                        Activation& activation, FrameSources sources, DynamicChannel& owner)
     : LoggedFailures{ diagnostics }, _link{ link }, _configuration{ configuration }, _activation{ activation },
-      _sources{ sources }, _channel{ link.Channels(), link.Connection(), *this }, _avc{ diagnostics }, _owner{ owner } {
-}
+      _sources{ sources }, _channel{ link.Channels(), *this }, _avc{ diagnostics }, _owner{ owner } { }
 GfxChannel::~GfxChannel() = default;
 auto GfxChannel::ChannelAssigned(std::uint32_t id) -> void {
   _assignment.emplace(_link.Dynamic().Assign(id, _owner));

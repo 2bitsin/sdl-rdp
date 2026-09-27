@@ -31,7 +31,7 @@ constexpr std::array Offered{ ClipboardFormat::UnicodeText, ClipboardFormat::Tex
 ClipboardChannel::ClipboardChannel(PeerLink& link, Activation const& activation, ClipboardStore& store,
                                    EventQueue& events, Diagnostics const& diagnostics) noexcept
     : LoggedFailures{ diagnostics }, _activation{ activation }, _store{ store }, _events{ events },
-      _channel{ link.Channels(), link.Connection(), *this } { }
+      _channel{ link.Channels(), *this } { }
 auto ClipboardChannel::Event() const -> std::optional<WaitHandle> {
   if (!_opened) return std::nullopt;
   return _channel.Handle();

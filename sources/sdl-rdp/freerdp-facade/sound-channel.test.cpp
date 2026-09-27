@@ -60,10 +60,10 @@ protected:
     std::ranges::copy(formats, context.client_formats);
   }
   Recorded             recorded;
-  Recorder             events  { recorded                            };
+  Recorder             events  { recorded                                                            };
   UnjoinedConnection   unjoined;
-  SoundChannel channel{ unjoined.channels, unjoined.connection, events, Offered, std::chrono::milliseconds{ 10 } };
-  RdpsndServerContext& context { SoundChannelProbe::Context(channel) };
+  SoundChannel         channel { unjoined.channels, events, Offered, std::chrono::milliseconds{ 10 } };
+  RdpsndServerContext& context { SoundChannelProbe::Context(channel)                                 };
 };
 auto Pcm(std::uint32_t rate, std::uint16_t channels, std::uint16_t bits = 16) -> AUDIO_FORMAT {
   AUDIO_FORMAT format{ };

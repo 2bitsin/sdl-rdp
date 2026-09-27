@@ -28,9 +28,12 @@ using sdl_rdp::freerdp_facade::support_test::RecordedFailures;
 using sdl_rdp::freerdp_facade::support_test::UnjoinedConnection;
 
 // ainput waits up to 1 s on the manager's manual-reset event before its first open (FreeRDP 3.32 ainput_main.c:113).
-auto Signalled(ChannelManager& channels) -> bool {
-  auto const throwaway = channels.Create<AdvancedInputContext, ainput_server_context_new>();
-  return throwaway && SetEvent(WTSVirtualChannelManagerGetEventHandle(throwaway->vcm));
+auto PresetManagerEvent(ChannelManager& channels) -> bool {
+  constexpr auto unslotted = [](ainput_server_context& /*context*/) { };
+  int            owner     { };
+  auto const throwaway = channels.Bound<AdvancedInputContext, ainput_server_context_new, &ainput_server_context::data,
+                                        unslotted, int>(owner);
+  return SetEvent(WTSVirtualChannelManagerGetEventHandle(throwaway->vcm));
 }
 
 struct Recorded {
@@ -52,11 +55,11 @@ private:
 class UnopenedAdvancedInput : public testing::Test {
 protected:
   Recorded             recorded;
-  Recorder             events   { recorded                                                 };
-  RecordedAssignee     assignee { recorded.failures                                        };
+  Recorder             events   { recorded                              };
+  RecordedAssignee     assignee { recorded.failures                     };
   UnjoinedConnection   unjoined;
-  bool                 signalled{ Signalled(unjoined.channels)                             };
-  AdvancedInputChannel channel  { unjoined.channels, unjoined.connection, events, assignee };
+  bool                 signalled{ PresetManagerEvent(unjoined.channels) };
+  AdvancedInputChannel channel  { unjoined.channels, events, assignee   };
 };
 // The open fails while the client has no dynamic channels, but the context and its slots are in place.
 class AdvancedInputSlots : public UnopenedAdvancedInput {

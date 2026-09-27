@@ -1,5 +1,6 @@
 #include <sdl-rdp/freerdp-facade/graphics-channel.hpp>
 
+#include <sdl-rdp/freerdp-facade/support.test/recorded-failures.hpp>
 #include <sdl-rdp/freerdp-facade/support.test/unjoined-connection.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
@@ -13,7 +14,7 @@
 #include <optional>
 #include <span>
 #include <stdexcept>
-#include <string_view>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -26,23 +27,25 @@ public:
 };
 namespace {
 using namespace std::chrono_literals;
+using sdl_rdp::freerdp_facade::support_test::RecordedFailures;
 using sdl_rdp::freerdp_facade::support_test::UnjoinedConnection;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
-using sdl_rdp::utilities::OperationName;
 using testing::ElementsAre;
 using testing::FieldsAre;
 
 struct Recorded {
-  bool                       accepts   { true };
-  bool                       throws    { };
-  std::vector<GfxCapability> advertised;
-  std::vector<FrameAck>      acks;
-  std::vector<QoeAck>        qoes;
+  bool                         accepts   { true };
+  bool                         throws    { };
+  std::vector<GfxCapability>   advertised;
+  std::vector<FrameAck>        acks;
+  std::vector<QoeAck>          qoes;
+  std::optional<std::uint32_t> assigned;
+  std::vector<std::string>     failures;
 };
-class Recorder final : public GraphicsChannelEvents {
+class Recorder final : public RecordedFailures<GraphicsChannelEvents> {
 public:
-  explicit Recorder(Recorded& recorded) : _recorded{ recorded } { }
+  explicit Recorder(Recorded& recorded) : RecordedFailures{ recorded.failures }, _recorded{ recorded } { }
   auto     CapsAdvertise(std::span<GfxCapability const> advertised) -> bool override {
     if (_recorded.throws) throw std::runtime_error{ "handler failed" };
     _recorded.advertised.assign(advertised.begin(), advertised.end());
@@ -55,8 +58,9 @@ public:
   auto QoeFrameAcknowledge(QoeAck ack) -> void override {
     _recorded.qoes.push_back(ack);
   }
-  auto ChannelAssigned(std::uint32_t /*id*/)                                   -> void override { }
-  auto Failed(OperationName /*operation*/, std::string_view /*failure*/) const -> void override { }
+  auto ChannelAssigned(std::uint32_t id) -> void override {
+    _recorded.assigned = id;
+  }
 
 private:
   Recorded& _recorded;
@@ -98,9 +102,9 @@ auto Commanded(RdpgfxServerContext* /*context*/, RDPGFX_SURFACE_COMMAND const* c
 class UnopenedGraphics : public testing::Test {
 protected:
   Recorded           recorded;
-  Recorder           events  { recorded                                       };
+  Recorder           events  { recorded                  };
   UnjoinedConnection unjoined;
-  GraphicsChannel    channel { unjoined.channels, unjoined.connection, events };
+  GraphicsChannel    channel { unjoined.channels, events };
 };
 // The open fails while no client has joined rdpgfx, but the context and its slots are in place.
 class GraphicsSlots : public UnopenedGraphics {
@@ -157,6 +161,11 @@ TEST_F(GraphicsSlots, AThrowingHandlerIsAnInternalError) {
   RDPGFX_FRAME_ACKNOWLEDGE_PDU const ack { .queueDepth = 0, .frameId = 1                   };
   EXPECT_EQ(context.CapsAdvertise(&context, &pdu), ERROR_INTERNAL_ERROR);
   EXPECT_EQ(context.FrameAcknowledge(&context, &ack), ERROR_INTERNAL_ERROR);
+  EXPECT_THAT(recorded.failures, ElementsAre("Graphics capabilities", "Graphics frame acknowledgement"));
+}
+TEST_F(GraphicsSlots, TheAssignedIdReachesTheHandler) {
+  EXPECT_TRUE(context.ChannelIdAssigned(&context, 7));
+  EXPECT_EQ(recorded.assigned, 7U);
 }
 TEST_F(GraphicsSlots, AConfirmCarriesTheDataLengthOfItsVersion) {
   context.CapsConfirm = Confirmed;

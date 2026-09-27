@@ -1,5 +1,6 @@
 #include <sdl-rdp/freerdp-facade/display-channel.hpp>
 
+#include <sdl-rdp/freerdp-facade/support.test/recorded-failures.hpp>
 #include <sdl-rdp/freerdp-facade/support.test/unjoined-connection.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 
@@ -9,7 +10,8 @@
 #include <cstdint>
 #include <optional>
 #include <span>
-#include <string_view>
+#include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -21,26 +23,28 @@ public:
   }
 };
 namespace {
+using sdl_rdp::freerdp_facade::support_test::RecordedFailures;
 using sdl_rdp::freerdp_facade::support_test::UnjoinedConnection;
 using sdl_rdp::utilities::Narrowed;
-using sdl_rdp::utilities::OperationName;
 
 struct Recorded {
   bool                         accepts { true };
+  bool                         throws  { };
   std::optional<std::uint32_t> assigned;
   std::vector<DisplayMonitor>  monitors;
+  std::vector<std::string>     failures;
 };
-class Recorder final : public DisplayChannelEvents {
+class Recorder final : public RecordedFailures<DisplayChannelEvents> {
 public:
-  explicit Recorder(Recorded& recorded) : _recorded{ recorded } { }
+  explicit Recorder(Recorded& recorded) : RecordedFailures{ recorded.failures }, _recorded{ recorded } { }
   auto     ChannelAssigned(std::uint32_t id) -> void override {
     _recorded.assigned = id;
   }
   auto MonitorLayout(std::span<DisplayMonitor const> monitors) -> bool override {
+    if (_recorded.throws) throw std::runtime_error{ "refused" };
     _recorded.monitors.assign(monitors.begin(), monitors.end());
     return _recorded.accepts;
   }
-  auto Failed(OperationName /*operation*/, std::string_view /*failure*/) const -> void override { }
 
 private:
   Recorded& _recorded;
@@ -48,9 +52,9 @@ private:
 class UnopenedDisplay : public testing::Test {
 protected:
   Recorded           recorded;
-  Recorder           events  { recorded                                       };
+  Recorder           events  { recorded                  };
   UnjoinedConnection unjoined;
-  DisplayChannel     channel { unjoined.channels, unjoined.connection, events };
+  DisplayChannel     channel { unjoined.channels, events };
 };
 // The open fails while the client has no dynamic channels, but the context and its slots are in place.
 class DisplaySlots : public UnopenedDisplay {
@@ -109,5 +113,12 @@ TEST_F(DisplaySlots, ARefusedLayoutIsInvalidData) {
 TEST_F(DisplaySlots, TheAssignedIdReachesTheHandler) {
   EXPECT_TRUE(context.ChannelIdAssigned(&context, 7));
   EXPECT_EQ(recorded.assigned, 7U);
+}
+TEST_F(DisplaySlots, AThrowingLayoutHandlerIsAnInternalErrorReportedOnce) {
+  recorded.throws = true;
+  std::array monitors{ Monitor(0, 0, 800, 600) };
+  auto const pdu     { Layout(monitors)        };
+  EXPECT_EQ(context.DispMonitorLayout(&context, &pdu), ERROR_INTERNAL_ERROR);
+  EXPECT_EQ(recorded.failures, std::vector<std::string>{ "Display layout" });
 }
 }

@@ -9,8 +9,7 @@ using sdl_rdp::freerdp_facade::ManualResetEvent;
 using sdl_rdp::freerdp_facade::StringKey;
 
 PeerLink::PeerLink(freerdp_facade::Connection accepted)
-    : _connection{ std::move(accepted) }, _wake{ ManualResetEvent("Peer wake event") },
-      _channels{ _connection.Context() } { }
+    : _connection{ std::move(accepted) }, _wake{ ManualResetEvent("Peer wake event") }, _channels{ _connection } { }
 auto PeerLink::Connection() const noexcept -> freerdp_facade::Connection const& {
   return _connection;
 }

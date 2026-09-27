@@ -47,7 +47,7 @@ auto Peer::Capabilities() -> bool {
     _desktop.RecordScreen(settings);
   }
   if (!std::ranges::contains(ColourDepths, settings.Get(NumberKey::ColorDepth))) {
-    _diagnostics.Log(LogLevel::Warn, "Connection refused: colour depth must be 16, 24 or 32 bpp.");
+    Logger().Log(LogLevel::Warn, "Connection refused: colour depth must be 16, 24 or 32 bpp.");
     return false;
   }
   ApplyDesktopSize(settings, _desktop.Offer(_store.Picture(frame)));

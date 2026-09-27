@@ -28,10 +28,12 @@ auto ReleaseSound(s_rdpsnd_server_context* context) noexcept -> void {
   rdpsnd_server_context_free(context);
 }
 namespace {
-constexpr OperationName AudioActivation  { "Audio activation"         };
-constexpr OperationName AudioConfirmation{ "Audio block confirmation" };
-auto Owner(RdpsndServerContext const& context) -> SoundChannel& {
-  return CallbackOwner<SoundChannel, &RdpsndServerContext::data>(context);
+constexpr OperationName AudioActivation   { "Audio activation"         };
+constexpr OperationName AudioConfirmation { "Audio block confirmation" };
+constexpr auto          UserData          = &RdpsndServerContext::data;
+using Owner = SoundChannelEvents;
+auto Events(RdpsndServerContext const& context) -> SoundChannelEvents& {
+  return CallbackOwner<Owner, UserData>(context);
 }
 auto ServerFormat(AudioFormat const& format) -> AUDIO_FORMAT {
   auto const frame = Narrowed<std::uint16_t>(format.channels * format.bits / 8);
@@ -61,43 +63,33 @@ auto Offer(RdpsndServerContext& sound, std::span<AudioFormat const> offered) -> 
   // The first offered format is the source the server's samples are in.
   sound.src_format = &sound.server_formats[0];
 }
+auto ClientOf(RdpsndServerContext const& sound) -> SoundClient {
+  SoundClient client{ .version = sound.clientVersion };
+  std::ranges::transform(ClientFormats(sound), std::back_inserter(client.formats), ClientFormat);
+  return client;
 }
-class SoundChannel::Slots {
-public:
-  static auto Install(RdpsndServerContext& context) -> void;
-
-private:
-  static auto Activated(SoundChannel& channel)                                              -> void;
-  static auto Confirmed(SoundChannel& channel, std::uint8_t block, std::uint16_t timestamp) -> std::uint32_t;
-};
-auto SoundChannel::Slots::Install(RdpsndServerContext& context) -> void {
-  constexpr auto failures = [](SoundChannel const& channel, OperationName operation) noexcept {
-    return SinkFailures(channel._events, operation);
-  };
-  // abi: psRdpsndServerActivated; psRdpsndServerConfirmBlock, BYTE is uint8_t, UINT16 is uint16_t, UINT is uint32_t
-  context.Activated    = Handled<Owner, &Slots::Activated, AudioActivation, failures>;
-  context.ConfirmBlock = Handled<Owner, &Slots::Confirmed, AudioConfirmation, failures, ERROR_INTERNAL_ERROR>;
+auto Activate(RdpsndServerContext& sound) -> void {
+  Events(sound).Activated(ClientOf(sound));
 }
-auto SoundChannel::Slots::Activated(SoundChannel& channel) -> void {
-  channel._events.Activated(channel.Client());
-}
-auto SoundChannel::Slots::Confirmed(SoundChannel& channel, std::uint8_t block, std::uint16_t timestamp)
-    -> std::uint32_t {
-  channel._events.Confirmed({ .block = block, .timestamp = timestamp });
+auto Confirmed(SoundChannelEvents& events, std::uint8_t block, std::uint16_t timestamp) -> std::uint32_t {
+  events.Confirmed({ .block = block, .timestamp = timestamp });
   return CHANNEL_RC_OK;
 }
+auto InstallSlots(RdpsndServerContext& context) -> void {
+  // abi: psRdpsndServerActivated; psRdpsndServerConfirmBlock, BYTE is uint8_t, UINT16 is uint16_t, UINT is uint32_t
+  context.Activated    = Handled<Itself<RdpsndServerContext>, Activate, AudioActivation, SinkFailuresThrough<Events>>;
+  context.ConfirmBlock = Handled<Events, Confirmed, AudioConfirmation, SinkFailures, ERROR_INTERNAL_ERROR>;
+}
+}
 
-SoundChannel::SoundChannel(ChannelManager& channels, Connection& connection, SoundChannelEvents& events,
-                           std::span<AudioFormat const> offered, std::chrono::milliseconds latency)
-    : _channels{ channels }, _events{ events }, _context{ channels.Create<SoundContext, rdpsnd_server_context_new>() } {
-  if (!_context) throw AllocationFailed{ "Audio channel" };
+SoundChannel::SoundChannel(ChannelManager& channels, SoundChannelEvents& events, std::span<AudioFormat const> offered,
+                           std::chrono::milliseconds latency)
+    : _channels{ channels },
+      _context{ channels.Bound<SoundContext, rdpsnd_server_context_new, UserData, InstallSlots, Owner>(events) } {
   auto& context = *_context;
-  context.data = this;
-  context.rdpcontext = &connection.Context();
   context.use_dynamic_virtual_channel = false;
   context.latency = Narrowed<std::uint32_t>(latency.count());
   Offer(context, offered);
-  Slots::Install(context);
 }
 SoundChannel::~SoundChannel() {
   _context.reset();
@@ -123,10 +115,7 @@ auto SoundChannel::Handle() const -> WaitHandle {
   return WaitHandle::Lent<rdpsnd_server_get_event_handle>(Context());
 }
 auto SoundChannel::Client() const -> SoundClient {
-  auto const& sound  = Context();
-  SoundClient client { .version = sound.clientVersion };
-  std::ranges::transform(ClientFormats(sound), std::back_inserter(client.formats), ClientFormat);
-  return client;
+  return ClientOf(Context());
 }
 auto SoundChannel::Volume() const -> std::optional<std::uint32_t> {
   auto const& sound = Context();

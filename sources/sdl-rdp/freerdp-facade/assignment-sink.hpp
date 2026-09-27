@@ -9,8 +9,14 @@ class AssignmentSink : public FailureSink {
 public:
   virtual auto ChannelAssigned(std::uint32_t id) -> void = 0;
 };
+// Every channel's id slot: the sink told its id, the slot answered.
+inline constexpr auto Assigned = [](AssignmentSink& sink, std::uint32_t id) {
+  sink.ChannelAssigned(id);
+  return true;
+};
 }
 
 namespace sdl_rdp::freerdp_facade {
+using detail::assignment_sink::Assigned;
 using detail::assignment_sink::AssignmentSink;
 }

@@ -44,7 +44,7 @@ auto Covering(std::span<DisplayMonitor const> monitors) -> Rect {
 DisplayControl::DisplayControl(PeerLink& link, Activation const& activation, DesktopLayout const& desktop,
                                EventQueue& events, Diagnostics const& diagnostics) noexcept
     : LoggedFailures{ diagnostics }, _link{ link }, _activation{ activation }, _desktop{ desktop }, _events{ events },
-      _channel{ link.Channels(), link.Connection(), *this } { }
+      _channel{ link.Channels(), *this } { }
 auto DisplayControl::Open() -> bool {
   if (_open || !_link.Connection().Settings().Get(BoolKey::SupportDisplayControl) || !_link.Channels().DynamicReady())
     return true;

@@ -2,7 +2,6 @@
 #include <sdl-rdp/freerdp-facade/advanced-input-channel-events.hpp>
 #include <sdl-rdp/freerdp-facade/assignment-sink.hpp>
 #include <sdl-rdp/freerdp-facade/channel-manager.hpp>
-#include <sdl-rdp/freerdp-facade/connection.hpp>
 #include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 #include <sdl-rdp/utilities/releases.hpp>
@@ -22,8 +21,7 @@ using AdvancedInputContext = std::unique_ptr<s_ainput_server_context, Releases<R
 // The ainput dynamic channel: opened once the dynamic channels are ready, mouse events to its events.
 class AdvancedInputChannel : private Pinned {
 public:
-       AdvancedInputChannel(ChannelManager& channels, Connection& connection, AdvancedInputChannelEvents& events,
-                            AssignmentSink& assignee) noexcept;
+  AdvancedInputChannel(ChannelManager& channels, AdvancedInputChannelEvents& events, AssignmentSink& assignee) noexcept;
   auto Open()         -> bool;
   auto Pump()         -> bool;
   auto Handle() const -> std::optional<WaitHandle>;
@@ -36,7 +34,6 @@ private:
   auto Started()       -> bool;
   auto Context() const -> s_ainput_server_context&;
   ChannelManager&             _channels;
-  Connection&                 _connection;
   AdvancedInputChannelEvents& _events;
   AssignmentSink&             _assignee;
   AdvancedInputContext        _context;

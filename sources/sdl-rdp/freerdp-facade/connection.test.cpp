@@ -1,7 +1,9 @@
 #include <sdl-rdp/freerdp-facade/connection.hpp>
 
+#include <sdl-rdp/freerdp-facade/connection.test.hpp>
 #include <sdl-rdp/freerdp-facade/ntlm.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
+#include <sdl-rdp/freerdp-facade/support.test/unjoined-connection.hpp>
 #include <sdl-rdp/utilities/posix.hpp>
 
 #include <freerdp/error.h>
@@ -26,6 +28,7 @@
 
 namespace sdl_rdp::freerdp_facade::detail::connection {
 namespace {
+using sdl_rdp::freerdp_facade::support_test::UnjoinedConnection;
 using sdl_rdp::utilities::ConnectedSockets;
 using sdl_rdp::utilities::NtOwf;
 using sdl_rdp::utilities::OperationName;
@@ -95,15 +98,14 @@ private:
 };
 class ConnectionSlots : public testing::Test {
 protected:
-  Recorded      recorder;
-  Recorder      events     { recorder                           };
-  SocketPair    sockets    { ConnectedSockets()                 };
-  int           adopted    { sockets.server.Get()               };
-  Connection    connection { std::move(sockets.server)          };
-  Observation   observation{ connection.Observe(events, events) };
-  rdp_context&  context    { connection.Context()               };
-  rdpInput&     input      { *context.input                     };
-  freerdp_peer& peer       { *context.peer                      };
+  Recorded           recorder;
+  Recorder           events     { recorder                             };
+  UnjoinedConnection unjoined;
+  Connection&        connection { unjoined.connection                  };
+  Observation        observation{ connection.Observe(events, events)   };
+  rdp_context&       context    { ConnectionProbe::Context(connection) };
+  rdpInput&          input      { *context.input                       };
+  freerdp_peer&      peer       { *context.peer                        };
 };
 template <std::size_t N> auto Units(std::u16string_view text) -> std::array<std::uint16_t, N> {
   std::array<std::uint16_t, N> units{ };
@@ -266,7 +268,10 @@ TEST_F(ConnectionSlots, LastErrorMapsToItsCause) {
   freerdp_set_last_error(&context, FREERDP_ERROR_CONNECT_CANCELLED);
   EXPECT_EQ(connection.Error().cause, Cause::Other);
 }
-TEST_F(ConnectionSlots, SocketIsTheAdoptedDescriptor) {
+TEST(Adopted, SocketIsTheAdoptedDescriptor) {
+  SocketPair       sockets   { ConnectedSockets()        };
+  int const        adopted   { sockets.server.Get()      };
+  Connection const connection{ std::move(sockets.server) };
   EXPECT_EQ(connection.Socket(), adopted);
 }
 TEST_F(ConnectionSlots, ObservingTwiceIsAContractFailure) {

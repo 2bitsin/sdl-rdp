@@ -1,4 +1,5 @@
 #include <sdl-rdp/configuration/setup.hpp>
+#include <sdl-rdp/freerdp-facade/connection.test.hpp>
 #include <sdl-rdp/freerdp-facade/display-channel-events.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/headless-client.test/backend/events.hpp>
@@ -24,6 +25,7 @@
 
 namespace sdl_rdp::integration::video_test::detail::resize {
 using sdl_rdp::configuration::Codec;
+using sdl_rdp::freerdp_facade::ConnectionProbe;
 using sdl_rdp::freerdp_facade::DisplayMonitor;
 using sdl_rdp::freerdp_facade::NumberKey;
 using sdl_rdp::freerdp_facade::SettingsView;
@@ -107,7 +109,7 @@ public:
 
 private:
   static auto CurrentClient(Backend& backend) -> freerdp_peer& {
-    return *RequiredStatus(backend).connection.get().Context().peer;
+    return *ConnectionProbe::Context(RequiredStatus(backend).connection).peer;
   }
   auto InFinalization() const -> bool {
     auto const current = freerdp_get_state(_client.context);

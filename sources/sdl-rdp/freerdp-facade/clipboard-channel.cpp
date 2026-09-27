@@ -25,11 +25,13 @@ static_assert(std::to_underlying(ClipboardFormat::Text) == CF_TEXT);
 static_assert(std::to_underlying(ClipboardFormat::UnicodeText) == CF_UNICODETEXT);
 
 namespace {
-constexpr OperationName ClipboardFormats { "Clipboard format list"   };
-constexpr OperationName ClipboardRequest { "Clipboard data request"  };
-constexpr OperationName ClipboardResponse{ "Clipboard data response" };
-auto Owner(CliprdrServerContext const& context) -> ClipboardChannel& {
-  return CallbackOwner<ClipboardChannel, &CliprdrServerContext::custom>(context);
+constexpr OperationName ClipboardFormats  { "Clipboard format list"   };
+constexpr OperationName ClipboardRequest  { "Clipboard data request"  };
+constexpr OperationName ClipboardResponse { "Clipboard data response" };
+constexpr auto          UserData          = &CliprdrServerContext::custom;
+using Owner = ClipboardChannelEvents;
+auto Events(CliprdrServerContext const& context) -> ClipboardChannelEvents& {
+  return CallbackOwner<Owner, UserData>(context);
 }
 auto Formats(CLIPRDR_FORMAT_LIST const& list) -> std::vector<ClipboardFormat> {
   return std::span(list.formats, list.numFormats)
@@ -50,55 +52,36 @@ auto Answered(bool replied) -> std::uint32_t {
 auto Sent(std::uint32_t code) -> bool {
   return code == CHANNEL_RC_OK;
 }
+auto FormatList(ClipboardChannelEvents& events, CLIPRDR_FORMAT_LIST const& list) -> std::uint32_t {
+  return Answered(events.ClientFormatList(Formats(list)));
+}
+auto DataRequest(ClipboardChannelEvents& events, CLIPRDR_FORMAT_DATA_REQUEST const& request) -> std::uint32_t {
+  return Answered(events.ClientFormatDataRequest(ClipboardFormat{ request.requestedFormatId }));
+}
+auto DataResponse(ClipboardChannelEvents& events, CLIPRDR_FORMAT_DATA_RESPONSE const& response) -> std::uint32_t {
+  return Answered(events.ClientFormatDataResponse(Data(response)));
+}
+auto InstallSlots(CliprdrServerContext& context) -> void {
+  constexpr auto failed = ERROR_INTERNAL_ERROR;
+  // abi: psCliprdrClientFormatList, FormatDataRequest, FormatDataResponse; UINT is uint32_t
+  context.ClientFormatList         = Handled<Events, FormatList, ClipboardFormats, SinkFailures, failed>;
+  context.ClientFormatDataRequest  = Handled<Events, DataRequest, ClipboardRequest, SinkFailures, failed>;
+  context.ClientFormatDataResponse = Handled<Events, DataResponse, ClipboardResponse, SinkFailures, failed>;
+}
 }
 auto ReleaseClipboard(s_cliprdr_server_context* context) noexcept -> void {
   context->Close(context);
   cliprdr_server_context_free(context);
 }
 
-class ClipboardChannel::Slots {
-public:
-  static auto Install(CliprdrServerContext& context) -> void;
-
-private:
-  static auto FormatList(ClipboardChannel& channel, CLIPRDR_FORMAT_LIST const& list)                -> std::uint32_t;
-  static auto DataRequest(ClipboardChannel& channel, CLIPRDR_FORMAT_DATA_REQUEST const& request)    -> std::uint32_t;
-  static auto DataResponse(ClipboardChannel& channel, CLIPRDR_FORMAT_DATA_RESPONSE const& response) -> std::uint32_t;
-};
-auto ClipboardChannel::Slots::Install(CliprdrServerContext& context) -> void {
-  constexpr auto failures = [](ClipboardChannel const& channel, OperationName operation) noexcept {
-    return SinkFailures(channel._events, operation);
-  };
-  constexpr auto failed   = ERROR_INTERNAL_ERROR;
-  // abi: psCliprdrClientFormatList, FormatDataRequest, FormatDataResponse; UINT is uint32_t
-  context.ClientFormatList         = Handled<Owner, &Slots::FormatList, ClipboardFormats, failures, failed>;
-  context.ClientFormatDataRequest  = Handled<Owner, &Slots::DataRequest, ClipboardRequest, failures, failed>;
-  context.ClientFormatDataResponse = Handled<Owner, &Slots::DataResponse, ClipboardResponse, failures, failed>;
-}
-auto ClipboardChannel::Slots::FormatList(ClipboardChannel& channel, CLIPRDR_FORMAT_LIST const& list) -> std::uint32_t {
-  return Answered(channel._events.ClientFormatList(Formats(list)));
-}
-auto ClipboardChannel::Slots::DataRequest(ClipboardChannel& channel, CLIPRDR_FORMAT_DATA_REQUEST const& request)
-    -> std::uint32_t {
-  return Answered(channel._events.ClientFormatDataRequest(ClipboardFormat{ request.requestedFormatId }));
-}
-auto ClipboardChannel::Slots::DataResponse(ClipboardChannel& channel, CLIPRDR_FORMAT_DATA_RESPONSE const& response)
-    -> std::uint32_t {
-  return Answered(channel._events.ClientFormatDataResponse(Data(response)));
-}
-
-ClipboardChannel::ClipboardChannel(ChannelManager& channels, Connection& connection,
-                                   ClipboardChannelEvents& events) noexcept
-    : _channels{ channels }, _connection{ connection }, _events{ events } { }
+ClipboardChannel::ClipboardChannel(ChannelManager& channels, ClipboardChannelEvents& events) noexcept
+    : _channels{ channels }, _events{ events } { }
 auto ClipboardChannel::Open() -> bool {
   Expects(_context == nullptr, "clipboard opens once");
-  _context = _channels.Create<ClipboardContext, cliprdr_server_context_new>();
-  if (!_context) return false;
+  _context = _channels.Bound<ClipboardContext, cliprdr_server_context_new, UserData, InstallSlots, Owner>(_events);
   auto& context = *_context;
-  BindContext(context, *this, _connection.Context());
   context.autoInitializationSequence = false;
   context.useLongFormatNames         = true;
-  Slots::Install(context);
   return context.Open(&context) == CHANNEL_RC_OK;
 }
 auto ClipboardChannel::Pump() -> bool {

@@ -1,5 +1,6 @@
 #include <sdl-rdp/headless-client.test/backend/authentication.hpp>
 #include <sdl-rdp/configuration/setup.hpp>
+#include <sdl-rdp/freerdp-facade/connection.test.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/headless-client.test/client/client.hpp>
 #include <sdl-rdp/session/backend.hpp>
@@ -14,6 +15,7 @@
 namespace sdl_rdp::integration::auth_test::detail::authentication {
 using sdl_rdp::configuration::AuthMode;
 using sdl_rdp::freerdp_facade::BoolKey;
+using sdl_rdp::freerdp_facade::ConnectionProbe;
 using sdl_rdp::headless_client_test::backend::Authentication;
 using sdl_rdp::headless_client_test::backend::CurrentStatus;
 using sdl_rdp::headless_client_test::backend::FixedPair;
@@ -175,7 +177,7 @@ auto DisconnectWithPending(Backend& backend, std::uint32_t code) -> void {
   auto const frame   = backend.Frames().Lock();
   auto&      current = Required(backend.Session().Current(frame), "a client is current").get();
   current.Repaint(frame, { .x = 0, .y = 0, .w = 1, .h = 1 });
-  auto& context = current.Status(frame).connection.get().Context();
+  auto& context = ConnectionProbe::Context(current.Status(frame).connection);
   freerdp_set_last_error(&context, code);
   // abi: psPeerCheckFileDescriptor, BOOL is int
   context.peer->CheckFileDescriptor = [](freerdp_peer*) -> int { return false; };

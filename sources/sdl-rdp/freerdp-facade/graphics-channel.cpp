@@ -1,5 +1,6 @@
 #include <sdl-rdp/freerdp-facade/graphics-channel.hpp>
 
+#include <sdl-rdp/freerdp-facade/assignment-sink.hpp>
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
 #include <sdl-rdp/freerdp-facade/handled.hpp>
 #include <sdl-rdp/freerdp-facade/lent.hpp>
@@ -32,8 +33,10 @@ constexpr OperationName GraphicsQoe             { "Graphics QoE acknowledgement"
 constexpr OperationName GraphicsAssignment      { "Graphics channel assignment"    };
 constexpr std::uint32_t Version101DataLength    = 16;
 constexpr std::uint32_t FlagsDataLength         = 4;
-auto Owner(RdpgfxServerContext const& context) -> GraphicsChannel& {
-  return CallbackOwner<GraphicsChannel, &RdpgfxServerContext::custom>(context);
+constexpr auto          UserData                = &RdpgfxServerContext::custom;
+using Owner = GraphicsChannelEvents;
+auto Events(RdpgfxServerContext const& context) -> GraphicsChannelEvents& {
+  return CallbackOwner<Owner, UserData>(context);
 }
 // MS-RDPEGFX 2.2.3.4: version 10.1 carries 16 reserved bytes where every other version carries its flags.
 auto DataLength(GfxVersion version) -> std::uint32_t {
@@ -107,6 +110,30 @@ auto Answered(bool accepted) -> std::uint32_t {
 auto Sent(std::uint32_t code) -> bool {
   return code == CHANNEL_RC_OK;
 }
+auto Caps(GraphicsChannelEvents& events, RDPGFX_CAPS_ADVERTISE_PDU const& pdu) -> std::uint32_t {
+  return Answered(events.CapsAdvertise(Advertised(pdu)));
+}
+auto Ack(GraphicsChannelEvents& events, RDPGFX_FRAME_ACKNOWLEDGE_PDU const& pdu) -> std::uint32_t {
+  auto const suspended = pdu.queueDepth == SUSPEND_FRAME_ACKNOWLEDGEMENT;
+  events.FrameAcknowledge(
+      { .frame = pdu.frameId, .queue_depth = suspended ? 0 : pdu.queueDepth, .suspended = suspended });
+  return CHANNEL_RC_OK;
+}
+auto Qoe(GraphicsChannelEvents& events, RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU const& pdu) -> std::uint32_t {
+  events.QoeFrameAcknowledge({ .frame         = pdu.frameId,
+                               .timestamp     = pdu.timestamp,
+                               .time_diff_se  = pdu.timeDiffSE,
+                               .time_diff_edr = pdu.timeDiffEDR });
+  return CHANNEL_RC_OK;
+}
+auto InstallSlots(RdpgfxServerContext& context) -> void {
+  constexpr auto failed = ERROR_INTERNAL_ERROR;
+  // abi: psRdpgfxCapsAdvertise, FrameAcknowledge, QoeFrameAcknowledge, UINT is uint32_t; ChannelIdAssigned, BOOL is int
+  context.CapsAdvertise       = Handled<Events, Caps, GraphicsCapabilities, SinkFailures, failed>;
+  context.FrameAcknowledge    = Handled<Events, Ack, GraphicsAcknowledgement, SinkFailures, failed>;
+  context.QoeFrameAcknowledge = Handled<Events, Qoe, GraphicsQoe, SinkFailures, failed>;
+  context.ChannelIdAssigned   = Handled<Events, Assigned, GraphicsAssignment, SinkFailures, false>;
+}
 }
 auto ReleaseGraphics(s_rdpgfx_server_context* context) noexcept -> void {
   rdpgfx_server_context_free(context);
@@ -130,61 +157,14 @@ auto GraphicsChannel::Avc420Buffers::Stream(Avc420Metablock const& metablock, st
            .length = Narrowed<std::uint32_t>(payload.size()),
            .data   = Lent(payload).data() };
 }
-class GraphicsChannel::Slots {
-public:
-  static auto Install(RdpgfxServerContext& context) -> void;
-
-private:
-  static auto Caps(GraphicsChannel& channel, RDPGFX_CAPS_ADVERTISE_PDU const& pdu)       -> std::uint32_t;
-  static auto Ack(GraphicsChannel& channel, RDPGFX_FRAME_ACKNOWLEDGE_PDU const& pdu)     -> std::uint32_t;
-  static auto Qoe(GraphicsChannel& channel, RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU const& pdu) -> std::uint32_t;
-  static auto Assigned(GraphicsChannel& channel, std::uint32_t id)                       -> bool;
-};
-auto GraphicsChannel::Slots::Install(RdpgfxServerContext& context) -> void {
-  constexpr auto failures = [](GraphicsChannel const& channel, OperationName operation) noexcept {
-    return SinkFailures(channel._events, operation);
-  };
-  constexpr auto failed   = ERROR_INTERNAL_ERROR;
-  // abi: psRdpgfxCapsAdvertise, FrameAcknowledge, QoeFrameAcknowledge, UINT is uint32_t; ChannelIdAssigned, BOOL is int
-  context.CapsAdvertise       = Handled<Owner, &Slots::Caps, GraphicsCapabilities, failures, failed>;
-  context.FrameAcknowledge    = Handled<Owner, &Slots::Ack, GraphicsAcknowledgement, failures, failed>;
-  context.QoeFrameAcknowledge = Handled<Owner, &Slots::Qoe, GraphicsQoe, failures, failed>;
-  context.ChannelIdAssigned   = Handled<Owner, &Slots::Assigned, GraphicsAssignment, failures, false>;
-}
-auto GraphicsChannel::Slots::Caps(GraphicsChannel& channel, RDPGFX_CAPS_ADVERTISE_PDU const& pdu) -> std::uint32_t {
-  return Answered(channel._events.CapsAdvertise(Advertised(pdu)));
-}
-auto GraphicsChannel::Slots::Ack(GraphicsChannel& channel, RDPGFX_FRAME_ACKNOWLEDGE_PDU const& pdu) -> std::uint32_t {
-  auto const suspended = pdu.queueDepth == SUSPEND_FRAME_ACKNOWLEDGEMENT;
-  channel._events.FrameAcknowledge(
-      { .frame = pdu.frameId, .queue_depth = suspended ? 0 : pdu.queueDepth, .suspended = suspended });
-  return CHANNEL_RC_OK;
-}
-auto GraphicsChannel::Slots::Qoe(GraphicsChannel& channel, RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU const& pdu)
-    -> std::uint32_t {
-  channel._events.QoeFrameAcknowledge({ .frame         = pdu.frameId,
-                                        .timestamp     = pdu.timestamp,
-                                        .time_diff_se  = pdu.timeDiffSE,
-                                        .time_diff_edr = pdu.timeDiffEDR });
-  return CHANNEL_RC_OK;
-}
-auto GraphicsChannel::Slots::Assigned(GraphicsChannel& channel, std::uint32_t id) -> bool {
-  channel._events.ChannelAssigned(id);
-  return true;
-}
-
-GraphicsChannel::GraphicsChannel(ChannelManager& channels, Connection& connection,
-                                 GraphicsChannelEvents& events) noexcept
-    : _channels{ channels }, _connection{ connection }, _events{ events } { }
+GraphicsChannel::GraphicsChannel(ChannelManager& channels, GraphicsChannelEvents& events) noexcept
+    : _channels{ channels }, _events{ events } { }
 GraphicsChannel::~GraphicsChannel() = default;
 auto GraphicsChannel::Open() -> bool {
   Expects(_context == nullptr, "graphics opens once");
-  _context = _channels.Create<GraphicsContext, rdpgfx_server_context_new>();
-  if (!_context) return false;
-  _avc420 = std::make_unique<Avc420Buffers>();
+  _context = _channels.Bound<GraphicsContext, rdpgfx_server_context_new, UserData, InstallSlots, Owner>(_events);
+  _avc420  = std::make_unique<Avc420Buffers>();
   auto& context = *_context;
-  BindContext(context, *this, _connection.Context());
-  Slots::Install(context);
   return context.Initialize(&context, true) && context.Open(&context);
 }
 auto GraphicsChannel::Pump() -> bool {

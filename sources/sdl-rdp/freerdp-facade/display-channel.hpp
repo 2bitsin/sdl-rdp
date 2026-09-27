@@ -1,6 +1,5 @@
 #pragma once
 #include <sdl-rdp/freerdp-facade/channel-manager.hpp>
-#include <sdl-rdp/freerdp-facade/connection.hpp>
 #include <sdl-rdp/freerdp-facade/display-channel-events.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 #include <sdl-rdp/utilities/releases.hpp>
@@ -12,7 +11,6 @@ struct s_disp_server_context;
 
 namespace sdl_rdp::freerdp_facade::detail::display_channel {
 using sdl_rdp::freerdp_facade::ChannelManager;
-using sdl_rdp::freerdp_facade::Connection;
 using sdl_rdp::freerdp_facade::DisplayChannelEvents;
 using sdl_rdp::utilities::Pinned;
 using sdl_rdp::utilities::Releases;
@@ -29,18 +27,16 @@ struct DisplayCaps {
 // The display control dynamic channel of a connection.
 class DisplayChannel : private Pinned {
 public:
-       DisplayChannel(ChannelManager& channels, Connection& connection, DisplayChannelEvents& events) noexcept;
+       DisplayChannel(ChannelManager& channels, DisplayChannelEvents& events) noexcept;
   auto Open(DisplayCaps caps) -> bool;
   auto Close() noexcept       -> void;
   auto Caps()                 -> bool;
 
 private:
-  class Slots;
   // The unit test drives the slots through the context.
   friend class DisplayChannelProbe;
   auto Context() const -> s_disp_server_context&;
   ChannelManager&       _channels;
-  Connection&           _connection;
   DisplayChannelEvents& _events;
   DisplayContext        _context;
 };

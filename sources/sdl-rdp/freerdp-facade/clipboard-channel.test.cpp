@@ -1,5 +1,6 @@
 #include <sdl-rdp/freerdp-facade/clipboard-channel.hpp>
 
+#include <sdl-rdp/freerdp-facade/support.test/recorded-failures.hpp>
 #include <sdl-rdp/freerdp-facade/support.test/unjoined-connection.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
@@ -12,7 +13,7 @@
 #include <cstdint>
 #include <gmock/gmock.h>
 #include <optional>
-#include <string_view>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -24,10 +25,10 @@ public:
   }
 };
 namespace {
+using sdl_rdp::freerdp_facade::support_test::RecordedFailures;
 using sdl_rdp::freerdp_facade::support_test::UnjoinedConnection;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
-using sdl_rdp::utilities::OperationName;
 using sdl_rdp::utilities::support_test::OutOfRangeEnum;
 using testing::ElementsAre;
 using Bytes = std::vector<std::byte>;
@@ -37,10 +38,11 @@ struct Recorded {
   std::vector<ClipboardFormat>      formats;
   std::vector<ClipboardFormat>      requests;
   std::vector<std::optional<Bytes>> responses;
+  std::vector<std::string>          failures;
 };
-class Recorder final : public ClipboardChannelEvents {
+class Recorder final : public RecordedFailures<ClipboardChannelEvents> {
 public:
-  explicit Recorder(Recorded& recorded) : _recorded{ recorded } { }
+  explicit Recorder(Recorded& recorded) : RecordedFailures{ recorded.failures }, _recorded{ recorded } { }
   auto     ClientFormatList(std::span<ClipboardFormat const> formats) -> bool override {
     _recorded.formats.assign(formats.begin(), formats.end());
     return _recorded.replies;
@@ -53,7 +55,6 @@ public:
     _recorded.responses.push_back(data.transform([](auto bytes) { return Bytes(bytes.begin(), bytes.end()); }));
     return _recorded.replies;
   }
-  auto Failed(OperationName /*operation*/, std::string_view /*failure*/) const -> void override { }
 
 private:
   Recorded& _recorded;
@@ -77,9 +78,9 @@ auto Captured(CliprdrServerContext* /*context*/, CLIPRDR_FORMAT_DATA_RESPONSE co
 class Unopened : public testing::Test {
 protected:
   Recorded           recorded;
-  Recorder           events  { recorded                                       };
+  Recorder           events  { recorded                  };
   UnjoinedConnection unjoined;
-  ClipboardChannel   channel { unjoined.channels, unjoined.connection, events };
+  ClipboardChannel   channel { unjoined.channels, events };
 };
 // The open fails while no client has joined cliprdr, but the context and its slots are in place.
 class ClipboardSlots : public Unopened {

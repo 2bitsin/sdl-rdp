@@ -1,6 +1,5 @@
 #pragma once
 #include <sdl-rdp/freerdp-facade/channel-manager.hpp>
-#include <sdl-rdp/freerdp-facade/connection.hpp>
 #include <sdl-rdp/freerdp-facade/sound-channel-events.hpp>
 #include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
@@ -29,8 +28,8 @@ enum class SoundPump : std::uint8_t { Handled, FailedBeforeFormats, Failed };
 // The rdpsnd static channel: the formats the server offers, the client's answer, and the sample blocks.
 class SoundChannel : private Pinned {
 public:
-       SoundChannel(ChannelManager& channels, Connection& connection, SoundChannelEvents& events,
-                    std::span<AudioFormat const> offered, std::chrono::milliseconds latency);
+       SoundChannel(ChannelManager& channels, SoundChannelEvents& events, std::span<AudioFormat const> offered,
+                    std::chrono::milliseconds latency);
        ~SoundChannel();
   auto Initialize()                                                                -> bool;
   auto Pump()                                                                      -> SoundPump;
@@ -42,14 +41,12 @@ public:
   auto SendSamples(std::span<std::int16_t const> samples, std::uint16_t timestamp) -> bool;
 
 private:
-  class Slots;
   // The unit test drives the slots through the context.
   friend class SoundChannelProbe;
   static auto Pumped(std::uint32_t result, bool answered) -> SoundPump;
   auto        Context() const                             -> s_rdpsnd_server_context&;
-  ChannelManager&     _channels;
-  SoundChannelEvents& _events;
-  SoundContext        _context;
+  ChannelManager& _channels;
+  SoundContext    _context;
 };
 }
 

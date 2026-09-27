@@ -1,5 +1,6 @@
 #pragma once
 #include <sdl-rdp/freerdp-facade/connection-events.hpp>
+#include <sdl-rdp/freerdp-facade/forward.hpp>
 #include <sdl-rdp/freerdp-facade/input-sink.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/freerdp-facade/wait-handle.hpp>
@@ -15,9 +16,11 @@ struct rdp_context;
 struct rdp_freerdp_peer;
 
 namespace sdl_rdp::freerdp_facade::detail::connection {
+using sdl_rdp::freerdp_facade::ChannelManager;
 using sdl_rdp::freerdp_facade::ConnectionEvents;
 using sdl_rdp::freerdp_facade::Identity;
 using sdl_rdp::freerdp_facade::InputSink;
+using sdl_rdp::freerdp_facade::Updates;
 using sdl_rdp::utilities::Descriptor;
 using sdl_rdp::utilities::Releases;
 
@@ -71,10 +74,13 @@ public:
   auto               Refuse(Refusal refusal)                             -> void;
   auto               Disconnect() noexcept                               -> void;
   auto               Close()                                             -> void;
-  // The raw context the channel, update and channel-context rounds (facade-3 to facade-5) still reach through.
-  auto Context() noexcept -> rdp_context&;
 
 private:
+  // The facade classes over the raw context, and the tests that drive FreeRDP through it.
+  friend       ChannelManager;
+  friend       Updates;
+  friend class ConnectionProbe;
+  auto Context() noexcept    -> rdp_context&;
   auto Peer() const noexcept -> rdp_freerdp_peer&;
   int        _socket;
   PeerHandle _peer;

@@ -138,7 +138,6 @@ private:
   auto FrameAcknowledged(std::uint32_t frame) -> void                 override;
   auto SuppressOutput(bool allow)             -> void                 override;
 
-  Diagnostics const&   _diagnostics;
   Configuration const& _configuration;
   FrameStore&          _store;
   SessionAccess&       _session;

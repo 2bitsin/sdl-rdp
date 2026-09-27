@@ -19,9 +19,9 @@ using sdl_rdp::video::gfx::FrameSources;
 using sdl_rdp::video::gfx::GfxChannel;
 Peer::Peer(Connection accepted, Diagnostics const& diagnostics, EventQueue& events, Configuration const& configuration,
            FrameStore& store, Generational<PointerShape>& pointer, ClipboardStore& clipboard, SessionAccess& session)
-    : LoggedFailures{ diagnostics }, _diagnostics{ diagnostics }, _configuration{ configuration }, _store{ store },
-      _session{ session }, _link{ std::move(accepted) }, _traces{ diagnostics }, _activation{ events, _link },
-      _frames{ store }, _pacing{ diagnostics, events, configuration, store, _link, _activation, _traces, _statistics },
+    : LoggedFailures{ diagnostics }, _configuration{ configuration }, _store{ store }, _session{ session },
+      _link{ std::move(accepted) }, _traces{ diagnostics }, _activation{ events, _link }, _frames{ store },
+      _pacing{ diagnostics, events, configuration, store, _link, _activation, _traces, _statistics },
       _scaler{ _frames, _desktop }, _authenticator{ _link, configuration, diagnostics },
       _graphics{ _link,
                  diagnostics,

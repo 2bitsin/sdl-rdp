@@ -1,5 +1,5 @@
 #pragma once
-#include <sdl-rdp/freerdp-facade/failure-sink.hpp>
+#include <sdl-rdp/freerdp-facade/assignment-sink.hpp>
 
 #include <cstdint>
 #include <span>
@@ -13,9 +13,8 @@ struct DisplayMonitor {
   std::uint32_t height{ };
 };
 // What a display control channel reports: its dynamic channel id, then each monitor layout the client requests.
-class DisplayChannelEvents : public FailureSink {
+class DisplayChannelEvents : public AssignmentSink {
 public:
-  virtual auto ChannelAssigned(std::uint32_t id) -> void = 0;
   // False when the layout is invalid data.
   virtual auto MonitorLayout(std::span<DisplayMonitor const> monitors) -> bool = 0;
 };

@@ -74,12 +74,12 @@ auto NewStopEvent() -> EventHandle {
 }
 Listener::Listener(Configuration const& configuration, Credentials const& credentials, Diagnostics const& diagnostics,
                    Session& session, PeerFactory make)
-    : LoggedFailures{ diagnostics }, _diagnostics{ diagnostics }, _session{ session }, _make{ std::move(make) },
+    : LoggedFailures{ diagnostics }, _session{ session }, _make{ std::move(make) },
       _listener{ Bound(configuration.Config()), *this }, _stop{ NewStopEvent() } {
   RehearseTls(credentials);
-  _diagnostics.Log(LogLevel::Info, std::format("Listening on port {}", _listener.Port()));
+  Logger().Log(LogLevel::Info, std::format("Listening on port {}", _listener.Port()));
   _thread = std::jthread([this](std::stop_token const& quit) {
-    std::ignore = Contained([&] { Listen(quit); }, FailureLog{ _diagnostics, "Listener" });
+    std::ignore = Contained([&] { Listen(quit); }, FailureLog{ Logger(), "Listener" });
   });
   Ensures(_listener.Port() != 0, "bound port is available");
 }
@@ -87,7 +87,7 @@ auto Listener::Port() const noexcept -> std::uint32_t {
   return _listener.Port();
 }
 auto Listener::Accepted(Connection accepted) -> void {
-  _diagnostics.Log(LogLevel::Info, std::format("Peer accepted: {}.", accepted.Hostname()));
+  Logger().Log(LogLevel::Info, std::format("Peer accepted: {}.", accepted.Hostname()));
   _session.Add(_make(std::move(accepted)));
 }
 auto Listener::Listen(std::stop_token const& quit) -> void {

@@ -1,5 +1,6 @@
 #include <sdl-rdp/freerdp-facade/channel-manager.hpp>
 
+#include <sdl-rdp/freerdp-facade/connection.hpp>
 #include <sdl-rdp/freerdp-facade/exceptions.hpp>
 #include <sdl-rdp/freerdp-facade/handled.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
@@ -14,7 +15,6 @@
 #include <utility>
 
 namespace sdl_rdp::freerdp_facade::detail::channel_manager {
-using sdl_rdp::utilities::AllocationFailed;
 using sdl_rdp::utilities::CopyTerminated;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::OperationName;
@@ -38,7 +38,8 @@ auto Terminated(std::string_view name) -> std::array<char, CHANNEL_NAME_LEN + 1>
 auto ForgetChannelCreation(void* manager) noexcept -> void {
   WTSVirtualChannelManagerSetDVCCreationCallback(manager, nullptr, nullptr);
 }
-ChannelManager::ChannelManager(rdp_context& context) : _handle{ ServerOf(context) } { }
+ChannelManager::ChannelManager(Connection& connection)
+    : _session{ connection.Context() }, _handle{ ServerOf(_session) } { }
 auto ChannelManager::Open(std::string_view name) -> VirtualChannel {
   auto opened = Opened(name);
   if (!opened) throw ChannelOpenFailed{ name };
@@ -50,34 +51,30 @@ auto ChannelManager::Reclaim(std::string_view name) noexcept -> void {
 }
 auto ChannelManager::Joined(std::string_view name) const -> bool {
   auto terminated = Terminated(name);
-  return WTSVirtualChannelManagerIsChannelJoined(Server().get(), terminated.data());
+  return WTSVirtualChannelManagerIsChannelJoined(_handle.get(), terminated.data());
 }
 auto ChannelManager::DynamicReady() const -> bool {
-  return WTSVirtualChannelManagerGetDrdynvcState(Server().get()) == DRDYNVC_STATE_READY;
+  return WTSVirtualChannelManagerGetDrdynvcState(_handle.get()) == DRDYNVC_STATE_READY;
 }
 auto ChannelManager::Pump() -> bool {
-  return WTSVirtualChannelManagerCheckFileDescriptor(Server().get());
+  return WTSVirtualChannelManagerCheckFileDescriptor(_handle.get());
 }
 // Sends the queued channel PDUs without opening the dynamic channel the way Pump does (FreeRDP 3.32 server.c:683).
 auto ChannelManager::Flush() -> bool {
-  return WTSVirtualChannelManagerCheckFileDescriptorEx(Server().get(), false);
+  return WTSVirtualChannelManagerCheckFileDescriptorEx(_handle.get(), false);
 }
 auto ChannelManager::Handle() const -> WaitHandle {
-  return WaitHandle::Of(Server());
+  return WaitHandle::Of(_handle);
 }
 auto ChannelManager::OnDynamicCreation(DynamicCreationSink& sink) -> CreationRegistration {
   // abi: psDVCCreationStatusCallback, BOOL is int
   WTSVirtualChannelManagerSetDVCCreationCallback(
-      Server().get(),
+      _handle.get(),
       Handled<Itself<DynamicCreationSink>, &DynamicCreationSink::Created, ChannelCreation, SinkFailures, false>, &sink);
-  return CreationRegistration{ Server().get() };
+  return CreationRegistration{ _handle.get() };
 }
 auto ChannelManager::Opened(std::string_view name) noexcept -> ChannelHandle {
   auto terminated = Terminated(name);
-  return ChannelHandle{ WTSVirtualChannelOpen(Server().get(), WTS_CURRENT_SESSION, terminated.data()) };
-}
-auto ChannelManager::Server() const -> ServerHandle const& {
-  Expects(_handle != nullptr, "the channel manager is not moved from");
-  return _handle;
+  return ChannelHandle{ WTSVirtualChannelOpen(_handle.get(), WTS_CURRENT_SESSION, terminated.data()) };
 }
 }

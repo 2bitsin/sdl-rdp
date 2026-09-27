@@ -1,9 +1,9 @@
 #include <sdl-rdp/freerdp-facade/updates.hpp>
 
-#include <sdl-rdp/freerdp-facade/connection.hpp>
+#include <sdl-rdp/freerdp-facade/connection.test.hpp>
 #include <sdl-rdp/freerdp-facade/handled.hpp>
+#include <sdl-rdp/freerdp-facade/support.test/unjoined-connection.hpp>
 #include <sdl-rdp/utilities/operation-name.hpp>
-#include <sdl-rdp/utilities/posix.hpp>
 
 #include <freerdp/freerdp.h>
 #include <freerdp/peer.h>
@@ -16,14 +16,12 @@
 #include <optional>
 #include <span>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 namespace sdl_rdp::freerdp_facade::detail::updates {
 namespace {
-using sdl_rdp::utilities::ConnectedSockets;
+using sdl_rdp::freerdp_facade::support_test::UnjoinedConnection;
 using sdl_rdp::utilities::OperationName;
-using sdl_rdp::utilities::SocketPair;
 
 struct Recorded {
   SURFACE_FRAME_MARKER              marker          { };
@@ -97,13 +95,12 @@ protected:
     return recorded.bitmaps.empty() ? BITMAP_DATA{ } : recorded.bitmaps.front();
   }
   Recorded                          recorded;
-  SocketPair                        sockets   { ConnectedSockets()        };
-  Connection                        connection{ std::move(sockets.server) };
-  rdp_context&                      context   { connection.Context()      };
-  Updates                           updates   { connection                };
-  std::array<std::uint8_t, 8> const pixels    { 1, 2, 3, 4, 5, 6, 7, 8    };
-  std::array<std::uint8_t, 4> const mask      { 0x80, 0, 0x40, 0          };
-  PointerImage const                image     {
+  UnjoinedConnection                unjoined;
+  rdp_context&                      context { ConnectionProbe::Context(unjoined.connection) };
+  Updates                           updates { unjoined.connection                           };
+  std::array<std::uint8_t, 8> const pixels  { 1, 2, 3, 4, 5, 6, 7, 8                        };
+  std::array<std::uint8_t, 4> const mask    { 0x80, 0, 0x40, 0                              };
+  PointerImage const                image   {
     .size = { .width = 2, .height = 1 }, .hot_x = 1, .hot_y = 2, .pixels = pixels, .mask = mask
   };
 };

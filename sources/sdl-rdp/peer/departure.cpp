@@ -24,9 +24,9 @@ auto Peer::Depart() -> void {
 }
 auto Peer::LogDeparture() const -> void {
   if (!_activation.Activated()) return;
-  _diagnostics.Log(LogLevel::Info, _statistics.Summary());
+  Logger().Log(LogLevel::Info, _statistics.Summary());
   _redirection.LogAudio();
-  _diagnostics.Log(LogLevel::Info, std::format("Client {} disconnected.", ClientHostname(_link)));
-  _diagnostics.Line("disconnect");
+  Logger().Log(LogLevel::Info, std::format("Client {} disconnected.", ClientHostname(_link)));
+  Logger().Line("disconnect");
 }
 }

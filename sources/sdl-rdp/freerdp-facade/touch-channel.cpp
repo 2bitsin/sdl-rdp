@@ -21,10 +21,12 @@ auto ReleaseTouch(s_rdpei_server_context* context) noexcept -> void {
   rdpei_server_context_free(context);
 }
 namespace {
-constexpr OperationName TouchInput     { "Touch event"              };
-constexpr OperationName TouchAssignment{ "Touch channel assignment" };
-auto Owner(RdpeiServerContext const& context) -> TouchChannel& {
-  return CallbackOwner<TouchChannel, &RdpeiServerContext::user_data>(context);
+constexpr OperationName TouchInput      { "Touch event"              };
+constexpr OperationName TouchAssignment { "Touch channel assignment" };
+constexpr auto          UserData        = &RdpeiServerContext::user_data;
+using Owner = TouchChannel;
+auto Channel(RdpeiServerContext const& context) -> Owner& {
+  return CallbackOwner<Owner, UserData>(context);
 }
 auto Phase(std::uint32_t flags) -> ContactPhase {
   if (flags & RDPINPUT_CONTACT_FLAG_CANCELED) return ContactPhase::Cancel;
@@ -58,45 +60,29 @@ auto Serviced(std::uint32_t result) -> bool {
   default:               return false;
   }
 }
+auto Touched(TouchChannelEvents& events, RDPINPUT_TOUCH_EVENT const& event) -> std::uint32_t {
+  events.Touch(Contacts(event));
+  return CHANNEL_RC_OK;
+}
 }
 class TouchChannel::Slots {
 public:
   static auto Install(RdpeiServerContext& context) -> void;
-
-private:
-  static auto Touched(TouchChannel& channel, RDPINPUT_TOUCH_EVENT const& event) -> std::uint32_t;
-  static auto Assigned(TouchChannel& channel, std::uint32_t id)                 -> bool;
 };
 auto TouchChannel::Slots::Install(RdpeiServerContext& context) -> void {
-  constexpr auto events   = [](TouchChannel const& channel, OperationName operation) noexcept {
-    return SinkFailures(channel._events, operation);
-  };
-  constexpr auto assignee = [](TouchChannel const& channel, OperationName operation) noexcept {
-    return SinkFailures(channel._assignee, operation);
-  };
+  constexpr auto events   = [](RdpeiServerContext const& bound) -> auto& { return Channel(bound)._events; };
+  constexpr auto assignee = [](RdpeiServerContext const& bound) -> auto& { return Channel(bound)._assignee; };
   // abi: rdpei onTouchEvent, UINT is uint32_t; onChannelIdAssigned, BOOL is int
-  context.onTouchEvent        = Handled<Owner, &Slots::Touched, TouchInput, events, ERROR_INTERNAL_ERROR>;
-  context.onChannelIdAssigned = Handled<Owner, &Slots::Assigned, TouchAssignment, assignee, false>;
-}
-auto TouchChannel::Slots::Touched(TouchChannel& channel, RDPINPUT_TOUCH_EVENT const& event) -> std::uint32_t {
-  channel._events.Touch(Contacts(event));
-  return CHANNEL_RC_OK;
-}
-auto TouchChannel::Slots::Assigned(TouchChannel& channel, std::uint32_t id) -> bool {
-  channel._assignee.ChannelAssigned(id);
-  return true;
+  context.onTouchEvent        = Handled<events, Touched, TouchInput, SinkFailures, ERROR_INTERNAL_ERROR>;
+  context.onChannelIdAssigned = Handled<assignee, Assigned, TouchAssignment, SinkFailures, false>;
 }
 
 TouchChannel::TouchChannel(ChannelManager& channels, TouchChannelEvents& events, AssignmentSink& assignee) noexcept
     : _channels{ channels }, _events{ events }, _assignee{ assignee } { }
 auto TouchChannel::Open() -> bool {
   Expects(_context == nullptr, "a touch channel opens once");
-  _context = _channels.Create<TouchContext, rdpei_server_context_new>();
-  if (!_context) return false;
-  auto& context = *_context;
-  context.user_data = this;
-  Slots::Install(context);
-  return rdpei_server_init(&context) == CHANNEL_RC_OK;
+  _context = _channels.Bound<TouchContext, rdpei_server_context_new, UserData, &Slots::Install, Owner>(*this);
+  return rdpei_server_init(&Context()) == CHANNEL_RC_OK;
 }
 auto TouchChannel::Pump() -> bool {
   return Serviced(rdpei_server_handle_messages(&Context()));

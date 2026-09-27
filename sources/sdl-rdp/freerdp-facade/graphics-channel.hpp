@@ -1,6 +1,5 @@
 #pragma once
 #include <sdl-rdp/freerdp-facade/channel-manager.hpp>
-#include <sdl-rdp/freerdp-facade/connection.hpp>
 #include <sdl-rdp/freerdp-facade/graphics-channel-events.hpp>
 #include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/utilities/geometry.hpp>
@@ -17,7 +16,6 @@ struct s_rdpgfx_server_context;
 
 namespace sdl_rdp::freerdp_facade::detail::graphics_channel {
 using sdl_rdp::freerdp_facade::ChannelManager;
-using sdl_rdp::freerdp_facade::Connection;
 using sdl_rdp::freerdp_facade::GfxCapability;
 using sdl_rdp::freerdp_facade::GraphicsChannelEvents;
 using sdl_rdp::freerdp_facade::WaitHandle;
@@ -60,7 +58,7 @@ struct GraphicsCommand {
 // The rdpgfx dynamic channel of a connection, polled by the server: no channel thread.
 class GraphicsChannel : private Pinned {
 public:
-       GraphicsChannel(ChannelManager& channels, Connection& connection, GraphicsChannelEvents& events) noexcept;
+       GraphicsChannel(ChannelManager& channels, GraphicsChannelEvents& events) noexcept;
        ~GraphicsChannel();
   auto Open()                                                                    -> bool;
   auto Pump()                                                                    -> bool;
@@ -76,14 +74,12 @@ public:
   auto SurfaceCommand(GraphicsCommand const& command)                            -> bool;
 
 private:
-  class Slots;
   // The AVC420 metablock's wire arrays, kept across frames so a frame allocates nothing.
   class Avc420Buffers;
   // The unit test drives the slots through the context.
   friend class GraphicsChannelProbe;
   auto Context() const -> s_rdpgfx_server_context&;
   ChannelManager&                _channels;
-  Connection&                    _connection;
   GraphicsChannelEvents&         _events;
   GraphicsContext                _context;
   std::unique_ptr<Avc420Buffers> _avc420;
