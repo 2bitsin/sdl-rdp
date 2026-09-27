@@ -6,7 +6,6 @@
 #include <sdl-rdp/utilities/pinned.hpp>
 
 #include <freerdp/client/cliprdr.h>
-#include <freerdp/event.h>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>

@@ -8,6 +8,7 @@ import clones
 import cmake
 import columns
 import contracts
+import facade
 import format as formatter
 import includes
 import namespaces
@@ -63,6 +64,10 @@ def test_prefixes():
 
 def test_pointers():
     assert pointers.main(['--baseline', str(LINT / 'pointers.baseline')]) == 0
+
+
+def test_facade():
+    assert facade.main([]) == 0
 
 
 def test_contracts():

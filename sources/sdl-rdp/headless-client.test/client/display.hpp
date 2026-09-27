@@ -6,7 +6,6 @@
 #include <sdl-rdp/utilities/pinned.hpp>
 
 #include <freerdp/client/disp.h>
-#include <freerdp/event.h>
 #include <atomic>
 #include <concepts>
 #include <cstddef>

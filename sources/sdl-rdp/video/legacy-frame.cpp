@@ -11,7 +11,6 @@
 #include <sdl-rdp/video/peer-frames.hpp>
 
 #include <freerdp/codec/color.h>
-#include <freerdp/constants.h>
 #include <freerdp/settings.h>
 #include <freerdp/update.h>
 #include <oxbox/utilities/span.hpp>

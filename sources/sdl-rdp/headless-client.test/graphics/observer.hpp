@@ -5,7 +5,6 @@
 #include <sdl-rdp/utilities/pinned.hpp>
 
 #include <freerdp/client/rdpgfx.h>
-#include <freerdp/event.h>
 #include <cstddef>
 #include <cstdint>
 #include <functional>

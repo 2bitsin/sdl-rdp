@@ -10,7 +10,6 @@
 #include <sdl-rdp/headless-client.test/utilities/io.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 
-#include <freerdp/gdi/gdi.h>
 #include <oxbox/utilities/number-text.hpp>
 #include <oxbox/utilities/text.hpp>
 #include <algorithm>

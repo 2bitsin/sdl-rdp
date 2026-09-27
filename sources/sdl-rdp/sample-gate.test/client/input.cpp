@@ -1,5 +1,6 @@
 #include <sdl-rdp/sample-gate.test/client/input.hpp>
 
+#include <freerdp/client/channels.h>
 #include <array>
 #include <string>
 

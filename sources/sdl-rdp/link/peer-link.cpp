@@ -10,7 +10,6 @@
 #include <freerdp/channels/wtsvc.h>
 #include <freerdp/settings.h>
 #include <freerdp/svc.h>
-#include <winpr/synch.h>
 #include <array>
 #include <cstdint>
 #include <utility>

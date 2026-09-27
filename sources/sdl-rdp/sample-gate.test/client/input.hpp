@@ -1,6 +1,5 @@
 #pragma once
 #include <freerdp/client/ainput.h>
-#include <freerdp/client/channels.h>
 #include <freerdp/client/rdpei.h>
 #include <sdl-rdp/headless-client.test/client/channels.hpp>
 #include <sdl-rdp/headless-client.test/client/client.hpp>
