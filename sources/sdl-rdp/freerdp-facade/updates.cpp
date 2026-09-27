@@ -19,7 +19,7 @@
 namespace sdl_rdp::freerdp_facade::detail::updates {
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
-using sdl_rdp::utilities::PixelBytes;
+using sdl_rdp::utilities::Stride;
 using sdl_rdp::utilities::Unreachable;
 
 namespace {
@@ -166,7 +166,7 @@ auto Updates::HidePointer() -> bool {
 auto ConvertPixels(std::span<std::uint8_t const> bgrx, Extent size, PixelFormat format) -> std::vector<std::byte> {
   auto const code   = Code(format);
   auto const stride = PackedStride(size.width, FreeRDPGetBitsPerPixel(code));
-  auto const source = Narrowed<std::uint32_t>(std::size_t{ size.width } * PixelBytes);
+  auto const source = Stride(size.width);
   Expects(bgrx.size() >= std::size_t{ source } * size.height, "the source covers every pixel");
   std::vector<std::byte> converted(std::size_t{ stride } * size.height);
   auto const             target    = oxbox::utilities::SpanCast<std::uint8_t>(std::span{ converted });

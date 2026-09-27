@@ -34,7 +34,7 @@ class LegacyFrame : private Pinned {
 public:
        LegacyFrame(PeerLink& link, Configuration const& configuration, Activation& activation, PeerFrames& frames,
                    FramePacing& pacing, Encoder& encoder, Scaler& scaler) noexcept;
-  auto Prepare()                  -> bool;
+  auto Prepare()                  -> void;
   auto Encode()                   -> bool;
   auto Send()                     -> bool;
   auto Delivered() const noexcept -> bool;
@@ -52,7 +52,7 @@ private:
     std::vector<Packet>        packets;
     std::optional<std::size_t> next;
   };
-  auto SelectEncoder()                                                                                     -> bool;
+  auto SelectEncoder()                                                                                     -> void;
   auto AppendPlanar(Packet& packet, std::size_t& wire_size, Rect area, std::span<std::byte const> payload) -> void;
   auto AppendBand(PixelBand band)                                                                          -> bool;
   auto Finish()                                                                                            -> bool;

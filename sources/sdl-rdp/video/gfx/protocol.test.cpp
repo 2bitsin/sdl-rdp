@@ -96,8 +96,8 @@ auto ThenRegionBounds(Regions const& regions) -> void {
   EXPECT_EQ(regions.Bounds().h, 21);
 }
 auto ThenRegionQuality(auto const& q) -> void {
-  EXPECT_EQ(q.qpVal, 0x9a);
-  EXPECT_EQ(q.qualityVal, 100);
+  EXPECT_EQ(q.qp_value, 0x9a);
+  EXPECT_EQ(q.quality_value, 100);
   EXPECT_EQ(q.p, 1);
   EXPECT_EQ(q.qp, 26);
 }

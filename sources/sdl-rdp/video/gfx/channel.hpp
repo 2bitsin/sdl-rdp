@@ -2,13 +2,13 @@
 #include <sdl-rdp/configuration/forward.hpp>
 #include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/diagnostics/forward.hpp>
+#include <sdl-rdp/freerdp-facade/progressive-encoder.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/link/dynamic-channels.hpp>
 #include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
-#include <sdl-rdp/utilities/stopwatch.hpp>
 #include <sdl-rdp/video/avc/encoder.hpp>
 #include <sdl-rdp/video/avc/encoding.hpp>
 #include <sdl-rdp/video/avc/regions.hpp>
@@ -16,7 +16,6 @@
 #include <sdl-rdp/video/frame/forward.hpp>
 #include <sdl-rdp/video/gfx/protocol.hpp>
 
-#include <freerdp/codec/progressive.h>
 #include <freerdp/server/rdpgfx.h>
 #include <chrono>
 #include <cstddef>
@@ -31,6 +30,7 @@ namespace sdl_rdp::video::gfx::detail::channel {
 using sdl_rdp::configuration::Codec;
 using sdl_rdp::configuration::Configuration;
 using sdl_rdp::diagnostics::Diagnostics;
+using sdl_rdp::freerdp_facade::ProgressiveEncoder;
 using sdl_rdp::freerdp_facade::WaitHandle;
 using sdl_rdp::link::Activation;
 using sdl_rdp::link::DynamicChannel;
@@ -40,7 +40,6 @@ using sdl_rdp::utilities::Extent;
 using sdl_rdp::utilities::Pinned;
 using sdl_rdp::utilities::Rect;
 using sdl_rdp::utilities::Releases;
-using sdl_rdp::utilities::Stopwatch;
 using sdl_rdp::video::avc::Encoder;
 using sdl_rdp::video::avc::EncodingTimes;
 using sdl_rdp::video::avc::Regions;
@@ -85,10 +84,8 @@ private:
   auto FailureSource() const noexcept                                           -> Diagnostics const&;
   auto Ack(RDPGFX_FRAME_ACKNOWLEDGE_PDU const& ack)                             -> std::uint32_t;
   auto Qoe(RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU const& ack)                         -> std::uint32_t;
-  auto CompressProgressive(REGION16& damage, Stopwatch const& watch)            -> bool;
   auto CodecChoice()                                                            -> Codec;
   auto AvcFailure()                                                             -> std::string;
-  auto ProgressiveDamage(REGION16& damage) const                                -> bool;
   auto FinishFrame()                                                            -> bool;
   auto LogCapabilities(std::span<RDPGFX_CAPSET const> advertised) const         -> void;
   auto ActivateCapabilities(RDPGFX_CAPSET const& selected, bool wanted)         -> std::uint32_t;
@@ -109,15 +106,14 @@ private:
   auto WriteCommand(Packet const& packet)                                       -> bool;
   auto Command(Rect area, std::span<std::byte const> data, std::uint32_t codec) -> bool;
   auto Check(std::uint32_t result, std::string_view operation) const            -> bool;
-  using GraphicsContext    = std::unique_ptr<RdpgfxServerContext, Releases<rdpgfx_server_context_free>>;
-  using ProgressiveContext = std::unique_ptr<PROGRESSIVE_CONTEXT, Releases<progressive_context_free>>;
+  using GraphicsContext = std::unique_ptr<RdpgfxServerContext, Releases<rdpgfx_server_context_free>>;
   PeerLink&                                  _link;
   Diagnostics const&                         _diagnostics;
   Configuration const&                       _configuration;
   Activation&                                _activation;
   FrameSources                               _sources;
   GraphicsContext                            _context;
-  ProgressiveContext                         _progressive;
+  std::optional<ProgressiveEncoder>          _progressive;
   Encoder                                    _avc;
   GraphicsTiming                             _timing;
   DynamicChannel&                            _owner;

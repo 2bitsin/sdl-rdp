@@ -86,6 +86,7 @@ TEST(RectDeathTest, UnionAndTouchesRejectANegativeExtent) {
 }
 TEST(Rect, BytesCountFourOctetsPerPixel) {
   EXPECT_EQ(RowBytes(320), 1280u);
+  EXPECT_EQ(Stride(320), 1280u);
   EXPECT_EQ(AreaBytes({ 7, 9, 320, 200 }), 256000u);
 }
 TEST(RectDeathTest, BytesRejectANegativeExtent) {

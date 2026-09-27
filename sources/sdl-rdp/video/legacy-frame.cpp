@@ -55,21 +55,20 @@ LegacyFrame::LegacyFrame(PeerLink& link, Configuration const& configuration, Act
                          FramePacing& pacing, Encoder& encoder, Scaler& scaler) noexcept
     : _link{ link }, _configuration{ configuration }, _activation{ activation }, _frames{ frames }, _pacing{ pacing },
       _encoder{ encoder }, _scaler{ scaler } { }
-auto LegacyFrame::SelectEncoder() -> bool {
+auto LegacyFrame::SelectEncoder() -> void {
   auto const previous = _encoder.SelectedCodec();
-  if (!_encoder.Select(_link.Connection().Settings(), _configuration.CodecPreference())) return false;
+  _encoder.Select(_link.Connection().Settings(), _configuration.CodecPreference());
   if (previous != _encoder.SelectedCodec()) _activation.CodecChanged(_encoder.SelectedCodec());
-  return true;
 }
 auto LegacyFrame::Marker(FrameAction action) -> bool {
   if (!_link.Connection().Settings().Get(BoolKey::FrameMarkerCommandEnabled)) return true;
   return Updates{ _link.Connection() }.FrameMarker(action, _pacing.Frame());
 }
-auto LegacyFrame::Prepare() -> bool {
+auto LegacyFrame::Prepare() -> void {
   ExpectCaptured(_frames);
   _queue.packets.clear();
   _queue.next.reset();
-  if (!SelectEncoder()) return false;
+  SelectEncoder();
   auto const settings = _link.Connection().Settings();
   auto const depth    = settings.Get(NumberKey::ColorDepth);
   auto const wire     = depth != 32 ? LegacyWire::Bitmap
@@ -77,7 +76,6 @@ auto LegacyFrame::Prepare() -> bool {
                         : settings.Get(BoolKey::SurfaceCommandsEnabled) ? LegacyWire::Surface
                                                                         : LegacyWire::Bitmap;
   _format = { .depth = depth, .codec = wire == LegacyWire::Surface ? _encoder.Id(settings) : 0, .wire = wire };
-  return true;
 }
 auto LegacyFrame::AppendPlanar(Packet& packet, std::size_t& wire_size, Rect area, std::span<std::byte const> payload)
     -> void {

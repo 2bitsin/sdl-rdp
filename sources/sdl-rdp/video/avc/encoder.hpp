@@ -1,4 +1,5 @@
 #pragma once
+#include <sdl-rdp/diagnostics/forward.hpp>
 #include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 #include <sdl-rdp/video/avc/encoding.hpp>
@@ -11,12 +12,13 @@
 #include <vector>
 
 namespace sdl_rdp::video::avc::detail::encoder {
+using sdl_rdp::diagnostics::Diagnostics;
 using sdl_rdp::utilities::Extent;
 using sdl_rdp::utilities::Pinned;
 
 class Encoder : private Pinned {
 public:
-              Encoder();
+  explicit    Encoder(Diagnostics const& diagnostics);
               ~Encoder();
   static auto Available()                                                 -> bool;
   static auto UnavailableReason()                                         -> std::string;

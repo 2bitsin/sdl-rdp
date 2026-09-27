@@ -56,6 +56,8 @@ enum class StringKey : std::uint8_t {
   Username,
 };
 enum class EncryptionLevel : std::uint8_t { ClientCompatible };
+// The surface bits codec id of uncompressed pixels; RemoteFxCodecId and NSCodecId name the others.
+inline constexpr std::uint32_t NoCodecId = 0;
 struct LargePointerSizes {
   bool up_to_96x96  { };
   bool up_to_384x384{ };
@@ -116,6 +118,7 @@ namespace sdl_rdp::freerdp_facade {
 using detail::settings::BoolKey;
 using detail::settings::EncryptionLevel;
 using detail::settings::LargePointerSizes;
+using detail::settings::NoCodecId;
 using detail::settings::NumberKey;
 using detail::settings::ReconnectCookie;
 using detail::settings::SettingsReader;

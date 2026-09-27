@@ -47,7 +47,10 @@ auto FrameSender::Transmit(EncodeState kind) -> bool {
 auto FrameSender::Prepare() -> bool {
   if (_state == EncodeState::LegacyReady) return SendLegacy();
   auto const confirmed = _graphics.Confirmed();
-  if (!(confirmed ? _graphics.Channel().Prepare() : _legacy.Prepare())) return false;
+  if (!confirmed)
+    _legacy.Prepare();
+  else if (!_graphics.Channel().Prepare())
+    return false;
   Transition(confirmed ? EncodeState::Graphics : EncodeState::Legacy);
   return true;
 }

@@ -19,9 +19,9 @@
 #include <sdl-rdp/video/peer-frames.hpp>
 #include <sdl-rdp/video/scaler.hpp>
 
+#include <freerdp/codec/color.h>
 #include <oxbox/utilities/span.hpp>
 #include <oxbox/utilities/text.hpp>
-#include <winpr/sysinfo.h>
 #include <algorithm>
 #include <array>
 #include <concepts>
@@ -31,6 +31,7 @@
 #include <memory>
 #include <numeric>
 #include <ranges>
+#include <type_traits>
 #include <utility>
 
 namespace sdl_rdp::video::gfx::detail::channel {
@@ -45,12 +46,16 @@ using sdl_rdp::utilities::Ensures;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::OperationName;
-using sdl_rdp::utilities::PixelBytes;
+using sdl_rdp::utilities::RowBytes;
 using sdl_rdp::utilities::SameSize;
+using sdl_rdp::utilities::Stride;
+using sdl_rdp::utilities::Stopwatch;
 using sdl_rdp::utilities::Unreachable;
 using sdl_rdp::utilities::Whole;
 using sdl_rdp::video::avc::Bitrate;
+using sdl_rdp::video::avc::QuantQuality;
 using sdl_rdp::video::avc::ReplicateEdges;
+using sdl_rdp::video::avc::WireRect;
 using sdl_rdp::video::EncodePlanarRows;
 using sdl_rdp::video::frame::AcknowledgementMode;
 
@@ -88,7 +93,7 @@ GfxChannel::GfxChannel(PeerLink& link, Diagnostics const& diagnostics, Configura
                        Activation& activation, FrameSources sources, DynamicChannel& owner)
     : _link{ link }, _diagnostics{ diagnostics }, _configuration{ configuration }, _activation{ activation },
       _sources{ sources }, _context{ link.Channels().Create<GraphicsContext, rdpgfx_server_context_new>() },
-      _owner{ owner } { }
+      _avc{ diagnostics }, _owner{ owner } { }
 GfxChannel::~GfxChannel() = default;
 auto GfxChannel::Assign(std::uint32_t id) -> bool {
   _assignment.emplace(_link.Dynamic().Assign(id, _owner));
@@ -124,6 +129,7 @@ auto GfxChannel::LogCapabilities(std::span<RDPGFX_CAPSET const> advertised) cons
     return std::format("version=0x{:08x} flags=0x{:08x};", cap.version, cap.flags);
   });
   _diagnostics.Log(LogLevel::Info, "GFX advertised sets: " + sets);
+  if (!Encoder::Available()) _diagnostics.Log(LogLevel::Warn, "AVC420 unavailable: " + Encoder::UnavailableReason());
 }
 auto GfxChannel::ActivateCapabilities(RDPGFX_CAPSET const& selected, bool wanted) -> std::uint32_t {
   auto const codec      = _sources.encoder.get().SelectedCodec();
@@ -222,7 +228,6 @@ auto GfxChannel::FailureSource() const noexcept -> Diagnostics const& {
   return _diagnostics;
 }
 namespace {
-using InitializedRegion = std::unique_ptr<REGION16, Releases<region16_uninit>>;
 constexpr std::size_t   ProgressiveSyncBytes        = 12;
 constexpr std::size_t   ProgressiveContextBytes     = 10;
 constexpr std::size_t   ProgressiveBlockHeaderBytes = sizeof(std::uint16_t) + sizeof(std::uint32_t);
@@ -230,6 +235,9 @@ constexpr auto          ProgressiveHeaderBytes      = ProgressiveSyncBytes + Pro
 constexpr std::uint16_t ProgressiveSyncBlock        = 0xCCC0;
 constexpr std::uint16_t ProgressiveContextBlock     = 0xCCC3;
 constexpr std::size_t   WireToSurfaceHeaderBytes    = 25;
+// abi: the AVC420 metablock points at FreeRDP's own structs, which the project's wire structs match.
+static_assert(std::is_layout_compatible_v<WireRect, RECTANGLE_16>);
+static_assert(std::is_layout_compatible_v<QuantQuality, RDPGFX_H264_QUANT_QUALITY>);
 auto SurfaceCommand(Rect area, std::span<std::byte> data, std::uint32_t codec) -> RDPGFX_SURFACE_COMMAND {
   RDPGFX_SURFACE_COMMAND command{ };
   command.surfaceId = GraphicsSurfaceId;
@@ -271,7 +279,7 @@ auto EachArea(bool confirmed, Extent surface, Scaler const& scaler, std::predica
   return std::ranges::all_of(scaler.Areas(), send);
 }
 auto SurfaceStride(Extent surface) -> std::uint32_t {
-  return Aligned(surface.width) * std::uint32_t{ PixelBytes };
+  return Stride(Aligned(surface.width));
 }
 auto ExpectInside(Rect area, Extent surface) -> void {
   Expects(area.x >= 0, "command left edge is nonnegative");
@@ -316,23 +324,6 @@ auto GfxChannel::AvcFailure() -> std::string {
   auto const   opened  = _avc.Open(size, Bitrate(size, _configuration.AvcBitrate()), _avc_rate);
   return opened ? std::string{ } : _avc.Error();
 }
-auto GfxChannel::CompressProgressive(REGION16& damage, Stopwatch const& watch) -> bool {
-  std::uint8_t* data    = nullptr;
-  std::uint32_t size    = 0;
-  auto          picture { Picture()               };
-  auto          stride  { SurfaceStride(_surface) };
-  auto          result  = progressive_compress(_progressive.get(), picture.data(), picture.size(), PIXEL_FORMAT_BGRX32,
-                                               _surface.width, _surface.height, stride, &damage, &data, &size);
-  _sources.encoder.get().Charge(watch.Elapsed());
-  return result >= 0 && data && ProgressivePayload(oxbox::utilities::AsBytes(std::span{ data, size }));
-}
-auto GfxChannel::ProgressiveDamage(REGION16& damage) const -> bool {
-  return std::ranges::all_of(_sources.scaler.get().Areas(), [&](Rect area) {
-    RECTANGLE_16 const wire{ Narrowed<std::uint16_t>(area.x), Narrowed<std::uint16_t>(area.y),
-                             Narrowed<std::uint16_t>(area.x + area.w), Narrowed<std::uint16_t>(area.y + area.h) };
-    return region16_union_rect(&damage, &damage, &wire);
-  });
-}
 auto GfxChannel::AvcTimes() const -> std::optional<EncodingTimes> {
   Expects(!_prepared.empty(), "accounting a prepared frame");
   if (_prepared.front().codec != RDPGFX_CODECID_AVC420) return std::nullopt;
@@ -350,7 +341,7 @@ auto GfxChannel::Select() -> bool {
   auto preference = _configuration.CodecPreference();
   auto choice     = CodecChoice();
   auto previous   = _sources.encoder.get().SelectedCodec();
-  if (choice == Codec::Planar && !_sources.encoder.get().SetupPlanar(_link.Connection().Settings(), true)) return false;
+  if (choice == Codec::Planar) _sources.encoder.get().SetupPlanar(_link.Connection().Settings(), true);
   // Raw and planar do not populate the persistent progressive surface.
   if (previous != choice && Persistent(choice) && _sources.frames.get().Snapshot()) _sources.frames.get().Include();
   if (previous != choice) _force_idr = true;
@@ -382,9 +373,9 @@ auto GfxChannel::Picture() -> std::span<std::uint8_t const> {
   auto const& snapshot = _sources.frames.get().Snapshot();
   ExpectCaptured(_sources.frames.get());
   if (SameSize(snapshot.Bounds(), Whole(_surface))) return snapshot.Pixels();
-  auto const pitch = std::size_t{ Aligned(_surface.width) } * PixelBytes;
+  auto const pitch = std::size_t{ SurfaceStride(_surface) };
   std::ranges::for_each(_sources.scaler.get().Areas(), [&](Rect area) {
-    auto const offset = (Narrowed<std::size_t>(area.y) * pitch) + (Narrowed<std::size_t>(area.x) * PixelBytes);
+    auto const offset = (Narrowed<std::size_t>(area.y) * pitch) + RowBytes(area.x);
     _sources.scaler.get().Place(area, std::span(_pixels).subspan(offset), pitch);
   });
   ReplicateEdges(_pixels, _surface);
@@ -420,22 +411,24 @@ auto GfxChannel::WriteCommand(Packet const& packet) -> bool {
   ExpectInside(packet.area, _surface);
   auto const                  data    = std::span(_payload).subspan(packet.offset, packet.length);
   auto                        command = SurfaceCommand(packet.area, data, packet.codec);
-  RDPGFX_AVC420_BITMAP_STREAM stream  { { Narrowed<std::uint32_t>(_regions.Areas().size()), _regions.Areas().data(),
-                                          _regions.Quality().data() },
-                                        Narrowed<std::uint32_t>(data.size()),
-                                        oxbox::utilities::SpanCast<std::uint8_t>(data).data() };
+  RDPGFX_AVC420_BITMAP_STREAM stream  {
+    { Narrowed<std::uint32_t>(_regions.Areas().size()),
+      oxbox::utilities::SpanCast<RECTANGLE_16>(_regions.Areas()).data(),
+      oxbox::utilities::SpanCast<RDPGFX_H264_QUANT_QUALITY>(_regions.Quality()).data() },
+    Narrowed<std::uint32_t>(data.size()),
+    oxbox::utilities::SpanCast<std::uint8_t>(data).data()
+  };
   if (packet.codec == RDPGFX_CODECID_AVC420) command.extra = &stream;
   return Check(_context->SurfaceCommand(_context.get(), &command), "surface command");
 }
 auto GfxChannel::Progressive() -> bool {
   ExpectSurface(_confirmed, _surface);
   Stopwatch const watch;
-  if (!_progressive) _progressive.reset(progressive_context_new_ex(true, THREADING_FLAGS_DISABLE_THREADS));
-  if (!_progressive) return false;
-  REGION16 damage;
-  region16_init(&damage);
-  InitializedRegion const owned{ &damage };
-  return ProgressiveDamage(damage) && CompressProgressive(damage, watch);
+  if (!_progressive) _progressive.emplace();
+  auto const damage  = _sources.scaler.get().Areas();
+  auto const encoded = _progressive->Compress(Picture(), SurfaceStride(_surface), _surface, damage);
+  _sources.encoder.get().Charge(watch.Elapsed());
+  return encoded && ProgressivePayload(*encoded);
 }
 auto GfxChannel::ProgressivePayload(std::span<std::byte const> data) -> bool {
   if (!ProgressiveHeaders(data)) return false;

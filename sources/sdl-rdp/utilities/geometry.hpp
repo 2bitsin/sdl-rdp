@@ -56,6 +56,9 @@ inline auto ExpectsArea(Rect area, std::source_location where = std::source_loca
 inline auto RowBytes(int width) -> std::size_t {
   return Narrowed<std::size_t>(width) * PixelBytes;
 }
+inline auto Stride(std::uint32_t width) -> std::uint32_t {
+  return Narrowed<std::uint32_t>(std::size_t{ width } * PixelBytes);
+}
 inline auto AreaBytes(Rect area) -> std::size_t {
   return RowBytes(area.w) * Narrowed<std::size_t>(area.h);
 }
@@ -102,6 +105,7 @@ using detail::geometry::RowBytes;
 using detail::geometry::Rows;
 using detail::geometry::SameSize;
 using detail::geometry::SizeOf;
+using detail::geometry::Stride;
 using detail::geometry::Touches;
 using detail::geometry::Union;
 using detail::geometry::Whole;

@@ -11,6 +11,7 @@ using std::string_view;
 
 using ChannelOpenFailed  = RuntimeFailure<"ChannelOpenFailed"_hash, "Virtual channel {} open failed.", string_view>;
 using ChannelQueryFailed = RuntimeFailure<"ChannelQueryFailed"_hash, "Virtual channel event query failed.">;
+using CodecSetupFailed   = RuntimeFailure<"CodecSetupFailed"_hash, "{} codec setup failed.", string_view>;
 using CredentialFailed   = RuntimeFailure<"CredentialFailed"_hash, "Server credential {} failed.", string_view>;
 using EventWaitFailed    = RuntimeFailure<"EventWaitFailed"_hash, "Event readiness wait failed.">;
 using LibraryInitFailed  = RuntimeFailure<"LibraryInitFailed"_hash, "{} initialisation failed.", string_view>;
@@ -22,6 +23,7 @@ using PeerContextFailed  = RuntimeFailure<"PeerContextFailed"_hash, "{} peer con
 namespace sdl_rdp::freerdp_facade {
 using detail::exceptions::ChannelOpenFailed;
 using detail::exceptions::ChannelQueryFailed;
+using detail::exceptions::CodecSetupFailed;
 using detail::exceptions::CredentialFailed;
 using detail::exceptions::EventWaitFailed;
 using detail::exceptions::LibraryInitFailed;

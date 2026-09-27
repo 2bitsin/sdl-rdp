@@ -16,14 +16,9 @@ sources/sdl-rdp/peer/redirection.cpp: 1
 sources/sdl-rdp/peer/status.hpp: 1
 sources/sdl-rdp/session/listener.cpp: 1
 sources/sdl-rdp/session/session.cpp: 1
-sources/sdl-rdp/video/acknowledgement-window.cpp: 1
-sources/sdl-rdp/video/avc/encoder.cpp: 2
-sources/sdl-rdp/video/avc/regions.hpp: 1
 sources/sdl-rdp/video/display-control.hpp: 1
-sources/sdl-rdp/video/encoder.cpp: 1
-sources/sdl-rdp/video/encoder.hpp: 4
 sources/sdl-rdp/video/gfx/channel.cpp: 1
-sources/sdl-rdp/video/gfx/channel.hpp: 2
+sources/sdl-rdp/video/gfx/channel.hpp: 1
 sources/sdl-rdp/video/gfx/protocol.hpp: 2
 
 [names]
@@ -47,16 +42,10 @@ sources/sdl-rdp/peer/redirection.cpp: 3
 sources/sdl-rdp/peer/status.hpp: 1
 sources/sdl-rdp/session/listener.cpp: 1
 sources/sdl-rdp/session/session.cpp: 2
-sources/sdl-rdp/video/acknowledgement-window.cpp: 1
-sources/sdl-rdp/video/avc/encoder.cpp: 7
-sources/sdl-rdp/video/avc/regions.cpp: 2
-sources/sdl-rdp/video/avc/regions.hpp: 4
 sources/sdl-rdp/video/display-control.cpp: 15
 sources/sdl-rdp/video/display-control.hpp: 4
-sources/sdl-rdp/video/encoder.cpp: 34
-sources/sdl-rdp/video/encoder.hpp: 8
-sources/sdl-rdp/video/gfx/channel.cpp: 59
-sources/sdl-rdp/video/gfx/channel.hpp: 13
+sources/sdl-rdp/video/gfx/channel.cpp: 51
+sources/sdl-rdp/video/gfx/channel.hpp: 9
 sources/sdl-rdp/video/gfx/protocol.hpp: 34
 
 [facade headers]

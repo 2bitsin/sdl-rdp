@@ -6,6 +6,7 @@
 #include <sdl-rdp/utilities/releases.hpp>
 #include <sdl-rdp/utilities/wiped-string.hpp>
 
+#include <freerdp/constants.h>
 #include <freerdp/crypto/certificate.h>
 #include <freerdp/crypto/privatekey.h>
 #include <freerdp/settings.h>
@@ -72,6 +73,7 @@ constexpr Table<StringKey, FreeRDP_Settings_Keys_String, 6>  StringKeys{ {
 } };
 // MS-RDPBCGR 2.2.4.2: ARC_SC_PRIVATE_PACKET's cbLen is always 28.
 constexpr std::uint32_t CookieLength = 28;
+static_assert(NoCodecId == RDP_CODEC_ID_NONE);
 static_assert(sizeof(ReconnectCookie::random_bits) == sizeof(ARC_SC_PRIVATE_PACKET::arcRandomBits));
 using ServerKey         = std::unique_ptr<rdpPrivateKey, Releases<freerdp_key_free>>;
 using ServerCertificate = std::unique_ptr<rdpCertificate, Releases<freerdp_certificate_free>>;

@@ -34,7 +34,7 @@ auto Peer::Activate() -> bool {
   }
   auto& connection = _link.Connection();
   if (!_authenticator.VerifySettings() || !connection.OfferReconnect(SessionLogonId)) return false;
-  if (!_encoder.Select(connection.Settings(), _configuration.CodecPreference())) return false;
+  _encoder.Select(connection.Settings(), _configuration.CodecPreference());
   _arrival.Admit(_encoder.SelectedCodec());
   return true;
 }

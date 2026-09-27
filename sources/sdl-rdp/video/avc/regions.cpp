@@ -20,18 +20,20 @@ auto Regions::Add(Rect area) -> void {
   Expects(area.x + area.w <= 32766, "region right edge fits wire");
   Expects(area.y + area.h <= 32766, "region bottom edge fits wire");
   bounds = areas.empty() ? area : Union(bounds, area);
-  areas.push_back({ Narrowed<std::uint16_t>(area.x), Narrowed<std::uint16_t>(area.y),
-                    Narrowed<std::uint16_t>(area.x + area.w), Narrowed<std::uint16_t>(area.y + area.h) });
-  quality.push_back({ 0x9a, 100, 26, 0, 1 });
+  areas.push_back({ .left   = Narrowed<std::uint16_t>(area.x),
+                    .top    = Narrowed<std::uint16_t>(area.y),
+                    .right  = Narrowed<std::uint16_t>(area.x + area.w),
+                    .bottom = Narrowed<std::uint16_t>(area.y + area.h) });
+  quality.push_back({ .qp_value = 0x9a, .quality_value = 100, .qp = 26, .r = 0, .p = 1 });
 }
 auto Regions::Bytes() const -> std::size_t {
   Expects(areas.size() == quality.size(), "every region has quantization metadata");
   return 4 + (10 * areas.size());
 }
-auto Regions::Areas() -> std::vector<RECTANGLE_16>& {
+auto Regions::Areas() -> std::span<WireRect> {
   return areas;
 }
-auto Regions::Quality() -> std::vector<RDPGFX_H264_QUANT_QUALITY>& {
+auto Regions::Quality() -> std::span<QuantQuality> {
   return quality;
 }
 auto Regions::Bounds() const -> Rect {

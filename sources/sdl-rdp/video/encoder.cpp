@@ -2,48 +2,31 @@
 
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/geometry.hpp>
-#include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/utilities/stopwatch.hpp>
 
-#include <freerdp/settings_types.h>
-#include <oxbox/utilities/span.hpp>
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 
 namespace sdl_rdp::video::detail::encoder {
 using sdl_rdp::configuration::Codec;
 using sdl_rdp::freerdp_facade::BoolKey;
+using sdl_rdp::freerdp_facade::NoCodecId;
 using sdl_rdp::freerdp_facade::NumberKey;
-using sdl_rdp::utilities::Ensures;
+using sdl_rdp::freerdp_facade::PlanarOptions;
+using sdl_rdp::freerdp_facade::SurfaceCodec;
 using sdl_rdp::utilities::Expects;
-using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::PixelBytes;
 using sdl_rdp::utilities::Stopwatch;
 using sdl_rdp::utilities::Unreachable;
 
-auto FreeStream(wStream* stream) noexcept -> void {
-  Stream_Free(stream, true);
-}
 namespace {
-constexpr std::size_t InitialStreamCapacity = 64uz * 1024;
-auto PrepareRemoteFx(RemoteFxContext& rfx) -> bool {
-  if (!rfx) rfx.reset(rfx_context_new_ex(true, THREADING_FLAGS_DISABLE_THREADS));
-  if (rfx) rfx_context_set_pixel_format(rfx.get(), PIXEL_FORMAT_BGRX32);
-  return rfx != nullptr;
-}
-auto PrepareNsCodec(NsCodecContext& nsc) -> bool {
-  if (!nsc) nsc.reset(nsc_context_new());
-  return nsc && nsc_context_set_parameters(nsc.get(), NSC_COLOR_FORMAT, PIXEL_FORMAT_BGRX32)
-         && nsc_context_set_parameters(nsc.get(), NSC_COLOR_LOSS_LEVEL, 1)
-         && nsc_context_set_parameters(nsc.get(), NSC_ALLOW_SUBSAMPLING, 0);
-}
-auto CompressRow(BITMAP_PLANAR_CONTEXT& context, std::span<std::uint8_t const> pixels, std::uint32_t width,
-                 std::span<std::byte> out, std::uint32_t& size) -> bool {
-  return nullptr
-         != freerdp_bitmap_compress_planar(&context, pixels.data(), PIXEL_FORMAT_BGRA32, width, 1, width * PixelBytes,
-                                           oxbox::utilities::SpanCast<std::uint8_t>(out).data(), &size);
+// Select prepares the encoder of the codec it selects, so an unprepared one is a codec set without Select.
+template <class EncoderTy> auto Prepared(std::optional<EncoderTy>& encoder, Codec codec) -> EncoderTy& {
+  if (!encoder) Unreachable(codec);
+  return *encoder;
 }
 auto Available(SettingsReader settings, Codec codec) -> bool {
   auto surface = settings.Get(BoolKey::SurfaceCommandsEnabled);
@@ -59,102 +42,60 @@ auto Available(SettingsReader settings, Codec codec) -> bool {
   }
 }
 }
-auto Encoder::SetupPlanar(SettingsReader settings, bool xrgb) -> bool {
-  auto alpha = xrgb || settings.Get(BoolKey::DrawAllowSkipAlpha);
-  if (planar.skip_alpha != alpha) {
-    planar.context.reset();
-    planar.width = 0;
-  }
-  planar.skip_alpha    = alpha;
-  planar.dynamic_color = settings.Get(BoolKey::DrawAllowDynamicColorFidelity);
-  if (!stream) stream.reset(Stream_New(nullptr, InitialStreamCapacity));
-  if (!planar.context)
-    planar.context.reset(freerdp_bitmap_planar_context_new(
-        PLANAR_FORMAT_HEADER_RLE | (planar.skip_alpha ? PLANAR_FORMAT_HEADER_NA : 0), 1, 1));
-  return stream && planar.context;
+auto Encoder::SetupPlanar(SettingsReader settings, bool xrgb) -> void {
+  PlanarOptions const options{ .skip_alpha    = xrgb || settings.Get(BoolKey::DrawAllowSkipAlpha),
+                               .dynamic_color = settings.Get(BoolKey::DrawAllowDynamicColorFidelity) };
+  if (planar)
+    planar->Configure(options);
+  else
+    planar.emplace(options);
 }
-auto Encoder::InitializeCodec(SettingsReader settings) -> bool {
+auto Encoder::Prepare(SettingsReader settings) -> void {
   switch (codec) {
-  case Codec::Planar:   return SetupPlanar(settings);
-  case Codec::RemoteFx: return PrepareRemoteFx(remote_fx.context);
-  case Codec::NsCodec:  return PrepareNsCodec(nsc);
-  case Codec::Raw:      return true;
-  default:              Unreachable(codec);
+  case Codec::Planar: SetupPlanar(settings); return;
+  case Codec::RemoteFx:
+    if (!remote_fx) remote_fx.emplace(SurfaceCodec::RemoteFx);
+    return;
+  case Codec::NsCodec:
+    if (!nsc) nsc.emplace(SurfaceCodec::NsCodec);
+    return;
+  case Codec::Raw: return;
+  default:         Unreachable(codec);
   }
 }
-auto Encoder::Select(SettingsReader settings, Codec preference) -> bool {
+auto Encoder::Select(SettingsReader settings, Codec preference) -> void {
   if (settings.Get(NumberKey::ColorDepth) != 32) preference = Codec::Raw;
   constexpr std::array choices{ Codec::RemoteFx, Codec::NsCodec, Codec::Planar, Codec::Raw };
   codec = Available(settings, preference)
               ? preference
               : *std::ranges::find_if(choices, [&](auto choice) { return Available(settings, choice); });
-  if (!stream) stream.reset(Stream_New(nullptr, InitialStreamCapacity));
-  if (!stream) return false;
-  return InitializeCodec(settings);
+  Prepare(settings);
 }
 auto Encoder::Encode(std::span<std::uint8_t const> pixels, std::uint32_t width, std::uint32_t height) -> bool {
-  Stopwatch const watch;
-  auto const      result = EncodePayload(pixels, width, height);
-  Charge(watch.Elapsed());
-  return result;
-}
-auto Encoder::ResetRemoteFx(std::uint32_t width, std::uint32_t height) -> bool {
-  if (width == remote_fx.size.width && height == remote_fx.size.height) return true;
-  if (!rfx_context_reset(remote_fx.context.get(), width, height)) return false;
-  remote_fx.size = { .width = width, .height = height };
-  return true;
-}
-auto Encoder::EncodeRemoteFx(std::span<std::uint8_t const> pixels, std::uint32_t width, std::uint32_t height) -> bool {
-  if (!ResetRemoteFx(width, height)) return false;
-  RFX_RECT const rect{ 0, 0, Narrowed<std::uint16_t>(width), Narrowed<std::uint16_t>(height) };
-  return rfx_compose_message(remote_fx.context.get(), stream.get(), &rect, 1, pixels.data(), width, height, width * 4);
-}
-auto Encoder::EncodePayload(std::span<std::uint8_t const> pixels, std::uint32_t width, std::uint32_t height) -> bool {
   Expects(width, "encoder input is a packed band");
   Expects(height, "encoder input is a packed band");
-  Expects(pixels.size() == std::size_t{ width } * height * 4, "encoder input is a packed band");
-  Stream_SetPosition(stream.get(), 0);
-  if (codec == Codec::Planar) {
-    Expects(height == 1, "planar is row by row until sdl-rdp#42");
-    return EncodePlanar(pixels, width);
-  }
-  bool result = false;
-  if (codec == Codec::RemoteFx) {
-    result = EncodeRemoteFx(pixels, width, height);
-  } else if (codec == Codec::NsCodec)
-    result = nsc_compose_message(nsc.get(), stream.get(), pixels.data(), width, height, width * 4);
-  else
-    Unreachable(codec);
-  payload = oxbox::utilities::AsWritableBytes(
-      std::span{ Stream_Buffer(stream.get()), Stream_GetPosition(stream.get()) });
-  return result;
+  Expects(pixels.size() == std::size_t{ width } * height * PixelBytes, "encoder input is a packed band");
+  Stopwatch const watch;
+  auto const      encoded = Encoded(pixels, { .width = width, .height = height });
+  Charge(watch.Elapsed());
+  payload = encoded.value_or(std::span<std::byte const>{ });
+  return encoded.has_value();
 }
-auto Encoder::EncodePlanar(std::span<std::uint8_t const> pixels, std::uint32_t width) -> bool {
-  Expects(planar.context != nullptr, "planar context exists");
-  Expects(pixels.size() == std::size_t{ width } * PixelBytes, "planar input is one row");
-  if (width > planar.width) {
-    if (!freerdp_bitmap_planar_context_reset(planar.context.get(), width, 1)) return false;
-    planar.width = width;
+auto Encoder::Encoded(std::span<std::uint8_t const> pixels, Extent size) -> std::optional<std::span<std::byte const>> {
+  switch (codec) {
+  case Codec::Planar:
+    Expects(size.height == 1, "planar is row by row until sdl-rdp#42");
+    return Prepared(planar, codec).Encode(pixels);
+  case Codec::RemoteFx: return Prepared(remote_fx, codec).Encode(pixels, size);
+  case Codec::NsCodec:  return Prepared(nsc, codec).Encode(pixels, size);
+  default:              Unreachable(codec);
   }
-  auto& compressed = planar.compressed;
-  compressed.resize(pixels.size() + 1024);
-  auto size   = Narrowed<std::uint32_t>(compressed.size());
-  auto result = width >= 4 && CompressRow(*planar.context, pixels, width, compressed, size);
-  if (!result) {
-    planar.fallback.reset(freerdp_bitmap_planar_context_new(planar.skip_alpha ? PLANAR_FORMAT_HEADER_NA : 0, width, 1));
-    if (!planar.fallback) return false;
-    freerdp_planar_switch_bgr(planar.fallback.get(), planar.dynamic_color);
-    result = CompressRow(*planar.fallback, pixels, width, compressed, size);
-  }
-  payload = std::span{ compressed }.first(size);
-  if (result) Ensures(payload.size() <= pixels.size() + 2, "planar row fits bitmap length");
-  return result;
 }
 auto Encoder::Id(SettingsReader settings) const -> std::uint32_t {
   switch (codec) {
   case Codec::RemoteFx: return settings.Get(NumberKey::RemoteFxCodecId);
   case Codec::NsCodec:  return settings.Get(NumberKey::NSCodecId);
-  case Codec::Raw:      return RDP_CODEC_ID_NONE;
+  case Codec::Raw:      return NoCodecId;
   default:              Unreachable(codec);
   }
 }

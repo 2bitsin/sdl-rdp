@@ -1,13 +1,14 @@
 #include <sdl-rdp/video/acknowledgement-window.hpp>
+#include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 
-#include <winpr/synch.h>
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
 
 namespace sdl_rdp::video::detail::acknowledgement_window {
+using sdl_rdp::freerdp_facade::Forever;
 using sdl_rdp::utilities::Narrowed;
 
 auto WaitMilliseconds(std::chrono::nanoseconds remaining, std::int64_t floor) -> std::uint32_t {
@@ -55,7 +56,7 @@ auto AcknowledgementWindow::Open(std::size_t window) const noexcept -> bool {
   return _pending.size() < window;
 }
 auto AcknowledgementWindow::Remaining(Clock::time_point now) const -> std::uint32_t {
-  if (_pending.empty()) return INFINITE;
+  if (_pending.empty()) return Forever;
   return WaitMilliseconds(AcknowledgementTimeout - (now - _pending.front().at), 1);
 }
 auto AcknowledgementWindow::Settled(std::uint64_t target) const noexcept -> bool {

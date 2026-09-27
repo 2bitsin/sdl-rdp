@@ -1,11 +1,13 @@
 #include <sdl-rdp/video/avc/encoder.hpp>
+#include <sdl-rdp/diagnostics/diagnostics.hpp>
+#include <sdl-rdp/freerdp-facade/yuv420.hpp>
 #include <sdl-rdp/picture/geometry.hpp>
+#include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/stopwatch.hpp>
 #include <sdl-rdp/video/avc/encoding.hpp>
 #include <sdl-rdp/video/avc/preset.hpp>
 
-#include <winpr/wlog.h>
 #include <array>
 #include <cstddef>
 #include <string>
@@ -22,21 +24,36 @@ auto LoaderFailure(std::string& detail, std::string_view format, std::string_vie
   sdl_rdp::video::avc::detail::encoder::LoaderFailure(*static_cast<std::string*>(ctx), msg, __VA_ARGS__)
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage): Required by the ffnvcodec loader.
 #define FFNV_DEBUG_LOG_FUNC(ctx, msg, ...) static_cast<void>(0)
-#include <freerdp/primitives.h>
 #include <sdl-rdp/freerdp-facade/nvenc.hpp>
 #include <cstdint>
 #include <ffnvcodec/dynlink_loader.h>
 #include <format>
+#include <functional>
 #include <memory>
+#include <optional>
 #include <span>
+#include <tuple>
 #include <utility>
 
 namespace sdl_rdp::video::avc::detail::encoder {
+using sdl_rdp::diagnostics::LogLevel;
+using sdl_rdp::freerdp_facade::PackedI420;
+using sdl_rdp::freerdp_facade::RgbToYuv420;
 using sdl_rdp::picture::Aligned;
+using sdl_rdp::utilities::Contained;
 using sdl_rdp::utilities::Ensures;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Stopwatch;
 namespace {
+using Reporter = std::optional<std::reference_wrapper<Diagnostics const>>;
+// Release-step reports: destructors reach them, where a sink that throws has nowhere further to go.
+template <class... ArgsTy>
+auto Released(Reporter reporter, int status, std::format_string<ArgsTy const&...> operation,
+              ArgsTy const&... args) noexcept -> void {
+  if (status == 0 || !reporter) return;
+  auto const text = [&] { return std::format("AVC420 {} failed: {}", std::format(operation, args...), status); };
+  std::ignore = Contained([&] { reporter->get().Log(LogLevel::Error, text()); }, [](std::string_view) noexcept { });
+}
 template <auto FREE> struct FreesLibrary {
   auto operator()(auto* functions) const noexcept -> void {
     Expects(functions != nullptr, "unique_ptr releases the library it holds");
@@ -45,24 +62,24 @@ template <auto FREE> struct FreesLibrary {
 };
 class DestroysSession {
 public:
-           DestroysSession() noexcept                    = default;
-  explicit DestroysSession(PNVENCDESTROYENCODER destroy) noexcept : _destroy{ destroy } {
+  DestroysSession() noexcept                                       = default;
+  DestroysSession(PNVENCDESTROYENCODER destroy, Reporter reporter) noexcept
+      : _destroy{ destroy }, _reporter{ reporter } {
     Expects(destroy != nullptr, "the session comes with its API table");
   }
   auto operator()(void* session) const noexcept -> void {
     Expects(session != nullptr, "unique_ptr releases the session it holds");
     Expects(_destroy != nullptr, "the session came with its API table");
-    if (auto const status = _destroy(session); status != NV_ENC_SUCCESS)
-      WLog_ERR("sdlrdp.avc", "AVC420 destroy session failed: %d", int{ status });
+    Released(_reporter, _destroy(session), "destroy session");
   }
 
 private:
-  PNVENCDESTROYENCODER _destroy = nullptr;
+  PNVENCDESTROYENCODER _destroy  = nullptr;
+  Reporter             _reporter;
 };
 using CudaLibrary   = std::unique_ptr<CudaFunctions, FreesLibrary<cuda_free_functions>>;
 using NvencLibrary  = std::unique_ptr<NvencFunctions, FreesLibrary<nvenc_free_functions>>;
 using EncodeSession = std::unique_ptr<void, DestroysSession>;
-enum class Report : std::uint8_t { Logged, Quiet };
 auto LoaderFailure(std::string& detail, std::string_view format, std::string_view name) -> void {
   Expects(format == "Cannot load %s\n", "the loader reports one message shape");
   detail = std::format("cannot load {}", name);
@@ -70,22 +87,21 @@ auto LoaderFailure(std::string& detail, std::string_view format, std::string_vie
 }
 struct Encoder::Impl {
 public:
-  auto Fail(std::string_view operation, std::string_view why, Report report)                -> void;
-  auto Check(int status, std::string_view operation, Report report)                         -> bool;
-  auto Check(int status, std::string_view operation)                                        -> bool;
-  auto Load(Report report)                                                                  -> bool;
-  auto Session()                                                                            -> bool;
-  auto Initialize(std::uint32_t bitrate, std::uint32_t fps)                                 -> bool;
-  auto Parameters(std::uint32_t fps, NV_ENC_CONFIG& config) const                           -> NV_ENC_INITIALIZE_PARAMS;
-  auto Buffers()                                                                            -> bool;
-  auto Capability(NV_ENC_CAPS query, int& value, std::string_view operation)                -> bool;
-  auto MinimumSize()                                                                        -> bool;
-  auto Picture(bool force_idr) const                                                        -> NV_ENC_PIC_PARAMS;
-  auto Fill(std::span<std::uint8_t const> bgrx, std::uint32_t stride, EncodingTimes& times) -> bool;
-  auto Encoded(NV_ENC_PIC_PARAMS& pic, std::vector<std::byte>& encoded, EncodingTimes& times) -> bool;
-  auto Close()                                                                              -> void;
-  template <auto LOAD, class LibraryTy>
-  auto Loaded(LibraryTy& library, std::string_view name, Report report) -> bool;
+  explicit Impl(Reporter reporter) noexcept;
+  auto     Fail(std::string_view operation, std::string_view why)                                 -> void;
+  auto     Check(int status, std::string_view operation)                                          -> bool;
+  auto     Load()                                                                                 -> bool;
+  auto     Session()                                                                              -> bool;
+  auto     Initialize(std::uint32_t bitrate, std::uint32_t fps)                                   -> bool;
+  auto Parameters(std::uint32_t fps, NV_ENC_CONFIG& config) const -> NV_ENC_INITIALIZE_PARAMS;
+  auto     Buffers()                                                                              -> bool;
+  auto     Capability(NV_ENC_CAPS query, int& value, std::string_view operation)                  -> bool;
+  auto     MinimumSize()                                                                          -> bool;
+  auto     Picture(bool force_idr) const                                                          -> NV_ENC_PIC_PARAMS;
+  auto     Fill(std::span<std::uint8_t const> bgrx, std::uint32_t stride, EncodingTimes& times)   -> bool;
+  auto     Encoded(NV_ENC_PIC_PARAMS& pic, std::vector<std::byte>& encoded, EncodingTimes& times) -> bool;
+  auto     Close() noexcept                                                                       -> void;
+  template <auto LOAD, class LibraryTy> auto Loaded(LibraryTy& library, std::string_view name) -> bool;
 
 private:
   friend class Encoder;
@@ -107,38 +123,36 @@ private:
     NV_ENC_INPUT_PTR  input   = nullptr;
     NV_ENC_OUTPUT_PTR output  = nullptr;
   };
+  Reporter    reporter;
   Driver      driver;
   Handles     handles;
   Extent      picture;
   Extent      aligned;
-  bool        small   = false;
-  bool        first   = true;
+  bool        small    = false;
+  bool        first    = true;
   std::string error;
 };
-auto Encoder::Impl::Fail(std::string_view operation, std::string_view why, Report report) -> void {
+Encoder::Impl::Impl(Reporter reporter) noexcept : reporter{ reporter } { }
+auto Encoder::Impl::Fail(std::string_view operation, std::string_view why) -> void {
   error = std::format("{} failed: {}", operation, why);
-  if (report == Report::Logged) WLog_ERR("sdlrdp.avc", "AVC420 %s", error.c_str());
-}
-auto Encoder::Impl::Check(int status, std::string_view operation, Report report) -> bool {
-  if (status != 0) Fail(operation, std::to_string(status), report);
-  return status == 0;
+  if (reporter) reporter->get().Log(LogLevel::Error, "AVC420 " + error);
 }
 auto Encoder::Impl::Check(int status, std::string_view operation) -> bool {
-  return Check(status, operation, Report::Logged);
+  if (status != 0) Fail(operation, std::to_string(status));
+  return status == 0;
 }
-template <auto LOAD, class LibraryTy>
-auto Encoder::Impl::Loaded(LibraryTy& library, std::string_view name, Report report) -> bool {
+template <auto LOAD, class LibraryTy> auto Encoder::Impl::Loaded(LibraryTy& library, std::string_view name) -> bool {
   typename LibraryTy::pointer loaded = nullptr;
   std::string                 why;
   auto const                  status = LOAD(&loaded, &why);
   library.reset(loaded);
-  if (status != 0) Fail(std::format("load {}", name), why.empty() ? std::to_string(status) : why, report);
+  if (status != 0) Fail(std::format("load {}", name), why.empty() ? std::to_string(status) : why);
   return status == 0;
 }
-auto Encoder::Impl::Load(Report report) -> bool {
-  return Loaded<cuda_load_functions>(driver.cuda, "libcuda.so.1", report)
-         && Loaded<nvenc_load_functions>(driver.loader, "libnvidia-encode.so.1", report)
-         && Check(driver.cuda->cuInit(0), "cuInit", report);
+auto Encoder::Impl::Load() -> bool {
+  return Loaded<cuda_load_functions>(driver.cuda, "libcuda.so.1")
+         && Loaded<nvenc_load_functions>(driver.loader, "libnvidia-encode.so.1")
+         && Check(driver.cuda->cuInit(0), "cuInit");
 }
 auto Encoder::Impl::Session() -> bool {
   Expects(driver.cuda != nullptr, "CUDA library is loaded");
@@ -157,7 +171,7 @@ auto Encoder::Impl::Session() -> bool {
   open.apiVersion = NVENCAPI_VERSION;
   void*      session = nullptr;
   auto const status  = driver.api.nvEncOpenEncodeSessionEx(&open, &session);
-  handles.session = EncodeSession{ session, DestroysSession{ driver.api.nvEncDestroyEncoder } };
+  handles.session = EncodeSession{ session, DestroysSession{ driver.api.nvEncDestroyEncoder, reporter } };
   return Check(status, "open session");
 }
 auto Encoder::Impl::Parameters(std::uint32_t fps, NV_ENC_CONFIG& config) const -> NV_ENC_INITIALIZE_PARAMS {
@@ -217,16 +231,13 @@ namespace {
 auto Bytes(NV_ENC_LOCK_BITSTREAM const& lock) -> std::span<std::byte const> {
   return { static_cast<std::byte const*>(lock.bitstreamBufferPtr), lock.bitstreamSizeInBytes };
 }
-auto ConvertInput(NV_ENC_LOCK_INPUT_BUFFER const& lock, prim_size_t const& size, std::span<std::uint8_t const> bgrx,
-                  std::uint32_t stride) -> int {
+auto ConvertInput(NV_ENC_LOCK_INPUT_BUFFER const& lock, Extent size, std::span<std::uint8_t const> bgrx,
+                  std::uint32_t stride) -> bool {
   Expects(lock.pitch >= size.width, "I420 pitch covers aligned width");
-  Expects(lock.pitch % 2 == 0, "I420 pitch is even");
-  auto*                        y      { static_cast<std::uint8_t*>(lock.bufferDataPtr) };
-  std::array<std::uint8_t*, 3> planes { y, y + (std::size_t{ lock.pitch } * size.height),
-                                        y + (std::size_t{ lock.pitch } * size.height * 5 / 4) };
-  std::array<std::uint32_t, 3> pitches{ lock.pitch, lock.pitch / 2, lock.pitch / 2     };
-  return primitives_get()->RGBToYUV420_8u_P3AC4R(bgrx.data(), PIXEL_FORMAT_BGRX32, stride, planes.data(),
-                                                 pitches.data(), &size);
+  // abi: NVENC lends the locked IYUV input as void*.
+  std::span const frame{ static_cast<std::uint8_t*>(lock.bufferDataPtr),
+                         std::size_t{ lock.pitch } * size.height * 3 / 2 };
+  return RgbToYuv420(bgrx, stride, size, PackedI420(frame, lock.pitch, size.height));
 }
 }
 // NVENC lends a buffer from its lock to its unlock: the unlock runs on every path out, and Unlock reports it.
@@ -236,9 +247,7 @@ public:
   Locked(Impl& owner, ParametersTy lock, std::string_view name)
       : _owner{ owner }, _lock{ lock }, _name{ name }, _locked{ Acquired() } { }
   ~Locked() {
-    if (!_locked) return;
-    if (auto const status = Release(); status != NV_ENC_SUCCESS)
-      WLog_ERR("sdlrdp.avc", "AVC420 unlock %s failed: %d", _name.c_str(), int{ status });
+    if (_locked) Released(_owner.reporter, Release(), "unlock {}", _name);
   }
   explicit operator bool() const noexcept {
     return _locked;
@@ -272,11 +281,12 @@ auto Encoder::Impl::Fill(std::span<std::uint8_t const> bgrx, std::uint32_t strid
   LockedInput input{ *this, { .version = NV_ENC_LOCK_INPUT_BUFFER_VER, .inputBuffer = handles.input }, "input" };
   if (!input) return false;
   times.upload = watch.Lap();
-  auto const status = ConvertInput(input.Lock(), { aligned.width, aligned.height }, bgrx, stride);
+  auto const converted = ConvertInput(input.Lock(), aligned, bgrx, stride);
   times.convert = watch.Lap();
   auto const unlocked = input.Unlock();
   times.upload += watch.Lap();
-  return Check(status, "BT.709 conversion") && unlocked;
+  if (!converted) Fail("BT.709 conversion", "primitives refused the picture");
+  return converted && unlocked;
 }
 auto Encoder::Impl::Encoded(NV_ENC_PIC_PARAMS& pic, std::vector<std::byte>& encoded, EncodingTimes& times) -> bool {
   Stopwatch const watch;
@@ -290,20 +300,21 @@ auto Encoder::Impl::Encoded(NV_ENC_PIC_PARAMS& pic, std::vector<std::byte>& enco
   encoded.assign(bytes.begin(), bytes.end());
   return bitstream.Unlock();
 }
-auto Encoder::Impl::Close() -> void {
-  if (handles.input) Check(driver.api.nvEncDestroyInputBuffer(handles.session.get(), handles.input), "destroy input");
+auto Encoder::Impl::Close() noexcept -> void {
+  auto* const session = handles.session.get();
+  if (handles.input) Released(reporter, driver.api.nvEncDestroyInputBuffer(session, handles.input), "destroy input");
   if (handles.output)
-    Check(driver.api.nvEncDestroyBitstreamBuffer(handles.session.get(), handles.output), "destroy bitstream");
+    Released(reporter, driver.api.nvEncDestroyBitstreamBuffer(session, handles.output), "destroy bitstream");
   handles.input  = nullptr;
   handles.output = nullptr;
   handles.session.reset();
-  if (driver.context) Check(driver.cuda->cuDevicePrimaryCtxRelease(driver.device), "release CUDA context");
+  if (driver.context) Released(reporter, driver.cuda->cuDevicePrimaryCtxRelease(driver.device), "release CUDA context");
   driver.context = nullptr;
   driver.loader.reset();
   driver.cuda.reset();
   first = true;
 }
-Encoder::Encoder() : impl(std::make_unique<Impl>()) { }
+Encoder::Encoder(Diagnostics const& diagnostics) : impl(std::make_unique<Impl>(std::cref(diagnostics))) { }
 Encoder::~Encoder() {
   Close();
 }
@@ -324,10 +335,9 @@ auto Encoder::Error() const -> std::string const& {
 }
 auto Encoder::UnavailableReason() -> std::string {
   static std::string const reason = [] {
-    Impl       probe;
-    auto const available = probe.Load(Report::Quiet);
+    Impl       probe     { std::nullopt };
+    auto const available = probe.Load();
     probe.Close();
-    if (!available) WLog_WARN("sdlrdp.avc", "AVC420 unavailable: %s", probe.error.c_str());
     return available ? std::string{ } : probe.error;
   }();
   return reason;
@@ -359,8 +369,8 @@ auto Encoder::Open(Extent size, std::uint32_t bitrate, std::uint32_t fps) -> boo
   impl->small   = false;
   impl->picture = size;
   impl->aligned = { .width = Aligned(width), .height = Aligned(height) };
-  if (!impl->Load(Report::Logged) || !impl->Session() || !impl->MinimumSize() || impl->small
-      || !impl->Initialize(bitrate, fps) || !impl->Buffers()) {
+  if (!impl->Load() || !impl->Session() || !impl->MinimumSize() || impl->small || !impl->Initialize(bitrate, fps)
+      || !impl->Buffers()) {
     Close();
     return false;
   }
