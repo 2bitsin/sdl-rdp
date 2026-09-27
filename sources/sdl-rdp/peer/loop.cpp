@@ -19,7 +19,6 @@
 #include <sdl-rdp/video/acknowledgement-window.hpp>
 
 #include <freerdp/peer.h>
-#include <freerdp/settings.h>
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -52,48 +51,51 @@ using sdl_rdp::video::WaitMilliseconds;
 using sdl_rdp::video::frame::Delivery;
 
 namespace {
-using sdl_rdp::freerdp_facade::FirstRefused;
-using sdl_rdp::freerdp_facade::Set;
+using sdl_rdp::freerdp_facade::BoolKey;
+using sdl_rdp::freerdp_facade::EncryptionLevel;
+using sdl_rdp::freerdp_facade::NumberKey;
+using sdl_rdp::freerdp_facade::SettingsReader;
+using sdl_rdp::freerdp_facade::SettingsView;
+using sdl_rdp::freerdp_facade::StringKey;
 constexpr std::uint32_t LoopHandleCount     = 2;
 constexpr std::uint32_t AppendedHandleCount = ChannelHandleLimit + LoopHandleCount;
 // WinPR BIO signals readability only; retry blocked output every 5 ms for static frames.
 constexpr std::uint32_t BlockedRetry = 5;
-using SecurityFlags = std::array<std::pair<FreeRDP_Settings_Keys_Bool, bool>, 12>;
+using SecurityFlags = std::array<std::pair<BoolKey, bool>, 12>;
 auto Flags(AuthMode auth) -> SecurityFlags {
   return { {
-      { FreeRDP_NlaSecurity, auth == AuthMode::Nla },
+      { BoolKey::NlaSecurity, auth == AuthMode::Nla },
       // sdl-rdp#41: FreeRDP 3.32 nla.c:943 sends Early User Authorization success before Logon decides.
-      { FreeRDP_ExtSecurity              , false                  },
-      { FreeRDP_TlsSecurity              , true                   },
-      { FreeRDP_RdpSecurity              , auth == AuthMode::None },
-      { FreeRDP_RemoteFxCodec            , true                   },
-      { FreeRDP_NSCodec                  , true                   },
-      { FreeRDP_SupportGraphicsPipeline  , true                   },
-      { FreeRDP_AutoReconnectionEnabled  , true                   },
-      { FreeRDP_WaitForOutputBufferFlush , false                  },
-      { FreeRDP_FrameMarkerCommandEnabled, true                   },
-      { FreeRDP_SupportDisplayControl    , true                   },
-      { FreeRDP_SuppressOutput           , true                   },
+      { BoolKey::ExtSecurity              , false                  },
+      { BoolKey::TlsSecurity              , true                   },
+      { BoolKey::RdpSecurity              , auth == AuthMode::None },
+      { BoolKey::RemoteFxCodec            , true                   },
+      { BoolKey::NSCodec                  , true                   },
+      { BoolKey::SupportGraphicsPipeline  , true                   },
+      { BoolKey::AutoReconnectionEnabled  , true                   },
+      { BoolKey::WaitForOutputBufferFlush , false                  },
+      { BoolKey::FrameMarkerCommandEnabled, true                   },
+      { BoolKey::SupportDisplayControl    , true                   },
+      { BoolKey::SuppressOutput           , true                   },
   } };
 }
-auto ApplySettings(rdpSettings& settings, AuthMode auth, Rect picture) -> bool {
-  std::array<std::pair<FreeRDP_Settings_Keys_UInt32, std::uint32_t>, 3> const numbers{ {
-      { FreeRDP_EncryptionLevel , ENCRYPTION_LEVEL_CLIENT_COMPATIBLE                    },
-      { FreeRDP_FrameAcknowledge, AcknowledgedFrameWindow                               },
-      { FreeRDP_LargePointerFlag, LARGE_POINTER_FLAG_96x96 | LARGE_POINTER_FLAG_384x384 },
-  } };
-  return Set(settings, FreeRDP_AuthenticationPackageList, "!kerberos") && !FirstRefused(settings, Flags(auth))
-         && !FirstRefused(settings, numbers) && ApplyDesktopSize(settings, picture);
+auto ApplySettings(SettingsView settings, AuthMode auth, Rect picture) -> void {
+  settings.Set(StringKey::AuthenticationPackageList, "!kerberos");
+  settings.Apply(Flags(auth));
+  settings.SetEncryptionLevel(EncryptionLevel::ClientCompatible);
+  settings.Set(NumberKey::FrameAcknowledge, Narrowed<std::uint32_t>(AcknowledgedFrameWindow));
+  settings.SetLargePointer({ .up_to_96x96 = true, .up_to_384x384 = true });
+  ApplyDesktopSize(settings, picture);
 }
-auto BeginNegotiationLogging(rdpSettings& settings) -> rdpSettings& {
+auto BeginNegotiationLogging(SettingsReader settings) -> SettingsReader {
   ResetAuthenticationLogging();
   PeerNegotiationLogging(settings);
   return settings;
 }
-auto EndNegotiationLogging(rdpSettings& /*settings*/) noexcept -> void {
+auto EndNegotiationLogging(SettingsReader /*settings*/) noexcept -> void {
   ResetAuthenticationLogging();
 }
-using NegotiationLogging = RAIIWrap<rdpSettings&, BeginNegotiationLogging, EndNegotiationLogging>;
+using NegotiationLogging = RAIIWrap<SettingsReader, BeginNegotiationLogging, EndNegotiationLogging>;
 struct LiveConnection {
   std::reference_wrapper<PeerLink>      link;
   std::reference_wrapper<SessionAccess> session;
@@ -114,7 +116,7 @@ auto Peer::Serve(std::stop_token const& quit) -> void {
   std::stop_callback const wake(quit, [this] { _link.Signal(); });
   NegotiationLogging const logging { _link.Settings() };
   auto const               served  = [&] {
-    if (!Configure()) throw PeerSetupFailed{ "configuration" };
+    Configure();
     Run(quit);
     return true;
   };
@@ -132,11 +134,11 @@ auto Peer::Run(std::stop_token const& quit) -> void {
   while (!quit.stop_requested() && Step(quit, handles)) {
   }
 }
-auto Peer::Configure() -> bool {
+auto Peer::Configure() -> void {
   auto const picture  = _store.Read([](FrameStore const& store, FrameLock const& held) { return store.Picture(held); });
-  auto&      settings = _link.Settings();
+  auto const settings = _link.Settings();
   _authenticator.InstallCredentials(settings);
-  return ApplySettings(settings, _authenticator.Auth(), picture);
+  ApplySettings(settings, _authenticator.Auth(), picture);
 }
 auto Peer::Step(std::stop_token const& quit, std::span<WaitHandle> handles) -> bool {
   auto const plan = [&] {

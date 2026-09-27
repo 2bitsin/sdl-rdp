@@ -14,6 +14,8 @@
 
 namespace sdl_rdp::video::detail::encoder {
 using sdl_rdp::configuration::Codec;
+using sdl_rdp::freerdp_facade::BoolKey;
+using sdl_rdp::freerdp_facade::NumberKey;
 using sdl_rdp::utilities::Ensures;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
@@ -43,12 +45,12 @@ auto CompressRow(BITMAP_PLANAR_CONTEXT& context, std::span<std::uint8_t const> p
          != freerdp_bitmap_compress_planar(&context, pixels.data(), PIXEL_FORMAT_BGRA32, width, 1, width * PixelBytes,
                                            oxbox::utilities::SpanCast<std::uint8_t>(out).data(), &size);
 }
-auto Available(rdpSettings const& settings, Codec codec) -> bool {
-  auto surface = freerdp_settings_get_bool(&settings, FreeRDP_SurfaceCommandsEnabled);
+auto Available(SettingsReader settings, Codec codec) -> bool {
+  auto surface = settings.Get(BoolKey::SurfaceCommandsEnabled);
   switch (codec) {
-  case Codec::Planar:   return freerdp_settings_get_uint32(&settings, FreeRDP_ColorDepth) == 32;
-  case Codec::RemoteFx: return surface && freerdp_settings_get_bool(&settings, FreeRDP_RemoteFxCodec);
-  case Codec::NsCodec:  return surface && freerdp_settings_get_bool(&settings, FreeRDP_NSCodec);
+  case Codec::Planar:   return settings.Get(NumberKey::ColorDepth) == 32;
+  case Codec::RemoteFx: return surface && settings.Get(BoolKey::RemoteFxCodec);
+  case Codec::NsCodec:  return surface && settings.Get(BoolKey::NSCodec);
   case Codec::Raw:      return true;
   case Codec::Avc420:
   case Codec::Progressive:
@@ -57,21 +59,21 @@ auto Available(rdpSettings const& settings, Codec codec) -> bool {
   }
 }
 }
-auto Encoder::SetupPlanar(rdpSettings const& settings, bool xrgb) -> bool {
-  auto alpha = xrgb || freerdp_settings_get_bool(&settings, FreeRDP_DrawAllowSkipAlpha);
+auto Encoder::SetupPlanar(SettingsReader settings, bool xrgb) -> bool {
+  auto alpha = xrgb || settings.Get(BoolKey::DrawAllowSkipAlpha);
   if (planar.skip_alpha != alpha) {
     planar.context.reset();
     planar.width = 0;
   }
   planar.skip_alpha    = alpha;
-  planar.dynamic_color = freerdp_settings_get_bool(&settings, FreeRDP_DrawAllowDynamicColorFidelity);
+  planar.dynamic_color = settings.Get(BoolKey::DrawAllowDynamicColorFidelity);
   if (!stream) stream.reset(Stream_New(nullptr, InitialStreamCapacity));
   if (!planar.context)
     planar.context.reset(freerdp_bitmap_planar_context_new(
         PLANAR_FORMAT_HEADER_RLE | (planar.skip_alpha ? PLANAR_FORMAT_HEADER_NA : 0), 1, 1));
   return stream && planar.context;
 }
-auto Encoder::InitializeCodec(rdpSettings const& settings) -> bool {
+auto Encoder::InitializeCodec(SettingsReader settings) -> bool {
   switch (codec) {
   case Codec::Planar:   return SetupPlanar(settings);
   case Codec::RemoteFx: return PrepareRemoteFx(remote_fx.context);
@@ -80,8 +82,8 @@ auto Encoder::InitializeCodec(rdpSettings const& settings) -> bool {
   default:              Unreachable(codec);
   }
 }
-auto Encoder::Select(rdpSettings const& settings, Codec preference) -> bool {
-  if (freerdp_settings_get_uint32(&settings, FreeRDP_ColorDepth) != 32) preference = Codec::Raw;
+auto Encoder::Select(SettingsReader settings, Codec preference) -> bool {
+  if (settings.Get(NumberKey::ColorDepth) != 32) preference = Codec::Raw;
   constexpr std::array choices{ Codec::RemoteFx, Codec::NsCodec, Codec::Planar, Codec::Raw };
   codec = Available(settings, preference)
               ? preference
@@ -148,10 +150,10 @@ auto Encoder::EncodePlanar(std::span<std::uint8_t const> pixels, std::uint32_t w
   if (result) Ensures(payload.size() <= pixels.size() + 2, "planar row fits bitmap length");
   return result;
 }
-auto Encoder::Id(rdpSettings const& settings) const -> std::uint32_t {
+auto Encoder::Id(SettingsReader settings) const -> std::uint32_t {
   switch (codec) {
-  case Codec::RemoteFx: return freerdp_settings_get_uint32(&settings, FreeRDP_RemoteFxCodecId);
-  case Codec::NsCodec:  return freerdp_settings_get_uint32(&settings, FreeRDP_NSCodecId);
+  case Codec::RemoteFx: return settings.Get(NumberKey::RemoteFxCodecId);
+  case Codec::NsCodec:  return settings.Get(NumberKey::NSCodecId);
   case Codec::Raw:      return RDP_CODEC_ID_NONE;
   default:              Unreachable(codec);
   }

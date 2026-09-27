@@ -4,6 +4,7 @@
 #include <sdl-rdp/configuration/forward.hpp>
 #include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/diagnostics/forward.hpp>
+#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/utilities/nt-owf.hpp>
 #include <sdl-rdp/utilities/operation-name.hpp>
@@ -21,6 +22,7 @@ using sdl_rdp::configuration::AuthMode;
 using sdl_rdp::configuration::Configuration;
 using sdl_rdp::diagnostics::Diagnostics;
 using sdl_rdp::diagnostics::FailureLog;
+using sdl_rdp::freerdp_facade::SettingsView;
 using sdl_rdp::link::PeerLink;
 using sdl_rdp::utilities::NtOwf;
 using sdl_rdp::utilities::OperationName;
@@ -35,7 +37,7 @@ public:
   auto VerifySettings()                                              -> bool;
   auto Hash(SEC_WINNT_AUTH_IDENTITY const& identity, NtKey response) -> bool;
   auto End()                                                         -> void;
-  auto InstallCredentials(rdpSettings& settings) const               -> void;
+  auto InstallCredentials(SettingsView settings) const               -> void;
   auto Auth() const noexcept                                         -> AuthMode;
 
 private:

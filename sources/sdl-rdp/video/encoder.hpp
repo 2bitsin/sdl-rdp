@@ -1,13 +1,13 @@
 #pragma once
 #include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/video/scaler.hpp>
 
 #include <freerdp/codec/nsc.h>
 #include <freerdp/codec/planar.h>
 #include <freerdp/codec/rfx.h>
-#include <freerdp/settings.h>
 #include <winpr/stream.h>
 #include <algorithm>
 #include <chrono>
@@ -20,6 +20,7 @@
 
 namespace sdl_rdp::video::detail::encoder {
 using sdl_rdp::configuration::Codec;
+using sdl_rdp::freerdp_facade::SettingsReader;
 using sdl_rdp::utilities::Extent;
 using sdl_rdp::utilities::Rect;
 using sdl_rdp::utilities::Releases;
@@ -33,12 +34,12 @@ using RemoteFxContext = std::unique_ptr<RFX_CONTEXT, Releases<rfx_context_free>>
 using NsCodecContext  = std::unique_ptr<NSC_CONTEXT, Releases<nsc_context_free>>;
 class Encoder {
 public:
-  auto SetupPlanar(rdpSettings const& settings, bool xrgb = false)             -> bool;
-  auto Select(rdpSettings const& settings, Codec preference)                   -> bool;
+  auto SetupPlanar(SettingsReader settings, bool xrgb = false)                 -> bool;
+  auto Select(SettingsReader settings, Codec preference)                       -> bool;
   auto EncodePlanar(std::span<std::uint8_t const> pixels, std::uint32_t width) -> bool;
   auto Encode(std::span<std::uint8_t const> pixels, std::uint32_t width, std::uint32_t height) -> bool;
   auto EncodePayload(std::span<std::uint8_t const> pixels, std::uint32_t width, std::uint32_t height) -> bool;
-  auto Id(rdpSettings const& settings) const                                   -> std::uint32_t;
+  auto Id(SettingsReader settings) const                                       -> std::uint32_t;
   auto SelectedCodec() const noexcept                                          -> Codec;
   auto Use(Codec value) noexcept                                               -> void;
   auto Payload() const noexcept                                                -> std::span<std::byte const>;
@@ -47,7 +48,7 @@ public:
 
 private:
   auto EncodeRemoteFx(std::span<std::uint8_t const> pixels, std::uint32_t width, std::uint32_t height) -> bool;
-  auto InitializeCodec(rdpSettings const& settings)                                                    -> bool;
+  auto InitializeCodec(SettingsReader settings)                                                        -> bool;
   auto ResetRemoteFx(std::uint32_t width, std::uint32_t height)                                        -> bool;
   using PlanarContext = std::unique_ptr<BITMAP_PLANAR_CONTEXT, Releases<freerdp_bitmap_planar_context_free>>;
   struct PlanarState {

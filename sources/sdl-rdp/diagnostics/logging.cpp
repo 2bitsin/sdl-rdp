@@ -5,7 +5,6 @@
 #include <sdl-rdp/utilities/contract.hpp>
 
 #include <freerdp/error.h>
-#include <freerdp/settings.h>
 #include <oxbox/utilities/number-text.hpp>
 #include <winpr/wlog.h>
 #include <algorithm>
@@ -17,14 +16,15 @@
 #include <string_view>
 
 namespace sdl_rdp::diagnostics::detail::logging {
+using sdl_rdp::freerdp_facade::NumberKey;
 using sdl_rdp::utilities::Contained;
 using sdl_rdp::utilities::Expects;
 
 auto ResetAuthenticationLogging() -> void {
   LogRoute::WithFilter([](auto& filter) { filter = { }; });
 }
-auto PeerNegotiationLogging(rdpSettings const& settings) -> void {
-  LogRoute::WithFilter([&](auto& filter) { filter.peer_settings = std::cref(settings); });
+auto PeerNegotiationLogging(SettingsReader settings) -> void {
+  LogRoute::WithFilter([&](auto& filter) { filter.peer_settings = settings; });
 }
 auto NegotiationRefused() -> bool {
   return LogRoute::WithFilter([](auto const& filter) { return filter.negotiation_failed; });
@@ -95,7 +95,7 @@ auto DetectNegotiationRefusal(LogRoute::Filter& filter, std::string_view prefix,
 }
 auto DetectTlsHandshakeFailure(LogRoute::Filter& filter, std::string_view prefix, std::string_view text) -> bool {
   if (!filter.peer_settings || prefix != "com.freerdp.crypto" || text != "BIO_do_handshake failed") return false;
-  if (freerdp_settings_get_uint32(&filter.peer_settings->get(), FreeRDP_SelectedProtocol) != SecurityTls) return false;
+  if (filter.peer_settings->Get(NumberKey::SelectedProtocol) != SecurityTls) return false;
   filter.handshake_failed = true;
   return true;
 }

@@ -109,7 +109,7 @@ private:
 
   auto Serve(std::stop_token const& quit)                                                          -> void;
   auto Run(std::stop_token const& quit)                                                            -> void;
-  auto Configure()                                                                                 -> bool;
+  auto Configure()                                                                                 -> void;
   auto Step(std::stop_token const& quit, std::span<WaitHandle> handles)                            -> bool;
   auto Dispatch(std::stop_token const& quit, std::span<WaitHandle> handles, std::uint32_t timeout) -> bool;
   auto Plan(std::span<WaitHandle> handles)                                                         -> WaitPlan;

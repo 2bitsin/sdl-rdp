@@ -28,10 +28,10 @@
 #include <utility>
 
 namespace sdl_rdp::headless_client_test::client::detail::client {
-using sdl_rdp::freerdp_facade::FirstRefused;
+using sdl_rdp::freerdp_facade::BoolKey;
 using sdl_rdp::freerdp_facade::MaximumWaitHandles;
-using sdl_rdp::freerdp_facade::Refusal;
-using sdl_rdp::freerdp_facade::Set;
+using sdl_rdp::freerdp_facade::NumberKey;
+using sdl_rdp::freerdp_facade::StringKey;
 using sdl_rdp::freerdp_facade::WaitHandle;
 using sdl_rdp::utilities::Ensures;
 using sdl_rdp::utilities::Narrowed;
@@ -43,55 +43,51 @@ namespace {
 // abi: pPostConnect, BOOL is int
 auto ClientPostConnect(freerdp* client) -> int {
   Expects(client != nullptr, "post-connect names its client");
-  auto& context = *client->context;
-  return freerdp_client_codecs_reset(context.codecs, FREERDP_CODEC_ALL,
-                                     freerdp_settings_get_uint32(context.settings, FreeRDP_DesktopWidth),
-                                     freerdp_settings_get_uint32(context.settings, FreeRDP_DesktopHeight))
+  auto&      context  = *client->context;
+  auto const settings = SettingsView{ *context.settings };
+  return freerdp_client_codecs_reset(context.codecs, FREERDP_CODEC_ALL, settings.Get(NumberKey::DesktopWidth),
+                                     settings.Get(NumberKey::DesktopHeight))
          && gdi_init(client, PIXEL_FORMAT_BGRX32);
 }
 // abi: pDesktopResize, BOOL is int
 auto ClientDesktopResize(rdpContext* context) -> int {
   Expects(context != nullptr, "resize names its client context");
-  auto& resized = *context;
-  auto  w       = freerdp_settings_get_uint32(resized.settings, FreeRDP_DesktopWidth);
-  auto  h       = freerdp_settings_get_uint32(resized.settings, FreeRDP_DesktopHeight);
+  auto&      resized  = *context;
+  auto const settings = SettingsView{ *resized.settings };
+  auto const w        = settings.Get(NumberKey::DesktopWidth);
+  auto const h        = settings.Get(NumberKey::DesktopHeight);
   return freerdp_client_codecs_reset(resized.codecs, FREERDP_CODEC_ALL, w, h) && gdi_resize(resized.gdi, w, h);
 }
-auto ConfigureClientCodecs(rdpSettings& settings, bool surface) -> void {
-  std::array<std::pair<FreeRDP_Settings_Keys_Bool, bool>, 5> const codecs_and_security{ {
-      { FreeRDP_RemoteFxCodec          , true  },
-      { FreeRDP_NSCodec                , true  },
-      { FreeRDP_IgnoreCertificate      , true  },
-      { FreeRDP_NlaSecurity            , false },
-      { FreeRDP_SupportGraphicsPipeline, false },
+auto ConfigureClientCodecs(SettingsView settings, bool surface) -> void {
+  std::array<std::pair<BoolKey, bool>, 5> const codecs_and_security{ {
+      { BoolKey::RemoteFxCodec          , true  },
+      { BoolKey::NSCodec                , true  },
+      { BoolKey::IgnoreCertificate      , true  },
+      { BoolKey::NlaSecurity            , false },
+      { BoolKey::SupportGraphicsPipeline, false },
   } };
 
-  auto const refused_codec_or_security = FirstRefused(settings, codecs_and_security);
-  Expects(!refused_codec_or_security.has_value(),
-          Refusal("client codec and security policy", refused_codec_or_security));
-  if (surface) return;
-  auto const surface_off = Set(settings, FreeRDP_SurfaceCommandsSupported, std::uint32_t{ 0 });
-  Expects(surface_off, "surface commands disabled");
+  settings.Apply(codecs_and_security);
+  if (!surface) settings.Set(NumberKey::SurfaceCommandsSupported, 0U);
 }
-auto ConfigureClient(rdpSettings& settings, std::uint32_t port, bool surface, std::uint32_t width, std::uint32_t height)
+auto ConfigureClient(rdpSettings& native, std::uint32_t port, bool surface, std::uint32_t width, std::uint32_t height)
     -> void {
-  std::array<std::pair<FreeRDP_Settings_Keys_String, std::string_view>, 2> const server_and_user           { {
-      { FreeRDP_ServerHostname, "127.0.0.1" },
-      { FreeRDP_Username      , "test"      },
+  std::array<std::pair<StringKey, std::string_view>, 2> const server_and_user { {
+      { StringKey::ServerHostname, "127.0.0.1" },
+      { StringKey::Username      , "test"      },
   } };
-  std::array<std::pair<FreeRDP_Settings_Keys_UInt32, std::uint32_t>, 5> const    port_desktop_and_threading{ {
-      { FreeRDP_ServerPort    , port                            },
-      { FreeRDP_DesktopWidth  , width                           },
-      { FreeRDP_DesktopHeight , height                          },
-      { FreeRDP_ColorDepth    , 32                              },
-      { FreeRDP_ThreadingFlags, THREADING_FLAGS_DISABLE_THREADS },
+  std::array<std::pair<NumberKey, std::uint32_t>, 4> const    port_and_desktop{ {
+      { NumberKey::ServerPort   , port   },
+      { NumberKey::DesktopWidth , width  },
+      { NumberKey::DesktopHeight, height },
+      { NumberKey::ColorDepth   , 32     },
   } };
 
-  auto const refused_server_or_user = FirstRefused(settings, server_and_user);
-  Expects(!refused_server_or_user.has_value(), Refusal("client server and user", refused_server_or_user));
-  auto const refused_port_desktop_or_threading = FirstRefused(settings, port_desktop_and_threading);
-  Expects(!refused_port_desktop_or_threading.has_value(),
-          Refusal("client port, desktop and threading", refused_port_desktop_or_threading));
+  SettingsView const settings{ native };
+  settings.Apply(server_and_user);
+  settings.Apply(port_and_desktop);
+  auto const unthreaded = freerdp_settings_set_uint32(&native, FreeRDP_ThreadingFlags, THREADING_FLAGS_DISABLE_THREADS);
+  Expects(unthreaded, "client codec threads disabled");
   ConfigureClientCodecs(settings, surface);
 }
 auto StartGraphicsDecoder(rdpContext& context, RdpgfxClientContext& channel) -> void {
@@ -141,17 +137,16 @@ Client::Client(std::uint32_t port, bool surface, std::uint32_t width, std::uint3
   ConfigureClient(*instance->context->settings, port, surface, width, height);
 }
 auto Client::EnableGraphics(GraphicsOptions options) -> void {
-  std::array<std::pair<FreeRDP_Settings_Keys_Bool, bool>, 5> const graphics{ {
-      { FreeRDP_GfxH264                   , options.h264                 },
-      { FreeRDP_GfxSendQoeAck             , options.qoe_acknowledgements },
-      { FreeRDP_GfxAVC444                 , false                        },
-      { FreeRDP_SupportGraphicsPipeline   , true                         },
-      { FreeRDP_SynchronousDynamicChannels, true                         },
+  std::array<std::pair<BoolKey, bool>, 5> const graphics{ {
+      { BoolKey::GfxH264                   , options.h264                 },
+      { BoolKey::GfxSendQoeAck             , options.qoe_acknowledgements },
+      { BoolKey::GfxAVC444                 , false                        },
+      { BoolKey::SupportGraphicsPipeline   , true                         },
+      { BoolKey::SynchronousDynamicChannels, true                         },
   } };
 
-  auto*      context          = instance->context;
-  auto const refused_graphics = FirstRefused(*context->settings, graphics);
-  Expects(!refused_graphics.has_value(), Refusal("the client's graphics pipeline preferences", refused_graphics));
+  auto* context = instance->context;
+  SettingsOf(*this).Apply(graphics);
   freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
   PubSub_SubscribeChannelConnected(context->pubSub,
                                    GraphicsDecoderEvent<StartGraphicsDecoder, ChannelConnectedEventArgs>);
@@ -160,24 +155,22 @@ auto Client::EnableGraphics(GraphicsOptions options) -> void {
   instance->LoadChannels = ChannelLoader<LoadDynamicChannel, "rdpgfx">;
 }
 auto Client::Credentials(Login const& login, bool nla) -> void {
-  std::array<std::pair<FreeRDP_Settings_Keys_String, std::string_view>, 4> const credentials{ {
-      { FreeRDP_Username                 , login.user     },
-      { FreeRDP_Password                 , login.password },
-      { FreeRDP_Domain                   , login.domain   },
-      { FreeRDP_AuthenticationPackageList, "!kerberos"    },
+  std::array<std::pair<StringKey, std::string_view>, 4> const credentials{ {
+      { StringKey::Username                 , login.user     },
+      { StringKey::Password                 , login.password },
+      { StringKey::Domain                   , login.domain   },
+      { StringKey::AuthenticationPackageList, "!kerberos"    },
   } };
-  std::array<std::pair<FreeRDP_Settings_Keys_Bool, bool>, 4> const               security   { {
-      { FreeRDP_NlaSecurity, nla   },
-      { FreeRDP_ExtSecurity, nla   },
-      { FreeRDP_TlsSecurity, !nla  },
-      { FreeRDP_RdpSecurity, false },
+  std::array<std::pair<BoolKey, bool>, 4> const               security   { {
+      { BoolKey::NlaSecurity, nla   },
+      { BoolKey::ExtSecurity, nla   },
+      { BoolKey::TlsSecurity, !nla  },
+      { BoolKey::RdpSecurity, false },
   } };
 
-  auto&      settings           = *instance->context->settings;
-  auto const refused_credential = FirstRefused(settings, credentials);
-  Expects(!refused_credential.has_value(), Refusal("client credentials", refused_credential));
-  auto const refused_security = FirstRefused(settings, security);
-  Expects(!refused_security.has_value(), Refusal("client security policy", refused_security));
+  auto const settings = SettingsOf(*this);
+  settings.Apply(credentials);
+  settings.Apply(security);
 }
 auto Client::Connect() -> bool {
   auto const connected = freerdp_connect(instance.get()) != 0;
@@ -245,6 +238,10 @@ auto DecodedPixels(Client const& client) -> std::span<std::uint32_t const> {
 }
 auto UntilDesktop(Client& client, std::uint32_t width, std::uint32_t height) -> bool {
   return client.Until([&] { return client.DesktopSize() == Extent{ .width = width, .height = height }; });
+}
+auto SettingsOf(Client& client) -> SettingsView {
+  Expects(client.Instance()->context != nullptr, "the client has a context");
+  return SettingsView{ *client.Instance()->context->settings };
 }
 auto UntilMatches(Client& client, Pixels const& pixels) -> bool {
   return client.Until([&] { return client.Matches(pixels); });

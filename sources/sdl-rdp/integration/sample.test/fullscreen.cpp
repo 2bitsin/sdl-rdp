@@ -1,3 +1,4 @@
+#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/sample-gate.test/client/steps.hpp>
 #include <sdl-rdp/sample-gate.test/frame/first-size.hpp>
 #include <sdl-rdp/sample-gate.test/frame/full-desktop.hpp>
@@ -22,8 +23,10 @@
 
 namespace sdl_rdp::integration::sample_test::detail::fullscreen {
 using namespace std::chrono_literals;
+using sdl_rdp::freerdp_facade::NumberKey;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::DisplayClient;
+using sdl_rdp::headless_client_test::client::SettingsOf;
 using sdl_rdp::headless_client_test::client::Tap;
 using sdl_rdp::headless_client_test::client::UntilDesktop;
 using sdl_rdp::headless_client_test::frame::FrameObserver;
@@ -286,7 +289,7 @@ auto ThenRefilledWindow(Client& client, FrameObserver& observer, std::size_t& ac
   ASSERT_TRUE(client.Until([&] { return observer.Frames().size() >= acknowledged + window; }));
 }
 auto FillSendWindow(Client& client, FrameObserver& observer) -> void {
-  auto window = freerdp_settings_get_uint32(client.Instance()->context->settings, FreeRDP_FrameAcknowledge);
+  auto window = SettingsOf(client).Get(NumberKey::FrameAcknowledge);
   ASSERT_EQ(window, 2u);
   std::size_t acknowledged = 0;
   ASSERT_TRUE(client.Until([&] { return observer.Frames().size() >= window; }));

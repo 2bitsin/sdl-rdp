@@ -7,6 +7,7 @@
 #include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
 #include <sdl-rdp/freerdp-facade/handled.hpp>
+#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/input/events.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
@@ -19,7 +20,6 @@
 #include <sdl-rdp/video/output-control.hpp>
 
 #include <freerdp/session.h>
-#include <freerdp/settings.h>
 #include <freerdp/update.h>
 #include <winpr/crypto.h>
 #include <algorithm>
@@ -36,13 +36,14 @@ using sdl_rdp::utilities::OperationName;
 
 namespace {
 using sdl_rdp::freerdp_facade::Handled;
+using sdl_rdp::freerdp_facade::NumberKey;
+using sdl_rdp::freerdp_facade::ReconnectCookie;
 constexpr OperationName                PeerActivation       { "Peer activation"               };
 constexpr OperationName                PeerCapabilities     { "Peer capabilities"             };
 constexpr OperationName                PeerLogon            { "Peer logon"                    };
 constexpr OperationName                NtlmHash             { "NTLM hash"                     };
 constexpr OperationName                FrameAcknowledgement { "Surface frame acknowledgement" };
 constexpr OperationName                SuppressOutput       { "Suppress output"               };
-constexpr std::uint32_t                CookieLength         = 28;
 constexpr std::uint32_t                SessionLogonId       = 1;
 constexpr std::array<std::uint32_t, 3> ColourDepths         { 16, 24, 32                      };
 auto PeerOwner(freerdp_peer const& client) -> Peer& {
@@ -52,17 +53,15 @@ auto ContextOwner(rdpContext const& context) -> Peer& {
   Expects(context.peer != nullptr, "the callback context has its peer");
   return PeerOwner(*context.peer);
 }
-auto SendCookie(rdpContext& context) -> bool {
-  ARC_SC_PRIVATE_PACKET cookie{ };
-  cookie.cbLen   = CookieLength;
-  cookie.version = AUTO_RECONNECT_VERSION_1;
-  cookie.logonId = SessionLogonId;
-  if (winpr_RAND(cookie.arcRandomBits, sizeof(cookie.arcRandomBits)) != 0) return false;
-  if (!freerdp_settings_set_pointer_len(context.settings, FreeRDP_ServerAutoReconnectCookie, &cookie, 1)) return false;
+auto SendCookie(PeerLink& link) -> bool {
+  ReconnectCookie cookie{ .logon_id = SessionLogonId };
+  if (winpr_RAND(cookie.random_bits.data(), cookie.random_bits.size()) != 0) return false;
+  link.Settings().SetAutoReconnectCookie(cookie);
   logon_info_ex info{ };
   info.haveCookie = true;
-  info.LogonId    = cookie.logonId;
-  std::ranges::copy(cookie.arcRandomBits, info.ArcRandomBits);
+  info.LogonId    = cookie.logon_id;
+  std::ranges::copy(cookie.random_bits, info.ArcRandomBits);
+  auto& context = link.Context();
   return context.update->SaveSessionInfo(&context, INFO_TYPE_LOGON_EXTENDED_INF, &info);
 }
 }
@@ -100,24 +99,25 @@ auto Peer::Activate() -> bool {
     _link.Signal();
     return true;
   }
-  if (!_authenticator.VerifySettings() || !SendCookie(_link.Context())) return false;
+  if (!_authenticator.VerifySettings() || !SendCookie(_link)) return false;
   if (!_encoder.Select(_link.Settings(), _configuration.CodecPreference())) return false;
   _arrival.Admit(_encoder.SelectedCodec());
   return true;
 }
 auto Peer::AcceptCapabilities() -> bool {
   if (!_authenticator.VerifySettings()) return false;
-  auto&      settings = _link.Settings();
+  auto const settings = _link.Settings();
   auto const frame    = _store.Lock();
   if (!_activation.Activated()) {
     _pacing.Restart(frame);
     _desktop.RecordScreen(settings);
   }
-  if (!std::ranges::contains(ColourDepths, freerdp_settings_get_uint32(&settings, FreeRDP_ColorDepth))) {
+  if (!std::ranges::contains(ColourDepths, settings.Get(NumberKey::ColorDepth))) {
     _diagnostics.Log(LogLevel::Warn, "Connection refused: colour depth must be 16, 24 or 32 bpp.");
     return false;
   }
-  return ApplyDesktopSize(settings, _desktop.Offer(_store.Picture(frame)));
+  ApplyDesktopSize(settings, _desktop.Offer(_store.Picture(frame)));
+  return true;
 }
 auto Peer::Acknowledge(std::uint32_t id) -> bool {
   _output.Acknowledge(id);

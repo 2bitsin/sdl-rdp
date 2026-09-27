@@ -1,5 +1,6 @@
 #include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/diagnostics/log-sink.hpp>
+#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/headless-client.test/backend/events.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
 #include <sdl-rdp/headless-client.test/frame/pattern.hpp>
@@ -25,10 +26,12 @@
 namespace sdl_rdp::integration::video_test::detail::gfx {
 using sdl_rdp::configuration::Codec;
 using sdl_rdp::diagnostics::LogLevel;
+using sdl_rdp::freerdp_facade::BoolKey;
 using sdl_rdp::headless_client_test::backend::Where;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::DecodedPixels;
 using sdl_rdp::headless_client_test::client::Pixels;
+using sdl_rdp::headless_client_test::client::SettingsOf;
 using sdl_rdp::headless_client_test::frame::FillArea;
 using sdl_rdp::headless_client_test::frame::MovingTilePattern;
 using sdl_rdp::headless_client_test::graphics::GraphicsBackend;
@@ -118,8 +121,7 @@ protected:
     ASSERT_NO_FATAL_FAILURE(Open(codec, width, height));
     graphics_client = std::make_unique<Client>(backend.Port(), true);
     graphics_client->EnableGraphics({ .h264 = avc });
-    if (!avc)
-      ASSERT_TRUE(freerdp_settings_set_bool(graphics_client->Instance()->context->settings, FreeRDP_GfxH264, false));
+    if (!avc) SettingsOf(*graphics_client).Set(BoolKey::GfxH264, false);
     graphics_observer = std::make_unique<GraphicsObserver>(*graphics_client);
     ConnectGraphics(*graphics_client);
   }

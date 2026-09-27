@@ -3,6 +3,7 @@
 #include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/freerdp-facade/callback-owner.hpp>
 #include <sdl-rdp/freerdp-facade/handled.hpp>
+#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/event-queue.hpp>
 #include <sdl-rdp/link/event.hpp>
@@ -13,7 +14,6 @@
 #include <sdl-rdp/utilities/narrowed.hpp>
 
 #include <freerdp/channels/wtsvc.h>
-#include <freerdp/settings.h>
 #include <algorithm>
 #include <concepts>
 #include <cstdint>
@@ -23,6 +23,7 @@
 namespace sdl_rdp::video::detail::display_control {
 using sdl_rdp::diagnostics::FailuresThrough;
 using sdl_rdp::freerdp_facade::BindContext;
+using sdl_rdp::freerdp_facade::BoolKey;
 using sdl_rdp::freerdp_facade::CallbackOwner;
 using sdl_rdp::link::DynamicChannelsReady;
 using sdl_rdp::link::ScreenChanged;
@@ -72,9 +73,7 @@ DisplayControl::DisplayControl(PeerLink& link, Activation const& activation, Des
                                EventQueue& events, Diagnostics const& diagnostics) noexcept
     : _link{ link }, _activation{ activation }, _desktop{ desktop }, _events{ events }, _diagnostics{ diagnostics } { }
 auto DisplayControl::Open() -> bool {
-  if (_open || !freerdp_settings_get_bool(&_link.Settings(), FreeRDP_SupportDisplayControl)
-      || !DynamicChannelsReady(_link))
-    return true;
+  if (_open || !_link.Settings().Get(BoolKey::SupportDisplayControl) || !DynamicChannelsReady(_link)) return true;
   _context.reset(disp_server_context_new(_link.Channels().get()));
   if (!_context) return false;
   BindContext(*_context, *this, _link.Context());

@@ -1,5 +1,6 @@
 #pragma once
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
+#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 #include <sdl-rdp/freerdp-facade/wake-event.hpp>
 #include <sdl-rdp/link/dynamic-channels.hpp>
@@ -14,6 +15,8 @@
 namespace sdl_rdp::link::detail::peer_link {
 using sdl_rdp::freerdp_facade::ChannelManager;
 using sdl_rdp::freerdp_facade::PeerHandle;
+using sdl_rdp::freerdp_facade::SettingsReader;
+using sdl_rdp::freerdp_facade::SettingsView;
 using sdl_rdp::freerdp_facade::WaitHandle;
 using sdl_rdp::freerdp_facade::WakeEvent;
 using sdl_rdp::utilities::Pinned;
@@ -23,7 +26,8 @@ public:
   explicit PeerLink(PeerHandle accepted);
   auto     Client() const noexcept              -> freerdp_peer&;
   auto     Context() const noexcept             -> rdpContext&;
-  auto     Settings() const noexcept            -> rdpSettings&;
+  auto     Settings() const noexcept            -> SettingsReader;
+  auto     Settings() noexcept                  -> SettingsView;
   auto     Channels() const noexcept            -> ChannelManager const&;
   auto     Dynamic() noexcept                   -> DynamicChannels&;
   auto     Socket() const noexcept              -> int;

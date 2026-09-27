@@ -1,22 +1,20 @@
 #include <sdl-rdp/link/peer-link.hpp>
 
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
-#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/link/exceptions.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/exceptions.hpp>
 #include <sdl-rdp/utilities/text.hpp>
 
 #include <freerdp/channels/wtsvc.h>
-#include <freerdp/settings.h>
 #include <freerdp/svc.h>
 #include <array>
 #include <cstdint>
 #include <utility>
 
 namespace sdl_rdp::link::detail::peer_link {
-using sdl_rdp::freerdp_facade::Get;
 using sdl_rdp::freerdp_facade::ManualResetEvent;
+using sdl_rdp::freerdp_facade::StringKey;
 using sdl_rdp::utilities::AllocationFailed;
 using sdl_rdp::utilities::CopyTerminated;
 using sdl_rdp::utilities::Expects;
@@ -47,8 +45,11 @@ auto PeerLink::Client() const noexcept -> freerdp_peer& {
 auto PeerLink::Context() const noexcept -> rdpContext& {
   return *_client->context;
 }
-auto PeerLink::Settings() const noexcept -> rdpSettings& {
-  return *_client->context->settings;
+auto PeerLink::Settings() const noexcept -> SettingsReader {
+  return SettingsReader{ *_client->context->settings };
+}
+auto PeerLink::Settings() noexcept -> SettingsView {
+  return SettingsView{ *_client->context->settings };
 }
 auto PeerLink::Channels() const noexcept -> ChannelManager const& {
   return _channels;
@@ -83,7 +84,7 @@ auto PeerLink::Close() -> void {
 }
 // The name the client announced, else the address the listener accepted it from.
 auto ClientHostname(PeerLink const& link) -> std::string {
-  return std::string{ Get(link.Settings(), FreeRDP_ClientHostname).value_or(link.Client().hostname) };
+  return std::string{ link.Settings().Get(StringKey::ClientHostname).value_or(link.Client().hostname) };
 }
 auto DynamicChannelsReady(PeerLink const& link) -> bool {
   return WTSVirtualChannelManagerGetDrdynvcState(link.Channels().get()) == DRDYNVC_STATE_READY;

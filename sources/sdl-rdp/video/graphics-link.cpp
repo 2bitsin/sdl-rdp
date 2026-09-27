@@ -3,19 +3,20 @@
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/failure-log.hpp>
 #include <sdl-rdp/diagnostics/log-sink.hpp>
+#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/video/acknowledgement-window.hpp>
 #include <sdl-rdp/video/encoder.hpp>
 #include <sdl-rdp/video/frame/pacing.hpp>
 
-#include <freerdp/settings.h>
 #include <algorithm>
 #include <cstddef>
 #include <utility>
 
 namespace sdl_rdp::video::detail::graphics_link {
 using sdl_rdp::diagnostics::LogLevel;
+using sdl_rdp::freerdp_facade::BoolKey;
 using sdl_rdp::link::DynamicChannelsReady;
 using sdl_rdp::utilities::Expects;
 
@@ -25,8 +26,7 @@ GraphicsLink::GraphicsLink(PeerLink& link, Diagnostics const& diagnostics, Activ
       _make{ std::move(make) } { }
 auto GraphicsLink::Pump(Signalled const& ready) -> bool {
   if (_channel) return !ready.Contains(_channel->Event()) || _channel->Pump();
-  if (_attempted || !freerdp_settings_get_bool(&_link.Settings(), FreeRDP_SupportGraphicsPipeline)
-      || !DynamicChannelsReady(_link))
+  if (_attempted || !_link.Settings().Get(BoolKey::SupportGraphicsPipeline) || !DynamicChannelsReady(_link))
     return true;
   _attempted = true;
   _link.Invalidate();

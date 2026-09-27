@@ -46,7 +46,8 @@ auto FrameCapture::Take() -> Rect {
 auto FrameCapture::Resize(Rect picture) -> bool {
   auto& context = _link.Context();
   _desktop.BeginResize(picture);
-  if (!ApplyDesktopSize(*context.settings, picture) || !context.update->DesktopResize(&context)) return false;
+  ApplyDesktopSize(_link.Settings(), picture);
+  if (!context.update->DesktopResize(&context)) return false;
   _frames.Resend();
   return true;
 }

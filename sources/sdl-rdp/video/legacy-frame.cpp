@@ -2,6 +2,7 @@
 
 #include <sdl-rdp/configuration/configuration.hpp>
 #include <sdl-rdp/configuration/setup.hpp>
+#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/utilities/geometry.hpp>
@@ -11,7 +12,6 @@
 #include <sdl-rdp/video/peer-frames.hpp>
 
 #include <freerdp/codec/color.h>
-#include <freerdp/settings.h>
 #include <freerdp/update.h>
 #include <oxbox/utilities/span.hpp>
 #include <algorithm>
@@ -23,6 +23,8 @@
 #include <span>
 namespace sdl_rdp::video::detail::legacy_frame {
 using sdl_rdp::configuration::Codec;
+using sdl_rdp::freerdp_facade::BoolKey;
+using sdl_rdp::freerdp_facade::NumberKey;
 using sdl_rdp::utilities::AreaBytes;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
@@ -122,9 +124,9 @@ auto LegacyFrame::SelectEncoder() -> bool {
   return true;
 }
 auto LegacyFrame::Marker(std::uint16_t action) -> bool {
-  auto& context = _link.Context();
-  if (!freerdp_settings_get_bool(context.settings, FreeRDP_FrameMarkerCommandEnabled)) return true;
-  SURFACE_FRAME_MARKER const marker{ action, _pacing.Frame() };
+  if (!_link.Settings().Get(BoolKey::FrameMarkerCommandEnabled)) return true;
+  auto&                      context = _link.Context();
+  SURFACE_FRAME_MARKER const marker  { action, _pacing.Frame() };
   return context.update->SurfaceFrameMarker(&context, &marker);
 }
 auto LegacyFrame::Prepare() -> bool {
@@ -132,12 +134,12 @@ auto LegacyFrame::Prepare() -> bool {
   _queue.packets.clear();
   _queue.next.reset();
   if (!SelectEncoder()) return false;
-  auto const& settings = _link.Settings();
-  auto const  depth    = freerdp_settings_get_uint32(&settings, FreeRDP_ColorDepth);
-  auto const  wire     = depth != 32 ? LegacyWire::Bitmap
-                         : _encoder.SelectedCodec() == Codec::Planar ? LegacyWire::Planar
-                         : freerdp_settings_get_bool(&settings, FreeRDP_SurfaceCommandsEnabled) ? LegacyWire::Surface
-                                                                                                : LegacyWire::Bitmap;
+  auto const settings = _link.Settings();
+  auto const depth    = settings.Get(NumberKey::ColorDepth);
+  auto const wire     = depth != 32 ? LegacyWire::Bitmap
+                        : _encoder.SelectedCodec() == Codec::Planar ? LegacyWire::Planar
+                        : settings.Get(BoolKey::SurfaceCommandsEnabled) ? LegacyWire::Surface
+                                                                        : LegacyWire::Bitmap;
   _format = { .depth = depth, .codec = wire == LegacyWire::Surface ? _encoder.Id(settings) : 0, .wire = wire };
   return true;
 }

@@ -1,11 +1,11 @@
 #include <sdl-rdp/video/pointer/shape.hpp>
 
+#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/picture/frame-snapshot.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 
 #include <freerdp/freerdp.h>
-#include <freerdp/settings.h>
 #include <freerdp/update.h>
 #include <algorithm>
 #include <cstddef>
@@ -15,6 +15,7 @@
 #include <vector>
 
 namespace sdl_rdp::video::pointer::detail::shape {
+using sdl_rdp::freerdp_facade::SettingsView;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::PixelBytes;
@@ -83,8 +84,7 @@ auto PointerShape::Send(rdpContext& context) const -> PointerDelivery {
     POINTER_NEW_UPDATE const image{ ColorBits, ColorImage(buffers) };
     return Delivered(update->PointerNew(&context, &image) != 0);
   }
-  if (!(freerdp_settings_get_uint32(context.settings, FreeRDP_LargePointerFlag) & LARGE_POINTER_FLAG_384x384))
-    return PointerDelivery::Unsupported;
+  if (!SettingsView{ *context.settings }.LargePointer().up_to_384x384) return PointerDelivery::Unsupported;
   return Delivered(SendLarge(context, buffers));
 }
 auto PointerShape::SendLarge(rdpContext& context, Buffers& buffers) const -> bool {

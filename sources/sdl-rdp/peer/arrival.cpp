@@ -2,6 +2,7 @@
 
 #include <sdl-rdp/auth/authenticator.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
+#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/link/session-access.hpp>
@@ -10,7 +11,6 @@
 #include <sdl-rdp/video/frame/pacing.hpp>
 #include <sdl-rdp/video/peer-frames.hpp>
 
-#include <freerdp/settings.h>
 #include <cstdint>
 #include <format>
 #include <utility>
@@ -18,6 +18,9 @@
 namespace sdl_rdp::peer::detail::arrival {
 using sdl_rdp::auth::AuthenticationIdentity;
 using sdl_rdp::configuration::MillihertzPerHz;
+using sdl_rdp::freerdp_facade::BoolKey;
+using sdl_rdp::freerdp_facade::NumberKey;
+using sdl_rdp::freerdp_facade::SettingsReader;
 using sdl_rdp::link::ClientHostname;
 using sdl_rdp::link::ScreenChanged;
 using sdl_rdp::utilities::Whole;
@@ -26,18 +29,18 @@ using sdl_rdp::video::frame::AcknowledgementMode;
 namespace {
 auto ConnectedFrom(PeerLink const& link, DesktopLayout const& desktop, std::uint32_t refresh_millihertz, Codec codec)
     -> Connected {
-  auto const& settings = link.Settings();
-  auto const  screen   = desktop.Screen();
-  auto        identity = AuthenticationIdentity(link.Client());
-  return { .width              = freerdp_settings_get_uint32(&settings, FreeRDP_DesktopWidth),
-           .height             = freerdp_settings_get_uint32(&settings, FreeRDP_DesktopHeight),
-           .bpp                = freerdp_settings_get_uint32(&settings, FreeRDP_ColorDepth),
+  auto const settings = link.Settings();
+  auto const screen   = desktop.Screen();
+  auto       identity = AuthenticationIdentity(link.Client());
+  return { .width              = settings.Get(NumberKey::DesktopWidth),
+           .height             = settings.Get(NumberKey::DesktopHeight),
+           .bpp                = settings.Get(NumberKey::ColorDepth),
            .client_name        = ClientHostname(link),
            .codec              = codec,
            .screen_width       = screen.width,
            .screen_height      = screen.height,
            .refresh_millihertz = refresh_millihertz,
-           .keyboard_layout    = freerdp_settings_get_uint32(&settings, FreeRDP_KeyboardLayout),
+           .keyboard_layout    = settings.Get(NumberKey::KeyboardLayout),
            .user               = std::move(identity.user),
            .domain             = std::move(identity.domain),
            .authenticated      = identity.authenticated };
@@ -46,9 +49,8 @@ auto ScreenOf(DesktopLayout const& desktop) -> ScreenChanged {
   auto const screen = desktop.Screen();
   return { .width = screen.width, .height = screen.height };
 }
-auto Acknowledging(rdpSettings const& settings) -> AcknowledgementMode {
-  return freerdp_settings_get_uint32(&settings, FreeRDP_FrameAcknowledge) ? AcknowledgementMode::Tracking
-                                                                          : AcknowledgementMode::Suspended;
+auto Acknowledging(SettingsReader settings) -> AcknowledgementMode {
+  return settings.Get(NumberKey::FrameAcknowledge) ? AcknowledgementMode::Tracking : AcknowledgementMode::Suspended;
 }
 }
 Arrival::Arrival(SessionAccess& session, FrameStore& store, PeerFrames& frames, PeerLink& link, Activation& activation,
@@ -66,8 +68,7 @@ auto Arrival::Enter(Connected connection, Codec codec) -> void {
     _link.Signal();
   }
   _activation.Hold(std::move(connection), ScreenOf(_desktop));
-  if (!freerdp_settings_get_bool(&_link.Settings(), FreeRDP_SupportGraphicsPipeline))
-    _activation.Announce(codec, _pacing.Effective());
+  if (!_link.Settings().Get(BoolKey::SupportGraphicsPipeline)) _activation.Announce(codec, _pacing.Effective());
 }
 auto Arrival::Admit(Codec codec) -> void {
   auto connection = Connection(codec);

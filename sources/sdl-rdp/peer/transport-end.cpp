@@ -4,11 +4,11 @@
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
 #include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/diagnostics/logging.hpp>
+#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/video/peer-frames.hpp>
 
-#include <freerdp/settings.h>
 #include <oxbox/utilities/text.hpp>
 #include <array>
 #include <cstdint>
@@ -29,6 +29,9 @@ using sdl_rdp::diagnostics::SecurityRdsaad;
 using sdl_rdp::diagnostics::SecurityRdstls;
 using sdl_rdp::diagnostics::SecurityTls;
 using sdl_rdp::diagnostics::TlsHandshakeFailed;
+using sdl_rdp::freerdp_facade::BoolKey;
+using sdl_rdp::freerdp_facade::NumberKey;
+using sdl_rdp::freerdp_facade::SettingsReader;
 
 namespace {
 constexpr std::array<std::pair<std::uint32_t, std::string_view>, 5> ProtocolFlags{ { { SecurityTls   , "TLS"     },
@@ -43,14 +46,14 @@ auto ProtocolNames(std::uint32_t mask, bool rdp) -> std::string {
                      | std::views::values);
   return oxbox::utilities::Joined(names, "|");
 }
-auto Refusal(rdpSettings const& settings, std::string const& protocols) -> std::string {
-  auto const offered = (freerdp_settings_get_bool(&settings, FreeRDP_TlsSecurity) ? SecurityTls : 0)
-                       | (freerdp_settings_get_bool(&settings, FreeRDP_NlaSecurity) ? SecurityNla : 0);
+auto Refusal(SettingsReader settings, std::string const& protocols) -> std::string {
+  auto const offered = (settings.Get(BoolKey::TlsSecurity) ? SecurityTls : 0)
+                       | (settings.Get(BoolKey::NlaSecurity) ? SecurityNla : 0);
   return std::format("Connection refused: client requested {}, server offers {}", protocols,
-                     ProtocolNames(offered, freerdp_settings_get_bool(&settings, FreeRDP_RdpSecurity)));
+                     ProtocolNames(offered, settings.Get(BoolKey::RdpSecurity)));
 }
-auto HandshakeFailure(rdpSettings const& settings, std::string const& protocols) -> std::string {
-  auto const selected = freerdp_settings_get_uint32(&settings, FreeRDP_SelectedProtocol);
+auto HandshakeFailure(SettingsReader settings, std::string const& protocols) -> std::string {
+  auto const selected = settings.Get(NumberKey::SelectedProtocol);
   return std::format("TLS handshake failed: client requested {}, server selected {}", protocols,
                      ProtocolNames(selected, !selected));
 }
@@ -73,9 +76,9 @@ TransportEnd::TransportEnd(PeerLink& link, Activation const& activation, Authent
       _diagnostics{ diagnostics } { }
 auto TransportEnd::SecurityEnded() const -> bool {
   if (!NegotiationRefused() && !TlsHandshakeFailed()) return false;
-  auto const& settings = _link.Settings();
+  SettingsReader const settings = _link.Settings();
   // FreeRDP 3.32 nego.c:1663 publishes requestedProtocols even after a failure response.
-  auto const requested = freerdp_settings_get_uint32(&settings, FreeRDP_RequestedProtocols);
+  auto const requested = settings.Get(NumberKey::RequestedProtocols);
   auto const protocols = ProtocolNames(requested, !requested);
   _diagnostics.Log(LogLevel::Warn,
                    NegotiationRefused() ? Refusal(settings, protocols) : HandshakeFailure(settings, protocols));

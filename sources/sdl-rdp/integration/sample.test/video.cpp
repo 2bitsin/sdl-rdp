@@ -1,3 +1,4 @@
+#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/headless-client.test/client/display.hpp>
 #include <sdl-rdp/headless-client.test/client/sound.hpp>
 #include <sdl-rdp/headless-client.test/frame/observer.hpp>
@@ -15,10 +16,12 @@
 #include <vector>
 
 namespace sdl_rdp::integration::sample_test::detail::video {
+using sdl_rdp::freerdp_facade::NumberKey;
 using sdl_rdp::headless_client_test::backend::Logs;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::DisplayClient;
 using sdl_rdp::headless_client_test::client::Pixels;
+using sdl_rdp::headless_client_test::client::SettingsOf;
 using sdl_rdp::headless_client_test::client::SoundClient;
 using sdl_rdp::headless_client_test::client::UntilMatches;
 using sdl_rdp::sample_gate_test::frame::FullDesktopFrames;
@@ -76,7 +79,7 @@ auto PresentDesktop(Client& client, SDL_Window& window) -> void {
 }
 auto ConnectDesktop(Client& client, Logs& logs) -> void {
   Expects(client.Instance() != nullptr, "desktop client exists");
-  ASSERT_TRUE(freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_FrameAcknowledge, 0));
+  SettingsOf(client).Set(NumberKey::FrameAcknowledge, 0U);
   ASSERT_TRUE(client.Connect()) << logs.Text(true);
   ASSERT_TRUE(client.Until([&] {
     SDL_PumpEvents();

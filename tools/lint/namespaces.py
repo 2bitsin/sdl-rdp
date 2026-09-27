@@ -3,6 +3,7 @@
 
 A .cpp with no header of its stem may instead open the detail namespace of a sibling header it includes, and only that.
 """
+import functools
 import pathlib
 import re
 import sys
@@ -19,6 +20,9 @@ SKIPPED  = ('//', '/*', "'", '#')
 RUNTIME  = re.compile(r'main|operator(?:new|delete)|__libc_\w+|reflect_scheme')
 # The opaque driver-data tags SDL's internal headers leave a driver to define.
 SDL_TAGS = frozenset(('SDL_VideoData', 'SDL_CursorData', 'SDL_PrivateAudioData'))
+# The facade names an opaque FreeRDP struct in its headers without including FreeRDP: a C tag is global.
+FACADE   = SOURCES / 'sdl-rdp' / 'freerdp-facade'
+NAMES    = pathlib.Path(__file__).resolve().parent / 'facade.names'
 LEADERS  = shape.EXPRESSION_KEYWORDS | shape.SPECIFIERS | {'using', 'typename', 'auto', 'const'}
 KEYS     = frozenset(('class', 'struct', 'union', 'enum', 'concept'))
 SKIPS    = frozenset(('friend', 'static_assert', 'using', 'namespace', 'extern'))
@@ -226,9 +230,24 @@ def extern_findings(file, statement):
     return global_findings(file, statement[2 if values[1:2] == ['"C"'] else 1:])
 
 
+@functools.cache
+def c_tags(names=NAMES):
+    """The struct tags facade.names lists: the FreeRDP and WinPR records a facade header may leave incomplete."""
+    rows = (line.split('\t') for line in names.read_text().splitlines()[1:])
+    return frozenset(row[0] for row in rows if 'struct' in row[1].split(','))
+
+
+def opaque_c_tag(file, values):
+    """`struct tag;` in a facade header: the C type its interface refers to, left incomplete."""
+    return (file.header and file.relative.is_relative_to(FACADE) and len(values) == 3
+            and values[0] == 'struct' and values[1] in c_tags() and values[2] == ';')
+
+
 def global_findings(file, statement):
     """What a statement outside every named namespace may be: ABI, an extern of ABI, a .cpp's imports."""
     values = [token.value for token in statement]
+    if opaque_c_tag(file, values):
+        return []
     if values[0] == 'extern':
         return extern_findings(file, statement)
     if values[0] == 'using' and not file.header and values[1] != 'namespace' and values[2:3] != ['=']:

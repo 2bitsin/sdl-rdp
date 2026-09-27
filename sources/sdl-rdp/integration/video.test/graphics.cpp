@@ -1,5 +1,6 @@
 #include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/diagnostics/log-sink.hpp>
+#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
 #include <sdl-rdp/headless-client.test/backend/status.hpp>
 #include <sdl-rdp/headless-client.test/backend/waits.hpp>
@@ -18,6 +19,8 @@
 namespace sdl_rdp::integration::video_test::detail::graphics {
 using sdl_rdp::configuration::Codec;
 using sdl_rdp::diagnostics::LogLevel;
+using sdl_rdp::freerdp_facade::BoolKey;
+using sdl_rdp::freerdp_facade::NumberKey;
 using sdl_rdp::headless_client_test::backend::AwaitAllAcknowledged;
 using sdl_rdp::headless_client_test::backend::Clock;
 using sdl_rdp::headless_client_test::backend::RequiredStatus;
@@ -25,6 +28,7 @@ using sdl_rdp::headless_client_test::backend::UntilLogged;
 using sdl_rdp::headless_client_test::client::Client;
 using sdl_rdp::headless_client_test::client::DisplayClient;
 using sdl_rdp::headless_client_test::client::Pixels;
+using sdl_rdp::headless_client_test::client::SettingsOf;
 using sdl_rdp::headless_client_test::client::UntilMatches;
 using sdl_rdp::headless_client_test::codec::CodecTolerance;
 using sdl_rdp::headless_client_test::codec::Gate;
@@ -74,7 +78,7 @@ protected:
     legacy.Tolerance(client->Tolerance());
     ASSERT_TRUE(legacy.Connect());
     ASSERT_TRUE(UntilMatches(legacy, pixels));
-    EXPECT_FALSE(freerdp_settings_get_bool(legacy.Instance()->context->settings, FreeRDP_SupportGraphicsPipeline));
+    EXPECT_FALSE(SettingsOf(legacy).Get(BoolKey::SupportGraphicsPipeline));
     ThenGraphicsTakeover();
   }
   auto WhenQueuedGraphics(Rect full) -> void {
@@ -221,8 +225,7 @@ TEST_F(RoundFive, ProgressiveDamageAndQoe) {
 TEST_F(RoundFive, GraphicsVersion101) {
   ASSERT_NO_FATAL_FAILURE(GivenGraphicsClient(Codec::Progressive));
   auto& client = GraphicsClient();
-  ASSERT_TRUE(freerdp_settings_set_uint32(client.Instance()->context->settings, FreeRDP_GfxCapsFilter,
-                                          ((1u << 11) - 1) & ~(1u << 3)));
+  SettingsOf(client).Set(NumberKey::GfxCapsFilter, ((1U << 11) - 1) & ~(1U << 3));
   ASSERT_NO_FATAL_FAILURE(Connect(client));
   ASSERT_TRUE(UntilLogged(client, logs, "GFX confirmed version=0x000a0100 flags=0x00000000"));
   auto pixels = GraphicsScene(3, false);
@@ -235,7 +238,7 @@ TEST_F(RoundFive, GraphicsVersion101) {
 TEST_F(RoundFive, GraphicsWithoutDynamicChannelsUsesLegacy) {
   ASSERT_NO_FATAL_FAILURE(Open(640, 480, { }, Codec::Raw));
   Client client(backend.Port(), true, 640, 480);
-  ASSERT_TRUE(freerdp_settings_set_bool(client.Instance()->context->settings, FreeRDP_SupportGraphicsPipeline, true));
+  SettingsOf(client).Set(BoolKey::SupportGraphicsPipeline, true);
   // abi: pLoadChannels, BOOL is int
   client.Instance()->LoadChannels = [](freerdp*) -> int { return true; };
   ASSERT_NO_FATAL_FAILURE(ThenLegacyFallback(client));

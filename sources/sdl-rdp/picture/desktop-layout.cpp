@@ -8,14 +8,15 @@
 #include <utility>
 
 namespace sdl_rdp::picture::detail::desktop_layout {
+using sdl_rdp::freerdp_facade::NumberKey;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::Rect;
 using sdl_rdp::utilities::SameSize;
 
-auto ApplyDesktopSize(rdpSettings& settings, Rect picture) -> bool {
-  return freerdp_settings_set_uint32(&settings, FreeRDP_DesktopWidth, picture.w)
-         && freerdp_settings_set_uint32(&settings, FreeRDP_DesktopHeight, picture.h);
+auto ApplyDesktopSize(SettingsView settings, Rect picture) -> void {
+  settings.Set(NumberKey::DesktopWidth, Narrowed<std::uint32_t>(picture.w));
+  settings.Set(NumberKey::DesktopHeight, Narrowed<std::uint32_t>(picture.h));
 }
 auto DesktopLayout::Desktop() const noexcept -> Rect {
   return _desktop;
@@ -23,9 +24,9 @@ auto DesktopLayout::Desktop() const noexcept -> Rect {
 auto DesktopLayout::Assign(Rect value) noexcept -> void {
   _desktop = value;
 }
-auto DesktopLayout::RecordScreen(rdpSettings const& settings) -> void {
-  _screen_width  = freerdp_settings_get_uint32(&settings, FreeRDP_DesktopWidth);
-  _screen_height = freerdp_settings_get_uint32(&settings, FreeRDP_DesktopHeight);
+auto DesktopLayout::RecordScreen(SettingsReader settings) -> void {
+  _screen_width  = settings.Get(NumberKey::DesktopWidth);
+  _screen_height = settings.Get(NumberKey::DesktopHeight);
 }
 auto DesktopLayout::Screen() const noexcept -> Extent {
   return { .width = _screen_width, .height = _screen_height };

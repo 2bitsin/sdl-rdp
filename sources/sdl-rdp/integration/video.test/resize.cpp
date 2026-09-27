@@ -1,4 +1,5 @@
 #include <sdl-rdp/configuration/setup.hpp>
+#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/headless-client.test/backend/events.hpp>
 #include <sdl-rdp/headless-client.test/backend/status.hpp>
 #include <sdl-rdp/headless-client.test/client/display.hpp>
@@ -19,6 +20,8 @@
 
 namespace sdl_rdp::integration::video_test::detail::resize {
 using sdl_rdp::configuration::Codec;
+using sdl_rdp::freerdp_facade::NumberKey;
+using sdl_rdp::freerdp_facade::SettingsView;
 using sdl_rdp::headless_client_test::backend::As;
 using sdl_rdp::headless_client_test::backend::Holds;
 using sdl_rdp::headless_client_test::backend::Presented;
@@ -216,8 +219,8 @@ TEST_F(RoundFive, ResizeDesktop) {
   // abi: pDesktopResize, BOOL is int
   client.Instance()->context->update->DesktopResize = [](rdpContext* context) -> int {
     Expects(context != nullptr, "resize names its client context");
-    return gdi_resize(context->gdi, freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopWidth),
-                      freerdp_settings_get_uint32(context->settings, FreeRDP_DesktopHeight));
+    auto const settings = SettingsView{ *context->settings };
+    return gdi_resize(context->gdi, settings.Get(NumberKey::DesktopWidth), settings.Get(NumberKey::DesktopHeight));
   };
   ASSERT_NO_FATAL_FAILURE(Connect(client, false));
   EXPECT_EQ(client.DesktopSize().width, 640u);

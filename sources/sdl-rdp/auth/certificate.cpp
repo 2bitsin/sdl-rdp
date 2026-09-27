@@ -1,13 +1,12 @@
 #include <sdl-rdp/auth/certificate.hpp>
 
 #include <sdl-rdp/auth/exceptions.hpp>
+#include <sdl-rdp/freerdp-facade/exceptions.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/exceptions.hpp>
 #include <sdl-rdp/utilities/posix.hpp>
 
-#include <freerdp/crypto/certificate.h>
-#include <freerdp/crypto/privatekey.h>
 #include <openssl/pem.h>
 #include <openssl/rsa.h>
 #include <openssl/x509v3.h>
@@ -22,24 +21,20 @@
 #include <string>
 #include <sys/file.h>
 #include <sys/stat.h>
-#include <tuple>
 #include <unistd.h>
-#include <utility>
 
 namespace sdl_rdp::auth::detail::certificate {
 using sdl_rdp::freerdp_facade::Bio;
 using sdl_rdp::freerdp_facade::Certificate;
+using sdl_rdp::freerdp_facade::CredentialFailed;
 using sdl_rdp::utilities::AllocationFailed;
 using sdl_rdp::utilities::Descriptor;
 using sdl_rdp::utilities::Ensures;
-using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Releases;
 using sdl_rdp::utilities::SystemCall;
 namespace {
-using Key        = std::unique_ptr<EVP_PKEY, Releases<EVP_PKEY_free>>;
-using ServerKey  = std::unique_ptr<rdpPrivateKey, Releases<freerdp_key_free>>;
-using ServerCert = std::unique_ptr<rdpCertificate, Releases<freerdp_certificate_free>>;
-using Extension  = std::unique_ptr<X509_EXTENSION, Releases<X509_EXTENSION_free>>;
+using Key       = std::unique_ptr<EVP_PKEY, Releases<EVP_PKEY_free>>;
+using Extension = std::unique_ptr<X509_EXTENSION, Releases<X509_EXTENSION_free>>;
 class DirectoryLock {
 public:
   explicit DirectoryLock(std::filesystem::path const& directory)
@@ -50,13 +45,6 @@ public:
 private:
   Descriptor descriptor;
 };
-template <FreeRDP_Settings_Keys_Pointer KEY, typename VTy, auto RELEASE>
-auto Adopt(rdpSettings& settings, std::unique_ptr<VTy, Releases<RELEASE>> owned) -> void {
-  Expects(owned != nullptr, "the server credential loaded");
-  // These pointer setters transfer ownership despite the generic API's copy documentation.
-  if (!freerdp_settings_set_pointer_len(&settings, KEY, owned.get(), 1)) throw CredentialFailed{ "installation" };
-  std::ignore = owned.release();
-}
 auto Hostname() -> std::string {
   std::array<char, 256> name{ };
   SystemCall(gethostname(name.data(), name.size() - 1), "Hostname");
@@ -114,13 +102,5 @@ auto EnsureCertificate(Credentials const& credentials) -> void {
                                std::filesystem::perms::owner_read | std::filesystem::perms::owner_write);
   Ensures(std::filesystem::exists(credentials.Certificate()), "certificate exists");
   Ensures(std::filesystem::exists(credentials.Key()), "private key exists");
-}
-auto InstallServerCredentials(rdpSettings& settings, Credentials const& credentials) -> void {
-  ServerKey  key        { freerdp_key_new_from_file(credentials.Key().c_str())                 };
-  ServerCert certificate{ freerdp_certificate_new_from_file(credentials.Certificate().c_str()) };
-  if (!key) throw CredentialFailed{ "private key loading" };
-  if (!certificate) throw CredentialFailed{ "certificate loading" };
-  Adopt<FreeRDP_RdpServerRsaKey>(settings, std::move(key));
-  Adopt<FreeRDP_RdpServerCertificate>(settings, std::move(certificate));
 }
 }

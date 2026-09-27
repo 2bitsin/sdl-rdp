@@ -1,25 +1,27 @@
 #pragma once
+#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/utilities/geometry.hpp>
 
-#include <freerdp/settings.h>
 #include <cstdint>
 
 namespace sdl_rdp::picture::detail::desktop_layout {
+using sdl_rdp::freerdp_facade::SettingsReader;
+using sdl_rdp::freerdp_facade::SettingsView;
 using sdl_rdp::utilities::Extent;
 using sdl_rdp::utilities::Rect;
-auto ApplyDesktopSize(rdpSettings& settings, Rect picture) -> bool;
+auto ApplyDesktopSize(SettingsView settings, Rect picture) -> void;
 auto Rescale(int value, int extent, std::uint32_t target)  -> int;
 class DesktopLayout {
 public:
-  auto Desktop() const noexcept                  -> Rect;
-  auto Assign(Rect value) noexcept               -> void;
-  auto RecordScreen(rdpSettings const& settings) -> void;
-  auto Screen() const noexcept                   -> Extent;
-  auto Resizing() const noexcept                 -> bool;
-  auto BeginResize(Rect picture) noexcept        -> void;
-  auto EndResize() noexcept                      -> bool;
-  auto Matches(Rect picture) const noexcept      -> bool;
-  auto Offer(Rect picture) const noexcept        -> Rect;
+  auto Desktop() const noexcept              -> Rect;
+  auto Assign(Rect value) noexcept           -> void;
+  auto RecordScreen(SettingsReader settings) -> void;
+  auto Screen() const noexcept               -> Extent;
+  auto Resizing() const noexcept             -> bool;
+  auto BeginResize(Rect picture) noexcept    -> void;
+  auto EndResize() noexcept                  -> bool;
+  auto Matches(Rect picture) const noexcept  -> bool;
+  auto Offer(Rect picture) const noexcept    -> Rect;
 
 private:
   Rect          _desktop      { };

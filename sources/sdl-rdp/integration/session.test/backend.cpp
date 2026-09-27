@@ -3,7 +3,6 @@
 #include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/diagnostics/log-sink.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
-#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/headless-client.test/backend/config.hpp>
 #include <sdl-rdp/headless-client.test/backend/events.hpp>
 #include <sdl-rdp/headless-client.test/backend/instance.hpp>
@@ -39,7 +38,6 @@ using sdl_rdp::configuration::Setup;
 using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::freerdp_facade::Bio;
 using sdl_rdp::freerdp_facade::Certificate;
-using sdl_rdp::freerdp_facade::Settings;
 using sdl_rdp::headless_client_test::backend::BackendInstance;
 using sdl_rdp::headless_client_test::backend::Clock;
 using sdl_rdp::headless_client_test::backend::ConnectWithCookie;
@@ -270,8 +268,6 @@ TEST(Certificate, StableDefaultAndPermissions) {
 }
 
 TEST(Planar, Noisy640Rows) {
-  Settings const settings(freerdp_settings_new(0));
-  ASSERT_TRUE(freerdp_settings_set_uint32(settings.get(), FreeRDP_ColorDepth, 32));
   PlanarContext const encoder(
       freerdp_bitmap_planar_context_new(PLANAR_FORMAT_HEADER_RLE | PLANAR_FORMAT_HEADER_NA, 1, 1));
   ASSERT_TRUE(freerdp_bitmap_planar_context_reset(encoder.get(), 640, 1));

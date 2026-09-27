@@ -1,8 +1,8 @@
 #pragma once
 #include <sdl-rdp/diagnostics/log-sink.hpp>
+#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
-#include <freerdp/settings.h>
 #include <winpr/wlog.h>
 #include <cstdint>
 #include <functional>
@@ -12,24 +12,25 @@
 #include <string_view>
 #include <thread>
 namespace sdl_rdp::diagnostics::detail::logging {
+using sdl_rdp::freerdp_facade::SettingsReader;
 using sdl_rdp::utilities::Pinned;
 
 // MS-RDPBCGR 2.2.1.1.1 requestedProtocols (FreeRDP keeps these constants private).
 inline constexpr std::uint32_t SecurityTls = 0x01, SecurityNla = 0x02, SecurityRdstls = 0x04, SecurityNlaExt = 0x08,
                                SecurityRdsaad = 0x10;
-auto PeerNegotiationLogging(rdpSettings const& settings) -> void;
-auto NegotiationRefused()                                -> bool;
-auto TlsHandshakeFailed()                                -> bool;
-auto ExpectedDisconnect(std::uint32_t code)              -> bool;
-auto AuthenticationRejectedLogging()                     -> void;
-auto ResetAuthenticationLogging()                        -> void;
+auto PeerNegotiationLogging(SettingsReader settings) -> void;
+auto NegotiationRefused()                            -> bool;
+auto TlsHandshakeFailed()                            -> bool;
+auto ExpectedDisconnect(std::uint32_t code)          -> bool;
+auto AuthenticationRejectedLogging()                 -> void;
+auto ResetAuthenticationLogging()                    -> void;
 class LogRoute : private Pinned {
 public:
   struct Filter {
-    bool                                                     authentication_failed{ false };
-    std::optional<std::reference_wrapper<rdpSettings const>> peer_settings;
-    bool                                                     negotiation_failed   { false };
-    bool                                                     handshake_failed     { false };
+    bool                          authentication_failed{ false };
+    std::optional<SettingsReader> peer_settings;
+    bool                          negotiation_failed   { false };
+    bool                          handshake_failed     { false };
   };
   explicit    LogRoute(LogSink& sink);
               ~LogRoute();

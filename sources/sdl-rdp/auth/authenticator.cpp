@@ -1,6 +1,5 @@
 #include <sdl-rdp/auth/authenticator.hpp>
 
-#include <sdl-rdp/auth/certificate.hpp>
 #include <sdl-rdp/auth/identity.hpp>
 #include <sdl-rdp/configuration/configuration.hpp>
 #include <sdl-rdp/diagnostics/diagnostics.hpp>
@@ -15,10 +14,8 @@
 #include <sdl-rdp/utilities/pinned.hpp>
 #include <sdl-rdp/utilities/text.hpp>
 
-#include <freerdp/settings.h>
 #include <algorithm>
 #include <cstdint>
-#include <cstring>
 #include <optional>
 #include <tuple>
 
@@ -26,37 +23,32 @@ namespace sdl_rdp::auth::detail::authenticator {
 using sdl_rdp::configuration::AuthMode;
 using sdl_rdp::diagnostics::AuthenticationRejectedLogging;
 using sdl_rdp::diagnostics::LogLevel;
-using sdl_rdp::freerdp_facade::Get;
 using sdl_rdp::freerdp_facade::NtOwfV2;
+using sdl_rdp::freerdp_facade::StringKey;
 using sdl_rdp::utilities::Contained;
 using sdl_rdp::utilities::Ensures;
 using sdl_rdp::utilities::Pinned;
 using sdl_rdp::utilities::Utf16;
-using sdl_rdp::utilities::Wipe;
 using sdl_rdp::utilities::WipedString;
 
 namespace {
 struct SettingsPassword : private Pinned {
 public:
-  explicit SettingsPassword(rdpSettings& value) : settings{ value } { }
+  explicit SettingsPassword(SettingsView value) : settings{ value } { }
            ~SettingsPassword() {
-    auto* password = freerdp_settings_get_string_writable(&settings, FreeRDP_Password);
-    if (password) Wipe(std::as_writable_bytes(std::span{ password, std::strlen(password) }));
-    // FreeRDP 3.32 include/freerdp/settings.h:553: set_string copies input; nullptr removes the old entry.
-    auto const cleared = freerdp_settings_set_string(&settings, FreeRDP_Password, nullptr);
-    Ensures(cleared, "password cleared");
+    settings.Wipe(StringKey::Password);
   }
 
 private:
-  rdpSettings& settings;
+  SettingsView settings;
 };
 }
 Authenticator::Authenticator(PeerLink& link, Configuration const& configuration,
                              Diagnostics const& diagnostics) noexcept
     : _link{ link }, _configuration{ configuration }, _diagnostics{ diagnostics },
       _credentials{ configuration.CertificateDirectory() } { }
-auto Authenticator::InstallCredentials(rdpSettings& settings) const -> void {
-  InstallServerCredentials(settings, _credentials);
+auto Authenticator::InstallCredentials(SettingsView settings) const -> void {
+  settings.InstallServerCredentials(_credentials.Key(), _credentials.Certificate());
 }
 auto Authenticator::Auth() const noexcept -> AuthMode {
   return _configuration.Auth();
@@ -94,11 +86,11 @@ auto Authenticator::Logon(bool automatic) -> bool {
   if (!automatic || _configuration.Config().auth == AuthMode::None) return true;
   // FreeRDP 3.32 nla.c:1494 stores delegated credentials in settings, not nla_get_identity().
   std::ignore = _state.TestAndSetChecked();
-  auto const& settings = _link.Settings();
-  auto const  verified = [&] {
-    return Verify(std::string{ Get(settings, FreeRDP_Domain).value_or("") },
-                  std::string{ Get(settings, FreeRDP_Username).value_or("") },
-                  Get(settings, FreeRDP_Password).value_or(""));
+  auto const settings = _link.Settings();
+  auto const verified = [&] {
+    return Verify(std::string{ settings.Get(StringKey::Domain).value_or("") },
+                  std::string{ settings.Get(StringKey::Username).value_or("") },
+                  settings.Get(StringKey::Password).value_or(""));
   };
   if (!Contained(false, verified, Failures("Logon verification"))) Reject();
   return true;
@@ -110,7 +102,7 @@ auto Authenticator::Unauthenticated(std::string const& domain, std::string const
 }
 auto Authenticator::VerifySettings() -> bool {
   auto&                  client   = _link.Client();
-  auto&                  settings = _link.Settings();
+  auto const             settings = _link.Settings();
   SettingsPassword const clear    { settings };
   if (_state.TestAndSetChecked()) {
     if (!_state.Rejected()) return true;
@@ -119,10 +111,10 @@ auto Authenticator::VerifySettings() -> bool {
     return false;
   }
   auto const verified = [&] -> std::optional<bool> {
-    auto const domain = std::string{ Get(settings, FreeRDP_Domain).value_or("") };
-    auto const user   = std::string{ Get(settings, FreeRDP_Username).value_or("") };
+    auto const domain = std::string{ settings.Get(StringKey::Domain).value_or("") };
+    auto const user   = std::string{ settings.Get(StringKey::Username).value_or("") };
     if (_configuration.Config().auth == AuthMode::None) return Unauthenticated(domain, user);
-    return Verify(domain, user, Get(settings, FreeRDP_Password).value_or("")) || Denied();
+    return Verify(domain, user, settings.Get(StringKey::Password).value_or("")) || Denied();
   };
   if (auto const outcome = Contained(std::optional<bool>{ }, verified, Failures("Settings verification")))
     return *outcome;

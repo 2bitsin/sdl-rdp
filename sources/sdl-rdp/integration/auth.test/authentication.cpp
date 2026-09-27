@@ -1,5 +1,6 @@
 #include <sdl-rdp/headless-client.test/backend/authentication.hpp>
 #include <sdl-rdp/configuration/setup.hpp>
+#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/headless-client.test/client/client.hpp>
 #include <sdl-rdp/session/backend.hpp>
 #include <cstddef>
@@ -10,10 +11,12 @@
 
 namespace sdl_rdp::integration::auth_test::detail::authentication {
 using sdl_rdp::configuration::AuthMode;
+using sdl_rdp::freerdp_facade::BoolKey;
 using sdl_rdp::headless_client_test::backend::Authentication;
 using sdl_rdp::headless_client_test::backend::CurrentStatus;
 using sdl_rdp::headless_client_test::backend::FixedPair;
 using sdl_rdp::headless_client_test::client::Client;
+using sdl_rdp::headless_client_test::client::SettingsOf;
 using sdl_rdp::session::Backend;
 using sdl_rdp::utilities::Required;
 
@@ -23,9 +26,9 @@ auto RejectCertificate(std::uint32_t port, bool& rejected) -> void {
   verified = false;
   Client client(port, false);
   client.Credentials({ .user = "alice", .password = "correct-secret", .domain = "LAB" }, true);
-  auto* settings = client.Instance()->context->settings;
-  ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_TlsSecurity, true));
-  ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_IgnoreCertificate, false));
+  auto const settings = SettingsOf(client);
+  settings.Set(BoolKey::TlsSecurity, true);
+  settings.Set(BoolKey::IgnoreCertificate, false);
   client.Instance()->VerifyCertificateEx = [](freerdp*, char const*, std::uint16_t, char const*, char const*,
                                               char const*, char const*, std::uint32_t) -> std::uint32_t {
     verified = true;
@@ -183,9 +186,9 @@ TEST_F(Authentication, RefusedSecurityLogs) {
     {
       Client client(backend.Port(), false);
       client.Credentials({ .user = "alice", .password = "correct-secret", .domain = "LAB" }, nla);
-      auto* settings = client.Instance()->context->settings;
-      ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_TlsSecurity, false));
-      ASSERT_TRUE(freerdp_settings_set_bool(settings, FreeRDP_RdpSecurity, !nla));
+      auto const settings = SettingsOf(client);
+      settings.Set(BoolKey::TlsSecurity, false);
+      settings.Set(BoolKey::RdpSecurity, !nla);
       EXPECT_FALSE(client.Connect());
     }
     backend.Close();

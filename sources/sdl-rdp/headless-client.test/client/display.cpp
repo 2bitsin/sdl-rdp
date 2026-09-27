@@ -14,8 +14,8 @@
 #include <utility>
 
 namespace sdl_rdp::headless_client_test::client::detail::display {
-using sdl_rdp::freerdp_facade::FirstRefused;
-using sdl_rdp::freerdp_facade::Refusal;
+using sdl_rdp::freerdp_facade::BoolKey;
+using sdl_rdp::headless_client_test::client::SettingsOf;
 using sdl_rdp::headless_client_test::utilities::Delegated;
 using sdl_rdp::utilities::Expects;
 namespace {
@@ -29,13 +29,12 @@ DisplayClient::DisplayClient(Client& client)
       connections(ClientContext(client)) {
   ClientUpdates(client).DesktopResize = Delegated<&DisplayClient::Resize>;
   freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
-  std::array<std::pair<FreeRDP_Settings_Keys_Bool, bool>, 2> const display_control{ {
-      { FreeRDP_SupportDisplayControl     , true },
-      { FreeRDP_SynchronousDynamicChannels, true },
+  std::array<std::pair<BoolKey, bool>, 2> const display_control{ {
+      { BoolKey::SupportDisplayControl     , true },
+      { BoolKey::SynchronousDynamicChannels, true },
   } };
 
-  auto const refused_display_control = FirstRefused(*ClientContext(client).settings, display_control);
-  Expects(!refused_display_control.has_value(), Refusal("display control", refused_display_control));
+  SettingsOf(client).Apply(display_control);
   ClientHandle(client).LoadChannels = ChannelLoader<LoadDynamicChannel, "disp">;
 }
 DisplayClient::~DisplayClient() {

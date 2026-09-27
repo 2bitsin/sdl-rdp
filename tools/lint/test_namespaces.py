@@ -69,6 +69,20 @@ def test_runtime_hooks_and_sdl_tags_stay_global(tree):
     assert findings(tree, text, SOURCE) == []
 
 
+def test_facade_headers_forward_declare_c_tags_globally(tree):
+    (tree / 'sources/sdl-rdp/freerdp-facade').mkdir(parents=True)
+    detail = 'namespace sdl_rdp::freerdp_facade::detail::{} {{\nclass View {{}};\n}}\n'
+    cases  = {'view.hpp': ('struct rdp_settings;\n', []), 'named.hpp': ('struct Settings;\n', ['named.hpp:1']),
+              'defined.hpp': ('struct rdp_settings {};\n', ['defined.hpp:1']),
+              'unlisted.hpp': ('struct scratch_state;\n', ['unlisted.hpp:1']),
+              'source.cpp': ('struct rdp_settings;\n', ['source.cpp:1'])}
+    for name, (declaration, expected) in cases.items():
+        path = tree / 'sources/sdl-rdp/freerdp-facade' / name
+        assert findings(tree, declaration + detail.format(name.split('.')[0]), str(path.relative_to(tree))) == expected
+        path.unlink()
+    assert findings(tree, f'struct rdp_settings;\n{DETAIL}class Rate {{}};\n}}\n') == ['frame-rate.hpp:1']
+
+
 def test_c_linkage_tables_live_in_the_detail_namespace(tree):
     table = 'extern "C" VideoBootStrap const RDP_bootstrap = { };\n'
     assert findings(tree, f'{DETAIL}{table}}}\n', SOURCE) == []

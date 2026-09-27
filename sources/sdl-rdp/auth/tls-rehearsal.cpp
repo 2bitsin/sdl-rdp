@@ -2,6 +2,7 @@
 
 #include <sdl-rdp/auth/exceptions.hpp>
 #include <sdl-rdp/auth/unsignalled-socket-bio.hpp>
+#include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/link/exceptions.hpp>
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
@@ -25,6 +26,7 @@
 namespace sdl_rdp::auth::detail::tls_rehearsal {
 using sdl_rdp::auth::detail::unsignalled_socket_bio::UnsignalledSocketBio;
 using sdl_rdp::freerdp_facade::Bio;
+using sdl_rdp::freerdp_facade::SettingsView;
 using sdl_rdp::link::PeerContextFailed;
 using sdl_rdp::utilities::AllocationFailed;
 using sdl_rdp::utilities::ConnectedSockets;
@@ -52,7 +54,7 @@ auto ServingPeer(Descriptor socket, Credentials const& credentials) -> PeerHandl
   auto peer = AdoptedPeer(std::move(socket));
   if (!freerdp_peer_context_new(peer.get())) throw PeerContextFailed{ "TLS rehearsal" };
   Ensures(peer->context != nullptr, "the peer has a context");
-  InstallServerCredentials(*peer->context->settings, credentials);
+  SettingsView{ *peer->context->settings }.InstallServerCredentials(credentials.Key(), credentials.Certificate());
   return peer;
 }
 auto AcceptTls(freerdp_peer& peer) -> bool {
