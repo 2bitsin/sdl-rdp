@@ -1,9 +1,14 @@
 """The pointer lint on canonical types: the reviews' evasions fail, the ABI's own signatures pass."""
 import collections
+import concurrent.futures
+import hashlib
 import json
 import os
 import pathlib
+import re
+import shutil
 import subprocess
+import sys
 
 import pytest
 
@@ -379,6 +384,16 @@ struct SavedOpen {
   auto Call() const -> int { return open([](Dev* saved_lambda) -> int { return saved_lambda == nullptr; }); }
   int (*open)(int (*)(Dev*));
 };
+struct Holding {
+  explicit Holding(int (*held_cb)(Dev*)) : held(held_cb) { }
+  int (*held)(Dev*);
+};
+auto Copies(int (*copied_cb)(Dev*)) -> int {
+  auto const copy = copied_cb;
+  return copy(nullptr);
+}
+template <class... ArgsTy> auto PackDeref(ArgsTy... pack_deref) -> int { return *pack_deref...[0]; }
+auto Derefs(int& value) -> int { return PackDeref(&value); }
 }
 extern "C" auto sdl_passes(int (*passed_cb)(Dev*)) -> int { return c_lookup()(passed_cb); }
 extern "C" auto sdl_calls(int (*called_cb)(Dev*)) -> int { return called_cb(nullptr); }
@@ -408,6 +423,8 @@ PROBE   = 'sources/sdl-rdp/video/probe.cpp'
 ADAPTER = 'sources/sdl-rdp/SDL3/adapter.cpp'
 GETTER  = 'sources/sdl-rdp/video/getters.cpp'
 FACADES = 'sources/sdl-rdp/freerdp-facade/facade.cpp'
+SHAPE   = 'sources/sdl-rdp/video/shapes.cpp'
+DEFINE  = 'sources/sdl-rdp/video/defined.cpp'
 FILES   = {PROBE: PROBES, ADAPTER: ADAPTERS, FACADES: FACADE, GETTER: GETTERS}
 
 
@@ -712,13 +729,13 @@ def test_an_acquiring_functor_an_raii_type_holds_is_part_of_it(found):
 @pytest.fixture(scope='module')
 def shaped(tmp_path_factory):
     root  = tmp_path_factory.mktemp('shapes')
-    files = {'sources/sdl-rdp/video/shapes.cpp': SHAPES, 'sources/sdl-rdp/video/defined.cpp': DEFINED}
+    files = {SHAPE: SHAPES, DEFINE: DEFINED}
     build = tree(root, files, files)
     return {(str(item.path), item.line, item.kind) for item in pointers.findings(root, build)}
 
 
 def shape_at(shaped, needle, kind):
-    return ('sources/sdl-rdp/video/shapes.cpp', locate(SHAPES, needle), kind) in shaped
+    return (SHAPE, locate(SHAPES, needle), kind) in shaped
 
 
 @pytest.mark.parametrize('needle', ['int (*restored)(Dev*)', 'int (*initialized)(Dev*)', 'int (*assigned)(Dev*)'])
@@ -800,9 +817,9 @@ def test_a_tracked_unit_outside_the_database_fails(tmp_path):
 
 
 def test_a_query_clang_query_rejects_fails(tmp_path, monkeypatch):
-    monkeypatch.setattr(pointers, 'QUERIES', pointers.QUERIES + 'match functionDecl()\n  .bind("dropped")\n')
-    build = tree(tmp_path, {PROBE: PROBES}, [PROBE])
-    with pytest.raises(SystemExit, match='unknown command'):
+    monkeypatch.setattr(pointers, 'QUERIES', pointers.QUERIES + 'match functionDecl(isNotAMatcher())\n')
+    build = tree(tmp_path, {'sources/sdl-rdp/video/tiny.cpp': 'int x;\n'}, ['sources/sdl-rdp/video/tiny.cpp'])
+    with pytest.raises(SystemExit, match='Matcher not found: isNotAMatcher'):
         pointers.findings(tmp_path, build)
 
 
@@ -869,20 +886,200 @@ def test_a_recorded_input_that_is_gone_leaves_no_cache_key(tmp_path):
     (tmp_path / 'unit.cpp').write_text('')
     (tmp_path / 'kept.hpp').write_text('')
     unit = {'directory': str(tmp_path), 'file': 'unit.cpp', 'arguments': ['clang++']}
-    assert pointers.unit_key(unit, 'q', ['kept.hpp'])
-    assert pointers.unit_key(unit, 'q', ['kept.hpp', 'moved.hpp']) is None
+    assert pointers.unit_key(unit, 'q', ['kept.hpp'], pointers.content_digests())
+    assert pointers.unit_key(unit, 'q', ['kept.hpp', 'moved.hpp'], pointers.content_digests()) is None
 
 
-def test_a_cached_match_is_keyed_on_the_queries_and_the_tool_not_the_judgement(tmp_path, monkeypatch):
+def test_a_cached_match_is_keyed_on_the_queries_the_tool_and_the_flags_not_the_judgement(tmp_path):
     (tmp_path / 'unit.cpp').write_text('')
-    monkeypatch.setattr(pointers, 'dependencies', lambda build: {})
-    monkeypatch.setattr(pointers, 'preprocessed_inputs', lambda unit: [])
-    units = [{'directory': str(tmp_path), 'file': 'unit.cpp', 'arguments': ['clang++']}]
-    tool  = pointers.clang_query()
-    keys  = pointers.cached_keys(units, pointers.lint_text('q', tool), tmp_path)
-    assert pointers.cached_keys(units, pointers.lint_text('q', tool), tmp_path) == keys
-    assert pointers.cached_keys(units, pointers.lint_text('r', tool), tmp_path) != keys
+    units   = [{'directory': str(tmp_path), 'file': 'unit.cpp', 'arguments': ['clang++']}]
+    flagged = [{**units[0], 'arguments': ['clang++', '-DFLAGGED']}]
+    inputs  = {'unit.cpp': []}
+    tool    = pointers.clang_query()
+    keys    = pointers.cached_keys(units, pointers.lint_text('q', tool), inputs)
+    assert pointers.cached_keys(units, pointers.lint_text('q', tool), inputs) == keys
+    assert pointers.cached_keys(units, pointers.lint_text('r', tool), inputs) != keys
+    assert pointers.cached_keys(flagged, pointers.lint_text('q', tool), inputs) != keys
     assert pathlib.Path(pointers.__file__).read_text() not in pointers.lint_text('q', tool)
+
+
+@pytest.mark.parametrize('text, refusal', [
+    ('let a varDecl()\nlet a fieldDecl()\nmatch varDecl()\n', '`let a` is defined twice'),
+    ('match decl(varDecl())\n', 'no traversal root known for the matcher: decl(varDecl())'),
+    ('match typeLoc()\n', 'no traversal root known for the matcher: typeLoc()'),
+    ('unlet a\n', 'no folding known for the query command: unlet a'),
+])
+def test_folding_refuses_a_query_text_it_cannot_fold_unchanged(text, refusal):
+    with pytest.raises(SystemExit, match=re.escape(refusal)):
+        pointers.folded(text)
+
+
+def test_a_set_ends_a_folded_section_so_no_match_moves_past_it():
+    text = 'match varDecl()\nset traversal IgnoreUnlessSpelledInSource\nmatch fieldDecl()\n'
+    assert pointers.folded(text).splitlines() == ['match decl(decl(varDecl()).bind("query0"))',
+                                                  'set traversal IgnoreUnlessSpelledInSource',
+                                                  'match decl(decl(fieldDecl()).bind("query2"))']
+
+
+FOLDED_FILES = {**FILES, SHAPE: SHAPES, DEFINE: DEFINED}
+
+
+def clang_matches(root, build, text):
+    """clang-query's matches of a query text over each unit of the tree, as it printed them."""
+    work  = build / hashlib.sha256(text.encode()).hexdigest()
+    units = pointers.translation_units(root, build)
+    work.mkdir()
+    (work / 'compile_commands.json').write_text(json.dumps(units))
+    (work / 'queries.txt').write_text(text)
+    command = [pointers.clang_query(), '-p', str(work), '-f', str(work / 'queries.txt')]
+    with concurrent.futures.ThreadPoolExecutor(len(units)) as pool:
+        runs = pool.map(lambda unit: subprocess.run([*command, unit['file']], capture_output=True, text=True,
+                                                    check=True), units)
+        return [pointers.matches(run.stdout) for run in runs]
+
+
+@pytest.fixture(scope='module')
+def folding(tmp_path_factory):
+    """The fixtures' matches per unit, under the folded queries and under the queries as written."""
+    root  = tmp_path_factory.mktemp('folding')
+    build = tree(root, FOLDED_FILES, FOLDED_FILES)
+    texts = [pointers.query_text(root)]
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(pointers, 'folded', lambda text: text)
+        texts.append(pointers.query_text(root))
+    with concurrent.futures.ThreadPoolExecutor(len(texts)) as pool:
+        return texts[0], *pool.map(lambda text: clang_matches(root, build, text), texts)
+
+
+def tagged_count(blocks):
+    return sum(any(pointers.QUERY_TAG.match(name) for name in block) for block in blocks)
+
+
+def as_text(block):
+    return json.dumps(block, sort_keys=True)
+
+
+def without(blocks, removed):
+    """The blocks in order, less one copy of each removed block."""
+    left = collections.Counter(map(as_text, removed))
+    kept = []
+    for block in blocks:
+        if left[as_text(block)]:
+            left[as_text(block)] -= 1
+        else:
+            kept.append(block)
+    return kept
+
+
+def test_folded_queries_report_every_match_in_the_order_separate_traversals_gave(folding):
+    _, folded, alone = folding
+    for unit_folded, unit_alone in zip(folded, alone, strict=True):
+        tagged  = tagged_count(unit_folded)
+        ordered = pointers.in_query_order(unit_folded)
+        assert tagged and ordered[:tagged] == without(unit_alone, ordered[tagged:])
+        assert sorted(map(as_text, ordered)) == sorted(map(as_text, unit_alone))
+
+
+def fired(command, tag, blocks):
+    """Whether a diagnostic query matched: by its tag, or by its own names where it binds a translation unit."""
+    if command.startswith('match translationUnitDecl('):
+        return any(name in block for block in blocks for name in re.findall(r'\.bind\("(\w+)"\)', command))
+    return any(tag in block for block in blocks)
+
+
+def test_every_diagnostic_query_matches_in_the_fixtures(folding):
+    text, folded, _ = folding
+    commands = pointers.query_commands(pointers.QUERIES)
+    blocks   = [block for unit in folded for block in unit]
+    tags     = [int(tag) for tag in re.findall(r'\.bind\("query(\d+)"\)', text)]
+    silent   = [commands[tag] for tag in tags if not fired(commands[tag], f'query{tag}', blocks)]
+    assert len(tags) == 54
+    assert not silent, 'silent queries:\n' + '\n'.join(silent)
+
+
+CACHED_HEADER = 'namespace cached::detail::shared {\nstruct Shared { int* held; };\n}\n'
+CACHED_USER   = '#include "sdl-rdp/video/shared.hpp"\nauto Use(int* used) -> int;\n'
+CACHED_FILES  = {'sources/sdl-rdp/video/shared.hpp': CACHED_HEADER,
+                 'sources/sdl-rdp/video/user.cpp':   CACHED_USER,
+                 'sources/sdl-rdp/video/apart.cpp':  'auto Apart(char* apart) -> int;\n'}
+CACHED_UNITS  = [name for name in CACHED_FILES if name.endswith('.cpp')]
+
+
+def queried(monkeypatch):
+    """The units the lint hands to clang-query."""
+    parsed = []
+    query  = pointers.query
+
+    def recorded(*args):
+        parsed.append(pathlib.Path(args[-1]['file']).name)
+        return query(*args)
+    monkeypatch.setattr(pointers, 'query', recorded)
+    return parsed
+
+
+def test_the_matches_follow_the_units_not_the_compile_databases_order(tmp_path):
+    build    = tree(tmp_path, CACHED_FILES, CACHED_UNITS)
+    database = build / 'compile_commands.json'
+    runs     = [pointers.query_units(tmp_path, build)]
+    database.write_text(json.dumps(json.loads(database.read_text())[::-1]))
+    runs.append(pointers.query_units(tmp_path, build))
+    shutil.rmtree(build / 'pointers' / 'cache')
+    runs.append(pointers.query_units(tmp_path, build))
+    paths    = {value.path for block in runs[0] for value in block.values() if isinstance(value, pointers.Location)}
+    assert paths >= {str(tmp_path / name) for name in CACHED_UNITS}
+    assert runs == [runs[0]] * 3
+
+
+def test_a_cached_unit_is_parsed_again_only_when_an_inputs_text_changes(tmp_path, monkeypatch):
+    header = tmp_path / 'sources/sdl-rdp/video/shared.hpp'
+    build  = tree(tmp_path, CACHED_FILES, CACHED_UNITS)
+    parsed = queried(monkeypatch)
+    pointers.findings(tmp_path, build)
+    header.write_text(CACHED_HEADER)
+    os.utime(header, (header.stat().st_atime + 60, header.stat().st_mtime + 60))
+    pointers.findings(tmp_path, build)
+    assert sorted(parsed) == ['apart.cpp', 'user.cpp']
+    header.write_text(CACHED_HEADER.replace('int* held', 'char* held'))
+    assert {item.type for item in pointers.findings(tmp_path, build)} >= {'char *'}
+    assert sorted(parsed) == ['apart.cpp', 'user.cpp', 'user.cpp']
+
+
+@pytest.mark.parametrize('entry', ['{"key": "', '', '[]', '{"matches": []}'])
+def test_a_cache_entry_that_does_not_read_is_parsed_again_and_rewritten(tmp_path, monkeypatch, entry):
+    build  = tree(tmp_path, CACHED_FILES, CACHED_UNITS)
+    found  = pointers.findings(tmp_path, build)
+    parsed = queried(monkeypatch)
+    user   = next(unit for unit in pointers.translation_units(tmp_path, build) if unit['file'].endswith('user.cpp'))
+    pointers.cache_file(build / 'pointers', user).write_text(entry)
+    assert pointers.findings(tmp_path, build) == found
+    assert pointers.findings(tmp_path, build) == found
+    assert parsed == ['user.cpp']
+
+
+FAILING_TOOL = '''import pathlib, sys
+if sys.argv[1:] != ['--version']:
+    with open(pathlib.Path(__file__).with_suffix('.log'), 'a') as log:
+        log.write(sys.argv[-1] + '\\n')
+    sys.stderr.write('\\n'.join(f'noise {line}' for line in range(40)) + '\\nclang-query: the last line\\n')
+    sys.exit(3)
+'''
+
+
+def test_the_first_failed_unit_stops_the_run_and_names_the_unit_the_exit_and_the_output_tail(tmp_path, monkeypatch):
+    units = [f'sources/sdl-rdp/video/unit{index}.cpp' for index in range(6)]
+    build = tree(tmp_path, dict.fromkeys(units, 'int x;\n'), units)
+    tool  = tmp_path / 'failing.py'
+    tool.write_text(f'#!{sys.executable}\n' + FAILING_TOOL)
+    tool.chmod(0o755)
+    monkeypatch.setattr(pointers, 'clang_query', lambda: str(tool))
+    monkeypatch.setattr(pointers, 'THREADS', 1)
+    with pytest.raises(SystemExit) as failure:
+        pointers.findings(tmp_path, build)
+    ran = tool.with_suffix('.log').read_text().splitlines()
+    assert len(ran) <= 2  # the one worker may take the next unit before the pool shuts down
+    assert str(failure.value).startswith(f'pointers: clang-query exited 3 on {ran[0]}:\n')
+    assert str(failure.value).endswith('\nclang-query: the last line')
+    assert 'noise 20' not in str(failure.value)
 
 
 def bench_build(root, database_age, bench_age):

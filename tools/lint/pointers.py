@@ -13,6 +13,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 from typing import NamedTuple
 
 import shape
@@ -30,6 +31,7 @@ HEAD_END        = re.compile(r'[{;]')
 THREADS         = os.cpu_count() or 1
 SITE            = ('sitefn', 'sitelambda', 'siteouter')
 HEAD_LINES      = 20
+OUTPUT_LINES    = 20
 ISOLATED_REASON = re.compile(r'^\s*// isolated: \S')
 TEMPLATE_HEAD   = re.compile(r'^\s*template\s*<')
 CLASS_HEAD      = re.compile(r'^\s*(?:class|struct|union)\s+(?:(?:\[\[.*?\]\]|alignas\(.*?\))\s*)*(\w+(?:::\w+)*)')
@@ -39,6 +41,13 @@ REFLECT_ENTRY   = 'reflect_scheme'
 PLATFORM_TAGS   = frozenset(('win32', 'linux', 'macos', 'emscripten', 'posix', 'apple', 'native'))
 LIVE_PLATFORMS  = frozenset(('native', 'posix', 'linux'))
 CARRIED_ENTRIES = re.compile(r'^(BUILD_TESTING|CMAKE_BUILD_TYPE|CMAKE_TOOLCHAIN_FILE|BUILDUTIL_\w+|\w+_OPTION_\w+)$')
+QUOTED          = re.compile(r'"[^"]*"')
+OUTPUT_MODE     = re.compile(r'^(set|enable|disable) output (\w+)')
+SECTION_END     = re.compile(r'^(set|enable|disable) ')
+LET_NAME        = re.compile(r'^let (\w+) ')
+STATEMENT_ROOTS = frozenset(('binaryOperator', 'callExpr', 'cxxConstructExpr', 'cxxOperatorCallExpr',
+                             'cxxReinterpretCastExpr', 'declRefExpr', 'expr', 'implicitCastExpr', 'initListExpr'))
+QUERY_TAG       = re.compile(r'^query(\d+)$')
 QUERIES         = r'''
 set traversal AsIs
 set output diag
@@ -276,7 +285,84 @@ KIND_TEXT = {'parameters':  'pointer parameter',
 
 def query_text(root):
     sources = re.escape(f'{root}/sources/')
-    return QUERIES.replace('{sources}', sources).replace('{reflect}', REFLECT_ENTRY)
+    return folded(QUERIES.replace('{sources}', sources).replace('{reflect}', REFLECT_ENTRY))
+
+
+def query_commands(text):
+    """clang-query's commands: a line starts one unless a parenthesis before it is still open."""
+    commands, depth = [], 0
+    for line in text.strip('\n').splitlines():
+        if depth:
+            commands[-1] += '\n' + line
+        else:
+            commands.append(line)
+        unquoted  = QUOTED.sub('', line)
+        depth    += unquoted.count('(') - unquoted.count(')')
+    return commands
+
+
+def traversal_root(expression):
+    """The node kind a top-level matcher runs on: a declaration, a statement or a constructor initializer."""
+    name = re.match(r'\w*', expression)[0]
+    if name.endswith('Decl'):
+        return 'decl'
+    if name == 'cxxCtorInitializer':
+        return name
+    if name in STATEMENT_ROOTS:
+        return 'stmt'
+    raise SystemExit(f'pointers: no traversal root known for the matcher: {expression}')
+
+
+def printing_after(command, printing):
+    """Whether clang-query prints bound nodes after an output command, which would print a tag's whole node."""
+    verb, mode = OUTPUT_MODE.match(command).groups()
+    return verb != 'disable' if mode == 'print' else printing and verb != 'set'
+
+
+def folded_match(root, branches):
+    """One `match` over a node kind, its matchers as `eachOf` branches, each still reporting every match it makes."""
+    joined = branches[0] if len(branches) == 1 else 'eachOf(\n    ' + ',\n    '.join(branches) + ')'
+    return f'match {root}({joined})'
+
+
+def bound_once(command, bound):
+    """A `let` that names a value for the first time: a redefinition would change the matches folded before it."""
+    name = LET_NAME.match(command)[1]
+    if name in bound:
+        raise SystemExit(f'pointers: `let {name}` is defined twice, which folding would apply to earlier matches')
+    bound.add(name)
+
+
+def folded(text):
+    """The queries with each section's matches folded into one traversal per node kind, tagged by position."""
+    # clang-query traverses the whole AST once per `match`, every header included; a section ends at every `set`,
+    # `enable` or `disable`, since a match folded past one would run under its setting.
+    lines, pending, printing, bound = [], collections.defaultdict(list), False, set()
+    for index, command in enumerate(query_commands(text)):
+        if command.startswith('match '):
+            expression = command.removeprefix('match ')
+            root       = traversal_root(expression)
+            pending[root].append(expression if printing else f'{root}({expression}).bind("query{index}")')
+            continue
+        if command.startswith('let '):
+            bound_once(command, bound)
+        elif SECTION_END.match(command):
+            lines    += [folded_match(*kind) for kind in pending.items()]
+            pending   = collections.defaultdict(list)
+            printing  = printing_after(command, printing) if OUTPUT_MODE.match(command) else printing
+        else:
+            raise SystemExit(f'pointers: no folding known for the query command: {command}')
+        lines.append(command)
+    return '\n'.join(lines + [folded_match(*kind) for kind in pending.items()]) + '\n'
+
+
+def in_query_order(blocks):
+    """The matches in the order separate traversals gave them, untagged last."""
+    # A fact seen twice keeps the last; the untagged were printed or bound at the translation unit, and are all sets.
+    def position(block):
+        return min((int(tag[1]) for name in block if (tag := QUERY_TAG.match(name))), default=sys.maxsize)
+    return [{name: value for name, value in block.items() if not QUERY_TAG.match(name)}
+            for block in sorted(blocks, key=position)]
 
 
 def compiler_install_dir(compiler):
@@ -362,7 +448,7 @@ def translation_units(root, build):
         units = database_units(root, benches, install_dirs) | units
     if missing := sorted(tracked - units.keys()):
         raise SystemExit('pointers: not in the compile database: ' + ', '.join(str(path) for path in missing))
-    return list(units.values())
+    return sorted(units.values(), key=lambda unit: unit['file'])
 
 
 def dependencies(build):
@@ -397,15 +483,19 @@ def object_of(unit):
     return arguments[arguments.index('-o') + 1] if '-o' in arguments else None
 
 
-def unit_key(unit, queries, inputs):
-    """A digest of the command, the queries and every input's size and time; no key for an input unrecorded or gone."""
+def content_digests():
+    """A file's digest, read once per run however many units include it."""
+    return functools.cache(lambda path: hashlib.sha256(path.read_bytes()).hexdigest())
+
+
+def unit_key(unit, queries, inputs, digests):
+    """A digest of the command, the queries and every input's path and content; none for an input unrecorded or gone."""
     paths = [pathlib.Path(unit['directory']) / path for path in [unit['file'], *(inputs or [])]]
-    if inputs is None or not all(path.exists() for path in paths):
+    if inputs is None or not all(path.is_file() for path in paths):
         return None
     digest = hashlib.sha256(json.dumps(unit['arguments']).encode() + queries.encode())
     for path in paths:
-        status = path.stat()
-        digest.update(f'{path}:{status.st_size}:{status.st_mtime_ns}'.encode())
+        digest.update(f'{path}:{digests(path)}'.encode())
     return digest.hexdigest()
 
 
@@ -447,11 +537,16 @@ def declared_name(location):
     return next((word for word in DECLARED.findall(head) if word not in NOT_DECLARED), '?')
 
 
+def last_lines(output):
+    return output.splitlines()[-OUTPUT_LINES:]
+
+
 def query(tool, database, queries, unit):
     run = subprocess.run([tool, '-p', str(database), '-f', str(queries), unit['file']], capture_output=True, text=True)
     if run.returncode or ('error:' in run.stderr and 'Match #' not in run.stdout):
-        raise SystemExit(f'pointers: clang could not parse {unit["file"]}:\n{run.stdout[-1000:]}{run.stderr[-2000:]}')
-    return matches(run.stdout)
+        output = '\n'.join([*last_lines(run.stdout), *last_lines(run.stderr)])
+        raise SystemExit(f'pointers: clang-query exited {run.returncode} on {unit["file"]}:\n{output}')
+    return in_query_order(matches(run.stdout))
 
 
 def lint_text(queries, tool):
@@ -460,11 +555,22 @@ def lint_text(queries, tool):
     return queries + version
 
 
-def cached_keys(units, text, build):
-    inputs = dependencies(build)
+def unit_inputs(units, build):
+    """Each unit's inputs: ninja's record where it built the unit, the preprocessor's list where it did not."""
+    recorded = dependencies(build)
     with concurrent.futures.ThreadPoolExecutor(THREADS) as pool:
-        listed = pool.map(lambda unit: inputs.get(object_of(unit)) or preprocessed_inputs(unit), units)
-        return {unit['file']: unit_key(unit, text, recorded) for unit, recorded in zip(units, listed)}
+        listed = pool.map(lambda unit: recorded.get(object_of(unit)) or preprocessed_inputs(unit), units)
+        return {unit['file']: inputs for unit, inputs in zip(units, listed)}
+
+
+def cached_keys(units, text, inputs):
+    digests = content_digests()
+    return {unit['file']: unit_key(unit, text, inputs[unit['file']], digests) for unit in units}
+
+
+def widest_first(units, inputs):
+    """The units by input count, most first: parse time follows it (r = 0.93 over 265 units), so the last is short."""
+    return sorted(units, key=lambda unit: -len(inputs[unit['file']] or ()))
 
 
 def cache_file(work, unit):
@@ -473,19 +579,40 @@ def cache_file(work, unit):
 
 def cached(work, unit, key):
     """A unit's matches as its last run left them, when its key still holds; each unit is its own file, written as
-    the unit finishes, so a run stopped midway keeps what it parsed."""
+    the unit finishes, so a run stopped midway keeps what it parsed, and an entry that does not read is a miss."""
     path = cache_file(work, unit)
     if not key or not path.exists():
         return None
-    entry = json.loads(path.read_text())
-    return entry['matches'] if entry['key'] == key else None
+    try:
+        entry = json.loads(path.read_text())
+        return entry['matches'] if entry['key'] == key else None
+    except (ValueError, KeyError, TypeError):
+        return None
+
+
+def written(path, text):
+    """The text in place in one step, so a reader, a second run or a kill midway never sees part of it."""
+    with tempfile.NamedTemporaryFile('w', dir=path.parent, prefix=f'{path.name}.', delete=False) as part:
+        part.write(text)
+    os.replace(part.name, path)
 
 
 def parsed(tool, work, unit, key):
     found = query(tool, work, work / 'queries.txt', unit)
     if key:
-        cache_file(work, unit).write_text(json.dumps({'key': key, 'matches': found}))
+        written(cache_file(work, unit), json.dumps({'key': key, 'matches': found}))
     return found
+
+
+def each_parsed(units, parse):
+    """Every unit parsed across the box's cores; the first failure cancels the units not yet started."""
+    with concurrent.futures.ThreadPoolExecutor(THREADS) as pool:
+        futures = [pool.submit(parse, unit) for unit in units]
+        concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_EXCEPTION)
+        pool.shutdown(cancel_futures=True)
+    if failure := next((error for future in futures if not future.cancelled() and (error := future.exception())), None):
+        raise failure
+    return [future.result() for future in futures]
 
 
 def query_units(root, build):
@@ -493,15 +620,15 @@ def query_units(root, build):
     work = build / 'pointers'
     (work / 'cache').mkdir(parents=True, exist_ok=True)
     units, text = translation_units(root, build), query_text(root)
-    (work / 'compile_commands.json').write_text(json.dumps(units))
-    (work / 'queries.txt').write_text(text)
-    tool  = clang_query()
-    keys  = cached_keys(units, lint_text(text, tool), build)
-    found = {unit['file']: cached(work, unit, keys[unit['file']]) for unit in units}
-    stale = [unit for unit in units if found[unit['file']] is None]
-    with concurrent.futures.ThreadPoolExecutor(THREADS) as pool:
-        for unit, matches in zip(stale, pool.map(lambda unit: parsed(tool, work, unit, keys[unit['file']]), stale)):
-            found[unit['file']] = matches
+    written(work / 'compile_commands.json', json.dumps(units))
+    written(work / 'queries.txt', text)
+    tool   = clang_query()
+    inputs = unit_inputs(units, build)
+    keys   = cached_keys(units, lint_text(text, tool), inputs)
+    found  = {unit['file']: cached(work, unit, keys[unit['file']]) for unit in units}
+    stale  = widest_first([unit for unit in units if found[unit['file']] is None], inputs)
+    for unit, matches in zip(stale, each_parsed(stale, lambda unit: parsed(tool, work, unit, keys[unit['file']]))):
+        found[unit['file']] = matches
     return [{name: value if name == 'type' else Location(*value) for name, value in block.items()}
             for matches in found.values() for block in matches]
 
