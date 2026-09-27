@@ -1,8 +1,5 @@
 [includes]
 sources/sdl-rdp/audio/channel.hpp: 1
-sources/sdl-rdp/clipboard/capabilities.hpp: 1
-sources/sdl-rdp/clipboard/channel.cpp: 1
-sources/sdl-rdp/clipboard/channel.hpp: 1
 sources/sdl-rdp/diagnostics/logging.cpp: 1
 sources/sdl-rdp/diagnostics/logging.hpp: 1
 sources/sdl-rdp/drive/capabilities.cpp: 1
@@ -13,10 +10,8 @@ sources/sdl-rdp/input/events.cpp: 2
 sources/sdl-rdp/input/events.hpp: 1
 sources/sdl-rdp/input/protocol.hpp: 2
 sources/sdl-rdp/peer/redirection.cpp: 1
-sources/sdl-rdp/peer/status.hpp: 1
 sources/sdl-rdp/session/listener.cpp: 1
 sources/sdl-rdp/session/session.cpp: 1
-sources/sdl-rdp/video/display-control.hpp: 1
 sources/sdl-rdp/video/gfx/channel.cpp: 1
 sources/sdl-rdp/video/gfx/channel.hpp: 1
 sources/sdl-rdp/video/gfx/protocol.hpp: 2
@@ -25,9 +20,6 @@ sources/sdl-rdp/video/gfx/protocol.hpp: 2
 sources/sdl-rdp/SDL3/rdp/settings/options.cpp: 2
 sources/sdl-rdp/audio/channel.cpp: 24
 sources/sdl-rdp/audio/channel.hpp: 2
-sources/sdl-rdp/clipboard/capabilities.hpp: 9
-sources/sdl-rdp/clipboard/channel.cpp: 48
-sources/sdl-rdp/clipboard/channel.hpp: 6
 sources/sdl-rdp/diagnostics/logging.cpp: 20
 sources/sdl-rdp/diagnostics/logging.hpp: 2
 sources/sdl-rdp/drive/capabilities.cpp: 26
@@ -38,12 +30,9 @@ sources/sdl-rdp/input/events.cpp: 26
 sources/sdl-rdp/input/events.hpp: 1
 sources/sdl-rdp/input/protocol.cpp: 24
 sources/sdl-rdp/input/protocol.hpp: 6
-sources/sdl-rdp/peer/redirection.cpp: 3
-sources/sdl-rdp/peer/status.hpp: 1
+sources/sdl-rdp/peer/redirection.cpp: 2
 sources/sdl-rdp/session/listener.cpp: 1
 sources/sdl-rdp/session/session.cpp: 2
-sources/sdl-rdp/video/display-control.cpp: 15
-sources/sdl-rdp/video/display-control.hpp: 4
 sources/sdl-rdp/video/gfx/channel.cpp: 51
 sources/sdl-rdp/video/gfx/channel.hpp: 9
 sources/sdl-rdp/video/gfx/protocol.hpp: 34

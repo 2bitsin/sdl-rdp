@@ -1,4 +1,5 @@
 #include <sdl-rdp/configuration/setup.hpp>
+#include <sdl-rdp/freerdp-facade/display-channel-events.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/headless-client.test/backend/events.hpp>
 #include <sdl-rdp/headless-client.test/backend/status.hpp>
@@ -9,17 +10,20 @@
 #include <sdl-rdp/link/event.hpp>
 #include <sdl-rdp/session/backend.hpp>
 #include <sdl-rdp/utilities/geometry.hpp>
+#include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
 #include <array>
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <tuple>
 #include <vector>
 
 namespace sdl_rdp::integration::video_test::detail::resize {
 using sdl_rdp::configuration::Codec;
+using sdl_rdp::freerdp_facade::DisplayMonitor;
 using sdl_rdp::freerdp_facade::NumberKey;
 using sdl_rdp::freerdp_facade::SettingsView;
 using sdl_rdp::headless_client_test::backend::As;
@@ -36,6 +40,7 @@ using sdl_rdp::link::ScreenChanged;
 using sdl_rdp::session::Backend;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Extent;
+using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::Pinned;
 using sdl_rdp::utilities::Required;
 
@@ -83,13 +88,10 @@ public:
     auto const held   = _backend.Session().Lock();
     auto const status = RequiredStatus(_backend);
     Expects(status.resizing, "peer has an in-flight resize");
-    DISPLAY_CONTROL_MONITOR_LAYOUT monitor{ };
-    monitor.Flags  = DISPLAY_CONTROL_MONITOR_PRIMARY;
-    monitor.Width  = status.desktop.w;
-    monitor.Height = status.desktop.h;
-    DISPLAY_CONTROL_MONITOR_LAYOUT_PDU const layout  { sizeof(monitor), 1, &monitor };
-    auto&                                    display = Required(status.display, "peer has a display channel").get();
-    EXPECT_EQ(display.DispMonitorLayout(&display, &layout), CHANNEL_RC_OK);
+    DisplayMonitor const monitor { .width  = Narrowed<std::uint32_t>(status.desktop.w),
+                                   .height = Narrowed<std::uint32_t>(status.desktop.h) };
+    auto&                display = Required(status.display, "peer has a display channel").get();
+    EXPECT_TRUE(display.MonitorLayout(std::span{ &monitor, 1 }));
   }
   auto ConfirmActiveCallback() -> void {
     auto const held = _backend.Session().Lock();

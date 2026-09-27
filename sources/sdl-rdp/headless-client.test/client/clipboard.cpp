@@ -1,6 +1,5 @@
 #include <sdl-rdp/headless-client.test/client/clipboard.hpp>
 
-#include <sdl-rdp/clipboard/capabilities.hpp>
 #include <sdl-rdp/headless-client.test/client/channels.hpp>
 #include <sdl-rdp/headless-client.test/client/handles.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
@@ -18,7 +17,6 @@
 #include <utility>
 
 namespace sdl_rdp::headless_client_test::client::detail::clipboard {
-using sdl_rdp::clipboard::SendGeneralCapabilities;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
 
@@ -26,6 +24,17 @@ namespace {
 auto HeldClipboard(CliprdrClientContext& context) -> ClipboardClient& {
   Expects(context.custom != nullptr, "callback context carries its observer");
   return *static_cast<ClipboardClient*>(context.custom);
+}
+auto SendCapabilities(CliprdrClientContext& context) -> std::uint32_t {
+  CLIPRDR_GENERAL_CAPABILITY_SET general{ .capabilitySetType   = CB_CAPSTYPE_GENERAL,
+                                          .capabilitySetLength = CB_CAPSTYPE_GENERAL_LEN,
+                                          .version             = CB_CAPS_VERSION_2,
+                                          .generalFlags        = CB_USE_LONG_FORMAT_NAMES };
+  // MS-RDPECLIP 2.2.2.1.1: a general capability set begins with the generic capability set header.
+  CLIPRDR_CAPABILITIES const caps{ .common            = { .msgType = CB_CLIP_CAPS },
+                                   .cCapabilitiesSets = 1,
+                                   .capabilitySets    = reinterpret_cast<CLIPRDR_CAPABILITY_SET*>(&general) };
+  return context.ClientCapabilities(&context, &caps);
 }
 auto AnnounceFormat(CliprdrClientContext& context, bool unicode) -> std::uint32_t {
   CLIPRDR_FORMAT      format{ Narrowed<std::uint32_t>(unicode ? CF_UNICODETEXT : CF_DIB), nullptr };
@@ -117,7 +126,7 @@ auto ClipboardClient::Accepted() -> std::uint32_t {
   return CHANNEL_RC_OK;
 }
 auto ClipboardClient::Ready(CliprdrClientContext& context) -> std::uint32_t {
-  auto result = SendGeneralCapabilities([&](auto const& caps) { return context.ClientCapabilities(&context, &caps); });
+  auto result = SendCapabilities(context);
   if (result != CHANNEL_RC_OK) return result;
   if (!outgoing.empty()) return AnnounceFormat(context, true);
   CLIPRDR_FORMAT_LIST const list{ .common = { .msgType = CB_FORMAT_LIST } };

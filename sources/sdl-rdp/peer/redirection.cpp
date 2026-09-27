@@ -3,6 +3,7 @@
 #include <sdl-rdp/audio/channel.hpp>
 #include <sdl-rdp/clipboard/channel.hpp>
 #include <sdl-rdp/drive/channel.hpp>
+#include <sdl-rdp/freerdp-facade/clipboard-channel.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/link/session-access.hpp>
@@ -15,6 +16,7 @@
 #include <utility>
 
 namespace sdl_rdp::peer::detail::redirection {
+using sdl_rdp::freerdp_facade::ClipboardChannelName;
 using sdl_rdp::utilities::Expects;
 
 namespace {
@@ -32,7 +34,7 @@ Redirection::~Redirection() {
   Disconnect();
 }
 auto Redirection::OpenClipboard() -> bool {
-  if (_clipboard || !_link.Channels().Joined(CLIPRDR_SVC_CHANNEL_NAME)) return true;
+  if (_clipboard || !_link.Channels().Joined(ClipboardChannelName)) return true;
   _link.Invalidate();
   _clipboard = _make_clipboard();
   return _clipboard->Open();

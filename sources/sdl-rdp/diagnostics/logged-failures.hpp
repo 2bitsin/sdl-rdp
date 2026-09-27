@@ -15,6 +15,9 @@ using sdl_rdp::utilities::OperationName;
 template <class InterfaceTy> class LoggedFailures : public InterfaceTy {
 protected:
   explicit LoggedFailures(Diagnostics const& diagnostics) noexcept : _diagnostics{ diagnostics } { }
+  auto     Logger() const noexcept -> Diagnostics const& {
+    return _diagnostics;
+  }
 
 private:
   auto Failed(OperationName operation, std::string_view failure) const -> void final {
