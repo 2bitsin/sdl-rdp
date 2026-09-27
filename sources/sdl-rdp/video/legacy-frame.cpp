@@ -3,6 +3,7 @@
 #include <sdl-rdp/configuration/configuration.hpp>
 #include <sdl-rdp/configuration/setup.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
+#include <sdl-rdp/freerdp-facade/updates.hpp>
 #include <sdl-rdp/link/activation.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/utilities/geometry.hpp>
@@ -11,8 +12,6 @@
 #include <sdl-rdp/video/frame/pacing.hpp>
 #include <sdl-rdp/video/peer-frames.hpp>
 
-#include <freerdp/codec/color.h>
-#include <freerdp/freerdp.h>
 #include <oxbox/utilities/span.hpp>
 #include <algorithm>
 #include <array>
@@ -24,12 +23,16 @@
 namespace sdl_rdp::video::detail::legacy_frame {
 using sdl_rdp::configuration::Codec;
 using sdl_rdp::freerdp_facade::BoolKey;
+using sdl_rdp::freerdp_facade::ConvertPixels;
 using sdl_rdp::freerdp_facade::NumberKey;
+using sdl_rdp::freerdp_facade::PixelFormat;
+using sdl_rdp::freerdp_facade::Updates;
 using sdl_rdp::utilities::AreaBytes;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::Rect;
 using sdl_rdp::utilities::RowBytes;
+using sdl_rdp::utilities::SizeOf;
 using sdl_rdp::utilities::Unreachable;
 using sdl_rdp::video::EncodePlanarRows;
 
@@ -38,74 +41,9 @@ constexpr std::size_t BITMAP_RECTANGLE_LIMIT = 0xFFFF;
 constexpr std::size_t BitmapHeaderReserve    = 1024;
 constexpr int         RemoteFxBandRows       = 64;
 
-auto SendSurfaceBits(rdpUpdate& update, Rect area, std::span<std::byte> payload, std::uint32_t codec) -> bool {
-  Expects(update.SurfaceBits != nullptr, "surface callback exists");
-  auto command = SURFACE_BITS_COMMAND{ };
-  command.cmdType              = CMDTYPE_SET_SURFACE_BITS;
-  command.skipCompression      = true;
-  command.destLeft             = Narrowed<std::uint32_t>(area.x);
-  command.destTop              = Narrowed<std::uint32_t>(area.y);
-  command.destRight            = Narrowed<std::uint32_t>(area.x + area.w);
-  command.destBottom           = Narrowed<std::uint32_t>(area.y + area.h);
-  command.bmp.bpp              = 32u;
-  command.bmp.codecID          = Narrowed<std::uint16_t>(codec);
-  command.bmp.width            = Narrowed<std::uint16_t>(area.w);
-  command.bmp.height           = Narrowed<std::uint16_t>(area.h);
-  command.bmp.bitmapDataLength = Narrowed<std::uint32_t>(payload.size());
-  command.bmp.bitmapData       = oxbox::utilities::SpanCast<std::uint8_t>(payload).data();
-  return update.SurfaceBits(update.context, &command);
-}
-
-// Bitmap update corners are inclusive, unlike a surface command's.
-auto BitmapArea(Rect area) -> BITMAP_DATA {
-  auto rectangle = BITMAP_DATA{ };
-  rectangle.destLeft           = Narrowed<std::uint32_t>(area.x);
-  rectangle.destTop            = Narrowed<std::uint32_t>(area.y);
-  rectangle.destRight          = Narrowed<std::uint32_t>(area.x + area.w - 1);
-  rectangle.destBottom         = Narrowed<std::uint32_t>(area.y + area.h - 1);
-  rectangle.width              = Narrowed<std::uint32_t>(area.w);
-  rectangle.height             = Narrowed<std::uint32_t>(area.h);
-  rectangle.cbScanWidth        = Narrowed<std::uint32_t>(RowBytes(area.w));
-  rectangle.cbUncompressedSize = Narrowed<std::uint32_t>(AreaBytes(area));
-  return rectangle;
-}
-auto BitmapRectangle(Rect area, std::span<std::byte> payload, bool compressed) -> BITMAP_DATA {
-  Expects(!payload.empty(), "bitmap payload exists");
-  auto rectangle = BitmapArea(area);
-  rectangle.bitsPerPixel       = 32u;
-  rectangle.bitmapLength       = Narrowed<std::uint32_t>(payload.size());
-  rectangle.bitmapDataStream   = oxbox::utilities::SpanCast<std::uint8_t>(payload).data();
-  rectangle.compressed         = compressed;
-  rectangle.cbCompMainBodySize = Narrowed<std::uint32_t>(payload.size());
-  return rectangle;
-}
-auto SendBitmapBand(rdpUpdate& update, std::span<BITMAP_DATA> rectangles) -> bool {
-  Expects(update.BitmapUpdate != nullptr, "bitmap callback exists");
-  Expects(!rectangles.empty(), "bitmap batch exists");
-  auto batch = BITMAP_UPDATE{ };
-  batch.number          = Narrowed<std::uint32_t>(rectangles.size());
-  batch.rectangles      = rectangles.data();
-  batch.skipCompression = true;
-  return update.BitmapUpdate(update.context, &batch);
-}
-
-auto PackedStride(int width, std::uint32_t depth) -> std::uint32_t {
-  return (Narrowed<std::uint32_t>(width) * (depth / 8) + 3) & ~3u;
-}
 auto Convert(PixelBand band, std::uint32_t depth) -> std::vector<std::byte> {
   Expects(std::ranges::contains(std::array{ 16u, 24u }, depth), "supported packed colour depth");
-  auto const             area      = band.area;
-  auto const             format    = depth == 16 ? PIXEL_FORMAT_RGB16 : PIXEL_FORMAT_BGR24;
-  auto const             stride    = PackedStride(area.w, depth);
-  std::vector<std::byte> converted(std::size_t{ stride } * Narrowed<std::size_t>(area.h));
-  auto const             target    = oxbox::utilities::SpanCast<std::uint8_t>(std::span{ converted });
-  auto const             width     = Narrowed<std::uint32_t>(area.w);
-  auto const             height    = Narrowed<std::uint32_t>(area.h);
-  auto const             source    = Narrowed<std::uint32_t>(RowBytes(area.w));
-  if (!freerdp_image_copy(target.data(), format, stride, 0, 0, width, height, band.pixels.data(), PIXEL_FORMAT_BGRX32,
-                          source, 0, 0, nullptr, FREERDP_FLIP_NONE))
-    return { };
-  return converted;
+  return ConvertPixels(band.pixels, SizeOf(band.area), depth == 16 ? PixelFormat::Rgb16 : PixelFormat::Bgr24);
 }
 auto PacketBytes(auto const& packets) -> std::size_t {
   auto sizes = packets | std::views::transform([](auto const& packet) { return std::span(packet.bands); })
@@ -123,11 +61,9 @@ auto LegacyFrame::SelectEncoder() -> bool {
   if (previous != _encoder.SelectedCodec()) _activation.CodecChanged(_encoder.SelectedCodec());
   return true;
 }
-auto LegacyFrame::Marker(std::uint16_t action) -> bool {
+auto LegacyFrame::Marker(FrameAction action) -> bool {
   if (!_link.Connection().Settings().Get(BoolKey::FrameMarkerCommandEnabled)) return true;
-  auto&                      context = _link.Connection().Context();
-  SURFACE_FRAME_MARKER const marker  { action, _pacing.Frame() };
-  return context.update->SurfaceFrameMarker(&context, &marker);
+  return Updates{ _link.Connection() }.FrameMarker(action, _pacing.Frame());
 }
 auto LegacyFrame::Prepare() -> bool {
   ExpectCaptured(_frames);
@@ -204,34 +140,28 @@ auto LegacyFrame::Encode() -> bool {
 }
 auto LegacyFrame::Describe(Packet& packet) const -> void {
   if (_format.wire == LegacyWire::Surface) return;
-  auto const depth = _format.depth;
   packet.rectangles.reserve(packet.bands.size());
   std::ranges::transform(packet.bands, std::back_inserter(packet.rectangles), [&](Band& band) {
-    auto rectangle = BitmapRectangle(band.area, band.bytes, _format.wire == LegacyWire::Planar);
-    if (depth != 32) {
-      auto stride = PackedStride(band.area.w, depth);
-      rectangle.bitsPerPixel       = depth;
-      rectangle.width              = stride / (depth / 8);
-      rectangle.cbScanWidth        = stride;
-      rectangle.cbUncompressedSize = Narrowed<std::uint32_t>(band.bytes.size());
-    }
-    return rectangle;
+    return Bitmap{
+      .area = band.area, .payload = band.bytes, .depth = _format.depth, .compressed = _format.wire == LegacyWire::Planar
+    };
   });
 }
 auto LegacyFrame::Write(Packet& packet) -> bool {
   Expects(!packet.bands.empty(), "encoded packet exists");
-  auto& update = *_link.Connection().Context().update;
+  Updates updates{ _link.Connection() };
   switch (_format.wire) {
   case LegacyWire::Surface:
-    return SendSurfaceBits(update, packet.bands.front().area, packet.bands.front().bytes, _format.codec);
+    return updates.SurfaceBits(
+        { .area = packet.bands.front().area, .codec_id = _format.codec, .payload = packet.bands.front().bytes });
   case LegacyWire::Bitmap:
-  case LegacyWire::Planar: return SendBitmapBand(update, packet.rectangles);
+  case LegacyWire::Planar: return updates.Bitmaps(packet.rectangles);
   default:                 Unreachable(_format.wire);
   }
 }
 auto LegacyFrame::Finish() -> bool {
   if (_link.Connection().WriteBlocked()) return true;
-  if (!Marker(SURFACECMD_FRAMEACTION_END)) return false;
+  if (!Marker(FrameAction::End)) return false;
   _pacing.Sent(_frames,
                { .bytes = PacketBytes(_queue.packets), .encoded = _encoder.EncodeTime(), .avc = std::nullopt });
   _queue.packets.clear();
@@ -240,7 +170,7 @@ auto LegacyFrame::Finish() -> bool {
 auto LegacyFrame::Send() -> bool {
   ExpectCaptured(_frames);
   if (!_queue.next) {
-    if (!Marker(SURFACECMD_FRAMEACTION_BEGIN)) return false;
+    if (!Marker(FrameAction::Begin)) return false;
     _queue.next = 0;
   }
   for (auto& index = *_queue.next; index < _queue.packets.size(); ++index) {

@@ -15,7 +15,7 @@ PointerSender::PointerSender(Generational<PointerShape>& pointer, PeerLink& link
     : _pointer{ pointer }, _link{ link }, _diagnostics{ diagnostics } { }
 auto PointerSender::Send() -> bool {
   if (_generation == _pointer.Generation()) return true;
-  auto const delivery = _pointer.Value().Send(_link.Connection().Context());
+  auto const delivery = _pointer.Value().Send(_link.Connection());
   switch (delivery) {
   case PointerDelivery::Failed: return false;
   case PointerDelivery::Unsupported:

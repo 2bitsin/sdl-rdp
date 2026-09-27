@@ -1,5 +1,6 @@
 #include <sdl-rdp/video/frame/capture.hpp>
 
+#include <sdl-rdp/freerdp-facade/updates.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/picture/desktop-layout.hpp>
 #include <sdl-rdp/utilities/geometry.hpp>
@@ -7,10 +8,8 @@
 #include <sdl-rdp/video/frame/pacing.hpp>
 #include <sdl-rdp/video/peer-frames.hpp>
 
-#include <freerdp/freerdp.h>
-#include <freerdp/update.h>
-
 namespace sdl_rdp::video::frame::detail::capture {
+using sdl_rdp::freerdp_facade::Updates;
 using sdl_rdp::picture::ApplyDesktopSize;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::Rect;
@@ -44,10 +43,9 @@ auto FrameCapture::Take() -> Rect {
   return picture;
 }
 auto FrameCapture::Resize(Rect picture) -> bool {
-  auto& context = _link.Connection().Context();
   _desktop.BeginResize(picture);
   ApplyDesktopSize(_link.Connection().Settings(), picture);
-  if (!context.update->DesktopResize(&context)) return false;
+  if (!Updates{ _link.Connection() }.DesktopResize()) return false;
   _frames.Resend();
   return true;
 }

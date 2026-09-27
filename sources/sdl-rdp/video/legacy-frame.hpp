@@ -1,5 +1,6 @@
 #pragma once
 #include <sdl-rdp/configuration/forward.hpp>
+#include <sdl-rdp/freerdp-facade/updates.hpp>
 #include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
@@ -7,7 +8,6 @@
 #include <sdl-rdp/video/frame/forward.hpp>
 #include <sdl-rdp/video/scaler.hpp>
 
-#include <freerdp/update.h>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -16,6 +16,8 @@
 
 namespace sdl_rdp::video::detail::legacy_frame {
 using sdl_rdp::configuration::Configuration;
+using sdl_rdp::freerdp_facade::Bitmap;
+using sdl_rdp::freerdp_facade::FrameAction;
 using sdl_rdp::link::Activation;
 using sdl_rdp::link::PeerLink;
 using sdl_rdp::utilities::Pinned;
@@ -43,8 +45,8 @@ private:
     std::vector<std::byte> bytes;
   };
   struct Packet {
-    std::vector<Band>        bands;
-    std::vector<BITMAP_DATA> rectangles;
+    std::vector<Band>   bands;
+    std::vector<Bitmap> rectangles;
   };
   struct Queue {
     std::vector<Packet>        packets;
@@ -54,7 +56,7 @@ private:
   auto AppendPlanar(Packet& packet, std::size_t& wire_size, Rect area, std::span<std::byte const> payload) -> void;
   auto AppendBand(PixelBand band)                                                                          -> bool;
   auto Finish()                                                                                            -> bool;
-  auto Marker(std::uint16_t action)                                                                        -> bool;
+  auto Marker(FrameAction action)                                                                          -> bool;
   auto Planar(Rect area)                                                                                   -> bool;
   auto Bands(Rect area)                                                                                    -> bool;
   auto Describe(Packet& packet) const                                                                      -> void;

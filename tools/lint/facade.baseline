@@ -22,14 +22,9 @@ sources/sdl-rdp/video/avc/regions.hpp: 1
 sources/sdl-rdp/video/display-control.hpp: 1
 sources/sdl-rdp/video/encoder.cpp: 1
 sources/sdl-rdp/video/encoder.hpp: 4
-sources/sdl-rdp/video/frame/capture.cpp: 2
 sources/sdl-rdp/video/gfx/channel.cpp: 1
 sources/sdl-rdp/video/gfx/channel.hpp: 2
 sources/sdl-rdp/video/gfx/protocol.hpp: 2
-sources/sdl-rdp/video/legacy-frame.cpp: 2
-sources/sdl-rdp/video/legacy-frame.hpp: 1
-sources/sdl-rdp/video/pointer/shape.cpp: 2
-sources/sdl-rdp/video/pointer/shape.hpp: 1
 
 [names]
 sources/sdl-rdp/SDL3/rdp/settings/options.cpp: 2
@@ -63,10 +58,6 @@ sources/sdl-rdp/video/encoder.hpp: 8
 sources/sdl-rdp/video/gfx/channel.cpp: 59
 sources/sdl-rdp/video/gfx/channel.hpp: 13
 sources/sdl-rdp/video/gfx/protocol.hpp: 34
-sources/sdl-rdp/video/legacy-frame.cpp: 17
-sources/sdl-rdp/video/legacy-frame.hpp: 1
-sources/sdl-rdp/video/pointer/shape.cpp: 7
-sources/sdl-rdp/video/pointer/shape.hpp: 4
 
 [facade headers]
 sources/sdl-rdp/freerdp-facade/nvenc.hpp: 1

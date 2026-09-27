@@ -1,7 +1,6 @@
 #include <sdl-rdp/picture/frame-store.hpp>
 
 #include <sdl-rdp/utilities/geometry.hpp>
-#include <sdl-rdp/utilities/narrowed.hpp>
 
 #include <cstdint>
 #include <source_location>
@@ -10,9 +9,9 @@
 namespace sdl_rdp::picture::detail::frame_store {
 using sdl_rdp::utilities::AspectRatio;
 using sdl_rdp::utilities::Ensures;
-using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::Rect;
 using sdl_rdp::utilities::SameSize;
+using sdl_rdp::utilities::SizeOf;
 using sdl_rdp::utilities::Whole;
 
 namespace {
@@ -22,7 +21,7 @@ auto EnsureConsistent(FrameSnapshot const& shadow, PictureGeometry const& geomet
   Ensures(consistent, "the shadow has the picture's size", where);
 }
 auto Blank(Rect bounds) -> FrameSnapshot {
-  Extent const size{ .width = Narrowed<std::uint32_t>(bounds.w), .height = Narrowed<std::uint32_t>(bounds.h) };
+  auto const size = SizeOf(bounds);
   return { std::make_shared<std::vector<std::uint8_t> const>(FrameBytes(size)), size };
 }
 }

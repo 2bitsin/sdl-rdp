@@ -39,6 +39,9 @@ struct Rect {
 constexpr auto Whole(Extent size) noexcept -> Rect {
   return { .x = 0, .y = 0, .w = Narrowed<int>(size.width), .h = Narrowed<int>(size.height) };
 }
+constexpr auto SizeOf(Rect area) -> Extent {
+  return { .width = Narrowed<std::uint32_t>(area.w), .height = Narrowed<std::uint32_t>(area.h) };
+}
 inline auto Rows(Rect area) {
   return std::views::iota(area.y, area.y + area.h)
          | std::views::transform([area](int y) { return Rect{ .x = area.x, .y = y, .w = area.w, .h = 1 }; });
@@ -98,6 +101,7 @@ using detail::geometry::Rect;
 using detail::geometry::RowBytes;
 using detail::geometry::Rows;
 using detail::geometry::SameSize;
+using detail::geometry::SizeOf;
 using detail::geometry::Touches;
 using detail::geometry::Union;
 using detail::geometry::Whole;
