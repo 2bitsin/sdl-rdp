@@ -32,7 +32,6 @@ auto LoaderFailure(std::string& detail, std::string_view format, std::string_vie
 #include <memory>
 #include <optional>
 #include <span>
-#include <tuple>
 #include <utility>
 
 namespace sdl_rdp::video::avc::detail::encoder {
@@ -51,8 +50,10 @@ template <class... ArgsTy>
 auto Released(Reporter reporter, int status, std::format_string<ArgsTy const&...> operation,
               ArgsTy const&... args) noexcept -> void {
   if (status == 0 || !reporter) return;
-  auto const text = [&] { return std::format("AVC420 {} failed: {}", std::format(operation, args...), status); };
-  std::ignore = Contained([&] { reporter->get().Log(LogLevel::Error, text()); }, [](std::string_view) noexcept { });
+  auto const report = [&] {
+    reporter->get().Log(LogLevel::Error, std::format("AVC420 {} failed: {}", std::format(operation, args...), status));
+  };
+  Contained(report, [](std::string_view) noexcept { });
 }
 template <auto FREE> struct FreesLibrary {
   auto operator()(auto* functions) const noexcept -> void {
