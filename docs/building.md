@@ -7,25 +7,35 @@ dependency is public. The build driver is
 (an install into a virtual environment you activate yourself does not
 bootstrap its toolchain yet, 2bitsin/buildutil#2).
 `openssl/3.6.3`, `nv-codec-headers/13.0.19.0` (FFmpeg's NVENC headers), gtest
-and google-benchmark come from conancenter. Two packages are built once into
-this checkout's conan home, `_conanhome/`, after which the `Require` lines in
-`sources/CMakeLists.txt` resolve them: `oxbox/0.33.1.364`, the utility library
-the backend uses, from tag `v0.33.1` of
-[2bitsin/oxbox](https://github.com/2bitsin/oxbox) (the pin names the build
+and google-benchmark come from conancenter. Two packages are put into this
+checkout's conan home, `_conanhome/`, after which the `Require` lines in
+`sources/CMakeLists.txt` resolve them and the first `./buildutil build`
+compiles both inside the cache for this project's dependency graph:
+`oxbox/0.33.1.364`, the utility library the backend uses, from tag `v0.33.1`
+of [2bitsin/oxbox](https://github.com/2bitsin/oxbox) (the pin names the build
 number its published package carries, and the local build takes the same
-number); and `freerdp/3.32.0`, FreeRDP 3.32.0 with the patches this project
-needs, from tag `3.32.0-sdl-rdp.1` of
-[2bitsin/FreeRDP](https://github.com/2bitsin/FreeRDP):
+number; `--bake-buildutil` ships the driver inside the package so this
+project's build can rebuild it, because FreeRDP takes OpenSSL shared and that
+gives oxbox a different package id from the one a standalone build produces);
+and `freerdp/3.32.0`, FreeRDP 3.32.0 with the patches this project needs, from
+tag `3.32.0-sdl-rdp.1` of [2bitsin/FreeRDP](https://github.com/2bitsin/FreeRDP),
+exported as a recipe only (a fresh conan home has no profile for
+`conan create`; the project's build carries the right one):
 
 ```sh
 pipx install git+https://github.com/2bitsin/buildutil@v0.96.0
 export CONAN_HOME="$PWD/_conanhome"
 (git clone -b v0.33.1 https://github.com/2bitsin/oxbox.git ../oxbox && cd ../oxbox &&
-  ./buildutil publish --conan-home "$CONAN_HOME" --no-upload --release --version 0.33.1.364)
+  ./buildutil publish --conan-home "$CONAN_HOME" --no-upload --release --version 0.33.1.364 --bake-buildutil)
 (git clone -b 3.32.0-sdl-rdp.1 https://github.com/2bitsin/FreeRDP.git ../FreeRDP && cd ../FreeRDP &&
-  conan create . --build=missing)
+  conan export .)
+./buildutil build --watchdog-budget 3600
 ```
 
+The first build compiles FreeRDP and oxbox in the conan cache, which is why
+it carries a watchdog budget: buildutil's default of 180 s assumes prebuilt
+dependencies. Later builds do not need it; `./buildutil test` takes the same
+flag on a machine that needs more than three minutes for the gate.
 Nothing FreeRDP or OpenSSL is taken from the system at build time. AVC420
 needs an NVIDIA driver with NVENC at runtime and is skipped without one.
 `./buildutil build` builds everything, `./buildutil test` runs the gate (Release,
