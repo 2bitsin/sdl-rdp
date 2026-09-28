@@ -1,19 +1,14 @@
-#include <sdl-rdp/utilities/posix.hpp>
+#include <sdl-rdp/utilities/descriptor.posix.hpp>
 
 #include <sdl-rdp/utilities/contract.hpp>
 
-#include <arpa/inet.h>
-#include <array>
 #include <cerrno>
-#include <cstdint>
-#include <netinet/in.h>
 #include <string>
-#include <sys/socket.h>
 #include <system_error>
 #include <unistd.h>
 #include <utility>
 
-namespace sdl_rdp::utilities::detail::posix {
+namespace sdl_rdp::utilities::detail::descriptor {
 
 Descriptor::Descriptor(int owned) noexcept : descriptor(owned) {
   Expects(owned >= 0, "an owned descriptor is open");
@@ -42,20 +37,5 @@ auto SystemCall(int result, std::string_view operation) -> int {
   Expects(!operation.empty(), "the failing operation can be named");
   if (result < 0) throw std::system_error(errno, std::system_category(), std::string(operation));
   return result;
-}
-auto ConnectedSockets() -> SocketPair {
-  std::array<int, 2> ends{ };
-  SystemCall(::socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, ends.data()), "socket pair");
-  return { .server = Descriptor{ ends[0] }, .client = Descriptor{ ends[1] } };
-}
-auto Generic(sockaddr_in& address) noexcept -> sockaddr& {
-  // POSIX socket calls take an IPv4 address through the generic sockaddr it begins with.
-  return reinterpret_cast<sockaddr&>(address);
-}
-auto BoundPort(Descriptor const& socket) -> std::uint16_t {
-  sockaddr_in address { };
-  socklen_t   size    = sizeof(address);
-  SystemCall(::getsockname(socket.Get(), &Generic(address), &size), "Socket name");
-  return ntohs(address.sin_port);
 }
 }

@@ -1,10 +1,8 @@
 #pragma once
-#include <cstdint>
-#include <netinet/in.h>
 #include <string_view>
-#include <sys/socket.h>
 
-namespace sdl_rdp::utilities::detail::posix {
+namespace sdl_rdp::utilities::detail::descriptor {
+// A POSIX file descriptor, closed by its destructor; the Windows build has no such handle.
 class Descriptor {
 public:
   explicit           Descriptor(int owned)                                 noexcept;
@@ -21,21 +19,10 @@ private:
   static constexpr int Closed     = -1;
   int                  descriptor;
 };
-struct SocketPair {
-  Descriptor server;
-  Descriptor client;
-};
 auto SystemCall(int result, std::string_view operation) -> int;
-auto ConnectedSockets()                                 -> SocketPair;
-auto Generic(sockaddr_in& address) noexcept             -> sockaddr&;
-auto BoundPort(Descriptor const& socket)                -> std::uint16_t;
 }
 
 namespace sdl_rdp::utilities {
-using detail::posix::BoundPort;
-using detail::posix::ConnectedSockets;
-using detail::posix::Descriptor;
-using detail::posix::Generic;
-using detail::posix::SocketPair;
-using detail::posix::SystemCall;
+using detail::descriptor::Descriptor;
+using detail::descriptor::SystemCall;
 }

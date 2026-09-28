@@ -12,7 +12,7 @@
 #include <sdl-rdp/link/event-queue.hpp>
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/picture/frame-store.hpp>
-#include <sdl-rdp/utilities/posix.hpp>
+#include <sdl-rdp/utilities/socket.hpp>
 #include <sdl-rdp/video/encoder.hpp>
 #include <sdl-rdp/video/frame/pacing.hpp>
 #include <sdl-rdp/video/frame/statistics.hpp>

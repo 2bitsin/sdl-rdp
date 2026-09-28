@@ -9,9 +9,9 @@
 #include <sdl-rdp/headless-client.test/codec/mode.hpp>
 #include <sdl-rdp/headless-client.test/frame/pattern.hpp>
 #include <sdl-rdp/link/event.hpp>
+#include <sdl-rdp/utilities/descriptor.posix.hpp>
 #include <sdl-rdp/utilities/geometry.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
-#include <sdl-rdp/utilities/posix.hpp>
 #include <sdl-rdp/utilities/support.test/out-of-range-enum.hpp>
 
 #include <algorithm>

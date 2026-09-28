@@ -6,7 +6,7 @@ sdl-rdp/audio/channel.hpp: AudioChannel member functions 20 > 15 # the two Sound
 sdl-rdp/clipboard/channel.hpp: ClipboardChannel data members 13 > 10 # collaborators replace Peer&; split in #6
 sdl-rdp/drive/channel.hpp: DriveChannel data members 14 > 10 # collaborators replace Peer&; split in #6
 sdl-rdp/drive/channel.hpp: DriveChannel member functions 27 > 15 # split in #6
-sdl-rdp/freerdp-facade/connection.cpp:158: ResponseKey parameters 7 > 5 # FreeRDP SspiNtlmHashCallback signature is the ABI
+sdl-rdp/freerdp-facade/connection.cpp:160: ResponseKey parameters 7 > 5 # FreeRDP SspiNtlmHashCallback signature is the ABI
 sdl-rdp/freerdp-facade/connection.hpp: Connection member functions 25 > 15 # one freerdp_peer handle: lifecycle, transport, authentication and error verbs, each with a caller, and the private moved-from check they share; the raw Context() is private, reached only by ChannelManager, Updates and the test probe
 sdl-rdp/freerdp-facade/connection.test.hpp: ConnectionProbe bodies in header 1 > 0 # the one bridge to Connection's private context for two test executables that compile no common source
 sdl-rdp/freerdp-facade/settings.hpp: classes with member functions 2 > 1 # SettingsReader and the SettingsView that writes through it: one view, split so a read path cannot write (facade-1 M1)

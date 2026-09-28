@@ -12,7 +12,7 @@
 
 namespace sdl_rdp::freerdp_facade::detail::listener {
 using sdl_rdp::utilities::AllocationFailed;
-using sdl_rdp::utilities::BoundPort;
+using sdl_rdp::utilities::DescriptorOf;
 using sdl_rdp::utilities::OperationName;
 
 auto ReleaseListener(rdp_freerdp_listener* listener) noexcept -> void {
@@ -36,14 +36,15 @@ auto Opened(ListenerEvents& events) -> ListenerHandle {
   listener->PeerAccepted = Handled<Events, accepted, PeerConstruction, SinkFailures, true>;
   return listener;
 }
-auto Adopting(ListenerHandle listener, Descriptor socket) -> ListenerHandle {
-  if (!listener->OpenFromSocket(listener.get(), socket.Get())) throw ListenerFailed{ "socket adoption" };
+auto Adopting(ListenerHandle listener, Socket socket) -> ListenerHandle {
+  if (!listener->OpenFromSocket(listener.get(), DescriptorOf(socket.Native())))
+    throw ListenerFailed{ "socket adoption" };
   std::ignore = socket.Release();
   return listener;
 }
 }
-Listener::Listener(Descriptor socket, ListenerEvents& events)
-    : _port{ BoundPort(socket) }, _listener{ Adopting(Opened(events), std::move(socket)) } { }
+Listener::Listener(Socket socket, ListenerEvents& events)
+    : _port{ socket.Port() }, _listener{ Adopting(Opened(events), std::move(socket)) } { }
 auto Listener::Port() const noexcept -> std::uint16_t {
   return _port;
 }

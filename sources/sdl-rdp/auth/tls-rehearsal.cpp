@@ -6,16 +6,13 @@
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/exceptions.hpp>
-#include <sdl-rdp/utilities/posix.hpp>
+#include <sdl-rdp/utilities/socket.hpp>
 
 #include <openssl/ssl.h>
-#include <cerrno>
 #include <chrono>
+#include <functional>
 #include <future>
-#include <initializer_list>
 #include <string_view>
-#include <sys/socket.h>
-#include <sys/time.h>
 #include <tuple>
 #include <utility>
 
@@ -24,33 +21,22 @@ using sdl_rdp::auth::detail::unsignalled_socket_bio::UnsignalledSocketBio;
 using sdl_rdp::freerdp_facade::Bio;
 using sdl_rdp::utilities::ConnectedSockets;
 using sdl_rdp::utilities::Contained;
-using sdl_rdp::utilities::Descriptor;
 using sdl_rdp::utilities::Ensures;
 using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::LastSocketError;
+using sdl_rdp::utilities::PeerGone;
 using sdl_rdp::utilities::Releases;
-using sdl_rdp::utilities::SystemCall;
+using sdl_rdp::utilities::Socket;
 
 namespace {
-using sdl_rdp::utilities::Ensures;
-using sdl_rdp::utilities::Expects;
 using SslContext = std::unique_ptr<SSL_CTX, Releases<SSL_CTX_free>>;
 using SslSession = std::unique_ptr<SSL, Releases<SSL_free>>;
 
-auto Serving(Descriptor socket, Credentials const& credentials) -> Connection {
+auto Serving(Socket socket, Credentials const& credentials) -> Connection {
   Expects(socket.Owns(), "the server end is open");
   Connection server{ std::move(socket) };
   server.Settings().InstallServerCredentials(credentials.Key(), credentials.Certificate());
   return server;
-}
-auto Timeval(std::chrono::microseconds span) -> timeval {
-  auto const seconds = std::chrono::floor<std::chrono::seconds>(span);
-  auto const rest    = span - seconds;
-  return { .tv_sec = static_cast<time_t>(seconds.count()), .tv_usec = static_cast<suseconds_t>(rest.count()) };
-}
-auto LimitBlockedCalls(int socket, std::chrono::milliseconds limit) -> void {
-  auto const bound = Timeval(limit);
-  for (auto const option : { SO_RCVTIMEO, SO_SNDTIMEO })
-    SystemCall(::setsockopt(socket, SOL_SOCKET, option, &bound, sizeof(bound)), "rehearsal blocked call limit");
 }
 auto Bounding(std::chrono::milliseconds limit) -> std::chrono::milliseconds {
   Expects(limit > std::chrono::milliseconds::zero(), "a zero limit would mean none");
@@ -61,7 +47,7 @@ auto AttachBio(SSL& session, Bio bio) -> void {
   auto* const shared = bio.release();
   SSL_set_bio(&session, shared, shared);
 }
-auto Handshake(int socket) -> bool {
+auto Handshake(Socket& socket) -> bool {
   SslContext const context{ SSL_CTX_new(TLS_client_method()) };
   if (!context) return false;
   SslSession const session{ SSL_new(context.get()) };
@@ -70,18 +56,21 @@ auto Handshake(int socket) -> bool {
   AttachBio(*session, UnsignalledSocketBio(socket));
   return SSL_connect(session.get()) == 1;
 }
-auto StopDirection(int socket, int direction) noexcept -> void {
-  if (::shutdown(socket, direction) != 0) Ensures(errno == ENOTCONN, "only a gone peer refuses a shutdown");
+auto StopDirection(Socket const& socket, Socket::Direction direction) noexcept -> void {
+  if (socket.Shutdown(direction)) return;
+  // A gone peer is ENOTCONN on the POSIX pair, WSAENOTCONN or a reset or abort on the Windows loopback TCP pair.
+  auto const gone = PeerGone(LastSocketError());
+  Ensures(gone, "only a gone peer refuses a shutdown");
 }
-auto ConnectTls(int socket, std::chrono::milliseconds limit) noexcept -> bool {
-  Expects(socket >= 0, "the client socket is open");
-  auto const handshake = [socket, limit] {
-    LimitBlockedCalls(socket, limit);
+auto ConnectTls(Socket& socket, std::chrono::milliseconds limit) noexcept -> bool {
+  Expects(socket.Owns(), "the client socket is open");
+  auto const handshake = [&socket, limit] {
+    socket.LimitBlockedCalls(limit);
     return Handshake(socket);
   };
   // The false result reaches Perform, which throws the client's failure on the calling thread.
   auto const connected = Contained(false, handshake, [](std::string_view) noexcept { });
-  StopDirection(socket, SHUT_WR);
+  StopDirection(socket, Socket::Direction::Send);
   return connected;
 }
 }
@@ -89,10 +78,10 @@ TlsRehearsal::TlsRehearsal(Credentials const& credentials, std::chrono::millisec
     : blocked_call_limit(Bounding(limit)), ends(ConnectedSockets()),
       server(Serving(std::move(ends.server), credentials)) { }
 auto TlsRehearsal::Perform() && -> void {
-  auto       handshake = std::async(std::launch::async, ConnectTls, ends.client.Get(), blocked_call_limit);
+  auto       handshake = std::async(std::launch::async, ConnectTls, std::ref(ends.client), blocked_call_limit);
   auto const accepted  = server.AcceptTls();
   // FreeRDP 3.32 transport.c:708 keeps the server socket open after a failed accept, so the client would wait for it.
-  StopDirection(ends.client.Get(), SHUT_RD);
+  StopDirection(ends.client, Socket::Direction::Receive);
   auto const connected = handshake.get();
   if (!accepted) throw TlsAcceptRefused{ };
   if (!connected) throw TlsHandshakeFailed{ };

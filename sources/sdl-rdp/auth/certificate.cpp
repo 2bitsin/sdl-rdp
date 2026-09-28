@@ -1,55 +1,36 @@
 #include <sdl-rdp/auth/certificate.hpp>
 
-#include <sdl-rdp/auth/exceptions.hpp>
+#include <sdl-rdp/auth/private-directory.hpp>
 #include <sdl-rdp/freerdp-facade/exceptions.hpp>
 #include <sdl-rdp/freerdp-facade/rdp-handles.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/exceptions.hpp>
-#include <sdl-rdp/utilities/posix.hpp>
+#include <sdl-rdp/utilities/socket.hpp>
 
 #include <openssl/pem.h>
 #include <openssl/rsa.h>
 #include <openssl/x509v3.h>
+#include <oxbox/utilities/path.hpp>
 #include <oxbox/utilities/span.hpp>
-#include <array>
-#include <cerrno>
 #include <chrono>
 #include <cstdint>
-#include <fcntl.h>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <string>
-#include <sys/file.h>
-#include <sys/stat.h>
-#include <unistd.h>
 
 namespace sdl_rdp::auth::detail::certificate {
+using oxbox::utilities::PathToString;
 using sdl_rdp::freerdp_facade::Bio;
 using sdl_rdp::freerdp_facade::Certificate;
 using sdl_rdp::freerdp_facade::CredentialFailed;
 using sdl_rdp::utilities::AllocationFailed;
-using sdl_rdp::utilities::Descriptor;
 using sdl_rdp::utilities::Ensures;
+using sdl_rdp::utilities::HostName;
 using sdl_rdp::utilities::Releases;
-using sdl_rdp::utilities::SystemCall;
 namespace {
 using Key       = std::unique_ptr<EVP_PKEY, Releases<EVP_PKEY_free>>;
 using Extension = std::unique_ptr<X509_EXTENSION, Releases<X509_EXTENSION_free>>;
-class DirectoryLock {
-public:
-  explicit DirectoryLock(std::filesystem::path const& directory)
-      : descriptor(SystemCall(open(directory.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC), "certificate directory")) {
-    SystemCall(flock(descriptor.Get(), LOCK_EX), "certificate directory lock");
-  }
-
-private:
-  Descriptor descriptor;
-};
-auto Hostname() -> std::string {
-  std::array<char, 256> name{ };
-  SystemCall(gethostname(name.data(), name.size() - 1), "Hostname");
-  return name.data();
-}
 auto Stamp(X509& cert) -> bool {
   constexpr int  X509Version3 = 2;
   constexpr auto Validity     = std::chrono::seconds(std::chrono::days(3650));
@@ -70,19 +51,16 @@ auto Identify(X509& cert, EVP_PKEY& key, std::string const& host) -> bool {
 auto SelfSigned(EVP_PKEY& key) -> Certificate {
   Certificate cert(X509_new());
   if (!cert) throw AllocationFailed{ "Certificate" };
-  if (!Stamp(*cert) || !Identify(*cert, key, Hostname()) || !X509_sign(cert.get(), &key, EVP_sha256()))
+  if (!Stamp(*cert) || !Identify(*cert, key, HostName()) || !X509_sign(cert.get(), &key, EVP_sha256()))
     throw CredentialFailed{ "certificate signing" };
   return cert;
 }
-auto Generate(Credentials const& paths) -> void {
+auto Generate(Credentials const& paths, PrivateDirectory const& directory) -> void {
   Key const key(EVP_RSA_gen(2048));
   if (!key) throw CredentialFailed{ "RSA key generation" };
-  auto      cert     = SelfSigned(*key);
-  auto      fd       = open(paths.Key().c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
-  Bio const key_file(fd < 0 ? nullptr : BIO_new_fd(fd, BIO_CLOSE));
-  if (key_file)
-    std::filesystem::permissions(paths.Key(), std::filesystem::perms::owner_read | std::filesystem::perms::owner_write);
-  Bio const cert_file(BIO_new_file(paths.Certificate().c_str(), "w"));
+  auto      cert      = SelfSigned(*key);
+  Bio const key_file  = directory.NewFile(paths.Key().filename());
+  Bio const cert_file(BIO_new_file(PathToString(paths.Certificate()).c_str(), "wb"));
   if (!key_file || !cert_file
       || !PEM_write_bio_PrivateKey(key_file.get(), key.get(), nullptr, nullptr, 0, nullptr, nullptr)
       || !PEM_write_bio_X509(cert_file.get(), cert.get()))
@@ -90,16 +68,11 @@ auto Generate(Credentials const& paths) -> void {
 }
 }
 auto EnsureCertificate(Credentials const& credentials) -> void {
-  auto const&            directory        = credentials.Directory();
   static std::mutex      generation_guard;
   std::scoped_lock const lock(generation_guard);
-  if (!directory.parent_path().empty()) std::filesystem::create_directories(directory.parent_path());
-  if (mkdir(directory.c_str(), 0700) && errno != EEXIST) throw CertificateDirectoryFailed{ directory.native() };
-  DirectoryLock const process_lock(directory);
-  std::filesystem::permissions(directory, std::filesystem::perms::owner_all);
-  if (!credentials.Exist()) Generate(credentials);
-  std::filesystem::permissions(credentials.Key(),
-                               std::filesystem::perms::owner_read | std::filesystem::perms::owner_write);
+  PrivateDirectory const directory(credentials.Directory());
+  if (!credentials.Exist()) Generate(credentials, directory);
+  directory.Secure(credentials.Key().filename());
   Ensures(std::filesystem::exists(credentials.Certificate()), "certificate exists");
   Ensures(std::filesystem::exists(credentials.Key()), "private key exists");
 }

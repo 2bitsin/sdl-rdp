@@ -1,7 +1,7 @@
 #pragma once
 #include <sdl-rdp/freerdp-facade/channel-manager.hpp>
 #include <sdl-rdp/freerdp-facade/connection.hpp>
-#include <sdl-rdp/utilities/posix.hpp>
+#include <sdl-rdp/utilities/socket.hpp>
 
 #include <utility>
 

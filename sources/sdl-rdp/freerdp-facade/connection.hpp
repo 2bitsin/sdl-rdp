@@ -4,8 +4,8 @@
 #include <sdl-rdp/freerdp-facade/input-sink.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/freerdp-facade/wait-handle.hpp>
-#include <sdl-rdp/utilities/posix.hpp>
 #include <sdl-rdp/utilities/releases.hpp>
+#include <sdl-rdp/utilities/socket.hpp>
 
 #include <cstdint>
 #include <memory>
@@ -21,8 +21,10 @@ using sdl_rdp::freerdp_facade::ConnectionEvents;
 using sdl_rdp::freerdp_facade::Identity;
 using sdl_rdp::freerdp_facade::InputSink;
 using sdl_rdp::freerdp_facade::Updates;
-using sdl_rdp::utilities::Descriptor;
+using sdl_rdp::utilities::NativeSocket;
 using sdl_rdp::utilities::Releases;
+using sdl_rdp::utilities::Socket;
+using sdl_rdp::utilities::SocketLibrary;
 
 // abi: the release steps of a peer, handed the peer; the context goes before the peer that holds it.
 auto ReleasePeer(rdp_freerdp_peer* peer) noexcept -> void;
@@ -52,7 +54,7 @@ struct LastError {
 class Connection {
 public:
   explicit           Connection(PeerHandle accepted);
-  explicit           Connection(Descriptor socket);
+  explicit           Connection(Socket socket);
   [[nodiscard]] auto Observe(ConnectionEvents& events, InputSink& input) -> Observation;
   auto               Settings() const noexcept                           -> SettingsReader;
   auto               Settings() noexcept                                 -> SettingsView;
@@ -62,7 +64,7 @@ public:
   auto               Active() const                                      -> bool;
   auto               WriteBlocked() const                                -> bool;
   auto               DrainOutput()                                       -> bool;
-  auto               Socket() const noexcept                             -> int;
+  auto               PeerSocket() const noexcept                         -> NativeSocket;
   auto               Hostname() const noexcept                           -> std::string_view;
   auto               Claimed() const                                     -> Identity;
   auto               Authenticated() const noexcept                      -> bool;
@@ -82,8 +84,10 @@ private:
   friend class ConnectionProbe;
   auto Context() noexcept    -> rdp_context&;
   auto Peer() const noexcept -> rdp_freerdp_peer&;
-  int        _socket;
-  PeerHandle _peer;
+  // FreeRDP owns the socket and never starts Winsock, so the connection holds the reference for it.
+  SocketLibrary _library;
+  NativeSocket  _peer_socket;
+  PeerHandle    _peer;
 };
 }
 

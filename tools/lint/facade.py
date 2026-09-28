@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """includes: a production file outside freerdp-facade includes <freerdp/...> or <winpr/...>, held to facade.baseline.
 names: a production file outside the facade names a FreeRDP or WinPR declaration (facade.names) in code, outside a
-branch only Windows compiles, where the Win32 names WinPR clones are the platform's own.
+branch or a `*.win32` source only Windows compiles, where the Win32 names WinPR clones are the platform's own.
 facade headers: a header of the facade includes <freerdp/...> or <winpr/...>; tests and benches do not ship."""
 import argparse
 import collections
@@ -64,6 +64,11 @@ def outside_windows(lexemes):
             yield token
 
 
+def windows_only(path):
+    """A source buildutil compiles for Windows alone: `socket.win32.cpp`, or anything under a `*.win32/` folder."""
+    return 'win32' in {tag for part in path.parts for tag in part.split('.')[1:]}
+
+
 def named(text, names):
     tokens = spellings.code_words(outside_windows(shape.enabled_lexemes(text)))
     return sum(1 for token in tokens if token.value in names)
@@ -80,7 +85,7 @@ def counts(root, names):
             found['facade headers'][str(relative)] = included
         elif not inside and production(relative):
             found['includes'][str(relative)] = included
-            found['names'][str(relative)]    = named(text, names)
+            found['names'][str(relative)]    = 0 if windows_only(relative) else named(text, names)
     return {section: +counter for section, counter in found.items()}
 
 

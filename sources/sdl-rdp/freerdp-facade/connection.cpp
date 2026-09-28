@@ -39,8 +39,10 @@
 namespace sdl_rdp::freerdp_facade::detail::connection {
 using sdl_rdp::utilities::AllocationFailed;
 using sdl_rdp::utilities::Contained;
+using sdl_rdp::utilities::DescriptorOf;
 using sdl_rdp::utilities::Ensures;
 using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::NativeOf;
 using sdl_rdp::utilities::NtOwf;
 using sdl_rdp::utilities::OperationName;
 using sdl_rdp::utilities::TranscodeRange;
@@ -60,17 +62,17 @@ auto PrepareLibrary() -> void {
     if (!winpr_InitializeSSL(WINPR_SSL_INIT_DEFAULT)) throw LibraryInitFailed{ "OpenSSL" };
   });
 }
-auto Adopted(Descriptor socket) -> PeerHandle {
+auto Adopted(Socket socket) -> PeerHandle {
   Expects(socket.Owns(), "the connection's socket is open");
-  PeerHandle peer{ freerdp_peer_new(socket.Get()) };
+  PeerHandle peer{ freerdp_peer_new(DescriptorOf(socket.Native())) };
   if (!peer) throw AllocationFailed{ "Peer" };
   std::ignore = socket.Release();
   return peer;
 }
 // The transport takes the descriptor from the peer when the context is created and leaves sockfd behind.
-auto SocketOf(PeerHandle const& peer) -> int {
+auto SocketOf(PeerHandle const& peer) -> NativeSocket {
   Expects(peer != nullptr, "the accepted peer exists");
-  return peer->sockfd;
+  return NativeOf(peer->sockfd);
 }
 auto WithContext(PeerHandle peer) -> PeerHandle {
   Expects(peer != nullptr, "the accepted peer exists");
@@ -252,8 +254,8 @@ auto Unobserve(rdp_freerdp_peer* peer) noexcept -> void {
   peer->context->input->param1 = nullptr;
 }
 Connection::Connection(PeerHandle accepted)
-    : _socket{ SocketOf(accepted) }, _peer{ WithContext(std::move(accepted)) } { }
-Connection::Connection(Descriptor socket) : Connection{ Adopted(std::move(socket)) } { }
+    : _peer_socket{ SocketOf(accepted) }, _peer{ WithContext(std::move(accepted)) } { }
+Connection::Connection(Socket socket) : Connection{ Adopted(std::move(socket)) } { }
 auto Connection::Observe(ConnectionEvents& events, InputSink& input) -> Observation {
   auto& peer = Peer();
   Expects(peer.ContextExtra == nullptr, "a connection is observed once");
@@ -292,8 +294,8 @@ auto Connection::DrainOutput() -> bool {
   auto& peer = Peer();
   return peer.DrainOutputBuffer(&peer) >= 0;
 }
-auto Connection::Socket() const noexcept -> int {
-  return _socket;
+auto Connection::PeerSocket() const noexcept -> NativeSocket {
+  return _peer_socket;
 }
 auto Connection::Hostname() const noexcept -> std::string_view {
   return Peer().hostname;

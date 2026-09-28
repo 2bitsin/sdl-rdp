@@ -59,7 +59,8 @@ those before the RDP driver runs. Set them through hints or the environment.
 
 Settings include:
 `SDL_RDP_PORT` (3389, 0 for ephemeral), `SDL_RDP_BIND` (0.0.0.0),
-`SDL_RDP_CERT_DIR` (`$XDG_DATA_HOME/sdl-rdp` or `~/.local/share/sdl-rdp`), `SDL_RDP_WIDTH`,
+`SDL_RDP_CERT_DIR` (`$XDG_DATA_HOME/sdl-rdp` or `~/.local/share/sdl-rdp` on Linux,
+`~/Library/Application Support/sdl-rdp` on macOS, `%LOCALAPPDATA%\sdl-rdp` on Windows), `SDL_RDP_WIDTH`,
 `SDL_RDP_HEIGHT` (1024x768), `SDL_RDP_REFRESH` (integer Hz, `auto-client`, `auto-client-average`,
 or `auto-sender`; default 60, set before video initialization),
 `SDL_RDP_WAIT_FOR_CLIENT`,

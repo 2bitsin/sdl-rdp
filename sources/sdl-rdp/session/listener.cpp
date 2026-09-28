@@ -14,10 +14,9 @@
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/exceptions.hpp>
-#include <sdl-rdp/utilities/posix.hpp>
+#include <sdl-rdp/utilities/socket.hpp>
 
 #include <algorithm>
-#include <arpa/inet.h>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -36,10 +35,10 @@ using sdl_rdp::freerdp_facade::Forever;
 using sdl_rdp::freerdp_facade::ManualResetEvent;
 using sdl_rdp::freerdp_facade::WaitHandle;
 using sdl_rdp::utilities::Contained;
-using sdl_rdp::utilities::Descriptor;
 using sdl_rdp::utilities::Ensures;
-using sdl_rdp::utilities::Generic;
-using sdl_rdp::utilities::SystemCall;
+using sdl_rdp::utilities::Ipv4Endpoint;
+using sdl_rdp::utilities::ListeningSocket;
+using sdl_rdp::utilities::ParsedIpv4;
 
 namespace {
 constexpr int         ListenBacklog      = 8;
@@ -50,22 +49,11 @@ auto RehearseTls(Credentials const& credentials) -> void {
   static std::once_flag once;
   std::call_once(once, [&credentials] { TlsRehearsal{ credentials }.Perform(); });
 }
-auto Address(Setup const& config) -> sockaddr_in {
-  sockaddr_in address{ };
-  address.sin_family = AF_INET;
-  address.sin_port   = htons(config.port);
-  auto const bind = config.bind.value_or("0.0.0.0");
-  if (inet_pton(AF_INET, bind.c_str(), &address.sin_addr) != 1) throw AddressNotIpv4{ bind };
-  return address;
-}
-auto Bound(Setup const& config) -> Descriptor {
-  Descriptor socket  { SystemCall(::socket(AF_INET, SOCK_STREAM, 0), "Socket creation") };
-  auto       address = Address(config);
-  int        reuse   = 1;
-  SystemCall(setsockopt(socket.Get(), SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)), "Socket options");
-  SystemCall(::bind(socket.Get(), &Generic(address), sizeof(address)), "Listener bind");
-  SystemCall(::listen(socket.Get(), ListenBacklog), "Listener listen");
-  return socket;
+auto Endpoint(Setup const& config) -> Ipv4Endpoint {
+  auto const bind    = config.bind.value_or("0.0.0.0");
+  auto const address = ParsedIpv4(bind);
+  if (!address) throw AddressNotIpv4{ bind };
+  return { .address = *address, .port = config.port };
 }
 auto NewStopEvent() -> EventHandle {
   return ManualResetEvent("Listener stop event");
@@ -74,7 +62,7 @@ auto NewStopEvent() -> EventHandle {
 Listener::Listener(Configuration const& configuration, Credentials const& credentials, Diagnostics const& diagnostics,
                    Session& session, PeerFactory make)
     : LoggedFailures{ diagnostics }, _session{ session }, _make{ std::move(make) },
-      _listener{ Bound(configuration.Config()), *this }, _stop{ NewStopEvent() } {
+      _listener{ ListeningSocket(Endpoint(configuration.Config()), ListenBacklog), *this }, _stop{ NewStopEvent() } {
   RehearseTls(credentials);
   Logger().Log(LogLevel::Info, std::format("Listening on port {}", _listener.Port()));
   _thread = std::jthread([this](std::stop_token const& quit) {

@@ -4,7 +4,7 @@
 #include <sdl-rdp/freerdp-facade/ntlm.hpp>
 #include <sdl-rdp/freerdp-facade/settings.hpp>
 #include <sdl-rdp/freerdp-facade/support.test/unjoined-connection.hpp>
-#include <sdl-rdp/utilities/posix.hpp>
+#include <sdl-rdp/utilities/socket.hpp>
 
 #include <freerdp/error.h>
 #include <freerdp/freerdp.h>
@@ -270,9 +270,9 @@ TEST_F(ConnectionSlots, LastErrorMapsToItsCause) {
 }
 TEST(Adopted, SocketIsTheAdoptedDescriptor) {
   SocketPair       sockets   { ConnectedSockets()        };
-  int const        adopted   { sockets.server.Get()      };
+  auto const       adopted   { sockets.server.Native()   };
   Connection const connection{ std::move(sockets.server) };
-  EXPECT_EQ(connection.Socket(), adopted);
+  EXPECT_EQ(connection.PeerSocket(), adopted);
 }
 TEST_F(ConnectionSlots, ObservingTwiceIsAContractFailure) {
   EXPECT_DEATH(std::ignore = connection.Observe(events, events), "observed once");

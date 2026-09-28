@@ -188,3 +188,15 @@ def test_a_branch_every_target_but_windows_compiles_counts(tree):
     text  = '#ifndef _WIN32\nUINT32 a;\n#endif\n#if !defined(SDL_PLATFORM_WINDOWS)\nUINT32 b;\n#endif\n'
     found = counted(tree, {'sources/sdl-rdp/video/a.cpp': text})
     assert found['names'] == {'sources/sdl-rdp/video/a.cpp': 2}
+
+
+@pytest.mark.parametrize('path', ['sources/sdl-rdp/video/a.win32.cpp', 'sources/sdl-rdp/video/host.win32/a.cpp'])
+def test_a_source_only_windows_compiles_names_win32_and_its_include_still_counts(tree, path):
+    (tree / path).parent.mkdir(parents=True, exist_ok=True)
+    found = counted(tree, {path: '#include <winpr/wtypes.h>\nUINT32 a;\n'})
+    assert found == {'includes': {path: 1}, 'names': {}, 'facade headers': {}}
+
+
+def test_a_source_for_every_other_target_counts(tree):
+    found = counted(tree, {'sources/sdl-rdp/video/a.posix.cpp': 'UINT32 a;\n'})
+    assert found['names'] == {'sources/sdl-rdp/video/a.posix.cpp': 1}

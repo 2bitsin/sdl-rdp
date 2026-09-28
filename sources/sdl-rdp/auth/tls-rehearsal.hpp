@@ -1,7 +1,7 @@
 #pragma once
 #include <sdl-rdp/auth/certificate.hpp>
 #include <sdl-rdp/freerdp-facade/connection.hpp>
-#include <sdl-rdp/utilities/posix.hpp>
+#include <sdl-rdp/utilities/socket.hpp>
 
 #include <chrono>
 
