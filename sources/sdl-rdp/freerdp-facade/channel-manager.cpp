@@ -67,7 +67,7 @@ auto ChannelManager::Handle() const -> WaitHandle {
   return WaitHandle::Of(_handle);
 }
 auto ChannelManager::OnDynamicCreation(DynamicCreationSink& sink) -> CreationRegistration {
-  // abi: psDVCCreationStatusCallback, BOOL is int
+  // abi: psDVCCreationStatusCallback
   WTSVirtualChannelManagerSetDVCCreationCallback(
       _handle.get(),
       Handled<Itself<DynamicCreationSink>, &DynamicCreationSink::Created, ChannelCreation, SinkFailures, false>, &sink);

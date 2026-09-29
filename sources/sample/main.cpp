@@ -46,11 +46,14 @@ auto Draw(SDL_Window& window, std::uint32_t frame, bool full) -> void {
 }
 
 auto CycleCodec() -> void {
-  static constexpr std::array codecs  { "auto", "planar", "remotefx", "nscodec", "raw", "progressive" };
-  char const*                 hint    = SDL_GetHint(SDL_HINT_RDP_CODEC);
-  auto const*                 current = std::ranges::find(codecs, std::string_view(hint ? hint : "auto"));
-  auto                        next    = current == codecs.end() ? 0 : (current - codecs.begin() + 1) % codecs.size();
-  Check(SDL_SetHint(SDL_HINT_RDP_CODEC, codecs[next]));
+  static constexpr std::array codecs { "auto", "planar", "remotefx", "nscodec", "raw", "progressive" };
+  char const*                 hint   = SDL_GetHint(SDL_HINT_RDP_CODEC);
+
+  auto const before_current = [current = std::string_view{ hint ? hint : "auto" }](std::string_view codec) {
+    return codec != current;
+  };
+  auto       following      = codecs | std::views::drop_while(before_current) | std::views::drop(1);
+  Check(SDL_SetHint(SDL_HINT_RDP_CODEC, following.empty() ? codecs.front() : following.front()));
 }
 
 auto PrintCodecChange(SDL_Window& window, std::string& previous) -> void {
@@ -183,15 +186,13 @@ auto Fullscreen(SDL_Window& window, Options const& options) -> void {
 }
 
 auto FlagOption(std::string_view name, Options& options) -> bool {
-  constexpr std::array<std::pair<std::string_view, bool Options::*>, 4> flags{ { { "--tone"   , &Options::tone    },
-                                                                                 { "--tight"  , &Options::tight   },
-                                                                                 { "--partial", &Options::partial },
-                                                                                 { "--fullscreen",
-                                                                                   &Options::fullscreen } } };
-  auto const* found = std::ranges::find(flags, name, &decltype(flags)::value_type::first);
-  if (found == flags.end()) return false;
-  options.*found->second = true;
-  return true;
+  switch (HashString(name)) {
+  case "--tone"_hash:       options.tone = true; return true;
+  case "--tight"_hash:      options.tight = true; return true;
+  case "--partial"_hash:    options.partial = true; return true;
+  case "--fullscreen"_hash: options.fullscreen = true; return true;
+  default:                  return false;
+  }
 }
 auto ValueOption(std::string_view name, std::string_view value, Options& options) -> bool {
   switch (HashString(name)) {

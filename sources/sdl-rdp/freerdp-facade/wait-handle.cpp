@@ -1,6 +1,7 @@
 #include <sdl-rdp/freerdp-facade/wait-handle.hpp>
 
 #include <sdl-rdp/freerdp-facade/exceptions.hpp>
+#include <sdl-rdp/utilities/parameter.hpp>
 
 #include <freerdp/channels/wtsvc.h>
 #include <winpr/synch.h>
@@ -8,13 +9,17 @@
 #include <algorithm>
 #include <memory>
 #include <ranges>
+#include <type_traits>
 
 namespace sdl_rdp::freerdp_facade::detail::wait_handle {
 using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Parameter;
 using sdl_rdp::utilities::Releases;
 
 namespace {
 using QueriedMemory = std::unique_ptr<void, Releases<WTSFreeMemory>>;
+// abi: WinPR's DWORD is unsigned long under Windows and std::uint32_t elsewhere.
+using QueriedSize = std::remove_pointer_t<Parameter<WTSVirtualChannelQuery, 3>>;
 static_assert(MaximumWaitHandles == MAXIMUM_WAIT_OBJECTS);
 static_assert(Forever == INFINITE);
 }
@@ -25,8 +30,8 @@ auto WaitHandle::Of(ServerHandle const& manager) -> WaitHandle {
 }
 auto WaitHandle::Of(ChannelHandle const& channel) -> WaitHandle {
   Expects(channel != nullptr, "the virtual channel is open");
-  void*         data = nullptr;
-  std::uint32_t size = 0;
+  void*       data = nullptr;
+  QueriedSize size = 0;
   if (!WTSVirtualChannelQuery(channel.get(), WTSVirtualEventHandle, &data, &size)) throw ChannelQueryFailed{ };
   QueriedMemory const queried{ data };
   Ensures(size == sizeof(HANDLE), "WinPR answers the event query with one handle");

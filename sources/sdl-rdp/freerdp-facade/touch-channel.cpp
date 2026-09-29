@@ -10,7 +10,6 @@
 #include <cstdint>
 #include <optional>
 #include <ranges>
-#include <span>
 #include <vector>
 
 namespace sdl_rdp::freerdp_facade::detail::touch_channel {
@@ -72,7 +71,7 @@ public:
 auto TouchChannel::Slots::Install(RdpeiServerContext& context) -> void {
   constexpr auto events   = [](RdpeiServerContext const& bound) -> auto& { return Channel(bound)._events; };
   constexpr auto assignee = [](RdpeiServerContext const& bound) -> auto& { return Channel(bound)._assignee; };
-  // abi: rdpei onTouchEvent, UINT is uint32_t; onChannelIdAssigned, BOOL is int
+  // abi: rdpei onTouchEvent, UINT is uint32_t; onChannelIdAssigned
   context.onTouchEvent        = Handled<events, Touched, TouchInput, SinkFailures, ERROR_INTERNAL_ERROR>;
   context.onChannelIdAssigned = Handled<assignee, Assigned, TouchAssignment, SinkFailures, false>;
 }

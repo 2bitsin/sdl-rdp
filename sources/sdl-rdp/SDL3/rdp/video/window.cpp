@@ -45,7 +45,7 @@ auto PlaceAtOrigin(SDL_Window& window) -> void {
   window.y = window.windowed.y = window.floating.y = 0;
 }
 // SDL's video callback table supplies borrowed device and window pointers.
-auto CreateWindow(SDL_VideoDevice* device, SDL_Window* window, [[maybe_unused]] SDL_PropertiesID unused_properties)
+auto CreateSDLWindow(SDL_VideoDevice* device, SDL_Window* window, [[maybe_unused]] SDL_PropertiesID unused_properties)
     -> bool {
   Expects(device != nullptr, "window creation has a device");
   Expects(window != nullptr, "window creation has a window");
@@ -101,7 +101,7 @@ auto Fullscreen(SDL_VideoDevice* device, SDL_Window* window, SDL_VideoDisplay* d
 }
 }
 auto InitWindow(SDL_VideoDevice& device) -> void {
-  device.CreateSDLWindow     = CreateWindow;
+  device.CreateSDLWindow     = CreateSDLWindow;
   device.DestroyWindow       = DestroyWindow;
   device.SetWindowSize       = SetWindowSize;
   device.ShowWindow          = ShowWindow;

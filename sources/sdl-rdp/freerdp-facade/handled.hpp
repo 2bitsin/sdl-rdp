@@ -1,10 +1,10 @@
 #pragma once
 #include <sdl-rdp/utilities/contained.hpp>
 #include <sdl-rdp/utilities/contract.hpp>
+#include <sdl-rdp/utilities/parameter.hpp>
 
 #include <concepts>
 #include <cstddef>
-#include <cstdint>
 #include <functional>
 #include <span>
 #include <string_view>
@@ -15,33 +15,29 @@
 namespace sdl_rdp::freerdp_facade::detail::handled {
 using sdl_rdp::utilities::Contained;
 using sdl_rdp::utilities::Expects;
+using sdl_rdp::utilities::Parameters;
 
-struct                  NoFailure{ };
-template <class> struct Signature;
-template <class ResultTy, class OwnerTy,
-          class... ArgsTy> struct Signature<std::function<ResultTy(OwnerTy, ArgsTy...)>> {
-  using Owner      = OwnerTy;
-  using Parameters = std::tuple<ArgsTy...>;
-};
-template <class ResultTy, class OwnerTy, bool NOEXCEPT, class... ArgsTy>
-struct Signature<ResultTy (OwnerTy::*)(ArgsTy...) noexcept(NOEXCEPT)> {
-  using Parameters = std::tuple<ArgsTy...>;
-};
-template <class ResultTy, class OwnerTy, bool NOEXCEPT, class... ArgsTy>
-struct Signature<ResultTy (OwnerTy::*)(ArgsTy...) const noexcept(NOEXCEPT)> {
-  using Parameters = std::tuple<ArgsTy...>;
+struct                  NoFailure { };
+template <class> struct OwnerFirst;
+template <class OwnerTy, class... ArgsTy> struct OwnerFirst<std::tuple<OwnerTy, ArgsTy...>> {
+  using Owner     = OwnerTy;
+  using Arguments = std::tuple<ArgsTy...>;
+  using type      = Arguments;
 };
 // A member function takes the arguments after its object; any other handler takes the owner first.
-template <auto HANDLER> consteval auto SignatureOf() {
-  if constexpr (std::is_member_function_pointer_v<decltype(HANDLER)>)
-    return Signature<decltype(HANDLER)>{ };
-  else
-    return Signature<decltype(std::function{ HANDLER })>{ };
-}
-template <auto HANDLER> using HandlerParameters = typename decltype(SignatureOf<HANDLER>())::Parameters;
+template <auto HANDLER>
+using HandlerParameters = typename std::conditional_t<std::is_member_function_pointer_v<decltype(HANDLER)>,
+                                                      std::type_identity<Parameters<HANDLER>>,
+                                                      OwnerFirst<Parameters<HANDLER>>>::type;
+// A trailing slot argument the handler does not declare.
+struct Unused{ };
+template <auto HANDLER, std::size_t INDEX>
+using SlotParameter = typename std::conditional_t<(INDEX < std::tuple_size_v<HandlerParameters<HANDLER>>),
+                                                  std::tuple_element<INDEX, HandlerParameters<HANDLER>>,
+                                                  std::type_identity<Unused>>::type;
 // A registration's `void*` user data is the object the owner projection takes.
 template <auto OWNER>
-using UserData = std::remove_reference_t<typename Signature<decltype(std::function{ OWNER })>::Owner>;
+using UserData = std::remove_reference_t<typename OwnerFirst<Parameters<OWNER>>::Owner>;
 template <class> constexpr bool FixedSpan = false;
 template <class ElementTy, std::size_t EXTENT>
 constexpr bool FixedSpan<std::span<ElementTy, EXTENT>> = EXTENT != std::dynamic_extent;
@@ -49,7 +45,9 @@ constexpr bool FixedSpan<std::span<ElementTy, EXTENT>> = EXTENT != std::dynamic_
 // A C slot passes each record by pointer: the handler receives it as a reference, checked here once, and a buffer the
 // handler takes as a fixed-extent span as that span.
 template <class ParameterTy, class ArgTy> auto Referenced(ArgTy argument) -> decltype(auto) {
-  if constexpr (!std::is_pointer_v<ArgTy>) {
+  if constexpr (std::same_as<ParameterTy, Unused>) {
+    return Unused{ };
+  } else if constexpr (!std::is_pointer_v<ArgTy>) {
     return argument;
   } else if constexpr (FixedSpan<ParameterTy>) {
     Expects(argument != nullptr, "the callback buffer is supplied");
@@ -60,16 +58,21 @@ template <class ParameterTy, class ArgTy> auto Referenced(ArgTy argument) -> dec
   }
 }
 
-template <auto HANDLER, class OwnerTy, class... ArgsTy>
-auto Invoked(OwnerTy& owner, ArgsTy... args) -> decltype(auto) {
-  using ParametersTy = HandlerParameters<HANDLER>;
-  // GCC 16 refuses to index an empty pack even inside an empty expansion.
-  if constexpr (sizeof...(ArgsTy) == 0)
-    return std::invoke(HANDLER, owner);
-  else
-    return [&]<std::size_t... INDEX>(std::index_sequence<INDEX...>) -> decltype(auto) {
-      return std::invoke(HANDLER, owner, Referenced<std::tuple_element_t<INDEX, ParametersTy>>(args...[INDEX])...);
-    }(std::make_index_sequence<std::tuple_size_v<ParametersTy>>{ });
+// The handler takes the slot's leading arguments, as many as it declares.
+template <auto HANDLER, class OwnerTy, class... ReferencedTy>
+auto Invoked(OwnerTy& owner, ReferencedTy&&... referenced) -> decltype(auto) {
+  auto arguments = std::forward_as_tuple(std::forward<ReferencedTy>(referenced)...);
+  return [&]<std::size_t... INDEX>(std::index_sequence<INDEX...>) -> decltype(auto) {
+    return std::invoke(HANDLER, owner, std::get<INDEX>(arguments)...);
+  }(std::make_index_sequence<std::tuple_size_v<HandlerParameters<HANDLER>>>{ });
+}
+
+// Each slot argument is converted to the parameter the handler declares at its position, then the handler is called.
+template <auto HANDLER, class OwnerTy, class... ArgsTy> auto Dispatched(OwnerTy& owner, ArgsTy... args)
+    -> decltype(auto) {
+  return [&]<std::size_t... INDEX>(std::index_sequence<INDEX...>) -> decltype(auto) {
+    return Invoked<HANDLER>(owner, Referenced<SlotParameter<HANDLER, INDEX>>(args)...);
+  }(std::index_sequence_for<ArgsTy...>{ });
 }
 
 // The registration hands back the owner it was given.
@@ -89,7 +92,7 @@ auto Handled(ContextTy* context, ArgsTy... args) noexcept -> ResultTy {
       return std::invoke(OWNER, *context);
   }();
   auto const reported = [&](std::string_view failure) { std::invoke(FAILURES, owner, OPERATION)(failure); };
-  auto const handled  = [&] -> decltype(auto) { return Invoked<HANDLER>(owner, args...); };
+  auto const handled  = [&] -> decltype(auto) { return Dispatched<HANDLER>(owner, args...); };
   if constexpr (std::is_void_v<ResultTy>)
     std::ignore = Contained([&] { handled(); }, reported);
   else

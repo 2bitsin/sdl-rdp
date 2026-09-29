@@ -44,7 +44,7 @@ auto ContractRun::ExpectBroken(std::string_view text, int continuation) const ->
   switch (mode) {
   case STOP:     ExpectStopped(text); return;
   case COMPLAIN: ExpectComplained(text, continuation); return;
-  case IGNORE:   ExpectIgnored(continuation); return;
+  case OFF:      ExpectIgnored(continuation); return;
   default:       Unreachable(static_cast<int>(mode));
   }
 }

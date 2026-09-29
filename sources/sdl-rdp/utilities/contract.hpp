@@ -17,7 +17,7 @@ consteval auto Mode() -> oxbox::platform::ContractMode {
                                std::string_view{ "ignore" } };
   constexpr auto       found = std::ranges::find(names, std::string_view{ SDL_RDP_CONTRACTS }) - names.begin();
   static_assert(found != names.size(), "unknown SDL_RDP_CONTRACTS word");
-  return std::array{ STOP, COMPLAIN, IGNORE }[found];
+  return std::array{ STOP, COMPLAIN, OFF }[found];
 }
 using Checked = oxbox::platform::Contracts<Mode()>;
 

@@ -34,6 +34,7 @@
 #include <string>
 #include <string_view>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 
 namespace sdl_rdp::freerdp_facade::detail::connection {
@@ -177,11 +178,13 @@ auto InstallPeerSlots(freerdp_peer& peer) -> void {
   constexpr auto logon = [](ConnectionEvents& events, SEC_WINNT_AUTH_IDENTITY const& /*identity*/, int automatic) {
     return events.Logon(automatic != 0);
   };
-  // abi: psPeerActivate, psPeerCapabilities, psPeerPostConnect, psPeerLogon; BOOL is int
+  // abi: psPeerActivate, psPeerCapabilities, psPeerPostConnect, psPeerLogon
   peer.Activate     = Handled<Events, &ConnectionEvents::Activate, PeerActivation, SinkFailures, false>;
   peer.Capabilities = Handled<Events, &ConnectionEvents::Capabilities, PeerCapabilities, SinkFailures, false>;
   // PostConnect has no work that can fail: the session starts at Activate.
-  peer.PostConnect = [](freerdp_peer*) noexcept -> int { return true; };
+  peer.PostConnect = [](freerdp_peer*) noexcept -> std::invoke_result_t<psPeerPostConnect, freerdp_peer*> {
+    return true;
+  };
   peer.Logon       = Handled<Events, logon, PeerLogon, SinkFailures, false>;
   // abi: psSspiNtlmHashCallback, SECURITY_STATUS is LONG, an int32_t
   peer.SspiNtlmHashCallback = Handled<Events, ResponseKey, NtlmHashing, SinkFailures, SEC_E_INTERNAL_ERROR>;
@@ -195,7 +198,7 @@ auto InstallUpdateSlots(rdpUpdate& update) -> void {
     events.SuppressOutput(allow != 0);
     return true;
   };
-  // abi: pSurfaceFrameAcknowledge, pSuppressOutput; BOOL is int
+  // abi: pSurfaceFrameAcknowledge, pSuppressOutput
   update.SurfaceFrameAcknowledge = Handled<ContextEvents, acknowledged, FrameAcknowledgement, SinkFailures, false>;
   update.SuppressOutput          = Handled<ContextEvents, suppressed, OutputSuppression, SinkFailures, false>;
 }
@@ -242,7 +245,7 @@ auto InstallInputSlots(rdpInput& input) -> void {
   constexpr auto extended = [](InputSink& sink, std::uint16_t flags, std::uint16_t x, std::uint16_t y) {
     return sink.Pointer(ExtendedPointer(flags, x, y));
   };
-  // abi: pKeyboardEvent, pUnicodeKeyboardEvent, pMouseEvent, pExtendedMouseEvent; BOOL is int
+  // abi: pKeyboardEvent, pUnicodeKeyboardEvent, pMouseEvent, pExtendedMouseEvent
   input.KeyboardEvent        = Handled<Sink, key, KeyboardInput, SinkFailures, false>;
   input.UnicodeKeyboardEvent = Handled<Sink, unicode, UnicodeInput, SinkFailures, false>;
   input.MouseEvent           = Handled<Sink, mouse, MouseInput, SinkFailures, false>;

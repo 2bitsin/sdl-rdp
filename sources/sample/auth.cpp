@@ -2,11 +2,26 @@
 
 #include <sample/check.hpp>
 
-#include <algorithm>
-#include <array>
+#include <oxbox/utilities/hash.hpp>
+#include <optional>
 #include <string>
 
 namespace sample::detail::auth {
+using oxbox::utilities::HashString;
+using oxbox::utilities::literals::operator""_hash;
+
+namespace {
+// The SDL hint an authentication option sets, if the option is one.
+auto HintOf(std::string_view option) -> std::optional<std::string_view> {
+  switch (HashString(option)) {
+  case "--user"_hash:     return SDL_HINT_RDP_USER;
+  case "--password"_hash: return SDL_HINT_RDP_PASSWORD;
+  case "--domain"_hash:   return SDL_HINT_RDP_DOMAIN;
+  case "--auth"_hash:     return SDL_HINT_RDP_AUTH;
+  default:                return std::nullopt;
+  }
+}
+}
 auto SDLCALL Authenticator::Deny(void* /*unused*/, char const* /*unused*/, char const* /*unused*/,
                                  char const* /*unused*/) -> bool {
   return false;
@@ -34,14 +49,10 @@ auto Authenticator::Option(std::span<std::string_view const> arguments, std::siz
     deny = true;
     return true;
   }
-  constexpr std::array<std::pair<std::string_view, char const*>, 4> hints{ { { "--user"    , SDL_HINT_RDP_USER     },
-                                                                             { "--password", SDL_HINT_RDP_PASSWORD },
-                                                                             { "--domain"  , SDL_HINT_RDP_DOMAIN   },
-                                                                             { "--auth", SDL_HINT_RDP_AUTH } } };
-  auto const* found = std::ranges::find(hints, option, &decltype(hints)::value_type::first);
-  if (found == hints.end()) return false;
+  auto const hint = HintOf(option);
+  if (!hint) return false;
   Check(index + 1 < arguments.size());
-  Check(SDL_SetHint(found->second, std::string{ arguments[++index] }.c_str()));
+  Check(SDL_SetHint(std::string{ *hint }.c_str(), std::string{ arguments[++index] }.c_str()));
   return true;
 }
 auto Authenticator::Defaults() const -> void {

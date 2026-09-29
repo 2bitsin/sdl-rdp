@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <optional>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 
 namespace sdl_rdp::freerdp_facade::detail::log_appender {
@@ -40,8 +41,9 @@ auto Forward(wLogMessage const& message) -> void {
   std::invoke(*target, LogMessage{ .severity = Severity(message.Level), .prefix = prefix, .text = message.TextString });
 }
 auto Configure(wLog& root) -> bool {
-  // abi: wLogCallbackMessage_t and its siblings, BOOL is int
-  constexpr auto forward   = [](wLogMessage const* message) noexcept -> int {
+  // abi: wLogCallbackMessage_t and its siblings, whose BOOL differs by platform
+  constexpr auto forward   =
+      [](wLogMessage const* message) noexcept -> std::invoke_result_t<wLogCallbackMessage_t, wLogMessage const*> {
     Expects(message != nullptr, "WLog message exists");
     // The log is the only reporting channel, so a failure to forward has nowhere further to go.
     auto const forwarded = [&] {

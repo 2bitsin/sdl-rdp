@@ -35,7 +35,7 @@ auto Layout(DisplayChannelEvents& events, DISPLAY_CONTROL_MONITOR_LAYOUT_PDU con
   return events.MonitorLayout(Monitors(pdu)) ? CHANNEL_RC_OK : ERROR_INVALID_DATA;
 }
 auto InstallSlots(DispServerContext& context) -> void {
-  // abi: psDispMonitorLayout, UINT is uint32_t; psDispChannelIdAssigned, BOOL is int
+  // abi: psDispMonitorLayout, UINT is uint32_t; psDispChannelIdAssigned
   context.DispMonitorLayout = Handled<Events, Layout, DisplayLayout, SinkFailures, ERROR_INTERNAL_ERROR>;
   context.ChannelIdAssigned = Handled<Events, Assigned, DisplayAssignment, SinkFailures, false>;
 }

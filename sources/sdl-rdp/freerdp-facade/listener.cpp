@@ -32,7 +32,7 @@ auto Opened(ListenerEvents& events) -> ListenerHandle {
     return true;
   };
   listener->info = &events;
-  // abi: psPeerAccepted, BOOL is int; true hands the peer over even when construction failed and RAII released it.
+  // abi: psPeerAccepted; true hands the peer over even when construction failed and RAII released it.
   listener->PeerAccepted = Handled<Events, accepted, PeerConstruction, SinkFailures, true>;
   return listener;
 }

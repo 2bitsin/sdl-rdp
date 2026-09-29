@@ -128,7 +128,7 @@ auto Qoe(GraphicsChannelEvents& events, RDPGFX_QOE_FRAME_ACKNOWLEDGE_PDU const& 
 }
 auto InstallSlots(RdpgfxServerContext& context) -> void {
   constexpr auto failed = ERROR_INTERNAL_ERROR;
-  // abi: psRdpgfxCapsAdvertise, FrameAcknowledge, QoeFrameAcknowledge, UINT is uint32_t; ChannelIdAssigned, BOOL is int
+  // abi: psRdpgfxCapsAdvertise, FrameAcknowledge, QoeFrameAcknowledge, UINT is uint32_t; ChannelIdAssigned
   context.CapsAdvertise       = Handled<Events, Caps, GraphicsCapabilities, SinkFailures, failed>;
   context.FrameAcknowledge    = Handled<Events, Ack, GraphicsAcknowledgement, SinkFailures, failed>;
   context.QoeFrameAcknowledge = Handled<Events, Qoe, GraphicsQoe, SinkFailures, failed>;

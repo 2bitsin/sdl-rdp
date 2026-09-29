@@ -2,11 +2,12 @@
 
 #include <sdl-rdp/link/peer-link.hpp>
 
+#include <oxbox/utilities/present.hpp>
 #include <algorithm>
 #include <array>
-#include <ranges>
 
 namespace sdl_rdp::input::detail::input {
+using oxbox::utilities::Present;
 using sdl_rdp::utilities::Expects;
 
 Input::Input(PeerLink& link, InputEvents& events, Diagnostics const& diagnostics) noexcept
@@ -19,7 +20,7 @@ auto Input::Channels(Signalled const& ready) -> bool {
 auto Input::Handles(std::span<WaitHandle> out) const -> std::span<WaitHandle> {
   Expects(out.size() >= InputHandleLimit, "handle span has room for the input channels");
   auto const events = std::array{ _advanced.Event(), _touch.Event() };
-  auto const next   = std::ranges::copy(events | std::views::join, out.begin()).out;
+  auto const next   = std::ranges::copy(events | Present, out.begin()).out;
   return { next, out.end() };
 }
 auto Input::Open() -> bool {

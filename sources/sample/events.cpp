@@ -3,12 +3,12 @@
 #include <sample/auth.hpp>
 #include <sample/check.hpp>
 
-#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <format>
 #include <memory>
 #include <optional>
+#include <ranges>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -47,8 +47,8 @@ constexpr std::array<std::pair<std::uint32_t, std::string_view>, 24> EventLabels
     { SDL_EVENT_MOUSE_WHEEL                 , "MOUSE_WHEEL"                  },
 } };
 auto EventName(std::uint32_t type) -> std::string_view {
-  auto const* label = std::ranges::find(EventLabels, type, &std::pair<std::uint32_t, std::string_view>::first);
-  return label == EventLabels.end() ? "OTHER" : label->second;
+  auto labelled = EventLabels | std::views::filter([type](auto const& label) { return label.first == type; });
+  return labelled.empty() ? "OTHER" : labelled.front().second;
 }
 
 auto PrintGeometry(SDL_Event const& event, SDL_Window& window) -> void {

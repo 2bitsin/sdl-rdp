@@ -7152,6 +7152,7 @@ IFCALL	macro	freerdp/api.h
 IFCALLRESULT	macro	freerdp/api.h
 IFCALLRET	macro	freerdp/api.h
 IGBO	macro	freerdp/locale/locale.h
+IGNORE	macro	winpr/comm.h
 IID	typedef	winpr/wtypes.h
 IME_CMODE_CHARCODE	macro	freerdp/rail.h
 IME_CMODE_EUDC	macro	freerdp/rail.h

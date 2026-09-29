@@ -10,6 +10,7 @@
 #include <freerdp/crypto/certificate.h>
 #include <freerdp/crypto/privatekey.h>
 #include <freerdp/settings.h>
+#include <oxbox/utilities/path.hpp>
 #include <cstddef>
 #include <cstring>
 #include <memory>
@@ -18,6 +19,7 @@
 #include <tuple>
 
 namespace sdl_rdp::freerdp_facade::detail::settings {
+using oxbox::utilities::PathToString;
 using sdl_rdp::utilities::AllocationFailed;
 using sdl_rdp::utilities::Ensures;
 using sdl_rdp::utilities::Expects;
@@ -181,8 +183,9 @@ auto SettingsView::SetAutoReconnectCookie(ReconnectCookie const& cookie) const -
 }
 auto SettingsView::InstallServerCredentials(std::filesystem::path const& key,
                                             std::filesystem::path const& certificate) const -> void {
-  ServerKey         loaded_key        { freerdp_key_new_from_file(key.c_str())                 };
-  ServerCertificate loaded_certificate{ freerdp_certificate_new_from_file(certificate.c_str()) };
+  // FreeRDP opens both with OpenSSL's BIO_new_file, which reads the name as UTF-8 on Windows.
+  ServerKey         loaded_key        { freerdp_key_new_from_file(PathToString(key).c_str())                 };
+  ServerCertificate loaded_certificate{ freerdp_certificate_new_from_file(PathToString(certificate).c_str()) };
   if (!loaded_key) throw CredentialFailed{ "private key loading" };
   if (!loaded_certificate) throw CredentialFailed{ "certificate loading" };
   Adopt<FreeRDP_RdpServerRsaKey>(Held(), std::move(loaded_key));

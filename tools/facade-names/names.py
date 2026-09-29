@@ -20,8 +20,8 @@ KINDS     = {'MACRO_DEFINITION': 'macro', 'FUNCTION_DECL': 'function', 'TYPEDEF_
              'ENUM_DECL': 'enum', 'ENUM_CONSTANT_DECL': 'enumerator', 'VAR_DECL': 'variable'}
 NAMED     = re.compile(r'[A-Za-z_]\w*')
 SCOPES    = frozenset(('LINKAGE_SPEC', 'STRUCT_DECL', 'UNION_DECL', 'CLASS_DECL', 'ENUM_DECL'))
-# WinPR spellings C++ owns too: std::byte and locals named byte, oxbox's IGNORE enumerator.
-SHARED    = frozenset(('byte', 'IGNORE'))
+# WinPR spellings C++ owns too: std::byte and locals named byte.
+SHARED    = frozenset(('byte',))
 # `_` and a lowercase letter is a project data member's shape; WinPR spells its socket and C runtime shims so.
 MEMBER    = re.compile(r'_[a-z]')
 # er.h defines winpr/asn1.h's ER_TAG_* enumerators as macros; der.h includes er.h.

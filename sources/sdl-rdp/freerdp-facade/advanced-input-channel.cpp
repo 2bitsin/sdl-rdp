@@ -58,7 +58,7 @@ public:
 auto AdvancedInputChannel::Slots::Install(ainput_server_context& context) -> void {
   constexpr auto events   = [](ainput_server_context const& bound) -> auto& { return Channel(bound)._events; };
   constexpr auto assignee = [](ainput_server_context const& bound) -> auto& { return Channel(bound)._assignee; };
-  // abi: psAInputServerMouseEvent, UINT is uint32_t; psAInputChannelIdAssigned, BOOL is int
+  // abi: psAInputServerMouseEvent, UINT is uint32_t; psAInputChannelIdAssigned
   context.MouseEvent        = Handled<events, Mouse, AdvancedMouse, SinkFailures, ERROR_INTERNAL_ERROR>;
   context.ChannelIdAssigned = Handled<assignee, Assigned, AdvancedAssignment, SinkFailures, false>;
 }

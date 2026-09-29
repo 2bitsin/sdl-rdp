@@ -10,13 +10,14 @@
 #include <sdl-rdp/link/peer-link.hpp>
 #include <sdl-rdp/link/session-access.hpp>
 
+#include <oxbox/utilities/present.hpp>
 #include <algorithm>
 #include <array>
 #include <optional>
-#include <ranges>
 #include <utility>
 
 namespace sdl_rdp::peer::detail::redirection {
+using oxbox::utilities::Present;
 using sdl_rdp::freerdp_facade::ClipboardChannelName;
 using sdl_rdp::freerdp_facade::DriveChannelName;
 using sdl_rdp::freerdp_facade::SoundChannelName;
@@ -88,7 +89,7 @@ auto Redirection::Disconnect() -> void {
 auto Redirection::Handles(std::span<WaitHandle> out) const -> std::span<WaitHandle> {
   Expects(out.size() >= RedirectionHandleLimit, "handle span has room for the redirection channels");
   auto const events = std::array{ EventOf(_drive), EventOf(_clipboard), EventOf(_sound) };
-  auto const next   = std::ranges::copy(events | std::views::join, out.begin()).out;
+  auto const next   = std::ranges::copy(events | Present, out.begin()).out;
   return { next, out.end() };
 }
 }
