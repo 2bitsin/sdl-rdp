@@ -9,6 +9,7 @@ import re
 import sys
 from typing import NamedTuple
 
+import fan
 import shape
 import spellings
 
@@ -409,7 +410,7 @@ def own_namespace(tops, candidates):
     return next((name for name in opened if name in candidates), candidates[0])
 
 
-def file_findings(root, relative, details):
+def file_findings(root, details, relative):
     text   = (root / relative).read_text(errors='replace')
     tokens = code(text)
     tops   = statements(tokens)
@@ -443,8 +444,7 @@ def checked(root):
 def findings(root):
     files   = checked(root)
     details = frozenset(detail_namespace(relative) for relative in files)
-    for relative in files:
-        yield from file_findings(root, relative, details)
+    return fan.flattened(file_findings, files, root, details)
 
 
 def main():

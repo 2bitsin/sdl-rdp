@@ -5,6 +5,7 @@ import re
 import pytest
 
 import columns
+import fan
 
 
 def run(capsys, *arguments):
@@ -1217,9 +1218,8 @@ def test_sources_preserve_non_whitespace_text():
     root = pathlib.Path(__file__).resolve().parents[2]
     paths = columns.source_files([root / 'sources'])
     assert paths, 'source files must be available to the gate'
-    for path in paths:
-        before = path.read_text()
-        assert collapsed_outside_literals(before) == collapsed_outside_literals(align(before)), str(path)
+    for path, (before, after) in zip(paths, fan.out(columns.aligned_file, paths)):
+        assert collapsed_outside_literals(before) == collapsed_outside_literals(after.text), str(path)
 
 
 @pytest.mark.parametrize('operator', ['==', '!=', '<=', '>=', '+=', '-=', '*=', '/=', '%=',

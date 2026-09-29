@@ -890,6 +890,17 @@ def test_a_recorded_input_that_is_gone_leaves_no_cache_key(tmp_path):
     assert pointers.unit_key(unit, 'q', ['kept.hpp', 'moved.hpp'], pointers.content_digests()) is None
 
 
+def test_an_input_removed_between_two_units_leaves_the_second_no_cache_key(tmp_path):
+    for name in ('first.cpp', 'second.cpp', 'shared.hpp'):
+        (tmp_path / name).write_text('')
+    digests = pointers.content_digests()
+    first, second = ({'directory': str(tmp_path), 'file': name, 'arguments': ['clang++']}
+                     for name in ('first.cpp', 'second.cpp'))
+    assert pointers.unit_key(first, 'q', ['shared.hpp'], digests)
+    (tmp_path / 'shared.hpp').unlink()
+    assert pointers.unit_key(second, 'q', ['shared.hpp'], digests) is None
+
+
 def test_a_cached_match_is_keyed_on_the_queries_the_tool_and_the_flags_not_the_judgement(tmp_path):
     (tmp_path / 'unit.cpp').write_text('')
     units   = [{'directory': str(tmp_path), 'file': 'unit.cpp', 'arguments': ['clang++']}]

@@ -6,6 +6,7 @@ import re
 import sys
 from typing import NamedTuple
 
+import fan
 import shape
 import spellings
 
@@ -236,23 +237,22 @@ def file_declarations(source, owning):
             yield found[0], declaration(source, index, found[1], context)
 
 
-def visible(relative, sources, seen=None):
+def visible(relative, includes, seen=None):
     """The file, its header or source twin and every project header they include, transitively."""
     seen    = set() if seen is None else seen
-    pending = [relative, *(twin for suffix in ('.hpp', '.cpp') if (twin := relative.with_suffix(suffix)) in sources)]
+    pending = [relative, *(twin for suffix in ('.hpp', '.cpp') if (twin := relative.with_suffix(suffix)) in includes)]
     while pending:
         current = pending.pop()
-        if current in seen or current not in sources:
+        if current in seen or current not in includes:
             continue
         seen.add(current)
-        pending += included(current, sources)
+        pending += includes[current]
     return seen
 
 
-def included(relative, sources):
-    text = '\n'.join(sources[relative].lines)
-    for name in INCLUDE.findall(text):
-        yield from (path for path in (pathlib.Path('sources', name), relative.parent / name) if path in sources)
+def included(relative, names, files):
+    """The checked files an include of each name reaches, from the project root or beside the file."""
+    return [path for name in names for path in (pathlib.Path('sources', name), relative.parent / name) if path in files]
 
 
 def reachable(declared, arguments, member):
@@ -384,6 +384,11 @@ def contracts(source):
             yield index
 
 
+def contracted(source):
+    """Whether the source holds a contract; the first may start at token 0."""
+    return next(contracts(source), None) is not None
+
+
 def conversions(source):
     """Every `operator bool` declared without `const noexcept`, which the accepted casts rely on."""
     declared = (index for index, token in enumerate(source.tokens)
@@ -391,43 +396,71 @@ def conversions(source):
     yield from (index for index in declared if not {'const', 'noexcept'} <= qualifiers(source, source.pairs[index + 2]))
 
 
+class Parsed(NamedTuple):
+    """What one source adds to the tree, and the findings it holds that need no other file."""
+    declarations: list
+    includes:     list
+    aliases:      set
+    macros:       set
+    mutating:     set
+    contracted:   bool
+    conversions:  list
+
+
+def text(path):
+    """A file's text as its lexed lines join it."""
+    return '\n'.join(path.read_text().splitlines())
+
+
+def owned(root, relative):
+    return OWNING.findall(text(root / relative))
+
+
+def parsed(root, owning, relative):
+    source      = shape.Source(root / relative)
+    joined      = '\n'.join(source.lines)
+    unqualified = [Finding(relative, source.tokens[index].line, 'operator bool', 'is not const noexcept')
+                   for index in conversions(source)]
+    return Parsed(list(file_declarations(source, owning)), INCLUDE.findall(joined), set(ALIAS.findall(joined)),
+                  set(DEFINE.findall(joined)), set(mutable_classes(source)), contracted(source), unqualified)
+
+
 class Tree:
-    """Every checked source lexed once, with its declarations, `std` aliases and macros."""
+    """Every checked source's declarations, includes, `std` aliases and conversions, and all their macros."""
 
     def __init__(self, root):
-        self.sources      = {relative: shape.Source(root / relative) for relative in spellings.checked(root)}
-        texts             = {relative: '\n'.join(source.lines) for relative, source in self.sources.items()}
-        owning            = set().union(*(OWNING.findall(text) for text in texts.values()))
-        self.macros       = set().union(*(DEFINE.findall(text) for text in texts.values()))
-        mutating          = set().union(*(mutable_classes(source) for source in self.sources.values()))
+        files             = list(spellings.checked(root))
+        owning            = set().union(*(fan.called(owned, (root,), relative) for relative in files))
+        self.parsed       = dict(zip(files, fan.out(parsed, files, root, owning)))
+        mutating          = set().union(*(item.mutating for item in self.parsed.values()))
+        self.macros       = set().union(*(item.macros for item in self.parsed.values()))
         self.declarations = {relative: [(name, found._replace(pure=found.pure and found.owner not in mutating))
-                                        for name, found in file_declarations(source, owning)]
-                             for relative, source in self.sources.items()}
-        self.aliases      = {relative: set(ALIAS.findall(text)) for relative, text in texts.items()}
+                                        for name, found in item.declarations]
+                             for relative, item in self.parsed.items()}
+        self.includes     = {relative: included(relative, item.includes, self.parsed)
+                             for relative, item in self.parsed.items()}
 
     def scope(self, relative):
         """The declarations by name, the `std` aliases and the project macros a file sees."""
-        seen, declared = visible(relative, self.sources), collections.defaultdict(list)
+        seen, declared = visible(relative, self.includes), collections.defaultdict(list)
         for name, found in (item for path in seen for item in self.declarations[path]):
             declared[name].append(found)
-        return declared, {STD}.union(*(self.aliases[path] for path in seen)), self.macros
+        return declared, {STD}.union(*(self.parsed[path].aliases for path in seen)), self.macros
 
 
-def file_findings(tree, relative):
-    source = tree.sources[relative]
-    starts = list(contracts(source))
-    scope  = tree.scope(relative) if starts else ({}, set(), set())
-    for index in starts:
-        for at, subject, reason in condition_findings(source, index + 1, scope):
-            yield Finding(relative, source.tokens[at].line, subject, f'in {source.word(index)} {reason}')
-    for index in conversions(source):
-        yield Finding(relative, source.tokens[index].line, 'operator bool', 'is not const noexcept')
+def condition_file_findings(root, tree, relative):
+    """The file's contract conditions judged in the scope it sees; the file is lexed again only when it has one."""
+    if not tree.parsed[relative].contracted:
+        return []
+    source, scope = shape.Source(root / relative), tree.scope(relative)
+    return [Finding(relative, source.tokens[at].line, subject, f'in {source.word(index)} {reason}')
+            for index in contracts(source) for at, subject, reason in condition_findings(source, index + 1, scope)]
 
 
 def findings(root):
     tree = Tree(root)
-    for relative in tree.sources:
-        yield from file_findings(tree, relative)
+    return [finding for relative, item in tree.parsed.items()
+            for finding in [*fan.called(condition_file_findings, (root, tree), relative), *item.conversions]]
 
 
 def main():

@@ -11,6 +11,8 @@ import re
 import sys
 import typing
 
+import fan
+
 # Limits: Step 0 quality gate brief, 2026-09-23; function limits: sdl-rdp#4 and the done table.
 FILE_LINES           = 400
 CLASS_LINES          = 150
@@ -114,6 +116,15 @@ class AllowEntry(typing.NamedTuple):
 class Declarator(typing.NamedTuple):
     name:       str
     parameters: int
+
+
+class Tally(typing.NamedTuple):
+    """What one source adds to the measures of the whole tree."""
+    path:     pathlib.Path
+    classes:  list
+    nolint:   int
+    compound: int
+    leading:  list
 
 
 class ClassSpan(typing.NamedTuple):
@@ -917,22 +928,21 @@ def first_argument_end(source, opening):
     return min(cursor, source.pairs[opening])
 
 
-def tree_findings(sources):
-    nolint = sum('NOLINT' in line for source in sources for line in source.lines)
-    contracts = sum(len(compound_contracts(source)) for source in sources)
-    c_files = sum(source.path.suffix == '.c' for source in sources)
+def tree_findings(tallies):
+    nolint = sum(item.nolint for item in tallies)
+    contracts = sum(item.compound for item in tallies)
+    c_files = sum(item.path.suffix == '.c' for item in tallies)
     totals = (('NOLINT lines',       nolint,    NOLINT_LINES),
               ('compound contracts', contracts, COMPOUND_CONTRACTS),
               ('c files',            c_files,   C_FILES))
     return [finding(file_scope('sources'), measure) for measure in over_limits(1, totals)]
 
 
-def leading_return_findings(sources):
-    lines = [(source, line) for source in sources if source.path.suffix in ('.cpp', '.hpp')
-             for line in leading_returns(source) if not source.unmatched]
+def leading_return_findings(tallies):
+    lines = [(item.path, line) for item in tallies for line in item.leading]
     if len(lines) <= LEADING_RETURN:
         return []
-    return [Finding(f'{file_scope(source.path)}:{line}: leading return type', False) for source, line in lines]
+    return [Finding(f'{file_scope(path)}:{line}: leading return type', False) for path, line in lines]
 
 
 def file_measures(source):
@@ -1022,15 +1032,28 @@ def allow_entries(allow):
     return {entry.strip(): AllowEntry(number, reason.strip()) for number, entry, _, reason in parsed if entry.strip()}
 
 
-def fixture_classes(sources):
+def tally(source):
+    leading = leading_returns(source) if source.path.suffix in ('.cpp', '.hpp') and not source.unmatched else []
+    return Tally(source.path, [(item.name, base_names(source, item.start)) for item in classes(source)],
+                 sum('NOLINT' in line for line in source.lines), len(compound_contracts(source)), leading)
+
+
+def tallied(path):
+    return tally(Source(path))
+
+
+def checked_findings(fixtures, path):
+    return source_findings(Source(path), fixtures)
+
+
+def fixture_classes(tallies):
     bases = {}
     helpers = set()
-    for source in sources:
-        declared = [(item.name, base_names(source, item.start)) for item in classes(source)]
-        for name, parents in declared:
+    for item in tallies:
+        for name, parents in item.classes:
             bases.setdefault(name, set()).update(parents)
-        if test_support(source.path):
-            helpers.update(name for name, _ in declared)
+        if test_support(item.path):
+            helpers.update(name for name, _ in item.classes)
     return fixture_closure(bases, helpers)
 
 
@@ -1063,13 +1086,13 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--allow', type=pathlib.Path)
     args = parser.parse_args(argv)
-    sources = [Source(path) for path in sorted(pathlib.Path('sources').rglob('*'))
-               if path.suffix in EXTENSIONS and path.is_file()]
-    fixtures = fixture_classes(sources)
-    findings = [finding for source in sources for finding in source_findings(source, fixtures)]
-    findings += tree_findings(sources)
-    findings += leading_return_findings(sources)
-    findings += [finding for path in sorted(pathlib.Path('tools').glob('*/*.py')) for finding in python_findings(path)]
+    paths = [path for path in sorted(pathlib.Path('sources').rglob('*'))
+             if path.suffix in EXTENSIONS and path.is_file()]
+    tallies = fan.out(tallied, paths)
+    findings = fan.flattened(checked_findings, paths, fixture_classes(tallies))
+    findings += tree_findings(tallies)
+    findings += leading_return_findings(tallies)
+    findings += fan.flattened(python_findings, sorted(pathlib.Path('tools').glob('*/*.py')))
     return check_allow(findings, args.allow)
 
 

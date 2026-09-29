@@ -16,6 +16,7 @@ import sys
 import tempfile
 from typing import NamedTuple
 
+import fan
 import shape
 
 ROOT            = pathlib.Path(__file__).resolve().parents[2]
@@ -382,16 +383,18 @@ def clang_arguments(arguments, install_dirs):
     return ['clang++', f'--gcc-install-dir={install_dirs[compiler]}', *kept]
 
 
+def entry_arguments(entry):
+    return entry.get('arguments') or shlex.split(entry['command'])
+
+
 def database_units(root, database, install_dirs):
     """The project's C++ translation units in one compile database, as clang commands, by resolved path."""
-    units, sources = {}, root / 'sources'
-    for entry in json.loads(database.read_text()):
-        path = pathlib.Path(entry['directory'], entry['file']).resolve()
-        if path.suffix == '.cpp' and path.is_relative_to(sources):
-            arguments   = entry.get('arguments') or shlex.split(entry['command'])
-            units[path] = {'directory': entry['directory'], 'file': str(path),
-                           'arguments': clang_arguments(arguments, install_dirs)}
-    return units
+    entries = {path: entry for entry in json.loads(database.read_text())
+               if (path := pathlib.Path(entry['directory'], entry['file']).resolve()).suffix == '.cpp'
+               and path.is_relative_to(root / 'sources')}
+    return {path: {'directory': entry['directory'], 'file': str(path),
+                   'arguments': clang_arguments(arguments, install_dirs)}
+            for (path, entry), arguments in zip(entries.items(), fan.out(entry_arguments, entries.values()))}
 
 
 def other_platform(path):
@@ -483,15 +486,23 @@ def object_of(unit):
     return arguments[arguments.index('-o') + 1] if '-o' in arguments else None
 
 
+@functools.cache
+def input_path(directory, name):
+    """An input's path as its key records it, spelled once however many units include it."""
+    return str(pathlib.Path(directory) / name)
+
+
 def content_digests():
     """A file's digest, read once per run however many units include it."""
-    return functools.cache(lambda path: hashlib.sha256(path.read_bytes()).hexdigest())
+    return functools.cache(lambda path: hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest())
 
 
 def unit_key(unit, queries, inputs, digests):
     """A digest of the command, the queries and every input's path and content; none for an input unrecorded or gone."""
-    paths = [pathlib.Path(unit['directory']) / path for path in [unit['file'], *(inputs or [])]]
-    if inputs is None or not all(path.is_file() for path in paths):
+    if inputs is None:
+        return None
+    paths = [input_path(unit['directory'], name) for name in [unit['file'], *inputs]]
+    if not all(map(os.path.isfile, paths)):
         return None
     digest = hashlib.sha256(json.dumps(unit['arguments']).encode() + queries.encode())
     for path in paths:

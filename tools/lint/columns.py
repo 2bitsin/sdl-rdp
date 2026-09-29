@@ -7,6 +7,8 @@ import re
 from types import SimpleNamespace
 from typing import NamedTuple
 
+import fan
+
 RAW_DELIMITER_LIMIT = 16  # C++ raw-string delimiters have at most 16 characters.
 PROTECTED           = re.compile(r'R"(?P<d>[^ ()\\\t\r\n]{0,' + str(RAW_DELIMITER_LIMIT) + r'})\(.*?\)(?P=d)"'
                                  r'|"(?:\\.|[^"\\])*"|(?<![0-9])\'(?:\\.|[^\'\\\n])*\'|//[^\n]*|/\*.*?\*/'
@@ -1119,6 +1121,11 @@ def source_files(paths):
     return sorted(path for path in candidates if path.suffix in SOURCE_SUFFIXES and not path.is_symlink())
 
 
+def aligned_file(path):
+    original = path.read_text()
+    return original, align(original)
+
+
 def print_statistics(path, stats):
     print(f'{path}: {stats.groups} groups; {len(stats.exceptions)} exceptions')
     for exception in stats.exceptions:
@@ -1163,9 +1170,8 @@ def main(argv=None):
         return int(not check_python_columns(args.paths[0] if args.paths else pathlib.Path(__file__).parent))
     update = report_if_changed if args.check else write_if_changed
     failed = False
-    for path in source_files(args.paths or [pathlib.Path('sources')]):
-        original = path.read_text()
-        result = align(original)
+    paths  = source_files(args.paths or [pathlib.Path('sources')])
+    for path, (original, result) in zip(paths, fan.out(aligned_file, paths)):
         if args.report:
             print_statistics(path, result)
         failed |= update(path, original, result)

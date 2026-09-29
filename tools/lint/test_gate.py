@@ -1,4 +1,6 @@
 """The whole-tree lints of the gate, each over the checked-out sources."""
+import functools
+import os
 import pathlib
 
 import pytest
@@ -26,6 +28,21 @@ def repository_root(monkeypatch):
     monkeypatch.chdir(LINT.parents[1])
 
 
+def overlapped(selected, worker):
+    """Whether jscpd starts ahead of `test_clones`: only when the session runs it and no xdist worker shares it."""
+    return 'test_clones' in selected and not worker
+
+
+@pytest.fixture(scope='module', autouse=True)
+def clone_detection(request):
+    """jscpd is one single-threaded process over the whole tree, so it runs beside the other lints."""
+    if not overlapped({item.name for item in request.session.items}, os.environ.get('PYTEST_XDIST_WORKER')):
+        yield clones.main
+        return
+    with clones.running() as run:
+        yield functools.partial(clones.finished, run)
+
+
 def test_shape():
     assert shape.main(['--allow', str(LINT / 'shape.allow')]) == 0
 
@@ -40,10 +57,6 @@ def test_python_columns():
 
 def test_format():
     assert formatter.main(['--check']) == 0
-
-
-def test_clones():
-    assert clones.main() == 0
 
 
 def test_cmake():
@@ -84,3 +97,7 @@ def test_reserved():
 
 def test_namespaces():
     assert namespaces.main() == 0
+
+
+def test_clones(clone_detection):
+    assert clone_detection() == 0

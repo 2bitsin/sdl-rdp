@@ -4,6 +4,7 @@ import re
 import sys
 from typing import NamedTuple
 
+import fan
 import spellings
 
 RESERVED = re.compile(r'_[A-Z]\w*|\w*__\w*')
@@ -25,8 +26,7 @@ def file_findings(root, relative):
 
 
 def findings(root):
-    for relative in spellings.checked(root):
-        yield from file_findings(root, relative)
+    return fan.flattened(file_findings, spellings.checked(root), root)
 
 
 def main():

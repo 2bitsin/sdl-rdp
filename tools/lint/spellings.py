@@ -5,6 +5,7 @@ import subprocess
 import sys
 from typing import NamedTuple
 
+import fan
 import shape
 
 ROOT      = pathlib.Path(__file__).resolve().parents[2]
@@ -116,8 +117,7 @@ def checked(root):
 
 
 def findings(root):
-    for relative in checked(root):
-        yield from file_findings(root, relative)
+    return fan.flattened(file_findings, checked(root), root)
 
 
 def main():

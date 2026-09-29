@@ -30,6 +30,10 @@ def test_a_c_call_in_a_condition_fails(tree):
     assert findings(tree, {'a.cpp': text}) == ['a.cpp:2 freerdp_settings_set_bool']
 
 
+def test_a_contract_at_a_files_first_token_is_judged(tree):
+    assert findings(tree, {'check.hpp': 'Expects(Mutate(), "changed");\n'}) == ['check.hpp:1 Mutate']
+
+
 def test_a_hoisted_call_passes(tree):
     text = condition('  auto const set = freerdp_settings_set_bool(s, K, true);\n  Expects(set, "set");\n')
     assert findings(tree, {'a.cpp': text}) == []

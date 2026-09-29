@@ -12,6 +12,7 @@ import sys
 import tempfile
 
 import columns
+import fan
 
 ROOT    = pathlib.Path(__file__).resolve().parents[2]
 VERSION = re.compile(r'version 20\.')
@@ -35,9 +36,9 @@ def lay_out(executable, tree):
 
 
 def align(tree):
-    for path in columns.source_files([tree]):
-        original = path.read_text()
-        columns.write_if_changed(path, original, columns.align(original))
+    paths = columns.source_files([tree])
+    for path, (original, result) in zip(paths, fan.out(columns.aligned_file, paths)):
+        columns.write_if_changed(path, original, result)
 
 
 def format_tree(executable, tree):

@@ -4,6 +4,7 @@ import re
 import sys
 from typing import NamedTuple
 
+import fan
 import spellings
 
 FUNDAMENTAL = frozenset(('bool', 'char', 'char8_t', 'char16_t', 'char32_t', 'wchar_t', 'short', 'int', 'long',
@@ -215,8 +216,7 @@ def file_findings(root, relative):
 
 
 def findings(root):
-    for relative in spellings.checked(root):
-        yield from file_findings(root, relative)
+    return fan.flattened(file_findings, spellings.checked(root), root)
 
 
 def main():

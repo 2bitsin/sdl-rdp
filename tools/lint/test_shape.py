@@ -367,7 +367,7 @@ def test_fixture_helpers_live_in_test_directories(tmp_path, directory, expected)
     (tmp_path / directory).mkdir()
     helper  = write(tmp_path, 'class Steps {\nprotected:\n  void Given();\n};\n', f'{directory}/steps.hpp')
     fixture = write(tmp_path, 'class Suite : public Steps, public Test { };\n', 'suite.cpp')
-    assert shape.fixture_classes([shape.Source(helper), shape.Source(fixture)]) == shape.FIXTURE_ROOTS | expected
+    assert shape.fixture_classes([shape.tallied(helper), shape.tallied(fixture)]) == shape.FIXTURE_ROOTS | expected
 
 
 def leading(tmp_path, source):
