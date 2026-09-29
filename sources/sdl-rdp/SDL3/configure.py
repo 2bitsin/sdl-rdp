@@ -130,7 +130,7 @@ def configure(source, fingerprint):
     stamp       = bc.output_dir() / "configured.sha256"
     target      = bc.target_system()
     toolchain   = bc.cmake_toolchain_args()
-    fingerprint = "\n".join((fingerprint, target, *toolchain, *toolchain_digests(toolchain)))
+    fingerprint = "\n".join((fingerprint, str(source), target, *toolchain, *toolchain_digests(toolchain)))
     if stamp.exists() and stamp.read_text() == fingerprint:
         return config
     shutil.rmtree(config, ignore_errors=True)

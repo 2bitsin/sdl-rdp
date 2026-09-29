@@ -11,7 +11,7 @@ beside it in `sources/sample/`; each installs at its source-relative path:
 and the sha256 of every supported release; another pinned release is selected
 by editing `build`. Each
 version keeps its archive, patched tree and configure cache under
-`_build/generated/sdl-rdp-SDL3/<version>/`.
+`_build/generated/sdl-rdp/SDL3/<version>/`.
 
 - `sources/sdl-rdp/SDL3/` builds `libSDL3.so`, the library applications link.
   `rdp/` is the driver, C++26 with `extern "C"` only at SDL's bootstrap

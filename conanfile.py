@@ -39,6 +39,7 @@ def _package_section() -> dict:
 _PKG = _package_section()
 
 _HOST_REQUIRES = 1
+_CONSUMER_OPTIONS = 1
 
 
 def _parse_requires(recipe_folder: Path, target_os: str,
@@ -47,6 +48,66 @@ def _parse_requires(recipe_folder: Path, target_os: str,
   text = (recipe_folder / "sources" / "CMakeLists.txt").read_text()
   return [entry for entry in buildutil_requires.requires(text, target_os)
           if host_packages or not entry["system"]]
+
+
+def _test_lanes() -> bool:
+  """Whether TEST and BENCH lines enter the graph; --no-tests drops them."""
+  return os.environ.get("SDL_RDP_SKIP_TEST_DEPS") != "1"
+
+
+def _held_options(recipe_folder: Path, target_os: str) -> list[dict]:
+  """The active lines in the graph whose OPTIONS are consumer patterns."""
+  return [entry for entry in _parse_requires(recipe_folder, target_os)
+          if entry["options"] and not entry["system"] and not entry["tool"]
+          and (_test_lanes() or not (entry["test"] or entry["bench"]))]
+
+
+def _lost_options(conanfile) -> list[tuple[dict, str, object, object]]:
+  """(entry, key, declared, resolved) for each held option the graph changed."""
+  lost = []
+  for entry in _held_options(Path(conanfile.recipe_folder),
+                             str(conanfile.settings.os)):
+    if entry["conan_name"] not in conanfile.dependencies:
+      continue
+    resolved = conanfile.dependencies[entry["conan_name"]].options
+    lost += [(entry, key, declared, resolved.get_safe(key))
+             for key, declared in entry["options"].items()
+             if str(resolved.get_safe(key)) != str(declared)]
+  return lost
+
+
+def _is_root_build(conanfile) -> bool:
+  """Whether this recipe is the project the driver builds, not a dependency."""
+  root = os.environ.get("BUILDUTIL_CONSUMER")
+  return bool(root) and Path(root).resolve() == Path(conanfile.recipe_folder).resolve()
+
+
+def _lost_refusal(project: str, entry: dict, key: str, declared, got) -> str:
+  """Why the project's own build lost an option it declares."""
+  cmake, conan = entry["cmake_name"], entry["conan_name"]
+  stated = f"{project}: Require({cmake}) sets {conan} option {key}={declared}"
+  if got is None:
+    return (f"{stated}, and {conan} has no option {key} in this configuration: "
+            "its recipe lacks it or removes it here (as fPIC under shared=True "
+            "or on Windows). Fix the name, or narrow the line with PLATFORM.")
+  return (f"{stated}, and the graph resolved {key}={got}: the profile or the "
+          "command line sets it otherwise, or conanfile.py does not set it as "
+          "a consumer pattern (`buildutil init` regenerates it, the old recipe "
+          "is kept as conanfile.py.bak).")
+
+
+def _check_options(conanfile) -> None:
+  """Refuse a lost option in the root build; as a dependency, the consumer's
+  value wins and is reported."""
+  lost = _lost_options(conanfile)
+  if lost and _is_root_build(conanfile):
+    raise ConanException("\n".join(_lost_refusal(conanfile.name, *item)
+                                    for item in lost))
+  for entry, key, declared, got in lost:
+    conanfile.output.warning(
+      f"{conanfile.name}: Require({entry['cmake_name']}) sets "
+      f"{entry['conan_name']} option {key}={declared}; a consumer downstream "
+      f"resolved {key}={got}, which wins.")
 
 
 def _pin_satisfied(pin: str, host: str) -> bool:
@@ -295,6 +356,7 @@ class ProjectRecipe(ConanFile):
         "graph all come from the driver). If you really need direct "
         "conan, set BUILDUTIL=1 in the environment.")
     _refuse_foreign_copies(self)
+    _check_options(self)
 
   def layout(self):
     cmake_layout(self)
@@ -305,6 +367,12 @@ class ProjectRecipe(ConanFile):
   def generate(self):
     CMakeToolchain(self).generate()
     CMakeDeps(self).generate()
+
+  def configure(self):
+    # a dependency requiring the package first fixes its options; a consumer pattern wins
+    for entry in _held_options(Path(self.recipe_folder), str(self.settings.os)):
+      for key, value in entry["options"].items():
+        setattr(self.options[f"{entry['conan_name']}/*"], key, value)
 
   def requirements(self):
     entries = _parse_requires(Path(self.recipe_folder), str(self.settings.os),
@@ -319,10 +387,7 @@ class ProjectRecipe(ConanFile):
 
   def _require(self, entry: dict, packages: str) -> None:
     """One Require() line as its conan requirement."""
-    # OPTIONS ride the requires call itself (conan 2 supports it on
-    # every requires kind) rather than default_options: the option
-    # then follows the entry's own gating — a PLATFORM-skipped or
-    # SYSTEM dep never leaves a stray pattern behind.
+    # equal to configure()'s patterns, so conan sees no options conflict
     kwargs = {"options": entry["options"]} if entry["options"] else {}
     # PUBLIC: this dep's headers appear in headers this package
     # exports, so consumers must see them too — conan does not
@@ -333,7 +398,7 @@ class ProjectRecipe(ConanFile):
     # bench_requires); a test-only SYSTEM overrides without entering the
     # runtime graph.
     if entry["test"] or entry["bench"]:
-      if os.environ.get("BACKEND_SKIP_TEST_DEPS") != "1":
+      if _test_lanes():
         if entry["system"]:
           self.requires(_wrapper_ref(Path(self.recipe_folder), entry),
                         override=True)
@@ -390,6 +455,7 @@ class ProjectRecipe(ConanFile):
           f' --build-dir "{self.build_folder}"'
           f' --toolchain "{toolchain}"'
           f' --build-type {self.settings.build_type}'
+          f' --package-version {self.version}'
           f' --linkage {"shared" if shared else "static"}',
           cwd=str(source))
       finally:

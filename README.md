@@ -65,7 +65,8 @@ aspect: 4:3
 
 ## Building
 
-Linux only for now; run `./buildutil build` to build everything.
+Linux builds and tests the tree; each release also carries Windows x86_64 and macOS arm64 archives, cross-built on
+Linux. Run `./buildutil build` to build everything.
 Run `./buildutil test` for the gate; see [building and consuming](docs/building.md) for dependencies and packaging.
 
 ## License

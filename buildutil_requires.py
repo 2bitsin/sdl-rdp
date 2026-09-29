@@ -8,9 +8,13 @@ from pathlib import Path
 REQUIRE_RE = re.compile(
   # Package name permits letters, digits, underscores, and hyphens
   # (yaml-cpp et al. aren't \w-only).
-  r'^\s*Require\s*\(\s*([\w-]+)\s+VERSION\s+"([^"]+)"(.*?)\)',
+  r'^\s*Require\s*\(\s*([\w-]+)\s+VERSION\s+"([^"]+)"((?:"[^"]*"|[^")])*)\)',
   re.MULTILINE | re.DOTALL,
 )
+# One cmake argument; a quoted one keeps its spaces and parentheses.
+ARGUMENT_RE = re.compile(r'"([^"]*)"|([^\s"]+)')
+QUOTED_OR_COMMENT_RE = re.compile(r'("[^"]*")|#[^\n]*')
+REQUIRE_START_RE = re.compile(r'^[ \t]*(Require)\s*\(', re.MULTILINE)
 
 
 FLAGS = {"TEST": "test", "BENCH": "bench", "TOOL": "tool", "SYSTEM": "system",
@@ -56,9 +60,14 @@ def _options(tokens: list[str]) -> dict:
   return options
 
 
+def arguments(extra: str) -> list[str]:
+  """The cmake arguments of a Require call's text, quotes removed."""
+  return [quoted or bare for quoted, bare in ARGUMENT_RE.findall(extra)]
+
+
 def parse_extra(extra: str) -> dict:
   """The keywords after Require(NAME VERSION "v") as one record."""
-  values = _keyword_values(extra.split())
+  values = _keyword_values(arguments(extra))
   out = {field: keyword in values for keyword, field in FLAGS.items()}
   components = values.get("COMPONENTS", [])
   out["conan"] = next(iter(values.get("CONAN", [])), None)
@@ -121,10 +130,31 @@ def to_conan_version(v: str) -> str:
   return f"[{v}]"
 
 
-def requires(text: str, target_os: str | None = None) -> list[dict]:
+def strip_comments(text: str) -> str:
+  """cmake's text with each # line comment outside quotes removed."""
+  return QUOTED_OR_COMMENT_RE.sub(lambda match: match.group(1) or "", text)
+
+
+def _calls(text: str, path: str) -> list[tuple[str, str, str]]:
+  """(name, version, extra) of every Require call; one the grammar cannot
+  read is refused, since a skipped line would drop the package unnoticed."""
+  calls = []
+  for start in REQUIRE_START_RE.finditer(text):
+    call = REQUIRE_RE.match(text, start.start())
+    if call is None:
+      line = text.count("\n", 0, start.start(1)) + 1
+      raise ValueError(
+        f"{path}:{line}: this Require call does not read as "
+        'Require(NAME VERSION "v" ...) with balanced quotes')
+    calls.append(call.groups())
+  return calls
+
+
+def requires(text: str, target_os: str | None = None,
+             path: str = "sources/CMakeLists.txt") -> list[dict]:
   """The Require() calls active on target_os, or on any platform if None."""
   entries = []
-  for name, version, extra in REQUIRE_RE.findall(text):
+  for name, version, extra in _calls(strip_comments(text), path):
     info = parse_extra(extra)
     if target_os and info["platform"] and target_os not in info["platform"]:
       continue
