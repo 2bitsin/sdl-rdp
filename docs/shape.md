@@ -31,8 +31,8 @@ version keeps its archive, patched tree and configure cache under
   the driver in SDL's build and bootstrap list. `configure.py` is buildutil's
   per-module hook: it downloads the selected SDL release into the generated
   folder once, applies the patch there, runs SDL's own CMake configure (never
-  its build) to learn the file list, defines and `SDL_build_config.h` of a
-  headless Linux build, and hands those sources to buildutil, which compiles
+  its build) to learn the file list, defines and `SDL_build_config.h` for the
+  build's target and toolchain, and hands those sources to buildutil, which compiles
   them, the driver and the backend modules into one library whose dynamic
   section names libfreerdp-server3, libfreerdp3, libwinpr3, libssl and
   libcrypto (`readelf -d`; the NVENC loader is resolved at run time). Nothing SDL

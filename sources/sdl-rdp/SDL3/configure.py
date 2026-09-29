@@ -1,6 +1,7 @@
 """Build SDL from its release archive with the rdp driver patched in, configured by SDL's own CMake."""
 import hashlib
 import json
+import re
 import shlex
 import shutil
 import tarfile
@@ -14,14 +15,45 @@ import buildutil_configure as bc
 ROOT     = bc.source_dir()
 VERSIONS = ROOT / "versions.toml"
 PATCH    = ROOT / "rdp-driver.patch"
-DISABLED = ("X11", "WAYLAND", "OPENGL", "OPENGLES", "VULKAN", "GPU", "ALSA", "PULSEAUDIO", "SNDIO", "DBUS",
-            "LIBUDEV", "HIDAPI", "CAMERA", "TRAY", "DIALOG", "TESTS", "EXAMPLES")
-ENABLED  = ("UNIX_CONSOLE_BUILD", "RDP", "RDPAUDIO", "RDPSTORAGE", "SHARED")
 # NDEBUG and DEBUG follow the build type of the build that compiles SDL, never SDL's own configure.
 BUILD_TYPE_DEFINES = frozenset(("NDEBUG", "DEBUG", "_DEBUG"))
-OPTION_PREFIXES    = ("-m", "-W")
+OPTION_PREFIX      = "-W"
 OPTION_FLAGS       = frozenset(("-pthread", "-fno-strict-aliasing", "-fno-strict-overflow"))
 DRIVER_OPTIONS     = ("-Wsign-compare",)
+FRAMEWORK_FLAGS    = {"-framework": False, "-weak_framework": True}
+# -pthread and -lpthread in LINK_FLAGS are the outer build's threads policy; its other flags are how SDL links.
+THREAD_LIBRARIES   = frozenset(("-lpthread",))
+SHARED_LINK        = re.compile(r"^build [^\n]*\b(C|CXX)_SHARED_LIBRARY_LINKER__SDL3-shared_[^\n]*\n((?:  [^\n]*\n)*)",
+                                re.MULTILINE)
+VARIABLES          = re.compile(r"^  (\w+) = (.*)$", re.MULTILINE)
+BUILD_OUTPUTS      = re.compile(r"^build ([^:\n]+):", re.MULTILINE)
+TOOLCHAIN_FILE     = "-DCMAKE_TOOLCHAIN_FILE="
+FRONTEND_VARIANT   = re.compile(r'^set\(CMAKE_C_COMPILER_FRONTEND_VARIANT "(\w*)"\)$', re.MULTILINE)
+
+
+@dataclass(frozen=True)
+class Options:
+    enabled:  tuple[str, ...] = ()
+    disabled: tuple[str, ...] = ()
+    cmake:    tuple[str, ...] = ()
+
+    def __add__(self, other):
+        return Options(self.enabled + other.enabled, self.disabled + other.disabled, self.cmake + other.cmake)
+
+    def arguments(self):
+        return [*(f"-DSDL_{option}=ON" for option in self.enabled),
+                *(f"-DSDL_{option}=OFF" for option in self.disabled), *self.cmake]
+
+
+COMMON  = Options(("RDP", "RDPAUDIO", "RDPSTORAGE", "SHARED"),
+                  ("OPENGL", "OPENGLES", "VULKAN", "GPU", "HIDAPI", "CAMERA", "TRAY", "DIALOG", "TESTS", "EXAMPLES",
+                   "STATIC", "TEST_LIBRARY"))
+# UNIX_CONSOLE_BUILD waives SDL's X11-or-Wayland check, which it makes under UNIX AND NOT APPLE only.
+TARGETS = {"Linux":   Options(("UNIX_CONSOLE_BUILD",),
+                              ("X11", "WAYLAND", "ALSA", "PULSEAUDIO", "SNDIO", "DBUS", "LIBUDEV")),
+           "Windows": Options(),
+           # SDL's add_library refuses Ninja's rpath relink on Mach-O.
+           "Darwin":  Options(cmake=("-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON",))}
 
 
 @dataclass(frozen=True)
@@ -76,22 +108,34 @@ def patched_source(release, fingerprint):
     shutil.rmtree(source, ignore_errors=True)
     with tarfile.open(download(release)) as package:
         package.extractall(release.root, filter="data")
-    bc.run(["patch", "-p1", "--batch", "-i", PATCH], what="applying rdp-driver.patch", cwd=source)
+    bc.run(["git", "apply", "-p1", "--check", PATCH], what="checking rdp-driver.patch", cwd=source)
+    bc.run(["git", "apply", "-p1", PATCH], what="applying rdp-driver.patch", cwd=source)
     stamp.write_text(fingerprint)
     return source
 
 
-def configure(release, source, fingerprint):
-    config = release.root / "config"
-    stamp  = release.root / "configured.sha256"
+def target_options(target):
+    if target not in TARGETS:
+        raise SystemExit(f"SDL is configured for {', '.join(TARGETS)}, not {target}")
+    return COMMON + TARGETS[target]
+
+
+def toolchain_digests(toolchain):
+    return [digest(Path(argument.removeprefix(TOOLCHAIN_FILE))) for argument in toolchain
+            if argument.startswith(TOOLCHAIN_FILE)]
+
+
+def configure(source, fingerprint):
+    config      = bc.output_dir() / "config"
+    stamp       = bc.output_dir() / "configured.sha256"
+    target      = bc.target_system()
+    toolchain   = bc.cmake_toolchain_args()
+    fingerprint = "\n".join((fingerprint, target, *toolchain, *toolchain_digests(toolchain)))
     if stamp.exists() and stamp.read_text() == fingerprint:
         return config
     shutil.rmtree(config, ignore_errors=True)
     command  = ["cmake", "-S", source, "-B", config, "-G", "Ninja", "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"]
-    command += [f"-DSDL_{option}=OFF" for option in DISABLED]
-    command += [f"-DSDL_{option}=ON" for option in ENABLED]
-    command += ["-DSDL_STATIC=OFF", "-DSDL_TEST_LIBRARY=OFF",
-                "-DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON"]
+    command += [*target_options(target).arguments(), "-DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON", *toolchain]
     bc.run(command, what="SDL's CMake configure")
     stamp.write_text(fingerprint)
     return config
@@ -101,9 +145,21 @@ def arguments(entry):
     return entry.get("arguments") or shlex.split(entry["command"])
 
 
-def c_entries(config):
-    entries = json.loads((config / "compile_commands.json").read_text())
-    return [entry for entry in entries if Path(entry["file"]).suffix == ".c"]
+def compiled_entries(config):
+    return json.loads((config / "compile_commands.json").read_text())
+
+
+def cache_value(config, name):
+    found = re.search(rf"^{name}:[A-Z]+=(.*)$", (config / "CMakeCache.txt").read_text(), re.MULTILINE)
+    return found.group(1) if found else ""
+
+
+def gnu_frontend(config):
+    compiler = next(config.glob("CMakeFiles/*/CMakeCCompiler.cmake")).read_text()
+    found    = FRONTEND_VARIANT.search(compiler)
+    if found is None:
+        raise SystemExit(f"{config} records no C compiler frontend variant")
+    return found.group(1) == "GNU"
 
 
 def defines(entry):
@@ -113,21 +169,66 @@ def defines(entry):
 
 def compile_options(entry):
     return [argument for argument in arguments(entry)
-            if argument.startswith(OPTION_PREFIXES) or argument in OPTION_FLAGS]
+            if argument.startswith(OPTION_PREFIX) or argument in OPTION_FLAGS]
 
 
 def build_config(config):
     header = next(config.rglob("SDL_build_config.h")).read_text()
-    # 2bitsin/buildutil#1: the hook receives no build type, so DEBUG follows NDEBUG.
+    # DEBUG follows the compiling build's NDEBUG, as SDL's own $<CONFIG:Debug> follows its build type.
     lines  = ["", "#ifndef NDEBUG", "#define DEBUG 1", "#endif", ""]
     bc.emit("SDL_build_config.h", header + "\n".join(lines))
 
 
-def declare_sources(entries, sdl_c):
+def declare_sources(config, entries, sdl_c):
+    gnu = gnu_frontend(config)
     for entry in entries:
-        bc.declare(entry["file"], options=compile_options(entry), defines=defines(entry))
+        bc.declare(entry["file"], options=compile_options(entry) if gnu else [], defines=defines(entry))
+    driver = [*compile_options(sdl_c), *DRIVER_OPTIONS] if gnu else []
     for source in sorted(ROOT.rglob("*.cpp")):
-        bc.declare(source, options=[*compile_options(sdl_c), *DRIVER_OPTIONS], defines=defines(sdl_c))
+        bc.declare(source, options=driver, defines=defines(sdl_c))
+
+
+def shared_link_statement(ninja, path):
+    found     = SHARED_LINK.search(ninja)
+    variables = dict(VARIABLES.findall(found.group(2))) if found else {}
+    if "LINK_LIBRARIES" not in variables:
+        raise SystemExit(f"{path} holds no SDL3-shared link statement with LINK_LIBRARIES")
+    return found.group(1), variables
+
+
+def without_suffix(tokens, suffix):
+    return tokens[:-len(suffix)] if suffix and tokens[-len(suffix):] == suffix else tokens
+
+
+def shared_link_libraries(config):
+    ninja               = (config / "build.ninja").read_text()
+    language, variables = shared_link_statement(ninja, config / "build.ninja")
+    internal            = {output for line in BUILD_OUTPUTS.findall(ninja) for output in line.split()}
+    standard            = shlex.split(cache_value(config, f"CMAKE_{language}_STANDARD_LIBRARIES"))
+    flags               = [token for token in shlex.split(variables.get("LINK_FLAGS", ""))
+                           if token.startswith("-l") and token not in THREAD_LIBRARIES]
+    libraries           = without_suffix(shlex.split(variables["LINK_LIBRARIES"]), standard)
+    # -Xlinker hands the next token to the linker: -Xlinker -weak_framework -Xlinker X is the pair -weak_framework X.
+    return [token for token in [*flags, *libraries] if token != "-Xlinker" and token not in internal]
+
+
+def library_name(token):
+    if token.startswith("-l"):
+        return token.removeprefix("-l")
+    if not token.startswith("-") and ("/" in token or "\\" in token):
+        return token
+    if not token.startswith("-") and token.endswith(".lib"):
+        return token.removesuffix(".lib")
+    raise SystemExit(f"SDL's link line holds {token!r}, which is neither -l<name>, <name>.lib, a path nor a framework")
+
+
+def declare_links(config):
+    tokens = iter(shared_link_libraries(config))
+    for token in tokens:
+        if token in FRAMEWORK_FLAGS:
+            bc.framework(next(tokens), weak=FRAMEWORK_FLAGS[token])
+        else:
+            bc.link(library_name(token))
 
 
 def public_headers(source, config):
@@ -159,11 +260,12 @@ def main():
     bc.depends(__file__, VERSIONS, PATCH)
     source_hash = release.sha256 + digest(PATCH)
     source      = patched_source(release, source_hash)
-    config      = configure(release, source, source_hash + digest(Path(__file__)))
-    entries     = c_entries(config)
+    config      = configure(source, source_hash + digest(Path(__file__)))
+    entries     = compiled_entries(config)
     sdl_c       = next(entry for entry in entries if Path(entry["file"]).name == "SDL.c")
     build_config(config)
-    declare_sources(entries, sdl_c)
+    declare_sources(config, entries, sdl_c)
+    declare_links(config)
     headers = public_headers(source, config)
     include_layer(source, headers)
     bc.emit("exports.map", (source / "src/dynapi/SDL_dynapi.sym").read_text())

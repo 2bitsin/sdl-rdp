@@ -3,7 +3,7 @@
 Linux only for now. The tree is C++26 (GCC 16 and Clang 20 are the compilers
 it is built with) and needs CMake, ninja, Python 3 and conan 2. Every
 dependency is public. The build driver is
-[buildutil](https://github.com/2bitsin/buildutil) v0.96.0, installed with pipx
+[buildutil](https://github.com/2bitsin/buildutil) v0.97.0, installed with pipx
 (an install into a virtual environment you activate yourself does not
 bootstrap its toolchain yet, 2bitsin/buildutil#2).
 `openssl/3.6.3`, `nv-codec-headers/13.0.19.0` (FFmpeg's NVENC headers), gtest
@@ -23,7 +23,7 @@ exported as a recipe only (a fresh conan home has no profile for
 `conan create`; the project's build carries the right one):
 
 ```sh
-pipx install git+https://github.com/2bitsin/buildutil@v0.96.0
+pipx install git+https://github.com/2bitsin/buildutil@v0.97.0
 export CONAN_HOME="$PWD/_conanhome"
 (git clone -b v0.36.1 https://github.com/2bitsin/oxbox.git ../oxbox && cd ../oxbox &&
   ./buildutil publish --conan-home "$CONAN_HOME" --no-upload --release --version 0.36.1.377 --bake-buildutil)
