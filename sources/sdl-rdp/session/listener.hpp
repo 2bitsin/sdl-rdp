@@ -10,13 +10,14 @@
 #include <sdl-rdp/peer/forward.hpp>
 #include <sdl-rdp/session/forward.hpp>
 
+#include <oxbox/utilities/function.hpp>
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <stop_token>
 #include <thread>
 
 namespace sdl_rdp::session::detail::listener {
+using oxbox::utilities::MoveOnlyFunction;
 using sdl_rdp::auth::Credentials;
 using sdl_rdp::configuration::Configuration;
 using sdl_rdp::diagnostics::Diagnostics;
@@ -26,7 +27,7 @@ using sdl_rdp::freerdp_facade::EventHandle;
 using sdl_rdp::freerdp_facade::ListenerEvents;
 using sdl_rdp::peer::Peer;
 
-using PeerFactory = std::move_only_function<std::unique_ptr<Peer>(Connection)>;
+using PeerFactory = MoveOnlyFunction<std::unique_ptr<Peer>(Connection)>;
 class Listener final : public LoggedFailures<ListenerEvents> {
 public:
        Listener(Configuration const& configuration, Credentials const& credentials, Diagnostics const& diagnostics,

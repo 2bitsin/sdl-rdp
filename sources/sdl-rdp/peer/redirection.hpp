@@ -7,12 +7,14 @@
 #include <sdl-rdp/link/forward.hpp>
 #include <sdl-rdp/utilities/pinned.hpp>
 
+#include <oxbox/utilities/function.hpp>
 #include <cstddef>
 #include <functional>
 #include <memory>
 #include <span>
 
 namespace sdl_rdp::peer::detail::redirection {
+using oxbox::utilities::MoveOnlyFunction;
 using sdl_rdp::audio::AudioChannel;
 using sdl_rdp::clipboard::ClipboardChannel;
 using sdl_rdp::drive::DriveChannel;
@@ -23,9 +25,9 @@ using sdl_rdp::link::PeerLink;
 using sdl_rdp::link::SessionAccess;
 using sdl_rdp::utilities::Pinned;
 
-using MakeSound     = std::move_only_function<auto()->std::unique_ptr<AudioChannel>>;
-using MakeClipboard = std::move_only_function<auto()->std::unique_ptr<ClipboardChannel>>;
-using MakeDrive     = std::move_only_function<auto()->std::shared_ptr<DriveChannel>>;
+using MakeSound     = MoveOnlyFunction<auto()->std::unique_ptr<AudioChannel>>;
+using MakeClipboard = MoveOnlyFunction<auto()->std::unique_ptr<ClipboardChannel>>;
+using MakeDrive     = MoveOnlyFunction<auto()->std::shared_ptr<DriveChannel>>;
 
 inline constexpr std::size_t RedirectionHandleLimit = 3;
 class Redirection : private Pinned {

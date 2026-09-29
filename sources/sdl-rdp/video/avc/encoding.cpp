@@ -3,6 +3,7 @@
 #include <sdl-rdp/utilities/contract.hpp>
 #include <sdl-rdp/utilities/narrowed.hpp>
 
+#include <oxbox/utilities/chunk.hpp>
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -10,6 +11,7 @@
 #include <span>
 
 namespace sdl_rdp::video::avc::detail::encoding {
+using oxbox::utilities::Chunk;
 using sdl_rdp::picture::Aligned;
 using sdl_rdp::utilities::Ensures;
 using sdl_rdp::utilities::Expects;
@@ -46,7 +48,7 @@ auto ReplicateEdges(std::span<std::uint8_t> pixels, Extent size) -> void {
   std::ranges::for_each(std::views::iota(0u, height), [&](std::uint32_t row) {
     auto line = pixels.subspan(std::size_t{ row } * stride, stride);
     auto edge = line.subspan(std::size_t{ width - 1 } * 4, 4);
-    std::ranges::for_each(line.subspan(std::size_t{ width } * 4) | std::views::chunk(4),
+    std::ranges::for_each(line.subspan(std::size_t{ width } * 4) | Chunk(4),
                           [&](std::span<std::uint8_t> pixel) { std::ranges::copy(edge, pixel.begin()); });
   });
   auto last = pixels.subspan(std::size_t{ height - 1 } * stride, stride);

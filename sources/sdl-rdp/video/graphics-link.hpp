@@ -10,6 +10,7 @@
 #include <sdl-rdp/video/frame/forward.hpp>
 #include <sdl-rdp/video/gfx/channel.hpp>
 
+#include <oxbox/utilities/function.hpp>
 #include <chrono>
 #include <cstddef>
 #include <functional>
@@ -18,6 +19,7 @@
 #include <string_view>
 
 namespace sdl_rdp::video::detail::graphics_link {
+using oxbox::utilities::MoveOnlyFunction;
 using sdl_rdp::diagnostics::Diagnostics;
 using sdl_rdp::diagnostics::FailureLog;
 using sdl_rdp::freerdp_facade::Signalled;
@@ -30,7 +32,7 @@ using sdl_rdp::video::frame::FramePacing;
 using sdl_rdp::video::gfx::GfxChannel;
 using sdl_rdp::video::gfx::GraphicsTiming;
 
-using MakeGfx = std::move_only_function<auto(DynamicChannel&)->std::unique_ptr<GfxChannel>>;
+using MakeGfx = MoveOnlyFunction<auto(DynamicChannel&)->std::unique_ptr<GfxChannel>>;
 
 inline constexpr auto        GraphicsConnectionWait = std::chrono::seconds(3);
 inline constexpr std::size_t GraphicsHandleLimit    = 1;

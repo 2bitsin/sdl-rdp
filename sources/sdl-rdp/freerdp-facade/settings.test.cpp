@@ -4,18 +4,19 @@
 
 #include <freerdp/settings.h>
 #include <gtest/gtest.h>
+#include <oxbox/utilities/enumerate.hpp>
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
-#include <ranges>
 #include <string>
 #include <string_view>
 #include <utility>
 
 namespace sdl_rdp::freerdp_facade::detail::settings {
 namespace {
+using oxbox::utilities::Enumerate;
 using sdl_rdp::utilities::Releases;
 using OwnedSettings = std::unique_ptr<rdpSettings, Releases<freerdp_settings_free>>;
 template <typename KeyTy, std::size_t COUNT>
@@ -82,7 +83,7 @@ TEST_F(Settings, EveryKeyReachesTheFreeRdpKeyOfItsName) {
     view.Set(key, !view.Get(key));
     EXPECT_EQ(freerdp_settings_get_bool(owned.get(), native), view.Get(key)) << spelling;
   }
-  for (auto const& [index, entry] : NumberSpellings | std::views::enumerate) {
+  for (auto const& [index, entry] : NumberSpellings | Enumerate) {
     auto const value = static_cast<std::uint32_t>(1000 + index);
     view.Set(entry.first, value);
     auto const native = static_cast<FreeRDP_Settings_Keys_UInt32>(FreeRdpKey(entry.second));

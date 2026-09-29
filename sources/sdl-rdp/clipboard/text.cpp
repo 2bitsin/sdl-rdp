@@ -5,12 +5,13 @@
 #include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/utilities/text.hpp>
 
+#include <oxbox/utilities/chunk.hpp>
 #include <algorithm>
 #include <cstdint>
-#include <ranges>
 #include <span>
 
 namespace sdl_rdp::clipboard::detail::text {
+using oxbox::utilities::Chunk;
 using oxbox::utilities::Encoding;
 using sdl_rdp::utilities::Narrowed;
 using sdl_rdp::utilities::TranscodeRange;
@@ -28,7 +29,7 @@ auto ClipboardUnicode(std::string_view text) -> std::vector<std::byte> {
 }
 auto ClipboardUtf8(std::span<std::byte const> bytes) -> std::string {
   if (bytes.size() < sizeof(char16_t) || bytes.size() % sizeof(char16_t)) throw InvalidClipboardLength{ bytes.size() };
-  auto units = bytes | std::views::chunk(sizeof(char16_t));
+  auto units = bytes | Chunk(sizeof(char16_t));
   auto end   = std::ranges::find_if(
       units, [](std::span<std::byte const> unit) { return unit[0] == std::byte{ 0 } && unit[1] == std::byte{ 0 }; });
   if (end == units.end()) throw UnterminatedClipboard{ };

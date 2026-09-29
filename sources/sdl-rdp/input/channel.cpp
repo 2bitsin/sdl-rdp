@@ -5,7 +5,7 @@
 
 namespace sdl_rdp::input::detail::channel {
 template <class ChannelTy>
-InputChannel<ChannelTy>::InputChannel(PeerLink& link, InputEvents& events, Diagnostics const& diagnostics) noexcept
+InputChannel<ChannelTy>::InputChannel(PeerLink& link, InputEvents& events, Diagnostics const& diagnostics)
     : _dynamic{ [this] { return Activate(); } }, _assignee{ link, diagnostics, _dynamic },
       _channel{ link.Channels(), events, _assignee } { }
 template <class ChannelTy> auto InputChannel<ChannelTy>::Open() -> bool {

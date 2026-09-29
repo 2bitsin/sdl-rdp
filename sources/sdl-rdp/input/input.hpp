@@ -23,7 +23,7 @@ using sdl_rdp::utilities::Pinned;
 inline constexpr std::size_t InputHandleLimit = 2;
 class Input : private Pinned {
 public:
-       Input(PeerLink& link, InputEvents& events, Diagnostics const& diagnostics) noexcept;
+       Input(PeerLink& link, InputEvents& events, Diagnostics const& diagnostics);
   auto Channels(Signalled const& ready)         -> bool;
   auto Handles(std::span<WaitHandle> out) const -> std::span<WaitHandle>;
 

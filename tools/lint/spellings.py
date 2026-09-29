@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Refuse integer, WinPR and SDL scalar spellings outside the cstdint vocabulary; no allow list."""
+"""Refuse scalar spellings outside the cstdint vocabulary and std operations libc++ 20 lacks; no allow list."""
 import pathlib
 import subprocess
 import sys
@@ -35,6 +35,10 @@ BARE      = {name: f'std::{name}' for name in QUALIFIED - {'size_t'}}
 SDL       = {f'{prefix}int{width}': f'std::{kind}int{width}_t'
              for prefix, kind in (('U', 'u'), ('S', '')) for width in (8, 16, 32, 64)}
 BOUNDARY  = {'HANDLE': 'WaitHandle, the facade alias'}
+# libc++ 20, the macOS 26.1 SDK's, has none of these; a name is matched with the qualifier before it.
+PORTABLE  = {'move_only_function': 'oxbox::utilities::MoveOnlyFunction',
+             'views::chunk': 'oxbox::utilities::Chunk', 'ranges::chunk_view': 'oxbox::utilities::Chunk',
+             'views::enumerate': 'oxbox::utilities::Enumerate', 'ranges::enumerate_view': 'oxbox::utilities::Enumerate'}
 SCANNED   = ('sources', 'test_package')
 
 
@@ -50,6 +54,13 @@ def forbidden(relative):
     if relative.is_relative_to(FACADE):
         return FIXED | SDL | BUILTIN | BARE
     return FIXED | SDL | BUILTIN | BARE | BOUNDARY
+
+
+def portable(tokens, index):
+    """The PORTABLE key a token spells: its name with the qualifier before it, else its bare name."""
+    name      = tokens[index].value
+    qualified = f'{tokens[index - 2].value}::{name}' if index >= 2 and tokens[index - 1].value == '::' else name
+    return next((spelling for spelling in (qualified, name) if spelling in PORTABLE), None)
 
 
 def words(text):
@@ -88,6 +99,8 @@ def file_findings(root, relative):
     for index, token in enumerate(tokens):
         if token.value in spellings and spelled(tokens, index):
             yield Finding(relative, token.line, token.value, spellings[token.value])
+        elif (operation := portable(tokens, index)) is not None:
+            yield Finding(relative, token.line, operation, PORTABLE[operation])
 
 
 def tracked(root):

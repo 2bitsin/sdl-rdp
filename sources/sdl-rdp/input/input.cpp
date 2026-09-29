@@ -10,7 +10,7 @@ namespace sdl_rdp::input::detail::input {
 using oxbox::utilities::Present;
 using sdl_rdp::utilities::Expects;
 
-Input::Input(PeerLink& link, InputEvents& events, Diagnostics const& diagnostics) noexcept
+Input::Input(PeerLink& link, InputEvents& events, Diagnostics const& diagnostics)
     : _link{ link }, _advanced{ link, events, diagnostics }, _touch{ link, events, diagnostics } { }
 auto Input::Channels(Signalled const& ready) -> bool {
   if (!_link.Channels().DynamicReady()) return true;

@@ -90,3 +90,27 @@ def test_untracked_new_files_are_scanned(tree):
     (tree / 'sources/sdl-rdp/video/new.cpp').write_text('unsigned a;\n')
     assert [f'{finding.path.name}:{finding.line} {finding.spelling}' for finding in spellings.findings(tree)] == [
         'new.cpp:1 unsigned']
+
+
+OPERATIONS = ('std::move_only_function<auto()->bool> a;\nauto b = s | std::views::chunk(2);\n'
+              'std::ranges::chunk_view<V> c;\nauto d = std::views::enumerate(s);\nstd::ranges::enumerate_view<V> e;\n')
+
+
+@pytest.mark.parametrize('path', ['sources/sdl-rdp/video/a.cpp', 'sources/sdl-rdp/video/a.test.cpp',
+                                  'sources/sdl-rdp/headless-client.test/audio/a.cpp'])
+def test_operations_libcxx_20_lacks_fail_in_code_and_tests(tree, path):
+    (tree / path).parent.mkdir(parents=True, exist_ok=True)
+    assert [finding.split(':', 1)[1] for finding in findings(tree, path, OPERATIONS)] == [
+        '1 move_only_function', '2 views::chunk', '3 ranges::chunk_view', '4 views::enumerate',
+        '5 ranges::enumerate_view']
+
+
+def test_unqualified_chunk_and_enumerate_pass(tree):
+    text = 'auto chunk = Chunk{ };\nchunk.enumerate();\nauto enumerate = 1;\nstd::chunk_view<V> a;\n'
+    assert findings(tree, 'sources/sdl-rdp/video/a.cpp', text) == []
+
+
+def test_oxbox_operations_pass(tree):
+    text = ('oxbox::utilities::MoveOnlyFunction<auto()->bool> a;\nauto b = s | Chunk(2);\n'
+            'auto c = oxbox::utilities::Enumerate(s);\nauto d = s | Present;\n')
+    assert findings(tree, 'sources/sdl-rdp/video/a.cpp', text) == []

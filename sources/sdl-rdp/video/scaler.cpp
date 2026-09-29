@@ -7,6 +7,7 @@
 #include <sdl-rdp/utilities/narrowed.hpp>
 #include <sdl-rdp/video/peer-frames.hpp>
 
+#include <oxbox/utilities/enumerate.hpp>
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -16,6 +17,7 @@
 #include <utility>
 
 namespace sdl_rdp::video::detail::scaler {
+using oxbox::utilities::Enumerate;
 using sdl_rdp::utilities::Expects;
 using sdl_rdp::utilities::ExpectsBand;
 using sdl_rdp::utilities::Narrowed;
@@ -61,7 +63,7 @@ auto Sample(std::span<std::uint8_t const> row, Tap column, std::size_t channel) 
 auto BlendRow(std::span<Tap const> columns, std::span<std::uint8_t const> top, std::span<std::uint8_t const> bottom,
               float weight, std::span<std::uint8_t> out) -> void {
   auto channels = std::views::iota(std::size_t{ 0 }, PixelBytes);
-  for (auto [index, column] : std::views::enumerate(columns))
+  for (auto [index, column] : Enumerate(columns))
     for (auto channel : channels)
       // A blend of two bytes stays within 0..255, so the rounded value fits a byte.
       out[(Narrowed<std::size_t>(index) * PixelBytes) + channel] = static_cast<std::uint8_t>(

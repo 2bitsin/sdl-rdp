@@ -2,22 +2,23 @@
 
 #include <sdl-rdp/diagnostics/log-sink.hpp>
 
+#include <oxbox/utilities/chunk.hpp>
 #include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
-#include <ranges>
 #include <string>
 #include <thread>
 
 namespace sdl_rdp::headless_client_test::audio::detail::gate {
+using oxbox::utilities::Chunk;
 using sdl_rdp::diagnostics::LogLevel;
 using sdl_rdp::headless_client_test::audio::WriteFrames;
 using sdl_rdp::headless_client_test::backend::Clock;
 
 namespace {
 auto ThenInitialVolumeSamples(SoundClient const& audio) -> void {
-  for (auto frame : audio.CaptureState().samples | std::views::chunk(2)) {
+  for (auto frame : audio.CaptureState().samples | Chunk(2)) {
     EXPECT_EQ(frame[0], -12000);
     EXPECT_EQ(frame[1], 6000);
   }

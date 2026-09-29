@@ -20,9 +20,8 @@ using sdl_rdp::utilities::Parameters;
 struct                  NoFailure { };
 template <class> struct OwnerFirst;
 template <class OwnerTy, class... ArgsTy> struct OwnerFirst<std::tuple<OwnerTy, ArgsTy...>> {
-  using Owner     = OwnerTy;
-  using Arguments = std::tuple<ArgsTy...>;
-  using type      = Arguments;
+  using Owner = OwnerTy;
+  using type  = std::tuple<ArgsTy...>;
 };
 // A member function takes the arguments after its object; any other handler takes the owner first.
 template <auto HANDLER>

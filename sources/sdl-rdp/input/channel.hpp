@@ -24,7 +24,7 @@ using sdl_rdp::utilities::Pinned;
 // A dynamic input channel of the facade, opened once the dynamic channels are ready and serviced once activated.
 template <class ChannelTy> class InputChannel final : private Pinned {
 public:
-       InputChannel(PeerLink& link, InputEvents& events, Diagnostics const& diagnostics) noexcept;
+       InputChannel(PeerLink& link, InputEvents& events, Diagnostics const& diagnostics);
   auto Open()                       -> bool;
   auto Pump(Signalled const& ready) -> bool;
   auto Event() const                -> std::optional<WaitHandle>;
