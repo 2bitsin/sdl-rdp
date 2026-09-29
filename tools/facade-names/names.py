@@ -13,7 +13,9 @@ import clang.cindex
 ROOT      = pathlib.Path(__file__).resolve().parents[2]
 TABLE     = ROOT / 'tools/lint/facade.names'
 TREES     = ('winpr3', 'freerdp3')
-REQUIRED  = re.compile(r'^\s*Require\s*\(\s*FreeRDP\s+VERSION\s+"([^"]+)"', re.M)
+REQUIRED  = re.compile(r'^\s*Require\s*\(\s*FreeRDP\s+VERSION\s+"([^"]+)".*$', re.M)
+FORK      = '-sdl-rdp'
+RELEASE   = re.compile(r'\.\d+')
 VERSION   = re.compile(r'^#define FREERDP_VERSION_FULL "([^"]+)"', re.M)
 KINDS     = {'MACRO_DEFINITION': 'macro', 'FUNCTION_DECL': 'function', 'TYPEDEF_DECL': 'typedef',
              'TYPE_ALIAS_DECL': 'typedef', 'STRUCT_DECL': 'struct', 'UNION_DECL': 'struct', 'CLASS_DECL': 'struct',
@@ -31,13 +33,23 @@ OPTIONS   = (clang.cindex.TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD
 
 
 def required_version(root):
-    """The FreeRDP version sources/CMakeLists.txt requires."""
-    return REQUIRED.search((root / 'sources/CMakeLists.txt').read_text()).group(1)
+    """The upstream FreeRDP version sources/CMakeLists.txt requires; the fork's `-sdl-rdp.<n>` is not in its headers."""
+    line                    = REQUIRED.search((root / 'sources/CMakeLists.txt').read_text())
+    upstream, fork, release = line.group(1).partition(FORK)
+    if fork and not RELEASE.fullmatch(release):
+        raise SystemExit(f'facade-names: the fork release is {FORK}.<n> with a numeric n: {line.group(0).strip()}')
+    return upstream
 
 
 def conan_home(root, override):
     """The CONAN_HOME buildutil resolves: the flag, then the environment, then the repository's own."""
     return pathlib.Path(override or os.environ.get('CONAN_HOME') or root / '_conanhome')
+
+
+def cached_includes(home):
+    """The include directory of every package in the conan cache."""
+    # Conan 2 keeps a downloaded package at p/<name+hash>/p and one it built locally at p/b/<name+hash>/p.
+    return sorted([*home.glob('p/*/p/include'), *home.glob('p/b/*/p/include')])
 
 
 def header_version(include):
@@ -46,7 +58,7 @@ def header_version(include):
 
 def freerdp_include(home, version):
     """The include directory of the cached FreeRDP package at this version."""
-    found = [include for include in sorted(home.glob('p/*/p/include'))
+    found = [include for include in cached_includes(home)
              if (include / 'freerdp3/freerdp/version.h').is_file() and header_version(include) == version]
     if not found:
         raise SystemExit(f'facade-names: no FreeRDP {version} package under {home}; build once to fill the cache')
@@ -55,7 +67,7 @@ def freerdp_include(home, version):
 
 def openssl_includes(home):
     """WinPR's ssl.h includes OpenSSL; any cached OpenSSL declares what it needs to parse."""
-    return [include for include in sorted(home.glob('p/*/p/include')) if (include / 'openssl/ssl.h').is_file()][:1]
+    return [include for include in cached_includes(home) if (include / 'openssl/ssl.h').is_file()][:1]
 
 
 def headers(include):

@@ -1,4 +1,6 @@
 """The name table: every FreeRDP and WinPR declaration by name, nothing from system headers, no fields."""
+import re
+
 import pytest
 
 import names
@@ -87,13 +89,44 @@ def test_the_cache_is_searched_for_the_required_version(tmp_path):
     assert names.freerdp_include(tmp_path, '3.2.0') == wanted
 
 
+def test_a_locally_built_package_is_found(tmp_path):
+    built = include_root(tmp_path / 'p/b/built/p/include', '3.2.0')
+    assert names.freerdp_include(tmp_path, '3.2.0') == built
+
+
+def test_a_locally_built_openssl_is_found(tmp_path):
+    built = tmp_path / 'p/b/openssl/p/include'
+    (built / 'openssl').mkdir(parents=True)
+    (built / 'openssl/ssl.h').write_text('')
+    assert names.openssl_includes(tmp_path) == [built]
+
+
 def test_a_missing_version_names_the_cache(tmp_path):
     include_root(tmp_path / 'p/one/p/include', '3.1.0')
     with pytest.raises(SystemExit, match='no FreeRDP 3.2.0 package'):
         names.freerdp_include(tmp_path, '3.2.0')
 
 
+def required(root, line):
+    (root / 'sources').mkdir()
+    (root / 'sources/CMakeLists.txt').write_text(line + '\n')
+    return names.required_version(root)
+
+
 def test_the_required_version_is_the_require_line(tmp_path):
-    (tmp_path / 'sources').mkdir()
-    (tmp_path / 'sources/CMakeLists.txt').write_text('Require(FreeRDP          VERSION "3.32.0"       CONAN freerdp)\n')
-    assert names.required_version(tmp_path) == '3.32.0'
+    assert required(tmp_path, 'Require(FreeRDP          VERSION "3.32.0"       CONAN freerdp)') == '3.32.0'
+
+
+def test_the_required_version_drops_the_fork_release(tmp_path):
+    assert required(tmp_path, 'Require(FreeRDP VERSION "3.32.0-sdl-rdp.3" CONAN freerdp)') == '3.32.0'
+
+
+def test_an_upstream_prerelease_is_kept(tmp_path):
+    assert required(tmp_path, 'Require(FreeRDP VERSION "3.32.0-rc1" CONAN freerdp)') == '3.32.0-rc1'
+
+
+@pytest.mark.parametrize('version', ['3.32.0-sdl-rdp.', '3.32.0-sdl-rdp.x'])
+def test_a_malformed_fork_release_names_the_line(tmp_path, version):
+    line = f'Require(FreeRDP VERSION "{version}" CONAN freerdp)'
+    with pytest.raises(SystemExit, match=re.escape(line)):
+        required(tmp_path, line)

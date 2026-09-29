@@ -19,8 +19,8 @@ number its published package carries, and the local build takes the same
 number; `--bake-buildutil` ships the driver inside the package so this
 project's build can rebuild it, because FreeRDP takes OpenSSL shared and that
 gives oxbox a different package id from the one a standalone build produces);
-and `freerdp/3.32.0`, FreeRDP 3.32.0 with the patches this project needs, from
-tag `3.32.0-sdl-rdp.2` of [2bitsin/FreeRDP](https://github.com/2bitsin/FreeRDP),
+and `freerdp/3.32.0-sdl-rdp.3`, FreeRDP 3.32.0 with the patches this project needs, from
+tag `3.32.0-sdl-rdp.3` of [2bitsin/FreeRDP](https://github.com/2bitsin/FreeRDP),
 exported as a recipe only (a fresh conan home has no profile for
 `conan create`; the project's build carries the right one):
 
@@ -29,7 +29,7 @@ pipx install git+https://github.com/2bitsin/buildutil@v0.98.0
 export CONAN_HOME="$PWD/_conanhome"
 (git clone -b v0.36.1 https://github.com/2bitsin/oxbox.git ../oxbox && cd ../oxbox &&
   ./buildutil publish --conan-home "$CONAN_HOME" --no-upload --release --version 0.36.1.377 --bake-buildutil)
-(git clone -b 3.32.0-sdl-rdp.2 https://github.com/2bitsin/FreeRDP.git ../FreeRDP && cd ../FreeRDP &&
+(git clone -b 3.32.0-sdl-rdp.3 https://github.com/2bitsin/FreeRDP.git ../FreeRDP && cd ../FreeRDP &&
   conan export .)
 ./buildutil build --watchdog-budget 3600
 ```
