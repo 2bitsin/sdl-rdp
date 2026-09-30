@@ -13,7 +13,7 @@ and google-benchmark come from conancenter. Two packages are put into this
 checkout's conan home, `_conanhome/`, after which the `Require` lines in
 `sources/CMakeLists.txt` resolve them and the first `./buildutil build`
 compiles both inside the cache for this project's dependency graph:
-`oxbox/0.36.2.379`, the utility library the backend uses, from tag `v0.36.2`
+`oxbox/0.37.0.384`, the utility library the backend uses, from tag `v0.37.0`
 of [2bitsin/oxbox](https://github.com/2bitsin/oxbox) (the pin names the build
 number its published package carries, and the local build takes the same
 number; `--bake-buildutil` ships the driver inside the package so this
@@ -27,8 +27,8 @@ exported as a recipe only (a fresh conan home has no profile for
 ```sh
 pipx install git+https://github.com/2bitsin/buildutil@v0.99.0
 export CONAN_HOME="$PWD/_conanhome"
-(git clone -b v0.36.2 https://github.com/2bitsin/oxbox.git ../oxbox && cd ../oxbox &&
-  ./buildutil publish --conan-home "$CONAN_HOME" --no-upload --release --version 0.36.2.379 --bake-buildutil)
+(git clone -b v0.37.0 https://github.com/2bitsin/oxbox.git ../oxbox && cd ../oxbox &&
+  ./buildutil publish --conan-home "$CONAN_HOME" --no-upload --release --version 0.37.0.384 --bake-buildutil)
 (git clone -b 3.32.0-sdl-rdp.3 https://github.com/2bitsin/FreeRDP.git ../FreeRDP && cd ../FreeRDP &&
   conan export .)
 ./buildutil build --watchdog-budget 3600
