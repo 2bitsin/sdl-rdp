@@ -5,7 +5,7 @@ Clang 20 are the compilers it is built with) and needs CMake, ninja, Python 3
 and conan 2. Every dependency is public. The Windows and macOS binaries are
 cross-built on Linux, in buildutil's `wine-msvc` and `osxcross` lanes (Release
 archives, below). The build driver is
-[buildutil](https://github.com/2bitsin/buildutil) v0.98.0, installed with pipx
+[buildutil](https://github.com/2bitsin/buildutil) v0.99.0, installed with pipx
 (an install into a virtual environment you activate yourself does not
 bootstrap its toolchain yet, 2bitsin/buildutil#2).
 `openssl/3.6.3`, `nv-codec-headers/13.0.19.0` (FFmpeg's NVENC headers), gtest
@@ -13,7 +13,7 @@ and google-benchmark come from conancenter. Two packages are put into this
 checkout's conan home, `_conanhome/`, after which the `Require` lines in
 `sources/CMakeLists.txt` resolve them and the first `./buildutil build`
 compiles both inside the cache for this project's dependency graph:
-`oxbox/0.36.1.377`, the utility library the backend uses, from tag `v0.36.1`
+`oxbox/0.36.2.379`, the utility library the backend uses, from tag `v0.36.2`
 of [2bitsin/oxbox](https://github.com/2bitsin/oxbox) (the pin names the build
 number its published package carries, and the local build takes the same
 number; `--bake-buildutil` ships the driver inside the package so this
@@ -25,10 +25,10 @@ exported as a recipe only (a fresh conan home has no profile for
 `conan create`; the project's build carries the right one):
 
 ```sh
-pipx install git+https://github.com/2bitsin/buildutil@v0.98.0
+pipx install git+https://github.com/2bitsin/buildutil@v0.99.0
 export CONAN_HOME="$PWD/_conanhome"
-(git clone -b v0.36.1 https://github.com/2bitsin/oxbox.git ../oxbox && cd ../oxbox &&
-  ./buildutil publish --conan-home "$CONAN_HOME" --no-upload --release --version 0.36.1.377 --bake-buildutil)
+(git clone -b v0.36.2 https://github.com/2bitsin/oxbox.git ../oxbox && cd ../oxbox &&
+  ./buildutil publish --conan-home "$CONAN_HOME" --no-upload --release --version 0.36.2.379 --bake-buildutil)
 (git clone -b 3.32.0-sdl-rdp.3 https://github.com/2bitsin/FreeRDP.git ../FreeRDP && cd ../FreeRDP &&
   conan export .)
 ./buildutil build --watchdog-budget 3600

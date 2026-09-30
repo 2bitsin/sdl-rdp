@@ -3,7 +3,7 @@ Require(FreeRDP          VERSION "3.32.0-sdl-rdp.3" CONAN freerdp PLATFORM Linux
 Require(FreeRDP          VERSION "3.32.0-sdl-rdp.3" CONAN freerdp PLATFORM Windows Macos OPTIONS with_openh264=False)
 Require(GTest            VERSION ">=1.17.0"         TEST CONAN gtest COMPONENTS gtest gtest_main)
 Require(benchmark        VERSION ">=1.9.0"          BENCH CONAN benchmark)
-Require(oxbox            VERSION "0.36.1.377"       CONAN oxbox)
+Require(oxbox            VERSION "0.36.2.379"       CONAN oxbox)
 Require(nv-codec-headers VERSION "13.0.19.0"        CONAN nv-codec-headers)
 Require(OpenSSL          VERSION "3.6.3"            CONAN openssl PLATFORM Linux) # oxbox pins it exactly (2bitsin/oxbox#1)
 # The shipped libssl reads openssl.cnf from openssldir, so it is a path only an administrator can write.
