@@ -1,5 +1,6 @@
 """The clone lint's background run: its streams kept apart and its whole process tree ended with it."""
 import io
+import os
 import pathlib
 import sys
 import time
@@ -14,8 +15,11 @@ LINGERING = SPAWNING + 'time.sleep(60)\n'
 
 
 def alive(pid):
-    status = pathlib.Path(f'/proc/{pid}/stat')
-    return status.exists() and status.read_text().rsplit(')', 1)[1].split()[0] != 'Z'
+    """Whether the pid is running: neither gone nor a zombie."""
+    try:
+        return pathlib.Path(f'/proc/{pid}/stat').read_text().rsplit(')', 1)[1].split()[0] != 'Z'
+    except FileNotFoundError:
+        return False
 
 
 def printed_pid(run):
@@ -52,11 +56,12 @@ def test_leaving_the_block_early_ends_the_child_the_wrapper_spawned():
     assert ended_in_time(child)
 
 
-def test_a_child_outliving_its_exited_wrapper_ends_with_the_block(capsys):
+def test_a_child_outliving_its_exited_wrapper_ends_with_the_block():
     with clones.running([sys.executable, '-c', SPAWNING]) as run:
-        assert clones.finished(run) == 0
-        child = int(capsys.readouterr().out)
+        os.waitid(os.P_PID, run.process.pid, os.WEXITED | os.WNOWAIT)
+        child = printed_pid(run)
         assert alive(child)
+        assert clones.finished(run) == 0
     assert ended_in_time(child)
 
 
