@@ -74,8 +74,7 @@ archives and one `SHA256SUMS` over them. Each unpacks into
 compiled out, SDL's public headers in `include/SDL3/`, `LICENSE`, `README.md`,
 `docs/`, and in `share/licenses/<package>/` the licence of SDL and of every
 package whose code is inside a shipped binary, statically linked or carried
-beside the library. oxbox's notice is not in the archives yet (#95): oxbox is
-MIT-licensed by the author of sdl-rdp, whose own `LICENSE` the archive carries.
+beside the library, oxbox's included.
 
 `sdl-rdp-<version>-linux-x86_64.tar.gz` holds `sdl-rdp/libSDL3.so*` and
 `sample`, which finds the library through its run path. The machine provides
